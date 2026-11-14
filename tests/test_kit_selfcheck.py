@@ -13,7 +13,7 @@ from snapback.adapters.kit_selfcheck import main, selfcheck
 
 HOUSE_KIT = Path(FIXTURE_KIT).parent / "costar-house-kit"
 TODAY = date(2026, 11, 14)
-SAFE_KEY = re.compile(r"[a-z_0-9]+")
+SAFE_KEY = re.compile(r"[a-z][a-z_0-9]{0,40}")  # a hex hash cannot pass as a key
 
 
 def _leaves(obj, path=""):
@@ -22,10 +22,8 @@ def _leaves(obj, path=""):
         for key, value in obj.items():
             assert SAFE_KEY.fullmatch(str(key)), f"unsafe key {key!r} at {path}"
             yield from _leaves(value, f"{path}.{key}")
-    elif isinstance(obj, list):
-        for item in obj:
-            assert isinstance(item, str) and SAFE_KEY.fullmatch(item), f"unsafe item at {path}"
     else:
+        assert not isinstance(obj, list), f"a list at {path}: the report has none"
         yield path, obj
 
 
@@ -49,6 +47,7 @@ def test_every_residential_and_demo_count_fills_on_the_house_kit():
     residential = report["residential"]
     for key in ("records", "public", "with_media_model", "houston"):
         assert residential[key] > 0, key
+    assert sum(residential["d7_lookup_on_own_address_sample"].values()) > 0
     assert sum(residential["status"].values()) == residential["public"]
     demo = report["demo_house"]
     assert demo["candidates"] > 0 and demo["trio_found"] == 1
@@ -80,6 +79,8 @@ def test_zero_fill_names_commercial_and_residential_fields(tmp_path):
     zero = selfcheck(kit, TODAY)["zero_fill"]
     assert "commercial_with_floors" in zero and "commercial_with_model_ids" in zero
     assert "residential_public" in zero and "residential_with_media_model" in zero
+    assert "residential_d7_lookup_on_own_address_sample" in zero  # an empty dict count
+    assert "demo_house_candidates" in zero
 
 
 def test_a_missing_kit_exits_1_without_a_path(tmp_path, capsys):

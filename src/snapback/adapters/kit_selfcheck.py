@@ -4,7 +4,7 @@ So the machine that has the real kit can show that no merged lane D code reads m
 show before/after counts for a key fix:
     uv run python -m snapback.adapters.kit_selfcheck --kit data/raw/costar/costar-hackathon-kit
 Every value printed is an integer and every key a lowercase identifier: never an id, a name, an
-address or a URL. A count that fills 0 of n records is listed under `zero_fill`, which is the bug
+address or a URL. A count that fills 0 of n records is listed under `zero_fill` (name: 0), the bug
 this check exists to catch.
 """
 
@@ -90,14 +90,17 @@ def demo_house_counts(kit: Path, today: date) -> dict[str, Any]:
     return {"candidates": len(candidates), "by_role": dict(roles), "trio_found": int(bool(trio))}
 
 
-def _zero_fill(section: str, counts: dict[str, Any]) -> list[str]:
+def _zero_fill(section: str, counts: dict[str, Any]) -> dict[str, int]:
+    """Every count that came back empty: an int of 0, or a dict of counts with nothing in it."""
     if not counts.get("records"):
-        return []
-    return [
-        f"{section}_{key}"
-        for key, value in counts.items()
-        if key != "records" and isinstance(value, int) and value == 0
-    ]
+        return {}
+    empty = {}
+    for key, value in counts.items():
+        if key == "records":
+            continue
+        if (isinstance(value, int) and value == 0) or (isinstance(value, dict) and not value):
+            empty[f"{section}_{key}"] = 0
+    return empty
 
 
 def selfcheck(kit: Path, today: date) -> dict[str, Any]:
@@ -105,11 +108,15 @@ def selfcheck(kit: Path, today: date) -> dict[str, Any]:
     residential = residential_counts(kit, today)
     if not commercial["records"] and not residential["records"]:
         raise costar_jsonl.KitNotFoundError("no kit files")
+    demo = demo_house_counts(kit, today)
+    zero = _zero_fill("commercial", commercial) | _zero_fill("residential", residential)
+    if residential["records"] and not demo["candidates"]:
+        zero["demo_house_candidates"] = 0
     return {
         "commercial": commercial,
         "residential": residential,
-        "demo_house": demo_house_counts(kit, today),
-        "zero_fill": _zero_fill("commercial", commercial) + _zero_fill("residential", residential),
+        "demo_house": demo,
+        "zero_fill": zero,
     }
 
 
