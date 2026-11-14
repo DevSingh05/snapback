@@ -1,6 +1,10 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { StrictMode } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
+import type { LocateResult } from "../contracts";
 import { TwinView } from "./TwinPage";
 
 describe("TwinView without a Matterport key", () => {
@@ -14,5 +18,79 @@ describe("TwinView without a Matterport key", () => {
   it("lists the located photo from the fixture and offers fly-to for it", () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
     expect(screen.getByRole("button", { name: /Fly to photo l1/ })).toBeInTheDocument();
+  });
+});
+
+describe("TwinView photo landing", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stubReducedMotion(reduce: boolean) {
+    vi.stubGlobal(
+      "matchMedia",
+      (q: string) =>
+        ({
+          matches: reduce && q.includes("reduce"),
+          media: q,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+  }
+
+  it("lands the fixture pose with the Taken here line and no 3D key (static fallback)", async () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(await screen.findByText("Taken here: Living room")).toBeInTheDocument();
+    expect(screen.getByTestId("static-plan")).toBeInTheDocument();
+    expect(screen.getByTestId("view-cone")).toBeInTheDocument();
+    expect(screen.getByTestId("photo-overlay")).toBeInTheDocument();
+  });
+
+  it("reduced motion: the photo is at landed opacity at once, with no flight", async () => {
+    stubReducedMotion(true);
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(screen.getByTestId("photo-landing")).toHaveAttribute("data-motion", "reduced");
+    await waitFor(() =>
+      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.6" }),
+    );
+    expect(screen.getByTestId("photo-overlay")).not.toHaveAttribute("data-flying");
+  });
+
+  it("still finishes landing under StrictMode's mount, unmount, mount", async () => {
+    stubReducedMotion(true);
+    render(
+      <StrictMode>
+        <TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />
+      </StrictMode>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.6" }),
+    );
+    expect(screen.getByTestId("photo-landing")).toHaveAttribute("data-phase", "landed");
+  });
+
+  it("a photo with no pose reads Not found in this building", async () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: /Fly to photo l2/ }));
+    expect(await screen.findByText("Not found in this building")).toBeInTheDocument();
+    expect(screen.queryByTestId("photo-overlay")).toBeNull();
+  });
+
+  it("keeps the trace as a collapsed strip", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(screen.getByRole("button", { name: /Agent trace/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("ignores a live LocateResult unless the flag is on", () => {
+    const live = { ...hold.locate, case_id: "live", poses: {} } as unknown as LocateResult;
+    const { unmount } = render(
+      <TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={live} />,
+    );
+    expect(screen.getAllByTestId("source-chip")[1]).toHaveTextContent("FIXTURE");
+    unmount();
+    render(<TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={live} liveLocate />);
+    expect(screen.getAllByTestId("source-chip")[1]).toHaveTextContent("LIVE");
   });
 });
