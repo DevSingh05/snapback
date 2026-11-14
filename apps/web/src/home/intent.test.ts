@@ -73,8 +73,10 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(viewFrom("find me a 1 bed")).toBeNull();
   });
 
-  it("a short question that only mentions a payment app is not treated as an ad", () => {
-    expect(at("Is $600 by Zelle normal?")).toBe("unsure");
+  it("a short question about paying is answered from the rules, not treated as an ad", () => {
+    expect(at("Is $600 by Zelle normal?")).toBe("rules");
+    expect(at("should I pay a deposit before seeing it?")).toBe("rules");
+    expect(at("what about this one?")).toBe("unsure");
   });
 
   it("offers the other reading as a one-tap switch", () => {

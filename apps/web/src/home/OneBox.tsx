@@ -70,6 +70,10 @@ export const EXAMPLES = [
   "Walk me through a place",
 ] as const;
 
+/** The card's two rules, as the answer to any question about paying. Written by code. */
+export const RULES_REPLY =
+  "Two rules: never pay before a signed lease and a viewing, and never pay by Zelle, wire or gift card. If you have the ad, paste it here and I'll check it.";
+
 export const FB_ASK =
   "Facebook keeps listings behind a login. Paste the listing text here and add its photos, and we'll check it.";
 
@@ -279,6 +283,10 @@ export function OneBox(props: Props) {
             note: "These have a 3D scan on record. Pick one to walk it, room by room.",
           });
         else add({ type: "open", view: intent.view });
+        return;
+      }
+      if (intent.kind === "rules") {
+        add({ type: "bot", by: "policy", text: RULES_REPLY });
         return;
       }
       if (intent.kind === "unsure") {

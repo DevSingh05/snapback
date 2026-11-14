@@ -13,7 +13,8 @@ export type Intent =
   | { kind: "find" } // a wish or a budget: the Finder
   | { kind: "ask" } // a question about the case on screen: the Finder answers
   | { kind: "open"; view: View } // "show me on the map", "replay a real case"
-  | { kind: "unsure" }; // could be either: two chips, one tap
+  | { kind: "unsure" } // could be either: two chips, one tap
+  | { kind: "rules" }; // a question about paying: the two rules, written by code
 
 export interface Submission {
   text: string;
@@ -31,6 +32,7 @@ export const ROUTE_LINE: Record<Intent["kind"], string> = {
   ask: "Answering about this case",
   open: "Opening",
   unsure: "Not sure what you meant",
+  rules: "Answering from our two rules",
 };
 
 export const VIEW_NAME: Record<View, string> = {
@@ -77,6 +79,8 @@ const WISH_WORDS =
   /\b(under|below|max|budget|up to)\s*\$?\s*\d|\$\s?\d|\bbeds?\b|\bbedroom|\bstudio\b|\b\d\s*br\b|\bparking\b|walk-?ups?|\bpets?\b|\bdogs?\b|\bcats?\b|\bnear\b|\bdowntown\b|\bapartments?\b|\bplaces?\b|\bhomes?\b/i;
 const CHECK_WORDS =
   /\bpaste\b.*\b(ad|listing)\b|\b(check|verify|scan)\b.*\b(ad|listing|post|this)\b|\b(scam|legit|fake|real)\b.*\??|\bis (this|it|the) (landlord|ad|listing|place) (real|legit|a scam|fake)\b/i;
+const PAYING =
+  /\b(pay|paying|zelle|venmo|cash ?app|wire|western union|gift ?cards?|deposit|holding fee|crypto|bitcoin)\b/i;
 const QUESTION = /\?\s*$|^\s*(is|are|does|do|did|should|can|could|what|why|how|who|when|will)\b/i;
 
 /** A command to open a view, read from the words. Null: not a command. */
@@ -141,6 +145,7 @@ export function route(s: Submission): Intent {
   if (CHECK_WORDS.test(text) && text.length < 120)
     return s.caseOnScreen && QUESTION.test(text) ? { kind: "ask" } : { kind: "check-ask" };
   if (s.caseOnScreen && QUESTION.test(text)) return { kind: "ask" };
+  if (question && PAYING.test(text)) return { kind: "rules" };
   if (question && (strong || signs > 0)) return { kind: "unsure" };
   if (WISH_WORDS.test(text) && !strong) return { kind: "find" };
   return s.caseOnScreen ? { kind: "ask" } : { kind: "unsure" };
@@ -151,7 +156,7 @@ export function switchOf(intent: Intent): Intent | null {
   if (intent.kind === "check") return { kind: "find" };
   if (intent.kind === "find" || intent.kind === "ask" || intent.kind === "open")
     return { kind: "check" };
-  return null; // "unsure" asks with two chips instead
+  return null; // "unsure" asks with two chips; "rules" answers from code
 }
 
 export const SWITCH_LABEL: Record<Intent["kind"], string> = {
@@ -162,6 +167,7 @@ export const SWITCH_LABEL: Record<Intent["kind"], string> = {
   ask: "It's a question",
   open: "Open it",
   unsure: "Choose",
+  rules: "Answer",
 };
 
 // ---------------------------------------------------------------------------------------------
