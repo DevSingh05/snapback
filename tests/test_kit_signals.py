@@ -40,7 +40,7 @@ def test_per_bed_prices_never_enter_the_building_rent_range():
 def test_unit_list_has_every_named_unit_and_its_beds():
     units = {u.unit: u for u in _rec().units}
     # propertyApartment.models[].units[].unitNumber; a unit with no number is skipped
-    assert set(units) == {"101", "204", "205", "4B"}
+    assert set(units) == {"101", "204", "205", "206", "4B"}
     assert units["204"].floor_plan == "2 bed / 2 bath"  # the model's beds and baths
     assert units["4B"].beds == 4
 
