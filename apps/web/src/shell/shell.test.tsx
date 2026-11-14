@@ -44,9 +44,8 @@ describe("the app shell", () => {
     expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
-  it("opens every page in light (Day), the map included, until the person picks", () => {
-    expect(defaultTheme(true)).toBe("light");
-    expect(defaultTheme(false)).toBe("light");
+  it("opens every page in Day, the map included, until the person picks", () => {
+    expect(defaultTheme()).toBe("light");
     const { unmount } = render(<AppShell section="map">map</AppShell>);
     expect(document.documentElement.dataset.theme).toBe("light");
     unmount();
@@ -54,21 +53,24 @@ describe("the app shell", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
   });
 
-  it("remembers a picked theme and uses it on every page, the map included", () => {
+  it("shows Day and Dusk as two words, remembers the pick and uses it on every page", () => {
     const { unmount } = render(<AppShell section="home">home</AppShell>);
-    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    expect(screen.queryByRole("button", { name: /^(Light|Dark|Auto)$/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Day" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Dusk" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
     expect(savedTheme()).toBe("dark");
-    fireEvent.click(screen.getByRole("button", { name: "Light" }));
     unmount();
     render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    fireEvent.click(screen.getByRole("button", { name: "Day" }));
+    expect(savedTheme()).toBe("light");
   });
 
   it("shares one key with the website and takes the theme from the address", () => {
     expect(THEME_KEY).toBe("snapback-theme");
-    expect(initialChoice("?theme=dark")).toBe("dark");
+    expect(initialChoice("?theme=dusk")).toBe("dark");
     expect(window.localStorage.getItem("snapback-theme")).toBe("dark");
     expect(initialChoice("?theme=purple")).toBe("dark"); // not a theme: the saved one stands
     window.localStorage.clear();
@@ -80,34 +82,68 @@ describe("the app shell", () => {
     window.history.replaceState(null, "", "/");
   });
 
-  it("Auto follows the device: no theme is forced", () => {
+  it("maps an older stored choice to Day or Dusk, and drops the device-follow one", () => {
+    window.localStorage.setItem(THEME_KEY, "light");
+    expect(savedTheme()).toBe("light");
+    window.localStorage.setItem(THEME_KEY, "dark");
+    expect(savedTheme()).toBe("dark");
+    window.localStorage.setItem(THEME_KEY, "dusk");
+    expect(savedTheme()).toBe("dark");
+    // "system" is gone: nothing follows the device, so the page opens in Day.
+    window.localStorage.setItem(THEME_KEY, "system");
+    expect(savedTheme()).toBeNull();
     render(<AppShell section="home">home</AppShell>);
-    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
-    expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(savedTheme()).toBe("system");
+    expect(document.documentElement.dataset.theme).toBe("light");
   });
 
-  it("the phone Menu moves focus in, closes on Escape back to Menu, and on focus leaving", () => {
-    render(
-      <>
-        <AppShell section="home">page</AppShell>
-        <button type="button">outside</button>
-      </>,
+  it("has Stories as a link and orders the bar mark, tabs, Stories, Day, Dusk", () => {
+    render(<AppShell section="home">page</AppShell>);
+    expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
+    const order = [...document.querySelectorAll<HTMLElement>(".app-bar :is(a, button)")].map(
+      (el) => el.getAttribute("aria-label") ?? el.textContent,
     );
-    const menu = screen.getByRole("button", { name: "Menu" });
-    fireEvent.click(menu);
-    expect(menu).toHaveAttribute("aria-expanded", "true");
-    const panel = document.getElementById("app-menu")!;
-    expect(panel).toHaveAttribute("data-open");
+    expect(order.slice(0, 1)).toEqual(["SNAPBACK home"]);
+    expect(order.slice(1, 6)).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
+    expect(order.slice(6, 9)).toEqual(["Stories", "Day", "Dusk"]);
+  });
+
+  it("on a phone the theme is one button naming the other theme, and Customize is in the footer", () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => ({
+      matches: true,
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      render(<AppShell section="home">page</AppShell>);
+      expect(screen.queryByRole("button", { name: "Day" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Switch to Dusk" }));
+      expect(document.documentElement.dataset.theme).toBe("dark");
+      expect(screen.getByRole("button", { name: "Switch to Day" })).toBeInTheDocument();
+      expect(
+        within(document.querySelector<HTMLElement>(".app-foot")!).getByRole("button", {
+          name: "Customize",
+        }),
+      ).toBeInTheDocument();
+      expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
+    } finally {
+      window.matchMedia = real;
+    }
+  });
+
+  it("Customize moves focus in, closes on Escape back to its button, and has no Menu", () => {
+    render(<AppShell section="home">page</AppShell>);
+    expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+    const btn = screen.getByRole("button", { name: "Customize" });
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    const panel = screen.getByTestId("customize");
     expect(panel.contains(document.activeElement)).toBe(true);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
-    expect(panel).not.toHaveAttribute("data-open");
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
-    // Focus leaving the panel for somewhere else closes it.
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    const first = panel.querySelector("a")!;
-    fireEvent.focusOut(first, { relatedTarget: screen.getByRole("button", { name: "outside" }) });
-    expect(panel).not.toHaveAttribute("data-open");
+    expect(screen.queryByTestId("customize")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Customize" }));
   });
 
   it("Customize hides a tab and picks the one that opens first, and remembers both", () => {
