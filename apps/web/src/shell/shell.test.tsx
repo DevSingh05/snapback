@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { seeingLine, waysOut } from "../walk/seeing";
-import { AppShell } from "./AppShell";
+import { AppShell, PURPOSE, withTheme } from "./AppShell";
 import { FinderPage } from "./FinderPage";
+import { briefFromChips, chipFromWords, loadLearned } from "./finderRules";
 import { loadFinderEvents, recordFinderEvent } from "./finderStore";
 import { clean, DEFAULT_PREFS, loadPrefs } from "./prefs";
 import { defaultTheme, initialChoice, savedTheme, THEME_KEY } from "./theme";
@@ -128,33 +129,96 @@ describe("Home: your checks", () => {
   });
 });
 
-describe("Finder", () => {
-  it("starts empty and says where events come from", () => {
+describe("Finder: a conversation, what it learned, and what fits", () => {
+  it("says honestly that nothing replies yet, and starts empty", () => {
     render(<FinderPage />);
-    expect(screen.getByTestId("finder-empty")).toHaveTextContent("Open a place on the map");
+    expect(screen.getByTestId("finder-honest")).toHaveTextContent("nothing answers your messages");
+    expect(screen.getByTestId("finder-honest")).toHaveTextContent("Picked by our rules");
+    expect(screen.getByTestId("finder-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("learned-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("finder-offer")).toBeNull();
   });
 
-  it("shows this visit's events and what was remembered", () => {
-    recordFinderEvent("passed", "Passed on a walk-up");
-    recordFinderEvent("remembered", "Remembered: no walk-ups. Added to your brief.");
+  it("a message is kept as yours and never answered: the only new line is the message", () => {
     render(<FinderPage />);
-    expect(screen.getByText("Passed on a walk-up")).toBeInTheDocument();
-    expect(screen.getAllByText("Remembered: no walk-ups. Added to your brief.")).toHaveLength(2);
-  });
-
-  it("saves a note and never answers it: no reply is made up", () => {
-    render(<FinderPage />);
-    fireEvent.change(screen.getByLabelText("Tell the finder what matters"), {
-      target: { value: "Ground floor only" },
+    fireEvent.change(screen.getByLabelText("Your message"), {
+      target: { value: "I like big windows" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(loadFinderEvents()[0]).toMatchObject({ kind: "note", text: "Ground floor only" });
-    expect(screen.getByText("Ground floor only")).toBeInTheDocument();
-    // Exactly one new line appears: the note itself, labelled as the renter's.
-    expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByRole("listitem")).toHaveTextContent("Your note");
-    expect(screen.getByTestId("finder-honest")).toHaveTextContent("Nothing replies yet");
-    expect(screen.getByTestId("finder-honest")).toHaveTextContent("Picked by policy");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const msgs = screen.getAllByTestId("finder-msg");
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toHaveAttribute("data-kind", "note");
+    expect(msgs[0]).toHaveTextContent("I like big windows");
+    expect(loadFinderEvents()[0]).toMatchObject({ kind: "note", text: "I like big windows" });
+    expect(screen.queryByTestId("finder-offer")).toBeNull(); // no rule fits: nothing is offered
+  });
+
+  it("offers to remember what a code rule reads in your words, stamped, and only keeps a yes", () => {
+    render(<FinderPage />);
+    fireEvent.change(screen.getByLabelText("Your message"), {
+      target: { value: "no walk-ups please, under $1,500" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    const offer = screen.getByTestId("finder-offer");
+    expect(offer).toHaveTextContent("Picked by our rules");
+    expect(offer).toHaveTextContent("Remember: no walk-ups?");
+    expect(screen.queryAllByTestId("learned-chip")).toHaveLength(0);
+    fireEvent.click(within(offer).getByRole("button", { name: "Yes, remember" }));
+    expect(screen.getAllByTestId("learned-chip").map((c) => c.textContent)).toEqual([
+      "no walk-ups×",
+    ]);
+    expect(loadLearned().chips).toEqual([{ id: "no_walkup", label: "no walk-ups" }]);
+    // A no is remembered too, so the same offer does not come back.
+    render(<FinderPage />);
+    expect(screen.queryAllByText("Remember: no walk-ups?")).toHaveLength(0);
+  });
+
+  it("chips can be added and removed by hand, and stand for a search brief", () => {
+    render(<FinderPage />);
+    fireEvent.change(screen.getByLabelText("Add something yourself"), {
+      target: { value: "near downtown" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getByTestId("learned-chip")).toHaveTextContent("near downtown");
+    fireEvent.click(screen.getByRole("button", { name: "Forget near downtown" }));
+    expect(screen.queryByTestId("learned-chip")).toBeNull();
+    expect(
+      briefFromChips([
+        { id: "no_walkup", label: "no walk-ups" },
+        { id: "max_rent", label: "under $1,500" },
+        { id: "note:near downtown", label: "near downtown" },
+      ]),
+    ).toEqual({ needs_no_walkup: true, max_rent_month: 1500 });
+    expect(chipFromWords("under $1,500")).toEqual({ id: "max_rent", label: "under $1,500" });
+    expect(chipFromWords("I like big windows")).toBeNull();
+  });
+
+  it("shows what you did on the map in the same conversation", () => {
+    recordFinderEvent("passed", "Passed on a place");
+    render(<FinderPage />);
+    expect(screen.getByTestId("finder-msg")).toHaveTextContent("You passed on");
+  });
+});
+
+describe("one purpose per page, and a theme that travels", () => {
+  it("says what the page is for in one line", () => {
+    const { unmount } = render(<AppShell section="map">map</AppShell>);
+    expect(screen.getByTestId("page-purpose")).toHaveTextContent("Find a home by where it is.");
+    unmount();
+    render(
+      <AppShell section={null} context={{ label: "Walk", href: "/tour/x" }}>
+        walk
+      </AppShell>,
+    );
+    expect(screen.getByTestId("page-purpose")).toHaveTextContent("See the home, room by room");
+    expect(Object.keys(PURPOSE)).toHaveLength(7);
+  });
+
+  it("adds the theme to a link out, keeping its query and hash", () => {
+    expect(withTheme("https://site.example/", "dark")).toBe("https://site.example/?theme=dark");
+    expect(withTheme("https://site.example/a?x=1#top", "light")).toBe(
+      "https://site.example/a?x=1&theme=light#top",
+    );
   });
 });
 

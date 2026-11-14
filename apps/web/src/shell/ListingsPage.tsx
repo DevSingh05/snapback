@@ -13,10 +13,6 @@ export function ListingsPage() {
       <header className="view-head">
         <p className="view-eyebrow mono">Listings</p>
         <h1 className="view-title">Researched places</h1>
-        <p className="view-lead">
-          Places on CoStar&apos;s record, with what it showed at its last research. Set your budget
-          and must-haves to narrow the list.
-        </p>
       </header>
       <div className="view-body view-split">
         <div className="view-side">

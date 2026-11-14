@@ -1,6 +1,6 @@
 /* The app frame: one bar on every page. Mark, tabs, light or dark. Sharp corners, tokens only. */
 .app {
-  --bar-h: 56px;
+  --bar-h: 92px;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -112,7 +112,7 @@
 
 @media (max-width: 760px) {
   .app {
-    --bar-h: 96px;
+    --bar-h: 132px;
   }
   .app-bar {
     flex-wrap: wrap;
@@ -477,5 +477,171 @@
   }
   .fd-kind {
     grid-column: 1 / -1;
+  }
+}
+
+/* One line under the bar: what this page is for. */
+.app-purpose {
+  margin: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: var(--sp-2) var(--page-pad);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  background: var(--layer-2);
+}
+.app-bar {
+  min-height: 56px;
+}
+.app-site {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--sp-2);
+  color: var(--act);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* ---------- Finder: a conversation, what it has learned, and what fits ---------- */
+.fd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  grid-template-areas: "talk learned" "results results";
+  gap: var(--sp-5);
+  align-items: start;
+}
+.fd-talk {
+  grid-area: talk;
+}
+.fd-learned {
+  grid-area: learned;
+}
+.fd-results {
+  grid-area: results;
+  min-width: 0;
+}
+.fd-thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.fd-msg {
+  align-self: flex-start;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--layer-1);
+  border-left: 3px solid var(--line);
+}
+.fd-msg[data-kind="note"] {
+  align-self: flex-end;
+  background: var(--act);
+  color: var(--on-act);
+  border-left: 0;
+}
+.fd-msg[data-kind="note"] .fd-kind {
+  color: var(--on-act);
+}
+.fd-msg[data-kind="remembered"] {
+  border-left-color: var(--act);
+}
+.fd-msg .fd-kind {
+  padding-top: 0;
+}
+.fd-offer {
+  align-self: flex-start;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--layer-1);
+  border-left: 6px solid var(--act);
+}
+.fd-offer .fd-stamp {
+  align-self: flex-start;
+}
+.fd-offer-text {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.fd-offer-acts {
+  display: flex;
+  gap: var(--sp-2);
+}
+.fd-offer-acts button {
+  min-height: 44px;
+}
+.fd-quiet {
+  min-height: 44px;
+  background: var(--layer-3);
+  color: var(--ink);
+}
+.fd-quiet:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fd-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  align-items: end;
+}
+.fd-input {
+  min-height: 64px;
+}
+.fd-send {
+  align-self: stretch;
+}
+.fd-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.fd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding-left: var(--sp-3);
+  background: var(--act);
+  color: var(--on-act);
+  font-weight: 700;
+}
+.fd-chip-x {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--on-act);
+  font-size: var(--fs-lg);
+}
+.fd-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+}
+.fd-own {
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  background: var(--layer-1);
+  color: var(--ink);
+  font: inherit;
+}
+@media (max-width: 760px) {
+  .fd-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "talk" "learned" "results";
   }
 }

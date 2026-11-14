@@ -15,6 +15,27 @@ interface Props {
   children: ReactNode;
 }
 
+/** What each page is for, in one line. One purpose per page. */
+export const PURPOSE: Record<string, string> = {
+  home: "Your cases, and checking a new ad.",
+  listings: "Browse the researched places.",
+  map: "Find a home by where it is.",
+  finder: "The agent that learns what you want and helps you find a home.",
+  replays: "Real reported cases, replayed step by step.",
+  Walk: "See the home, room by room, before you visit.",
+  "Tour prep": "Get ready to visit: what to ask and what to check.",
+};
+
+/** The website's address, when the app is built knowing it. Links to it carry the theme. */
+const SITE_URL = import.meta.env.VITE_SITE_URL as string | undefined;
+
+/** Adds the theme in force to a link, so the other side opens in the same look. */
+export function withTheme(href: string, theme: string): string {
+  const [path, hash = ""] = href.split("#");
+  const sep = path!.includes("?") ? "&" : "?";
+  return `${path}${sep}theme=${encodeURIComponent(theme)}${hash ? `#${hash}` : ""}`;
+}
+
 // The app's frame: one bar on every page with the mark, the views the renter chose, the light
 // or dark switch and Customize. No account, no sign-in: nothing here pretends there is one.
 export function AppShell({ section, context, children }: Props) {
@@ -62,6 +83,11 @@ export function AppShell({ section, context, children }: Props) {
           )}
         </nav>
         <div className="app-tools">
+          {SITE_URL && (
+            <a className="app-site" href={withTheme(SITE_URL, theme)}>
+              About SNAPBACK
+            </a>
+          )}
           <div className="app-theme" role="group" aria-label="Light, dark or your device's setting">
             {(["light", "dark", "system"] as const).map((t) => (
               <button
@@ -142,6 +168,11 @@ export function AppShell({ section, context, children }: Props) {
           </section>
         )}
       </header>
+      {(context ? PURPOSE[context.label] : section ? PURPOSE[section] : null) && (
+        <p className="app-purpose" data-testid="page-purpose">
+          {context ? PURPOSE[context.label] : PURPOSE[section!]}
+        </p>
+      )}
       {children}
     </div>
   );
