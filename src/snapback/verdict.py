@@ -149,8 +149,18 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             _for_sale(modules) is ForSaleStatus.ACTIVE and not _the_ad_is_the_office_s(modules)
         ),
         recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
+        # A phone that is not the office's holds the case, unless an active licence checked by
+        # number is sponsored by the brokerage on record (Vidyut, Sat 07:35): that clears this
+        # one reason only. phone_confirmed stays False, so it can never verify a case.
         phone_flag=(
-            modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
+            modules.authority is not None
+            and modules.authority.office_phone_match is PhoneMatch.NO
+            and _licence_clears_contact(modules) is None
+        ),
+        phone_cleared_by_licence=(
+            modules.authority is not None
+            and modules.authority.office_phone_match is PhoneMatch.NO
+            and _licence_clears_contact(modules) is not None
         ),
         phone_confirmed=_the_ad_is_the_office_s(modules),
         brokerage_only=modules.authority is not None and modules.authority.brokerage_only,
@@ -237,6 +247,38 @@ def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
     return authority is not None and authority.office_phone_match is PhoneMatch.YES
 
 
+def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
+    """The brokerage on record, when an active licence clears the contact line (Vidyut, Sat 07:35).
+
+    All four must hold: the licence is active (LICENSED); it was checked by NUMBER (the ad's or
+    the renter's, never a name lookup); its sponsor is a company; and that company is the
+    brokerage or office on record (the authority's, or a listing office of an ACTIVE
+    for-sale match), by the same matcher as everywhere else. Then a phone that is not the
+    office's is information, not "Not confirmed". It never verifies a case: the phone is
+    still not the office's, the owner line and the for-sale hold are not touched.
+    Returns that brokerage's name from the record, or None.
+    """
+    # Imported here: snapback.agent imports this module while it loads.
+    from snapback.agent.rules.contact import same_company
+
+    found = modules.license
+    if (
+        found is None
+        or found.status is not LicenseStatus.LICENSED
+        or found.number_from not in ("ad", "renter")
+        or not found.sponsor_broker
+    ):
+        return None
+    on_record = []
+    if modules.authority is not None and modules.authority.manager_on_record:
+        on_record.append(modules.authority.manager_on_record)
+    if modules.for_sale is not None and modules.for_sale.status is ForSaleStatus.ACTIVE:
+        on_record.extend(modules.for_sale.offices)
+    return next(
+        (name for name in on_record if same_company(found.sponsor_broker, name) is True), None
+    )
+
+
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """Turn the evidence for one case into a verdict with plain-language reasons.
 
@@ -307,6 +349,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # D10: a licence we could not confirm is no reason to call the number a red flag, so a
     # phone that is not the office's stays "not confirmed" whatever the licence list says.
     unconfirmed = ["reason.phone_flag"] if evidence.phone_flag else []
+    if evidence.phone_cleared_by_licence:
+        # The licence is a number anyone can copy from a real listing (review H1): the contact
+        # is still not shown to be the office, so a contact reason always remains.
+        unconfirmed = ["reason.phone_not_confirmed"]
     if evidence.license_given_flag:
         # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
         # confirmed and HOLD, never a red flag, and never in a report pack.
@@ -360,7 +406,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # H1: the name matches and the ad's contact was not shown to be the office. Said so the
     # hold has a reason. (A phone that is NOT the office's already has its own.)
     contact = []
-    if matches and not evidence.phone_confirmed and not evidence.phone_flag:
+    if (
+        matches
+        and not evidence.phone_confirmed
+        and not evidence.phone_flag
+        and not evidence.phone_cleared_by_licence
+    ):
         contact = [f"reason.phone_not_confirmed{by_brokerage}"]
     return verdict(
         VerdictState.HOLD,
@@ -614,7 +665,21 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     elif authority.office_phone_match is PhoneMatch.NO:
         # Not confirmed, never a red flag by itself (ruling, Sat 02:10, #121): agents and
         # locators often post with their own number.
-        if authority.manager_on_record:
+        cleared_by = _licence_clears_contact(modules)
+        if cleared_by is not None:
+            # Vidyut, Sat 07:35: an active licence checked by number, sponsored by the
+            # brokerage on record. Information only: the number is still not the office's.
+            brokerage = " ".join(cleared_by.split())[:MAX_BROKERAGE_CHARS]
+            lines.append(
+                _line(
+                    lang,
+                    "label.contact",
+                    CardTone.NOT_SHOWN,
+                    "contact.licensed_sponsor",
+                    brokerage=brokerage,
+                )
+            )
+        elif authority.manager_on_record:
             lines.append(
                 _line(
                     lang,
