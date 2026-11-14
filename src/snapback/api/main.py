@@ -27,7 +27,7 @@ valid or not.
 import asyncio
 import re
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -57,6 +57,7 @@ from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
+from snapback.card import strings
 from snapback.contracts import (
     AerialProofResponse,
     AerialSideOut,
@@ -76,6 +77,19 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.office.context import listing_context
+from snapback.office.domain import accepts_address, official_domain
+from snapback.office.models import (
+    ListingContext,
+    OfficeAnswer,
+    OfficeAnswered,
+    OfficePeek,
+    OfficeRequest,
+    OfficeRequested,
+    OfficeStatus,
+    OfficeTokenBody,
+)
+from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
 from snapback.pack import TourPrepPack, build_tour_prep
 from snapback.preferences import merge as merge_preferences
 from snapback.replays import SLUG as REPLAY_SLUG
@@ -177,6 +191,7 @@ def create_app(
     lookups: Lookups | None = None,
     *,
     registry: CaseRegistry | None | object = _DEFAULT,
+    office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
@@ -684,6 +699,146 @@ def create_app(
             return agentic_search(brief, lookups, chooser, prefs)
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
+
+    office = OfficeProofs(
+        resolve_data_dir(settings.snapback_data_dir) / "outbox",
+        settings.snapback_public_base_url,
+        **({"clock": office_clock} if office_clock else {}),
+    )
+
+    def office_state(case_id: str, case: RecordedCase | SessionCase) -> OfficeStatus:
+        domain = official_domain(getattr(case, "office_record", None))
+        confirmed = getattr(case, "office_confirmed_domain", None)
+        declined = getattr(case, "office_declined_domain", None)
+        return OfficeStatus(
+            case_id=case_id,
+            source=case.evidence.source,
+            domain=domain,
+            offered=domain is not None and isinstance(case, SessionCase),
+            confirmed=bool(confirmed),
+            confirmed_domain=confirmed,
+            declined=bool(declined),
+            declined_domain=declined,
+            guidance=(
+                strings.text("office.call_yourself")
+                if domain is None
+                else f"Ask the poster for an email address at {domain}. A one-time link goes "
+                "there; in this demo it lands in a local outbox file, never a real inbox."
+            ),
+        )
+
+    @app.get("/cases/{case_id}/office")
+    def get_office(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> OfficeStatus:
+        """The website domain CoStar has on record for this case's office, and whether it was
+        confirmed. Needs the case's read token in a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        return office_state(case_id, case)
+
+    @app.post("/cases/{case_id}/confirm-office", status_code=202)
+    def post_confirm_office(
+        case_id: str,
+        body: OfficeRequest,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> OfficeRequested:
+        """Ask for a one-time link to an address the poster gave the renter.
+
+        Accepted only if the address is at the website domain CoStar has on record for this
+        office (never a domain from the ad). The "email" is written to a local outbox file;
+        nothing is sent. Needs the case's write token in a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_write(case, _bearer(authorization, x_case_token))
+        if not isinstance(case, SessionCase):
+            raise HTTPException(status_code=409, detail="A recorded example cannot be changed.")
+        state = office_state(case_id, case)
+        if state.domain is None:
+            raise HTTPException(status_code=422, detail=state.guidance)
+        if not accepts_address(body.address, state.domain):
+            raise HTTPException(
+                status_code=422,
+                detail=f"That address is not at {state.domain}, the website on record for this "
+                "office. Ask the poster for one that is.",
+            )
+        try:
+            office.request(
+                case.case_id,
+                body.address,
+                state.domain,
+                listing_context(case.office_record, case.listing),
+            )
+        except RateLimited:
+            raise HTTPException(
+                status_code=429, detail="Too many requests for this case. Try again in a while."
+            ) from None
+        return OfficeRequested(
+            case_id=case_id,
+            source=state.source,
+            domain=state.domain,
+            expires_in_minutes=TOKEN_TTL_SECONDS // 60,
+            detail="A one-time link was written to the outbox (nothing is sent in this demo).",
+        )
+
+    def office_token_state(token: str) -> tuple[SessionCase, Redeemed]:
+        """The case and token state for a one-time token, without using it. Raises the plain
+        HTTP errors for an unknown, used or expired token and for a case that is gone."""
+        seen = office.peek(token)
+        if seen.outcome is Outcome.UNKNOWN:
+            raise HTTPException(status_code=404, detail="This link is not one we issued.")
+        if seen.outcome is Outcome.USED:
+            raise HTTPException(
+                status_code=410, detail="This link was already used. It works once."
+            )
+        if seen.outcome is Outcome.EXPIRED:
+            raise HTTPException(
+                status_code=410, detail="This link expired. Ask the renter for a new one."
+            )
+        case = find(seen.case_id or "")  # 404 for a case the renter deleted
+        if not isinstance(case, SessionCase):
+            raise HTTPException(status_code=404, detail="This case is gone.")
+        return case, seen
+
+    @app.post("/office/peek")
+    def post_office_peek(body: OfficeTokenBody) -> OfficePeek:
+        """What the confirm page shows the office: which ad it is asked about. Changes nothing,
+        so a mail scanner opening the link does no harm. The token travels in the body, never
+        in an address, so it stays out of access logs."""
+        case, seen = office_token_state(body.token)
+        return OfficePeek(
+            domain=seen.domain or "",
+            source=case.evidence.source,
+            listing=seen.context or ListingContext(),
+        )
+
+    @app.post("/office/answer")
+    def post_office_answer(body: OfficeAnswer) -> OfficeAnswered:
+        """ "Yes, ours" confirms the case; "Not ours" never does and records that the office did
+        not recognise the ad. Either answer uses the token."""
+        case, _ = office_token_state(body.token)
+        redeemed = office.redeem(body.token)
+        if redeemed.outcome is not Outcome.CONFIRMED:  # another answer got there first
+            raise HTTPException(
+                status_code=410, detail="This link was already used. It works once."
+            )
+        domain = redeemed.domain or ""
+        if body.decision == "yes":
+            case.confirm_office(domain)
+            message = (
+                f"Thank you. This ad is now confirmed through {domain}, the website on record "
+                "for this office. You can close this page."
+            )
+        else:
+            case.decline_office(domain)
+            message = "Thank you. We recorded that this ad is not yours. You can close this page."
+        return OfficeAnswered(decision=body.decision, domain=domain, message=message)
 
     @app.get("/cases/{case_id}/alternatives")
     def get_alternatives(

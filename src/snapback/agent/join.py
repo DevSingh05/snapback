@@ -335,6 +335,11 @@ class JoinedModules:
         # Lane D says who owns the home. What the poster says about owning it is added here.
         return check_owner(self._listing.contacts, self._owner)
 
+    @property
+    def record(self) -> PropertyRecord | None:
+        """The property record this case runs on, if it has one (read-only)."""
+        return self._record
+
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
         self._identify(case_id)

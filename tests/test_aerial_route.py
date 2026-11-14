@@ -5,6 +5,7 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
+from leakcheck import leaked
 from snapback.adapters import vexcel
 from snapback.adapters.vexcel import aerial_proof, public_record
 from snapback.api.main import create_app
@@ -327,7 +328,7 @@ def test_the_route_never_shows_the_phone_hash_site_units_or_rent_bands(tmp_path)
     assert record is not None and record["property_id"] == "fx-prop-4"
     assert record["site_phone_hash"] is None and record["website_host"] is None
     assert record["units"] == [] and record["floor_plan_rents"] == []
-    assert "fixtureliving" not in got.text and "0123" not in got.text and "4B" not in got.text
+    assert leaked(["fixtureliving", "0123", "4B"], got.text) == []
 
 
 def test_the_builder_has_a_hard_deadline(monkeypatch):

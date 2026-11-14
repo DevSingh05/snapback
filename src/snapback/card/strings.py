@@ -29,6 +29,7 @@ EN: dict[str, str] = {
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
+    "label.office": "Office confirmation",
     "label.link": "Link",
     "label.license": "License",
     "label.owner": "Owner of record",
@@ -152,6 +153,27 @@ EN: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    "contact.office_confirmed": (
+        "Confirmed by the office: someone at {domain}, the website CoStar has on record for "
+        "this office, said this ad is theirs."
+    ),
+    # Vidyut, Sat 11:06: the office said yes but the phone in the ad is not the office's, so the
+    # card still reads Hold off. Said plainly, right under the confirmation.
+    "contact.office_still_hold": (
+        "Still hold off: the phone in the ad is not the office's number on record. Call the "
+        "office on a number you look up yourself before you pay."
+    ),
+    "contact.office_declined": (
+        "Not confirmed. Someone at {domain}, the website CoStar has on record for this "
+        "office, said the office does not recognise this ad."
+    ),
+    "reason.office_declined": (
+        "The office at {domain}, the website CoStar has on record, did not recognise this ad."
+    ),
+    "office.call_yourself": (
+        "No website for this office is on record, so it cannot be confirmed here. Call the "
+        "office on a number you look up yourself."
     ),
     "license.licensed": "Licensed in Texas.",
     "license.licensed_sponsored": (
@@ -426,6 +448,12 @@ EN: dict[str, str] = {
     "reason.authority_matches_brokerage": (
         "The ad names the listing brokerage on record. Anyone can type that name."
     ),
+    # Vidyut, Sat 09:38: someone at the office's own website domain on CoStar's record opened
+    # a one-time link. Only the domain is named, never an address or a person.
+    "reason.office_confirmed": (
+        "Confirmed through {domain}, the website CoStar has on record for this office; "
+        "the photos are of this home."
+    ),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
@@ -475,6 +503,7 @@ ES: dict[str, str] = {
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
+    "label.office": "Confirmación de la oficina",
     "label.link": "Enlace",
     "label.license": "Licencia",
     "label.owner": "Propietario registrado",
@@ -594,6 +623,26 @@ ES: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "contact.office_confirmed": (
+        "Confirmado por la oficina: alguien en {domain}, el sitio web que CoStar tiene "
+        "registrado para esta oficina, dijo que este anuncio es suyo."
+    ),
+    "contact.office_still_hold": (
+        "Aún en espera: el teléfono del anuncio no es el número de la oficina en el registro. "
+        "Llame a la oficina a un número que usted mismo busque antes de pagar."
+    ),
+    "contact.office_declined": (
+        "No confirmado. Alguien en {domain}, el sitio web que CoStar tiene registrado para "
+        "esta oficina, dijo que la oficina no reconoce este anuncio."
+    ),
+    "reason.office_declined": (
+        "La oficina en {domain}, el sitio web que CoStar tiene registrado, no reconoció este "
+        "anuncio."
+    ),
+    "office.call_yourself": (
+        "No hay un sitio web registrado para esta oficina, así que no se puede confirmar aquí. "
+        "Llame a la oficina a un número que usted mismo busque."
     ),
     "license.licensed": "Con licencia en Texas.",
     "license.licensed_sponsored": (
@@ -909,6 +958,10 @@ ES: dict[str, str] = {
     "reason.authority_matches_brokerage": (
         "El anuncio nombra a la agencia que figura en el registro. Cualquiera puede escribir "
         "ese nombre."
+    ),
+    "reason.office_confirmed": (
+        "Confirmado a través de {domain}, el sitio web que CoStar tiene registrado para esta "
+        "oficina; las fotos son de este hogar."
     ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",
