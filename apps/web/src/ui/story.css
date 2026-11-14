@@ -1,0 +1,112 @@
+/* Layout for the primitives page only (ui/Story.tsx). */
+.st-page {
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: var(--sp-5) var(--page-pad) var(--sp-8);
+}
+.st-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+}
+.st-lock {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: inherit;
+  text-decoration: none;
+}
+.st-page h1 {
+  margin: var(--sp-6) 0 0;
+  font-size: var(--fs-xl);
+}
+.st-page section {
+  margin-top: var(--sp-7);
+}
+.st-page h2 {
+  margin: 0 0 var(--sp-4);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--ink);
+  font-size: var(--fs-lg);
+}
+.st-row,
+.st-marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-4);
+}
+.st-row {
+  gap: var(--sp-6);
+}
+.st-marks {
+  min-height: 48px;
+  color: inherit;
+  text-decoration: none;
+}
+.st-matte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--matte);
+}
+.st-matte > .ui-chapters {
+  flex: 1;
+}
+.st-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.st-tags {
+  display: flex;
+  gap: var(--sp-5);
+}
+.st-photos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+.st-photos .ui-photo {
+  aspect-ratio: 4 / 3;
+}
+.st-three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-6);
+}
+.st-field {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  font-weight: 700;
+}
+.st-field input {
+  min-height: 48px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  background: var(--layer-2);
+  color: var(--ink);
+  font: inherit;
+}
+@media (max-width: 760px) {
+  .st-photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .st-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
