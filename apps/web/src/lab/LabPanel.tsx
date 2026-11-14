@@ -22,7 +22,106 @@ const W = 760;
 const H = 290;
 const M = { top: 12, right: 16, bottom: 72, left: 76 };
 
+const NARROW_QUERY = "(max-width: 720px)";
+
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof window.matchMedia === "function" && window.matchMedia(NARROW_QUERY).matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(NARROW_QUERY);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
+// Narrow screens: one row per condition, bar under its label, so every label stays full size.
+function RowChart({ bars }: { bars: ResultRow[] }) {
+  const RW = 340;
+  const ROW = 98;
+  const top = 8;
+  const left = 22;
+  const right = 22;
+  const tickVals = niceTicks(Math.max(0.05, ...bars.map((b) => b.ci_high)));
+  const max = tickVals[tickVals.length - 1]!;
+  const x = linearScale([0, max], [left, RW - right]);
+  const plotH = top + ROW * bars.length;
+  const total = plotH + 22;
+  return (
+    <svg
+      viewBox={`0 0 ${RW} ${total}`}
+      role="img"
+      aria-labelledby="curve-title"
+      className="lab-svg"
+      data-testid="curve-chart"
+    >
+      <title id="curve-title">
+        Forged-reply false-accept rate by condition, with 95% interval and n
+      </title>
+      {tickVals.map((t) => (
+        <g key={t}>
+          <line x1={x(t)} x2={x(t)} y1={top} y2={plotH} className="lab-grid" />
+          <text x={x(t)} y={plotH + 14} className="lab-tick" textAnchor="middle">
+            {pct(t)}
+          </text>
+        </g>
+      ))}
+      {bars.map((b, i) => {
+        const y0 = top + ROW * i;
+        const by = y0 + 20;
+        const mid = by + 7;
+        return (
+          <g key={b.condition} data-testid="curve-bar">
+            <text x={left} y={y0 + 12} className="lab-axis">
+              {conditionLabel(b.condition)}
+            </text>
+            <rect
+              x={left}
+              y={by}
+              width={Math.max(0, x(b.rate) - left)}
+              height={14}
+              className="lab-bar"
+            />
+            <line x1={x(b.ci_low)} x2={x(b.ci_high)} y1={mid} y2={mid} className="lab-whisker" />
+            <line
+              x1={x(b.ci_low)}
+              x2={x(b.ci_low)}
+              y1={mid - 5}
+              y2={mid + 5}
+              className="lab-whisker"
+            />
+            <line
+              x1={x(b.ci_high)}
+              x2={x(b.ci_high)}
+              y1={mid - 5}
+              y2={mid + 5}
+              className="lab-whisker"
+            />
+            <text x={left} y={by + 32} className="lab-axis" data-testid="bar-rate">
+              {`${pct(b.rate)} (${b.k} of ${b.n})`}
+            </text>
+            <text x={left} y={by + 46} className="lab-tick lab-n" data-testid="bar-n">
+              {`n = ${b.n}`}
+            </text>
+            <text x={left} y={by + 60} className="lab-tick" data-testid="bar-ci">
+              {`95% CI ${pct(b.ci_low)} to ${pct(b.ci_high)}`}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function CurveChart({ bars }: { bars: ResultRow[] }) {
+  const narrow = useNarrow();
+  return narrow ? <RowChart bars={bars} /> : <WideChart bars={bars} />;
+}
+
+function WideChart({ bars }: { bars: ResultRow[] }) {
   const tickVals = niceTicks(Math.max(0.05, ...bars.map((b) => b.ci_high)));
   const max = tickVals[tickVals.length - 1]!;
   const y = linearScale([0, max], [H - M.bottom, M.top]);
@@ -236,7 +335,7 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
           <div className="lab-block">
             <h3>Forged replies we let through, on the held-out set</h3>
             {bars.length > 0 ? (
-              <div className="lab-scroll">
+              <div>
                 <CurveChart bars={bars} />
               </div>
             ) : (
