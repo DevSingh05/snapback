@@ -225,3 +225,24 @@ def test_a_model_reason_with_a_number_or_a_claim_is_replaced_by_code(tmp_path):
 def test_the_fixture_places_load_clean():
     places = load_fixture_places()
     assert len(places) == 10 and all(p.pid.startswith("fx-fnd-") for p in places)
+
+
+def test_model_turns_have_a_daily_cap_per_address(tmp_path):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from snapback.api.finder import make_router
+    from snapback.events import EventBus
+
+    app = FastAPI()
+    app.include_router(
+        make_router(EventBus(tmp_path / "log.jsonl"), crew(prefs=ALL_FOUR), model_turns_per_day=1)
+    )
+    c = TestClient(app)
+    b = c.post("/finder/sessions").json()
+    assert b["mode"] == "deepagents"
+    auth = {"Authorization": f"Bearer {b['token']}"}
+    url = f"/finder/{b['session_id']}/message"
+    assert c.post(url, headers=auth, json={}).status_code == 200
+    capped = c.post(url, headers=auth, json={})
+    assert capped.status_code == 429 and "today" in capped.json()["detail"]

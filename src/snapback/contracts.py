@@ -1043,6 +1043,25 @@ class FinderReply(BaseModel):
     as_of: str = AS_OF
 
 
+class FinderWatchRequest(BaseModel):
+    """`POST /finder/{session}/watch`. iMessage is the one channel (M10, ruling R-M1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channel: Literal["imessage"]
+
+
+class FinderWatchStatus(BaseModel):
+    """A watch on a finder session: recorded once, with the `watch_added` event it published."""
+
+    session_id: str
+    channel: Literal["imessage"]
+    kind: Literal["brief"] = "brief"  # it watches the session's brief, never one place
+    event_id: str
+    source: DataSource
+    at: datetime
+
+
 class FinderState(BaseModel):
     """`GET /finder/{session}/state`: everything the Finder tab shows."""
 
@@ -1056,6 +1075,7 @@ class FinderState(BaseModel):
     notes: list[FinderNote]
     trace: list[FinderTraceEvent]
     as_of: str = AS_OF
+    watch: FinderWatchStatus | None = None  # set by `POST /finder/{session}/watch`
 
 
 class FinderDecision(BaseModel):

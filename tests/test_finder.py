@@ -276,8 +276,9 @@ def test_api_shapes_and_tokens(tmp_path):
         "notes",
         "trace",
         "as_of",
+        "watch",
     }
-    assert state["applied"] == CasePreferences().model_dump()
+    assert state["applied"] == CasePreferences().model_dump() and state["watch"] is None
     assert set(state["trace"][0]) == {
         "session_id",
         "seq",
@@ -404,3 +405,85 @@ def test_passing_on_places_that_have_parking_is_not_a_parking_signal(tmp_path):
     reply = run_turn(s, [_place("pass", parking=True, walkup=False) for _ in range(3)])
     assert "passed_no_parking" not in s.learned() and "passed_walkups" not in s.learned()
     assert reply.proposals == []
+
+
+# --- hardening (review #238 item 5) --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "budget"),
+    [
+        ("budget under $1,400 please", 1400),
+        ("max $1400", 1400),
+        ("up to $ 950", 950),
+        ("budget under $12,500", 12500),
+    ],
+)
+def test_budgets_with_and_without_a_comma_are_read(text, budget):
+    read = [s for s in finder.read_text(text) if s.brief_field == "budget"]
+    assert [s.rent_max for s in read] == [budget]
+
+
+def test_pet_is_a_word_not_a_substring():
+    assert not [
+        s for s in finder.read_text("I love the carpet and the competition") if s.brief_field
+    ]
+    assert [s.brief_field for s in finder.read_text("I have a pet")] == ["pets"]
+    assert [s.brief_field for s in finder.read_text("two pets")] == ["pets"]
+    assert "pets" not in {s.brief_field for s in finder.read_text("no pets, no walk-ups")}
+
+
+def test_a_message_while_a_turn_is_running_is_refused_not_queued(tmp_path):
+    c = api(tmp_path)
+    b = c.post("/finder/sessions").json()
+    auth = {"Authorization": f"Bearer {b['token']}"}
+    session = finder.SESSIONS.get(b["session_id"], b["token"])
+    assert session.lock.acquire(blocking=False)  # a turn is running
+    try:
+        busy = c.post(f"/finder/{b['session_id']}/message", headers=auth, json={"signals": []})
+        assert busy.status_code == 409
+    finally:
+        session.lock.release()
+    assert c.post(f"/finder/{b['session_id']}/message", headers=auth, json={}).status_code == 200
+
+
+# --- the shared session store and the watch (review #238 item 6) ---------------------------------
+
+
+def test_the_session_store_is_shared_and_checks_the_token(tmp_path):
+    c = api(tmp_path)
+    b = c.post("/finder/sessions").json()
+    sid, token = b["session_id"], b["token"]
+    assert finder.SESSIONS.get(sid, token).id == sid
+    for sent, status in ((None, 401), ("wrong", 403)):
+        with pytest.raises(finder.FinderAccess) as refused:
+            finder.SESSIONS.get(sid, sent)
+        assert refused.value.status == status
+    with pytest.raises(finder.FinderAccess) as missing:
+        finder.SESSIONS.get("fs-nope0000", token)
+    assert missing.value.status == 404
+
+
+def test_watch_records_on_the_session_and_publishes_the_watch_event(tmp_path):
+    c = api(tmp_path)
+    b = c.post("/finder/sessions").json()
+    sid, auth = b["session_id"], {"Authorization": f"Bearer {b['token']}"}
+    assert c.post(f"/finder/{sid}/watch", json={"channel": "imessage"}).status_code == 401
+    assert c.post(f"/finder/{sid}/watch", headers=auth, json={"channel": "sms"}).status_code == 422
+    first = c.post(f"/finder/{sid}/watch", headers=auth, json={"channel": "imessage"})
+    assert first.status_code == 201
+    body = first.json()
+    assert set(body) == {"session_id", "channel", "kind", "event_id", "source", "at"}
+    assert body["channel"] == "imessage" and body["kind"] == "brief"
+    again = c.post(f"/finder/{sid}/watch", headers=auth, json={"channel": "imessage"})
+    assert again.status_code == 201 and again.json()["event_id"] == body["event_id"]
+    import json
+
+    lines = (tmp_path / "events" / "log.jsonl").read_text().splitlines()
+    watches = [json.loads(x) for x in lines if '"watch_added"' in x]
+    assert len(watches) == 1  # once per session, not once per tap
+    assert watches[0]["id"] == body["event_id"] and watches[0]["subject"] == sid
+    assert watches[0]["payload"] == {"session": sid, "kind": "brief"}
+    assert watches[0]["source"] == "renter"
+    state = c.get(f"/finder/{sid}/state", headers=auth).json()
+    assert state["watch"] == body

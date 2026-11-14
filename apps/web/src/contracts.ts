@@ -535,6 +535,20 @@ export interface FinderState {
   notes: FinderNote[];
   trace: FinderTraceEvent[];
   as_of: string;
+  watch?: FinderWatchStatus | null; // set by POST /finder/{session}/watch
+}
+
+export interface FinderWatchRequest {
+  channel: "imessage";
+}
+
+export interface FinderWatchStatus {
+  session_id: string;
+  channel: "imessage";
+  kind: "brief"; // the session's brief, never one place
+  event_id: string; // the watch_added event on the bus
+  source: DataSource;
+  at: string;
 }
 
 export interface FinderDecision {
