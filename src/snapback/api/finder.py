@@ -63,7 +63,7 @@ def make_router(events: EventBus, model: Any = None, places: Any = None) -> APIR
 
     @router.post("/finder/sessions", status_code=201)
     def start(request: Request) -> FinderSessionStarted:
-        """A new finder session. Shows LIVE or FIXTURE and which mode runs (policy or deepagents)."""
+        """A new finder session; shows LIVE or FIXTURE and the mode (policy or deepagents)."""
         address = request.client.host if request.client else "unknown"
         if not limit.allow(f"new:{address}"):
             raise HTTPException(status_code=429, detail="Too many sessions. Try again in a minute.")

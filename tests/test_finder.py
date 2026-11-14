@@ -1,0 +1,377 @@
+"""M9: the finder crew. Nothing applies before the renter says yes; a model sees only the
+allow-listed counts and aliases; policy and model end in the same applied preferences.
+
+Everything is made up. Deepagents tests use a scripted chat model: no network, no key, and they
+are skipped unless the `agent` extra is installed.
+"""
+
+import re
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from snapback.agent import finder
+from snapback.agent.finder import FinderSession, Place, run_turn
+from snapback.agent.preferences import FactLeak, guard_facts
+from snapback.api.main import create_app
+from snapback.contracts import (
+    CasePreferences,
+    FinderSignal,
+    PreferencesUpdate,
+)
+from snapback.events import EventBus, EventKind, EventRefused, EventSource, new_event
+from snapback.settings import Settings
+
+ROOT = Path(__file__).resolve().parent.parent
+BAIT_ADDRESS = "1234 Fixture Boulevard Unit 9"
+BAIT_PHONE = "713-555-0142"
+BAIT_COMPANY = "Fixture Realty Group"
+
+# 3 walk-ups passed, 3 without parking passed, 3 scan places picked, all well under the budget:
+# all four proposals are supported.
+SCRIPT = [
+    FinderSignal(kind="brief", brief_field="budget", rent_max=1800),
+    *[
+        FinderSignal(
+            kind="pass",
+            place_kind="apartment",
+            has_scan=False,
+            rent_from=1500,
+            walkup=True,
+            parking=False,
+        )
+        for _ in range(3)
+    ],
+    *[
+        FinderSignal(
+            kind="pick",
+            place_kind="apartment",
+            has_scan=True,
+            rent_from=1000,
+            walkup=False,
+            parking=True,
+        )
+        for _ in range(3)
+    ],
+]
+
+
+def baited_places() -> list[Place]:
+    """Fixture places whose raw records also carry an address, a phone and a company."""
+    import json
+
+    raw = json.loads(finder.FIXTURE_PLACES.read_text())["places"]
+    return [
+        Place.of(r | {"address": BAIT_ADDRESS, "phone": BAIT_PHONE, "office": BAIT_COMPANY})
+        for r in raw
+    ]
+
+
+def new_session(tmp_path, model=None, places=None) -> FinderSession:
+    return FinderSession(
+        "fs-test0001", EventBus(tmp_path / "log.jsonl"), places or baited_places(), model=model
+    )
+
+
+# --- policy mode ---------------------------------------------------------------------------------
+
+
+def test_nothing_applies_before_the_renter_accepts(tmp_path):
+    s = new_session(tmp_path)
+    reply = run_turn(s, SCRIPT)
+    assert {p.key for p in reply.proposals} == {
+        "propose_no_walkup",
+        "propose_parking",
+        "propose_prefer_scans",
+        "propose_lower_budget",
+    }
+    assert all(p.status == "proposed" and p.chosen_by == "policy" for p in reply.proposals)
+    assert s.applied == CasePreferences()
+    ranked_before = [p.pid for p in reply.picks]
+    # running again, answering nothing: still nothing applied, and no proposal is offered twice
+    again = run_turn(s, [])
+    assert s.applied == CasePreferences() and again.proposals == []
+    assert [p.pid for p in again.picks] == ranked_before
+
+    walkup = next(p for p in reply.proposals if p.key == "propose_no_walkup")
+    s.decide(walkup.id, accept=True)
+    assert s.applied.no_walkup is True and s.applied.needs_parking is False
+    assert s.applied.prefer_scans is False and s.applied.max_rent is None
+    scan = next(p for p in reply.proposals if p.key == "propose_prefer_scans")
+    s.decide(scan.id, accept=False)
+    assert s.applied.prefer_scans is False
+    with pytest.raises(ValueError):
+        s.decide(scan.id, accept=True)  # already answered
+    assert run_turn(s, []).proposals == []  # a declined proposal is not offered again
+
+
+def test_accepting_changes_the_picks_by_code_and_the_walkup_filter_holds(tmp_path):
+    s = new_session(tmp_path)
+    run_turn(s, SCRIPT)
+    all_ids = [p.pid for p in s.picks]
+    for p in list(s.proposals):
+        s.decide(p.id, accept=True)
+    after = [p.pid for p in s.picks]
+    walkups = {p.pid for p in s.places if p.walkup is True}
+    assert not walkups & set(after)
+    assert all(p.has_scan for p in s.picks)  # prefer_scans orders them first
+    assert after != all_ids
+    assert all(p.chosen_by == "policy" for p in s.picks)
+
+
+def test_every_step_is_stamped_and_picks_carry_a_code_line(tmp_path):
+    s = new_session(tmp_path)
+    reply = run_turn(s, SCRIPT)
+    assert len(reply.picks) == 3 and [p.rank for p in reply.picks] == [1, 2, 3]
+    for p in reply.picks:
+        assert "as of CoStar's last research" in p.line and p.chosen_by == "policy"
+        assert p.why.startswith("Leads because")
+    assert s.trace and all(e.chosen_by == "policy" for e in s.trace)
+    assert {n.path for n in s.notes.values()} == {
+        "/finder/fs-test0001/prefs.md",
+        "/finder/fs-test0001/picks.md",
+    }
+    assert s.learned()["passed_walkups"] == "3 of 3"
+
+
+def test_a_scripted_or_pipeline_event_never_teaches(tmp_path):
+    s = new_session(tmp_path)
+    for source in (EventSource.SIMULATED, EventSource.PIPELINE):
+        for _ in range(4):
+            s.bus.publish(
+                new_event(
+                    kind=EventKind.PLACE_PASSED,
+                    source=source,
+                    subject=s.id,
+                    payload={"session": s.id, "walkup": True},
+                )
+            )
+    assert run_turn(s, []).proposals == []
+
+
+def test_the_renters_words_are_read_by_code_and_go_nowhere(tmp_path):
+    s = new_session(tmp_path)
+    text = f"no walk-ups please, budget under $1400, call {BAIT_PHONE} at {BAIT_ADDRESS}"
+    signals = finder.read_text(text)
+    assert {x.brief_field for x in signals} == {"no_walkup", "budget"}
+    run_turn(s, signals)
+    log = (tmp_path / "log.jsonl").read_text()
+    assert BAIT_PHONE not in log and BAIT_ADDRESS not in log and "please" not in log
+
+
+# --- the allow-list ------------------------------------------------------------------------------
+
+
+def test_a_fact_a_model_may_not_see_is_refused_not_trimmed():
+    assert guard_facts({"passed_walkups": "3 of 3", "budget_set": True})
+    for leak in (
+        {"address": BAIT_ADDRESS},
+        {"passed_walkups": BAIT_ADDRESS},
+        {"passed_walkups": "call 713-555-0142"},
+        {"picked_with_scan": 1450},
+    ):
+        with pytest.raises(FactLeak):
+            guard_facts(leak)
+
+
+def test_place_rows_carry_aliases_and_yes_no_only(tmp_path):
+    rows = new_session(tmp_path).search_desk().rows()
+    assert rows and all(set(r) <= finder.ROW_KEYS for r in rows)
+    blob = repr(rows)
+    for bait in (BAIT_ADDRESS, BAIT_PHONE, BAIT_COMPANY, "fx-fnd", "rent_from", "1450"):
+        assert bait not in blob
+
+
+def test_a_mutant_that_leaks_an_address_into_a_row_fails(tmp_path, monkeypatch):
+    real = finder._alias_row
+
+    def leaky(alias, place, cap):
+        return real(alias, place, cap) | {"address": BAIT_ADDRESS}
+
+    monkeypatch.setattr(finder, "_alias_row", leaky)
+    with pytest.raises(FactLeak):
+        new_session(tmp_path).search_desk().rows()
+
+
+def test_a_mutant_that_leaks_a_price_value_into_a_row_fails(tmp_path, monkeypatch):
+    real = finder._alias_row
+    monkeypatch.setattr(
+        finder, "_alias_row", lambda a, p, c: real(a, p, c) | {"kind": "apartment at 12 Main St"}
+    )
+    with pytest.raises(FactLeak):
+        new_session(tmp_path).search_desk().rows()
+
+
+# --- the API -------------------------------------------------------------------------------------
+
+
+def api(tmp_path) -> TestClient:
+    return TestClient(create_app(Settings(snapback_data_dir=tmp_path)))
+
+
+def test_api_shapes_and_tokens(tmp_path):
+    c = api(tmp_path)
+    started = c.post("/finder/sessions")
+    assert started.status_code == 201
+    body = started.json()
+    assert set(body) == {"session_id", "token", "source", "mode"}
+    assert body["source"] == "fixture" and body["mode"] == "policy"
+    sid, auth = body["session_id"], {"Authorization": f"Bearer {body['token']}"}
+
+    assert c.get(f"/finder/{sid}/state").status_code == 401
+    assert c.get(f"/finder/{sid}/state", headers={"X-Finder-Token": "wrong"}).status_code == 403
+    assert c.get(f"/finder/{sid}/state?token={body['token']}", headers=auth).status_code == 401
+    assert c.get("/finder/fs-nope/state", headers=auth).status_code == 404
+
+    message = c.post(
+        f"/finder/{sid}/message",
+        headers={"X-Finder-Token": body["token"]},
+        json={"signals": [s.model_dump(exclude_none=True) for s in SCRIPT]},
+    )
+    assert message.status_code == 200
+    reply = message.json()
+    assert set(reply) == {
+        "session_id",
+        "source",
+        "mode",
+        "reply",
+        "reply_by",
+        "proposals",
+        "picks",
+        "as_of",
+    }
+    assert len(reply["proposals"]) == 4 and len(reply["picks"]) == 3
+    assert set(reply["picks"][0]) == {
+        "pid",
+        "rank",
+        "kind",
+        "has_scan",
+        "line",
+        "why",
+        "chosen_by",
+        "as_of",
+    }
+    assert set(reply["proposals"][0]) == {
+        "id",
+        "key",
+        "update",
+        "text",
+        "evidence",
+        "reason",
+        "chosen_by",
+        "status",
+        "at",
+    }
+
+    state = c.get(f"/finder/{sid}/state", headers=auth).json()
+    assert set(state) == {
+        "session_id",
+        "source",
+        "mode",
+        "applied",
+        "proposals",
+        "picks",
+        "learned",
+        "notes",
+        "trace",
+        "as_of",
+    }
+    assert state["applied"] == CasePreferences().model_dump()
+    assert set(state["trace"][0]) == {
+        "session_id",
+        "seq",
+        "at",
+        "kind",
+        "options",
+        "pick",
+        "reason",
+        "source",
+        "chosen_by",
+    }
+
+    first = reply["proposals"][0]["id"]
+    assert (
+        c.post(f"/finder/{sid}/proposals/{first}", headers=auth, json={"decision": "x"}).status_code
+        == 422
+    )
+    done = c.post(f"/finder/{sid}/proposals/{first}", headers=auth, json={"decision": "accept"})
+    assert done.status_code == 200 and done.json()["status"] == "accepted"
+    assert (
+        c.post(
+            f"/finder/{sid}/proposals/{first}", headers=auth, json={"decision": "accept"}
+        ).status_code
+        == 409
+    )
+    assert (
+        c.post(
+            f"/finder/{sid}/proposals/pr-99", headers=auth, json={"decision": "accept"}
+        ).status_code
+        == 404
+    )
+    applied = c.get(f"/finder/{sid}/state", headers=auth).json()["applied"]
+    assert sum(1 for v in applied.values() if v not in (False, None, [])) == 1
+
+
+def test_the_events_reach_the_bus_without_a_place_identity(tmp_path):
+    c = api(tmp_path)
+    b = c.post("/finder/sessions").json()
+    c.post(
+        f"/finder/{b['session_id']}/message",
+        headers={"Authorization": f"Bearer {b['token']}"},
+        json={"signals": [SCRIPT[1].model_dump(exclude_none=True)]},
+    )
+    log = (tmp_path / "events" / "log.jsonl").read_text()
+    assert "place_passed" in log and "fx-fnd" not in log and '"source":"renter"' in log
+
+
+# --- contracts -----------------------------------------------------------------------------------
+
+
+def test_contracts_are_additive():
+    assert PreferencesUpdate(no_walkup=True, max_rent=1500).no_walkup is True  # old payloads hold
+    old = CasePreferences(
+        no_walkup=True, needs_parking=True, max_rent=1500, avoid_property_ids=["a"]
+    )
+    assert old.prefer_scans is False
+    with pytest.raises(EventRefused):
+        new_event(
+            kind=EventKind.PLACE_PASSED,
+            source=EventSource.RENTER,
+            subject="fs-1",
+            payload={"session": "fs-1", "address": BAIT_ADDRESS},
+        )
+    ts = (ROOT / "apps" / "web" / "src" / "contracts.ts").read_text()
+    for name in (
+        "FinderSessionStarted",
+        "FinderSignal",
+        "FinderMessageRequest",
+        "FinderProposal",
+        "FinderPick",
+        "FinderNote",
+        "FinderTraceEvent",
+        "FinderReply",
+        "FinderState",
+        "FinderDecision",
+    ):
+        assert f"export interface {name}" in ts
+    assert "prefer_scans: boolean" in ts and "prefer_scans?: boolean | null" in ts
+    import snapback.contracts as py
+
+    for name, fields in {
+        "FinderState": ("applied", "proposals", "picks", "learned", "notes", "trace", "as_of"),
+        "FinderPick": ("pid", "rank", "line", "why", "chosen_by"),
+        "FinderProposal": (
+            "id",
+            "key",
+            "update",
+            "text",
+            "evidence",
+            "reason",
+            "chosen_by",
+            "status",
+        ),
+    }.items():
+        block = re.search(rf"export interface {name} \{{(.*?)\n\}}", ts, re.S).group(1)
+        for field in fields:
+            assert field in getattr(py, name).model_fields and re.search(rf"\b{field}\??:", block)

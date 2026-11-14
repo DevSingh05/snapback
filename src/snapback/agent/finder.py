@@ -838,5 +838,7 @@ def run_deep(session: FinderSession, prefs: PrefDesk, search: SearchDesk) -> str
         return None
     # What the model left open is code's: the policy fills it.
     prefs.settle_policy()
+    if not session.todos_seen:
+        return None  # a model that never planned does not get to speak for the finder
     line = ok_reason(" ".join(text.split()), "")
     return line[:MAX_REPLY] if line and not _BAD_REASON.search(line) else None
