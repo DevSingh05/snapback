@@ -97,9 +97,9 @@ def test_coverage_counts_residential_paths_and_codes_without_values():
     from snapback.adapters.costar_residential import coverage_residential
 
     report = coverage(FIXTURE_KIT) | coverage_residential(FIXTURE_KIT)
-    assert report["residential_records"] == 7
-    assert report["residential_fields"]["street"]["property.address.fullStreetAddress"] == 7
-    assert report["rent_pricing_codes"] == {"1": 2, "2": 1}
+    assert report["residential_records"] == 9
+    assert report["residential_fields"]["street"]["property.address.fullStreetAddress"] == 9
+    assert report["rent_pricing_codes"] == {"1": 2, "2": 2}
     text = json.dumps(report)
     assert "Fixture" not in text and "fx-" not in text and "2026" not in text
 

@@ -73,6 +73,7 @@ MODEL_FIELDS: dict[str, list[str]] = {
     "rent_min": ["minRent"],
     "rent_max": ["maxRent"],
     "rent_pricing": ["rentPricingType"],
+    "units_available": ["numUnitsAvailable"],  # 0 is a real answer: none reported available
 }
 UNIT_FIELDS: dict[str, list[str]] = {
     "unit": ["unitNumber", "unit", "name"],
@@ -111,6 +112,14 @@ def _first(obj: dict[str, Any], paths: list[str]) -> Any:
 def _as_int(value: Any) -> int | None:
     try:
         return int(round(float(value))) if _present(value) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_int_zero_ok(value: Any) -> int | None:
+    """Like `_as_int`, but 0 is kept: 0 units reported available is an answer, not unknown."""
+    try:
+        return int(round(float(value))) if value is not None and value != "" else None
     except (TypeError, ValueError):
         return None
 
@@ -250,6 +259,8 @@ def _floor_plan_rents(
             FloorPlanRent(
                 name=_floor_plan(m),
                 beds=int(beds) if beds is not None else None,
+                baths=_as_float(_first(m, MODEL_FIELDS["baths"])),
+                units_available=_as_int_zero_ok(_get_any(m, MODEL_FIELDS["units_available"])),
                 rent_min=_as_int(_first(m, MODEL_FIELDS["rent_min"])),
                 rent_max=_as_int(_first(m, MODEL_FIELDS["rent_max"])),
                 per_bed=listing_per_bed or _per_bed(_first(m, MODEL_FIELDS["rent_pricing"]), enums),
@@ -347,6 +358,25 @@ def _apply_listing(
     fields["rent_median"] = _as_int(statistics.median(mids)) if mids else None
 
 
+METERING = {1: "master", 2: "individual"}  # enums.json ApartmentMeteringType; 0 is unknown
+
+
+def _building_facts(record: dict[str, Any]) -> dict[str, Any]:
+    """Must-have facts for search: walk-up, elevator, metering, parking. None when not on record.
+    An empty elevator list is not read as "no elevator": the record may simply not say."""
+    apartment = record.get("propertyApartment")
+    apartment = apartment if isinstance(apartment, dict) else {}
+    walkup = apartment.get("isWalkup")
+    elevators = apartment.get("elevators")
+    ratio = _as_float(record.get("parkingRatio"))
+    return {
+        "is_walkup": walkup if isinstance(walkup, bool) else None,
+        "has_elevator": True if isinstance(elevators, list) and elevators else None,
+        "metering": METERING.get(_as_int(apartment.get("apartmentMeteringType")) or 0),
+        "parking_ratio": ratio if ratio is not None and ratio > 0 else None,  # 0 reads as unknown
+    }
+
+
 def parse_record(
     record: dict[str, Any],
     source: DataSource,
@@ -377,6 +407,7 @@ def parse_record(
         "website_host": _host(_first(record, FIELDS["website"])),
         "units": _property_units(record),
     }
+    fields.update(_building_facts(record))
     # The leasing office's phone is kept only as a keyed hash; the digits never leave here.
     phone = _first(record, FIELDS["site_phone"])
     fields["site_phone_hash"] = phone_hash(str(phone), phone_salt()) if phone else None
