@@ -10,6 +10,7 @@ import { fetchPlacesMap } from "./api";
 import type { Look } from "./mapStyle";
 import { CriteriaPanel, FinderPip, PlaceLedger } from "./panels";
 import { recordFinderEvent } from "../shell/finderStore";
+import type { FinderSignal } from "../contracts";
 import { S } from "./strings";
 import { EMPTY_CRITERIA, criteriaCount } from "./types";
 import type { Criteria, PlaceSheetData, PlacesMap, RenterEvent } from "./types";
@@ -57,10 +58,37 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
   const sheets = useRef(new Map<string, PlaceSheetData>());
   const nextId = useRef(1);
 
-  const log = useCallback((kind: RenterEvent["kind"], text: string, pid?: string) => {
-    setEvents((prev) => [{ id: nextId.current++, kind, text, pid }, ...prev].slice(0, 30));
-    recordFinderEvent(kind, text); // so the Finder tab can show this visit's events
+  const placesRef = useRef<PlacesMap["features"]>([]);
+
+  // A pick or pass as the Finder learns from it: the place's attributes, never which place.
+  const signalFor = useCallback((pid: string, kind: "pick" | "pass"): FinderSignal | undefined => {
+    const props = placesRef.current.find((f) => f.properties.pid === pid)?.properties;
+    if (!props) return undefined;
+    const musts = sheets.current.get(pid)?.plans[0]?.must_haves ?? [];
+    const met = (key: string) => musts.find((m) => m.key === key)?.met;
+    const walkup = met("walkup");
+    const parking = met("parking");
+    return {
+      kind,
+      place_kind: props.kind,
+      has_scan: props.has_scan,
+      rent_from: props.rent_from,
+      walkup: typeof walkup === "boolean" ? !walkup : null, // "no walk-up" met means not a walk-up
+      parking: typeof parking === "boolean" ? parking : null,
+    };
   }, []);
+
+  const log = useCallback(
+    (kind: RenterEvent["kind"], text: string, pid?: string) => {
+      setEvents((prev) => [{ id: nextId.current++, kind, text, pid }, ...prev].slice(0, 30));
+      const signal =
+        pid && (kind === "opened" || kind === "passed")
+          ? signalFor(pid, kind === "opened" ? "pick" : "pass")
+          : undefined;
+      recordFinderEvent(kind, text, signal); // so the Finder tab can show and send them
+    },
+    [signalFor],
+  );
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -80,6 +108,7 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
 
   const feed = load.state === "ready" ? load.feed : null;
   const places = useMemo(() => feed?.features ?? [], [feed]);
+  placesRef.current = places;
   const selected = places.find((f) => f.properties.pid === selectedPid) ?? null;
   const set = criteriaCount(criteria) > 0;
   const ledgerName = feed?.source === "live" ? S.ledger : S.ledgerSample;
