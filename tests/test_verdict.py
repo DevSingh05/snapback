@@ -1,3 +1,4 @@
+import itertools
 import json
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from snapback.contracts import (
     ModuleEvidence,
     PhotoLocation,
     PresenceStatus,
+    RuleCategory,
     VerdictState,
 )
 from snapback.verdict import decide, to_evidence
@@ -92,10 +94,49 @@ def test_photo_from_another_property_is_dont_pay():
     assert decide(evidence(photos=photos)).state is VerdictState.DONT_PAY
 
 
-@pytest.mark.parametrize("flag", ["price_flag", "payment_flag"])
-def test_record_mismatch_plus_a_red_flag_is_dont_pay(flag):
+@pytest.mark.parametrize("flag", ["price_flag", "payment_flag", "rule_flag"])
+def test_record_mismatch_is_hold_even_with_a_red_flag(flag):
+    # A mismatch is not proof: owners live elsewhere and agents act for them.
     result = decide(evidence(authority=AuthorityStatus.MISMATCH, **{flag: True}))
-    assert result.state is VerdictState.DONT_PAY
+    assert result.state is VerdictState.HOLD
+
+
+@pytest.mark.parametrize("flag", ["price_flag", "payment_flag", "rule_flag"])
+def test_any_red_flag_blocks_the_top_state(flag):
+    result = decide(
+        evidence(
+            presence=PresenceStatus.PROVEN,
+            authority=AuthorityStatus.MATCHES_RECORD,
+            **{flag: True},
+        )
+    )
+    assert result.state is VerdictState.HOLD
+    assert len(result.reasons) == 4  # the three findings plus the flag that held it back
+
+
+def test_dont_pay_needs_proof_and_the_top_state_needs_everything():
+    # Every combination that has no forged reply and no photo from another building.
+    not_forged = [PresenceStatus.NOT_REQUESTED, PresenceStatus.WAITING, PresenceStatus.PROVEN]
+    flags = [False, True]
+    for authority, presence, price, payment, rules in itertools.product(
+        AuthorityStatus, not_forged, flags, flags, flags
+    ):
+        state = decide(
+            evidence(
+                authority=authority,
+                presence=presence,
+                price_flag=price,
+                payment_flag=payment,
+                rule_flag=rules,
+            )
+        ).state
+        assert state is not VerdictState.DONT_PAY
+        everything = (
+            presence is PresenceStatus.PROVEN
+            and authority is AuthorityStatus.MATCHES_RECORD
+            and not (price or payment or rules)
+        )
+        assert (state is VerdictState.VERIFIED) == everything
 
 
 def test_red_flag_without_a_mismatch_is_not_dont_pay():
@@ -134,6 +175,7 @@ def test_decide_reasons_come_from_the_string_table(monkeypatch):
         evidence(presence=PresenceStatus.FORGED),
         evidence(photos=[photo(LocateStatus.LOCATED_ELSEWHERE)]),
         evidence(authority=AuthorityStatus.MISMATCH, price_flag=True, payment_flag=True),
+        evidence(authority=AuthorityStatus.MATCHES_RECORD, rule_flag=True),
         evidence(photos=[]),
         evidence(photos=[photo(LocateStatus.NOT_LOCATED)]),
         evidence(presence=PresenceStatus.PROVEN, authority=AuthorityStatus.MATCHES_RECORD),
@@ -237,6 +279,45 @@ def test_red_flag_rule_about_money_or_data_sets_the_payment_flag(category):
 def test_pressure_and_link_rules_do_not_set_the_payment_flag(category):
     flat = to_evidence(modules(rules=[rule("fx.rule", category)]))
     assert flat.payment_flag is False
+    assert flat.rule_flag is True
+
+
+MATCHES = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+IN_RANGE = {"status": "within_range", "listed_rent": 1900}
+
+
+def test_authority_match_with_a_zelle_red_flag_is_hold():
+    # The hold fixture has proven presence and a Zelle-before-viewing hit.
+    assert decide(to_evidence(modules(authority=MATCHES))).state is VerdictState.HOLD
+
+
+@pytest.mark.parametrize("category", [category.value for category in RuleCategory])
+def test_a_red_flag_rule_in_any_category_blocks_the_top_state(category):
+    flagged = modules(authority=MATCHES, price=IN_RANGE, rules=[rule("fx.rule", category)])
+    assert decide(to_evidence(flagged)).state is VerdictState.HOLD
+
+
+def test_a_rule_that_is_not_a_red_flag_does_not_block_the_top_state():
+    noted = modules(
+        authority=MATCHES, price=IN_RANGE, rules=[rule("fx.rule", "pressure", red_flag=False)]
+    )
+    assert to_evidence(noted).rule_flag is False
+    assert decide(to_evidence(noted)).state is VerdictState.VERIFIED
+
+
+def test_clean_case_with_presence_and_authority_reaches_the_top_state():
+    clean = modules(authority=MATCHES, price=IN_RANGE, rules=[])
+    assert decide(to_evidence(clean)).state is VerdictState.VERIFIED
+
+
+def test_mismatch_with_a_low_rent_and_a_payment_ask_is_hold_without_a_forgery():
+    # The forged fixture minus its forgery: mismatch and a rent far under the record.
+    data = json.loads((FIXTURES / "module_evidence_forged.json").read_text())
+    data["memory"] = []
+    data["recapture"] = []
+    data["challenge"]["presence"] = "proven"
+    data["rules"] = [rule("payment.zelle_before_viewing", "payment_method")]
+    assert decide(to_evidence(ModuleEvidence.model_validate(data))).state is VerdictState.HOLD
 
 
 def test_rule_that_is_not_a_red_flag_does_not_set_the_payment_flag():

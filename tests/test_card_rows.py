@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from snapback.card import strings
-from snapback.contracts import Card, CardRowKind, CardTone, ModuleEvidence
+from snapback.contracts import Card, CardRowKind, CardTone, ModuleEvidence, VerdictState
 from snapback.verdict import build_card, decide, to_evidence
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
@@ -66,6 +66,14 @@ VARIANTS = {
         authority={"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
     ),
     "rent_in_range": modules(price={"status": "within_range", "listed_rent": 1900}),
+    "clean": modules(
+        authority={"status": "matches_record", "manager_on_record": "Fixture Living LLC"},
+        price={"status": "within_range", "listed_rent": 1900},
+        rules=[],
+    ),
+    "pressure_only": modules(
+        rules=[{"rule_id": "fx.pressure", "category": "pressure", "red_flag": True}]
+    ),
     "no_rules": modules(rules=[]),
     "photo_elsewhere": modules(
         locate={
@@ -163,7 +171,7 @@ def test_tone_is_always_carried_by_words_too(name):
             else:
                 assert "red flag" not in item.text.lower(), item.text
             if item.tone is CardTone.NOT_SHOWN:
-                assert item.text.startswith("NOT SHOWN."), item.text
+                assert item.text.startswith(("NOT SHOWN.", "Not confirmed.")), item.text
             if item.tone is CardTone.NOT_CHECKED:
                 assert item.text.startswith("Not checked"), item.text
 
@@ -200,11 +208,73 @@ def test_no_challenge_yet_is_not_checked_rather_than_a_failure():
     assert here_now.tone is CardTone.NOT_CHECKED
 
 
-def test_manager_match_turns_the_authority_line_ok():
+def test_manager_match_does_not_lift_the_authority_line():
+    # Anyone can type a company's public name, so a match only tells the renter whom to call.
     allowed = line(
         card_for(VARIANTS["authority_matches"]), CardRowKind.PERSON, "Allowed to rent it"
     )
-    assert allowed.tone is CardTone.OK
+    assert allowed.tone is CardTone.NOT_SHOWN
+    assert allowed.text == (
+        "Not confirmed. Call Fixture Living LLC on a number you look up yourself before you pay."
+    )
+
+
+def test_manager_match_without_a_name_on_record_still_says_to_call():
+    allowed = line(
+        card_for(modules(authority={"status": "matches_record"})),
+        CardRowKind.PERSON,
+        "Allowed to rent it",
+    )
+    assert allowed.tone is CardTone.NOT_SHOWN
+    assert allowed.text.startswith("Not confirmed. Call ")
+
+
+def test_clean_case_card_is_the_top_state_and_still_says_authority_is_not_confirmed():
+    card = card_for(VARIANTS["clean"])
+    assert card.state is VerdictState.VERIFIED
+    assert line(card, CardRowKind.PERSON, "Allowed to rent it").tone is CardTone.NOT_SHOWN
+
+
+@pytest.mark.parametrize("name", VARIANTS)
+def test_payment_ask_line_is_always_there_and_comes_first(name):
+    price = lines(card_for(VARIANTS[name]), CardRowKind.PRICE)
+    assert price[0].label == "Payment ask"
+    assert price[-1].label == "Rent vs record"
+
+
+def test_pressure_alone_still_says_no_payment_ask_was_found():
+    card = card_for(VARIANTS["pressure_only"])
+    assert line(card, CardRowKind.PRICE, "Payment ask").tone is CardTone.OK
+    assert line(card, CardRowKind.PRICE, "Pressure").tone is CardTone.RED_FLAG
+
+
+def spots_replied_at(*times: str) -> dict:
+    challenge = raw("module_evidence_hold.json")["challenge"]
+    for spot, replied_at in zip(challenge["spots"], times, strict=True):
+        spot["replied_at"] = replied_at
+    return challenge
+
+
+def test_reply_times_are_shown_in_the_cards_own_timezone():
+    # The same two moments as the fixture, written in UTC and in Pacific time.
+    challenge = spots_replied_at("2026-11-14T02:43:10+00:00", "2026-11-13T18:44:20-08:00")
+    here_now = line(card_for(modules(challenge=challenge)), CardRowKind.PERSON, "Here now")
+    assert "21:44" in here_now.text
+
+
+def test_latest_reply_is_picked_by_instant_not_by_clock_reading():
+    # 02:44 UTC reads later than 21:50 but is six minutes earlier.
+    challenge = spots_replied_at("2026-11-13T21:50:00-05:00", "2026-11-14T02:44:20+00:00")
+    here_now = line(card_for(modules(challenge=challenge)), CardRowKind.PERSON, "Here now")
+    assert "21:50" in here_now.text
+
+
+def test_naive_times_are_rejected_with_a_clear_error():
+    with pytest.raises(ValueError, match="timezone"):
+        build_card(modules(), checked_at=datetime(2026, 11, 13, 21, 42))
+    challenge = spots_replied_at("2026-11-13T21:43:10-05:00", "2026-11-13T21:44:20")
+    with pytest.raises(ValueError, match="timezone"):
+        card_for(modules(challenge=challenge))
 
 
 def test_photo_from_another_building_is_a_red_flag_on_the_place_row():
