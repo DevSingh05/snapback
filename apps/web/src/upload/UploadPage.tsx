@@ -2,7 +2,16 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { DataSource } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
-import { MODE, createCase as defaultCreateCase, type CreateCase } from "./api";
+import { TracePanel } from "../trace";
+import {
+  MODE,
+  approveChallenge as defaultApprove,
+  createCase as defaultCreateCase,
+  getCaseStatus as defaultStatus,
+  type ApproveChallenge,
+  type CreateCase,
+  type GetCaseStatus,
+} from "./api";
 import { initialState, reduce } from "./machine";
 import { MAX_FILES, addFiles, classifyListingText, validateSubmission } from "./validate";
 import "./upload.css";
@@ -14,6 +23,9 @@ export function goToCase(caseId: string) {
 
 interface Props {
   createCase?: CreateCase;
+  approveChallenge?: ApproveChallenge;
+  getCaseStatus?: GetCaseStatus;
+  pollMs?: number;
   navigate?: (caseId: string) => void;
   checkingMs?: number;
   waitingMs?: number;
@@ -29,6 +41,9 @@ const STEPS = [
 
 export function UploadPage({
   createCase = defaultCreateCase,
+  approveChallenge = defaultApprove,
+  getCaseStatus = defaultStatus,
+  pollMs = 700,
   navigate = goToCase,
   checkingMs = 900,
   waitingMs = 1800,
@@ -51,9 +66,12 @@ export function UploadPage({
     heading.current?.focus();
   }, [state.step]);
 
+  // Fixture mode paces the steps with timers. Live mode has no timers: the server already ran
+  // the checks before POST /cases returned, so the approval step opens at once, and the waiting
+  // step follows the real case until the server reports it done.
   useEffect(() => {
-    if (state.step !== "checking" || mode !== "fixture") return;
-    const t = setTimeout(() => dispatch({ type: "checked" }), checkingMs);
+    if (state.step !== "checking") return;
+    const t = setTimeout(() => dispatch({ type: "checked" }), mode === "fixture" ? checkingMs : 0);
     return () => clearTimeout(t);
   }, [state.step, checkingMs, mode]);
 
@@ -62,6 +80,31 @@ export function UploadPage({
     const t = setTimeout(() => dispatch({ type: "done" }), waitingMs);
     return () => clearTimeout(t);
   }, [state.step, waitingMs, mode]);
+
+  const waitingCase = state.step === "waiting" ? state.caseId : null;
+  useEffect(() => {
+    if (waitingCase === null || mode !== "live") return;
+    const ctrl = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const s = await getCaseStatus(waitingCase, ctrl.signal);
+        if (s.status === "done") {
+          dispatch({ type: "done" });
+          return;
+        }
+      } catch {
+        if (ctrl.signal.aborted) return;
+        // A failed poll is retried; the renter can also open the result by hand.
+      }
+      timer = setTimeout(poll, pollMs);
+    };
+    void poll();
+    return () => {
+      ctrl.abort();
+      if (timer) clearTimeout(timer);
+    };
+  }, [waitingCase, mode, getCaseStatus, pollMs]);
 
   useEffect(() => {
     if (state.step === "done") navigate(state.caseId);
@@ -106,6 +149,24 @@ export function UploadPage({
         message: err instanceof Error ? err.message : "Something went wrong. Try again.",
       });
     }
+  }
+
+  // Live mode tells the server what the renter decided, with the case token, before the page
+  // moves on. Nothing moves on if the server refuses.
+  async function decide(decision: "send" | "cancel") {
+    if (state.step !== "approval") return;
+    if (mode === "live") {
+      try {
+        await approveChallenge(state.caseId, decision);
+      } catch (err) {
+        dispatch({
+          type: "fail",
+          message: err instanceof Error ? err.message : "Something went wrong. Try again.",
+        });
+        return;
+      }
+    }
+    dispatch({ type: decision === "send" ? "approve" : "skip" });
   }
 
   async function copy(message: string) {
@@ -320,23 +381,7 @@ export function UploadPage({
               <h1 ref={heading} tabIndex={-1}>
                 Checking the building
               </h1>
-              {mode === "fixture" ? (
-                <p className="upload-lead">Looking up the place on the listing.</p>
-              ) : (
-                <>
-                  <p className="upload-lead" data-testid="not-wired">
-                    Not wired yet: the server does not report building-check progress, so nothing
-                    was checked at this step.
-                  </p>
-                  <button
-                    type="button"
-                    className="upload-submit"
-                    onClick={() => dispatch({ type: "checked" })}
-                  >
-                    Continue
-                  </button>
-                </>
-              )}
+              <p className="upload-lead">Looking up the place on the listing.</p>
             </>
           )}
           {state.step === "waiting" && (
@@ -348,12 +393,7 @@ export function UploadPage({
                 No reply yet means HOLD, not a failure. You can open your result now; it updates
                 when they answer.
               </p>
-              {mode === "live" && (
-                <p className="upload-hint" data-testid="not-wired">
-                  Not wired yet: the server does not report the poster's reply, so this page does
-                  not wait for it.
-                </p>
-              )}
+              {mode === "live" && <TracePanel caseId={state.caseId} mode="live" />}
               <button
                 type="button"
                 className="upload-submit"
@@ -405,17 +445,13 @@ export function UploadPage({
               </span>
             </div>
             <div className="upload-actions">
-              <button
-                type="button"
-                className="upload-submit"
-                onClick={() => dispatch({ type: "approve" })}
-              >
+              <button type="button" className="upload-submit" onClick={() => void decide("send")}>
                 I approve it and I will send it
               </button>
               <button
                 type="button"
                 className="upload-secondary"
-                onClick={() => dispatch({ type: "skip" })}
+                onClick={() => void decide("cancel")}
               >
                 Skip the live check
               </button>

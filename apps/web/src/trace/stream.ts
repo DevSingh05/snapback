@@ -56,7 +56,7 @@ export function openLiveTrace(
   onStatus: OnStatus,
 ): () => void {
   const url = `${base.replace(/\/$/, "")}/cases/${encodeURIComponent(caseId)}/trace`;
-  const es = new EventSource(url);
+  const es = new EventSource(url, { withCredentials: true });
   onStatus("connecting");
   es.addEventListener("open", () => onStatus("live"));
   es.addEventListener("trace", (msg) => {

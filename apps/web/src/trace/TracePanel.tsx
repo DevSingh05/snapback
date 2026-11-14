@@ -4,6 +4,7 @@ import { SourceChip } from "../components/SourceChip";
 import type { ChoiceKind, DataSource, TraceEvent } from "../contracts";
 import traceRaw from "../../../../fixtures/contracts/trace_events.jsonl?raw";
 import { mergeEvent, parseFixtureLines } from "./parse";
+import { apiBase } from "../api";
 import { openLiveTrace, openReplayTrace, type StreamStatus } from "./stream";
 
 export const CHOICE_LABELS: Record<ChoiceKind, string> = {
@@ -105,7 +106,7 @@ export function TracePanel({
   );
   const [status, setStatus] = useState<StreamStatus>(mode === "static" ? "done" : "connecting");
 
-  const base = import.meta.env.VITE_API_URL as string | undefined;
+  const base = apiBase();
   const resolved: Exclude<TraceMode, "auto"> = mode === "auto" ? (base ? "live" : "replay") : mode;
 
   useEffect(() => {
