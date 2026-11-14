@@ -10,6 +10,9 @@ This file holds the standing rules. The issues hold the plan.
 2. Read your lane issue (`gh issue list --label agent:<your-human>`; names: `dev`, `vidyut`,
    `jeffrey`, `rishit`) and its newest comments.
 3. Run `make setup && make check` before changing anything, so you know the baseline is green.
+4. Read `docs/shared-memory.md` (decisions, data facts, gates, open questions) and your lane in
+   `docs/ROLES.md`. Session routine prompts: `docs/agents/KICKOFF.md` to start,
+   `docs/agents/HANDOFF.md` before you stop.
 
 ## Commands
 
@@ -57,8 +60,12 @@ These exist for reasons that will not change this weekend. Do not work around th
 
 - **Branch and PR.** Never push to `main`. Branch as `<lane>/<short-topic>`, open a PR, link the
   issue. Keep PRs small enough to review in five minutes.
+- **One issue per PR.** `Closes #<n>` for a task issue, `Refs #<n>` for a lane or inbox issue
+  (`Closes` would close it). Never force-push, never push to someone else's branch.
+- **Plain commits.** No `Co-Authored-By` lines and no AI attribution in commits or PR text.
 - **Stay in your lane's paths** (see the table in `README.md` and `.github/CODEOWNERS`). You may
-  merge your own PR when `make check` is green and it touches only your lane's paths.
+  ask for a merge when `make check` is green and the PR touches only your lane's paths. Only the XO
+  (on Vidyut's behalf) merges to `main`; agents never push or merge to `main`.
 - **Shared contracts.** A change to `src/snapback/contracts.py` or `src/snapback/verdict.py`
   needs the integrator lane's approval, because every lane depends on them. Propose the change
   in an issue first if it is more than adding an optional field.
