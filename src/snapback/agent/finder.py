@@ -78,7 +78,10 @@ _BAD_REASON = re.compile(
     re.IGNORECASE,
 )
 
-KICKOFF = "The renter just acted. Plan first, then work through it."
+KICKOFF = (
+    "The renter just acted. Your very first tool call must be write_todos with your plan: no "
+    "other tool before it, and no delegating until it is written. Then work through the plan."
+)
 NUDGE = (
     "You skipped the plan. Call write_todos now with your steps, then carry on. Until you do, "
     "the sub-agents will not answer."
@@ -616,6 +619,7 @@ def build_model(api_key: str | None = None, name: str | None = None) -> Any:
 def build_agent(session: FinderSession, prefs: PrefDesk, search: SearchDesk) -> Any:
     from deepagents import FilesystemPermission, create_deep_agent
     from langchain_core.tools import tool
+    from langchain.agents.middleware import TodoListMiddleware
     from langgraph.checkpoint.memory import InMemorySaver
 
     pp, kp = f"/finder/{session.id}/prefs.md", f"/finder/{session.id}/picks.md"
@@ -710,6 +714,10 @@ def build_agent(session: FinderSession, prefs: PrefDesk, search: SearchDesk) -> 
     return create_deep_agent(
         model=session.model,
         tools=[finder_status],
+        # This deepagents version does not add the todo tool by itself. Live models also skip a plan
+        # the prompt only asks for (and this one refuses a forced tool choice), so the sub-agents
+        # refuse to answer until the plan exists (`gated`) and `run_deep` nudges once.
+        middleware=[TodoListMiddleware()],
         system_prompt=SYSTEM_PROMPT,
         subagents=subagents,
         permissions=[FilesystemPermission(operations=["write"], paths=["/**"], mode="deny")],
