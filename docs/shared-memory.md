@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Fri Nov 13 2026, 22:00. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 00:37. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
 
 ## Decisions (locked)
 
@@ -15,6 +15,11 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - Fri 21:48 CoStar Terms accepted as written (IP assignment to CoStar is fine for a hackathon project). Each person accepts for themselves and runs `/costar-keys` in `#costar-group` for their own key. (Vidyut + Dev; Jeffrey and Rishit accept for themselves)
 - Fri 21:48 Scope: 12 committed modules plus the eval harness, then ordered stretch 13 tactic classifier, 14 scam-ring graph, 15 listing-time platform screen (S5), 16 feedback loop with anti-poisoning. See docs/ROLES.md. (Vidyut)
 - Fri 21:53 FINAL split: A agent/backend = Dev; T front end = Vidyut + Claude; V vision/ML = Jeffrey; D data + iMessage = Rishit. The XO runs the repo: issues, reviews, merges. (Vidyut)
+- Sat 00:35 Plan v3.2 (plan/snapback-v3.2.md, planner summary): one product, three proofs (PLACE, PERSON, PRICE), plus replays of real reported scams (#71, LOCKED 00:35). (Vidyut)
+- Sat 00:35 New issues #66-#79: D7 #66, A7 #67, V8 #68, eval route #69, D8 #71, A8 #72, A9 #73, V9 #74, T7-T11 #75-#79. #18, #19, #34 closed as design-only.
+- Sat 00:35 Overnight mode 01:30-07:30: humans sleep, agents work their v3.2 queue on their epic issue (#8 #10 #11, plan on #41). (Vidyut)
+- Sat 00:35 Token ruling: `GET /eval/results.csv` is public (aggregate only, no case data). (conductor, #69/#70)
+- Sat 00:35 Card words are locked; use the locked wording everywhere (CardPage.tsx included, #76). (conductor)
 - No "SAFE", "VERIFIED" or "SCAM" state anywhere. Card words come from code, never from a model. Say "could not verify", never "scam", about a person. (spec v3)
 
 ## Who is doing what
@@ -22,12 +27,12 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
 `epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                                                       |
-| ------- | ----------- | ------------------------------------ | --------------------------------------------------------- |
-| Dev     | DevSingh05  | A. agent and backend                 | data gate #5, then epic #8 (A1 #12)                       |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | data gate #5, then epic #9 (T1 #20)                       |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | data gate #5, then epic #10 (V1 #27)                      |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | data gate #5, then epic #11 (D1 #35); repo invite pending |
+| Person  | GitHub      | Lane                                 | Now                                                                                                                        |
+| ------- | ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Dev     | DevSingh05  | A. agent and backend                 | A1-A5 merged (#58 at 625caf5). #59 A6 and #70 eval route: FIX posted 00:31. A7 #67 started 00:31 (contract stub by 01:15)  |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | #53 #55 #64 #65 merged (web wired to real API, read token); design direction A+C being built                               |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | V1 #63 merged; #61 V5 and #62 V6 FIX still open, no push since 23:21; pinged on #10 at 00:36. Then V8 #68 probes           |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | D1-D6 re-pushed (heads e5ab819..dbb206f), no PRs yet; XO opens d/35, d/37, d/39 PRs if still missing at 01:15. Then D7 #66 |
 
 ## Data facts (REPORTED until our probe confirms)
 
@@ -64,7 +69,9 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Live facts
 
-- Nothing deployed yet.
+- Nothing deployed yet. main = 625caf5 (#58 A5 merged, Sat after 00:30).
+- Fri 22:10 data gate GO: 3/3 Houston multifamily Matterport models load on Vidyut's key (issue #5); apartment-listing has min/max rent per floor plan and the management company.
+- API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace/status; may go in `?token=`). `/c/:id` card stays public.
 
 ## Gotchas
 
@@ -76,3 +83,7 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 - Quickstart (unchecked on our keys): cube faces at 2k or 4k, a defurnished view of the same panoramas, labelled rooms with dimensions, and a residential folder joined by a home listing id. Probe the residential file too.
 - Sponsor Terms: all copies, caches and derivatives deleted when the event period ends (Sun 16:00); no sponsor data in a public demo or repo.
 - Branch names: `<lane>/<issue#>-<slug>` with lane `a`, `t`, `v` or `d`. Task PRs say `Closes #n`; epic and inbox issues only `Refs #n`.
+- Fri 23:35 Unbounded regex on user text is a DoS: `[\w.+-]+@` took 26 s on 80k chars. Bound every quantifier and cap text length before any pattern runs.
+- Fri 23:38 Never put the write secret in a URL (uvicorn logs the query string); use the read-only token for EventSource.
+- Fri 23:45 SQLite connections are per thread; FastAPI sync routes run in a threadpool. Open per call or lock.
+- Keep PR stacks at most 2 deep; merge `main` into the branch rather than stacking fixes.

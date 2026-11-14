@@ -91,4 +91,44 @@ def test_create_case_fixtures_parse_and_keep_the_secret_out_of_the_request():
     assert "token" not in contracts.CreateCaseRequest.model_fields
     assert response.source == "fixture"
     assert response.token.startswith("fx-")  # a fixture value, never a real secret
+    assert response.read_token and response.read_token.startswith("fx-")
+    assert response.read_token != response.token
     assert response.challenge_text
+
+
+def test_the_a7_contact_fields_are_optional_and_their_fixtures_parse():
+    # A7 (#67) and D7 (#66): everything added is optional, so records written before it
+    # still parse and say "not checked".
+    import snapback.contracts as contracts
+
+    old = contracts.PropertyRecord.model_validate_json(load("property_record.json"))
+    assert (old.site_phone_hash, old.website_host, old.floor_plan_rents, old.units) == (
+        None, None, [], [],
+    )  # fmt: skip
+
+    record = contracts.PropertyRecord.model_validate_json(load("property_record_contact.json"))
+    assert record.property_id.startswith("fx-") and record.website_host.endswith(".example")
+    assert record.site_phone_hash.startswith("fx-")  # a stand-in for a hash, never digits
+    assert [plan.per_bed for plan in record.floor_plan_rents] == [False, False, True]
+    assert {unit.unit for unit in record.units} == {"101", "204", "4B"}
+
+    for_sale = contracts.ForSaleMatch.model_validate_json(load("for_sale_match.json"))
+    assert for_sale.status is contracts.ForSaleStatus.ACTIVE and for_sale.site == "Homes.com"
+
+    hold = contracts.ModuleEvidence.model_validate_json(load("module_evidence_hold.json"))
+    assert hold.for_sale is None
+    if hold.authority is not None:
+        assert hold.authority.office_phone_match is contracts.PhoneMatch.NOT_CHECKED
+        assert hold.authority.link_domain is contracts.LinkDomain.NOT_CHECKED
+    if hold.price is not None:
+        assert hold.price.unit is contracts.UnitStatus.NOT_CHECKED and hold.price.per_bed is False
+    evidence = contracts.Evidence(case_id="fx-1", source="fixture")
+    assert not any(
+        (
+            evidence.for_sale_flag,
+            evidence.recently_rented_flag,
+            evidence.phone_flag,
+            evidence.lookalike_link_flag,
+            evidence.unit_flag,
+        )
+    )
