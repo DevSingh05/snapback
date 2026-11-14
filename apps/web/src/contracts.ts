@@ -328,3 +328,28 @@ export interface TourDraft {
   sent: false;
   source: DataSource;
 }
+
+// Mirrors PackLine and TourPrepPack in src/snapback/pack.py (GET /cases/{id}/tour-prep and
+// GET /places/{property_id}/tour-prep). Every word is the API's, written by code in the language
+// asked for; render it as given.
+export interface PackLine {
+  key: string;
+  text: string;
+  sources: string[];
+  as_of?: string | null; // "as of CoStar's last research", on lines from CoStar's research
+}
+
+export interface TourPrepPack {
+  source: DataSource;
+  lang: "en" | "es";
+  title: string;
+  subtitle: string;
+  note: string;
+  as_of: string;
+  facts_heading: string;
+  questions_heading: string;
+  pay_heading: string;
+  facts: PackLine[];
+  questions: PackLine[];
+  before_you_pay: string[];
+}
