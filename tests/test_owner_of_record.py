@@ -445,6 +445,8 @@ def test_a_poster_who_says_they_own_it_is_heard(text):
         "homeowners association",
         "This is not my house",
         "like it's my home",
+        "Sold by owner in 2019.",
+        "It was for rent by owner last year.",
     ],
 )
 def test_other_mentions_of_an_owner_are_not_a_claim(text):
