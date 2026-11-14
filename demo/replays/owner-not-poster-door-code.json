@@ -69,7 +69,7 @@
       {
         "step_id": "hold",
         "status": "warning",
-        "text": "The ad asks for rent or a deposit before move-in, and the owner of record is not the poster."
+        "text": "The ad asks you to pay rent or a deposit before move-in, and the owner of record is not the poster."
       },
       {
         "step_id": "hold",

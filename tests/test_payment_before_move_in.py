@@ -157,6 +157,9 @@ def test_an_ask_for_money_before_move_in_is_heard(text):
         "Send me your first and last name and I will set up a showing.",
         "Text your first and last name to book a tour.",
         "No security deposit required.",
+        "No pet deposit required.",
+        "No security or pet deposit required.",
+        "No holding deposit is needed.",
         "Rent $1,500, zero deposit.",
         # The writer refusing the thing is not the writer asking for it.
         "We do not require first month's rent to be paid before move-in.",
@@ -188,7 +191,7 @@ def test_an_ask_before_move_in_never_reads_matches():
     # who the money would go to is not something we checked.
     assert (line.tone, line.text) == (
         CardTone.NOT_SHOWN,
-        "The ad asks for rent or a deposit before move-in. "
+        "The ad asks you to pay rent or a deposit before move-in. "
         "We could not confirm who it would go to.",
     )
     assert "No risky payment ask" not in " ".join(
@@ -208,7 +211,7 @@ def test_an_owner_with_a_published_rule_makes_it_a_warning_with_the_rule_beside_
     assert labels[place - 1] == "Payment ask"  # right after the payment ask it speaks to
     assert (lines[place - 1].tone, lines[place - 1].text) == (
         CardTone.HOLD,
-        "The ad asks for rent or a deposit before move-in. "
+        "The ad asks you to pay rent or a deposit before move-in. "
         "We could not confirm who it would go to.",
     )
     assert (lines[place].tone, lines[place].text) == (
@@ -227,7 +230,7 @@ def test_an_owner_who_is_not_the_poster_makes_it_a_warning_even_without_a_rule()
     line = payment_line(modules)
     assert (line.tone, line.text) == (
         CardTone.HOLD,
-        "The ad asks for rent or a deposit before move-in, "
+        "The ad asks you to pay rent or a deposit before move-in, "
         "and the owner of record is not the poster.",
     )
     assert "Owner's rule" not in [item.label for item in all_lines(modules)]

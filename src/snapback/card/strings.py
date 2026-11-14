@@ -227,13 +227,14 @@ EN: dict[str, str] = {
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
-    # The ad asks for rent or a deposit before move-in. Honest listings do too, so it is
+    # The ad asks you to pay rent or a deposit before move-in. Honest listings do too, so it is
     # never a red flag; the line just must not read "Matches" (conductor, Sat 10:03).
     "payment.before_move_in": (
-        "The ad asks for rent or a deposit before move-in. We could not confirm who it would go to."
+        "The ad asks you to pay rent or a deposit before move-in. "
+        "We could not confirm who it would go to."
     ),
     "payment.before_move_in_not_owner": (
-        "The ad asks for rent or a deposit before move-in, "
+        "The ad asks you to pay rent or a deposit before move-in, "
         "and the owner of record is not the poster."
     ),
     # One entry per red-flag rule in agent/rules/table.py, keyed by its rule id.

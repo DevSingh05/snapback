@@ -57,13 +57,16 @@ class Rule:
 
 # Pieces of the "money before move-in" rule. A deposit that is "no deposit" or "without
 # deposit" is not money asked for, and "not required" is not an ask.
+# A deposit that is refused is not asked for: "no deposit", "no pet deposit", "zero deposit".
+_A_DEPOSIT = (
+    r"(?<!no )(?<!no security )(?<!no pet )(?<!no holding )(?<! or pet )"
+    r"(?<!without )(?<!zero )\bdeposit\b"
+)
 _MONEY = (
-    r"(?:(?<!no )(?<!no security )(?<!without )(?<!zero )\bdeposit\b"
-    r"|\bfirst month(?:'s)?\b|\bmonth'?s rent\b"
+    r"(?:" + _A_DEPOSIT + r"|\bfirst month(?:'s)?\b|\bmonth'?s rent\b"
     r"|\$\d[\d,]{0,12})"
 )
 _NOT = r"(?<!not )(?<!n't )(?<!never )(?<!dont )"
-_A_DEPOSIT = r"(?<!no )(?<!no security )(?<!without )(?<!zero )\bdeposit\b"
 _DOLLARS = r"\$[1-9][\d,]{0,12}"  # "$0 deposit" asks for nothing
 _BEFORE_MOVE_IN = r"\b(?:before|prior to|ahead of)\b[^.!?]{0,15}\bmov(?:e|ing)[- ]?in\b"
 
