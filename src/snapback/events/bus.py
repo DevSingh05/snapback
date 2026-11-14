@@ -10,7 +10,7 @@ import threading
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from snapback.events.models import Event, EventKind, EventRefused
+from snapback.events.models import Event, EventKind, EventRefused, checked
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +37,12 @@ class EventBus:
         self._events: list[Event] = []
         self._lines = 0
         if self._path.is_file():
-            for line in self._path.read_text(encoding="utf-8").splitlines():
+            text = self._path.read_text(encoding="utf-8")
+            if text and not text.endswith("\n"):
+                # A crash can leave half a line. End it, so the next event starts its own.
+                with self._path.open("a", encoding="utf-8") as out:
+                    out.write("\n")
+            for line in text.splitlines():
                 self._lines += 1
                 try:
                     self._events.append(Event.model_validate_json(line))
@@ -48,6 +53,7 @@ class EventBus:
         """Number the event, log it and tell the subscribers. Returns the numbered event."""
         if event.id:
             raise EventRefused("that event was already published")
+        event = checked(event)  # however it was built, and whatever was changed since
         with self._lock:
             self._lines += 1
             kept = event.model_copy(update={"id": f"ev-{self._lines:06d}"})

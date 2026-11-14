@@ -271,3 +271,104 @@ def test_with_no_token_configured_the_stream_is_closed_to_everyone(tmp_path):
     client = client_for(tmp_path, token=None)
     assert client.get("/events/stream", headers={"Authorization": "Bearer "}).status_code == 401
     assert client.get("/events/stream", headers={"Authorization": "Bearer x"}).status_code == 403
+
+
+# --- review of #226: checked however an event is made, values as well as keys ----------------
+
+
+def test_an_event_built_by_hand_is_checked_too():
+    with pytest.raises(ValueError):
+        Event(
+            kind=EventKind.MATCH_FOUND,
+            at=AT,
+            source=EventSource.PIPELINE,
+            subject="fx-place-1",
+            payload={"address": "1 Fixture Lane", "phone": "555-0100"},
+        )
+
+
+def test_an_event_read_back_from_json_is_checked_too():
+    line = json.dumps(
+        {
+            "kind": "match_found",
+            "at": AT.isoformat(),
+            "source": "pipeline",
+            "subject": "fx-place-1",
+            "payload": {"address": "1 Fixture Lane"},
+        }
+    )
+    with pytest.raises(ValueError):
+        Event.model_validate_json(line)
+
+
+def test_publish_refuses_an_event_whose_payload_was_changed_after_it_was_built(tmp_path):
+    events = bus(tmp_path)
+    event = new_event(**match(), at=AT)
+    event.payload["address"] = "1 Fixture Lane"
+    with pytest.raises(EventRefused):
+        events.publish(event)
+    assert events.after(0) == []
+    assert not (tmp_path / "events" / "log.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    "kind, source, payload",
+    [
+        (EventKind.SESSION_STARTED, EventSource.RENTER, {"lang": "1 Fixture Lane, call 555-0100"}),
+        (EventKind.SESSION_STARTED, EventSource.RENTER, {"lang": "fr"}),
+        (EventKind.WATCH_ADDED, EventSource.RENTER, {"session": "7135550100", "kind": "place"}),
+        (EventKind.WATCH_ADDED, EventSource.RENTER, {"session": "fx-sess-1", "kind": "anything"}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"fits_brief": "yes"}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"has_scan": 1}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"rent_from": "1100"}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"rent_from": -5}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"rent_from": True}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"rent_from": None}),
+        (EventKind.PLACE_RECORD_CHANGED, EventSource.SIMULATED, {"field": "owner_name"}),
+        (EventKind.INDEX_WARMED, EventSource.PIPELINE, {"twins": 2.5}),
+        (EventKind.CASE_CREATED, EventSource.PIPELINE, {"data_source": "kit"}),
+        (EventKind.AERIAL_CACHED, EventSource.PIPELINE, {"direction": "up"}),
+    ],
+)
+def test_a_value_is_one_of_a_few_words_a_number_a_yes_or_no_or_an_id(kind, source, payload):
+    with pytest.raises(EventRefused):
+        new_event(kind=kind, source=source, subject="fx-place-1", payload=payload)
+
+
+@pytest.mark.parametrize(
+    "kind, source, payload",
+    [
+        (EventKind.SESSION_STARTED, EventSource.RENTER, {"lang": "es"}),
+        (EventKind.WATCH_ADDED, EventSource.RENTER, {"session": "fx-sess-1", "kind": "brief"}),
+        (EventKind.MATCH_FOUND, EventSource.PIPELINE, {"rent_from": 1100, "has_scan": True}),
+        (EventKind.PLACE_RECORD_CHANGED, EventSource.SIMULATED, {"field": "units_reported"}),
+        (EventKind.INDEX_WARMED, EventSource.PIPELINE, {"twins": 21, "views": 21528}),
+        (EventKind.CASE_CREATED, EventSource.PIPELINE, {"data_source": "fixture"}),
+        (EventKind.AERIAL_CACHED, EventSource.PIPELINE, {"direction": "nadir"}),
+    ],
+)
+def test_every_kind_takes_its_own_values(kind, source, payload):
+    assert (
+        new_event(kind=kind, source=source, subject="fx-place-1", payload=payload).payload
+        == payload
+    )
+
+
+@pytest.mark.parametrize("subject", ["7135550100", "77002", "555-0100", "1.5"])
+def test_a_subject_made_only_of_digits_is_refused(subject):
+    with pytest.raises(EventRefused):
+        new_event(**(match() | {"subject": subject}))
+
+
+def test_half_a_line_left_by_a_crash_does_not_swallow_the_next_event(tmp_path):
+    events = bus(tmp_path)
+    events.publish(new_event(**match(), at=AT))
+    path = tmp_path / "events" / "log.jsonl"
+    with path.open("a") as log:
+        log.write('{"id": "ev-000002", "kind": "match_fo')  # no newline: the write was cut off
+    again = bus(tmp_path)
+    kept = again.publish(new_event(**match(), at=AT))
+    assert kept.id == "ev-000003"
+    lines = path.read_text().splitlines()
+    assert len(lines) == 3 and json.loads(lines[2])["id"] == "ev-000003"
+    assert [event.id for event in bus(tmp_path).after(0)] == ["ev-000001", "ev-000003"]
