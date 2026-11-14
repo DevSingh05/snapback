@@ -142,8 +142,8 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
   const title =
     heading ??
     (briefIsEmpty(brief)
-      ? "Checked places near this price"
-      : "Checked places that fit your budget");
+      ? "Researched places near this price"
+      : "Researched places that fit your budget");
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const briefKey = JSON.stringify(brief);
@@ -178,7 +178,7 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
       </div>
       {load.status === "ready" && <p className="pf-asof">{load.places.as_of}</p>}
 
-      {load.status === "loading" && <p className="pf-note">Looking up checked places…</p>}
+      {load.status === "loading" && <p className="pf-note">Looking up researched places…</p>}
       {load.status === "error" && (
         <div className="pf-empty" role="alert">
           <p>We could not load places right now.</p>
@@ -192,7 +192,7 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
       )}
       {load.status === "ready" && load.places.matches.length === 0 && (
         <div className="pf-empty" data-testid="places-empty">
-          <p>No checked places fit this budget and these must-haves.</p>
+          <p>No researched places fit this budget and these must-haves.</p>
           {load.places.tradeoff_question && (
             <p className="pf-tradeoff">{load.places.tradeoff_question}</p>
           )}
