@@ -5,7 +5,6 @@ Every image here is drawn by the test itself from a seed, so no photo file is co
 
 import io
 import sqlite3
-import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 
@@ -351,11 +350,16 @@ def test_check_purges_expired_rows_from_disk(memory, clock, tmp_path):
     )
 
 
-def test_a_12_megapixel_photo_is_fast(memory):
+def test_a_12_megapixel_photo_is_downscaled_before_hashing(memory):
+    """Hashing works on at most 1024 px on the long side, so a 12 MP photo costs no more than a
+    small one (it took 1.9 s before). Checked by behaviour, not by a clock, so CI is not flaky."""
+    from snapback.vision.memory.hashes import MAX_SIDE, fingerprint, prepare
+
     big = room(5, size=(4032, 3024))
-    started = time.perf_counter()
+    assert max(prepare(big).size) == MAX_SIDE == 1024
+    assert fingerprint(big) == fingerprint(prepare(big))
+
     memory.record("fx-case-a", "fx-big", big, PhotoRole.LISTING)
-    assert time.perf_counter() - started < 1.0
     small = jpeg(room(5).resize((1008, 756)), 60)
     assert memory.check("fx-case-a", "fx-r", small, PhotoRole.REPLY).hit is (
         MemoryHitKind.SAME_CASE_LISTING

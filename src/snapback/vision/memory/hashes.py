@@ -196,7 +196,8 @@ class Fingerprint:
 
 
 def fingerprint(image: Image.Image) -> Fingerprint:
-    image = prepare(image)
+    # Every hash is computed on grey pixels, so convert once rather than once per crop.
+    image = prepare(image).convert("L")
     crops = [
         _pair(name, image if sw == sh == 1.0 else crop(image, sw, sh, px, py))
         for name, sw, sh, px, py in CROPS
