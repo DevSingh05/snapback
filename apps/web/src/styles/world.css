@@ -1,0 +1,423 @@
+/* One world. The screens around the map, the first screen and the walk share their look: a
+   slab with a deep soft shadow and one thin glowing line along its top edge, mono caps for
+   labels, kit drawings where a picture helps, and teal for the strongest facts. State is carried
+   by teal, ink and slate steps with an icon and a word, never by red or amber. The map's glow
+   tokens are used when its set is present. Loaded after app.css. */
+.shell {
+  --glow: var(--map-glow, var(--zing));
+  --glow-edge: var(--glow-line, 0 0 14px color-mix(in srgb, var(--zing) 70%, transparent));
+  --wash: color-mix(in srgb, var(--glow) 10%, var(--paper));
+}
+:where(.shell) a {
+  color: var(--act);
+  text-underline-offset: 3px;
+}
+
+/* The glowing top edge on every slab. */
+.card-page,
+.pf-strip,
+.tp-sheet,
+.replay-page {
+  position: relative;
+  box-shadow: var(--shadow-lift);
+}
+.card-page::before,
+.pf-strip::before,
+.tp-sheet::before,
+.replay-page::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--glow), transparent 78%);
+  box-shadow: var(--glow-edge);
+  pointer-events: none;
+}
+
+/* Mono caps: the small label above a thing, as on the map. */
+.kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Where a fact comes from: the FIXTURE chip's shape, a quiet fill, no outline. */
+.prov {
+  display: inline-block;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--paper);
+  color: var(--muted);
+}
+
+/* Kit drawings and the pinned photos (components/KitArt.tsx). */
+.kit-art {
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+.ka-text {
+  fill: color-mix(in srgb, var(--muted) 50%, var(--h-wall));
+}
+.ka-thumb {
+  fill: var(--h-wall-shade);
+}
+.ka-lot {
+  fill: color-mix(in srgb, var(--glow) 24%, var(--h-lawn));
+  stroke: var(--glow);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--glow) 70%, transparent));
+}
+.ka-lit .dk-teal {
+  --c: var(--glow);
+}
+.ka-lit [data-part="roof"] {
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--glow) 60%, transparent));
+}
+.ka-mat {
+  fill: var(--h-wall);
+  filter: drop-shadow(0 5px 8px var(--h-shade));
+}
+.ka-pic {
+  fill: var(--h-unlit);
+}
+.ka-pic-floor {
+  fill: var(--h-path);
+}
+.ka-pic-thing {
+  fill: var(--h-roof);
+}
+.ka-trace {
+  stroke: var(--glow);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  fill: none;
+}
+.ka-pin {
+  fill: var(--glow);
+  stroke: var(--h-wall);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 5px var(--glow));
+}
+
+/* The verdict band: dusk behind the home the photos lead to. */
+.card-page .hero {
+  background:
+    radial-gradient(
+      ellipse 46% 90% at 86% 78%,
+      color-mix(in srgb, var(--glow) 30%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      100deg,
+      var(--v-band) 40%,
+      color-mix(in srgb, var(--v-band) 74%, var(--h-door)) 130%
+    );
+  box-shadow: inset 0 -4px 0 var(--state);
+  padding-right: clamp(190px, 30vw, 300px);
+}
+.card-page .hero-coral {
+  --state: var(--on-v-band);
+}
+.card-page .hero-amber {
+  --state: var(--v-slate);
+}
+.card-page .hero-teal {
+  --state: var(--glow);
+}
+.card-page .hero-blue {
+  --state: color-mix(in srgb, var(--v-slate) 46%, var(--v-band));
+}
+.card-page .hero-blue .hero-mark {
+  color: var(--on-v-band);
+}
+.card-page .hero-teal .hero-mark {
+  box-shadow: var(--glow-edge);
+}
+.card-page .hero-house {
+  right: clamp(10px, 2.4vw, 26px);
+  bottom: 10px;
+  width: clamp(170px, 27vw, 268px);
+}
+.hero .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.hero .meta {
+  font-size: 0.9rem;
+  opacity: 0.86;
+}
+
+/* The checks: each line is a slab; its group's label and drawing sit beside it. */
+.card-page .evidence {
+  padding-top: 18px;
+}
+.card-page .group {
+  border-top: 0;
+}
+.card-page .evidence :is(td, th) {
+  vertical-align: middle;
+  border-bottom: 4px solid var(--surface);
+}
+.card-page .group + .group tr:first-child > * {
+  border-top: 12px solid var(--surface);
+}
+.card-page .evidence td {
+  background: var(--paper);
+  padding-block: 16px;
+}
+.card-page .cell-kind {
+  width: 8.4rem;
+  padding: 4px 16px 4px 10px;
+  vertical-align: top;
+}
+.card-page .kind {
+  display: block;
+  padding: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+.kind-art {
+  width: 100%;
+  max-width: 112px;
+}
+.kit-art-person.kind-art {
+  max-width: 84px;
+}
+.kit-art-scan.kind-art {
+  max-width: none;
+  width: calc(100% + 14px);
+  margin-inline: -7px;
+}
+.kind-standin {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card-page .cell-what {
+  width: 10.5rem;
+  padding-left: 18px;
+}
+.card-page .cell-tone {
+  width: 10.6rem;
+}
+/* The strongest facts: a line that matches is lit. */
+.card-page tr:has(.tone-is-ok) td {
+  background: var(--wash);
+}
+.card-page tr:has(.tone-is-ok) .cell-what {
+  box-shadow: inset 3px 0 0 var(--glow);
+}
+.card-page .tone {
+  background: none;
+  min-width: 0;
+}
+.card-page .tone .tone-icon {
+  -webkit-text-fill-color: var(--on-tile, var(--surface));
+}
+.card-page .tone-is-ok {
+  --st: var(--glow);
+  --on-tile: var(--on-zing);
+}
+.card-page .tone-is-ok .tone-icon {
+  box-shadow: var(--glow-edge);
+}
+.card-page .tone-is-mismatch {
+  --st: var(--ink);
+}
+.card-page .tone-is-warn {
+  --st: color-mix(in srgb, var(--ink) 62%, var(--surface));
+}
+.card-page .tone-is-unconfirmed {
+  --st: color-mix(in srgb, var(--ink) 24%, var(--surface));
+  --on-tile: var(--ink);
+}
+.card-page .tone-is-unchecked {
+  --st: color-mix(in srgb, var(--ink) 9%, var(--surface));
+  --on-tile: var(--muted);
+}
+
+.card-page .not-checked {
+  background: var(--paper);
+  color: var(--ink);
+  padding: 12px 16px;
+}
+.card-page .not-checked h2 {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card-page .rules {
+  border-top: 0;
+  background: var(--paper);
+}
+
+/* Empty, loading and error states: the unlit home, plain words, one action. */
+.notice {
+  align-items: flex-start;
+  background-image: linear-gradient(180deg, var(--sky), var(--surface) 14rem);
+}
+.notice .notice-house {
+  width: 148px;
+}
+.wait {
+  position: relative;
+  margin: 0;
+  padding: 14px 16px 14px 18px;
+  background: var(--paper);
+  color: var(--muted);
+  overflow: hidden;
+}
+.wait::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--glow);
+  box-shadow: var(--glow-edge);
+}
+
+@media (max-width: 640px) {
+  .card-page .hero {
+    padding-right: clamp(18px, 4vw, 36px);
+  }
+  .card-page .hero-house {
+    top: 6px;
+    bottom: auto;
+    right: 6px;
+    width: 132px;
+  }
+  .card-page .hero > .eyebrow {
+    padding-right: 120px;
+    min-height: 48px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+  }
+  .card-page .evidence :is(td, th),
+  .card-page .group + .group tr:first-child > * {
+    border: 0;
+    background: none;
+  }
+  .card-page .group {
+    display: block;
+    margin-bottom: 14px;
+  }
+  .card-page tr {
+    position: relative;
+    margin-bottom: 4px;
+    padding: 14px;
+    background: var(--paper);
+    border: 0;
+  }
+  .card-page tr:has(.tone-is-ok) {
+    background: var(--wash);
+    box-shadow: inset 3px 0 0 var(--glow);
+  }
+  .card-page tr:has(.tone-is-ok) td {
+    background: none;
+  }
+  .card-page tr:has(.tone-is-ok) .cell-what {
+    box-shadow: none;
+  }
+  .card-page .evidence td {
+    padding: 0;
+  }
+  .card-page .cell-kind {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 4px 12px;
+    flex-wrap: wrap;
+    width: auto;
+    padding: 0 0 12px;
+  }
+  .card-page .kind {
+    margin: 0;
+    padding: 0 0 4px;
+    order: 1;
+    flex: 1;
+  }
+  .kind-art,
+  .kit-art-scan.kind-art {
+    order: 2;
+    width: 76px;
+    margin: 0;
+  }
+  .kit-art-scan.kind-art {
+    width: 124px;
+  }
+  .kind-standin {
+    order: 3;
+    flex-basis: 100%;
+    text-align: right;
+  }
+  .card-page .cell-what {
+    width: auto;
+    padding: 0;
+  }
+  .card-page .cell-tone {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The ledger: each check ticks in after the one before it, its word last. */
+  .card-page .evidence tr > * {
+    animation-delay: calc(var(--i, 0) * 120ms + 0.44s);
+  }
+  .card-page .evidence .tone {
+    animation-delay: calc(var(--i, 0) * 120ms + 0.62s);
+  }
+  .ka-photo {
+    animation: ka-drop 0.5s var(--ease-out) backwards;
+  }
+  @keyframes ka-drop {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+  .ka-trace {
+    animation: ka-draw 0.6s ease-out 0.8s backwards;
+  }
+  @keyframes ka-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+  }
+  .wait::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(104deg, transparent 35%, var(--sweep) 50%, transparent 65%);
+    animation: wait-pass 1.6s linear infinite;
+  }
+  @keyframes wait-pass {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+}
