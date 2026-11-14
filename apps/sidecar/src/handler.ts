@@ -50,10 +50,10 @@ export type SidecarConfig = {
 
 const MAX_PHOTOS = 10;
 
-/** Locked headlines (XO). Code picks the line from the verdict state; no model writes it. */
+/** Locked headlines: the `state.*` strings in src/snapback/card/strings.py, word for word. */
 export const HEADLINES: Record<VerdictState, string> = {
-  hold: "Hold off for now.",
-  unverified: "Hold off for now.",
+  hold: "Hold off for now",
+  unverified: "Could not place these photos",
   dont_pay: "Don't pay. Something here doesn't match.",
   verified: "Checks passed. Still follow the two rules.",
 };

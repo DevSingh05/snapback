@@ -91,7 +91,8 @@ test("inbound message -> one API call -> one reply containing the case link", as
 });
 
 for (const [state, headline] of [
-  ["hold", "Hold off for now."],
+  ["hold", "Hold off for now"],
+  ["unverified", "Could not place these photos"],
   ["dont_pay", "Don't pay. Something here doesn't match."],
   ["verified", "Checks passed. Still follow the two rules."],
 ] as const) {
@@ -104,7 +105,7 @@ for (const [state, headline] of [
 }
 
 test("no case token ever appears in the reply", async () => {
-  for (const state of ["hold", "dont_pay", "verified"]) {
+  for (const state of ["hold", "unverified", "dont_pay", "verified"]) {
     const photon = mockPhoton();
     await handleMessage(msg, photon, config([], { state }));
     const text = first(photon.sent).text;
