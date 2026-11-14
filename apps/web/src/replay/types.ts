@@ -7,14 +7,14 @@ export type ReplayStepKind = "listing" | "chat" | "hold_request" | "payment" | "
 // never from the JSON, so the locked wording cannot drift.
 // Locked row words (decisions.md 22:40).
 export type FindingStatus =
-  "matches" | "doesnt_match" | "not_confirmed" | "warning" | "not_checked";
+  "matches" | "doesnt_match" | "not_confirmed" | "warning" | "not_checked" | "red_flag";
 
 export type ReplayVerdict = "dont_pay" | "hold";
 
 export interface ReplayStep {
   id: string;
   kind: ReplayStepKind;
-  /** Date as reported by the source, YYYY-MM-DD. */
+  /** Date as reported by the source, YYYY-MM-DD; empty when the source gives none for the step. */
   reported_on: string;
   /** Short title, plain words. */
   label: string;
@@ -44,4 +44,6 @@ export interface Replay {
     /** What SNAPBACK's run found at each step it saw, in the locked row words. */
     findings: { step_id: string; status: FindingStatus; text: string }[];
   };
+  /** What SNAPBACK cannot catch in this case, in plain words. */
+  cant_catch?: string;
 }

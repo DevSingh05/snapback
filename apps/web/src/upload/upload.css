@@ -164,7 +164,7 @@
 }
 .upload-eyebrow {
   padding-bottom: 6px;
-  background: linear-gradient(var(--scan), var(--scan)) 0 100% / 100% 4px no-repeat;
+  background: linear-gradient(var(--zing), var(--zing)) 0 100% / 100% 4px no-repeat;
 }
 .upload-house {
   position: absolute;
@@ -173,12 +173,12 @@
   width: clamp(150px, 25vw, 250px);
 }
 
-/* The primary button: a teal block on an amber block. Pressing it sets it down. */
+/* The primary button: a teal block on an aqua block. Pressing it sets it down. */
 .upload-submit {
   padding: 12px 26px;
   font-size: 1.08rem;
   margin: 4px 6px 6px 0;
-  box-shadow: 6px 6px 0 var(--scan);
+  box-shadow: 6px 6px 0 var(--zing);
 }
 .upload-submit:disabled {
   box-shadow: none;
@@ -190,7 +190,7 @@
 @media (hover: hover) {
   .upload-submit:hover:not(:disabled) {
     transform: translate(-1px, -1px);
-    box-shadow: 7px 7px 0 var(--scan);
+    box-shadow: 7px 7px 0 var(--zing);
   }
   .upload-secondary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--sky) 90%, var(--ink));
@@ -198,7 +198,7 @@
 }
 .upload-submit:active:not(:disabled) {
   transform: translate(6px, 6px);
-  box-shadow: 0 0 0 var(--scan);
+  box-shadow: 0 0 0 var(--zing);
   background: color-mix(in srgb, var(--act) 86%, var(--ink));
 }
 

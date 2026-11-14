@@ -19,7 +19,6 @@ const ZING = [
   "sky-sweep",
   "band-in",
   "house-down",
-  "mark-down",
   "land",
   "stamp",
   "underline-in",
@@ -69,6 +68,20 @@ describe("zing pass", () => {
     }
   });
 
+  it("colours each chip by the word it shows, so one word always looks one way", () => {
+    const { container } = render(<CardView card={card} variant="result" />);
+    const kinds = new Map<string, Set<string>>();
+    for (const chip of container.querySelectorAll<HTMLElement>(".tone")) {
+      const word = chip.textContent!.slice(1);
+      const kind = [...chip.classList].find((c) => c.startsWith("tone-is-"))!;
+      kinds.set(word, (kinds.get(word) ?? new Set()).add(kind));
+    }
+    expect(kinds.size).toBeGreaterThan(1);
+    for (const [word, set] of kinds) expect([...set], word).toHaveLength(1);
+    expect(new Set([...kinds.values()].map((v) => [...v][0])).size).toBe(kinds.size);
+    expect([...kinds.get("Warning")!]).toEqual(["tone-is-warn"]);
+  });
+
   it("numbers the evidence lines in order so they land one after another", () => {
     const { container } = render(<CardView card={card} variant="result" />);
     const order = Array.from(container.querySelectorAll<HTMLElement>(".evidence tbody tr")).map(
@@ -84,7 +97,8 @@ describe("zing pass", () => {
     expect(svg).toHaveAttribute("aria-hidden", "true");
     expect(svg.textContent).toBe("");
     expect(container.innerHTML).not.toMatch(/href|url\(|<image|<use/);
-    expect(render(<HouseGlyph lit={false} />).container.querySelector(".house-mark")).toBeNull();
+    expect(svg).toHaveClass("house-lit");
+    expect(render(<HouseGlyph lit={false} />).container.querySelector(".house-lit")).toBeNull();
   });
 
   it("keys each researched place by how it sits against the budget", async () => {
