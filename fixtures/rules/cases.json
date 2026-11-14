@@ -460,5 +460,77 @@
     "category": "link",
     "text": "Floor plans at https://fixtureliving.example/plans; a credit check is run at application.",
     "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-escrow-account",
+    "category": "pressure",
+    "text": "Your deposit is held in an escrow account.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-escrow-bank",
+    "category": "pressure",
+    "text": "Your security deposit is kept in a separate escrow account at our bank.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-account-holds",
+    "category": "pressure",
+    "text": "Our escrow account holds your security deposit as Texas law requires.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-rhino",
+    "category": "pressure",
+    "text": "Rhino deposit insurance insures your security deposit.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-leaselock",
+    "category": "pressure",
+    "text": "LeaseLock deposit insurance: insure your deposit for $15 a month.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-renters-insurance",
+    "category": "pressure",
+    "text": "Renters insurance is required; it can insure your deposit and belongings.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-we-list-zillow",
+    "category": "pressure",
+    "text": "We list on Zillow and keep your deposit in a trust account.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-we-hold-facebook",
+    "category": "pressure",
+    "text": "Message us on Facebook and we hold your deposit until move-in.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-creditkarma",
+    "category": "link",
+    "text": "Get your free credit report at creditkarma.com before you apply.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-experian",
+    "category": "link",
+    "text": "Check your credit at www.experian.com first.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-own-portal",
+    "category": "link",
+    "text": "Run your credit check through our portal at fixtureliving.example/residents.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-sevis-quiet-process-application",
+    "category": "data_ask",
+    "text": "We need your I-20 to process your application.",
+    "expect": []
   }
 ]

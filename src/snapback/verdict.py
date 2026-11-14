@@ -762,7 +762,12 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         )
         lines.append(_line(lang, "label.contact", CardTone.NOT_CHECKED, key))
     if authority.link_domain is LinkDomain.LOOKALIKE:
-        lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
+        key = (
+            "contact.lookalike_sender"
+            if authority.lookalike_sender_only
+            else "contact.lookalike_link"
+        )
+        lines.append(_line(lang, "label.link", CardTone.RED_FLAG, key))
     return lines
 
 

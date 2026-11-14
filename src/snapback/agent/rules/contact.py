@@ -48,6 +48,16 @@ MIN_SITE_NAME = 5  # shorter names are too common to call anything a lookalike o
 
 # Sites many buildings share. A record that points at one gives nothing to imitate, and a
 # link to one says nothing about the poster.
+# Mail services anyone can sign up for. A sender on one of them says nothing about the
+# building, and short names such as "live" sit within an edit of many real ones.
+FREE_MAIL = frozenset(
+    {
+        "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "ymail.com", "outlook.com",
+        "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "mac.com", "aol.com",
+        "proton.me", "protonmail.com", "gmx.com", "mail.com", "zoho.com", "yandex.com",
+        "rediffmail.com", "qq.com", "163.com",
+    }
+)  # fmt: skip
 SHARED_HOSTS = frozenset(
     {
         "apartments.com", "zillow.com", "trulia.com", "homes.com", "realtor.com", "rent.com",
@@ -229,7 +239,7 @@ def _compare(host: str, record_host: str) -> LinkDomain:
         return LinkDomain.OTHER
     if name_before_at and name in _skeleton(name_before_at):
         return LinkDomain.LOOKALIKE
-    if _registrable(where) in SHARED_HOSTS:
+    if _registrable(where) in SHARED_HOSTS or _registrable(where) in FREE_MAIL:
         return LinkDomain.OTHER
 
     allowed = 1 if len(name) < 8 else 2
@@ -327,10 +337,16 @@ def check_authority(
             brokerage_only=bool(on_record),
         )
 
+    emails = getattr(claims, "emails", ())
+    link_domain = check_link(claims.links, record.website_host, emails)
     return AuthorityResult(
         status=status,
         manager_on_record=record.manager_company,
         poster_said=claims.company,
         office_phone_match=check_phone(claims.phones, record, salt),
-        link_domain=check_link(claims.links, record.website_host, getattr(claims, "emails", ())),
+        link_domain=link_domain,
+        lookalike_sender_only=(
+            link_domain is LinkDomain.LOOKALIKE
+            and check_link(claims.links, record.website_host) is not LinkDomain.LOOKALIKE
+        ),
     )

@@ -1,5 +1,8 @@
 """Impersonation and gap rules: hold only, one reason each, and the sender-address lookalike."""
 
+import json
+from pathlib import Path
+
 import pytest
 
 from snapback.agent.intake.fields import extract_contacts
@@ -16,6 +19,7 @@ NEW_IDS = (
     "data.sevis_before_viewing",
     "link.affiliate_credit_check",
 )
+ROOT = Path(__file__).resolve().parent.parent
 SITE = "fixtureliving.example"
 
 
@@ -44,7 +48,7 @@ def test_every_new_rule_has_an_english_and_a_spanish_line(rule_id):
 @pytest.mark.parametrize(
     "text",
     [
-        "From: payment@fixtureliving.co\nPlease confirm the deposit.",
+        "From: payment@fixtureliving.pay.example\nPlease confirm the deposit.",
         "Reply to leasing@fixture-living.example to reserve.",
         "Contact fixtureliviing.example staff: office@fixtureliviing.example",
     ],
@@ -59,7 +63,7 @@ def test_a_lookalike_sender_address_is_a_lookalike(text):
     "text",
     [
         "Questions? leasing@fixtureliving.example",
-        "Email maria.lopez@gmail.com or call us.",
+        "Email leasing@mailhost.example or call us.",
         "info@sunriseproperty.example",
     ],
 )
@@ -75,7 +79,7 @@ def test_no_email_and_no_link_is_not_checked():
 
 def test_a_personal_mail_address_that_carries_the_name_is_left_alone():
     # The part before the @ is not read for emails: small landlords use personal mail.
-    assert check_link([], SITE, emails=["fixtureliving@gmail.com"]) is LinkDomain.OTHER
+    assert check_link([], SITE, emails=["fixtureliving@mailhost.example"]) is LinkDomain.OTHER
 
 
 def test_the_rules_read_the_costar_example_message_three():
@@ -84,3 +88,61 @@ def test_the_rules_read_the_costar_example_message_three():
         "from Airbnb.com, they will hold and insure your money until you check the apartment."
     )
     assert "impersonation.escrow_agent" in [h.rule_id for h in apply_rules(text)]
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "office@live.com",
+        "office@hotmail.com",
+        "office@ymail.com",
+        "office@icloud.com",
+        "office@yahoo.co.in",
+        "office@proton.me",
+        "oliveoffice@gmail.com",
+    ],
+)
+def test_free_mail_domains_are_never_a_lookalike(email):
+    assert check_link([], "olive.example", emails=[email]) is LinkDomain.OTHER
+    assert check_link([], "gmailhome.example", emails=[email]) is LinkDomain.OTHER
+
+
+def test_a_free_mail_name_does_not_hide_a_real_lookalike():
+    assert (
+        check_link([], "olive.example", emails=["office@live.com", "office@olive.pay.example"])
+        is LinkDomain.LOOKALIKE
+    )
+
+
+def test_affiliate_credit_check_skips_the_buildings_own_host():
+    text = "Run your credit check at fixtureliving.example/residents."
+    assert "link.affiliate_credit_check" in [h.rule_id for h in apply_rules(text)]
+    assert "link.affiliate_credit_check" not in [
+        h.rule_id for h in apply_rules(text, own_host="fixtureliving.example")
+    ]
+
+
+def test_the_payment_reason_covers_papers_as_well_as_money():
+    line = strings.text("reason.payment_flag")
+    assert line == "Money or personal papers were asked for before any viewing."
+
+
+def test_a_sender_only_lookalike_has_its_own_card_line():
+    assert strings.has("contact.lookalike_sender") and strings.has("contact.lookalike_sender", "es")
+    assert "email address" in strings.text("contact.lookalike_sender")
+
+
+def test_a_lookalike_found_only_in_the_sender_is_marked_and_a_link_one_is_not():
+    from types import SimpleNamespace
+
+    from snapback.agent.rules.contact import check_authority
+    from snapback.contracts import PropertyRecord
+
+    data = json.loads((ROOT / "fixtures" / "contracts" / "property_record.json").read_text())
+    record = PropertyRecord.model_validate(data | {"website_host": SITE})
+    sender = SimpleNamespace(
+        company=None, phones=[], links=[], emails=["pay@fixtureliving.pay.example"]
+    )
+    link = SimpleNamespace(company=None, phones=[], links=["fixtureliving.pay.example"], emails=[])
+    assert check_authority(sender, record, "s").lookalike_sender_only is True
+    assert check_authority(link, record, "s").lookalike_sender_only is False

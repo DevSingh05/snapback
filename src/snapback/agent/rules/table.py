@@ -76,16 +76,20 @@ _PLATFORMS = (
     r"(?:apartments\.?com|apartment finder|airbnb|vrbo|homeaway|zillow|trulia|redfin|"
     r"realtor\.?com|zumper|homes\.?com|craigslist|facebook|marketplace)"
 )
-_NOT_REFUSED = r"(?:(?!\bnever\b|\bnot\b|n't\b|\bno\b|\bcannot\b)[^.!?])"
+# "We", "our" or "us" between the name and the verb means the office does it, not the site.
+_NOT_REFUSED = (
+    r"(?:(?!\bnever\b|\bnot\b|n't\b|\bno\b|\bcannot\b|\bwe\b|\bour\b|\bus\b|\bi\b|\bmy\b)"
+    r"[^.!?])"
+)
 _HOLDS = r"(?:hold|holds|holding|insure|insures|secure|secures|safeguard|safeguards|keep|keeps)"
 _RENTERS_MONEY = (
     r"your (?:money|deposit|payment|funds|rent|first month(?:'s)?(?: rent)?|security deposit)"
 )
-# A domain written out, other than the federal free credit report site.
+# A domain written out, other than the free report site, the three bureaus and Credit Karma.
 _ANY_SITE = (
-    r"(?<![\w.-])(?!(?:https?://)?(?:www\.)?annualcreditreport\.com)"
+    r"(?<![\w.-])(?!(?:https?://)?(?:www\.)?(?:annualcreditreport|experian|equifax|transunion|creditkarma)\.com)"
     r"(?:https?://|www\.|[a-z0-9-]{1,40}\.(?:com|net|org|co|io|us|info|biz|app|site|online|"
-    r"xyz|link|club|top))"
+    r"xyz|link|club|top|example))"
 )
 _SEND = r"\b(?:send|text|email|e-mail|forward|upload|attach|share|snap|screenshot)\b"
 _PAYSTUB = r"\b(?:pay ?stubs?|pay slips?|paycheck stubs?)\b"
@@ -322,7 +326,8 @@ RULES: tuple[Rule, ...] = (
         patterns=(
             _SEND + r"[^.!?]{0,40}\b(?:sevis|i[- ]?20|ds[- ]?2019)\b",
             r"\b(?:need|require|requires|required|want|must have)\b[^.!?]{0,30}"
-            r"\b(?:your|a copy of)\b[^.!?]{0,20}\b(?:sevis|i[- ]?20|ds[- ]?2019)\b",
+            r"\b(?:your|a copy of)\b[^.!?]{0,20}\b(?:sevis|i[- ]?20|ds[- ]?2019)\b"
+            r"[^.!?]{0,30}\b(?:reserve|hold|secure|save|book|before)\b",
         ),
         excused_after_viewing=True,
         excused_when_refused=True,
@@ -386,7 +391,16 @@ RULES: tuple[Rule, ...] = (
         category=RuleCategory.PRESSURE,
         red_flag=True,
         patterns=(
-            _PLATFORMS + _NOT_REFUSED + r"{0,40}\b" + _HOLDS + r"\b" + _NOT_REFUSED + r"{0,40}"
+            "^"
+            + _NOT_REFUSED
+            + r"{0,80}?"
+            + _PLATFORMS
+            + _NOT_REFUSED
+            + r"{0,40}\b"
+            + _HOLDS
+            + r"\b"
+            + _NOT_REFUSED
+            + r"{0,40}"
             r"\b(?:money|deposit|payment|funds|rent)\b",
             _PLATFORMS + r"\s{1,3}(?:payment|payments|escrow|billing|booking|rental|deposit) "
             r"(?:team|department|agent|agents|service|protection|desk|processor)\b",
@@ -402,17 +416,17 @@ RULES: tuple[Rule, ...] = (
         category=RuleCategory.PRESSURE,
         red_flag=True,
         patterns=(
-            r"\b(?:escrow|third[- ]party)\s{1,3}(?:agent|agents|company|service|account|officer)"
+            r"\b(?:escrow|third[- ]party)\s{1,3}(?:agent|agents|company|service|officer)"
             r"\b[^.!?]{0,40}\b" + _HOLDS + r"\b[^.!?]{0,30}\b" + _RENTERS_MONEY,
             r"\b(?:send|pay|wire|transfer|give|deposit)\b[^.!?]{0,40}\bto (?:the |our |an? |your )?"
             r"(?:escrow|third[- ]party)\s{1,3}(?:agent|company|service|account)\b",
             r"\bthe (?:platform|website|site|rental company|rental service|booking site)\b"
             r"[^.!?]{0,15}\b" + _HOLDS + r"\b[^.!?]{0,20}\b" + _RENTERS_MONEY,
             # CoStar's example 3: "they will hold and insure your money until you check".
-            r"\b(?:hold and insure|insure and hold|insure|insures)\b[^.!?]{0,15}\b"
-            + _RENTERS_MONEY,
+            r"\b(?:hold and insure|insure and hold)\b[^.!?]{0,15}\b" + _RENTERS_MONEY,
             r"\b" + _RENTERS_MONEY + r"\b[^.!?]{0,30}\b(?:held|kept|insured|secured|protected)"
-            r"\b[^.!?]{0,30}\b(?:escrow|third[- ]party|the platform)\b",
+            r"\b[^.!?]{0,30}\b(?:escrow\s{1,3}(?:agent|company|service)|third[- ]party|"
+            r"the platform)\b",
         ),
         excused_when_refused=True,
     ),
@@ -449,5 +463,6 @@ RULES: tuple[Rule, ...] = (
         ),
         excused_when_refused=True,
         excused_after_approval=True,
+        excused_through_portal=True,
     ),
 )

@@ -156,6 +156,9 @@ EN: dict[str, str] = {
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
+    "contact.lookalike_sender": (
+        "An email address in the listing imitates this building's website. Red flag."
+    ),
     "contact.office_confirmed": (
         "Confirmed by the office: someone at {domain}, the website CoStar has on record for "
         "this office, said this ad is theirs."
@@ -258,12 +261,11 @@ EN: dict[str, str] = {
     "rule.pressure.cannot_show": "They say they cannot show the unit in person. Red flag.",
     "rule.link.payment_link": "A payment link sent by the poster. Red flag.",
     "rule.impersonation.platform_holds_money": (
-        "Says a site such as Apartments.com or Airbnb will hold your money. Apartments.com's "
+        "Says a site such as Apartments.com or Airbnb will hold your money. CoStar's "
         "own page on fraud lists a claim of affiliation with it as a red flag. Red flag."
     ),
     "rule.impersonation.escrow_agent": (
-        "Says an escrow agent or the platform will hold your rental deposit. Rentals do not "
-        "use one. Red flag."
+        "A rental deposit goes to the owner's office, not to an escrow agent. Red flag."
     ),
     "rule.data.credit_score_screenshot": "A screenshot of your credit score. Red flag.",
     "rule.data.paystub_before_viewing": ("Pay stubs sent to a person before a viewing. Red flag."),
@@ -465,7 +467,7 @@ EN: dict[str, str] = {
     "reason.forged_copy_unknown": "The reply is a copy of one of the listing photos.",
     "reason.photo_elsewhere": "At least one listing photo was taken in a different property.",
     "reason.price_flag": "The rent is far below comparable units.",
-    "reason.payment_flag": "Payment was requested before any viewing.",
+    "reason.payment_flag": "Money or personal papers were asked for before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
     "reason.for_sale": (
         "This home is listed for sale. Confirm with the listing brokerage that it is also "
@@ -672,6 +674,9 @@ ES: dict[str, str] = {
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
+    "contact.lookalike_sender": (
+        "Una dirección de correo del anuncio imita el sitio web de este edificio. Señal de alerta."
+    ),
     "contact.office_confirmed": (
         "Confirmado por la oficina: alguien en {domain}, el sitio web que CoStar tiene "
         "registrado para esta oficina, dijo que este anuncio es suyo."
@@ -783,12 +788,12 @@ ES: dict[str, str] = {
     ),
     "rule.impersonation.platform_holds_money": (
         "Dice que un sitio como Apartments.com o Airbnb guardará su dinero. La página de "
-        "Apartments.com sobre fraude lista una supuesta afiliación con ellos como señal de "
+        "CoStar sobre fraude lista una supuesta afiliación con ellos como señal de "
         "alerta. Señal de alerta."
     ),
     "rule.impersonation.escrow_agent": (
-        "Dice que un agente de depósito en garantía o la plataforma guardará su depósito de "
-        "renta. Las rentas no usan uno. Señal de alerta."
+        "Un depósito de renta va a la oficina del dueño, no a un agente de depósito en "
+        "garantía. Señal de alerta."
     ),
     "rule.data.credit_score_screenshot": (
         "Una captura de pantalla de su puntaje de crédito. Señal de alerta."
@@ -1014,7 +1019,7 @@ ES: dict[str, str] = {
     "reason.forged_copy_unknown": "La respuesta es una copia de una de las fotos del anuncio.",
     "reason.photo_elsewhere": "Al menos una foto del anuncio se tomó en otra propiedad.",
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
-    "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
+    "reason.payment_flag": ("Se pidió dinero o documentos personales antes de cualquier visita."),
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
     "reason.for_sale": (
         "Esta vivienda está en venta. Confirme con la agencia que la anuncia que también se "
