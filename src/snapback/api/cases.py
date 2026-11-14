@@ -25,9 +25,9 @@ from snapback.agent import (
     FixtureModules,
     PolicyChooser,
     Trace,
-    detect_scope,
     run_case,
 )
+from snapback.agent.intake import Listing
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.card import strings
 from snapback.contracts import (
@@ -66,6 +66,8 @@ class CaseStatus(BaseModel):
     status: Literal["running", "waiting_for_approval", "done"]
     state: VerdictState | None = None  # set once the case is done
     photos: int = 0
+    screenshots: int = 0  # images that were read as text
+    injection_noticed: bool = False  # the listing had text written for an AI system
     challenge: ChallengeView | None = None
 
 
@@ -111,12 +113,12 @@ class SessionCase:
         self,
         case_id: str,
         session: CaseSession,
-        photos: int,
+        listing: Listing,
         runner: Callable[[CaseSession], object],
     ) -> None:
         self.case_id = case_id
         self.session = session
-        self._photos = photos
+        self._listing = listing
         self._runner = runner
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
@@ -156,7 +158,9 @@ class SessionCase:
             source=self.session.trace.source,
             status=status,
             state=self.session.verdict.state if self.session.verdict else None,
-            photos=self._photos,
+            photos=self._listing.photos,
+            screenshots=self._listing.screenshots,
+            injection_noticed=bool(self._listing.injection_spans),
             challenge=(
                 ChallengeView(text=draft.text, spot_label=draft.spot_label, code=draft.code)
                 if draft and status == "waiting_for_approval"
@@ -225,17 +229,26 @@ class CaseStore:
             if candidate not in self._cases:
                 return candidate
 
-    def create(self, listing_text: str, photos: int) -> SessionCase:
+    def check_can_create(self) -> None:
         if self._settings.snapback_data_source is not DataSource.FIXTURE:
             raise LiveModeNotWired
+
+    def create(self, listing: Listing) -> SessionCase:
+        self.check_can_create()
         with self._lock:
             short_id = self._new_id()
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
-            # The fixture modules stand in for the evidence. The kind of listing is still read
-            # from the text that was posted, so an out-of-scope listing is treated as one.
-            modules = FixtureModules(listing_scope=detect_scope(listing_text))
+            # The fixture modules stand in for the twin, the record and the challenge. What
+            # the renter sent is real: its scope, its rule hits and its rent come from intake.
+            modules = FixtureModules(
+                listing_scope=listing.scope,
+                rules=listing.rule_hits if listing.text else None,
+                listed_rent=listing.listed_rent,
+            )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
-            case = SessionCase(short_id, session, photos, self._runner)
+            if listing.injection_spans:
+                session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
+            case = SessionCase(short_id, session, listing, self._runner)
             self._cases[short_id] = case
         case.advance()
         return case

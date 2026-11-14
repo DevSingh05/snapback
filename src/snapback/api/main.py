@@ -23,6 +23,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from snapback.agent.intake import read_listing
+from snapback.agent.intake.ocr import MAX_IMAGE_BYTES
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
@@ -83,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     store = CaseStore(settings)
     limit = DailyLimit(settings.snapback_daily_limit)
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
+    app.state.store = store
 
     app.add_middleware(
         CORSMiddleware,
@@ -115,17 +118,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         renter_id: Annotated[str, Form()] = "anonymous",
         photos: Annotated[list[UploadFile] | None, File()] = None,
     ) -> CaseStatus:
-        """Start a check. Runs until it needs the renter's approval, then returns."""
+        """Start a check. Runs until it needs the renter's approval, then returns.
+
+        `photos` takes listing photos and screenshots alike. An image that is mostly text is
+        read locally as part of the listing; the rest are counted as photos.
+        """
         photos = photos or []
         if len(photos) > MAX_PHOTOS:
             raise HTTPException(status_code=413, detail=f"At most {MAX_PHOTOS} photos per check.")
-        if not limit.allow(renter_id):
-            raise HTTPException(
-                status_code=429,
-                detail=f"Limit reached: {limit.per_day} checks per renter per day.",
-            )
         try:
-            return store.create(listing_text, len(photos)).status()
+            store.check_can_create()
         except LiveModeNotWired:
             raise HTTPException(
                 status_code=503,
@@ -134,6 +136,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "not wired yet. Run with SNAPBACK_DATA_SOURCE=fixture."
                 ),
             ) from None
+        if not limit.allow(renter_id):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Limit reached: {limit.per_day} checks per renter per day.",
+            )
+
+        images = []
+        for photo in photos:
+            data = photo.file.read(MAX_IMAGE_BYTES + 1)
+            if len(data) > MAX_IMAGE_BYTES:
+                raise HTTPException(status_code=413, detail="One of the images is too large.")
+            images.append(data)
+        return store.create(read_listing(listing_text, images)).status()
 
     @app.get("/cases/{case_id}")
     def get_case(case_id: str) -> CaseStatus:

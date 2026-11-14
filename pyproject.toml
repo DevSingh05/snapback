@@ -27,6 +27,10 @@ agent = [
     "deepagents>=0.7.38",
     "langchain-anthropic>=1.7.10",
 ]
+intake = [
+    "pillow>=13.0.0",
+    "rapidocr-onnxruntime>=1.4.4",
+]
 
 [build-system]
 requires = ["hatchling"]
