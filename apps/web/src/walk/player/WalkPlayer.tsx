@@ -138,7 +138,8 @@ export function WalkPlayer({
     transport.onCue = (cue: Cue) => {
       const now = live.current;
       if (cue.type === "stop" || cue.type === "index") now.onIndex(cue.index);
-      if (cue.type === "stop") now.driver?.goto(now.stops[cue.index]!, { ...cue, next: now.stops[cue.index + 1] });
+      if (cue.type === "stop")
+        now.driver?.goto(now.stops[cue.index]!, { ...cue, next: now.stops[cue.index + 1] });
       if (cue.type === "pan") now.driver?.pan(cue.deg, cue.ms);
       // The pinned photo only lines up with the scan while the camera holds still.
       if (cue.type === "photo" && (cue.shown || now.surface === "scan")) now.onPhoto?.(cue.shown);
@@ -215,7 +216,8 @@ export function WalkPlayer({
     const onBlur = () =>
       setTimeout(() => {
         const frame = document.activeElement;
-        if (frame instanceof HTMLIFrameElement && stageOf()?.contains(frame)) startExploreRef.current();
+        if (frame instanceof HTMLIFrameElement && stageOf()?.contains(frame))
+          startExploreRef.current();
       }, 0);
     window.addEventListener("blur", onBlur);
     return () => window.removeEventListener("blur", onBlur);
@@ -346,9 +348,11 @@ export function WalkPlayer({
           </span>
           <strong>{stop.title}</strong>
         </p>
-        <p className="wp-caption" data-testid="wp-caption">
-          {loading ? "Loading the 3D view…" : captionOf(stop)}
-        </p>
+        {(loading || captionOf(stop)) && (
+          <p className="wp-caption" data-testid="wp-caption">
+            {loading ? "Loading the 3D view…" : captionOf(stop)}
+          </p>
+        )}
         {state.landing && (
           <p className="wp-pin" data-testid="wp-pin">
             <span className="wp-pin-mark" aria-hidden="true" />
@@ -511,7 +515,7 @@ export function WalkPlayer({
               <span className="wp-time mono" data-testid="wp-time">
                 {clockText(position)} <span className="wp-dim">/ {clockText(transport.total)}</span>
               </span>
-              <span className="wp-now">{stop.title}</span>
+              <span className="wp-now" aria-hidden="true" />
               <button
                 type="button"
                 className="wp-btn wp-speed mono"

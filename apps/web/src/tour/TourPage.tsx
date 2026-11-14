@@ -133,7 +133,12 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
   const placedPhoto = photoAt(stop, look.evidence);
   const photoAlias = placedPhoto?.alias ?? stop.photos[0]?.alias ?? stop.photos[0]?.photo_id;
   const unshown = stop.ad_view === "none_placed";
-  const firstAlias = placedPhoto?.alias ?? look.evidence?.photos[0]?.alias ?? null;
+  // "How we know" is about THIS stop: its own ad photo, or nothing. Never another stop's photo.
+  const firstAlias = placedPhoto?.alias ?? null;
+  // The drawer follows the walk: at another stop it shows that stop's photo, or closes.
+  useEffect(() => {
+    setDrawer((open) => (open === null ? null : firstAlias));
+  }, [firstAlias, stop.key]);
   const stills = placedPhoto ? look.images[placedPhoto.alias] : undefined;
   const liveScan = Boolean(live && modelId && sdkKey);
   const inRoom = stop.kind !== "arrive" && stop.kind !== "outro";
@@ -329,6 +334,11 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             >
               How we know
             </button>
+          )}
+          {look.evidence && !firstAlias && inRoom && !drawer && (
+            <span className="tour-how tour-how-none" data-testid="how-we-know-none">
+              No ad photo for this room
+            </span>
           )}
           {look.evidence && drawer && (
             <EvidenceDrawer

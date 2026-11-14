@@ -94,11 +94,12 @@ export function drawnPose(sweep: number): DrawnPose {
   };
 }
 
-/** One line on what is on screen at this stop. It only says what the plan itself says. */
+/** One line on what is on screen at this stop, or "" when the stage already says it. */
 export function captionOf(stop: TourStop): string {
   if (stop.kind === "arrive") return "Outside the building, before you go in.";
   if (stop.kind === "outro") return "That is the whole walk. Next, see it in person.";
-  if (stop.photos.length > 0) return "You are standing where the ad's photo was taken.";
+  // At a photo stop the stage's own caption says it ("Taken here: ad photo P2"): said once.
+  if (stop.photos.length > 0) return "";
   if (stop.ad_view === "none_placed") return "A room the ad left out.";
   if (stop.kind === "door") return "The way in.";
   return "A look around this room.";

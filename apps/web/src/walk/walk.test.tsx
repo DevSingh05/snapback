@@ -350,7 +350,7 @@ describe("StopStage and StageCaption", () => {
       </>,
     );
     expect(screen.getByTestId("stage-photo")).toHaveAttribute("data-fly", "true");
-    expect(screen.getByTestId("stage-caption")).toHaveTextContent("Taken here: Kitchen");
+    expect(screen.getByTestId("stage-caption")).toHaveTextContent("Taken here: ad photo P2");
     expect(screen.getByText("Drawn stand-in (fixture)")).toBeInTheDocument();
   });
 

@@ -159,11 +159,9 @@ export function StageCaption({ stop, photoAlias, unshown = false }: CaptionProps
   if (photoAlias)
     return (
       <p className="rs-caption rs-caption-placed" data-testid="stage-caption">
-        <strong>Taken here{stop.room_label ? `: ${stop.room_label}` : ""}</strong>
-        <span>
-          Your ad photo <span className="mono">{photoAlias}</span>, back where it was taken in this
-          scan.
-        </span>
+        <strong>
+          Taken here: ad photo <span className="mono">{photoAlias}</span>
+        </strong>
       </p>
     );
   if (unshown)

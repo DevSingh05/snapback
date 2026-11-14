@@ -63,7 +63,8 @@ export function createSdkDriver(sdk: PlayerSdk, { sweeps, onStatus }: Options): 
     onCollectionUpdated(all) {
       for (const [sid, v] of Object.entries(all)) {
         const p = (v as { position?: { x?: number; z?: number } }).position;
-        if (p && typeof p.x === "number" && typeof p.z === "number") places[sid] = { x: p.x, z: p.z };
+        if (p && typeof p.x === "number" && typeof p.z === "number")
+          places[sid] = { x: p.x, z: p.z };
       }
     },
   });
