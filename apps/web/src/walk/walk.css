@@ -430,6 +430,7 @@
   background: var(--layer-2);
 }
 .ar-head {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -475,39 +476,69 @@
     transparent 100%
   );
 }
-.ar-foot {
-  padding-bottom: var(--sp-3);
-}
 .ar-empty {
   margin: 0;
   padding: var(--sp-2) var(--sp-5) var(--sp-5);
   color: var(--muted);
 }
-.ar-relay {
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--sp-5) var(--sp-3);
+/* The tabs: every step, one agent's steps (the relay, in the order they held the case), or the
+   files the run wrote. The chosen tab is filled; the agent holding the case at this stop carries
+   a lit square. */
+.ar-tabs {
+  flex: none;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2) var(--sp-1);
+  gap: 3px;
+  padding: 0 var(--sp-5) var(--sp-3);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.ar-runner {
+.ar-tab {
   position: relative;
-  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-4);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 0 auto;
+  justify-content: center;
+  min-height: 32px;
+  padding: var(--sp-1) 9px;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
+  font-weight: 500;
   background: var(--layer-3);
   color: var(--ink);
-  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%);
 }
-.ar-runner:first-child {
-  padding-left: var(--sp-3);
-  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+.ar-tab:active:not(:disabled) {
+  transform: none;
 }
-.ar-runner[aria-current="true"] {
+.ar-tab:focus-visible {
+  outline-offset: 2px;
+}
+.ar-runner {
+  padding-inline: 13px 12px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
+}
+.ar-tab-all + .ar-runner {
+  padding-left: 9px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
+}
+.ar-runner[aria-current="true"]::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--act);
+}
+.ar-tab[aria-selected="true"] {
   background: var(--act);
   color: var(--on-act);
   font-weight: 700;
+}
+.ar-tab[aria-selected="true"][aria-current="true"]::before {
+  background: var(--on-act);
+}
+@media (hover: hover) {
+  .ar-tab[aria-selected="false"]:hover {
+    background: var(--layer-1);
+  }
 }
 .ar-list {
   list-style: none;
@@ -608,18 +639,9 @@
   border-top: 1px solid var(--line);
 }
 .ar-files {
-  padding: 0 var(--sp-5) var(--sp-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-.ar-files-toggle {
-  min-height: 44px;
-  background: var(--layer-1);
-  color: var(--ink);
+  padding: var(--sp-2) var(--sp-5) var(--sp-5);
 }
 @media (hover: hover) {
-  .ar-files-toggle:hover,
   button.ar-proof:hover {
     background: var(--match-stage-2);
   }
@@ -742,10 +764,13 @@
 }
 
 @media (min-width: 761px) {
-  /* Fill the column beside the stage and the facts, and scroll inside it. */
+  /* Exactly as tall as the stage beside it (the player and its controls bar), so the rail and the
+     player end on one line. The rail never sizes its row: the head and tabs stay put and the
+     steps scroll inside their own box, so opening a step never grows the page. */
   .ar {
     height: 0;
     min-height: 100%;
+    overflow: hidden;
   }
 }
 @media (max-width: 760px) {
@@ -814,12 +839,15 @@
   .ar[data-open="true"] .ar-fold {
     display: flex;
   }
-  .ar-relay {
+  .ar-tabs {
+    padding-inline: var(--sp-4);
+  }
+  .ar-files {
     padding-inline: var(--sp-4);
   }
   .ar-scroll {
     flex: none;
-    max-height: 56vh;
+    max-height: 60vh;
   }
   .ar-row,
   .ar[data-follow] .ar-line > .ar-tag {

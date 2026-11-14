@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource, TourStop, TraceEvent } from "../contracts";
@@ -36,6 +36,10 @@ interface Props {
   /** The evidence row of the ad photo placed at this stop (walkLook photoAt), if any. */
   photo?: EvidencePhoto | null;
 }
+
+/** Which slice of the run the list shows: every step, one agent's steps, or the files written. */
+const ALL = "all";
+const FILES = "files";
 
 /** How long a scroll inside the rail holds off the follow, in ms. */
 export const FOLLOW_PAUSE_MS = 8000;
@@ -195,6 +199,41 @@ function Line({
   );
 }
 
+function Tab({
+  id,
+  tab,
+  onPick,
+  className,
+  testId,
+  current,
+  children,
+}: {
+  id: string;
+  tab: string;
+  onPick: (id: string) => void;
+  className: string;
+  testId?: string;
+  /** The agent holding the case at the stop on screen. */
+  current?: boolean;
+  children: ReactNode;
+}) {
+  const on = id === tab;
+  return (
+    <button
+      type="button"
+      role="tab"
+      className={`ar-tab ${className}`}
+      data-testid={testId}
+      aria-selected={on}
+      tabIndex={on ? 0 : -1}
+      aria-current={current ? "true" : undefined}
+      onClick={() => onPick(id)}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** Where each gliding piece sits inside the scroll box, by its data-flip key. */
 function measure(box: HTMLElement): Map<string, number> {
   const at = new Map<string, number>();
@@ -216,7 +255,7 @@ export function AgentRail({
   photo = null,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [showFiles, setShowFiles] = useState(false);
+  const [tab, setTab] = useState<string>(ALL);
   const [opened, setOpened] = useState<ReadonlySet<number>>(new Set());
   const [paused, setPaused] = useState(false);
   const items = railItems(events);
@@ -236,6 +275,15 @@ export function AgentRail({
       : null;
   const hereAlias = stop && stop.photos.length > 0 ? (photo?.alias ?? null) : null;
 
+  // The list shows one tab at a time. When the walk lights a step another tab hides, the tab
+  // follows it to that step's agent, unless the reader holds the follow.
+  const [seenLit, setSeenLit] = useState(lit);
+  if (seenLit !== lit) {
+    setSeenLit(lit);
+    if (!paused && litItem && tab !== ALL && tab !== litItem.agent) setTab(litItem.agent);
+  }
+  const shownItems = tab === ALL ? items : items.filter((i) => i.agent === tab);
+
   // The reader's own scroll wins: it holds the follow off for a while, or until they ask.
   const timer = useRef<number | undefined>(undefined);
   const hold = () => {
@@ -247,6 +295,12 @@ export function AgentRail({
   const follow = () => {
     window.clearTimeout(timer.current);
     setPaused(false);
+    if (litItem && tab !== ALL && tab !== litItem.agent) setTab(litItem.agent);
+  };
+  const pick = (next: string) => {
+    if (next === tab) return;
+    setTab(next);
+    hold();
   };
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -256,29 +310,30 @@ export function AgentRail({
   // the rows are simply in their new place.
   const box = useRef<HTMLDivElement>(null);
   const tops = useRef(new Map<string, number>());
-  const last = useRef<{ lit: number | null; paused: boolean; open: boolean }>({
+  const last = useRef<{ lit: number | null; paused: boolean; open: boolean; tab: string }>({
     lit: null,
     paused: false,
     open: false,
+    tab: ALL,
   });
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
     const before = tops.current;
     const was = last.current;
-    last.current = { lit, paused, open };
+    last.current = { lit, paused, open, tab };
     const scrolledBefore = el.scrollTop;
     const now = measure(el);
     tops.current = now;
     if (lit == null) return;
     const moved = was.lit !== lit;
-    if (!moved && was.paused === paused && was.open === open) return;
+    if (!moved && was.paused === paused && was.open === open && was.tab === tab) return;
     if (!paused) {
       const row = el.querySelector<HTMLElement>(`[data-seq="${lit}"]`);
       const lead = row?.previousElementSibling as HTMLElement | null;
       if (row) el.scrollTop = Math.max(0, (lead ?? row).offsetTop - 8);
     }
-    if (reduced || was.lit == null) return;
+    if (reduced || was.lit == null || was.tab !== tab) return;
     const shift = el.scrollTop - scrolledBefore;
     for (const piece of el.querySelectorAll<HTMLElement>("[data-flip]")) {
       const from = before.get(piece.dataset.flip!);
@@ -339,60 +394,80 @@ export function AgentRail({
           </p>
         ) : (
           <>
-            <ol className="ar-relay" aria-label="Who held the case, in order">
+            <div
+              className="ar-tabs"
+              role="tablist"
+              aria-label="Who held the case, in order"
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                const all = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=tab]")];
+                const at = all.indexOf(document.activeElement as HTMLElement);
+                const to = all[(at + (e.key === "ArrowRight" ? 1 : all.length - 1)) % all.length];
+                to?.focus();
+                to?.click();
+              }}
+            >
+              <Tab id={ALL} tab={tab} onPick={pick} className="ar-tab-all">
+                All
+              </Tab>
               {who.map((name) => (
-                <li
+                <Tab
                   key={name}
+                  id={name}
+                  tab={tab}
+                  onPick={pick}
                   className="ar-runner"
-                  data-testid="rail-agent"
-                  aria-current={name === holder ? "true" : undefined}
+                  testId="rail-agent"
+                  current={name === holder}
                 >
                   {name}
-                </li>
+                </Tab>
               ))}
-            </ol>
+              <Tab id={FILES} tab={tab} onPick={pick} className="ar-tab-files">
+                Files {files.length}
+              </Tab>
+            </div>
             <div
               className="ar-scroll"
               ref={box}
+              role="tabpanel"
+              aria-label={tab === FILES ? "Files the run wrote" : "Steps"}
+              data-testid="rail-scroll"
               onWheel={hold}
               onTouchMove={hold}
               onKeyDown={(e) => {
                 if (/^(Arrow(Up|Down)|Page(Up|Down)|Home|End)$/.test(e.key)) hold();
               }}
             >
-              <ol className="ar-list">
-                {items.map((item, i) => (
-                  <Line
-                    key={item.event.seq}
-                    item={item}
-                    n={i + 1}
-                    evidence={evidence}
-                    onOpenPhoto={onOpenPhoto}
-                    folds={folds}
-                    lit={item.event.seq === lit}
-                    open={!folds || item.event.seq === lit || opened.has(item.event.seq)}
-                    here={item.event.seq === lit ? here : null}
-                    hereAlias={item.event.seq === lit ? hereAlias : null}
-                    onToggle={() => toggle(item.event.seq)}
-                  />
-                ))}
-              </ol>
-              <div className="ar-foot" data-flip="foot">
-                <p className="ar-rule" data-testid="rail-counts">
-                  {summaryLine(events)}. The agents pick what to check next. Code sets every number.
-                </p>
-                <div className="ar-files">
-                  <button
-                    type="button"
-                    className="ar-files-toggle"
-                    aria-expanded={showFiles}
-                    onClick={() => setShowFiles((s) => !s)}
-                  >
-                    Files ({files.length})
-                  </button>
-                  {showFiles && <FilesTree files={files} />}
+              {tab === FILES ? (
+                <div className="ar-files" data-testid="rail-files">
+                  <FilesTree files={files} />
                 </div>
-              </div>
+              ) : (
+                <>
+                  <ol className="ar-list">
+                    {shownItems.map((item) => (
+                      <Line
+                        key={item.event.seq}
+                        item={item}
+                        n={items.indexOf(item) + 1}
+                        evidence={evidence}
+                        onOpenPhoto={onOpenPhoto}
+                        folds={folds}
+                        lit={item.event.seq === lit}
+                        open={!folds || item.event.seq === lit || opened.has(item.event.seq)}
+                        here={item.event.seq === lit ? here : null}
+                        hereAlias={item.event.seq === lit ? hereAlias : null}
+                        onToggle={() => toggle(item.event.seq)}
+                      />
+                    ))}
+                  </ol>
+                  <p className="ar-rule" data-testid="rail-counts" data-flip="foot">
+                    {summaryLine(events)}. The agents pick what to check next. Code sets every
+                    number.
+                  </p>
+                </>
+              )}
             </div>
             {folds && paused && (
               <button

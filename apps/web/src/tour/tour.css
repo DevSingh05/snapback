@@ -86,7 +86,8 @@
 }
 .tour-page[data-rail="on"] .tour-body {
   grid-template-columns: minmax(0, 1fr) var(--rail-w);
-  grid-template-areas: "stage rail" "panel rail";
+  /* The rail sits beside the stage only and ends where the player ends; the panel runs under both. */
+  grid-template-areas: "stage rail" "panel panel";
 }
 
 .tour-stage {
