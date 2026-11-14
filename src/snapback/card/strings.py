@@ -151,6 +151,13 @@ EN: dict[str, str] = {
         "The model answered with something that was not on the list, so the default was used."
     ),
     "trace.error.model_failed": "The model could not be used, so the default was used.",
+    "trace.intake.injection": (
+        "The listing has text written for an AI system. It was ignored, and the checks go on."
+    ),
+    "trace.intake.truncated": (
+        "The text you sent was very long. Only the first 20,000 characters were read. "
+        "The rest was not checked."
+    ),
     # --- reasons a verdict gives (Verdict.reasons, Evidence.forgery_reason) ----------------
     "reason.forged": "The proof-of-presence reply was not a fresh photo taken in the unit.",
     "reason.forged_copy": "The reply is a copy of listing photo {n}.",
