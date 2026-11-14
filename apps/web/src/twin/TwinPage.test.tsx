@@ -68,11 +68,37 @@ describe("TwinView photo landing", () => {
     expect(screen.getByTestId("photo-landing")).toHaveAttribute("data-phase", "landed");
   });
 
-  it("a photo with no pose reads Not found in this building", async () => {
+  it("a located photo with no pose is Taken here, with no cone and a no-angle note", async () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
     await userEvent.click(screen.getByRole("button", { name: /Fly to photo l2/ }));
-    expect(await screen.findByText("Not found in this building")).toBeInTheDocument();
+    expect(await screen.findByText("Taken here: this building")).toBeInTheDocument();
+    expect(screen.getByText("No camera angle for this photo")).toBeInTheDocument();
+    expect(screen.queryByText("Not found in this building")).toBeNull();
+    expect(screen.queryByTestId("view-cone")).toBeNull();
     expect(screen.queryByTestId("photo-overlay")).toBeNull();
+  });
+
+  it("a photo the matcher did not place reads Not found in this building", async () => {
+    const l = {
+      ...hold.locate,
+      photos: [{ photo_id: "l1", status: "not_located" }],
+    } as unknown as LocateResult;
+    render(<TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={l} liveLocate />);
+    expect(await screen.findByText("Not found in this building")).toBeInTheDocument();
+  });
+
+  it("shows no fixture room name for a live pose without labels", async () => {
+    render(
+      <TwinView
+        caseId="x"
+        sdkKey={undefined}
+        modelId={undefined}
+        locate={{ ...hold.locate, case_id: "live" } as unknown as LocateResult}
+        liveLocate
+      />,
+    );
+    expect(await screen.findByText("Taken here")).toBeInTheDocument();
+    expect(screen.queryByText(/Living room/)).toBeNull();
   });
 
   it("keeps the trace as a collapsed strip", () => {

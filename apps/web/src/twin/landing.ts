@@ -4,6 +4,8 @@ import { quatToYawPitch } from "./pose";
 export type LandingState =
   | { kind: "loading" }
   | { kind: "not_found" }
+  | { kind: "elsewhere" } // placed in a different building than the one claimed
+  | { kind: "placed"; photoId: string; roomLabel: string | null } // in the building, no camera angle
   | {
       kind: "match";
       photoId: string;
@@ -22,21 +24,33 @@ export type LandingState =
  */
 export const FIXTURE_ROOM_LABELS: Record<string, string> = { l1: "Living room" };
 
-/** A photo lands only if it has a pose and its status does not say it was left unplaced. */
+/**
+ * Only "located_in_claimed" in the chosen model counts as taken here. "located_elsewhere" is a
+ * different building ("Not taken here"); "not_located" and "not_indexed" are "Not found in this
+ * building". A located photo with no pose is still taken here, just without a camera angle.
+ */
 export function landingFromLocate(
   locate: LocateResult,
   photoId: string,
   roomLabels: Record<string, string>,
 ): LandingState {
-  const pose = locate.poses[photoId];
   const photo = locate.photos.find((p) => p.photo_id === photoId);
-  if (!pose || (photo && !photo.status.startsWith("located"))) return { kind: "not_found" };
+  if (!photo) return { kind: "not_found" };
+  if (photo.status === "located_elsewhere") return { kind: "elsewhere" };
+  if (photo.status !== "located_in_claimed") return { kind: "not_found" };
+  // The web contract type omits `chosen` (it is in contracts.py); read it without editing the contract.
+  const chosenModel = (locate as LocateResult & { chosen?: { model_id?: string } | null }).chosen
+    ?.model_id;
+  if (chosenModel && photo.model_id && photo.model_id !== chosenModel) return { kind: "elsewhere" };
+  const roomLabel = roomLabels[photoId] ?? null;
+  const pose = locate.poses[photoId];
+  if (!pose) return { kind: "placed", photoId, roomLabel };
   const { yaw, pitch } = quatToYawPitch(pose.rotation_quat);
   return {
     kind: "match",
     photoId,
-    sweepId: pose.sweep_id ?? photo?.pano_id ?? "",
-    roomLabel: roomLabels[photoId] ?? null,
+    sweepId: pose.sweep_id ?? photo.pano_id ?? "",
+    roomLabel,
     yaw,
     pitch,
     fovDeg: pose.fov_deg ?? null,
@@ -45,9 +59,23 @@ export function landingFromLocate(
 }
 
 export function landingLine(s: LandingState): string {
-  if (s.kind === "loading") return "Placing the photo in the building";
-  if (s.kind === "not_found") return "Not found in this building";
-  return s.roomLabel ? `Taken here: ${s.roomLabel}` : "Taken here";
+  switch (s.kind) {
+    case "loading":
+      return "Placing the photo in the building";
+    case "not_found":
+      return "Not found in this building";
+    case "elsewhere":
+      return "Not taken here";
+    case "placed":
+      return `Taken here: ${s.roomLabel ?? "this building"}`;
+    case "match":
+      return s.roomLabel ? `Taken here: ${s.roomLabel}` : "Taken here";
+  }
+}
+
+/** A second, smaller line for a photo that is placed but has no camera angle. */
+export function landingNote(s: LandingState): string | null {
+  return s.kind === "placed" ? "No camera angle for this photo" : null;
 }
 
 /** The flag decides; with it off, or with no live result yet, the fixture is used. */

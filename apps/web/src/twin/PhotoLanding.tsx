@@ -1,6 +1,6 @@
 import { useMemo, type CSSProperties } from "react";
 
-import { landingLine, viewCone, type LandingState } from "./landing";
+import { landingLine, landingNote, viewCone, type LandingState } from "./landing";
 
 export type LandingPhase = "idle" | "flying" | "landed";
 export type SdkStatus = "ready" | "connecting" | "unavailable";
@@ -58,7 +58,6 @@ export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, fr
             <svg className="landing-plan" viewBox={`0 0 ${VIEW} ${VIEW}`} data-testid="static-plan">
               <title>Static plan of where the photo was taken</title>
               <rect x="20" y="20" width="200" height="200" className="plan-floor" />
-              <path d="M 20 120 H 90 M 150 20 V 80" className="plan-wall" />
             </svg>
           )}
           <svg
@@ -93,6 +92,10 @@ export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, fr
           )}
         </>
       )}
+      {state.kind === "match" && sdk === "unavailable" && (
+        <span className="landing-schematic">Schematic</span>
+      )}
+      {landingNote(state) && <p className="landing-note">{landingNote(state)}</p>}
       <p
         className={`landing-line landing-${state.kind}`}
         role="status"

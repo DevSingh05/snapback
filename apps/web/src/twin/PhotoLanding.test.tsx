@@ -40,6 +40,20 @@ describe("PhotoLanding states", () => {
     expect(screen.queryByTestId("view-cone")).toBeNull();
   });
 
+  it("placed: says Taken here with a no-camera-angle note and draws no cone or photo", () => {
+    render(<PhotoLanding {...base} state={{ kind: "placed", photoId: "l2", roomLabel: null }} />);
+    expect(screen.getByText("Taken here: this building")).toBeInTheDocument();
+    expect(screen.getByText("No camera angle for this photo")).toBeInTheDocument();
+    expect(screen.queryByTestId("view-cone")).toBeNull();
+    expect(screen.queryByTestId("photo-overlay")).toBeNull();
+  });
+
+  it("elsewhere: says Not taken here and shows no cone", () => {
+    render(<PhotoLanding {...base} state={{ kind: "elsewhere" }} />);
+    expect(screen.getByText("Not taken here")).toBeInTheDocument();
+    expect(screen.queryByTestId("view-cone")).toBeNull();
+  });
+
   it("loading: announces it politely and shows no result line", () => {
     render(<PhotoLanding {...base} state={{ kind: "loading" }} phase="idle" />);
     const status = screen.getByRole("status");
@@ -55,6 +69,7 @@ describe("PhotoLanding states", () => {
     expect(screen.getByTestId("view-cone")).toBeInTheDocument();
     expect(screen.getByTestId("photo-overlay")).toBeInTheDocument();
     expect(screen.getByText("Taken here: Living room")).toBeInTheDocument();
+    expect(screen.getByText("Schematic")).toBeInTheDocument();
   });
 
   it("with the SDK ready there is no static plan", () => {

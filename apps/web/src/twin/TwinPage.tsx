@@ -21,6 +21,7 @@ const PLACEHOLDER_PHOTO =
     `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dff3ee"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0b7a6c">Listing photo (fixture)</text></svg>`,
   );
 
+const NO_LABELS: Record<string, string> = {};
 const FLIGHT_MS = 900;
 const LANDED_OPACITY = 0.6;
 
@@ -41,19 +42,21 @@ interface ViewProps {
   aerialImageUrl?: string;
 }
 
-export function TwinView({
+function TwinViewInner({
   caseId,
   sdkKey,
   modelId,
   locate: liveResult,
   liveLocate = false,
-  roomLabels = FIXTURE_ROOM_LABELS,
+  roomLabels: roomLabelsProp,
   aerial = fixtureAerial,
   record = fixtureRecord,
   aerialImageUrl,
 }: ViewProps) {
   const locate = chooseLocate(liveLocate, liveResult, fixtureLocate);
   const poseIsLive = locate !== fixtureLocate;
+  // Fixture room names belong to the fixture pose only; a live result without labels shows none.
+  const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
   const live = Boolean(sdkKey && modelId);
   const reduced = usePrefersReducedMotion();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -126,6 +129,7 @@ export function TwinView({
       const target = landingFromLocate(locate, id, roomLabels);
       if (target.kind !== "match") {
         setPhase("landed");
+        setStatus("");
         return;
       }
       // Measure once; the flight itself is a CSS animation, nothing runs per frame.
@@ -166,7 +170,13 @@ export function TwinView({
           sdkStatus === "unavailable" ? "3D view unavailable: showing the static plan" : "",
         );
       }
-      await Promise.all([flight, moved]);
+      try {
+        await Promise.all([flight, moved]);
+      } catch (e) {
+        // The 3D move failed: land on the static view instead of staying at opacity 0.
+        setStatus(e instanceof Error ? e.message : "Could not move the 3D view");
+        setSdkFailed(true);
+      }
       if (!alive.current || run.current !== mine) return;
       setPhase("landed");
       setOpacity(LANDED_OPACITY);
@@ -188,7 +198,15 @@ export function TwinView({
       <header className="twin-head">
         <span className="wordmark">SNAPBACK</span>
         <span className="mono">Model</span>
-        <SourceChip source={live ? "live" : "fixture"} />
+        {live && sdkFailed ? (
+          <span className="chip chip-fixture" data-testid="source-chip">
+            <span className="chip-dot" aria-hidden="true" />
+            UNAVAILABLE
+            <span className="sr-only">. The 3D view could not load; a schematic is shown</span>
+          </span>
+        ) : (
+          <SourceChip source={live ? "live" : "fixture"} />
+        )}
         <span className="mono">Photo poses</span>
         <SourceChip source={poseIsLive ? "live" : "fixture"} />
         <span className="mono">{caseId}</span>
@@ -248,6 +266,20 @@ export function TwinView({
       </TraceStrip>
     </div>
   );
+}
+
+// A new LocateResult remounts the view, so the photo, phase and first-landing guard start fresh.
+const locateIds = new WeakMap<object, number>();
+let nextLocateId = 0;
+function locateKey(l: LocateResult): number {
+  let id = locateIds.get(l);
+  if (id === undefined) locateIds.set(l, (id = nextLocateId++));
+  return id;
+}
+
+export function TwinView(props: ViewProps) {
+  const locate = chooseLocate(props.liveLocate ?? false, props.locate, fixtureLocate);
+  return <TwinViewInner key={locateKey(locate)} {...props} />;
 }
 
 export function TwinPage({ caseId }: { caseId: string }) {

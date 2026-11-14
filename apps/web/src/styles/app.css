@@ -496,6 +496,8 @@ button {
   top: 8px;
   left: 12px;
   margin: 0;
+  max-width: calc(100% - 140px);
+  z-index: 1;
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -652,6 +654,24 @@ button {
   color: var(--ink);
   font-weight: 600;
 }
+.landing-note {
+  position: absolute;
+  left: 0;
+  bottom: 44px;
+  margin: 0;
+  padding: 4px 16px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.landing-schematic {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.landing-elsewhere,
 .landing-not_found {
   background: var(--coral-soft);
   color: var(--coral);
@@ -685,8 +705,7 @@ button {
   .twin-body {
     grid-template-columns: 1fr;
   }
-  .twin-stage,
-  .twin-placeholder {
+  .twin-stage {
     min-height: 45vh;
   }
 }
