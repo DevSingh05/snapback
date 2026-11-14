@@ -235,6 +235,7 @@ class PriceResult(BaseModel):
     # A7 (#67): the unit on the record, and the per-bed guard.
     unit: UnitStatus = UnitStatus.NOT_CHECKED
     per_bed: bool = False  # the record prices by the bed, so the rent was not compared
+    compared_beds: int | None = None  # the rent was compared with floor plans of this size
 
 
 class PhoneMatch(StrEnum):
