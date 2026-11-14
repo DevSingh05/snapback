@@ -93,7 +93,7 @@ EN: dict[str, str] = {
     # number. The line is Not confirmed, and it says who to call.
     "contact.phone_mismatch": (
         "Not confirmed. This number is not the leasing office's on record. "
-        "Agents often use their own. Call {manager} on record yourself to confirm."
+        "Agents often use their own, so check it with the office."
     ),
     "contact.phone_mismatch_unnamed": (
         "Not confirmed. This number is not the leasing office's on record. "
@@ -348,8 +348,7 @@ ES: dict[str, str] = {
     ),
     "contact.phone_mismatch": (
         "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
-        "registro. Los agentes suelen usar el suyo. Llame usted mismo a {manager}, que figura "
-        "en el registro, para confirmarlo."
+        "registro. Los agentes suelen usar el suyo, así que confírmelo con la oficina."
     ),
     "contact.phone_mismatch_unnamed": (
         "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "

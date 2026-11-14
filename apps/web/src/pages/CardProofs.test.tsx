@@ -88,9 +88,15 @@ describe("place, person and price proof lines", () => {
     ["unit on record", price({ unit: "on_record" }), "is on this building's list"],
     ["unit unchecked", price({ unit: "not_checked" }), "Not checked (the listing names no unit"],
     [
-      "phone differs",
+      "phone differs, manager on record",
+      authority({ office_phone_match: "no", manager_on_record: "Oak Court Management" }),
+      "This number is not the leasing office's on record. Agents often use their own, so check it with the office.",
+    ],
+    [
+      // Nothing else on the row says who to call, so this line does.
+      "phone differs, no manager on record",
       authority({ office_phone_match: "no" }),
-      "This number is not the leasing office's on record. Agents often use their own",
+      "This number is not the leasing office's on record. Agents often use their own. Call the office on record yourself to confirm.",
     ],
     [
       "phone matches",

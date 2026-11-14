@@ -119,14 +119,20 @@ def test_a_phone_that_is_not_the_office_holds_the_case_even_if_the_name_matches(
     # licensed locator or listing agent posting with their own number is normal and legal.
     tone, text = card_lines(modules, CardRowKind.PERSON)["Contact on record"]
     assert tone is CardTone.NOT_SHOWN
+    # The one "Call {manager} yourself" on this row is on the "Allowed to rent it" line, so
+    # this line does not say "call" a second time.
     assert text == (
         "Not confirmed. This number is not the leasing office's on record. "
-        "Agents often use their own. Call Fixture Living LLC on record yourself to confirm."
+        "Agents often use their own, so check it with the office."
     )
+    assert "Fixture Living LLC" in card_lines(modules, CardRowKind.PERSON)["Allowed to rent it"][1]
+
+    # With no manager on record nothing else on the row says who to call, so this line does.
     unnamed = check_authority(ContactClaims(phones=[OTHER]), record(manager_company=None), SALT)
-    _, said = card_lines(evidence(authority=unnamed.model_dump(mode="json")), CardRowKind.PERSON)[
-        "Contact on record"
-    ]
+    tone, said = card_lines(
+        evidence(authority=unnamed.model_dump(mode="json")), CardRowKind.PERSON
+    )["Contact on record"]
+    assert tone is CardTone.NOT_SHOWN
     assert said == (
         "Not confirmed. This number is not the leasing office's on record. "
         "Agents often use their own. Call the office on record yourself to confirm."
