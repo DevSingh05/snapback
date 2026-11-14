@@ -58,14 +58,6 @@ export interface AuthorityResult {
   link_domain: LinkDomain;
 }
 
-// Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
-// Used when the card API has not already put these lines in `rows`.
-export interface CardProofs {
-  price?: PriceResult | null;
-  authority?: AuthorityResult | null;
-  unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
-}
-
 export interface Card {
   for_sale?: ForSaleMatch | null; // D7; null or missing means not looked up
   case_id: string;

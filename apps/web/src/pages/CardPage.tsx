@@ -4,16 +4,8 @@ import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import { LabSection } from "../lab";
 import { replayForCase } from "../replay";
-import { STATE_WORD, historySteps, proofLines, shortDate, toneWord } from "../cardStrings";
-import type {
-  Card,
-  CardLine,
-  CardProofs,
-  CardRow,
-  CardRowKind,
-  CardTone,
-  VerdictState,
-} from "../contracts";
+import { STATE_WORD, historySteps, shortDate, toneWord } from "../cardStrings";
+import type { Card, CardLine, CardRowKind, CardTone, VerdictState } from "../contracts";
 
 const ROW_LABEL = { place: "PLACE", person: "PERSON", price: "PRICE" } as const;
 
@@ -80,34 +72,16 @@ function EvidenceRow({
   );
 }
 
-// A proof line replaces the API line with the same label; the rest are added after the API lines.
-// "Call X yourself" is skipped when the API row already names the manager.
-function mergeRows(base: CardRow[], extra: CardRow[], manager?: string | null): CardRow[] {
-  return base.map((row) => {
-    const named = (a: CardLine) =>
-      a.label === "Next step" && !!manager && row.lines.some((l) => l.text.includes(manager));
-    const add = (extra.find((e) => e.kind === row.kind)?.lines ?? []).filter((a) => !named(a));
-    const kept = row.lines.filter((l) => !add.some((a) => a.label === l.label));
-    return { ...row, lines: [...kept, ...add] };
-  });
-}
-
 export function CardView({
   card,
   variant,
   withLab = false,
-  proofs,
 }: {
   card: Card;
   variant: "result" | "verify";
   withLab?: boolean;
-  proofs?: CardProofs;
 }) {
-  const rows = mergeRows(
-    card.rows,
-    proofLines(proofs ?? {}, card.for_sale),
-    proofs?.authority?.manager_on_record,
-  );
+  const rows = card.rows;
   const history = historySteps(card.for_sale);
   const stateTone = STATE_TONE[card.state];
   return (
