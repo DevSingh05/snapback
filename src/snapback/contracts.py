@@ -81,6 +81,7 @@ class Evidence(BaseModel):
     phone_confirmed: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
+    license_flag: bool = False  # claims a real estate license; no active one holds that name
 
 
 class VerdictState(StrEnum):

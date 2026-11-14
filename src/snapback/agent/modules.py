@@ -19,6 +19,7 @@ from snapback.contracts import (
     DataSource,
     FloorPlanCandidate,
     ForSaleMatch,
+    LicenseResult,
     LocateResult,
     MemoryResult,
     ModuleEvidence,
@@ -80,6 +81,10 @@ class Modules(Protocol):
         """Is the home listed for sale, or just rented? None when it was not looked up."""
         ...
 
+    def license(self, case_id: str) -> LicenseResult | None:
+        """The poster's claimed real estate licence, looked up. None when it was not."""
+        ...
+
     def record_source(self, case_id: str) -> DataSource | None:
         """Where price, authority and for_sale came from, if not from where the case did."""
         ...
@@ -112,6 +117,7 @@ class FixtureModules:
         beds: int | None = None,
         record_file: str = "property_record.json",
         for_sale: ForSaleMatch | None = None,
+        license: LicenseResult | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
@@ -133,6 +139,7 @@ class FixtureModules:
         self._unit = unit
         self._beds = beds
         self._for_sale = for_sale
+        self._license = license
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
             None
@@ -187,6 +194,9 @@ class FixtureModules:
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         return self._for_sale if self._for_sale is not None else self.evidence.for_sale
+
+    def license(self, case_id: str) -> LicenseResult | None:
+        return self._license if self._license is not None else self.evidence.license
 
     def record_source(self, case_id: str) -> DataSource | None:
         return None  # all of a fixture case is fixture

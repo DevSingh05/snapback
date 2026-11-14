@@ -204,6 +204,7 @@ class CaseSession:
             "price": self.modules.price(self.case_id),
             "authority": self.modules.authority(self.case_id),
             "for_sale": self.modules.for_sale(self.case_id),
+            "license": self.modules.license(self.case_id),
             "record_source": self.modules.record_source(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:

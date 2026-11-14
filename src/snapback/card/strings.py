@@ -30,6 +30,7 @@ EN: dict[str, str] = {
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
     "label.link": "Link",
+    "label.license": "License",
     "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
@@ -138,6 +139,17 @@ EN: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    "license.licensed": "Licensed in Texas.",
+    "license.licensed_sponsored": "Licensed in Texas, sponsored by {broker}.",
+    # D10 (#128): NOT_FOUND only from a license number the ad itself gives. A name never gives it.
+    "license.not_found": (
+        "The license number in the ad is not an active Texas license. "
+        "Look it up yourself at trec.texas.gov."
+    ),
+    "license.not_checked_claimed": (
+        "Says they're licensed. Ask for their Texas license number and look it up at "
+        "trec.texas.gov."
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -304,6 +316,7 @@ EN: dict[str, str] = {
     ),
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
+    "reason.license_not_found": "The license number in the ad is not an active Texas license.",
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
@@ -361,6 +374,7 @@ ES: dict[str, str] = {
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
     "label.link": "Enlace",
+    "label.license": "Licencia",
     "label.unit": "Unidad en el registro",
     "place.located_plan": (
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
@@ -467,6 +481,15 @@ ES: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "license.licensed": "Con licencia en Texas.",
+    "license.licensed_sponsored": "Con licencia en Texas, patrocinada por {broker}.",
+    "license.not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas. "
+        "Búsquelo usted mismo en trec.texas.gov."
+    ),
+    "license.not_checked_claimed": (
+        "Dice tener licencia. Pídale su número de licencia de Texas y búsquelo en trec.texas.gov."
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
@@ -664,6 +687,9 @@ ES: dict[str, str] = {
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
+    "reason.license_not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas."
+    ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
