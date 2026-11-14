@@ -3,7 +3,7 @@
    primary action and the box's focus; verdict colours (--st-*) appear only next to their words.
    Cards are used only for things you can act on. Every colour is a token (tokens.css). */
 
-.shell-home {
+.app > .shell-home {
   background: var(--home-ground);
   padding-top: 0;
   overflow-x: clip;
@@ -516,7 +516,7 @@
   max-width: min(560px, 88%);
   margin-top: var(--sp-4);
   padding: var(--sp-3) var(--sp-4);
-  background: var(--home-raised);
+  background: var(--home-surface);
   color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -590,7 +590,7 @@
 .ob-replies button {
   min-height: 48px;
   padding: var(--sp-2) var(--sp-4);
-  background: var(--home-raised);
+  background: var(--home-surface);
   color: var(--ink);
   font-size: var(--fs-md);
 }
@@ -637,7 +637,7 @@
   flex-direction: column;
   gap: var(--sp-2);
   padding-block: var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
-  background: var(--home-surface);
+  background: var(--home-ground);
 }
 .ob-learned {
   margin: 0;
@@ -659,7 +659,7 @@
   flex-direction: column;
   gap: var(--sp-3);
   padding: var(--pad);
-  background: var(--home-raised);
+  background: var(--home-surface);
 }
 .ob-card-head {
   display: flex;
@@ -713,7 +713,7 @@
 }
 .ob-secondary,
 .ob-pick-go {
-  background: var(--home-surface);
+  background: var(--home-raised);
   color: var(--ink);
 }
 .ob-quiet,
@@ -789,7 +789,7 @@
   width: 100%;
   resize: vertical;
   padding: var(--sp-3);
-  background: var(--home-surface);
+  background: var(--home-raised);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-md);
@@ -883,7 +883,7 @@
   text-underline-offset: 3px;
 }
 .ob-card .ob-replies button {
-  background: var(--home-surface);
+  background: var(--home-raised);
 }
 .ob-follow {
   padding-top: var(--sp-3);
