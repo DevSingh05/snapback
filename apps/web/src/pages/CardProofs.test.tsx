@@ -63,8 +63,19 @@ describe("place, person and price proof lines", () => {
     [
       "for sale",
       {},
-      "This home is listed for sale on Homes.com, not for rent.",
-      { status: "active", site: "Homes.com", listed_on: "2026-09-02" },
+      "Listed for sale on Homes.com by Fixture Realty Group since 2026-09-02. Homes for sale are sometimes also offered for lease, so confirm with that brokerage before you pay.",
+      {
+        status: "active",
+        site: "Homes.com",
+        listed_on: "2026-09-02",
+        offices: ["Fixture Realty Group"],
+      },
+    ],
+    [
+      "for sale, no brokerage or date on record",
+      {},
+      "Listed for sale on Homes.com. Homes for sale are sometimes also offered for lease, so confirm with the listing brokerage before you pay.",
+      { status: "active", site: "Homes.com" },
     ],
     [
       "recently rented",
@@ -192,9 +203,15 @@ describe("place, person and price proof lines", () => {
         }}
       />,
     );
-    for (const re of [/listed for sale on Homes\.com/, /looks like the building/]) {
-      expect(screen.getByText(re).closest("tr")).toHaveTextContent("Doesn't match");
-    }
+    expect(screen.getByText(/looks like the building/).closest("tr")).toHaveTextContent(
+      "Doesn't match",
+    );
+    // A home listed for sale is a warning, never a mismatch (red team H5): homes for sale are
+    // sometimes also offered for lease.
+    const forSale = screen.getByText(/Listed for sale on Homes\.com/).closest("tr");
+    expect(forSale).toHaveTextContent("Warning");
+    expect(forSale).not.toHaveTextContent("Doesn't match");
+    expect(forSale).not.toHaveTextContent("not for rent");
     // A phone that is not the office's is Not confirmed, never a mismatch (#121): agents and
     // locators often post with their own number.
     const phone = screen.getByText(/number is not the leasing office's on record/).closest("tr");

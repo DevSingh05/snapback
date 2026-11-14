@@ -67,7 +67,11 @@ VARIANTS = {
     ),
     "rent_in_range": modules(price={"status": "within_range", "listed_rent": 1900}),
     "clean": modules(
-        authority={"status": "matches_record", "manager_on_record": "Fixture Living LLC"},
+        authority={
+            "status": "matches_record",
+            "manager_on_record": "Fixture Living LLC",
+            "office_phone_match": "yes",  # H1: a pass needs the ad's phone to be the office's
+        },
         price={"status": "within_range", "listed_rent": 1900},
         rules=[],
     ),

@@ -156,8 +156,11 @@ def test_a_phone_mismatch_alone_holds_the_case_and_puts_no_red_flag_anywhere_on_
     tones = [item.tone for row in card.rows for item in row.lines]
     assert CardTone.RED_FLAG not in tones
     assert not any("Red flag" in item.text for row in card.rows for item in row.lines)
-    # And without the mismatch the same case passes, so the phone is what holds it.
-    passing = check_authority(ContactClaims(company="Fixture Living LLC"), record(), SALT)
+    # And with the office's own number the same case passes, so the phone is what holds it.
+    passing = check_authority(
+        ContactClaims(company="Fixture Living LLC", phones=[OFFICE]), record(), SALT
+    )
+    assert passing.office_phone_match is PhoneMatch.YES
     assert state(evidence(authority=passing.model_dump(mode="json"), rules=[], price=None)) is (
         VerdictState.VERIFIED
     )
@@ -331,13 +334,18 @@ def test_links_are_read_from_the_listing_text():
 # --- for sale ------------------------------------------------------------------------------
 
 
-def test_a_home_listed_for_sale_is_a_red_flag_on_the_place_row_and_holds_the_case():
+def test_a_home_listed_for_sale_is_a_warning_on_the_place_row_and_holds_the_case():
     modules = evidence(for_sale={"status": "active"})
     assert to_evidence(modules).for_sale_flag is True
     assert state(modules) is VerdictState.HOLD
+    # Red team H5 (Sat 03:25): a warning, not a red flag, and never "not for rent". Homes
+    # for sale are sometimes also offered for lease, and lease status is not ours to claim.
     tone, text = card_lines(modules, CardRowKind.PLACE)["For sale"]
-    assert tone is CardTone.RED_FLAG
-    assert text == "This home is listed for sale on Homes.com, not for rent. Red flag."
+    assert tone is CardTone.HOLD
+    assert text == (
+        "Listed for sale on Homes.com. Homes for sale are sometimes also offered for lease, "
+        "so confirm with the listing brokerage before you pay."
+    )
 
 
 def test_for_sale_holds_a_case_even_when_no_photo_could_be_placed():
@@ -385,8 +393,13 @@ def test_for_sale_is_never_dont_pay_and_nothing_else_outranks_could_not_place():
 
 
 def verified_but_for(**sections) -> ModuleEvidence:
-    """A case that would be VERIFIED: presence proven, the company matches, nothing flagged."""
-    matches = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    """A case that would be VERIFIED: presence proven, the company and the office phone
+    match (red team H1: a name alone never verifies), nothing flagged."""
+    matches = {
+        "status": "matches_record",
+        "manager_on_record": "Fixture Living LLC",
+        "office_phone_match": "yes",
+    }
     return evidence(authority=matches, rules=[], price=None, **sections)
 
 
@@ -711,7 +724,7 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
         assert strings.text(f"reason.{key}") in verdict.reasons
 
     lines = {item.label: item for row in card.rows for item in row.lines}
-    assert lines["For sale"].tone is CardTone.RED_FLAG
+    assert lines["For sale"].tone is CardTone.HOLD  # a warning, not a red flag (H5)
     assert lines["Link"].tone is CardTone.RED_FLAG
     assert lines["Contact on record"].tone is CardTone.NOT_SHOWN
     assert lines["Unit on record"].tone is CardTone.HOLD

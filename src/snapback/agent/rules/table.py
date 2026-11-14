@@ -18,6 +18,12 @@ How to read a rule:
   Zelle"), is a warning, not an ask. The refusal has to come before the thing, in its clause.
 - `excused_as_rent_terms`: a clause that describes how tenants pay rent ("tenants can pay rent
   by Venmo or Zelle") and asks for nothing now is not an ask either.
+- `excused_after_approval`: a fee or a holding deposit that is due "after approval" or "once
+  approved" is the ordinary order of things: the application came first. It does not fire.
+- `excused_through_portal`: a fee paid "through our portal", "on our website" or "online" is
+  where an application fee is ordinarily paid. It does not fire.
+  Neither of these two excuses a sentence that names money that cannot be taken back (Zelle,
+  a wire, a gift card, cash, "to me") or that wants it today.
 - `needs_link`: the sentence must also contain a web link.
 - `red_flag`: shown on the card as a red flag. Rules that are not red flags are recorded for the
   agent's trace only, because honest listings use the same words ("won't last").
@@ -44,6 +50,8 @@ class Rule:
     excused_after_viewing: bool = False
     excused_when_refused: bool = False
     excused_as_rent_terms: bool = False
+    excused_after_approval: bool = False
+    excused_through_portal: bool = False
     needs_link: bool = False
 
 
@@ -134,6 +142,8 @@ RULES: tuple[Rule, ...] = (
         ),
         excused_after_viewing=True,
         excused_when_refused=True,
+        excused_after_approval=True,
+        excused_through_portal=True,
     ),
     Rule(
         # A listing that merely states an application fee is ordinary. An ask to send one is not.
@@ -148,6 +158,8 @@ RULES: tuple[Rule, ...] = (
         ),
         excused_after_viewing=True,
         excused_when_refused=True,
+        excused_after_approval=True,
+        excused_through_portal=True,
     ),
     # --- data asks: details that let someone take money or an identity ---------------------
     Rule(
@@ -186,13 +198,14 @@ RULES: tuple[Rule, ...] = (
         rule_id="pressure.cannot_show",
         category=RuleCategory.PRESSURE,
         red_flag=True,
+        # Being unable to show a home is ordinary: "I can't show it until Saturday", "we
+        # can't meet in person, but we offer a live video tour", "I'm out of town this week,
+        # but you can tour with the lockbox code" (red team H8, Sat 03:25). What is not
+        # ordinary is a poster who is abroad, or keys that come by mail.
         patterns=(
             r"\b(?:i am|i'm|i will be|we are|we're|currently|i work|i live|i moved|relocated)\b"
-            r"[^.!?]{0,30}\b(?:out of (?:the )?(?:country|state|town)|abroad|overseas|deployed|"
+            r"[^.!?]{0,30}\b(?:out of (?:the )?country|abroad|overseas|deployed|"
             r"on a mission)\b",
-            r"\b(?:can ?not|can't|cant|unable to|won't be able to|will not be able to|"
-            r"not able to)\b"
-            r"[^.!?]{0,20}\b(?:show|meet|give (?:you )?a tour)\b",
             r"\b(?:mail|ship|send|courier|fedex|overnight) (?:you )?the keys\b",
             r"\bkeys? (?:will be |by )?(?:mailed|shipped|mail)\b",
         ),

@@ -51,10 +51,23 @@ function forSaleLines(fs: ForSaleMatch | null | undefined): CardLine[] {
   if (fs === undefined) return [];
   if (fs === null)
     return [line("For sale", "Not checked (no for-sale lookup for this home).", "not_checked")];
-  if (fs.status === "active")
+  if (fs.status === "active") {
+    // A warning, not a mismatch, and never "not for rent" (red team H5, Sat 03:25). Mirrors
+    // the place.for_sale strings in strings.py: what the record says, and who to ask.
+    const brokerage = (fs.offices ?? [])
+      .map((name) => name.split(/\s+/).filter(Boolean).join(" ").slice(0, 80))
+      .find((name) => name.length > 0);
+    const by = brokerage ? ` by ${brokerage}` : "";
+    const since = fs.listed_on ? ` since ${fs.listed_on.slice(0, 10)}` : "";
+    const ask = brokerage ? "that brokerage" : "the listing brokerage";
     return [
-      line("For sale", `This home is listed for sale on ${fs.site}, not for rent.`, "red_flag"),
+      line(
+        "For sale",
+        `Listed for sale on ${fs.site}${by}${since}. Homes for sale are sometimes also offered for lease, so confirm with ${ask} before you pay.`,
+        "hold",
+      ),
     ];
+  }
   if (fs.status === "recently_rented") {
     const when = fs.changed_on ? ` on ${shortDate(fs.changed_on)}` : " recently";
     return [line("Rental history", `This home was rented${when}.`, "red_flag")];
