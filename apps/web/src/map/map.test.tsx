@@ -8,7 +8,6 @@ import MapPage from "./MapPage";
 import { monthsOld } from "./PlaceSheet";
 import { fixturePlacesMap, fixtureSheet } from "./fixture";
 import { columnHeight, columns, hexagon, metresBetween, nearestPlace } from "./geometry";
-import { loadMapLibre } from "./maplibre";
 import { BANNED } from "./strings";
 import { EMPTY_CRITERIA, toBrief } from "./types";
 
@@ -110,12 +109,6 @@ describe("map geometry", () => {
     const [lon, lat] = f.geometry.coordinates;
     expect(nearestPlace(feed.features, [lon + 0.0002, lat])?.properties.pid).toBe(f.properties.pid);
     expect(nearestPlace(feed.features, [lon + 0.2, lat + 0.2])).toBeNull();
-  });
-});
-
-describe("the map loader", () => {
-  it("says plainly that MapLibre is not installed yet", async () => {
-    await expect(loadMapLibre()).rejects.toThrow(/not installed/);
   });
 });
 

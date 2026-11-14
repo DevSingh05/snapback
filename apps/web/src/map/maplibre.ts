@@ -1,14 +1,7 @@
 // The one place MapLibre GL is loaded, and the narrow slice of its API the map screen uses.
 // It is imported with import() from the /map route only, so the home bundle does not grow.
-//
-// NOT INSTALLED YET. `maplibre-gl` is approved (decisions R-M3) but the npm install has not been
-// run on this branch, so loadMapLibre() rejects and the map screen shows its "could not start"
-// state with the full list of places. To turn the map on:
-//   1. npm install maplibre-gl@6.16.0 -w apps/web --save-exact   (BSD-3-Clause, released Oct 25 2026)
-//   2. replace the body of loadMapLibre() with the two lines in its comment.
-// Nothing else in the app changes; CityMap is written against the MapApi slice below.
-
-export const MAPLIBRE_VERSION = "6.16.0";
+// MapLibre GL JS 6.16.0 (BSD-3-Clause), pinned exactly in package.json. Version 6 ships its
+// worker as a separate file, so the worker's own URL is handed to it here.
 
 export interface Point {
   x: number;
@@ -76,11 +69,17 @@ export interface MapLibre {
   Map: new (options: MapOptions) => MapApi;
 }
 
+let loading: Promise<MapLibre> | null = null;
+
 export function loadMapLibre(): Promise<MapLibre> {
-  // After the install:
-  //   await import("maplibre-gl/dist/maplibre-gl.css");
-  //   return (await import("maplibre-gl")) as unknown as MapLibre;
-  return Promise.reject(
-    new Error(`maplibre-gl ${MAPLIBRE_VERSION} is not installed in this build.`),
-  );
+  loading ??= (async () => {
+    const [ml, worker] = await Promise.all([
+      import("maplibre-gl"),
+      import("maplibre-gl/dist/maplibre-gl-worker.mjs?url"),
+      import("maplibre-gl/dist/maplibre-gl.css"),
+    ]);
+    ml.setWorkerUrl(worker.default);
+    return ml as unknown as MapLibre;
+  })();
+  return loading;
 }
