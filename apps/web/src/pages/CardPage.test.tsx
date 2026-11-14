@@ -8,10 +8,10 @@ import { CardPage, CardView } from "./CardPage";
 const card = cardHold as Card;
 
 describe("CardView with card_hold.json", () => {
-  it("shows PLACE, PERSON, PRICE in that order", () => {
+  it("names the kind of every check, failing ones first, then passing, then not checked", () => {
     render(<CardView card={card} variant="result" />);
     const labels = screen.getAllByTestId("row-label").map((el) => el.textContent);
-    expect(labels).toEqual(["PLACE", "PERSON", "PRICE"]);
+    expect(labels).toEqual(["PERSON", "PRICE", "PLACE", "PERSON", "PRICE"]);
   });
 
   it("shows the FIXTURE chip for fixture data and LIVE for live data", () => {
