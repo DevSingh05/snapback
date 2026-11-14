@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
     ChallengeResult,
@@ -45,6 +46,10 @@ class ChallengeOutcome:
 
 
 class Modules(Protocol):
+    def listing_scope(self, case_id: str) -> ListingScope:
+        """What kind of listing this is, as read by code from its own link and wording."""
+        ...
+
     def has_twin(self, case_id: str) -> bool: ...
 
     def photo_count(self, case_id: str) -> int: ...
@@ -66,8 +71,10 @@ class Modules(Protocol):
     def new_code(self, case_id: str) -> str: ...
 
     def challenge(
-        self, case_id: str, spot: SpotCandidate, code: str, attempt: int
-    ) -> ChallengeOutcome: ...
+        self, case_id: str, spot: SpotCandidate, code: str, text: str, attempt: int
+    ) -> ChallengeOutcome:
+        """Send `text`, the message the renter approved, and judge the reply."""
+        ...
 
 
 class FixtureModules:
@@ -79,6 +86,7 @@ class FixtureModules:
         *,
         fixtures_dir: Path = FIXTURES_DIR,
         has_twin: bool = True,
+        listing_scope: ListingScope = ListingScope.RENTAL,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
@@ -93,6 +101,8 @@ class FixtureModules:
             (fixtures_dir / "spot_ranking.json").read_text()
         )
         self._has_twin = has_twin
+        self._listing_scope = ListingScope(listing_scope)
+        self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
             None
             if recapture_override is None
@@ -100,6 +110,9 @@ class FixtureModules:
         )
         self._recapture_clears_after = recapture_clears_after
         self._spots_available = spots_available
+
+    def listing_scope(self, case_id: str) -> ListingScope:
+        return self._listing_scope
 
     def has_twin(self, case_id: str) -> bool:
         return self._has_twin and bool(self.record.model_ids)
@@ -149,10 +162,11 @@ class FixtureModules:
         return self.evidence.challenge.code if self.evidence.challenge else new_code()
 
     def challenge(
-        self, case_id: str, spot: SpotCandidate, code: str, attempt: int
+        self, case_id: str, spot: SpotCandidate, code: str, text: str, attempt: int
     ) -> ChallengeOutcome:
         if self.evidence.challenge is None:
             raise LookupError("this fixture has no challenge result")
+        self.sent_messages.append(text)
         recapture = list(self.evidence.recapture)
         still_flagged = (
             self._recapture_clears_after is None or attempt < self._recapture_clears_after

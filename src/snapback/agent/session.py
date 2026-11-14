@@ -20,6 +20,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from snapback.agent.modules import Modules
+from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
 from snapback.contracts import (
@@ -155,11 +156,21 @@ class CaseSession:
     def _checks_offer(self) -> Offer:
         has_twin = self.modules.has_twin(self.case_id)
         if has_twin:
-            options = (TWIN_RULES_CHALLENGE, RULES_CHALLENGE, STATE_ONLY)
-            reason = self._say("trace.checks.twin")
+            options: tuple[str, ...] = (TWIN_RULES_CHALLENGE, RULES_CHALLENGE)
+            default, reason = TWIN_RULES_CHALLENGE, self._say("trace.checks.twin")
         else:
-            options = (RULES_ONLY, STATE_ONLY)
-            reason = self._say("trace.checks.no_twin")
+            options = (RULES_ONLY,)
+            default, reason = RULES_ONLY, self._say("trace.checks.no_twin")
+
+        # "state only" runs nothing, so it is on the list only for a kind of listing this check
+        # does not cover. On an ordinary rental it would be a way to skip a payment warning or
+        # to turn a forged reply into "could not check". Every other option reads the text.
+        scope = self.modules.listing_scope(self.case_id)
+        out_of_scope = scope is not ListingScope.RENTAL
+        if out_of_scope:
+            options = (*options, STATE_ONLY)
+            default, reason = STATE_ONLY, self._say(f"trace.checks.{scope.value}")
+
         return Offer(
             kind=ChoiceKind.WHICH_CHECKS,
             options=options,
@@ -167,8 +178,9 @@ class CaseSession:
             facts={
                 "building_has_a_3d_twin": has_twin,
                 "listing_photos": self.modules.photo_count(self.case_id),
+                "short_term_or_commercial_listing": out_of_scope,
             },
-            default=options[0],
+            default=default,
             default_reason=reason,
         )
 
@@ -354,7 +366,10 @@ class CaseSession:
         if decision == EDIT and text:
             draft = replace(draft, text=text)
 
-        outcome = self.modules.challenge(self.case_id, self._spot, draft.code, self.retries)
+        # The text handed over is the one the renter approved: the draft, or their edit of it.
+        outcome = self.modules.challenge(
+            self.case_id, self._spot, draft.code, draft.text, self.retries
+        )
         self.evidence = self.evidence.model_copy(
             update={
                 "challenge": outcome.challenge,
