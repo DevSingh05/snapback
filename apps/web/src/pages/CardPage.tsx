@@ -4,25 +4,18 @@ import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import { LabSection } from "../lab";
 import { replayForCase } from "../replay";
-import type { Card, CardLine, CardTone, VerdictState } from "../contracts";
+import { STATE_WORD, historySteps, proofLines, shortDate, toneWord } from "../cardStrings";
+import type {
+  Card,
+  CardLine,
+  CardProofs,
+  CardRow,
+  CardRowKind,
+  CardTone,
+  VerdictState,
+} from "../contracts";
 
 const ROW_LABEL = { place: "PLACE", person: "PERSON", price: "PRICE" } as const;
-
-// Words next to every colour. These are status labels for the tone, not new claims.
-const TONE_WORD: Record<CardTone, string> = {
-  ok: "Held up",
-  hold: "On hold",
-  red_flag: "Red flag",
-  not_shown: "Not shown",
-  not_checked: "Not checked",
-};
-
-const STATE_WORD: Record<VerdictState, string> = {
-  hold: "Hold",
-  dont_pay: "Don't pay · could not verify",
-  unverified: "Could not place these photos",
-  verified: "Checks held up",
-};
 
 const STATE_TONE: Record<VerdictState, string> = {
   hold: "amber",
@@ -47,18 +40,28 @@ export function expiryText(expiresAt: string, now: Date = new Date()): string {
   return `Expires in ${Math.max(1, Math.round(ms / 60_000))} min`;
 }
 
-function ToneMark({ tone }: { tone: CardTone }) {
+function ToneMark({ tone, row }: { tone: CardTone; row: CardRowKind }) {
   return (
     <span className={`tone tone-${tone}`}>
       <span className="tone-icon" aria-hidden="true">
         {tone === "ok" ? "✓" : tone === "red_flag" ? "!" : tone === "hold" ? "…" : "–"}
       </span>
-      {TONE_WORD[tone]}
+      {toneWord(tone, row)}
     </span>
   );
 }
 
-function EvidenceRow({ line, first, label }: { line: CardLine; first: boolean; label: string }) {
+function EvidenceRow({
+  line,
+  first,
+  label,
+  row,
+}: {
+  line: CardLine;
+  first: boolean;
+  label: string;
+  row: CardRowKind;
+}) {
   return (
     <tr className={first ? "row-first" : undefined}>
       <th scope="row" className="cell-kind">
@@ -71,21 +74,41 @@ function EvidenceRow({ line, first, label }: { line: CardLine; first: boolean; l
       <td className="cell-what">{line.label}</td>
       <td className="cell-text">{line.text}</td>
       <td className="cell-tone">
-        <ToneMark tone={line.tone} />
+        <ToneMark tone={line.tone} row={row} />
       </td>
     </tr>
   );
+}
+
+// A proof line replaces the API line with the same label; the rest are added after the API lines.
+// "Call X yourself" is skipped when the API row already names the manager.
+function mergeRows(base: CardRow[], extra: CardRow[], manager?: string | null): CardRow[] {
+  return base.map((row) => {
+    const named = (a: CardLine) =>
+      a.label === "Next step" && !!manager && row.lines.some((l) => l.text.includes(manager));
+    const add = (extra.find((e) => e.kind === row.kind)?.lines ?? []).filter((a) => !named(a));
+    const kept = row.lines.filter((l) => !add.some((a) => a.label === l.label));
+    return { ...row, lines: [...kept, ...add] };
+  });
 }
 
 export function CardView({
   card,
   variant,
   withLab = false,
+  proofs,
 }: {
   card: Card;
   variant: "result" | "verify";
   withLab?: boolean;
+  proofs?: CardProofs;
 }) {
+  const rows = mergeRows(
+    card.rows,
+    proofLines(proofs ?? {}, card.for_sale),
+    proofs?.authority?.manager_on_record,
+  );
+  const history = historySteps(card.for_sale);
   const stateTone = STATE_TONE[card.state];
   return (
     <article className={`card-page variant-${variant}`}>
@@ -132,7 +155,7 @@ export function CardView({
                 <th>Status</th>
               </tr>
             </thead>
-            {card.rows.map((row) => (
+            {rows.map((row) => (
               <tbody key={row.kind} className={`group group-${row.kind}`}>
                 {row.lines.map((line, i) => (
                   <EvidenceRow
@@ -140,6 +163,7 @@ export function CardView({
                     line={line}
                     first={i === 0}
                     label={ROW_LABEL[row.kind]}
+                    row={row.kind}
                   />
                 ))}
               </tbody>
@@ -147,6 +171,19 @@ export function CardView({
           </table>
         </div>
       </section>
+
+      {history.length > 0 ? (
+        <section className="history" aria-label="Listing history">
+          <ol data-testid="history-strip">
+            {history.map((step) => (
+              <li key={step.what}>
+                <span className="history-what">{step.what}</span>
+                <time dateTime={step.on}>{shortDate(step.on)}</time>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <section className="not-checked" aria-labelledby="nc-title">
         <h2 id="nc-title">Not checked</h2>
