@@ -25,6 +25,7 @@ school or people, never say "available now" and never offer to book.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -204,9 +205,12 @@ class PhotoWalkFields(BaseModel):
 
 
 class WalkResponse(BaseModel):
-    """`GET /cases/{id}/walk`: the plan with the case's placed photos, and the locate result."""
+    """`GET /cases/{id}/walk`: the plan with the case's placed photos, and the locate result.
+    `model_id` is the scan the walk was built from, for the token-gated page to load: the
+    browser shows that model and no other."""
 
     plan: TourPlan
+    model_id: str | None = None
     locate: LocateResult | None = None
     photos: dict[str, PhotoWalkFields] = Field(default_factory=dict)
 
@@ -665,6 +669,58 @@ def coverage_line(
     return base
 
 
+def _is_start_door(stop: TourStop) -> bool:
+    """The front door that is only the scan's first sweep (no entry room was labelled)."""
+    return stop.kind == "door" and stop.note == START_NOTE
+
+
+def _beds_of(plan: str | None) -> int | None:
+    """Bedrooms in a floor-plan label ("2 bed / 2 bath" is 2, "studio / 1 bath" is 0)."""
+    low = (plan or "").strip().lower()
+    if low.startswith("studio"):
+        return 0
+    m = re.match(r"(\d+)\s*(?:bed|br)", low)
+    return int(m.group(1)) if m else None
+
+
+def _bed_word(plan: str | None) -> str:
+    n = _beds_of(plan)
+    return "studio" if n == 0 else f"{n}-bed" if n is not None else str(plan)
+
+
+def _plans_differ(scan_plan: str | None, ad_plan: str | None) -> bool:
+    if not scan_plan or not ad_plan:
+        return False
+    a, b = _beds_of(scan_plan), _beds_of(ad_plan)
+    if a is not None and b is not None:
+        return a != b
+    return scan_plan.strip().lower() != ad_plan.strip().lower()
+
+
+def stop_for_photo(
+    plan: TourPlan, sweep: str | None, position: Sequence[float] | None
+) -> TourStop | None:
+    """The stop a placed photo belongs to. Its sweep's room first (a room beats the scan's start
+    door, which only shares that sweep); else the nearest stop within ROOM_LINK_M of the photo's
+    position (a photo 0.7 m from the Kitchen sweep is in the Kitchen); else the start door when
+    the sweep is its own; else None. A photo is never put on a far room."""
+    walked = [s for s in plan.stops if s.kind in WALKED]
+    holding = [s for s in walked if sweep and sweep in s.sweep_ids]
+    rooms = [s for s in holding if not _is_start_door(s)]
+    if rooms:
+        return rooms[0]
+    if position is not None:
+        near = [
+            (math.hypot(position[0] - s.position[0], position[2] - s.position[2]), i, s)
+            for i, s in enumerate(walked)
+            if s.position is not None and not _is_start_door(s)
+        ]
+        near = [n for n in near if n[0] <= ROOM_LINK_M]
+        if near:
+            return min(near, key=lambda n: (n[0], n[1]))[2]
+    return holding[0] if holding else None
+
+
 def map_locate(
     plan: TourPlan,
     locate: LocateResult,
@@ -685,7 +741,6 @@ def map_locate(
     placed_ids = [p.photo_id for p in locate.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
     elsewhere = sum(s is LocateStatus.LOCATED_ELSEWHERE for s in status.values())
     unplaced = len(status) - len(placed_ids) - elsewhere
-    all_placed = bool(status) and len(placed_ids) == len(status)
 
     order_of = alias_order or {p.photo_id: i for i, p in enumerate(locate.photos, start=1)}
     by_stop: dict[str, list[TourPhoto]] = {}
@@ -695,11 +750,9 @@ def map_locate(
             continue
         pose = locate.poses.get(photo.photo_id)
         sweep = photo.pano_id or (pose.sweep_id if pose else None)
-        stop = next(
-            (s for s in plan.stops if s.kind in WALKED and sweep and sweep in s.sweep_ids), None
-        )
+        stop = stop_for_photo(plan, sweep, pose.position if pose else None)
         if stop is None:
-            continue  # placed, but in a sweep that is no stop: never forced onto a nearby room
+            continue  # placed, but on no stop and near none: never forced onto a far room
         by_stop.setdefault(stop.key, []).append(
             TourPhoto(
                 photo_id=photo.photo_id,
@@ -711,6 +764,9 @@ def map_locate(
             )
         )
         where[photo.photo_id] = stop.key
+    # "The ad showed no photo of this room" is true only when every ad photo was placed in this
+    # home AND sits on a stop; one placed photo on no stop leaves every empty room unknown.
+    all_placed = bool(status) and all(pid in where for pid in status)
 
     stops = []
     for stop in plan.stops:
@@ -718,11 +774,16 @@ def map_locate(
             stops.append(stop)
             continue
         mine = by_stop.get(stop.key, [])
-        view = "placed" if mine else ("none_placed" if all_placed else "unknown")
+        if _is_start_door(stop) and not mine:
+            view = "unknown"  # the scan's start is not a room: it says nothing about the ad
+        else:
+            view = "placed" if mine else ("none_placed" if all_placed else "unknown")
         stops.append(stop.model_copy(update={"photos": mine, "ad_view": view}))
 
-    walked = [s for s in stops if s.kind in WALKED]
-    mismatch = bool(scan_plan and ad_plan and scan_plan.strip().lower() != ad_plan.strip().lower())
+    # The scan's start sweep, when it is no labelled room, stays out of the room total unless a
+    # photo sits on it.
+    walked = [s for s in stops if s.kind in WALKED and not (_is_start_door(s) and not s.photos)]
+    mismatch = _plans_differ(scan_plan, ad_plan)
     with_photo = sum(bool(s.photos) for s in walked)
     counted = "rooms" if plan.rooms_labelled else "spots"
     line: str | None
@@ -731,8 +792,8 @@ def map_locate(
     elif mismatch:
         counted = "none"
         line = (
-            f"This scan is a {scan_plan} floor plan and the ad is for a {ad_plan}, "
-            "so we show the scan without counting rooms."
+            f"This scan is a {_bed_word(scan_plan)} floor plan and the ad is for a "
+            f"{_bed_word(ad_plan)}, so we show the scan without counting rooms."
         )
     elif not placed_ids:
         counted = "none"
@@ -1024,11 +1085,13 @@ def claim_text(note: AdNote, lang: str = "en") -> str | None:
     )
 
 
-def count_line(kind: str, ad_value: str, rooms: int, word: str) -> str:
+def count_line(label: str, ad_value: str, rooms: int, word: str) -> str:
+    """`word` is the singular kind word (Bedroom, Bathroom); the ad's number sets the plural."""
+    ad_word = word if ad_value == "1" else f"{word}s"
     n = "room" if rooms == 1 else "rooms"
     return (
-        f"The ad says {ad_value} {word}. This scan has {rooms} {n} labelled "
-        f"{kind.capitalize()}. Labels can be wrong, so count them in person."
+        f"The ad says {ad_value} {ad_word.lower()}. This scan has {rooms} {n} labelled "
+        f"{label}. Labels can be wrong, so count them in person."
     )
 
 
@@ -1052,7 +1115,8 @@ def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> 
             if by_kind.get(room_kind):
                 key = by_kind[room_kind][0].key
                 break
-        added.setdefault(key, []).append(TourFact(text=text, source=SRC_RECORD))
+        source = "Vexcel" if note.key == "aerial_date" else SRC_RECORD
+        added.setdefault(key, []).append(TourFact(text=text, source=source))
 
     for note in notes:
         text = claim_text(note, lang)
@@ -1064,13 +1128,13 @@ def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> 
         for note in notes:
             if note.claim not in ("beds", "baths") or note.ad_value is None:
                 continue
-            kind, word = ("bed", "bedrooms") if note.claim == "beds" else ("bath", "bathrooms")
+            kind, word = ("bed", "bedroom") if note.claim == "beds" else ("bath", "bathroom")
             rooms = by_kind.get(kind, [])
             if note.ad_value == "0" or not rooms:
                 continue
             if str(len(rooms)) != note.ad_value.replace(",", ""):
                 label = rooms[0].room_label or kind
-                line = count_line(label.split()[0], note.ad_value, len(rooms), word)
+                line = count_line(label.split()[0].capitalize(), note.ad_value, len(rooms), word)
                 added.setdefault(rooms[0].key, []).append(TourFact(text=line, source=SRC_LABELS))
 
     stops = [
@@ -1082,14 +1146,27 @@ def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> 
 
 # --- where the photos were taken (X1) ------------------------------------------------------------
 
-ELSEWHERE_LINE = (
-    "The home in these photos is listed by {office} on CoStar's record. "
-    "We can't tell you if it is for rent, or at this price."
-)
-ELSEWHERE_NO_OFFICE = (
-    "The home in these photos has no leasing office on CoStar's record. "
-    "We can't tell you if it is for rent, or at this price."
-)
+ELSEWHERE_LINE = {
+    "en": (
+        "The home in these photos is listed by {office} on CoStar's record. "
+        "We can't tell you if it is offered, or at this price."
+    ),
+    "es": (
+        "La casa de estas fotos aparece a nombre de {office} en el registro de CoStar. "
+        "No podemos decirle si se ofrece, ni a qué precio."
+    ),
+}
+# Used only when the office truly cannot be read from the record (never "has no office").
+ELSEWHERE_UNREAD = {
+    "en": (
+        "We could not read this home's office from CoStar's record. "
+        "We can't tell you if it is offered, or at this price."
+    ),
+    "es": (
+        "No pudimos leer la oficina de esta casa en el registro de CoStar. "
+        "No podemos decirle si se ofrece, ni a qué precio."
+    ),
+}
 
 
 def elsewhere_property(locate: LocateResult) -> str | None:
@@ -1106,7 +1183,11 @@ def elsewhere_property(locate: LocateResult) -> str | None:
 
 
 def map_elsewhere(
-    plan: TourPlan, locate: LocateResult, property_id: str, office: str | None
+    plan: TourPlan,
+    locate: LocateResult,
+    property_id: str,
+    office: str | None,
+    lang: str = "en",
 ) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
     """The tour of the building the ad's photos were taken in. Only photos verified in THIS
     building enter its rooms; photos of the claimed home never do (they are another walk). No
@@ -1127,10 +1208,57 @@ def map_elsewhere(
         for s in out.stops
     ]
     coverage = WalkCoverage(counted="none", placed=len(mine))
-    line = ELSEWHERE_LINE.format(office=office) if office else ELSEWHERE_NO_OFFICE
+    line = ELSEWHERE_LINE[lang].format(office=office) if office else ELSEWHERE_UNREAD[lang]
     return (
         out.model_copy(
             update={"stops": stops, "coverage": coverage, "mode": "elsewhere", "mode_line": line}
         ),
         fields,
     )
+
+
+def scan_model_of(locate: LocateResult | None, property_id: str | None = None) -> str | None:
+    """The Matterport model the photos were placed in, so the walk uses the same scan: the chosen
+    floor plan's model, else the model most claimed photos name. For the other building (X1),
+    the model its photos matched. None when nothing names one."""
+    if locate is None:
+        return None
+    if property_id is None:
+        if locate.chosen and locate.chosen.model_id:
+            return locate.chosen.model_id
+        names = [
+            p.model_id
+            for p in locate.photos
+            if p.status is LocateStatus.LOCATED_IN_CLAIMED and p.model_id
+        ]
+    else:
+        names = [
+            p.matched_model_id
+            for p in locate.photos
+            if p.status is LocateStatus.LOCATED_ELSEWHERE
+            and p.matched_property_id == property_id
+            and p.matched_model_id
+        ]
+    return min(set(names), key=lambda n: (-names.count(n), n)) if names else None
+
+
+def ad_beds_of(case: object) -> int | None:
+    """Bedrooms the ad claims, read from the listing text the case already holds (never a
+    network call). None when the ad names none or the case holds no text."""
+    from snapback.agent.intake.claims import ClaimKind, extract_claims
+
+    modules = getattr(getattr(case, "session", None), "modules", None)
+    text = getattr(getattr(modules, "_listing", None), "text", None)
+    if not isinstance(text, str):
+        return None
+    try:
+        for claim in extract_claims(text).claims:
+            if claim.kind is ClaimKind.BEDS and claim.value is not None:
+                return int(claim.value)
+    except Exception:  # a reading that broke did not happen
+        return None
+    return None
+
+
+def ad_plan_word(beds: int | None) -> str | None:
+    return None if beds is None else ("studio" if beds == 0 else f"{beds} bed")
