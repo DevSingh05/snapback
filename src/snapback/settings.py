@@ -24,8 +24,13 @@ class Settings(BaseSettings):
     snapback_trace_pace_ms: int = 0
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
-    # Checks one renter may start per day.
+    # Checks one renter (or one browser) may start per day, and a ceiling per network address
+    # so that clearing cookies is not a way around it.
     snapback_daily_limit: int = 3
+    snapback_daily_limit_per_address: int = 100
+    # Upload caps, enforced before the body is parsed and again per file.
+    snapback_max_photos: int = 10
+    snapback_max_photo_mb: int = 10
 
     # Sponsor credentials. SecretStr keeps them out of logs and reprs.
     matterport_api_key: SecretStr | None = None

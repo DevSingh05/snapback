@@ -1,0 +1,76 @@
+"""What may be uploaded to a case, checked on the server.
+
+Two layers. `UploadSizeGuard` refuses an upload from its Content-Length alone, before any of
+the body is read or parsed. `read_images` then checks each file: it must be declared as an
+image, must start like one, and must be under the per-file cap.
+"""
+
+from fastapi import HTTPException, UploadFile
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+MB = 1024 * 1024
+FORM_OVERHEAD = MB  # room for the text fields and the multipart framing
+
+
+def _looks_like_an_image(head: bytes) -> bool:
+    if head.startswith((b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a")):
+        return True
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return True
+    # HEIC, HEIF and AVIF from phones: an ISO media file whose brand says so.
+    return head[4:8] == b"ftyp" and head[8:12] in (
+        b"heic",
+        b"heix",
+        b"hevc",
+        b"heim",
+        b"heis",
+        b"mif1",
+        b"msf1",
+        b"heif",
+        b"avif",
+    )
+
+
+def read_images(photos: list[UploadFile], max_photos: int, max_bytes: int) -> list[bytes]:
+    """The uploaded files as bytes, or an HTTP error naming what was wrong."""
+    if len(photos) > max_photos:
+        raise HTTPException(status_code=413, detail=f"At most {max_photos} photos per check.")
+    images = []
+    for photo in photos:
+        if not (photo.content_type or "").startswith("image/"):
+            raise HTTPException(status_code=415, detail="Only images can be uploaded.")
+        data = photo.file.read(max_bytes + 1)
+        if len(data) > max_bytes:
+            raise HTTPException(
+                status_code=413, detail=f"Each photo can be at most {max_bytes // MB} MB."
+            )
+        if not _looks_like_an_image(data[:16]):
+            raise HTTPException(status_code=415, detail="Only images can be uploaded.")
+        images.append(data)
+    return images
+
+
+class UploadSizeGuard:
+    """Refuse `POST /cases` bodies that are too large, or of unknown length, unread."""
+
+    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["method"] == "POST" and scope["path"] == "/cases":
+            length = dict(scope["headers"]).get(b"content-length")
+            refusal = None
+            if length is None or not length.isdigit():
+                refusal = JSONResponse(
+                    {"detail": "Send a Content-Length with the upload."}, status_code=411
+                )
+            elif int(length) > self.max_body_bytes:
+                refusal = JSONResponse(
+                    {"detail": "The upload is too large to accept."}, status_code=413
+                )
+            if refusal is not None:
+                await refusal(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
