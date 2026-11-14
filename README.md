@@ -34,6 +34,7 @@ Heavy dependencies are opt-in, so the base install stays fast:
 ```bash
 uv sync --extra vision   # torch, kornia, faiss, opencv
 uv sync --extra agent    # deepagents, langchain-anthropic
+uv sync --extra intake   # local OCR for screenshots (RapidOCR on ONNX Runtime)
 ```
 
 ## Get the CoStar kit

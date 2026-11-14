@@ -30,6 +30,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
+from snapback.agent.intake import read_listing
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
@@ -178,7 +179,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def start_case(text: str, link: str, photos: list[UploadFile]) -> SessionCase:
         images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
         listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
-        return store.create(listing_text, len(images))
+        # An image that is mostly text is a screenshot of the listing and is read locally as
+        # part of it; the rest are counted as photos.
+        return store.create(read_listing(listing_text, images))
 
     @app.post(
         "/cases",
@@ -207,8 +210,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def create_case(request: Request, response: Response) -> CreateCaseResponse:
         """Start a check. Runs until it needs the renter's approval, then returns.
 
-        The form is `CreateCaseRequest` in contracts.py plus `photos` as files. The link is
-        read as part of the listing's text and is never fetched.
+        The form is `CreateCaseRequest` in contracts.py plus `photos` as files, which may be
+        listing photos or screenshots of the listing. The link is read as part of the
+        listing's text and is never fetched.
         """
         try:
             store.check_can_create()
