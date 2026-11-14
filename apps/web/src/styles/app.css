@@ -580,6 +580,14 @@ button {
 .aerial-caption {
   font-weight: 700;
 }
+.aerial-date {
+  margin: 0;
+  color: var(--muted);
+}
+.aerial-banner {
+  margin: 0;
+  font-weight: 700;
+}
 .aerial-distance {
   margin: 0;
   color: var(--muted);

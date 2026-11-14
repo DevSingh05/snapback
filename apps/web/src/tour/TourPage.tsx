@@ -4,7 +4,8 @@ import { SourceChip } from "../components/SourceChip";
 import type { TourPlan, TourStop } from "../contracts";
 import { PhotoLanding } from "../twin/PhotoLanding";
 import { connectShowcase, embedUrl, watchSweeps, type ShowcaseSdk } from "../twin/showcase";
-import { useLiveAerial, canGoLive } from "../twin/useLiveAerial";
+import { AerialProof, formatCaptured, type AerialSide } from "../twin/AerialProof";
+import { canGoLive } from "../twin/useLiveAerial";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { fetchTour, type TourResult, type TourTarget } from "./api";
 import { RoomStop, landingOfStop } from "./RoomStop";
@@ -45,7 +46,10 @@ function Placeholder({ stop, plan }: { stop: TourStop; plan: TourPlan }) {
       <span className="mono">Placeholder visual (fixture)</span>
       <strong>{stop.title}</strong>
       {stop.kind === "arrive" && plan.aerial?.captured_on && (
-        <span>Aerial photo captured {plan.aerial.captured_on}</span>
+        <span>
+          Aerial photo captured {formatCaptured(plan.aerial.captured_on) ?? plan.aerial.captured_on}{" "}
+          ({plan.aerial.source === "live" ? "Vexcel" : "fixture tile"})
+        </span>
       )}
     </div>
   );
@@ -109,10 +113,25 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
 
   const last = plan.stops.length - 1;
   const stop = plan.stops[Math.min(index, last)]!;
-  const aerial = useLiveAerial(
-    caseId ?? undefined,
-    Boolean(caseId) && canGoLive(caseId ?? undefined),
-  );
+  const liveAerial = Boolean(caseId) && canGoLive(caseId ?? undefined);
+  // A plan with a fixture aerial draws the synthetic tile; a live plan draws it only through the
+  // case route (the Vexcel key stays on the server), else the placeholder.
+  const fixtureSide: AerialSide | null =
+    plan.aerial && plan.aerial.source === "fixture"
+      ? {
+          tile: {
+            property_id: plan.property_id,
+            source: "fixture",
+            direction: "nadir",
+            captured_on: plan.aerial.captured_on ?? null,
+            path: "",
+          },
+          record: null,
+        }
+      : null;
+  // Mismatch banner: every ad photo was placed in a different building (coverage from W1).
+  const noneFromHome = (plan.coverage?.elsewhere ?? 0) > 0 && (plan.coverage?.placed ?? 0) === 0;
+  const banner = noneFromHome ? "None of the ad's photos are from this home." : undefined;
 
   // Move the 3D view to the stop (or to where its ad photo was taken). Never a stand-in sweep:
   // a stop not in the model says so instead of flying somewhere else.
@@ -160,7 +179,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
     : live
       ? "Placeholder: the ad's own photo could not be loaded here."
       : "Placeholder photo (fixture).";
-  const showAerial = stop.kind === "arrive" && aerial.status === "ready" && aerial.claimed.imageUrl;
+  const arriveAerial = stop.kind === "arrive" && (liveAerial || fixtureSide !== null);
   return (
     <div
       className="tour-page"
@@ -214,8 +233,14 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
               src={embedUrl(modelId, sdkKey)}
               allow="fullscreen; xr-spatial-tracking"
             />
-          ) : showAerial ? (
-            <img className="tour-aerial" src={showAerial} alt="Aerial view of the building" />
+          ) : arriveAerial ? (
+            <AerialProof
+              caseId={liveAerial ? (caseId ?? undefined) : undefined}
+              banner={banner}
+              mismatch={false}
+              claimed={fixtureSide ?? { tile: null, record: null }}
+              matched={fixtureSide ?? { tile: null, record: null }}
+            />
           ) : (
             <Placeholder stop={stop} plan={plan} />
           )}
@@ -252,6 +277,13 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             photoNote={photoNote}
             rail={rail}
           />
+          {stop.kind === "door" && (
+            <div className="tour-door-scan" data-testid="tour-door-scan">
+              {plan.scan_label && <p>This is {plan.scan_label}.</p>}
+              {plan.scan_date_line && <p className="mono">{plan.scan_date_line}</p>}
+              {plan.scan_age_note && <p>{plan.scan_age_note}</p>}
+            </div>
+          )}
           {stop.kind === "outro" && (
             <p className="tour-outro">
               <a className="pf-action" href={plan.links.tour_prep} data-testid="tour-prep-link">

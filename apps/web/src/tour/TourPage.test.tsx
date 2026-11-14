@@ -46,11 +46,12 @@ describe("TourView in fixture mode (no SDK)", () => {
         /a 3D scan in this building \(it may be a model unit, not the one you'd rent\)/,
       ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Aerial view" })).toBeInTheDocument();
     expect(title()).toBe("Arrive outside");
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(title()).toBe("Front door");
+    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
     expect(screen.getByText(/Check this in person:/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(title()).toBe("Arrive outside");
@@ -177,5 +178,40 @@ describe("link to where the photos were taken", () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} demo="copied" />);
     const link = screen.getByTestId("where-photos-link");
     expect(link.getAttribute("href")).toMatch(/^\/tour\/.+\?case=fx-7Q2M&where=photos$/);
+  });
+});
+
+
+const withScanDate = (): typeof FIXTURE_TOUR => ({
+  ...FIXTURE_TOUR,
+  scan_date_line: "Scanned Mar 2026 (Matterport)",
+  scan_age_note: "Things can change after a scan: check finishes in person.",
+});
+
+describe("Arrive and door (W4)", () => {
+  it("shows the aerial with its capture date, labelled as a fixture tile in fixture mode", () => {
+    render(<TourView plan={FIXTURE_TOUR} />);
+    expect(screen.getByRole("region", { name: "Aerial view" })).toBeInTheDocument();
+    expect(screen.getByText(/Aerial photo captured Mar 2, 2025 \(fixture tile\)/)).toBeVisible();
+  });
+
+  it("the door stop names the kind of scan, its date and the age note", async () => {
+    render(<TourView plan={withScanDate()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    const door = screen.getByTestId("tour-door-scan");
+    expect(door).toHaveTextContent("a 3D scan in this building");
+    expect(door).toHaveTextContent("Scanned Mar 2026 (Matterport)");
+    expect(door).toHaveTextContent("check finishes in person");
+  });
+
+  it("the door stop says when the scan date is not on record", async () => {
+    render(<TourView plan={{ ...FIXTURE_TOUR, scan_date_line: "Scan date not on record" }} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByTestId("tour-door-scan")).toHaveTextContent("Scan date not on record");
+  });
+
+  it("the arrive stop has no door scan block", () => {
+    render(<TourView plan={withScanDate()} />);
+    expect(screen.queryByTestId("tour-door-scan")).toBeNull();
   });
 });

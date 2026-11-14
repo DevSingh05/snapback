@@ -33,6 +33,21 @@ function srcFor(side: AerialSide): string | null {
   return fixtureTileSrc(tile.property_id);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2025-03-14" as "Mar 14, 2025", read as written (no timezone shift); null when unparseable. */
+export function formatCaptured(iso: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${Number(m[3])}, ${m[1]}` : null;
+}
+
+function capturedLine(side: AerialSide): string | null {
+  const when = formatCaptured(side.tile?.captured_on);
+  if (!when) return null;
+  return `Aerial photo captured ${when} ${side.tile?.source === "live" ? "(Vexcel)" : "(fixture tile)"}`;
+}
+
 function facts(record: PropertyRecord | null): string {
   if (!record) return "";
   return [
@@ -67,6 +82,7 @@ function Tile({
       ) : (
         <div className="aerial-missing">No aerial image for this building yet</div>
       )}
+      {capturedLine(side) ? <p className="aerial-date">{capturedLine(side)}</p> : null}
       {caption ? <figcaption className="aerial-caption">{caption}</figcaption> : null}
       {showFacts && facts(side.record) ? (
         <p className="aerial-facts">{facts(side.record)}</p>
@@ -82,9 +98,12 @@ interface Props {
   mismatch: boolean;
   /** With a read token for this case in the browser, the proof comes from the live route instead. */
   caseId?: string;
+  /** Shown above the two buildings on a mismatch (the walk: none of the ad's photos are from this home). */
+  banner?: string;
 }
 
 interface ViewProps {
+  banner?: string;
   matched: AerialSide;
   claimed: AerialSide;
   mismatch: boolean;
@@ -93,7 +112,7 @@ interface ViewProps {
   chip?: "live" | "fixture";
 }
 
-function ProofView({ matched, claimed, mismatch, live = false, chip }: ViewProps) {
+function ProofView({ matched, claimed, mismatch, live = false, chip, banner }: ViewProps) {
   const shown = mismatch ? [claimed, matched] : [matched];
   // Fixture path: LIVE only when every tile and record on show is live; anything else reads FIXTURE.
   const allLive = shown.every((s) => s.tile?.source === "live" && s.record?.source === "live");
@@ -104,6 +123,11 @@ function ProofView({ matched, claimed, mismatch, live = false, chip }: ViewProps
         <span className="mono">Aerial</span>
         <SourceChip source={chip ?? (allLive ? "live" : "fixture")} />
       </div>
+      {mismatch && banner ? (
+        <p className="aerial-banner" role="note">
+          {banner}
+        </p>
+      ) : null}
       <div className={mismatch ? "aerial-pair" : "aerial-single"}>
         {mismatch ? (
           <Tile side={claimed} caption="The listing says here." showFacts={live} />
@@ -123,7 +147,7 @@ function ProofView({ matched, claimed, mismatch, live = false, chip }: ViewProps
   );
 }
 
-function LiveAerialProof({ caseId }: { caseId: string }) {
+function LiveAerialProof({ caseId, banner }: { caseId: string; banner?: string }) {
   const aerial = useLiveAerial(caseId, true);
   if (aerial.status === "loading") {
     return (
@@ -154,6 +178,7 @@ function LiveAerialProof({ caseId }: { caseId: string }) {
   return (
     <ProofView
       live
+      banner={banner}
       mismatch={matched !== null}
       claimed={claimed}
       matched={matched ?? claimed}
@@ -163,6 +188,6 @@ function LiveAerialProof({ caseId }: { caseId: string }) {
 }
 
 export function AerialProof({ caseId, ...rest }: Props) {
-  if (canGoLive(caseId)) return <LiveAerialProof caseId={caseId} />;
+  if (canGoLive(caseId)) return <LiveAerialProof caseId={caseId} banner={rest.banner} />;
   return <ProofView {...rest} />;
 }

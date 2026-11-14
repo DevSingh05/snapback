@@ -184,3 +184,6 @@
   background: var(--amber-soft);
   color: var(--amber);
 }
+.tour-door-scan p {
+  margin: 0 0 4px;
+}
