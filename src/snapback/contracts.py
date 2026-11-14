@@ -321,6 +321,10 @@ class LicenseResult(BaseModel):
     claimed_role: str | None = None  # "agent", "broker" or "locator", from the poster's words
     sponsor_broker: str | None = None  # LICENSED only, and only when the sponsor is a company
     state: str = "TX"
+    # Where the number that was looked up came from: "ad" (the listing printed it), "renter"
+    # (the renter typed it when asked, A24 stretch), or None (no number was looked up: a name
+    # lookup). Never the number. Same field as #177, so the two merge cleanly.
+    number_from: Literal["ad", "renter"] | None = None
 
 
 class OwnerKind(StrEnum):

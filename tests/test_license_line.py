@@ -228,7 +228,13 @@ def test_every_licence_line_follows_the_wording_rules_in_both_languages(result):
 def test_nothing_about_the_licence_names_a_person_or_a_number():
     modules = passing(license=LICENSED)
     card = build_card(modules, checked_at=CHECKED_AT)
-    assert set(LicenseResult.model_fields) == {"status", "claimed_role", "sponsor_broker", "state"}
+    assert set(LicenseResult.model_fields) == {
+        "status",
+        "claimed_role",
+        "sponsor_broker",
+        "state",
+        "number_from",
+    }
     said = card.model_dump_json()
     assert "Fixture Realty Group" in said  # a company, which is allowed
     assert not any(ch.isdigit() for ch in person(modules)["License"][1])

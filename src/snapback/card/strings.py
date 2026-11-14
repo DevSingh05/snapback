@@ -142,6 +142,12 @@ EN: dict[str, str] = {
         "Not confirmed. This number is not the leasing office's on record. "
         "Agents often use their own. Call the office on record yourself to confirm."
     ),
+    # Vidyut, Sat 07:35: an active licence checked by number, sponsored by the brokerage on
+    # record. Information, not a confirmation: the number is still not the office's.
+    "contact.licensed_sponsor": (
+        "Their number isn't the office's, but they hold an active Texas license sponsored by "
+        "{brokerage}, the brokerage on record."
+    ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
@@ -535,6 +541,10 @@ ES: dict[str, str] = {
         "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
         "registro. Los agentes suelen usar el suyo. Llame usted mismo a la oficina que figura "
         "en el registro para confirmarlo."
+    ),
+    "contact.licensed_sponsor": (
+        "Su número no es el de la oficina, pero tiene una licencia activa de Texas patrocinada "
+        "por {brokerage}, la agencia que figura en el registro."
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
