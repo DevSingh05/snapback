@@ -372,6 +372,24 @@ class OwnerResult(BaseModel):
     published_rule: PublishedRule | None = None  # lane A: the owner's own rule, if verified
 
 
+class AdNote(BaseModel):
+    """One ad-vs-record line, as facts. The words live in card/strings.py (`claims.<key>`).
+
+    `claim` names what the ad says (a `ClaimKind` value). `record` holds word keys for what
+    the record says (floor kinds and the like). `year` and `number` carry a date or a count.
+    `matches` is True for the one quiet confirming line. It carries no flag and holds no case.
+    """
+
+    key: str
+    claim: str
+    matches: bool = False
+    pretext: bool = False  # the ad explains why nothing can be seen (new management, away...)
+    record: list[str] = Field(default_factory=list)
+    year: int | None = None
+    ad_value: str | None = None
+    record_value: str | None = None
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -394,6 +412,9 @@ class ModuleEvidence(BaseModel):
     # A14: a reply came, could not be accepted, and no further photo will be asked for. The
     # card then says "we could not confirm", not "ask for a new photo". It changes no state.
     no_retry_left: bool = False
+    # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
+    # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
+    ad_notes: list[AdNote] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -405,6 +426,8 @@ class CardRowKind(StrEnum):
     PLACE = "place"
     PERSON = "person"
     PRICE = "price"
+    # Ad vs record: info lines only, drawn after PRICE and only when there is something to say.
+    CLAIMS = "claims"
 
 
 class CardTone(StrEnum):
@@ -438,7 +461,7 @@ class Card(BaseModel):
     state: VerdictState
     checked_at: datetime
     expires_at: datetime
-    rows: list[CardRow]  # always PLACE, PERSON, PRICE in that order
+    rows: list[CardRow]  # PLACE, PERSON, PRICE always; CLAIMS after them only when it has a line
     not_checked: list[str]  # "ID", "lease", "ownership"
     footer: list[str]
     verify_url: str | None = None
@@ -560,6 +583,22 @@ class PropertyRecord(BaseModel):
     has_elevator: bool | None = None  # True only when an elevator is on record
     metering: str | None = None  # "individual" or "master"
     parking_ratio: float | None = None  # spaces per unit, as reported
+    # What the ad can be held to (ad vs record). Derived words and numbers only, never a
+    # photo, a caption or a sentence from the kit. Empty or None means the record does not say.
+    floors_photos: list[str] = Field(default_factory=list)  # "wood", "carpet", "tile", "laminate"
+    floor_photo_count: int = 0  # photos whose labels name a floor
+    floors_listing: list[str] = Field(default_factory=list)  # the same words, from listing features
+    laundry_listing: list[str] = Field(default_factory=list)  # "machine", "hookup", "room"
+    pool_on_record: bool | None = None  # True: seen or listed; False: listed features name none
+    parking_spaces: int | None = None
+    yard_on_record: bool | None = None  # True only; the record never says "no yard"
+    pets_ok: bool | None = None
+    beds_range: tuple[int, int] | None = None
+    baths_range: tuple[float, float] | None = None
+    sqft_range: tuple[int, int] | None = None
+    manager_since: date | None = None  # the latest start of a property manager on record
+    sale_history_known: bool = False  # the record covers sales, so "no sale" is a finding
+    last_sale: date | None = None
 
 
 class AerialTile(BaseModel):

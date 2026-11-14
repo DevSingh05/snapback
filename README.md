@@ -14,10 +14,10 @@ researched places that fit your budget.
 [About](#about) · [How it works](#how-it-works) · [Screenshots](#screenshots) ·
 [Quickstart](#quickstart) · [Limits and status](#limits-and-status)
 
-<img src="docs/images/verdict-dont-pay.png" width="760" alt="A result card that reads 'Don't pay. Something here doesn't match.' Each row names a check, what it found and a status chip: one listing photo was taken in a different building, the unit is not on the building's record, the link imitates the building's website, and the rent is 44% under the lowest 2 bed on record. A FIXTURE badge sits in the corner." />
+<img src="docs/images/paste-the-ad.png" width="760" alt="The first screen. The eyebrow reads 'Trust the home, not the ad.' and the heading 'Found a place online? Paste the ad.' The sub-head reads 'See the real listing, the real office and a fair price, plus researched places that fit your budget.' A short house ad is pasted in the box, the max rent is 1,800, beds is set to 3 or more and Pets is ticked, above the 'Check this listing' button. A FIXTURE badge sits in the corner." />
 
-<sub>A finished card for a staged ad: one photo was taken in a different building, so the verdict
-is Don't pay. Fixture data made by the team.</sub>
+<sub>The first screen: paste the ad you found. Budget and must-haves are optional. Fixture data
+made by the team.</sub>
 
 </div>
 
@@ -100,16 +100,20 @@ scammer. Cards come as a web page and as a PNG with a verify link.
 
 <table>
   <tr>
-    <td width="40%" valign="top"><img src="docs/images/paste-the-ad.png" alt="The first screen. The eyebrow reads 'Trust the home, not the ad.' and the heading 'Found a place online? Paste the ad.' A short house ad is pasted in the box, the max rent is 1800, beds is set to 3 or more and Pets is ticked, above the 'Check this listing' button." /></td>
-    <td width="38%" valign="top"><img src="docs/images/places-tour-draft.png" alt="The 'Researched places that fit your budget' strip. A 1 bed, 1 bath floor plan at $1,100 to $1,250 a month as of CoStar's last research, with walk-up, utilities, parking and pet lines, a '3D scan in this building' tag, the leasing office on record, and an open tour-request draft addressed to that office with a Copy button." /></td>
-    <td width="22%" valign="top"><img src="docs/images/phone-verdict.png" alt="The Don't pay card for the same staged ad, on a phone, 390 pixels wide, with each check stacked above its status chip." /></td>
+    <td width="50%" valign="top"><img src="docs/images/verdict-dont-pay.png" width="400" alt="A result card that reads 'Don't pay. Something here doesn't match.' Each row names a check, what it found and a status chip: one listing photo was taken in a different building, the unit is not on the building's record, and the poster's right to rent and phone number are not confirmed. A FIXTURE badge sits in the corner." /></td>
+    <td width="50%" valign="top"><img src="docs/images/places-tour-draft.png" width="400" alt="The 'Researched places that fit your budget' strip. A 1 bed, 1 bath floor plan at $1,100 to $1,250 a month as of CoStar's last research, with walk-up, utilities, parking and pet lines, a '3D scan in this building' tag, the leasing office on record, and an open tour-request draft addressed to that office with a Copy button." /></td>
   </tr>
   <tr>
-    <td valign="top"><sub>Paste the ad you found. Budget and must-haves are optional.</sub></td>
-    <td valign="top"><sub>Researched places that fit the budget (a separate search), and a tour request drafted to the office on record. You copy it and send it yourself.</sub></td>
-    <td valign="top"><sub>The card on a phone.</sub></td>
+    <td valign="top"><sub>The card. One photo was taken in a different building, so it says Don't pay.</sub></td>
+    <td valign="top"><sub>Researched places in budget (a separate search), with a tour request you send yourself.</sub></td>
   </tr>
 </table>
+
+<p align="center">
+  <img src="docs/images/phone-verdict.png" width="220" alt="The Don't pay card for the same staged ad, on a phone, 390 pixels wide, with each check stacked above its status chip." />
+  <br />
+  <sub>The card for the same staged ad, on a phone.</sub>
+</p>
 
 <sub>Every screenshot is the web app running locally on synthetic fixture data made by the team,
 and each screen says FIXTURE. Office names such as "Fixture Living LLC" are made up.</sub>

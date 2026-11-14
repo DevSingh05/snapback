@@ -21,7 +21,7 @@ function fixtureTileSrc(seed: string): string {
   return (
     "data:image/svg+xml;utf8," +
     encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dbe8f4"/><path d="M0 300 L640 250 L640 400 L0 400Z" fill="#cfe6dd"/><rect x="${left}" y="${280 - tall}" width="180" height="${tall}" fill="#ffffff"/><text x="320" y="370" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#3b5a7a">Aerial tile (fixture)</text></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#cfe0ea"/><path d="M0 300 L640 250 L640 400 L0 400Z" fill="#b4d3e6"/><rect x="${left}" y="${280 - tall}" width="180" height="${tall}" fill="#ffffff"/><text x="320" y="370" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#43555f">Aerial tile (fixture)</text></svg>`,
     )
   );
 }

@@ -346,3 +346,15 @@ def test_retry_after_is_parsed_safely_and_capped(tmp_path, monkeypatch, retry_af
     client = httpx.Client(transport=httpx.MockTransport(handler))
     LiveMatterport("k", "s", cache_dir=tmp_path, client=client).sweeps("m6")
     assert slept == [expected]
+
+
+def test_cached_room_labels_read_the_cache_and_never_the_network(tmp_path, monkeypatch):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m7").mkdir()
+    (tmp_path / "m7" / "rooms.json").write_text(json.dumps({"sw1": "Kitchen", "sw2": None}))
+    monkeypatch.setattr(httpx.Client, "request", lambda *a, **k: pytest.fail("network used"))
+    assert cached_room_labels("m7", cache_dir=tmp_path) == {"sw1": "Kitchen", "sw2": None}
+    assert cached_room_labels("never-fetched", cache_dir=tmp_path) == {}
+    (tmp_path / "m7" / "rooms.json").write_text("{not json")
+    assert cached_room_labels("m7", cache_dir=tmp_path) == {}

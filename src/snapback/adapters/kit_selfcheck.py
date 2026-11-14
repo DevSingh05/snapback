@@ -14,7 +14,7 @@ import argparse
 import json
 import sys
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +90,62 @@ def demo_house_counts(kit: Path, today: date) -> dict[str, Any]:
     return {"candidates": len(candidates), "by_role": dict(roles), "trio_found": int(bool(trio))}
 
 
+MULTIFAMILY = "multifamily"
+SINCE_MAY = date(2026, 5, 1)
+
+
+def ad_vs_record_counts(kit: Path, today: date) -> dict[str, int]:
+    """What an ad can be held to, as counts: houses with room labels, listing features and
+    sale history, and buildings with a property-manager start or a sale in the last 12 months."""
+    out: dict[str, int] = {}
+    houses = costar_residential.house_records(DataSource.LIVE, kit)
+    rows = list(houses.values())
+    out["houses"] = len(rows)
+    out["houses_with_floor_photos"] = sum(bool(h.floors_photos) for h in rows)
+    out["houses_with_two_floor_photos"] = sum(h.floor_photo_count >= 2 for h in rows)
+    out["houses_with_listing_floors"] = sum(bool(h.floors_listing) for h in rows)
+    out["houses_with_laundry_features"] = sum(bool(h.laundry_listing) for h in rows)
+    out["houses_with_pool_answer"] = sum(h.pool_on_record is not None for h in rows)
+    out["houses_with_parking_count"] = sum(h.parking_spaces is not None for h in rows)
+    out["houses_with_pets_answer"] = sum(h.pets_ok is not None for h in rows)
+    out["houses_with_beds"] = sum(h.beds_range is not None for h in rows)
+    out["houses_with_sale_history"] = sum(h.sale_history_known for h in rows)
+    # The demo trio (for sale, recently sold, decoy), if one is found: do they have labels?
+    trio = costar_residential.pick_demo_houses(kit, today) or []
+    out["demo_houses"] = len(trio)
+    out["demo_houses_with_floor_photos"] = sum(
+        bool(houses.get(str(pick["propertyId"])) and houses[str(pick["propertyId"])].floors_photos)
+        for pick in trio
+    )
+    path = costar_jsonl._find(kit, costar_residential.RESIDENTIAL_FILE)
+    if path is not None:
+        raw = list(costar_jsonl._iter_jsonl(path))
+        media = [m for h in raw for m in h.get("media") or [] if isinstance(m, dict)]
+        out["listing_photos_with_room_labels"] = sum(bool(m.get("scenes")) for m in media)
+        out["listing_photos_with_keywords"] = sum(
+            bool(m.get("computerVisionKeywords")) for m in media
+        )
+    try:
+        buildings = list(costar_jsonl.load_records(DataSource.LIVE, kit_dir=kit).values())
+    except costar_jsonl.KitNotFoundError:
+        return out
+    cutoff = today - timedelta(days=365)
+    out["buildings"] = len(buildings)
+    out["buildings_with_manager_start"] = sum(b.manager_since is not None for b in buildings)
+    out["buildings_manager_started_in_12_months"] = sum(
+        b.manager_since is not None and b.manager_since >= cutoff for b in buildings
+    )
+    out["buildings_with_sale_history"] = sum(b.sale_history_known for b in buildings)
+    out["buildings_sold_in_12_months"] = sum(
+        b.last_sale is not None and b.last_sale >= cutoff for b in buildings
+    )
+    out["multifamily_sold_since_may_2026"] = sum(
+        b.property_type == MULTIFAMILY and b.last_sale is not None and b.last_sale >= SINCE_MAY
+        for b in buildings
+    )
+    return out
+
+
 def _zero_fill(section: str, counts: dict[str, Any]) -> dict[str, int]:
     """Every count that came back empty: an int of 0, or a dict of counts with nothing in it."""
     if not counts.get("records"):
@@ -116,6 +172,7 @@ def selfcheck(kit: Path, today: date) -> dict[str, Any]:
         "commercial": commercial,
         "residential": residential,
         "demo_house": demo,
+        "ad_vs_record": ad_vs_record_counts(kit, today),
         "zero_fill": zero,
     }
 
