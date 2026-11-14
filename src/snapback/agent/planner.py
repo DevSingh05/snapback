@@ -28,6 +28,7 @@ from snapback.contracts import (
     ForSaleMatch,
     ForSaleStatus,
     LicenseResult,
+    LicenseStatus,
     ModuleEvidence,
     PriceResult,
 )
@@ -80,6 +81,22 @@ class Plan:
         self._owner: object | None = owner_fn(case_id) if callable(owner_fn) else None
         self.ran: list[PlanKind] = []
 
+    @property
+    def _names_a_license(self) -> bool:
+        """The ad makes a license claim. A result with no status and no role is the lookup
+        saying there was nothing to look up: it is kept as evidence, but is not a claim."""
+        result = self._license
+        if result is None:
+            return False
+        return not (result.status is LicenseStatus.NOT_CHECKED and result.claimed_role is None)
+
+    def unclaimed_evidence(self) -> dict[str, object]:
+        """Evidence that is held whether or not an option runs: the lookup's own answer when
+        the ad names no license. The card reads it exactly as it did before the plan."""
+        if self._license is not None and not self._names_a_license:
+            return {"license": self._license}
+        return {}
+
     # --- what each option can run on -------------------------------------------------------
 
     @property
@@ -103,7 +120,7 @@ class Plan:
         if kind is PlanKind.LICENSE:
             if not self._license_offered:
                 return "plan.skip.license_off"
-            return None if self._license is not None else "plan.skip.license_none"
+            return None if self._names_a_license else "plan.skip.license_none"
         if kind is PlanKind.OWNER:
             if not self._owner_offered:
                 return "plan.skip.owner_off"
@@ -137,7 +154,7 @@ class Plan:
         return {
             "home_record_found": self._has_record(),
             "for_sale_listing_active": self._active_sale,
-            "ad_names_a_license": self._license is not None,
+            "ad_names_a_license": self._names_a_license,
             "owner_on_public_record": self._owner is not None,
             "checks_run": len(self.ran),
             "checks_left": len(self.open_options()),

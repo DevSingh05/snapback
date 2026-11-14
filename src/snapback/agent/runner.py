@@ -15,6 +15,10 @@ Approver = Callable[[ChallengeDraft], str]
 
 
 class Chooser(Protocol):
+    # Who is choosing: stamped on every trace step this chooser makes. Required, so a model
+    # chooser cannot be stamped "policy" (or a rule "model") by leaving it out.
+    chosen_by: Literal["model", "policy"]
+
     def choose(self, offer: Offer) -> tuple[str, str]:
         """Return (pick, reason). The pick may be an option label or its alias."""
         ...
@@ -61,5 +65,5 @@ def run_case(
                 # A model that is down, refuses or times out must not stall a renter's case.
                 case.choose_default(failed=True)
             else:
-                case.choose(pick, reason, by=getattr(chooser, "chosen_by", "policy"))
+                case.choose(pick, reason, by=chooser.chosen_by)
     return case.verdict

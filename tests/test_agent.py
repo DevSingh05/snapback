@@ -43,6 +43,8 @@ BANNED = ("scam", "safe", "verified")
 class ScriptedModel:
     """Stands in for the language model: answers each offer from a script, else the default."""
 
+    chosen_by = "model"
+
     def __init__(self, picks: dict[ChoiceKind, str] | None = None, reason: str | None = None):
         self.picks = picks or {}
         self.reason = reason
@@ -211,6 +213,8 @@ def test_an_alias_pick_is_recorded_under_its_real_label():
 
 def test_a_model_that_crashes_falls_back_to_the_default():
     class Broken:
+        chosen_by = "model"
+
         def choose(self, offer: Offer) -> tuple[str, str]:
             raise RuntimeError("no connection")
 

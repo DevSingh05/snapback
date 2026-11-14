@@ -281,3 +281,22 @@ def test_the_plan_speaks_spanish_when_the_case_does():
     run_case(session, PolicyChooser(), lambda draft: "send")
     assert any(e.reason.startswith("Omitido ") for e in session.trace.events)
     assert any(e.reason == "Solo había una opción abierta." for e in session.trace.events)
+
+
+# --- a lookup that found nothing to look up is not a license claim -------------------------------
+
+
+def test_a_no_claim_license_result_is_kept_as_evidence_but_is_not_an_option():
+    nothing = LicenseResult(status=LicenseStatus.NOT_CHECKED)  # what a live ad with no claim gives
+    case = make(FixtureModules(license=nothing))
+    assert offered(case) == ["home record"]
+    assert "Skipped TREC license: the ad names no license to look up." in skipped_lines(case)
+    offer = case.offer()
+    assert offer is not None and offer.facts["ad_names_a_license"] is False
+    run_case(case, PolicyChooser(), lambda draft: "send")
+    assert case.evidence.license == nothing  # the card reads it exactly as before the plan
+
+
+def test_a_license_claim_with_a_role_is_an_option_even_when_not_checked():
+    claim = LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role="agent")
+    assert "TREC license" in offered(make(FixtureModules(license=claim)))

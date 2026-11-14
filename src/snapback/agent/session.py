@@ -247,6 +247,7 @@ class CaseSession:
 
     def _begin_plan(self) -> None:
         self._plan = Plan(self.modules, self.case_id)
+        self.evidence = self.evidence.model_copy(update=self._plan.unclaimed_evidence())
         for skipped in self._plan.skipped():
             self.trace.emit(
                 TraceKind.STATUS,
