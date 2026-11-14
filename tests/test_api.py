@@ -749,3 +749,12 @@ def test_the_route_list_is_what_the_other_lanes_were_told():
         ("GET", "/healthz"),
     ]:
         assert expected in paths
+
+
+def test_every_trace_step_carries_who_chose_it(client):
+    case = create(client)
+    approve(client, case)
+    stream = stream_trace(client, case["case_id"], token=case["read_token"])
+    wire = [json.loads(e["data"]) for e in stream]
+    assert wire and all(event["chosen_by"] in ("model", "policy") for event in wire)
+    assert any(event["choice"] == "next_check" for event in wire)

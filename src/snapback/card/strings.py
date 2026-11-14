@@ -293,6 +293,20 @@ EN: dict[str, str] = {
     "trace.tool.reply": "Checked the reply photo for the code and against the listing photos.",
     "trace.hitl.edit": "The renter edited the challenge text and approved it.",
     "trace.hitl.cancel": "The renter chose not to send a challenge.",
+    # --- the evidence-driven plan (A24): which check runs next -------------------------------
+    "plan.pick.record": "The home's own record gives the rent band and who is on record. Read it.",
+    "plan.pick.brokerage": "The home is listed for sale right now. Check the listing office.",
+    "plan.pick.license": "The ad names a license. Look it up with the state.",
+    "plan.pick.owner": "An owner is on public record. Compare it with who is posting.",
+    "plan.pick.report": "Every check that could run has run. Gather what they found for a report.",
+    "plan.skip.record": "no property record to read",
+    "plan.skip.brokerage": "the home is not listed for sale right now",
+    "plan.skip.license_off": "license lookup not available",
+    "plan.skip.license_none": "the ad names no license to look up",
+    "plan.skip.owner_off": "owner lookup not available",
+    "plan.skip.owner_none": "no owner on record to read",
+    "plan.skipped": "Skipped {option}: {reason}.",
+    "plan.only_option": "Only one option was open.",
     "trace.retry.accept_both": "Both spots matched with the code read and no recapture flag.",
     "trace.retry.accept": (
         "{matched} of {total} spots matched with the code read and no recapture flag."
@@ -684,6 +698,23 @@ ES: dict[str, str] = {
     ),
     "trace.hitl.edit": "El inquilino editó el texto del reto y lo aprobó.",
     "trace.hitl.cancel": "El inquilino decidió no enviar un reto.",
+    "plan.pick.record": (
+        "El registro propio de la vivienda da el rango de renta y quién figura. Leerlo."
+    ),
+    "plan.pick.brokerage": "La vivienda está en venta ahora. Revisar la oficina que la anuncia.",
+    "plan.pick.license": "El anuncio menciona una licencia. Buscarla en el estado.",
+    "plan.pick.owner": "Hay un propietario en el registro público. Compararlo con quien publica.",
+    "plan.pick.report": (
+        "Se hicieron todas las comprobaciones posibles. Reunir lo encontrado para un informe."
+    ),
+    "plan.skip.record": "no hay registro de la propiedad que leer",
+    "plan.skip.brokerage": "la vivienda no está en venta ahora",
+    "plan.skip.license_off": "la búsqueda de licencias no está disponible",
+    "plan.skip.license_none": "el anuncio no menciona ninguna licencia que buscar",
+    "plan.skip.owner_off": "la búsqueda de propietarios no está disponible",
+    "plan.skip.owner_none": "no hay propietario en el registro que leer",
+    "plan.skipped": "Omitido {option}: {reason}.",
+    "plan.only_option": "Solo había una opción abierta.",
     "trace.retry.accept_both": (
         "Los dos puntos coincidieron, con el código leído y sin aviso de recaptura."
     ),
