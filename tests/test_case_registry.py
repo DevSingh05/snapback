@@ -197,7 +197,7 @@ def test_a_deleted_case_is_no_longer_served_by_the_running_api(tmp_path):
 
     delete_case(f"fx-{case['case_id']}", tmp_path)  # the renter's "delete", from another process
 
-    for route in ("", "/card", "/card.png"):
+    for route in ("", "/card", "/card.png", "/report"):
         assert client.get(f"/cases/{case['case_id']}{route}").status_code == 404
     bearer = {"Authorization": f"Bearer {case['token']}"}
     approve = client.post(

@@ -143,11 +143,16 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules
         ),
         rule_flag=any(hit.red_flag for hit in modules.rules),
-        for_sale_flag=_for_sale(modules) is ForSaleStatus.ACTIVE,
+        # For sale holds a case, unless the ad's phone is the office's on record: then the
+        # brokerage itself is offering the home, and it is information (ruling, Sat 03:36).
+        for_sale_flag=(
+            _for_sale(modules) is ForSaleStatus.ACTIVE and not _the_ad_is_the_office_s(modules)
+        ),
         recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
         phone_flag=(
             modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
         ),
+        phone_confirmed=_the_ad_is_the_office_s(modules),
         lookalike_link_flag=(
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
@@ -171,6 +176,7 @@ REASON_ORDER = (
     # owner of record.
     "reason.authority_matches",
     "reason.authority_unknown",
+    "reason.phone_not_confirmed",
     "reason.phone_flag",
     "reason.lookalike_link",
     "reason.license_not_found",
@@ -213,6 +219,12 @@ def _owner_is_not_the_poster(modules: ModuleEvidence) -> bool:
     return owner is not None and owner.poster_says_owner and owner.poster_matches is OwnerMatch.NO
 
 
+def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
+    """The phone in the listing is the leasing office's on record."""
+    authority = modules.authority
+    return authority is not None and authority.office_phone_match is PhoneMatch.YES
+
+
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """Turn the evidence for one case into a verdict with plain-language reasons.
 
@@ -225,8 +237,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     2. No photo placed in the claimed property gives UNVERIFIED, with what the record
        flagged listed among the reasons. One thing outranks it: a home listed for sale is
        HOLD, with that reason first, whether or not any photo could be placed.
-    3. Presence proven, authority matching the record and no red flag of any kind gives
-       VERIFIED.
+    3. Presence proven, authority matching the record, the ad's phone being the leasing
+       office's on record, and no red flag of any kind gives VERIFIED. The phone is needed
+       (red team H1, Sat 03:25): anyone can type the manager's public name, and a door code
+       or a former tenant gets a photo taken inside. A name match alone never verifies.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
        (price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike
        link, unit, a claimed licence with no active one under that name), or something
@@ -314,6 +328,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     if (
         evidence.presence is PresenceStatus.PROVEN
         and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and evidence.phone_confirmed
         and not red_flags
         and not unconfirmed
     ):
@@ -328,10 +343,16 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # the leasing office and a listing brokerage may all market a home.
     matches = evidence.authority is AuthorityStatus.MATCHES_RECORD
     proven = evidence.presence is PresenceStatus.PROVEN
+    # H1: the name matches and the ad's contact was not shown to be the office. Said so the
+    # hold has a reason. (A phone that is NOT the office's already has its own.)
+    contact = []
+    if matches and not evidence.phone_confirmed and not evidence.phone_flag:
+        contact = ["reason.phone_not_confirmed"]
     return verdict(
         VerdictState.HOLD,
         "reason.located",
         "reason.authority_matches" if matches else "reason.authority_unknown",
+        *contact,
         "reason.presence_proven_not_authority" if proven else "reason.presence_missing",
         *red_flags,
         *unconfirmed,
@@ -443,11 +464,35 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
     return [line.model_copy(update={"source": source}) for line in lines]
 
 
+MAX_BROKERAGE_CHARS = 80
+
+
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     status = _for_sale(modules)
     if status is ForSaleStatus.ACTIVE:
-        site = modules.for_sale.site if modules.for_sale else ""
-        return [_line(lang, "label.for_sale", CardTone.RED_FLAG, "place.for_sale", site=site)]
+        # A warning, not a red flag, and never "not for rent" (red team H5, Sat 03:25): homes
+        # for sale are sometimes also offered for lease, and whether this one is leased is
+        # something we do not know. The line says what the record says and who to ask.
+        found = modules.for_sale
+        offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
+        brokerage = next((name for name in offices if name), None)
+        since = found.listed_on.isoformat() if found.listed_on else None
+        record_key = {
+            (True, True): "place.for_sale_record",
+            (True, False): "place.for_sale_record_no_date",
+            (False, True): "place.for_sale_record_no_brokerage",
+            (False, False): "place.for_sale_record_bare",
+        }[(brokerage is not None, since is not None)]
+        record = strings.text(
+            record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
+        )
+        if _the_ad_is_the_office_s(modules):
+            # The brokerage itself is offering the home (ruling, Sat 03:36). Information
+            # only: it holds nothing, and the renter is told who to ask.
+            key = "place.for_sale_office"
+            return [_line(lang, "label.for_sale", CardTone.NOT_SHOWN, key, record=record)]
+        key = "place.for_sale" if brokerage is not None else "place.for_sale_ask_listing"
+        return [_line(lang, "label.for_sale", CardTone.HOLD, key, record=record)]
     if status is ForSaleStatus.RECENTLY_RENTED:
         rented_on = modules.for_sale.changed_on if modules.for_sale else None
         # Information, not a flag: we do not know whether it is rented now.
@@ -579,6 +624,10 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             lines.append(
                 _line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.phone_mismatch_unnamed")
             )
+    elif authority.status is AuthorityStatus.MATCHES_RECORD:
+        # H1: the name matches and there was no phone to compare. "Checks passed" needs the
+        # ad's contact to be the office's, so the card says this was not checked.
+        lines.append(_line(lang, "label.contact", CardTone.NOT_CHECKED, "contact.phone_unchecked"))
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
     return lines
