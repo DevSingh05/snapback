@@ -434,13 +434,13 @@
   {
     "id": "fx-rule-affiliate-credit-run",
     "category": "link",
-    "text": "Run your credit at www.freecreditnow.com and send me the results.",
+    "text": "Run your credit at www.freecreditnow.example and send me the results.",
     "expect": ["link.affiliate_credit_check"]
   },
   {
     "id": "fx-rule-affiliate-credit-bare-domain",
     "category": "link",
-    "text": "Get your credit report at scorecheckfast.com so I can approve your application.",
+    "text": "Get your credit report at scorecheckfast.example so I can approve your application.",
     "expect": ["link.affiliate_credit_check"]
   },
   {
