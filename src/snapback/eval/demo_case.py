@@ -96,6 +96,30 @@ def render_rooms(
     return out
 
 
+@dataclass(frozen=True)
+class Tried:
+    case: dict
+    sent: int
+    on_walk: int
+
+
+def first_full_walk(
+    candidates: Sequence[Pick], tries: int, attempt: Callable[[Pick], Tried | None]
+) -> tuple[Pick, Tried] | None:
+    """Try scans best first until every sent view is on a walk stop. `attempt` returns None when
+    a scan gives no view. The answer pairs each case with the building it was made for: the last
+    case made when no try is full, or None when no try made a case."""
+    shown: tuple[Pick, Tried] | None = None
+    for pick in candidates[:tries]:
+        tried = attempt(pick)
+        if tried is None:
+            continue
+        shown = (pick, tried)
+        if tried.on_walk == tried.sent:
+            break
+    return shown
+
+
 def browser_lines(web: str, property_id: str, case_id: str, read_token: str) -> list[str]:
     key = READ_TOKEN_PREFIX + case_id.upper()
     return [
@@ -108,8 +132,8 @@ def browser_lines(web: str, property_id: str, case_id: str, read_token: str) -> 
 def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs the kit and the API
     import httpx
 
-    from snapback.adapters.matterport import cached_room_labels
-    from snapback.agent.join import KitLookups
+    from snapback.adapters.matterport import REPO_ROOT, cached_room_labels
+    from snapback.agent.join import KitLookups, KitMissing
     from snapback.agent.locate_live import _default_sweeps
     from snapback.contracts import DataSource
     from snapback.settings import Settings
@@ -124,13 +148,21 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
     args = parser.parse_args(argv)
 
     settings = Settings()
-    meta = json.loads(
-        (
-            settings.snapback_data_dir / "index" / settings.snapback_locate_index / "index.json"
-        ).read_text()
-    )
-    indexed = {entry["model_id"] for entry in meta["entries"]}
-    records = KitLookups(DataSource.LIVE).records()
+    data_dir = settings.snapback_data_dir
+    if not data_dir.is_absolute():
+        data_dir = REPO_ROOT / data_dir  # the scan cache is under REPO_ROOT/data too
+    try:
+        meta = json.loads(
+            (data_dir / "index" / settings.snapback_locate_index / "index.json").read_text()
+        )
+        indexed = {entry["model_id"] for entry in meta["entries"]}
+        records = KitLookups(DataSource.LIVE).records()
+    except (FileNotFoundError, KeyError, KitMissing):
+        print(
+            "No locate index or kit under data/. Unzip the team data handoff (or build the index) first.",
+            file=sys.stderr,
+        )
+        return 2
     if args.property_id:
         record = records.get(args.property_id)
         models = [m for m in (record.model_ids if record else []) if m in indexed]
@@ -145,14 +177,16 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
             return 2
 
     wanted = [r.strip() for r in args.rooms.split(",") if r.strip()]
-    case: dict | None = None
-    pick = candidates[0]
-    for attempt, pick in enumerate(candidates[: args.tries], start=1):
+    number = 0
+
+    def attempt(pick: Pick) -> Tried | None:
+        nonlocal number
         views = render_rooms(
             _default_sweeps(pick.model_id), cached_room_labels(pick.model_id), wanted, args.seed
         )
         if not views:
-            continue
+            return None
+        number += 1
         files = [
             ("photos", (f"view-{i}.jpg", data, "image/jpeg"))
             for i, (_, data) in enumerate(views, 1)
@@ -176,18 +210,22 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
             if s["photos"]
         ]
         on_walk = sum(len(aliases) for _, aliases in stops)
-        print(f"try {attempt}: case {case['case_id']} ({case.get('source')}); photos are {LABEL}")
+        print(f"try {number}: case {case['case_id']} ({case.get('source')}); photos are {LABEL}")
         print(f"  sent: {[room for room, _ in views]}")
         print(f"  placed: {dict(statuses)}")
         print(f"  on the walk: {stops}")
-        if on_walk == len(views):
-            break
-        print("  not every view is on a walk stop; trying the next scan")
-    else:
-        print("No try put every view on a walk stop; the last case is above.")
-    if case is None:
+        if on_walk != len(views):
+            print("  not every view is on a walk stop")
+        return Tried(case, len(views), on_walk)
+
+    shown = first_full_walk(candidates, args.tries, attempt)
+    if shown is None:
         print("None of the scans tried labels those rooms.", file=sys.stderr)
         return 2
+    pick, tried = shown
+    case = tried.case
+    if tried.on_walk != tried.sent:
+        print("No try put every view on a walk stop; showing the last case made.")
     for line in browser_lines(args.web, pick.property_id, case["case_id"], case["read_token"]):
         print(line)
     return 0
