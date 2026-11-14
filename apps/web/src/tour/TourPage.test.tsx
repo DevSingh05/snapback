@@ -46,11 +46,12 @@ describe("TourView in fixture mode (no SDK)", () => {
         /a 3D scan in this building \(it may be a model unit, not the one you'd rent\)/,
       ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Aerial view" })).toBeInTheDocument();
     expect(title()).toBe("Arrive outside");
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(title()).toBe("Front door");
+    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
     expect(screen.getByText(/Check this in person:/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(title()).toBe("Arrive outside");
@@ -154,6 +155,61 @@ describe("TourView with a mocked Showcase SDK", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Front door" }));
     expect(screen.getByText("Start of the 3D scan")).toBeInTheDocument();
     expect(screen.getByText(/Rooms are not labelled/)).toBeInTheDocument();
+  });
+});
+
+const withClaims = (): typeof FIXTURE_TOUR => ({
+  ...FIXTURE_TOUR,
+  scan_date_line: "Scanned Mar 2026 (Matterport)",
+  scan_age_note: "Things can change after a scan: check finishes in person.",
+  stops: FIXTURE_TOUR.stops.map((s) =>
+    s.kind === "arrive"
+      ? {
+          ...s,
+          claims: [
+            {
+              text: "The ad says a 2-car garage. CoStar's record shows 2 parking spaces. Look for it as you arrive (as of CoStar's last research).",
+              source: "CoStar record",
+            },
+          ],
+        }
+      : s,
+  ),
+});
+
+describe("Arrive and door (W4)", () => {
+  it("shows the aerial with its capture date and the ad's outside claims as things to look for", () => {
+    render(<TourView plan={withClaims()} />);
+    expect(screen.getByText(/Aerial photo captured Mar 2, 2025 \(fixture tile\)/)).toBeVisible();
+    const list = screen.getByRole("list", { name: "What the ad says, to look for as you arrive" });
+    expect(list).toHaveTextContent("Look for it as you arrive (as of CoStar's last research)");
+    expect(list).toHaveTextContent("CoStar record");
+  });
+
+  it("shows no claims list when the ad made no outside claim", () => {
+    render(<TourView plan={FIXTURE_TOUR} />);
+    expect(screen.queryByRole("list", { name: /look for as you arrive/ })).toBeNull();
+  });
+
+  it("the door stop names the kind of scan, its date and the age note", async () => {
+    render(<TourView plan={withClaims()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    expect(title()).toBe("Front door");
+    const door = screen.getByTestId("tour-door-scan");
+    expect(door).toHaveTextContent("a 3D scan in this building");
+    expect(door).toHaveTextContent("Scanned Mar 2026 (Matterport)");
+    expect(door).toHaveTextContent("check finishes in person");
+  });
+
+  it("the door stop says when the scan date is not on record", async () => {
+    render(<TourView plan={{ ...FIXTURE_TOUR, scan_date_line: "Scan date not on record" }} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByTestId("tour-door-scan")).toHaveTextContent("Scan date not on record");
+  });
+
+  it("the arrive stop has no door scan block", () => {
+    render(<TourView plan={withClaims()} />);
+    expect(screen.queryByTestId("tour-door-scan")).toBeNull();
   });
 });
 

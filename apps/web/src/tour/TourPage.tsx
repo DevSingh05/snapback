@@ -4,7 +4,8 @@ import { SourceChip } from "../components/SourceChip";
 import type { TourPlan, TourStop } from "../contracts";
 import { poseToSdkCall } from "../twin/pose";
 import { connectShowcase, embedUrl, watchSweeps, type ShowcaseSdk } from "../twin/showcase";
-import { useLiveAerial, canGoLive } from "../twin/useLiveAerial";
+import { AerialProof, formatCaptured, type AerialSide } from "../twin/AerialProof";
+import { canGoLive } from "../twin/useLiveAerial";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { fetchTour, type TourTarget } from "./api";
 import "./tour.css";
@@ -51,7 +52,10 @@ function Placeholder({ stop, plan }: { stop: TourStop; plan: TourPlan }) {
       <span className="mono">Placeholder visual (fixture)</span>
       <strong>{stop.title}</strong>
       {stop.kind === "arrive" && plan.aerial?.captured_on && (
-        <span>Aerial photo captured {plan.aerial.captured_on}</span>
+        <span>
+          Aerial photo captured {formatCaptured(plan.aerial.captured_on) ?? plan.aerial.captured_on}{" "}
+          ({plan.aerial.source === "live" ? "Vexcel" : "fixture tile"})
+        </span>
       )}
     </div>
   );
@@ -119,10 +123,25 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
 
   const last = plan.stops.length - 1;
   const stop = plan.stops[Math.min(index, last)]!;
-  const aerial = useLiveAerial(
-    caseId ?? undefined,
-    Boolean(caseId) && canGoLive(caseId ?? undefined),
-  );
+  const liveAerial = Boolean(caseId) && canGoLive(caseId ?? undefined);
+  // A plan with a fixture aerial draws the synthetic tile; a live plan draws it only through the
+  // case route (the Vexcel key stays on the server), else the placeholder.
+  const fixtureSide: AerialSide | null =
+    plan.aerial && plan.aerial.source === "fixture"
+      ? {
+          tile: {
+            property_id: plan.property_id,
+            source: "fixture",
+            direction: "nadir",
+            captured_on: plan.aerial.captured_on ?? null,
+            path: "",
+          },
+          record: null,
+        }
+      : null;
+  // Mismatch banner: every ad photo was placed in a different building (coverage from W1).
+  const noneFromHome = (plan.coverage?.elsewhere ?? 0) > 0 && (plan.coverage?.placed ?? 0) === 0;
+  const banner = noneFromHome ? "None of the ad's photos are from this home." : undefined;
 
   // Move the 3D view to the stop's own sweep. Never a stand-in sweep: a stop not in the model
   // says so instead of flying somewhere else.
@@ -166,7 +185,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
   }, [autoplay, index, last, next]);
   const pause = () => setAutoplay(false);
 
-  const showAerial = stop.kind === "arrive" && aerial.status === "ready" && aerial.claimed.imageUrl;
+  const arriveAerial = stop.kind === "arrive" && (liveAerial || fixtureSide !== null);
   return (
     <div
       className="tour-page"
@@ -192,8 +211,14 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
               src={embedUrl(modelId, sdkKey)}
               allow="fullscreen; xr-spatial-tracking"
             />
-          ) : showAerial ? (
-            <img className="tour-aerial" src={showAerial} alt="Aerial view of the building" />
+          ) : arriveAerial ? (
+            <AerialProof
+              caseId={liveAerial ? (caseId ?? undefined) : undefined}
+              banner={banner}
+              mismatch={false}
+              claimed={fixtureSide ?? { tile: null, record: null }}
+              matched={fixtureSide ?? { tile: null, record: null }}
+            />
           ) : (
             <Placeholder stop={stop} plan={plan} />
           )}
@@ -207,6 +232,22 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
           {stop.kind === "room" && <p className="tour-note">{plan.rooms_note}</p>}
           {stop.kind === "door" && !plan.rooms_labelled && (
             <p className="tour-note">{plan.rooms_note}</p>
+          )}
+          {stop.kind === "door" && (
+            <div className="tour-door-scan" data-testid="tour-door-scan">
+              {plan.scan_label && <p>This is {plan.scan_label}.</p>}
+              {plan.scan_date_line && <p className="mono">{plan.scan_date_line}</p>}
+              {plan.scan_age_note && <p>{plan.scan_age_note}</p>}
+            </div>
+          )}
+          {stop.kind === "arrive" && stop.claims.length > 0 && (
+            <ul className="tour-claims" aria-label="What the ad says, to look for as you arrive">
+              {stop.claims.map((c) => (
+                <li key={c.text}>
+                  {c.text} <span className="tour-src">{c.source}</span>
+                </li>
+              ))}
+            </ul>
           )}
           {stop.facts.length > 0 && (
             <ul className="tour-facts" aria-label="What the record says">

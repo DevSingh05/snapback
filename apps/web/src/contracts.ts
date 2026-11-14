@@ -372,4 +372,6 @@ export interface TourPlan {
   links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
   coverage?: WalkCoverage | null;
   director?: TourDirector | null;
+  scan_date_line?: string | null; // "Scanned Mar 2026 (Matterport)" or "Scan date not on record"
+  scan_age_note?: string | null; // set when the scan is older than 12 months
 }
