@@ -739,8 +739,6 @@ def test_claimed_spread_floor_is_below_the_elsewhere_floor():
         ((51, 0.056), (263, 0.039), LocateStatus.NOT_LOCATED),
         # An honest claimed placement with no strong rival still passes.
         ((200, 0.40), (100, 0.05), LocateStatus.LOCATED_IN_CLAIMED),
-        # A clumped rival under the elsewhere inlier floor (16 in these tests) never blocks.
-        ((13, 0.40), (15, 0.05), LocateStatus.LOCATED_IN_CLAIMED),
     ],
 )
 def test_ambiguity_rival_needs_inliers_not_spread(
@@ -755,3 +753,41 @@ def test_ambiguity_rival_needs_inliers_not_spread(
         "fx-rival", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
     )
     assert result.photos[0].status is expected
+
+
+def test_a_rival_under_the_elsewhere_inlier_floor_never_blocks_even_at_3x(twins, monkeypatch):
+    """Rival 45 is over 3x the claimed 13 but under the floor (60 here): only the floor stops it."""
+    sweeps, index, catalog = twins
+    strict_floor = Locator(
+        index, sweeps, catalog, PatchMatcher(), replace(THRESHOLDS, elsewhere_min_inliers=60)
+    )
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted({"fx-model-a": (13, 0.40), "fx-model-b": (45, 0.05)}),
+    )
+    result = strict_floor.locate(
+        "fx-floor", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED
+
+
+def test_each_claimed_face_is_verified_at_most_once(twins, locator, monkeypatch):
+    """A claimed match failing only the spread floor must not cost a second pass (#186 review)."""
+    from snapback.vision.locate.verify import FEATURE_KEY
+
+    calls = {}
+    scripted = _scripted({"fx-model-a": (70, 0.018), "fx-model-b": (0, 0.0)})
+
+    def counting(matcher, photo, face, ransac_px):
+        key = face.info[FEATURE_KEY]
+        calls[key] = calls.get(key, 0) + 1
+        return scripted(matcher, photo, face, ransac_px)
+
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", counting)
+    sweeps, _, _ = twins
+    result = locator.locate(
+        "fx-once", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    claimed = {k: n for k, n in calls.items() if k.startswith("fx-model-a/")}
+    assert claimed and max(claimed.values()) == 1

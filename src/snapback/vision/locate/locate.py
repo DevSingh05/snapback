@@ -207,6 +207,31 @@ class Locator:
                 break
         return best
 
+    def _scan_claimed(
+        self, photo: Image.Image, hits: list, claimed_ok: Callable[[Verification], bool]
+    ) -> tuple[_Placement | None, bool]:
+        """One pass over the claimed candidates, each verified once: the best that passes the
+        claimed bar (stopping at a very strong one, as _best does), and whether any cleared
+        inliers and ratio (a candidate that fails only the spread floor)."""
+        t = self.thresholds
+        best, doubtful = None, False
+        for hit in hits:
+            entry = hit.entry
+            face = self._face(entry.model_id, entry.sweep_id, entry.face)
+            check = verify(self.matcher, photo, face, t.ransac_px)
+            if check.inliers >= t.min_inliers and check.ratio >= t.min_inlier_ratio:
+                doubtful = True
+            if claimed_ok(check) and (best is None or check.inliers > best.check.inliers):
+                best = _Placement(
+                    entry.model_id,
+                    self._sweeps[(entry.model_id, entry.sweep_id)],
+                    entry.face,
+                    check,
+                )
+            if best is not None and check.inliers >= t.stop_at_inliers and claimed_ok(check):
+                break
+        return best, doubtful
+
     def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
@@ -239,16 +264,12 @@ class Locator:
                 and c.spread >= t.claimed_min_spread
             )
 
-        placed = self._best(photo, claimed_hits, claimed_ok)
+        placed, doubtful = self._scan_claimed(photo, claimed_hits, claimed_ok)
         if placed is None:
             # A claimed match that clears inliers and ratio but fails only the spread floor is
             # doubtful, not absent: could not place, and never search elsewhere (no new route to
             # DON'T PAY; ruling 07:43, #28).
-            if self._best(
-                photo,
-                claimed_hits,
-                lambda c: c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio,
-            ):
+            if doubtful:
                 return None
             return self._best(photo, other_hits, strict)
 
