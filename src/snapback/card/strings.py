@@ -286,9 +286,7 @@ EN: dict[str, str] = {
     ),
     "reason.not_located": "The photos could not be located in this property's 3D twin.",
     "reason.located": "The photos were located in this property.",
-    "reason.authority_matches": (
-        "The ad names the manager on record. Anyone can type that name."
-    ),
+    "reason.authority_matches": ("The ad names the manager on record. Anyone can type that name."),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
