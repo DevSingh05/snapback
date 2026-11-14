@@ -212,3 +212,42 @@ describe("chips on every sample", () => {
     expect(screen.queryByText("What's your max rent a month?")).not.toBeInTheDocument();
   });
 });
+
+describe("the places card claims only FIXTURE until the server answers", () => {
+  function searchServer(search: "pending" | "fail") {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const path = String(url);
+        if (path === "/api/healthz")
+          return new Response(JSON.stringify({ status: "ok", data_source: "live" }));
+        if (path === "/api/search")
+          return search === "pending"
+            ? new Promise<Response>(() => {})
+            : new Response(JSON.stringify({ detail: "down" }), { status: 500 });
+        // No Finder on this server: code lists the places itself.
+        return new Response(JSON.stringify({ detail: "nope" }), { status: 404 });
+      }),
+    );
+  }
+
+  it("while the places are loading", async () => {
+    searchServer("pending");
+    const user = userEvent.setup();
+    render(<OneBox mode="live" />);
+    await paste(user, "find me a 1 bed under 1500");
+    const places = await screen.findByTestId("ob-places");
+    expect(places).toHaveTextContent("Looking up researched places");
+    expect(within(places).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+  });
+
+  it("when the places fail to load", async () => {
+    searchServer("fail");
+    const user = userEvent.setup();
+    render(<OneBox mode="live" />);
+    await paste(user, "find me a 1 bed under 1500");
+    const places = await screen.findByTestId("ob-places");
+    await waitFor(() => expect(places).toHaveTextContent("Places did not load"));
+    expect(within(places).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+  });
+});

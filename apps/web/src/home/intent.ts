@@ -61,7 +61,11 @@ const STRONG_SIGNS: RegExp[] = [
   /\$\s?[\d,]{3,6}\s*(\/\s*mo|\/\s*month|a month|per month|monthly)\b/i,
 ];
 
+/** A payment app or a phone number: a renter's wish almost never carries either. */
+const PAY_OR_PHONE: RegExp[] = [STRONG_SIGNS[0]!, STRONG_SIGNS[2]!];
+
 const AD_SIGNS: RegExp[] = [
+  /\b(tenants?|sublet|sublease|take over (my|the) lease)\b/i,
   /\b(zelle|venmo|cash ?app|wire|western union|gift ?card|paypal)\b/i,
   /\bdeposit\b/i,
   /\$\s?[\d,]{3,6}\s*(\/\s*mo|\/\s*month|a month|per month|monthly)\b/i,
@@ -103,7 +107,7 @@ export function viewFrom(text: string): View | null {
 /** A facebook.com (or fb.com) address. Its page is never fetched. */
 export function isFacebook(text: string): boolean {
   // Any subdomain (www., m., l.) and fb.com / fb.me, with or without a scheme.
-  return /(^|[\s/@(<"'])(?:[a-z0-9-]+\.)*(facebook\.com|fb\.com|fb\.me)\b/i.test(text);
+  return /(^|[\s/@(<"':])(?:[a-z0-9-]+\.)*(facebook\.com|fb\.com|fb\.me)\b/i.test(text);
 }
 
 /** Removes Facebook addresses from pasted text, so only the renter's own words are sent. */
@@ -127,7 +131,10 @@ export function route(s: Submission): Intent {
   // fetched or sent. With the address removed, ad text is checked; anything else asks for it.
   if (isFacebook(text)) {
     const rest = withoutFacebookLinks(text);
-    const isAd = adSigns(rest) > 0 || STRONG_SIGNS.some((r) => r.test(rest)) || rest.length >= 120;
+    const restSigns = adSigns(rest);
+    // A short question about the link ("legit? he wants a deposit first") is not the ad.
+    if (QUESTION.test(rest) && rest.length < 140 && restSigns < 2) return { kind: "check-fb" };
+    const isAd = restSigns > 0 || STRONG_SIGNS.some((r) => r.test(rest)) || rest.length >= 120;
     return { kind: isAd ? "check" : "check-fb" };
   }
   const kind = classifyListingText(text).kind;
@@ -147,7 +154,11 @@ export function route(s: Submission): Intent {
   if (!wish && !question && (strong || signs >= 2 || long)) return { kind: "check" };
   if (!wish && (signs >= 3 || text.length >= 400)) return { kind: "check" };
   // "Looking for a responsible tenant... deposit by Zelle": a wish opener does not hide an ad.
-  if (wish && strong && (signs >= 2 || text.length >= 80)) return { kind: "check" };
+  // A monthly price or a deposit alone stays a wish; a payment app or a phone number, with
+  // another sign or a long text, is an ad; so are three signs of any kind.
+  const payOrPhone = PAY_OR_PHONE.some((r) => r.test(text));
+  if (wish && ((payOrPhone && (signs >= 2 || text.length >= 80)) || signs >= 3))
+    return { kind: "check" };
   if (view && text.length < 120) return { kind: "open", view };
   if (wish) return { kind: "find" };
   if (CHECK_WORDS.test(text) && text.length < 120)

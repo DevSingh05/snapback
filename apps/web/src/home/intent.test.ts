@@ -58,6 +58,7 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(at("Any interested renters? Studio downtown $800 a month, Zelle deposit only")).toBe(
       "check",
     );
+    expect(at("Looking for tenant asap. Studio $900/month. Call 713-555-0101")).toBe("check");
   });
 
   it("finds a Facebook address with or without a scheme and never routes it anywhere else", () => {
@@ -75,6 +76,11 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(at("facebook.com/marketplace/item/123\n2 bed 1 bath $1500")).toBe("check");
     expect(at("is facebook.com/marketplace/item/1 legit?")).toBe("check-fb");
     expect(at("Is https://www.facebook.com/marketplace/item/1 legit?")).toBe("check-fb");
+    expect(at("is facebook.com/marketplace/item/1 legit? he wants a deposit first")).toBe(
+      "check-fb",
+    );
+    expect(isFacebook("Listing:facebook.com/marketplace/item/1")).toBe(true);
+    expect(at("Listing:facebook.com/marketplace/item/1")).toBe("check-fb");
     expect(at("is facebook.com/marketplace/item/1 legit?", { caseOnScreen: true })).toBe(
       "check-fb",
     );
@@ -89,6 +95,20 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(at("looking for a studio with parking")).toBe("find");
     expect(at("2 bed under $2,000, pets ok")).toBe("find");
     expect(at("My budget is 1.5k")).toBe("find");
+    // Wishes that name a monthly price, a deposit or "available now" are still wishes.
+    expect(at("Looking for a 2 bed under $2,000 a month with utilities included")).toBe("find");
+    expect(at("I want a studio, $1,000 monthly max, available now")).toBe("find");
+    expect(
+      at("We need a 3 bed house, budget $2,500 a month, pets ok, near a good school district"),
+    ).toBe("find");
+    expect(at("Looking for a 1 bed with parking, $1,400 a month, no deposit over $500")).toBe(
+      "find",
+    );
+    expect(at("I need a 2 bed 2 bath near the medical center, up to $1,800 per month")).toBe(
+      "find",
+    );
+    expect(at("Find me a pet friendly studio available now under $1,100 a month")).toBe("find");
+    expect(at("Help me find a 3 bed house with a yard, $2,200 a month max")).toBe("find");
   });
 
   it("a question while a case is on screen is answered about it", () => {
