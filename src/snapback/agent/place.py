@@ -25,6 +25,7 @@ it through the `PlaceSearcher` protocol, and tests use a stub.
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from collections.abc import Callable, Mapping
@@ -45,6 +46,8 @@ from snapback.contracts import (
     Pose,
 )
 from snapback.vision.locate.thresholds import Thresholds, load_thresholds
+
+log = logging.getLogger("snapback.place")
 
 MAX_SEARCHES = 2
 MAX_SECONDS = 10.0
@@ -378,7 +381,10 @@ class PlaceDesk:
                 search_thresholds(self.thresholds, option),
                 self.seconds_left,
             )
-        except Exception:
+        except Exception as exc:
+            # A broken retry costs its budget and changes nothing, but it is not silent. Only the
+            # error type is logged: its message may carry ids.
+            log.warning("place retry %s failed: %s", option.label, type(exc).__name__)
             outcome = None
         wall = max(0.0, self._clock() - started)
         reported = outcome.seconds if outcome and outcome.seconds is not None else 0.0
@@ -418,13 +424,20 @@ class PlaceDesk:
             and loc.inlier_ratio >= t.min_inlier_ratio
             and loc.spread is not None
             and loc.spread >= t.claimed_min_spread
+            # locate()'s ambiguity rule: a rival building far stronger blocks a claimed pass
+            and (loc.rival_ratio is None or loc.rival_ratio < t.ambiguity_ratio)
         )
 
     def _clears_elsewhere(self, loc: PhotoLocation) -> bool:
         """The strict bar for "taken in a different building", which can lead to DON'T PAY."""
         t = self.thresholds
+        claimed = self.base.claimed_property_id
         return (
-            loc.inliers is not None
+            # locate()'s guards: never "elsewhere" without a claimed home and a known other one
+            claimed is not None
+            and loc.matched_property_id is not None
+            and loc.matched_property_id != claimed
+            and loc.inliers is not None
             and loc.inliers >= t.elsewhere_min_inliers
             and loc.inlier_ratio is not None
             and loc.inlier_ratio >= t.min_inlier_ratio

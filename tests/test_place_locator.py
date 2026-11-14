@@ -1,25 +1,56 @@
-"""The live adapter, with a stub Locator in the shape lane V's #223 describes. The real
-`Locator.search` is not imported here; it plugs in once #223 lands."""
+"""The live adapter, built against lane V's `SearchResult` (#223 @ 5b58080). When that class is
+importable (once #223 is on this branch) the test uses it; until then a stub with the same field
+names stands in. The real `Locator.search` is never imported here."""
 
-import dataclasses
-from types import SimpleNamespace
+from dataclasses import dataclass
+
+import pytest
 
 from snapback.agent.place import PlaceDesk, SearchOption
-from snapback.agent.place_locator import MAX_POINTS, LocatorSearcher
-from snapback.contracts import LocateResult, LocateStatus, PhotoLocation
+from snapback.agent.place_locator import LocatorSearcher
+from snapback.contracts import EvidencePoints, LocateResult, LocateStatus, PhotoLocation, Pose
 from snapback.vision.locate.thresholds import load_thresholds
 
 BASE = load_thresholds()
 L = LocateStatus
 
 
+@dataclass(frozen=True)
+class StubResult:
+    """Same field names as `locate.SearchResult` in #223 (5b58080)."""
+
+    option: str
+    location: PhotoLocation | None = None
+    pose: Pose | None = None
+    points: EvidencePoints | None = None
+    identified_property_id: str | None = None
+    verified: int = 0
+    seconds: float = 0.0
+    timed_out: bool = False
+
+
+try:  # the real class, when #223 is on this branch
+    from snapback.vision.locate.locate import SearchResult as Result
+except ImportError:
+    Result = StubResult
+
+
 class StubLocator:
-    def __init__(self, **result):
-        self.result = SimpleNamespace(**result)
+    def __init__(self, result):
+        self.result = result
         self.calls = []
 
-    def search(self, photo, option, claimed_property_id, *, scan_model_id=None, deadline_s=None):
-        self.calls.append((photo, option, claimed_property_id, scan_model_id, deadline_s))
+    def search(
+        self,
+        photo,
+        option,
+        claimed_property_id,
+        *,
+        scan_model_id=None,
+        deadline_s=None,
+        photo_id="p",
+    ):
+        self.calls.append((photo, option, claimed_property_id, scan_model_id, deadline_s, photo_id))
         return self.result
 
 
@@ -27,49 +58,41 @@ def adapter(locator):
     return LocatorSearcher(locator, photo_for=lambda pid: f"image-of-{pid}")
 
 
-def test_the_adapter_passes_the_image_the_option_the_scan_and_the_deadline():
-    locator = StubLocator(status=L.NOT_LOCATED, seconds=1.5)
+def test_the_stub_has_the_real_result_class_s_field_names():
+    if Result is StubResult:
+        pytest.skip("lane V's SearchResult is not on this branch yet")
+    assert set(StubResult.__dataclass_fields__) <= set(Result.__dataclass_fields__)
+
+
+def test_the_adapter_passes_image_option_scan_deadline_and_photo_id_by_the_real_names():
+    locator = StubLocator(Result(option="focus_scan", seconds=1.5))
     out = adapter(locator).search(
         "l2", SearchOption("focus_scan", "S2", "m2"), "fx-prop-1", BASE, 7.5
     )
-    assert locator.calls == [("image-of-l2", "focus_scan", "fx-prop-1", "m2", 7.5)]
-    assert out.location.status is L.NOT_LOCATED and out.seconds == 1.5
+    assert locator.calls == [("image-of-l2", "focus_scan", "fx-prop-1", "m2", 7.5, "l2")]
+    assert out.location.status is L.NOT_LOCATED and out.seconds == 1.5  # location None: a miss
 
 
-def test_the_result_maps_into_a_photo_location_with_a_capped_point_sample():
-    pairs = [(i / 100, 0.5, i / 100, 0.5) for i in range(90)]
-    locator = StubLocator(
+def test_the_location_pose_and_points_come_through_unchanged():
+    points = EvidencePoints(n_total=90, sampled=[(i / 100, 0.5, i / 100, 0.5) for i in range(48)])
+    pose = Pose(sweep_id="sw1", position=(0, 0, 0), rotation_quat=(0, 0, 0, 1))
+    found = PhotoLocation(
+        photo_id="p",
         status=L.LOCATED_IN_CLAIMED,
         model_id="m2",
-        sweep_id="sw1",
+        pano_id="sw1",
         inliers=88,
         inlier_ratio=0.41,
         spread=0.31,
         rival_ratio=0.05,
-        bar_failed=None,
         matched_model_id="m2",
         matched_property_id="p1",
         room_label="Kitchen",
-        points=pairs,
-        n_points=88 + 2,
-        seconds=2.1,
     )
-    out = adapter(locator).search("l4", SearchOption("wider_index"), "p1", BASE, 10.0)
-    loc = out.location
-    assert (loc.photo_id, loc.status, loc.model_id, loc.inliers) == (
-        "l4",
-        L.LOCATED_IN_CLAIMED,
-        "m2",
-        88,
-    )
-    assert (loc.inlier_ratio, loc.spread, loc.rival_ratio) == (0.41, 0.31, 0.05)
-    assert (loc.room_label, loc.matched_property_id) == ("Kitchen", "p1")
-    assert len(out.points.sampled) == MAX_POINTS and out.points.n_total == 90
-
-
-def test_a_stop_or_an_empty_result_is_a_miss_not_an_error():
-    out = adapter(StubLocator(status=None)).search("l2", SearchOption("wider_index"), None, BASE, 5)
-    assert out.location.status is L.NOT_LOCATED and out.points is None
+    result = Result(option="wider_index", location=found, pose=pose, points=points, seconds=2.1)
+    out = adapter(StubLocator(result)).search("l4", SearchOption("wider_index"), "p1", BASE, 10.0)
+    assert out.location == found.model_copy(update={"photo_id": "l4"})  # keyed by OUR photo id
+    assert out.pose == pose and out.points == points and out.points.n_total == 90
 
 
 def located() -> LocateResult:
@@ -89,8 +112,20 @@ def located() -> LocateResult:
     )
 
 
+class Policy:
+    chosen_by = "policy"
+
+    def choose(self, offer):
+        return offer.default, "r"
+
+
+def drive(desk):
+    while desk.offer() is not None:
+        desk.choose(Policy())
+
+
 def test_the_desk_gives_each_search_the_time_left_and_the_case_cap():
-    locator = StubLocator(status=L.NOT_LOCATED, seconds=3.0)
+    locator = StubLocator(Result(option="x", seconds=3.0))
     desk = PlaceDesk(
         located(),
         adapter(locator),
@@ -99,10 +134,7 @@ def test_the_desk_gives_each_search_the_time_left_and_the_case_cap():
         max_searches=5,
         case_seconds_left=8.0,
     )
-    while desk.offer() is not None:
-        desk.choose(
-            type("P", (), {"chosen_by": "policy", "choose": lambda s, o: (o.default, "r")})()
-        )
+    drive(desk)
     deadlines = [c[4] for c in locator.calls]
     assert deadlines[0] == 8.0 and all(
         b < a for a, b in zip(deadlines, deadlines[1:], strict=False)
@@ -110,30 +142,25 @@ def test_the_desk_gives_each_search_the_time_left_and_the_case_cap():
 
 
 def test_even_a_wrong_status_from_the_locator_cannot_place_or_condemn_a_photo():
-    # the desk re-checks: 31 points and a thin spread is not "elsewhere", whatever the status says
-    locator = StubLocator(
+    thin = PhotoLocation(
+        photo_id="p",
         status=L.LOCATED_ELSEWHERE,
         model_id="m9",
         inliers=31,
         inlier_ratio=0.3,
         spread=0.06,
-        seconds=1.0,
+        matched_property_id="p-other",
     )
+    locator = StubLocator(Result(option="x", location=thin, seconds=1.0))
     desk = PlaceDesk(
-        located(), adapter(locator), scans={"S1": "m1", "S2": "m2"}, thresholds=BASE, max_searches=3
+        located(),
+        adapter(locator),
+        scans={"S1": "m1", "S2": "m2"},
+        thresholds=BASE,
+        max_searches=3,
     )
-    while desk.offer() is not None:
-        desk.choose(
-            type("P", (), {"chosen_by": "policy", "choose": lambda s, o: (o.default, "r")})()
-        )
+    drive(desk)
     assert desk.located().photos[1].status is L.NOT_LOCATED
-
-
-def test_the_dataclass_fields_the_adapter_reads_exist():
-    assert {"inliers", "inlier_ratio", "spread", "rival_ratio", "bar_failed", "room_label"} <= {
-        f for f in PhotoLocation.model_fields
-    }
-    assert dataclasses.is_dataclass(SearchOption)
 
 
 def test_our_search_thresholds_match_lane_vs_values_until_theirs_is_imported():

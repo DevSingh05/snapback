@@ -6,12 +6,10 @@ as the Locator names it (`focus_scan` carries the scan's model id, and every cal
 result against the bars before it counts, so a wrong status from here cannot place a photo or
 call it "elsewhere".
 
-The Locator is duck-typed: anything with
-`search(photo, option, claimed_property_id, *, scan_model_id=None, deadline_s=None)` returning an
-object with `status`, `inliers`, `inlier_ratio`, `spread`, `rival_ratio`, `bar_failed`,
-`model_id`, `matched_model_id`, `matched_property_id`, `room_label`, `pose`, `points` and
-`seconds` (any may be missing) works. `points` is a list of (ax, ay, bx, by) pairs normalised to
-0..1; at most 48 are kept.
+The Locator is lane V's (#223): `Locator.search(photo, option, claimed_property_id, *,
+scan_model_id=None, deadline_s=None, photo_id="p") -> SearchResult`, where `SearchResult` has
+`location` (a full `PhotoLocation`, or None for "stop"), `pose`, `points` (`EvidencePoints`),
+`seconds` and `timed_out`. Anything with that shape works; the real class is not imported.
 """
 
 from __future__ import annotations
@@ -21,10 +19,8 @@ from collections.abc import Callable
 from typing import Any
 
 from snapback.agent.place import SearchOption, SearchOutcome
-from snapback.contracts import EvidencePoints, LocateStatus, PhotoLocation
+from snapback.contracts import LocateStatus, PhotoLocation
 from snapback.vision.locate.thresholds import Thresholds
-
-MAX_POINTS = 48
 
 
 class LocatorSearcher:
@@ -49,36 +45,17 @@ class LocatorSearcher:
             claimed_property_id,
             scan_model_id=option.scan_model_id,
             deadline_s=deadline_s,
-        )
-        status = getattr(result, "status", None) or LocateStatus.NOT_LOCATED
-        location = PhotoLocation(
             photo_id=photo_id,
-            status=status,
-            model_id=getattr(result, "model_id", None),
-            pano_id=getattr(result, "sweep_id", None),
-            inliers=getattr(result, "inliers", None),
-            inlier_ratio=getattr(result, "inlier_ratio", None),
-            matched_model_id=getattr(result, "matched_model_id", None),
-            matched_property_id=getattr(result, "matched_property_id", None),
-            room_label=getattr(result, "room_label", None),
-            spread=getattr(result, "spread", None),
-            rival_ratio=getattr(result, "rival_ratio", None),
-            bar_failed=getattr(result, "bar_failed", None),
         )
+        location = getattr(result, "location", None)
+        if location is None:  # a stop, or nothing came back: a miss, not an error
+            location = PhotoLocation(photo_id=photo_id, status=LocateStatus.NOT_LOCATED)
+        else:
+            location = location.model_copy(update={"photo_id": photo_id})
         seconds = getattr(result, "seconds", None)
         return SearchOutcome(
             location,
             pose=getattr(result, "pose", None),
-            points=_points(getattr(result, "points", None), getattr(result, "n_points", None)),
+            points=getattr(result, "points", None),
             seconds=float(seconds) if seconds is not None else time.monotonic() - started,
         )
-
-
-def _points(raw: Any, n_total: int | None = None) -> EvidencePoints | None:
-    if not raw:
-        return None
-    pairs = [tuple(float(v) for v in p) for p in raw if len(p) == 4]
-    return EvidencePoints(
-        n_total=max(n_total or 0, len(pairs)),
-        sampled=pairs[:MAX_POINTS],  # type: ignore[arg-type]
-    )

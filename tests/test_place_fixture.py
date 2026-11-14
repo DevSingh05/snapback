@@ -88,3 +88,28 @@ def test_the_trace_shows_the_near_miss_the_search_and_who_chose_it():
         ("base", "not_placed"),
         ("focus_scan:S2", "placed"),
     ]
+
+
+def test_the_rail_line_is_in_renter_words():
+    from snapback.agent.demo import demo_modules, read_listing
+    from snapback.agent.session import CaseSession
+    from snapback.agent.trace import Trace
+    from snapback.card import strings
+    from snapback.contracts import DataSource
+
+    case = load_demo_case("a")
+    session = CaseSession(
+        "fx-demo-a",
+        demo_modules(case, read_listing(case.listing_text), with_retry=True),
+        Trace("fx-demo-a", DataSource.FIXTURE),
+    )
+    searcher = demo_place_searcher(case)
+    session.place_searcher, session.place_scans = searcher, searcher.scans
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    lines = [e.reason for e in session.trace.events if (e.pick or "").startswith("search: ")]
+    assert lines == [
+        "P4: searched one scan more closely (2.1 s). Placed.",
+        "P5: searched one scan more closely (2.0 s). Still could not place it.",
+    ]
+    assert strings.text("place.option.wider_index") == "more buildings"
+    assert strings.text("place.option.wider_index", "es") == "más edificios"

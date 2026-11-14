@@ -397,6 +397,7 @@ def strict_elsewhere(**over) -> PhotoLocation:
         inliers=60,
         inlier_ratio=0.3,
         spread=0.2,
+        matched_property_id="fx-prop-other",
     )
     return PhotoLocation(**{**fields, **over})
 
@@ -510,3 +511,73 @@ def test_the_case_clock_caps_the_retry_budget():
         ).offer()
         is None
     )
+
+
+# --- locate()'s blocking guards, and each claimed bar on its own --------------------------------
+
+
+def claimed_hit(**over) -> PhotoLocation:
+    fields = dict(
+        photo_id="x",
+        status=LOC.LOCATED_IN_CLAIMED,
+        model_id="m2",
+        inliers=88,
+        inlier_ratio=0.41,
+        spread=0.31,
+    )
+    return PhotoLocation(**{**fields, **over})
+
+
+def stays_unplaced(location: PhotoLocation) -> bool:
+    d = desk(one_result(location), max_searches=10, max_seconds=100)
+    drive(d, Scripted(lambda o: next(x for x in o.options if x != "stop")))
+    return all(p.status is LOC.NOT_LOCATED for p in d.located().photos[1:])
+
+
+def test_elsewhere_needs_a_known_other_building():
+    assert stays_unplaced(strict_elsewhere(matched_property_id=None))
+    assert stays_unplaced(strict_elsewhere(matched_property_id="fx-prop-1"))  # the claimed home
+    assert not stays_unplaced(strict_elsewhere())
+
+
+def test_elsewhere_needs_a_claimed_home_to_be_elsewhere_from():
+    no_claim = located().model_copy(update={"claimed_property_id": None})
+    d = PlaceDesk(
+        no_claim,
+        one_result(strict_elsewhere()),
+        scans=SCANS,
+        thresholds=BASE,
+        max_searches=10,
+        max_seconds=100,
+    )
+    drive(d, Scripted(lambda o: next(x for x in o.options if x != "stop")))
+    assert all(p.status is LOC.NOT_LOCATED for p in d.located().photos[1:])
+
+
+def test_a_claimed_pass_is_blocked_by_a_far_stronger_rival_but_not_by_none():
+    assert stays_unplaced(claimed_hit(rival_ratio=3.0))  # at the ratio: blocked
+    assert stays_unplaced(claimed_hit(rival_ratio=5.0))
+    assert not stays_unplaced(claimed_hit(rival_ratio=2.9))
+    assert not stays_unplaced(claimed_hit(rival_ratio=None))
+
+
+def test_each_claimed_bar_is_checked_on_its_own():
+    assert not stays_unplaced(claimed_hit())
+    assert stays_unplaced(claimed_hit(inliers=29))
+    assert stays_unplaced(claimed_hit(inliers=None))
+    assert stays_unplaced(claimed_hit(inlier_ratio=0.2))
+    assert stays_unplaced(claimed_hit(inlier_ratio=None))
+    assert stays_unplaced(claimed_hit(spread=0.04))
+    assert stays_unplaced(claimed_hit(spread=None))
+
+
+def test_a_failing_search_is_logged_by_type_only(caplog):
+    class Boom:
+        def search(self, *a, **k):
+            raise RuntimeError("secret-looking id fx-123")
+
+    d = desk(Boom())
+    with caplog.at_level("WARNING", logger="snapback.place"):
+        d.choose(Scripted(lambda o: o.options[0]))
+    text = caplog.text
+    assert "RuntimeError" in text and "fx-123" not in text and d.searches_used == 1
