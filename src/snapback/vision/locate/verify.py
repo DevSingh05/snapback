@@ -22,6 +22,7 @@ from PIL import Image
 from snapback.vision.locate.geometry import ransac_homography
 
 MATCH_SIDE = 1024  # images are matched at most this large on the long side
+FEATURE_KEY = "snapback_feature_key"  # Image.info key: where to keep this image's features
 
 
 class Matcher(Protocol):
@@ -41,6 +42,7 @@ class Verification:
     matches: int
     inliers: int
     homography: np.ndarray | None  # maps a pixels to b pixels
+    spread: float = 0.0  # bounding box of the inliers in a, as a fraction of a's area
 
     @property
     def ratio(self) -> float:
@@ -52,7 +54,16 @@ def verify(matcher: Matcher, a: Image.Image, b: Image.Image, ransac_px: float) -
     if len(pa) < 4:
         return Verification(len(pa), 0, None)
     h, mask = ransac_homography(pa, pb, ransac_px)
-    return Verification(len(pa), int(mask.sum()), h)
+    return Verification(len(pa), int(mask.sum()), h, _spread(pa[mask], a.size))
+
+
+def _spread(points: np.ndarray, size: tuple[int, int]) -> float:
+    """How much of the image the inliers cover. One planar object (a poster, an appliance)
+    puts all of them in a small box; a real room match spreads across the view."""
+    if len(points) < 2:
+        return 0.0
+    width, height = points.max(axis=0) - points.min(axis=0)
+    return float(width * height) / float(size[0] * size[1])
 
 
 def _shrink(image: Image.Image, side: int = MATCH_SIDE) -> tuple[Image.Image, float]:
@@ -143,10 +154,18 @@ class PatchMatcher:
 # --- DISK + LightGlue (the product matcher) ----------------------------------------------------
 
 
+@dataclass(frozen=True)
+class _Features:
+    keypoints: object  # torch tensor (n, 2)
+    descriptors: object  # torch tensor (n, 128)
+
+
 class DiskLightGlue:  # pragma: no cover - needs torch, kornia and a one-time weight download
     name = "disk+lightglue"
 
-    def __init__(self, max_keypoints: int = 2048, device: str | None = None) -> None:
+    def __init__(
+        self, max_keypoints: int = 2048, device: str | None = None, feature_dir=None
+    ) -> None:
         import kornia.feature as kf
         import torch
 
@@ -160,17 +179,46 @@ class DiskLightGlue:  # pragma: no cover - needs torch, kornia and a one-time we
         # cached; faces come back as the same objects from the locator's face cache.
         self._cache: OrderedDict[int, tuple] = OrderedDict()
         self.cache_size = 512
+        # Faces carry a key in Image.info; their DISK features are kept on disk under
+        # feature_dir (data/index/features, derived from sponsor imagery, deleted by purge).
+        self.feature_dir = feature_dir
 
     def _features(self, image: Image.Image):
         key = id(image)
         if key in self._cache and self._cache[key][0] is image:
             self._cache.move_to_end(key)
             return self._cache[key][1]
-        found = self._extract(image)
+        found = self._stored(image)
         self._cache[key] = (image, found)
         while len(self._cache) > self.cache_size:
             self._cache.popitem(last=False)
         return found
+
+    def _stored(self, image: Image.Image):
+        from pathlib import Path
+
+        name = image.info.get(FEATURE_KEY)
+        if self.feature_dir is None or not name:
+            return self._extract(image)
+        path = Path(self.feature_dir) / f"{name}.npz"
+        torch = self._torch
+        if path.is_file():
+            data = np.load(path)
+            feats = _Features(
+                torch.from_numpy(data["keypoints"].astype(np.float32)).to(self.device),
+                torch.from_numpy(data["descriptors"].astype(np.float32)).to(self.device),
+            )
+            return feats, float(data["scale"]), tuple(int(v) for v in data["size"])
+        feats, scale, size = self._extract(image)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            path,
+            keypoints=feats.keypoints.cpu().numpy().astype(np.float32),
+            descriptors=feats.descriptors.cpu().numpy().astype(np.float16),
+            scale=scale,
+            size=np.array(size),
+        )
+        return feats, scale, size
 
     def _extract(self, image: Image.Image):
         small, scale = _shrink(image)

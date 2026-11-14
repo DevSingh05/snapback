@@ -47,6 +47,18 @@ def held_out_view(sweep, rng: random.Random) -> tuple[Image.Image, np.ndarray, f
     return Image.open(buffer).convert("RGB"), pano @ rotation[:, 2], hfov
 
 
+def claimed_outcome_lines(statuses: Sequence[LocateStatus]) -> list[str]:
+    """The two counts the demo bar rests on, for views of the claimed building. Placed in another
+    building is what could turn an honest listing into DON'T PAY, so its bar is 0."""
+    n = len(statuses)
+    elsewhere = sum(s is LocateStatus.LOCATED_ELSEWHERE for s in statuses)
+    missing = sum(s in (LocateStatus.NOT_LOCATED, LocateStatus.NOT_INDEXED) for s in statuses)
+    return [
+        f"views of the claimed building placed in another building: {elsewhere} of {n}",
+        f"not located: {missing} of {n}",
+    ]
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m snapback.eval.locate_gate")
     parser.add_argument("--index", type=Path, default=REPO_ROOT / "data" / "index" / "demo")
@@ -83,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.matcher == "disk":
         from snapback.vision.locate.verify import DiskLightGlue
 
-        matcher = DiskLightGlue()
+        matcher = DiskLightGlue(feature_dir=args.index.parent / "features")
     else:
         from snapback.vision.locate.verify import PatchMatcher
 
@@ -91,8 +103,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     locator = Locator(index, sweeps, catalog, matcher)
     rng = random.Random(args.seed)
 
-    located = right_sweep = pose_ok = 0
-    errors, seconds = [], []
+    located = right_sweep = pose_ok = false_placed = 0
+    errors, seconds, claimed_statuses = [], [], []
     for number in range(args.n):
         sweep = rng.choice(sweeps[claimed])
         photo, truth, _ = held_out_view(sweep, rng)
@@ -100,6 +112,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = locator.locate(f"gate-{number}", {"p": photo}, f"gate-prop-{claimed}")
         seconds.append(time.monotonic() - started)
         placed = result.photos[0]
+        false_placed += placed.status is LocateStatus.LOCATED_ELSEWHERE
+        claimed_statuses.append(placed.status)
         if placed.status is LocateStatus.LOCATED_IN_CLAIMED:
             located += 1
             right_sweep += placed.pano_id == sweep.sweep_id
@@ -117,6 +131,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         photo, _, _ = held_out_view(rng.choice(sweeps[model]), rng)
         result = locator.locate(f"gate-o{number}", {"p": photo}, f"gate-prop-{claimed}")
         elsewhere += result.photos[0].status is LocateStatus.LOCATED_ELSEWHERE
+        false_placed += result.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED
 
     label = "RENDERS of live scans at unseen viewpoints, not phone photos"
     print(
@@ -134,6 +149,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"views of another building placed elsewhere: {elsewhere} of "
         f"{args.n_other if others else 0}"
     )
+    for line in claimed_outcome_lines(claimed_statuses):
+        print(line)
+    print(f"false placements (a view placed in the wrong building): {false_placed}")
     print(f"seconds per photo: median {np.median(seconds):.1f}, max {max(seconds):.1f}")
     return 0
 

@@ -1,0 +1,51 @@
+{
+  "property_id": "fx-demo-prop-1",
+  "source": "fixture",
+  "market": "Houston",
+  "property_type": "multifamily",
+  "floors": 4,
+  "year_built": 2015,
+  "lat": 0.0,
+  "lon": 0.0,
+  "model_ids": ["fx-model-a", "fx-model-b"],
+  "floor_plans": ["2 bed / 2 bath", "1 bed / 1 bath"],
+  "manager_company": "Fixture Living LLC",
+  "rent_min": 1200,
+  "rent_median": 1500,
+  "rent_max": 1900,
+  "site_phone_hash": "8369de6f4884e85e76a39e312ba65f86bc18dcbad4b9aac39f393d3210fa170d",
+  "website_host": "fixtureliving.example",
+  "floor_plan_rents": [
+    {
+      "name": "1 bed / 1 bath",
+      "beds": 1,
+      "rent_min": 1200,
+      "rent_max": 1400,
+      "per_bed": false
+    },
+    {
+      "name": "2 bed / 2 bath",
+      "beds": 2,
+      "rent_min": 1600,
+      "rent_max": 1900,
+      "per_bed": false
+    }
+  ],
+  "units": [
+    {
+      "unit": "101",
+      "beds": 1,
+      "floor_plan": "1 bed / 1 bath"
+    },
+    {
+      "unit": "204",
+      "beds": 2,
+      "floor_plan": "2 bed / 2 bath"
+    },
+    {
+      "unit": "305",
+      "beds": 2,
+      "floor_plan": "2 bed / 2 bath"
+    }
+  ]
+}

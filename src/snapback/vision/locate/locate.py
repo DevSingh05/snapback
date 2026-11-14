@@ -4,8 +4,10 @@ For each photo:
 
 1. Retrieve the closest views over every indexed building, plus the closest views in the
    claimed property's own twins (so the claimed building is always tried).
-2. Verify each candidate face with the matcher and a RANSAC homography. The best face with
-   enough inliers places the photo; otherwise it is not placed.
+2. Verify each candidate face with the matcher and a RANSAC homography. The claimed property's
+   twins are verified first and the best face with enough inliers places the photo there. Only
+   when none does, another building places it, and only on a stricter bar (more inliers,
+   spread over the photo); otherwise it is not placed.
 3. Status: placed in a twin of the claimed property is `located_in_claimed`; placed in any other
    building is `located_elsewhere`, with that building's ids; not placed is `not_located`, or
    `not_indexed` when the claimed property has no twin in the index.
@@ -35,7 +37,7 @@ from snapback.contracts import (
     PropertyRecord,
 )
 from snapback.vision.embed import unit
-from snapback.vision.locate.cube import face_basis, face_intrinsics, intrinsics
+from snapback.vision.locate.cube import SIDE_FACES, face_basis, face_intrinsics, intrinsics
 from snapback.vision.locate.geometry import (
     camera_quaternion,
     matrix_from_quaternion,
@@ -43,7 +45,7 @@ from snapback.vision.locate.geometry import (
 )
 from snapback.vision.locate.index import LocateIndex
 from snapback.vision.locate.thresholds import Thresholds, load_thresholds
-from snapback.vision.locate.verify import Matcher, Verification, verify
+from snapback.vision.locate.verify import FEATURE_KEY, Matcher, Verification, verify
 
 _EXIF_IFD = 0x8769
 _FOCAL_35MM = 0xA405
@@ -132,7 +134,9 @@ class Locator:
 
     def _load_face(self, model_id: str, sweep_id: str, face: int) -> Image.Image:
         with Image.open(self._sweeps[(model_id, sweep_id)].faces[face]) as opened:
-            return opened.convert("RGB")
+            image = opened.convert("RGB")
+        image.info[FEATURE_KEY] = f"{model_id}/{sweep_id}/{face}"
+        return image
 
     # --- one photo ---------------------------------------------------------------------------
 
@@ -142,9 +146,11 @@ class Locator:
         vector = unit(embedder.embed(photo)) if embedder is not None else None
         hits = self.index.search(photo, k=t.top_k, vector=vector)
         if claimed_models:
-            hits += self.index.search(
-                photo, k=t.top_k_claimed, model_ids=claimed_models, vector=vector
+            # The claimed building's side faces (where listing photos look), best first.
+            claimed = self.index.search(
+                photo, k=4 * t.top_k_claimed, model_ids=claimed_models, vector=vector
             )
+            hits += [h for h in claimed if h.entry.face in SIDE_FACES][: t.top_k_claimed]
         seen, out = set(), []
         for hit in sorted(hits, key=lambda h: -h.score):
             key = (hit.entry.model_id, hit.entry.sweep_id, hit.entry.face)
@@ -153,27 +159,49 @@ class Locator:
                 out.append(hit)
         return out
 
-    def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
+    def _best(self, photo: Image.Image, hits: list, passes: Callable[[Verification], bool]):
+        """The passing candidate with the most inliers, or None. Stops at a very strong one."""
         t = self.thresholds
         best = None
-        for hit in self._candidates(photo, claimed_models):
+        for hit in hits:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
             check = verify(self.matcher, photo, face, t.ransac_px)
-            if best is None or check.inliers > best.check.inliers:
+            if passes(check) and (best is None or check.inliers > best.check.inliers):
                 best = _Placement(
                     entry.model_id,
                     self._sweeps[(entry.model_id, entry.sweep_id)],
                     entry.face,
                     check,
                 )
-            if check.inliers >= t.stop_at_inliers:
+            if check.inliers >= t.stop_at_inliers and passes(check):
                 break
-        if best is None:
-            return None
-        if best.check.inliers < t.min_inliers or best.check.ratio < t.min_inlier_ratio:
-            return None
         return best
+
+    def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
+        """Claimed twins first, always: a twin of the claimed building that passes places the
+        photo there, whatever else matches and whatever order the index was built in. Another
+        building places it only on the stricter elsewhere bar (it can lead to DON'T PAY)."""
+        t = self.thresholds
+        hits = self._candidates(photo, claimed_models)
+        claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
+        other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
+        placed = self._best(
+            photo,
+            claimed_hits,
+            lambda c: c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio,
+        )
+        if placed is not None:
+            return placed
+        return self._best(
+            photo,
+            other_hits,
+            lambda c: (
+                c.inliers >= t.elsewhere_min_inliers
+                and c.ratio >= t.min_inlier_ratio
+                and c.spread >= t.elsewhere_min_spread
+            ),
+        )
 
     def _pose(self, photo: Image.Image, placed: _Placement) -> Pose | None:
         if placed.check.homography is None or placed.sweep.position is None:
@@ -214,6 +242,14 @@ class Locator:
         for photo_id, image in photos.items():
             photo = image.convert("RGB")
             placed = self._place(photo, claimed_models)
+            if (
+                placed is not None
+                and placed.model_id not in claimed_models
+                and self.catalog.property_of(placed.model_id) is None
+            ):
+                # Never "somewhere else" without a known other building: the catalog may just be
+                # missing the claimed property's own twin.
+                placed = None
             if placed is None:
                 status = LocateStatus.NOT_LOCATED if claimed_models else LocateStatus.NOT_INDEXED
                 locations.append(PhotoLocation(photo_id=photo_id, status=status))

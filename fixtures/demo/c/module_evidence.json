@@ -1,0 +1,29 @@
+{
+  "case_id": "fx-demo-c",
+  "source": "fixture",
+  "recapture": [],
+  "memory": [],
+  "rules": [],
+  "locate": {
+    "case_id": "fx-demo-c",
+    "photos": [
+      {
+        "photo_id": "l1",
+        "status": "not_indexed"
+      },
+      {
+        "photo_id": "l2",
+        "status": "not_indexed"
+      },
+      {
+        "photo_id": "l3",
+        "status": "not_indexed"
+      }
+    ],
+    "claimed_property_id": "fx-demo-prop-2",
+    "chosen": null,
+    "alternatives": [],
+    "poses": {},
+    "thresholds_version": "fx-thresholds-0"
+  }
+}

@@ -763,3 +763,24 @@ button {
   text-transform: uppercase;
   color: var(--muted);
 }
+.aerial-facts {
+  margin: 0;
+  color: var(--muted);
+}
+.aerial-skeleton {
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  border-radius: 0;
+  background: var(--line);
+  animation: aerial-pulse 1.4s ease-in-out infinite;
+}
+@keyframes aerial-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aerial-skeleton {
+    animation: none;
+  }
+}

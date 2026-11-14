@@ -260,7 +260,12 @@ function TwinViewInner({
             </label>
             <p className="twin-status">{status}</p>
           </div>
-          <AerialProof matched={matchedAerial} claimed={claimedAerial} mismatch={mismatch} />
+          <AerialProof
+            caseId={demo ? undefined : caseId}
+            matched={matchedAerial}
+            claimed={claimedAerial}
+            mismatch={mismatch}
+          />
         </aside>
       </div>
       <TraceStrip>
