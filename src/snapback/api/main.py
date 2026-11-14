@@ -11,6 +11,7 @@ Routes the web app and the iMessage sidecar call:
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
+    GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
     GET  /healthz                         liveness and the data source
     POST /verdict                         decide() on evidence the caller already has
 
@@ -648,6 +649,20 @@ def create_app(
             challenge_text=status.challenge_text,
         )
 
+    def eval_file(path: Path, missing: str) -> Response:
+        """One of the eval harness's CSVs, as written. Only the agreed format is served."""
+        try:
+            results = read_results(path)
+        except NotTheAgreedCsv:
+            raise HTTPException(
+                status_code=500, detail="The results file is not the agreed eval results CSV."
+            ) from None
+        if results is None:
+            raise HTTPException(status_code=404, detail=missing)
+        return Response(
+            content=results, media_type="text/csv", headers={"Cache-Control": "no-store"}
+        )
+
     @app.get("/eval/results.csv")
     def get_eval_results() -> Response:
         """The eval harness's results as CSV, for the Lab panel. Public and read-only (#69).
@@ -656,16 +671,18 @@ def create_app(
         with n), and no case data, so it needs no token. The path comes from settings, never
         from the request, and only the agreed CSV is ever served.
         """
-        try:
-            results = read_results(settings.snapback_eval_results)
-        except NotTheAgreedCsv:
-            raise HTTPException(
-                status_code=500, detail="The results file is not the agreed eval results CSV."
-            ) from None
-        if results is None:
-            raise HTTPException(status_code=404, detail="No eval results yet. Run `make eval`.")
-        return Response(
-            content=results, media_type="text/csv", headers={"Cache-Control": "no-store"}
+        return eval_file(settings.snapback_eval_results, "No eval results yet. Run `make eval`.")
+
+    @app.get("/eval/locate_real.csv")
+    def get_eval_locate_real() -> Response:
+        """Locate accuracy on the buildings' own listing photos (A8, #72). Totals only.
+
+        Same columns and the same rules as `/eval/results.csv`: public, read-only, a fixed
+        path, and only the agreed CSV is served.
+        """
+        return eval_file(
+            settings.snapback_eval_locate_real,
+            "No locate results yet. Run `make eval-locate-real`.",
         )
 
     return app
