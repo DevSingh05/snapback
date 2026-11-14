@@ -99,7 +99,7 @@ class Plan:
     applied. They are made once, here, and kept; only the moment and the order changed.
     """
 
-    def __init__(self, modules: Any, case_id: str, *, ask_enabled: bool = True) -> None:
+    def __init__(self, modules: Any, case_id: str, *, ask_enabled: bool = False) -> None:
         self._modules = modules
         self._case_id = case_id
         self._price: PriceResult | None = modules.price(case_id)
@@ -116,6 +116,7 @@ class Plan:
         by_number = getattr(modules, "license_by_number", None)
         self._ask_offered = ask_enabled and callable(by_number)
         self.number_given = False  # the renter's answer held a license number (a yes/no fact)
+        self.looked_up = False  # a lookup of that number answered (it ran and gave a result)
         self.ran: list[PlanKind] = []
 
     @property
@@ -127,7 +128,7 @@ class Plan:
             result is not None
             and result.status is LicenseStatus.NOT_CHECKED
             and result.claimed_role is not None
-            and not result.number_in_ad
+            and result.number_from is None
         )
 
     @property
@@ -198,6 +199,8 @@ class Plan:
         out = []
         for kind in ORDER[:-1]:
             reason = self._skip_reason(kind)
+            if kind is PlanKind.ASK and not (self._ask_offered and self._names_a_license):
+                continue  # asking is off, or there is no claim: the license skip line says it
             if reason is not None and kind not in self.ran:
                 out.append(Skipped(kind, reason))
         return out
@@ -258,12 +261,9 @@ class Plan:
 
     @property
     def _rerun(self) -> dict[str, Callable[[str], dict[str, object]]]:
-        return {
-            "license": self._rerun_license,
-            "owner": lambda _n: {"owner": self._modules.owner(self._case_id)},
-            "record": lambda _n: {"price": self._modules.price(self._case_id)},
-            "brokerage": lambda _n: {"for_sale": self._modules.for_sale(self._case_id)},
-        }
+        # Only the license check re-runs on a number. A wider UNLOCKS entry has nothing to run
+        # and raises KeyError, so the map in code cannot quietly grow what an answer re-runs.
+        return {"license": self._rerun_license}
 
     def _rerun_license(self, number: str) -> dict[str, object]:
         try:
@@ -272,5 +272,9 @@ class Plan:
             return {}  # a lookup that broke is a lookup that did not happen
         if found is None:
             return {}
+        if found.claimed_role is None and self._license is not None:
+            # the ad's claim read again from a long ad may be cut off: keep the first reading
+            found = found.model_copy(update={"claimed_role": self._license.claimed_role})
+        self.looked_up = True
         self._license = found
         return {"license": found}

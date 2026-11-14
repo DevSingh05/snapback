@@ -39,6 +39,22 @@ CLAIM = LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role="agent")
 SECRET_ANSWER = "ok here it is, TREC # 0900123, thanks"  # a number inside other words
 
 
+# The stand-in for the state's list: one active row, under the name the ad gives.
+ROW = {
+    "license_type": "Sales Agent",
+    "license_number": "0900123",
+    "full_name": "Sample, Fx",
+    "first_name": "FX",
+    "middle_name": "",
+    "last_name": "SAMPLE",
+    "status": "Active",
+    "related_license_type": "Broker Company",
+    "related_license_full_name": "Fixture Realty Group",
+}
+NAMED_AD = "I'm Fx Sample, a licensed real estate agent, and I handle this house myself."
+STATE = {"trec_rows": {"900123": ROW}, "ad_text": NAMED_AD}
+
+
 def licensed() -> LicenseResult:
     return LicenseResult(status=LicenseStatus.LICENSED, claimed_role="agent")
 
@@ -76,6 +92,7 @@ class Spy(FixtureModules):
 
 
 def make(modules, **kwargs) -> CaseSession:
+    kwargs.setdefault("ask_enabled", True)  # the session default is off, as on main
     return CaseSession(
         "fx-1", modules, Trace("fx-1", DataSource.FIXTURE), rng=random.Random(3), **kwargs
     )
@@ -116,30 +133,39 @@ def test_the_question_is_offered_for_a_claim_without_a_number():
     assert ASK in walk_to_plan(case).options
 
 
+ASK_SKIP = f"Skipped {ASK}: the ad does not claim a license without giving its number."
+
+
 @pytest.mark.parametrize(
-    "result",
+    "result, says_why",
     [
-        None,
-        LicenseResult(status=LicenseStatus.NOT_CHECKED),  # no claim at all
-        licensed(),
-        LicenseResult(status=LicenseStatus.NOT_FOUND, claimed_role="agent", number_in_ad=True),
+        (None, False),
+        (LicenseResult(status=LicenseStatus.NOT_CHECKED), False),  # no claim at all
+        (licensed(), True),
+        (
+            LicenseResult(status=LicenseStatus.NOT_FOUND, claimed_role="agent", number_from="ad"),
+            True,
+        ),
         # the ad gave a number and the state could not settle it: the renter has no new number
-        LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role="agent", number_in_ad=True),
+        (
+            LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role="agent", number_from="ad"),
+            True,
+        ),
     ],
 )
-def test_it_is_not_offered_otherwise_and_the_skip_says_why(result):
+def test_it_is_not_offered_otherwise_and_the_skip_says_why_only_when_there_is_a_claim(
+    result, says_why
+):
     case = make(FixtureModules(license=result))
     assert ASK not in walk_to_plan(case).options
-    line = f"Skipped {ASK}: the ad does not claim a license without giving its number."
-    assert line in [e.reason for e in case.trace.events]
+    said = [e.reason for e in case.trace.events]
+    assert (ASK_SKIP in said) is says_why  # no claim: the license skip line already explains
 
 
-def test_it_is_skipped_when_the_case_may_not_ask():
+def test_it_is_skipped_when_the_case_may_not_ask_and_adds_no_line():
     case = make(FixtureModules(license=CLAIM), ask_enabled=False)
     assert ASK not in walk_to_plan(case).options
-    assert f"Skipped {ASK}: asking the renter is not available." in [
-        e.reason for e in case.trace.events
-    ]
+    assert not [e.reason for e in case.trace.events if f"Skipped {ASK}" in e.reason]
 
 
 def test_modules_that_cannot_look_up_by_number_never_offer_it():
@@ -199,7 +225,7 @@ def run_to_answer(modules, chooser=None):
 
 
 def test_the_answer_re_runs_only_the_license_lookup():
-    spy = Spy(license=CLAIM, trec_numbers={"900123": licensed()})
+    spy = Spy(license=CLAIM, **STATE)
     case = run_to_answer(spy)
     before = list(spy.calls)
     case.answer(SECRET_ANSWER)
@@ -208,12 +234,13 @@ def test_the_answer_re_runs_only_the_license_lookup():
 
 
 def test_the_static_map_decides_what_runs_again(monkeypatch):
-    spy = Spy(license=CLAIM, trec_numbers={"900123": licensed()})
+    spy = Spy(license=CLAIM, **STATE)
     case = run_to_answer(spy)
     before = len(spy.calls)
     monkeypatch.setitem(planner.UNLOCKS, "license_number", ["license", "owner", "record"])
-    case.answer(SECRET_ANSWER)
-    assert {"owner", "price"} <= set(spy.calls[before:])  # a wider map would show here
+    with pytest.raises(KeyError):  # only the license check can re-run on a number
+        case.answer(SECRET_ANSWER)
+    assert set(spy.calls[before:]) <= {"license_by_number"}
 
 
 def test_the_map_is_exactly_the_license_check():
@@ -222,7 +249,7 @@ def test_the_map_is_exactly_the_license_check():
 
 def test_no_answer_text_reaches_the_model():
     model = Model(ask_first)
-    spy = Spy(license=CLAIM, trec_numbers={"900123": licensed()})
+    spy = Spy(license=CLAIM, **STATE)
     case = make(spy)
     run_case(case, model, approve)
     assert case.waiting_for_answer
@@ -249,7 +276,7 @@ def test_no_answer_text_reaches_the_model():
 
 
 def test_the_answer_is_not_kept_on_the_session():
-    case = run_to_answer(Spy(license=CLAIM, trec_numbers={"900123": licensed()}))
+    case = run_to_answer(Spy(license=CLAIM, **STATE))
     case.answer(SECRET_ANSWER)
     assert "900123" not in repr(vars(case)) and "thanks" not in repr(vars(case))
     assert "900123" not in repr(vars(case._plan))
@@ -304,7 +331,7 @@ def test_no_number_leaves_not_checked_and_the_verdict_unchanged(answer):
 
 
 def test_the_verdict_is_identical_with_the_model_on_and_off_when_a_number_is_given():
-    modules = lambda: FixtureModules(license=CLAIM, trec_numbers={"900123": licensed()})  # noqa: E731
+    modules = lambda: FixtureModules(license=CLAIM, **STATE)  # noqa: E731
     policy = final(modules(), SECRET_ANSWER, PolicyChooser())
     model = final(modules(), SECRET_ANSWER, Model(ask_first))
     assert model.verdict == policy.verdict
@@ -313,7 +340,7 @@ def test_the_verdict_is_identical_with_the_model_on_and_off_when_a_number_is_giv
 
 def test_the_yes_no_fact_follows_whether_the_answer_held_a_number():
     for answer, given in ((SECRET_ANSWER, True), ("no idea", False), (None, False)):
-        case = run_to_answer(FixtureModules(license=CLAIM, trec_numbers={"900123": licensed()}))
+        case = run_to_answer(FixtureModules(license=CLAIM, **STATE))
         assert case._plan.facts()["license_number_given"] is False  # before any answer
         case.answer(answer)
         assert case._plan.facts()["license_number_given"] is given
@@ -337,23 +364,90 @@ def test_answering_when_nothing_was_asked_is_refused():
 # --- a number the state cannot find: Doesn't match and HOLD, never DON'T PAY ------------------
 
 
-def test_a_number_with_no_row_gives_the_doesnt_match_line_and_hold_never_dont_pay():
+def license_line(case):
+    card = build_card(case.evidence)
+    [line] = [line for row in card.rows for line in row.lines if line.label == "License"]
+    return line
+
+
+def test_a_number_the_renter_gave_with_no_row_is_not_confirmed_and_hold_never_red():
     modules = FixtureModules(license=CLAIM)  # the stand-in list holds no 0000042
     case = final(modules, "my license is 0000042 ok? 4242424", PolicyChooser())
     assert case.evidence.license.status is LicenseStatus.NOT_FOUND
+    assert case.evidence.license.number_from == "renter"
     assert case.verdict.state is VerdictState.HOLD
-    card = build_card(case.evidence)
-    [row] = [r for r in card.rows if any(line.label == "License" for line in r.lines)]
-    [line] = [line for line in row.lines if line.label == "License"]
-    assert line.text == strings.text("license.not_found")
-    assert line.tone.value == "red_flag"
+    line = license_line(case)
+    assert line.text == strings.text("license.not_found_given")
+    assert line.tone.value == "hold"  # Not confirmed, never "Doesn't match" (ruling, 07:14)
     assert case.verdict.state is not VerdictState.DONT_PAY
+    assert strings.text("reason.license_not_found_given") in case.verdict.reasons
+    assert strings.text("reason.license_not_found") not in case.verdict.reasons
+
+
+def test_the_renter_wording_is_exact_in_both_languages():
+    assert strings.text("license.not_found_given") == (
+        "The license number you gave is not an active Texas license. Check it was typed right, "
+        "then look it up yourself at trec.texas.gov."
+    )
+    assert strings.text("license.not_found_given", "es") == (
+        "El número de licencia que usted dio no es una licencia activa de Texas. Revise que "
+        "esté bien escrito y búsquelo usted mismo en trec.texas.gov."
+    )
+    assert strings.text("reason.license_not_found_given") == (
+        "The license number you gave is not an active Texas license."
+    )
+    assert strings.text("reason.license_not_found_given", "es") == (
+        "El número de licencia que usted dio no es una licencia activa de Texas."
+    )
+    assert strings.text("license.not_checked_given") == (
+        "Says they're licensed. The number you gave did not confirm it. "
+        "Look it up yourself at trec.texas.gov."
+    )
+    assert strings.text("license.not_checked_given", "es") == (
+        "Dice tener licencia. El número que usted dio no lo confirmó. "
+        "Búsquelo usted mismo en trec.texas.gov."
+    )
+
+
+def test_a_number_active_under_another_name_reads_not_checked_in_the_renter_words():
+    stranger = {**ROW, "full_name": "Other, Person", "first_name": "PERSON", "last_name": "OTHER"}
+    modules = FixtureModules(license=CLAIM, trec_rows={"900123": stranger}, ad_text=NAMED_AD)
+    case = final(modules, SECRET_ANSWER, PolicyChooser())
+    assert case.evidence.license.status is LicenseStatus.NOT_CHECKED
+    assert license_line(case).text == strings.text("license.not_checked_given")
+
+
+def test_an_ad_number_with_no_row_is_unchanged_doesnt_match():
+    from snapback.contracts import ModuleEvidence
+
+    found = LicenseResult(status=LicenseStatus.NOT_FOUND, claimed_role="agent", number_from="ad")
+    modules = FixtureModules(license=found)
+    case = final(modules, None, PolicyChooser())
+    line = license_line(case)
+    assert line.text == strings.text("license.not_found") and line.tone.value == "red_flag"
+    assert isinstance(case.evidence, ModuleEvidence)
+
+
+def test_a_number_the_renter_gave_never_reaches_the_report_pack():
+    from snapback.api.report import build_report
+
+    case = final(
+        FixtureModules(license=CLAIM), "my license is 0000042 ok? 4242424", PolicyChooser()
+    )
+    report = build_report(
+        case.evidence, build_card(case.evidence), case_id="fx-1", lang="en", aerial=False
+    )
+    said = json.dumps(report.model_dump(mode="json"))
+    assert strings.text("reason.license_not_found_given") not in said
+    assert strings.text("reason.license_not_found") not in said
+    assert not report.proof_lines  # nothing else in the pack: no basis to report on
+    assert report.reportable is False
 
 
 def test_a_found_number_reads_as_licensed_and_does_not_lift_the_verdict():
     base = final(FixtureModules(license=CLAIM), None, PolicyChooser())
     case = final(
-        FixtureModules(license=CLAIM, trec_numbers={"900123": licensed()}),
+        FixtureModules(license=CLAIM, **STATE),
         SECRET_ANSWER,
         PolicyChooser(),
     )
@@ -444,9 +538,15 @@ class StateList:
         self.asked.append(listing_text)
         if "TREC license 900123" in listing_text:
             return LicenseResult(
-                status=LicenseStatus.LICENSED, claimed_role="agent", number_in_ad=True
+                status=LicenseStatus.LICENSED, claimed_role="agent", number_from="ad"
             )
         return LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role="agent")
+
+    def license_number(self, number, listing_text):
+        self.asked.append(f"{number}|{listing_text}")
+        if number == "900123":
+            return LicenseResult(status=LicenseStatus.LICENSED, claimed_role="agent")
+        return LicenseResult(status=LicenseStatus.NOT_FOUND, claimed_role="agent")
 
 
 def api(tmp_path, ask: bool):
@@ -498,3 +598,178 @@ def test_over_the_api_a_case_does_not_ask_unless_the_setting_is_on(tmp_path):
     assert (
         client.post(f"/cases/{case_id}/answer", json={"text": "1"}, headers=auth).status_code == 409
     )
+
+
+# --- off means main: the default adds nothing --------------------------------------------------
+
+
+def test_asking_is_off_unless_the_setting_turns_it_on():
+    import inspect
+
+    from snapback.settings import Settings
+
+    assert Settings(_env_file=None).snapback_ask_renter is False
+    for cls in (CaseSession, planner.Plan):
+        assert inspect.signature(cls).parameters["ask_enabled"].default is False
+
+
+def test_with_the_setting_unset_the_staged_demos_say_nothing_about_asking():
+    """Main's traces for demo cases a, b and c carry no ask line; neither do these."""
+    from snapback.agent.demo import demo_case_ids, demo_modules, load_demo_case
+    from snapback.agent.intake import read_listing
+
+    assert {"a", "b", "c"} <= set(demo_case_ids())
+    for case_id in demo_case_ids():
+        demo = load_demo_case(case_id)
+        modules = demo_modules(demo, read_listing(demo.listing_text))
+        session = CaseSession(f"fx-{case_id}", modules, Trace(f"fx-{case_id}", DataSource.FIXTURE))
+        assert run_case(session, PolicyChooser(), approve) is not None
+        ask_words = {
+            strings.text(key)
+            for key in (
+                "plan.pick.ask",
+                "plan.ask.question",
+                "plan.ask.looked_up",
+                "plan.ask.no_number",
+                "plan.ask.not_looked_up",
+            )
+        }
+        for event in session.trace.events:
+            assert ASK not in (event.pick, *event.options)
+            assert event.reason not in ask_words
+            assert not event.reason.startswith(f"Skipped {ASK}")
+
+
+# --- the trace says a lookup ran only when one answered ----------------------------------------
+
+
+def seen_trace(case) -> list[str]:
+    return [e.reason for e in case.trace.events]
+
+
+def test_a_number_with_no_lookup_behind_it_is_not_reported_as_looked_up():
+    class Broken(FixtureModules):
+        def license_by_number(self, case_id, number):
+            raise RuntimeError("the state list is down")
+
+    case = final(Broken(license=CLAIM), SECRET_ANSWER, PolicyChooser())
+    said = seen_trace(case)
+    assert strings.text("plan.ask.looked_up") not in said
+    assert strings.text("plan.ask.not_looked_up") in said
+    assert case.evidence.license == CLAIM  # nothing changed
+    nothing = final(FixtureModules(license=CLAIM, **STATE), None, PolicyChooser())
+    assert strings.text("plan.ask.looked_up") not in seen_trace(nothing)
+
+
+def test_the_could_not_look_up_line_exists_in_both_languages():
+    for lang in ("en", "es"):
+        text = strings.text("plan.ask.not_looked_up", lang)
+        assert text and "—" not in text and "–" not in text
+
+
+# --- the real check, behind the join, with a pretend state list --------------------------------
+
+
+def state_client(rows, seen):
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, json=rows)
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+class RealCheck:
+    """Lane D's real number check (trec), reached the way a live case reaches it, with the
+    state's list replaced by a mock transport. Nothing goes over the network."""
+
+    def __init__(self, rows, seen):
+        self.client = state_client(rows, seen)
+
+    def license_number(self, number, listing_text):
+        from snapback.adapters import trec
+
+        return trec.check_license_number(number, listing_text, client=self.client)
+
+
+def joined_modules(text, lookups):
+    from snapback.agent.intake import read_listing
+    from snapback.agent.join import JoinedModules
+    from snapback.agent.rules.contact import FIXTURE_PHONE_SALT
+
+    return JoinedModules(
+        stand_in=None,
+        listing=read_listing(text),
+        record=None,
+        for_sale=None,
+        salt=FIXTURE_PHONE_SALT,
+        record_source=None,
+        lookups=lookups,
+    )
+
+
+OTHER_NAME = {**ROW, "full_name": "Other, Person", "first_name": "PERSON", "last_name": "OTHER"}
+NO_NAME_AD = "House for rent, $1,400. I'm a licensed real estate agent. Call 555-010-0188."
+
+
+@pytest.mark.parametrize(
+    "ad, row, status",
+    [
+        (NAMED_AD, ROW, LicenseStatus.LICENSED),
+        (NAMED_AD, OTHER_NAME, LicenseStatus.NOT_CHECKED),  # a different name accuses no one
+        (NO_NAME_AD, ROW, LicenseStatus.NOT_CHECKED),  # no name to compare: never LICENSED
+        (NAMED_AD, None, LicenseStatus.NOT_FOUND),  # no row at all
+    ],
+)
+def test_live_and_the_fixture_stand_in_give_the_same_answer_for_the_same_ad(ad, row, status):
+    seen: list[str] = []
+    live = joined_modules(ad, RealCheck([row] if row else [], seen)).license_by_number(
+        "fx-1", "900123"
+    )
+    assert live is not None and live.status is status and live.number_from == "renter"
+    assert seen  # the state list was asked
+    stand_in = FixtureModules(
+        trec_rows={"900123": row} if row else {}, ad_text=ad
+    ).license_by_number("fx-1", "900123")
+    assert stand_in.status is status and stand_in.number_from == "renter"
+    assert stand_in.claimed_role == live.claimed_role
+
+
+def test_an_ad_over_two_thousand_characters_still_looks_up_the_number_the_renter_gave():
+    long_ad = NAMED_AD + " " + "x" * 2_400
+    assert len(long_ad) > 2_000
+    seen: list[str] = []
+    modules = joined_modules(long_ad, RealCheck([ROW], seen))
+    found = modules.license_by_number("fx-1", "900123")
+    assert found is not None and found.status is LicenseStatus.LICENSED
+    assert len(seen) == 1  # the number went straight to the state, not hidden past the cut-off
+
+
+def test_the_trace_claims_a_lookup_only_when_it_ran_for_a_long_ad():
+    class NoLookup(RealCheck):
+        def license_number(self, number, listing_text):
+            return None
+
+    for lookups, ran in ((RealCheck([ROW], []), True), (NoLookup([], []), False)):
+        modules = joined_modules(NAMED_AD + " " + "x" * 2_400, lookups)
+        case = CaseSession(
+            "fx-1", _AskModules(modules), Trace("fx-1", DataSource.FIXTURE), ask_enabled=True
+        )
+        run_case(case, PolicyChooser(), approve)
+        assert case.waiting_for_answer
+        case.answer(SECRET_ANSWER)
+        said = seen_trace(case)
+        assert (strings.text("plan.ask.looked_up") in said) is ran
+        assert (strings.text("plan.ask.not_looked_up") in said) is not ran
+
+
+class _AskModules(FixtureModules):
+    """The fixture case with the lookup by number sent to the joined modules above."""
+
+    def __init__(self, joined):
+        super().__init__(license=CLAIM)
+        self._joined = joined
+
+    def license_by_number(self, case_id, number):
+        return self._joined.license_by_number(case_id, number)

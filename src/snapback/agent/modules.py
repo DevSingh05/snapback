@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from snapback.adapters import trec
 from snapback.agent.rules import check_price
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, Claims, check_authority
 from snapback.agent.rules.owner import check_owner
@@ -126,7 +127,8 @@ class FixtureModules:
         record_file: str = "property_record.json",
         for_sale: ForSaleMatch | None = None,
         license: LicenseResult | None = None,
-        trec_numbers: dict[str, LicenseResult] | None = None,
+        trec_rows: dict[str, dict] | None = None,
+        ad_text: str = "",
         owner: OwnerResult | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
@@ -150,9 +152,12 @@ class FixtureModules:
         self._beds = beds
         self._for_sale = for_sale
         self._license = license
-        # A24 stretch: the stand-in for the state's list, keyed by license number. A number it
-        # does not hold has no row, which is what the real list says (D10: NOT_FOUND).
-        self._trec_numbers = trec_numbers or {}
+        # A24 stretch: the stand-in for the state's list, one row (as the state returns it)
+        # per license number. A number it does not hold has no row, which is what the real
+        # list says (D10: NOT_FOUND). The answer comes from trec's own rule, with the name the
+        # ad claims: an active number under no claimed name is NOT_CHECKED, as it is live.
+        self._trec_rows = trec_rows or {}
+        self._ad_text = ad_text
         self._owner = owner
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
@@ -214,15 +219,14 @@ class FixtureModules:
 
     def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
         """The license lookup by a number the renter gave (A24 stretch)."""
-        found = self._trec_numbers.get(number)
-        claimed = self._license if self._license is not None else self.evidence.license
-        role = claimed.claimed_role if claimed else None
-        if found is None:
-            return LicenseResult(
-                status=LicenseStatus.NOT_FOUND, claimed_role=role, number_in_ad=True
-            )
-        return found.model_copy(
-            update={"number_in_ad": True, "claimed_role": found.claimed_role or role}
+        row = self._trec_rows.get(number)
+        claim = trec.detect_claim(self._ad_text)
+        status, sponsor = trec.answer_for_number(number, [row] if row else [], claim)
+        return LicenseResult(
+            status=status,
+            claimed_role=claim.role if claim else None,
+            sponsor_broker=sponsor if status is LicenseStatus.LICENSED else None,
+            number_from="renter",
         )
 
     def owner(self, case_id: str) -> OwnerResult | None:

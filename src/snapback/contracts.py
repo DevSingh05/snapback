@@ -82,7 +82,8 @@ class Evidence(BaseModel):
     phone_confirmed: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
-    license_flag: bool = False  # claims a real estate license; no active one holds that name
+    license_flag: bool = False  # the ad prints a license number that is not an active license
+    license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
 
 
@@ -316,9 +317,11 @@ class LicenseResult(BaseModel):
     claimed_role: str | None = None  # "agent", "broker" or "locator", from the poster's words
     sponsor_broker: str | None = None  # LICENSED only, and only when the sponsor is a company
     state: str = "TX"
-    # A24 stretch: the lookup was made from a license number (the ad's own, or one the renter
-    # gave). A fact about the ad, never the number: with no number and a claim, we may ask.
-    number_in_ad: bool = False
+    # Where the number that was looked up came from: "ad" (the listing printed it), "renter"
+    # (the renter typed it when asked, A24 stretch), or None (no number was looked up, so with
+    # a claim and no number we may ask). Never the number. A renter's typed number is the
+    # renter's own thread: it never reaches the report pack and never reads as a fact about the ad.
+    number_from: Literal["ad", "renter"] | None = None
 
 
 class OwnerKind(StrEnum):

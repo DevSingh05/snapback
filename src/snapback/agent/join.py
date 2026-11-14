@@ -73,6 +73,9 @@ class Lookups(Protocol):
         """Who owns the home in the listing, by the county roll? None means no owner data."""
         ...
 
+    # Optional, so lookups written before A24 still fit: `license_number(number, listing_text)`
+    # looks up a license number the renter typed, by the same rules as `license`.
+
 
 def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
     """Lane D's licence answer for this listing, or None when nothing was looked up.
@@ -164,6 +167,16 @@ class KitLookups:
         except ImportError:
             return None  # lane D's lookup (D10) is not here: nothing was looked up
         return trec.check_license(listing_text)
+
+    def license_number(self, number: str, listing_text: str) -> LicenseResult | None:
+        """D10 for a number the renter typed (A24 stretch): a live run only, like `license`."""
+        if self.source is not DataSource.LIVE:
+            return None
+        try:
+            from snapback.adapters import trec
+        except ImportError:
+            return None
+        return trec.check_license_number(number, listing_text)
 
     def owner(self, listing_text: str) -> OwnerResult | None:
         # D12 (#130) plugs in here: the county owner roll, filtered to the kit's houses. Until
@@ -260,15 +273,23 @@ class JoinedModules:
         return self._license
 
     def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
-        """D10 again, with the number the renter gave (A24 stretch): the ad's own words and the
-        number, through the same lookup. None when nothing was looked up. The number is kept
-        nowhere; the result holds only whether the state found it."""
-        if self._lookups is None:
+        """D10 again, with the number the renter gave (A24 stretch): the number goes straight to
+        the lookup, with the ad's words for the name the poster claims, so the ad's length
+        cannot hide it. None when nothing was looked up (no lookup, or it broke). The number is
+        kept nowhere; the result holds only whether the state found it."""
+        lookup = getattr(self._lookups, "license_number", None)
+        if lookup is None:
             return None
-        found = license_of(self._lookups, f"{self._listing.text}\nTREC license {number}")
+        try:
+            found = lookup(number, self._listing.text)
+        except Exception as error:
+            log.warning(
+                "licence lookup failed (%s); treated as not looked up", type(error).__name__
+            )
+            return None
         if found is None:
             return None
-        return found.model_copy(update={"number_in_ad": True})
+        return found.model_copy(update={"number_from": "renter"})
 
     def owner(self, case_id: str) -> OwnerResult | None:
         # Lane D says who owns the home. What the poster says about owning it is added here.

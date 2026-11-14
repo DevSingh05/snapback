@@ -153,6 +153,16 @@ EN: dict[str, str] = {
         "Says they're licensed. Ask for their Texas license number and look it up at "
         "trec.texas.gov."
     ),
+    # A24 stretch: the number was typed by the renter, so these say "the number you gave" and
+    # a dead number is "Not confirmed" (typo risk), never "Doesn't match" (ruling, Sat 07:14).
+    "license.not_found_given": (
+        "The license number you gave is not an active Texas license. Check it was typed "
+        "right, then look it up yourself at trec.texas.gov."
+    ),
+    "license.not_checked_given": (
+        "Says they're licensed. The number you gave did not confirm it. Look it up yourself "
+        "at trec.texas.gov."
+    ),
     "owner.company_not_poster": "Not confirmed. Owner of record: {company}, not the poster.",
     "owner.company": "Not confirmed. Owner of record: {company}.",
     "owner.company_matches": "The company they named is the owner of record: {company}.",
@@ -307,6 +317,9 @@ EN: dict[str, str] = {
     ),
     "plan.ask.looked_up": "Looked up the license number you gave with the state.",
     "plan.ask.no_number": "No license number came back. The license stays not checked.",
+    "plan.ask.not_looked_up": (
+        "Could not look up the license number you gave. The license stays not checked."
+    ),
     "plan.skip.ask_off": "asking the renter is not available",
     "plan.skip.ask_none": "the ad does not claim a license without giving its number",
     "plan.pick.report": "Every check that could run has run. Gather what they found for a report.",
@@ -365,6 +378,7 @@ EN: dict[str, str] = {
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
     "reason.license_not_found": "The license number in the ad is not an active Texas license.",
+    "reason.license_not_found_given": "The license number you gave is not an active Texas license.",
     "reason.owner_not_poster": (
         "The poster says they are the owner, and the owner of record is someone else."
     ),
@@ -543,6 +557,14 @@ ES: dict[str, str] = {
     ),
     "license.not_checked_claimed": (
         "Dice tener licencia. Pídale su número de licencia de Texas y búsquelo en trec.texas.gov."
+    ),
+    "license.not_found_given": (
+        "El número de licencia que usted dio no es una licencia activa de Texas. Revise que "
+        "esté bien escrito y búsquelo usted mismo en trec.texas.gov."
+    ),
+    "license.not_checked_given": (
+        "Dice tener licencia. El número que usted dio no lo confirmó. Búsquelo usted mismo "
+        "en trec.texas.gov."
     ),
     "owner.company_not_poster": (
         "Sin confirmar. Propietario registrado: {company}, no quien publica."
@@ -724,6 +746,9 @@ ES: dict[str, str] = {
     ),
     "plan.ask.looked_up": "Se buscó en el estado el número de licencia que usted dio.",
     "plan.ask.no_number": "No llegó ningún número de licencia. La licencia sigue sin comprobarse.",
+    "plan.ask.not_looked_up": (
+        "No se pudo buscar el número de licencia que usted dio. La licencia sigue sin comprobarse."
+    ),
     "plan.skip.ask_off": "preguntar al inquilino no está disponible",
     "plan.skip.ask_none": "el anuncio no dice tener licencia sin dar su número",
     "plan.pick.report": (
@@ -796,6 +821,9 @@ ES: dict[str, str] = {
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
     "reason.license_not_found": (
         "El número de licencia del anuncio no es una licencia activa de Texas."
+    ),
+    "reason.license_not_found_given": (
+        "El número de licencia que usted dio no es una licencia activa de Texas."
     ),
     "reason.owner_not_poster": (
         "Quien publica dice ser el propietario, y el propietario registrado es otro."

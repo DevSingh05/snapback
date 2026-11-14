@@ -107,7 +107,7 @@ class CaseSession:
         *,
         rng: random.Random | None = None,
         lang: str = strings.DEFAULT_LANG,
-        ask_enabled: bool = True,
+        ask_enabled: bool = False,
     ) -> None:
         self.case_id = case_id
         self.ask_enabled = ask_enabled  # may the agent ask the renter for the license number?
@@ -313,8 +313,11 @@ class CaseSession:
             raise RuntimeError("no question is waiting for an answer")
         update = self._plan.answer(ASK_FIELDS[0], text)
         self.question = None
-        if self._plan.number_given:
+        if self._plan.looked_up:
             self.trace.emit(TraceKind.TOOL, self._say("plan.ask.looked_up"), pick="license")
+        elif self._plan.number_given:
+            # a number came but no lookup answered (none is wired, it broke, or it timed out)
+            self.trace.emit(TraceKind.STATUS, self._say("plan.ask.not_looked_up"))
         else:
             self.trace.emit(TraceKind.STATUS, self._say("plan.ask.no_number"))
         self.evidence = self.evidence.model_copy(update=update)

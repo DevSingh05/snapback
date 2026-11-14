@@ -233,7 +233,7 @@ def test_nothing_about_the_licence_names_a_person_or_a_number():
         "claimed_role",
         "sponsor_broker",
         "state",
-        "number_in_ad",  # a yes/no about the ad, never the number
+        "number_from",  # where the looked-up number came from ("ad", "renter"), never the number
     }
     said = card.model_dump_json()
     assert "Fixture Realty Group" in said  # a company, which is allowed

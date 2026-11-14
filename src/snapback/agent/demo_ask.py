@@ -4,7 +4,7 @@ A house for sale is posted by someone who says they are a licensed agent and giv
 A name never gives "Doesn't match" (D10), so the license line can only say "ask for it". The
 agent does that: it asks the renter, the renter answers with the number the poster sent, and
 only the license lookup runs again. Synthetic throughout: `fx-` ids, 555-010-01xx phones, a
-fixture stand-in for the state's list (`fixtures/demo-ask/case.json`, `trec_numbers`).
+fixture stand-in for the state's list (`fixtures/demo-ask/case.json`, `trec_rows`).
 
     uv run python -m snapback.agent.demo_ask            # the card before and after the answer
     uv run python -m snapback.agent.demo_ask 5550100    # answer with another number
@@ -52,10 +52,8 @@ def ask_modules() -> FixtureModules:
         beds=listing.beds,
         for_sale=ForSaleMatch.model_validate(about["for_sale"]),
         license=LicenseResult.model_validate(about["license"]),
-        trec_numbers={
-            number: LicenseResult.model_validate(found)
-            for number, found in about["trec_numbers"].items()
-        },
+        trec_rows=about["trec_rows"],
+        ad_text=listing.text,
     )
 
 
@@ -65,7 +63,9 @@ def staged_answer() -> str:
 
 def run_ask_demo(answer: str | None = None, *, lang: str = strings.DEFAULT_LANG) -> AskDemo:
     """Run the case to the question, then answer it (the staged answer unless one is given)."""
-    session = CaseSession(CASE_ID, ask_modules(), Trace(CASE_ID, DataSource.FIXTURE), lang=lang)
+    session = CaseSession(
+        CASE_ID, ask_modules(), Trace(CASE_ID, DataSource.FIXTURE), lang=lang, ask_enabled=True
+    )
     approve = lambda draft: "send"  # noqa: E731
     assert run_case(session, PolicyChooser(), approve) is None and session.waiting_for_answer
     question = session.question or ""
