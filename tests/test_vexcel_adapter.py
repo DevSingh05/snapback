@@ -248,10 +248,12 @@ class _SlowBody(httpx.SyncByteStream):
 
     def __init__(self, now: list[float], chunks: int, step: float, size: int = 1024) -> None:
         self.now, self.chunks, self.step, self.size = now, chunks, step, size
+        self.pulled = 0
 
     def __iter__(self):
         for _ in range(self.chunks):
             self.now[0] += self.step
+            self.pulled += 1
             yield b"\xff" * self.size
 
 
@@ -281,6 +283,72 @@ def test_a_reply_over_5_mb_gives_no_tile(tmp_path, monkeypatch):
 
     now = [0.0]
     monkeypatch.setattr(vexcel, "_monotonic", lambda: now[0])
-    big = _SlowBody(now, chunks=6, step=0.0, size=1024 * 1024)  # 6 MB, instantly
+    big = _SlowBody(now, chunks=10, step=0.0, size=1024 * 1024)  # 10 MB, instantly
     assert _live(tmp_path, _stream_api(now, big)) is None
+    assert not list(tmp_path.rglob("*.jpg"))
+    assert big.pulled == 6  # stops on the first chunk over 5 MB, never reads the rest
+
+
+def test_a_coverage_reply_that_trickles_past_the_budget_gives_no_tile(tmp_path, monkeypatch):
+    from snapback.adapters import vexcel
+
+    now = [0.0]
+    monkeypatch.setattr(vexcel, "_monotonic", lambda: now[0])
+    slow = _SlowBody(now, chunks=10, step=3.0, size=64)  # 30 s of trickle
+    api = Api(oriented__collections=[httpx.Response(200, stream=slow)])
+    assert _live(tmp_path, api) is None
+    assert len(api.seen) == 1  # no extract after a coverage reply that ran out of time
+    assert slow.pulled <= 7
+
+
+def test_every_read_is_held_to_a_short_slice(tmp_path):
+    timeouts: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        timeouts.append(request.extensions["timeout"])
+        if request.url.path.endswith("oriented/collections"):
+            return _coverage("north")
+        return _image()
+
+    tile = get_tile(
+        RECORD,
+        source=DataSource.LIVE,
+        data_dir=tmp_path,
+        api_key="fx-key",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        sleep=lambda s: None,
+    )
+    assert tile is not None
+    assert all(t["read"] <= 2.0 for t in timeouts)  # a slow first byte cannot eat the budget
+
+
+def test_content_length_over_the_cap_is_refused_before_reading(tmp_path, monkeypatch):
+    from snapback.adapters import vexcel
+
+    now = [0.0]
+    monkeypatch.setattr(vexcel, "_monotonic", lambda: now[0])
+    body = _SlowBody(now, chunks=1, step=0.0, size=10)
+    reply = httpx.Response(
+        200,
+        headers={"content-type": "image/jpeg", "content-length": str(6 * 1024 * 1024)},
+        stream=body,
+    )
+    api = Api(oriented__collections=[_coverage("north")], oriented__extract=[reply])
+    assert _live(tmp_path, api) is None
+    assert body.pulled == 0
+
+
+def test_a_compressed_reply_is_refused_and_identity_is_asked_for(tmp_path):
+    gz = httpx.Response(
+        200, headers={"content-type": "image/jpeg", "content-encoding": "gzip"}, content=b"x"
+    )
+    api = Api(oriented__collections=[_coverage("north")], oriented__extract=[gz])
+    assert _live(tmp_path, api) is None
+    assert all(r.headers["Accept-Encoding"] == "identity" for r in api.seen)
+
+
+def test_an_empty_image_is_not_cached(tmp_path):
+    empty = httpx.Response(200, headers={"content-type": "image/jpeg"}, content=b"")
+    api = Api(oriented__collections=[_coverage("north")], oriented__extract=[empty])
+    assert _live(tmp_path, api) is None
     assert not list(tmp_path.rglob("*.jpg"))
