@@ -379,6 +379,7 @@ export interface WalkCoverage {
   placed: number;
   elsewhere: number;
   unplaced: number;
+  other_scan?: number; // placed in this home, in another scan of the building: not on a stop
   plan_mismatch?: boolean;
   line?: string | null;
 }

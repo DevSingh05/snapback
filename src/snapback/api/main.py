@@ -57,6 +57,7 @@ from snapback.api.cases import (
     UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
@@ -134,6 +135,7 @@ KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
 # Our ids for records: short, and nothing that could be a path or a sentence.
 SEARCH_MAX_BODY = 4096  # bytes: a RenterBrief is a few hundred
+FORENSICS_MAX_BODY = 2048  # bytes: a question is at most 300 characters
 SEARCH_PER_MINUTE = 30  # searches one address may make in a minute
 PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 # What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
@@ -267,11 +269,12 @@ def create_app(
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
     app.state.events = events
+    app.include_router(forensics_router)  # the investigator view: SYNTHETIC data only
 
     app.add_middleware(
         UploadSizeGuard,
         max_body_bytes=settings.snapback_max_photos * max_photo_bytes + FORM_OVERHEAD,
-        small_posts={"/search": SEARCH_MAX_BODY},
+        small_posts={"/search": SEARCH_MAX_BODY, "/forensics/ask": FORENSICS_MAX_BODY},
     )
     app.add_middleware(
         CORSMiddleware,
@@ -1170,7 +1173,11 @@ def create_app(
             return plan, None, {}, model
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(
-            plan, locate, scan_plan=scan_plan, ad_plan=ad_plan_word(ad_beds_of(case))
+            plan,
+            locate,
+            scan_plan=scan_plan,
+            ad_plan=ad_plan_word(ad_beds_of(case)),
+            model_id=model,
         )
         plan = attach_claims(plan, ad_notes_of(case))
         prefs = getattr(case, "preferences", None)
