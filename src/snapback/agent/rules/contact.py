@@ -246,10 +246,31 @@ def _compare(host: str, record_host: str) -> LinkDomain:
     return LinkDomain.OTHER
 
 
-def check_link(links: Sequence[str], website: str | None) -> LinkDomain:
-    """The listing's links against the building's own site. A lookalike outweighs the rest."""
+def _sender_domains(emails: Sequence[str]) -> list[str]:
+    """The site each sender address sits on ("payment@fixtureliving.co" -> "fixtureliving.co").
+
+    Only the part after the "@" is read. The part before it is the sender's own choice of
+    name, and a small landlord who writes from a personal mailbox is not imitating anyone.
+    """
+    domains = []
+    for email in emails[:MAX_LINKS]:
+        _, at, domain = email[: MAX_HOST * 2].rpartition("@")
+        host = host_of(domain) if at else None
+        if host and "@" not in host:
+            domains.append(host)
+    return domains
+
+
+def check_link(links: Sequence[str], website: str | None, emails: Sequence[str] = ()) -> LinkDomain:
+    """The listing's links and sender addresses against the building's own site.
+
+    A lookalike outweighs the rest. A bare address ("name@host") is read by its host, the
+    same way a link is: the CoStar scam page's first example is a mail from a lookalike
+    address posing as the platform.
+    """
     record_host = host_of(website) if website else None
     hosts = [host for host in (host_of(link) for link in links[:MAX_LINKS]) if host]
+    hosts += _sender_domains(emails)
     if not record_host or "@" in record_host or not hosts:
         return LinkDomain.NOT_CHECKED
     found = {_compare(host, record_host) for host in hosts}
@@ -311,5 +332,5 @@ def check_authority(
         manager_on_record=record.manager_company,
         poster_said=claims.company,
         office_phone_match=check_phone(claims.phones, record, salt),
-        link_domain=check_link(claims.links, record.website_host),
+        link_domain=check_link(claims.links, record.website_host, getattr(claims, "emails", ())),
     )

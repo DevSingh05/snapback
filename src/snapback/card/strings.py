@@ -257,6 +257,20 @@ EN: dict[str, str] = {
     "rule.data.id_before_viewing": "A photo of your ID before a viewing. Red flag.",
     "rule.pressure.cannot_show": "They say they cannot show the unit in person. Red flag.",
     "rule.link.payment_link": "A payment link sent by the poster. Red flag.",
+    "rule.impersonation.platform_holds_money": (
+        "Says a site such as Apartments.com or Airbnb will hold your money. Apartments.com's "
+        "own page on fraud lists a claim of affiliation with it as a red flag. Red flag."
+    ),
+    "rule.impersonation.escrow_agent": (
+        "Says an escrow agent or the platform will hold your rental deposit. Rentals do not "
+        "use one. Red flag."
+    ),
+    "rule.data.credit_score_screenshot": "A screenshot of your credit score. Red flag.",
+    "rule.data.paystub_before_viewing": ("Pay stubs sent to a person before a viewing. Red flag."),
+    "rule.data.sevis_before_viewing": ("Your I-20 or SEVIS papers before a viewing. Red flag."),
+    "rule.link.affiliate_credit_check": (
+        "A link to run your own credit check, which can enrol you in a paid plan. Red flag."
+    ),
     "rule_category.payment_method": (
         "A payment that cannot be taken back, asked for before a viewing. Red flag."
     ),
@@ -766,6 +780,28 @@ ES: dict[str, str] = {
     ),
     "rule.link.payment_link": (
         "Un enlace de pago enviado por quien publicó el anuncio. Señal de alerta."
+    ),
+    "rule.impersonation.platform_holds_money": (
+        "Dice que un sitio como Apartments.com o Airbnb guardará su dinero. La página de "
+        "Apartments.com sobre fraude lista una supuesta afiliación con ellos como señal de "
+        "alerta. Señal de alerta."
+    ),
+    "rule.impersonation.escrow_agent": (
+        "Dice que un agente de depósito en garantía o la plataforma guardará su depósito de "
+        "renta. Las rentas no usan uno. Señal de alerta."
+    ),
+    "rule.data.credit_score_screenshot": (
+        "Una captura de pantalla de su puntaje de crédito. Señal de alerta."
+    ),
+    "rule.data.paystub_before_viewing": (
+        "Talones de pago enviados a una persona antes de una visita. Señal de alerta."
+    ),
+    "rule.data.sevis_before_viewing": (
+        "Sus documentos I-20 o SEVIS antes de una visita. Señal de alerta."
+    ),
+    "rule.link.affiliate_credit_check": (
+        "Un enlace para revisar su propio crédito, que puede inscribirle en un plan de pago. "
+        "Señal de alerta."
     ),
     "rule_category.payment_method": (
         "Un pago que no se puede recuperar, pedido antes de una visita. Señal de alerta."
@@ -1337,6 +1373,14 @@ ES.update(
             "Pida a la oficina que le muestre la casa."
         ),
     }
+)
+
+# CoStar's own published line (apartmenthomeliving.com/info/avoid-scams-and-fraud, "What we ask
+# you to do", read Nov 14 2026), quoted exactly where a surface explains the impersonation rule.
+# Kept out of the string tables: the quote has to say "Scammers", a word the card never uses.
+COSTAR_AFFILIATION_QUOTE = (
+    "Claim of affiliation with us. Scammers may impersonate Apartments.com or Apartment Finder "
+    "to make it seem like we participate in the lease transaction or transfer of funds."
 )
 
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}

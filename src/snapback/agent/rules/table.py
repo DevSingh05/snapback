@@ -70,6 +70,27 @@ _NOT = r"(?<!not )(?<!n't )(?<!never )(?<!dont )"
 _DOLLARS = r"\$[1-9][\d,]{0,12}"  # "$0 deposit" asks for nothing
 _BEFORE_MOVE_IN = r"\b(?:before|prior to|ahead of)\b[^.!?]{0,15}\bmov(?:e|ing)[- ]?in\b"
 
+# Names a scammer borrows to make the money look safe. A site that says it never holds money
+# is a warning, not the scam, so the words between the name and the "hold" may not refuse it.
+_PLATFORMS = (
+    r"(?:apartments\.?com|apartment finder|airbnb|vrbo|homeaway|zillow|trulia|redfin|"
+    r"realtor\.?com|zumper|homes\.?com|craigslist|facebook|marketplace)"
+)
+_NOT_REFUSED = r"(?:(?!\bnever\b|\bnot\b|n't\b|\bno\b|\bcannot\b)[^.!?])"
+_HOLDS = r"(?:hold|holds|holding|insure|insures|secure|secures|safeguard|safeguards|keep|keeps)"
+_RENTERS_MONEY = (
+    r"your (?:money|deposit|payment|funds|rent|first month(?:'s)?(?: rent)?|security deposit)"
+)
+# A domain written out, other than the federal free credit report site.
+_ANY_SITE = (
+    r"(?<![\w.-])(?!(?:https?://)?(?:www\.)?annualcreditreport\.com)"
+    r"(?:https?://|www\.|[a-z0-9-]{1,40}\.(?:com|net|org|co|io|us|info|biz|app|site|online|"
+    r"xyz|link|club|top))"
+)
+_SEND = r"\b(?:send|text|email|e-mail|forward|upload|attach|share|snap|screenshot)\b"
+_PAYSTUB = r"\b(?:pay ?stubs?|pay slips?|paycheck stubs?)\b"
+_SSN = r"\b(?:ssn|social security)\b"
+
 RULES: tuple[Rule, ...] = (
     # --- payment method: money that cannot be taken back ----------------------------------
     Rule(
@@ -260,6 +281,54 @@ RULES: tuple[Rule, ...] = (
         excused_after_viewing=True,
         excused_when_refused=True,
     ),
+    Rule(
+        # The FTC warns that scammers ask for a screenshot of a credit score (FTC, Dec 2025).
+        # A credit check run by the landlord after an application is ordinary.
+        rule_id="data.credit_score_screenshot",
+        category=RuleCategory.DATA_ASK,
+        red_flag=True,
+        patterns=(
+            r"\b(?:screen ?shots?|photos?|pictures?|pics?|copy|copies|scan|image)s? of (?:your|ur|"
+            r"the) (?:credit score|credit report|credit karma|credit)\b",
+            r"\b(?:send|text|email|forward|share|upload)\b[^.!?]{0,40}\bscreen ?shots?\b"
+            r"[^.!?]{0,30}\bcredit\b",
+        ),
+        excused_after_viewing=True,
+        excused_when_refused=True,
+        excused_after_approval=True,
+        excused_through_portal=True,
+    ),
+    Rule(
+        # Pay stubs sent to a person together with an SSN, or to "me", before a viewing.
+        # Landlords do collect pay stubs, but with the application, not by text.
+        rule_id="data.paystub_before_viewing",
+        category=RuleCategory.DATA_ASK,
+        red_flag=True,
+        patterns=(
+            _SEND + r"[^.!?]{0,40}" + _PAYSTUB + r"[^.!?]{0,60}(?:" + _SSN + r"|\b(?:me|my)\b)",
+            _SSN + r"[^.!?]{0,60}" + _PAYSTUB,
+        ),
+        excused_after_viewing=True,
+        excused_when_refused=True,
+        excused_after_approval=True,
+        excused_through_portal=True,
+    ),
+    Rule(
+        # UW International Student Services warns students about requests for SEVIS or
+        # I-20 papers by a stranger who has not shown the room.
+        rule_id="data.sevis_before_viewing",
+        category=RuleCategory.DATA_ASK,
+        red_flag=True,
+        patterns=(
+            _SEND + r"[^.!?]{0,40}\b(?:sevis|i[- ]?20|ds[- ]?2019)\b",
+            r"\b(?:need|require|requires|required|want|must have)\b[^.!?]{0,30}"
+            r"\b(?:your|a copy of)\b[^.!?]{0,20}\b(?:sevis|i[- ]?20|ds[- ]?2019)\b",
+        ),
+        excused_after_viewing=True,
+        excused_when_refused=True,
+        excused_after_approval=True,
+        excused_through_portal=True,
+    ),
     # --- pressure --------------------------------------------------------------------------
     Rule(
         # "I am abroad, I cannot show it, I will mail the keys": the story that removes the viewing.
@@ -307,6 +376,46 @@ RULES: tuple[Rule, ...] = (
             r"\bhigh demand\b",
         ),
     ),
+    # --- impersonation: a trusted name or a stranger said to hold the money ---------------
+    Rule(
+        # CoStar's own scam page lists "Claim of affiliation with us. Scammers may impersonate
+        # Apartments.com or Apartment Finder to make it seem like we participate in the lease
+        # transaction or transfer of funds." Filed under pressure: the claim is a way of
+        # making the ask feel safe.
+        rule_id="impersonation.platform_holds_money",
+        category=RuleCategory.PRESSURE,
+        red_flag=True,
+        patterns=(
+            _PLATFORMS + _NOT_REFUSED + r"{0,40}\b" + _HOLDS + r"\b" + _NOT_REFUSED + r"{0,40}"
+            r"\b(?:money|deposit|payment|funds|rent)\b",
+            _PLATFORMS + r"\s{1,3}(?:payment|payments|escrow|billing|booking|rental|deposit) "
+            r"(?:team|department|agent|agents|service|protection|desk|processor)\b",
+            _PLATFORMS + _NOT_REFUSED + r"{0,30}\bescrow\b",
+        ),
+        excused_when_refused=True,
+        excused_as_rent_terms=True,
+    ),
+    Rule(
+        # An "escrow agent" or "the platform" that is said to hold the renter's deposit.
+        # A rental deposit goes to the owner's office; sales have escrow, rentals do not.
+        rule_id="impersonation.escrow_agent",
+        category=RuleCategory.PRESSURE,
+        red_flag=True,
+        patterns=(
+            r"\b(?:escrow|third[- ]party)\s{1,3}(?:agent|agents|company|service|account|officer)"
+            r"\b[^.!?]{0,40}\b" + _HOLDS + r"\b[^.!?]{0,30}\b" + _RENTERS_MONEY,
+            r"\b(?:send|pay|wire|transfer|give|deposit)\b[^.!?]{0,40}\bto (?:the |our |an? |your )?"
+            r"(?:escrow|third[- ]party)\s{1,3}(?:agent|company|service|account)\b",
+            r"\bthe (?:platform|website|site|rental company|rental service|booking site)\b"
+            r"[^.!?]{0,15}\b" + _HOLDS + r"\b[^.!?]{0,20}\b" + _RENTERS_MONEY,
+            # CoStar's example 3: "they will hold and insure your money until you check".
+            r"\b(?:hold and insure|insure and hold|insure|insures)\b[^.!?]{0,15}\b"
+            + _RENTERS_MONEY,
+            r"\b" + _RENTERS_MONEY + r"\b[^.!?]{0,30}\b(?:held|kept|insured|secured|protected)"
+            r"\b[^.!?]{0,30}\b(?:escrow|third[- ]party|the platform)\b",
+        ),
+        excused_when_refused=True,
+    ),
     # --- links from the poster -------------------------------------------------------------
     Rule(
         rule_id="link.payment_link",
@@ -325,5 +434,20 @@ RULES: tuple[Rule, ...] = (
         red_flag=False,
         patterns=(r"\b(?:lease|application|apply|sign|docusign)\b",),
         needs_link=True,
+    ),
+    Rule(
+        # "Run your credit at <site>": a credit-check link that enrols the renter in a paid
+        # membership (FTC, Dec 2025). Honest listings say where the landlord runs the check,
+        # not where the renter should run their own.
+        rule_id="link.affiliate_credit_check",
+        category=RuleCategory.LINK,
+        red_flag=True,
+        patterns=(
+            r"\b(?:run|check|pull|get|see|view|do)\b[^.!?]{0,20}\b(?:your|ur|a) (?:own |free )?"
+            r"credit\b[^.!?]{0,30}\b(?:at|on|through|via|with|using|from|here)\b[^.!?]{0,15}"
+            + _ANY_SITE,
+        ),
+        excused_when_refused=True,
+        excused_after_approval=True,
     ),
 )
