@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ConfirmPage } from "./office/ConfirmPage";
 import { CardPage } from "./pages/CardPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
 import { ReplayNav } from "./replay/ReplayNav";
@@ -16,10 +17,12 @@ type Route =
   | { name: "verify"; id: string }
   | { name: "replay"; slug: string }
   | { name: "tour"; propertyId: string }
+  | { name: "confirm" }
   | { name: "replays" }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
@@ -52,6 +55,8 @@ export default function App() {
       <ReplayNav />
       {route.name === "home" ? (
         <UploadPage />
+      ) : route.name === "confirm" ? (
+        <ConfirmPage />
       ) : route.name === "replays" ? (
         <ReplayIndexPage />
       ) : route.name === "replay" ? (
