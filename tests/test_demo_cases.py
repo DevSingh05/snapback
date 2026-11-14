@@ -118,7 +118,9 @@ def test_case_a_is_dont_pay_on_the_copied_reply_and_shows_every_other_finding():
     assert verdict.state is VerdictState.DONT_PAY
     assert verdict.reasons == [strings.text("reason.forged_copy", n=2)]
 
-    place, person, price = (lines(card, kind) for kind in CardRowKind)
+    place, person, price = (
+        lines(card, kind) for kind in (CardRowKind.PLACE, CardRowKind.PERSON, CardRowKind.PRICE)
+    )
     assert place["Real"][0] is CardTone.OK  # the photos are of the real building
     assert place["Unit on record"][0] is CardTone.HOLD
     assert person["Here now"] == (
