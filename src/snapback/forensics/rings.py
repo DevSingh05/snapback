@@ -224,8 +224,9 @@ def _describe(graph: LinkGraph, members: list[int], copiers: dict[int, int]) -> 
                 kind="photo_reuse",
                 title="Photo-sets reused across ads",
                 summary=(
-                    f"{len(reused)} photo-set(s) appear in {sum(len(v) for v in reused.values())} "
-                    f"ad postings of this ring; the same pictures are re-cropped between ads "
+                    f"{len(reused)} pictures are reused across "
+                    f"{sum(len(v) for v in reused.values())} "
+                    f"ad postings of this ring, re-cropped between ads "
                     f"(ids within {_max_bits(graph, reused)} bits)."
                 ),
                 score=round(min(1.0, spread / 6), 2),

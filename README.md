@@ -222,6 +222,39 @@ interval) and runs a regression gate against `eval/baseline.csv`. The API serves
 synthetic and labelled FIXTURE, and its locate calibration rows were measured on renders of our
 scans and say so. Neither is accuracy on real ad photos, so this README quotes no accuracy number.
 
+## Forensics (Arlequin track)
+
+The investigator view at `/investigate` (API: `GET /forensics/rings`, `GET /forensics/rings/{id}`,
+`POST /forensics/ask`). One renter's check answers one ad; an investigator needs the ring behind
+many. **All data here is SYNTHETIC and FIXTURE**: about 300 generated rental ads in a made-up city
+(`fixtures/forensics/`, made by `uv run python -m snapback.forensics.generate`, seeded, same seed
+same bytes), 555 phone numbers, perceptual-hash-like photo ids. No CoStar, Matterport or Vexcel
+data, no real address or number.
+
+Pipeline (`src/snapback/forensics/`): claims and rule hits from the existing intake and rules code
+(the money-before-move-in rule and the payment rules), concept-folded TF-IDF for reworded text (no
+model, no network), a link graph of ads, photo-sets (ids within 6 bits), numbers and wordings,
+Louvain communities, then each ring's timeline. Every finding carries its evidence: ad ids, the
+matched sentence, photo ids, a score. The investigator Q&A answers only from that graph and says
+so when it has no evidence; an optional deepagents tool wraps it (not run in CI).
+
+Measured on the committed corpus (n = 301 ads, 4 seeded rings, 57 ring ads), against the seeded
+answer key, next to a keyword search that groups hits by exact number or photo id:
+
+| Method                              | Rings recovered | Ring recall | Ring ads found | Honest ads flagged |
+| ----------------------------------- | --------------- | ----------- | -------------- | ------------------ |
+| This pipeline                       | 4 of 4          | 100%        | 57 of 57       | 0 of 244           |
+| Keyword search + exact number/photo | 0 of 4          | 0%          | 11 of 57       | 0 of 244           |
+
+Honest limits: the corpus and the pipeline were built together and the folding lexicon is
+hand-written, so the table is a check that the method works on rings shaped like these, not an
+accuracy claim for real listings. On ten other seeded corpora never used while tuning (seeds 101
+to 110, about 300 ads each) the pipeline averaged ring precision 0.88 and ring recall 0.93, and the
+keyword baseline ring recall 0.00 (`snapback.forensics.evaluate.evaluate_seed`). The existing
+money-before-move-in rule alone is not enough: it fires on honest wording such as "deposit due at
+lease signing", so the pipeline needs a second signal (shared wording, numbers or photos) before it
+calls anything a ring.
+
 ## Data and privacy
 
 The full account is in [DATA_USE.md](DATA_USE.md).
