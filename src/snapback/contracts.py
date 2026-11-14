@@ -338,6 +338,9 @@ class Card(BaseModel):
     footer: list[str]
     verify_url: str | None = None
     lang: str = "en"
+    # A7 (#67): set when the home is listed for sale or was rented recently, so the web can
+    # draw the dates as a history strip. The sentence about it is a PLACE line like any other.
+    for_sale: ForSaleMatch | None = None
 
 
 class ChoiceKind(StrEnum):
