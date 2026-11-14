@@ -586,10 +586,11 @@ def test_ambiguity_ratio_is_in_thresholds():
 # --- identification never depends on index order, and its guards each have a test ---------------
 
 
+@pytest.mark.parametrize("stop", [60, 12])  # at 12 the fixtures reach it: an early stop fires
 @pytest.mark.parametrize("sister_first", [True, False])
 @pytest.mark.parametrize("n_photos", [1, 2])
 def test_tract_twin_makes_identification_ambiguous_in_either_index_order(
-    twins, tmp_path, sister_first, n_photos
+    twins, tmp_path, sister_first, n_photos, stop
 ):
     sweeps, _, catalog = twins
     sister = sister_sweeps(sweeps, tmp_path)
@@ -597,7 +598,13 @@ def test_tract_twin_makes_identification_ambiguous_in_either_index_order(
     index = LocateIndex.build("fx-tract", [s for group in ordered for s in group], TinyEmbedder())
     models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
     all_sweeps = {"fx-model-a": sweeps["fx-model-a"], "fx-model-sister": sister}
-    locator = Locator(index, all_sweeps, Catalog(models), PatchMatcher(), THRESHOLDS)
+    locator = Locator(
+        index,
+        all_sweeps,
+        Catalog(models),
+        PatchMatcher(),
+        replace(THRESHOLDS, stop_at_inliers=stop),
+    )
 
     photos = {
         "p1": listing_photo(sweeps, "fx-model-a", 2, 1),
