@@ -447,10 +447,7 @@ export interface TourPrepPack {
 // M9: the finder (src/snapback/agent/finder.py, api/finder.py). Mirrors the Finder* models in
 // contracts.py. Nothing the agent learns applies until the renter accepts a proposal.
 export type FinderProposalKey =
-  | "propose_no_walkup"
-  | "propose_parking"
-  | "propose_prefer_scans"
-  | "propose_lower_budget";
+  "propose_no_walkup" | "propose_parking" | "propose_prefer_scans" | "propose_lower_budget";
 
 export interface FinderSessionStarted {
   session_id: string;

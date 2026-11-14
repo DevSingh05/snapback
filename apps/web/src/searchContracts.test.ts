@@ -88,6 +88,7 @@ describe("search contracts", () => {
       needs_parking: false,
       max_rent: null,
       avoid_property_ids: [],
+      prefer_scans: false,
     };
     expect(prefs.no_walkup).toBe(true);
   });
