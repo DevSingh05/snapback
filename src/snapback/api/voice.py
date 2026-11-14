@@ -162,6 +162,6 @@ def make_router(settings: Settings, transport: httpx.AsyncBaseTransport | None =
             heard = str(res.json().get("text") or "")
         except ValueError:
             return _refuse(502, "The voice service sent something unreadable.")
-        return Heard(text=clean_words(heard))
+        return Heard(text=clean_words(heard, keep_amounts=True))
 
     return router

@@ -351,10 +351,12 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>{}`\u2039\u203a\u2329\u232a\u30
 REMOVED = "[removed]"
 
 
-def clean_words(text: str | None) -> str:
+def clean_words(text: str | None, *, keep_amounts: bool = False) -> str:
     """The renter's words as the main agent may see them: phone numbers, emails, links, street
     addresses, unit numbers and amounts replaced with [removed], fence characters dropped,
-    whitespace folded, capped at `MAX_WORDS`. Empty when nothing is left."""
+    whitespace folded, capped at `MAX_WORDS`. Empty when nothing is left. `keep_amounts` leaves
+    "$1,500" in place for text that goes back to the renter (a voice transcript), never to a
+    model."""
     if not text:
         return ""
     # Fold lookalikes first (fullwidth "＜" becomes "<", "７" becomes "7"), then drop format
@@ -367,7 +369,8 @@ def clean_words(text: str | None) -> str:
         if unicodedata.category(ch) != "Cf"
     )
     out = _CONTROL.sub(" ", out)
-    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT, _AMOUNT):
+    patterns = (_EMAIL, _URL, _PHONE, _STREET, _LONG_DIGITS, _UNIT)
+    for pattern in patterns if keep_amounts else (*patterns, _AMOUNT):
         out = pattern.sub(REMOVED, out)
     out = " ".join(out.split())
     if len(out) > MAX_WORDS:
