@@ -29,6 +29,7 @@ export interface ForSaleMatch {
   site: string;
   listed_on?: string | null; // ISO date
   changed_on?: string | null;
+  offices?: string[]; // listing offices on record: brokerage companies, never a person
 }
 
 export interface FloorPlanRent {

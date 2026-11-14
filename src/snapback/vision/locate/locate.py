@@ -261,8 +261,8 @@ class Locator:
         return best, len(homes) > 1
 
     def _pose(self, photo: Image.Image, placed: _Placement) -> Pose | None:
-        if placed.check.homography is None:
-            return None
+        if placed.check.homography is None or placed.sweep.position is None:
+            return None  # no geometry, e.g. a walkthrough video frame
         hfov = photo_hfov(photo, self.thresholds.default_hfov_deg)
         face_size = self._face(placed.model_id, placed.sweep.sweep_id, placed.face).size[0]
         photo_to_face = rotation_from_homography(

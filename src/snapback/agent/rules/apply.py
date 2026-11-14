@@ -115,6 +115,34 @@ _AFTER_VIEWING = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+# "After approval", "once approved", "upon approval": the application came first.
+_AFTER_APPROVAL = re.compile(
+    r"\b(?:after|once|upon|when|if)\b[^,;.!?]{0,40}?\b(?:approval|approved)\b"
+    r"|\b(?:of|following)\s{1,3}(?:your\s{1,3}|the\s{1,3})?approval\b"
+    r"|\bapproved applicants?\b",
+    re.IGNORECASE,
+)
+# A sentence that skips or postpones the viewing: no ordinary step excuses the money in it.
+_SKIPS_VIEWING = re.compile(
+    r"\bbefore (?:you |we |they )?(?:to )?(?:the |a |any |your )?(?:tour|see|view|show)\w{0,6}"
+    r"|\bno need to (?:see|tour|view)\b"
+    r"|\bsight unseen\b|\bno (?:viewing|showing|tour)s?\b",
+    re.IGNORECASE,
+)
+# The company's own portal, website or office, or simply "online": where a fee is ordinarily
+# paid or handed in.
+_THROUGH_PORTAL = re.compile(
+    r"\b(?:through|via|on|at|in|using)\s{1,3}(?:our|the|their)\s{1,3}(?:[\w-]{1,20}\s{1,3}){0,2}"
+    r"(?:portal|website|site|web ?page|app)\b|\bonline\b|\bwhen you apply\b"
+    r"|\b(?:to|at)\s{1,3}(?:our|the|my)\s{1,3}(?:[\w-]{1,20}\s{1,3})?(?:office|company|portal)\b",
+    re.IGNORECASE,
+)
+# Money that cannot be taken back, or that goes to a person. No ordinary step excuses these.
+_CANNOT_COME_BACK = re.compile(
+    r"\b(?:zelle|venmo|cash ?app|paypal|wire|western union|moneygram|gift ?cards?|crypto|"
+    r"bitcoin|cash)\b|\bto (?:me|my(?!\s{1,3}(?:office|company|portal)\b))\b|\b(?:send|pay) me\b",
+    re.IGNORECASE,
+)
 _AT_SIGNING = re.compile(r"\bat (?:the |your )?(?:lease )?signing\b|\bat move-?in\b", re.IGNORECASE)
 _ABOUT_PAYING = re.compile(
     r"\b(?:send|sent|pay|paid|deposit|zelle|venmo|wire|transfer|money|fee|cash)\b", re.IGNORECASE
@@ -221,6 +249,18 @@ class _Clause:
         return _AT_SIGNING.search(self.text) is not None
 
     @cached_property
+    def is_after_approval(self) -> bool:
+        return _AFTER_APPROVAL.search(self.text) is not None
+
+    @cached_property
+    def is_through_portal(self) -> bool:
+        return _THROUGH_PORTAL.search(self.text) is not None
+
+    @cached_property
+    def cannot_come_back(self) -> bool:
+        return _CANNOT_COME_BACK.search(self.text) is not None
+
+    @cached_property
     def viewing_phrases(self) -> list[_Phrase]:
         phrases: list[_Phrase] = []
         for found in _AFTER_VIEWING.finditer(self.text):
@@ -284,7 +324,25 @@ def _excused(rule: Rule, clauses: list[_Clause], index: int, match: re.Match[str
         return True
     if rule.excused_as_rent_terms and clause.is_rent_terms:
         return True
+    if _is_an_ordinary_step(rule, clauses, index):
+        return True
     return rule.excused_after_viewing and _comes_after_a_viewing(clauses, index, match)
+
+
+def _is_an_ordinary_step(rule: Rule, clauses: list[_Clause], index: int) -> bool:
+    """A fee or deposit asked for the way agents ordinarily ask (red team, H8).
+
+    Due after approval, or paid through the company's own portal. Neither covers a sentence
+    that wants the money today or names money that cannot be taken back: "once approved,
+    Zelle the deposit today" is still an ask.
+    """
+    if clauses[index].is_urgent or any(clause.cannot_come_back for clause in clauses):
+        return False
+    if any(_SKIPS_VIEWING.search(clause.text) for clause in clauses):
+        return False
+    if rule.excused_after_approval and any(clause.is_after_approval for clause in clauses):
+        return True
+    return rule.excused_through_portal and any(clause.is_through_portal for clause in clauses)
 
 
 def _fires(rule: Rule, clauses: list[_Clause]) -> bool:
