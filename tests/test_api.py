@@ -173,6 +173,19 @@ def test_the_card_is_available_before_the_case_is_done(client):
     assert card.rows[1].lines[0].tone == "not_checked"  # nobody has been asked yet
 
 
+@pytest.mark.parametrize(
+    "listing_text",
+    ["Cozy studio, $120 per night: https://www.airbnb.com/rooms/1", "Office space for lease, NNN."],
+)
+def test_a_short_term_or_commercial_listing_is_not_checked(client, listing_text):
+    case = create(client, listing_text=listing_text)
+    assert case["status"] == "done"
+    assert case["state"] == "unverified"
+    assert case["challenge"] is None
+    kinds = [json.loads(e["data"])["kind"] for e in stream_trace(client, case["case_id"])]
+    assert kinds == ["choice", "verdict"]
+
+
 def test_case_ids_are_short_and_differ(client):
     ids = {create(client, renter_id=f"renter-{n}")["case_id"] for n in range(5)}
     assert len(ids) == 5

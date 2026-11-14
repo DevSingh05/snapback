@@ -25,6 +25,7 @@ from snapback.agent import (
     FixtureModules,
     PolicyChooser,
     Trace,
+    detect_scope,
     run_case,
 )
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
@@ -230,7 +231,10 @@ class CaseStore:
         with self._lock:
             short_id = self._new_id()
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
-            session = CaseSession(full_id, FixtureModules(), Trace(full_id, DataSource.FIXTURE))
+            # The fixture modules stand in for the evidence. The kind of listing is still read
+            # from the text that was posted, so an out-of-scope listing is treated as one.
+            modules = FixtureModules(listing_scope=detect_scope(listing_text))
+            session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
             case = SessionCase(short_id, session, photos, self._runner)
             self._cases[short_id] = case
         case.advance()
