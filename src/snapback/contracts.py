@@ -294,6 +294,9 @@ class ModuleEvidence(BaseModel):
     price: PriceResult | None = None
     authority: AuthorityResult | None = None
     for_sale: ForSaleMatch | None = None  # D7; None means not looked up
+    # A10: where price, authority and for_sale came from, when the record is real and the
+    # rest of the case is not. None means "the same as `source`".
+    record_source: DataSource | None = None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -321,6 +324,10 @@ class CardLine(BaseModel):
     label: str  # "Here now", "Allowed to rent it", "Payment ask", "Rent vs record"
     text: str  # code-owned string from the string table, never model output
     tone: CardTone
+    # A10: where this line's facts came from, when that differs from the card as a whole. A
+    # card can hold lines from a real record beside stand-ins for the twin and the challenge.
+    # None means "the same as the card".
+    source: DataSource | None = None
 
 
 class CardRow(BaseModel):
@@ -473,6 +480,9 @@ class CreateCaseRequest(BaseModel):
     link: str | None = None  # the listing's link; read as text, never fetched
     text: str | None = None  # the listing text or the poster's messages, as the renter has them
     renter_id: str | None = None  # set by the iMessage sidecar; the web app sends none
+    # A10: our id for the building the listing claims to be in. With none, there is no record
+    # to compare the listing with.
+    property_id: str | None = None
 
 
 class CreateCaseResponse(BaseModel):

@@ -406,16 +406,24 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     if authority is None:
         return []
     lines = []
-    if authority.office_phone_match is not PhoneMatch.NOT_CHECKED:
-        matches = authority.office_phone_match is PhoneMatch.YES
-        key = "contact.phone_match" if matches else "contact.phone_mismatch"
-        tone = CardTone.OK if matches else CardTone.HOLD
+    if authority.office_phone_match is PhoneMatch.YES:
+        # Supporting only: the number is public, so this is not who the poster is.
+        lines.append(_line(lang, "label.contact", CardTone.OK, "contact.phone_match"))
+    elif authority.office_phone_match is PhoneMatch.NO:
         if authority.manager_on_record:
             lines.append(
-                _line(lang, "label.contact", tone, key, manager=authority.manager_on_record)
+                _line(
+                    lang,
+                    "label.contact",
+                    CardTone.HOLD,
+                    "contact.phone_mismatch",
+                    manager=authority.manager_on_record,
+                )
             )
         else:
-            lines.append(_line(lang, "label.contact", tone, f"{key}_unnamed"))
+            lines.append(
+                _line(lang, "label.contact", CardTone.HOLD, "contact.phone_mismatch_unnamed")
+            )
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
     return lines

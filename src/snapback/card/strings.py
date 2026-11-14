@@ -27,7 +27,7 @@ EN: dict[str, str] = {
     "label.rent_vs_record": "Rent vs record",
     "label.seen_before": "Seen before",
     "label.for_sale": "For sale",
-    "label.recently_rented": "Recently rented",
+    "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
     "label.link": "Link",
     "label.unit": "Unit on record",
@@ -76,12 +76,9 @@ EN: dict[str, str] = {
         "The name they gave does not match the manager on record for this building. Red flag."
     ),
     # Contact on record. The phone number itself and the record's web address are never shown.
+    # A match is a supporting line only. It never counts as matching the record by itself.
     "contact.phone_match": (
-        "The phone in the listing is the leasing office on record. Call {manager} yourself."
-    ),
-    "contact.phone_match_unnamed": (
-        "The phone in the listing is the leasing office on record. "
-        "Call the manager on record yourself."
+        "The phone matches the leasing office on record. Call it yourself to confirm."
     ),
     "contact.phone_mismatch": (
         "The phone in the listing is not the leasing office on record. Call {manager} yourself."
@@ -266,7 +263,7 @@ ES: dict[str, str] = {
     "label.rent_vs_record": "Renta frente al registro",
     "label.seen_before": "Visto antes",
     "label.for_sale": "En venta",
-    "label.recently_rented": "Alquilado hace poco",
+    "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
     "label.link": "Enlace",
     "label.unit": "Unidad en el registro",
@@ -323,12 +320,8 @@ ES: dict[str, str] = {
         "este edificio. Señal de alerta."
     ),
     "contact.phone_match": (
-        "El teléfono del anuncio es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a {manager}."
-    ),
-    "contact.phone_match_unnamed": (
-        "El teléfono del anuncio es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo al administrador que figura en el registro."
+        "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
+        "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_mismatch": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "

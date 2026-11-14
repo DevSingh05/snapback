@@ -16,7 +16,58 @@ export interface CardRow {
   lines: CardLine[];
 }
 
+// A7 (#67) and D7 proofs. Mirrors UnitStatus, PhoneMatch, LinkDomain, ForSaleStatus, ForSaleMatch,
+// PriceResult, AuthorityResult and FloorPlanRent in src/snapback/contracts.py.
+export type PriceStatus = "within_range" | "below_range" | "not_checked";
+export type UnitStatus = "on_record" | "not_on_record" | "beds_mismatch" | "not_checked";
+export type PhoneMatch = "yes" | "no" | "not_checked";
+export type LinkDomain = "matches" | "lookalike" | "other" | "not_checked";
+export type ForSaleStatus = "active" | "recently_rented" | "none";
+
+export interface ForSaleMatch {
+  status: ForSaleStatus;
+  site: string;
+  listed_on?: string | null; // ISO date
+  changed_on?: string | null;
+}
+
+export interface FloorPlanRent {
+  name?: string | null;
+  beds?: number | null;
+  rent_min?: number | null;
+  rent_max?: number | null;
+  per_bed: boolean;
+}
+
+export interface PriceResult {
+  status: PriceStatus;
+  listed_rent?: number | null;
+  record_median?: number | null;
+  record_min?: number | null;
+  record_max?: number | null;
+  n_floor_plans?: number | null;
+  unit: UnitStatus;
+  per_bed: boolean;
+}
+
+export interface AuthorityResult {
+  status: string; // AuthorityStatus: matches_record, mismatch, unknown
+  manager_on_record?: string | null; // company name only
+  poster_said?: string | null;
+  office_phone_match: PhoneMatch;
+  link_domain: LinkDomain;
+}
+
+// Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
+// Used when the card API has not already put these lines in `rows`.
+export interface CardProofs {
+  price?: PriceResult | null;
+  authority?: AuthorityResult | null;
+  unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
+}
+
 export interface Card {
+  for_sale?: ForSaleMatch | null; // D7; null or missing means not looked up
   case_id: string;
   source: DataSource;
   state: VerdictState;

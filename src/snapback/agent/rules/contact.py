@@ -8,7 +8,8 @@ Three comparisons, each a yes/no and nothing more:
 - a link in the listing, against the building's own website.
 
 None of them proves anything about a person. A match never lifts "Allowed to rent it"
-(anyone can type a public name or number), and a mismatch holds a case, it does not fail one.
+(anyone can type a public name or number), a phone match alone does not even count as
+matching the record, and a mismatch holds a case, it does not fail one.
 
 What never leaves this module: a phone number, a hash of one, or the record's web address.
 The record keeps the office phone only as a keyed hash (`phone_hash`), the listing's numbers
@@ -261,21 +262,20 @@ def check_link(links: Sequence[str], website: str | None) -> LinkDomain:
 def check_authority(claims: Claims, record: PropertyRecord | None, salt: str) -> AuthorityResult:
     """Compare what the listing says about the poster with the record. Yes/no only.
 
-    The status says whether the poster matches the contact on record: by the company they
-    named, or failing that by the phone number. A different company is a mismatch whatever
-    the phone says. The phone and link results travel beside it.
+    The status says whether the poster matches the contact on record, and only the company
+    they named decides it. A phone match alone never does (XO ruling on #87): anyone can copy
+    the office's public number into a listing. The phone and link results travel beside the
+    status as supporting yes/no lines.
     """
     if record is None:
         return AuthorityResult(status=AuthorityStatus.UNKNOWN, poster_said=claims.company)
 
     phone = check_phone(claims.phones, record, salt)
     company = same_company(claims.company, record.manager_company)
-    if company is False:
-        status = AuthorityStatus.MISMATCH
-    elif company or phone is PhoneMatch.YES:
-        status = AuthorityStatus.MATCHES_RECORD
-    else:
+    if company is None:
         status = AuthorityStatus.UNKNOWN
+    else:
+        status = AuthorityStatus.MATCHES_RECORD if company else AuthorityStatus.MISMATCH
 
     return AuthorityResult(
         status=status,
