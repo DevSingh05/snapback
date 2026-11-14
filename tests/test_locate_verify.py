@@ -2,6 +2,7 @@
 
 import io
 import math
+import shutil
 from dataclasses import replace
 
 import numpy as np
@@ -33,7 +34,9 @@ from snapback.vision.locate.thresholds import load_thresholds
 from snapback.vision.locate.verify import PatchMatcher, verify
 
 # The numpy matcher finds fewer points than DISK+LightGlue, so the tests use a lower floor.
-THRESHOLDS = replace(load_thresholds(), min_inliers=12, stop_at_inliers=60)
+THRESHOLDS = replace(
+    load_thresholds(), min_inliers=12, stop_at_inliers=60, elsewhere_min_inliers=16
+)
 
 
 def jpeg(image: Image.Image, quality: int = 85) -> Image.Image:
@@ -258,3 +261,79 @@ def test_thresholds_version_changes_with_the_file(tmp_path):
     copy.write_text(THRESHOLDS_FILE.read_text().replace("min_inliers = 30", "min_inliers = 31"))
     assert load_thresholds(copy).version != same == load_thresholds().version
     assert math.isfinite(load_thresholds().ransac_px)
+
+
+# --- claimed twin first, strict bar elsewhere (PR #111 FIX 1) -----------------------------------
+
+
+def sister_sweeps(sweeps, tmp_path):
+    """The same rooms again as another building's twin: a model with identical faces."""
+    copied = []
+    for sweep in sweeps["fx-model-a"]:
+        faces = []
+        for number, face in enumerate(sweep.faces):
+            target = tmp_path / sweep.sweep_id / f"{number}{face.suffix}"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(face, target)
+            faces.append(target)
+        copied.append(replace(sweep, model_id="fx-model-sister", faces=tuple(faces)))
+    return copied
+
+
+@pytest.mark.parametrize("sister_first", [True, False])
+def test_sister_twin_never_beats_the_claimed_building(twins, tmp_path, sister_first):
+    sweeps, _, catalog = twins
+    sister = sister_sweeps(sweeps, tmp_path)
+    ordered = [sister, sweeps["fx-model-a"]] if sister_first else [sweeps["fx-model-a"], sister]
+    index = LocateIndex.build("fx-sister", [s for group in ordered for s in group], TinyEmbedder())
+    models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
+    all_sweeps = {"fx-model-a": sweeps["fx-model-a"], "fx-model-sister": sister}
+    locator = Locator(index, all_sweeps, Catalog(models), PatchMatcher(), THRESHOLDS)
+
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    result = locator.locate("fx-sister", {"p": photo}, "fx-prop-1")
+
+    assert result.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED
+    assert result.photos[0].matched_property_id == "fx-prop-1"
+    assert result.chosen.model_id == "fx-model-a"
+
+
+def test_match_elsewhere_below_the_strict_bar_is_not_located(twins):
+    sweeps, index, catalog = twins
+    photos = {"p1": listing_photo(sweeps, "fx-model-a", 1, 2)}  # claims prop-2, shows prop-1
+    for strict in (
+        replace(THRESHOLDS, elsewhere_min_inliers=40),  # too few inliers for "another building"
+        replace(THRESHOLDS, elsewhere_min_spread=0.99),  # inliers packed into one small area
+    ):
+        locator = Locator(index, sweeps, catalog, PatchMatcher(), strict)
+        photo = locator.locate("fx-strict", photos, "fx-prop-2").photos[0]
+        assert photo.status is LocateStatus.NOT_LOCATED
+        assert photo.matched_model_id is None
+
+
+def test_verify_reports_how_far_the_inliers_spread(twins):
+    sweeps, _, _ = twins
+    face = Image.open(sweeps["fx-model-a"][1].faces[1]).convert("RGB")
+    check = verify(PatchMatcher(), face.crop((30, 20, 230, 190)), face, ransac_px=6.0)
+    assert 0.2 < check.spread <= 1.0
+    assert verify(PatchMatcher(), face.crop((0, 0, 4, 4)), face, ransac_px=6.0).spread == 0.0
+
+
+def test_gate_counts_claimed_views_placed_elsewhere_and_not_located(twins, locator):
+    from snapback.eval.locate_gate import claimed_outcome_lines
+
+    sweeps, _, _ = twins
+    noise = Image.fromarray(
+        np.random.default_rng(9).integers(0, 255, (180, 220, 3), dtype=np.uint8), "RGB"
+    )
+    results = [
+        locator.locate("g1", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"),
+        locator.locate("g2", {"p": listing_photo(sweeps, "fx-model-a", 0, 3)}, "fx-prop-1"),
+        locator.locate("g3", {"p": listing_photo(sweeps, "fx-model-a", 1, 2)}, "fx-prop-2"),
+        locator.locate("g4", {"p": noise}, "fx-prop-1"),
+    ]
+    lines = claimed_outcome_lines([r.photos[0].status for r in results])
+    assert lines == [
+        "views of the claimed building placed in another building: 1 of 4",
+        "not located: 1 of 4",
+    ]
