@@ -1,0 +1,79 @@
+{
+  "case_id": "fx-demo-a",
+  "model_id": "fx-model-a",
+  "floor_plan": "2 bed / 2 bath",
+  "spots": [
+    {
+      "spot_id": "fx-spot-window-n",
+      "model_id": "fx-model-a",
+      "label": "the north window frame in the living room",
+      "pose": {
+        "sweep_id": "fx-sweep-04",
+        "position": [2.1, 1.4, -1.0],
+        "rotation_quat": [0.0, 0.0, 0.0, 1.0]
+      },
+      "inliers": 240,
+      "overlaps_listing_photo": false
+    },
+    {
+      "spot_id": "fx-spot-door-b",
+      "model_id": "fx-model-a",
+      "label": "the bedroom 2 door and its frame",
+      "pose": {
+        "sweep_id": "fx-sweep-09",
+        "position": [-1.3, 1.4, 2.2],
+        "rotation_quat": [0.0, 0.71, 0.0, 0.71]
+      },
+      "inliers": 205,
+      "overlaps_listing_photo": false
+    },
+    {
+      "spot_id": "fx-spot-counter-e",
+      "model_id": "fx-model-a",
+      "label": "the east end of the kitchen counter",
+      "pose": {
+        "sweep_id": "fx-sweep-02",
+        "position": [0.4, 1.1, -2.9],
+        "rotation_quat": [0.0, 1.0, 0.0, 0.0]
+      },
+      "inliers": 188,
+      "overlaps_listing_photo": false
+    },
+    {
+      "spot_id": "fx-spot-closet",
+      "model_id": "fx-model-a",
+      "label": "the hall closet door",
+      "pose": {
+        "sweep_id": "fx-sweep-06",
+        "position": [0.0, 1.4, 0.5],
+        "rotation_quat": [0.0, -0.71, 0.0, 0.71]
+      },
+      "inliers": 160,
+      "overlaps_listing_photo": false
+    },
+    {
+      "spot_id": "fx-spot-door-a",
+      "model_id": "fx-model-a",
+      "label": "the front door from inside",
+      "pose": {
+        "sweep_id": "fx-sweep-01",
+        "position": [3.0, 1.4, 1.0],
+        "rotation_quat": [0.0, 0.38, 0.0, 0.92]
+      },
+      "inliers": 151,
+      "overlaps_listing_photo": false
+    },
+    {
+      "spot_id": "fx-spot-sink",
+      "model_id": "fx-model-a",
+      "label": "the kitchen sink",
+      "pose": {
+        "sweep_id": "fx-sweep-07",
+        "position": [0.6, 1.1, -3.1],
+        "rotation_quat": [0.0, 0.92, 0.0, 0.38]
+      },
+      "inliers": 230,
+      "overlaps_listing_photo": true
+    }
+  ]
+}

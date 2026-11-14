@@ -190,3 +190,86 @@ def test_dinov2_index_retrieves_the_same_view_top1(fixture_sweeps):  # pragma: n
         query = jpeg(face.convert("RGB"))
     top = index.search(query, k=1)[0]
     assert (top.entry.sweep_id, top.entry.face) == (fixture_sweeps[1].sweep_id, 3)
+
+
+# --- follow-ups from the V1 review (#10) -------------------------------------------------------
+
+
+def test_purge_deletes_the_faces_and_the_index(tmp_path):
+    from snapback.adapters.matterport import purge
+
+    faces, index = tmp_path / "matterport", tmp_path / "index"
+    (faces / "m1").mkdir(parents=True)
+    (faces / "m1" / "sweeps.json").write_text("[]")
+    (index / "demo").mkdir(parents=True)
+    (index / "demo" / "vectors.npy").write_bytes(b"x")
+    purge(faces, index_dir=index)
+    assert not faces.exists() and not index.exists()
+
+
+def test_model_with_no_skybox_sweeps_is_a_clear_error_and_is_not_cached(tmp_path):
+    def handler(request: httpx.Request) -> httpx.Response:
+        empty = {"id": "sw1", "panos": [{"skybox": {"children": []}}]}
+        return httpx.Response(200, json={"data": {"model": {"locations": [empty]}}})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    adapter = LiveMatterport("k", "s", cache_dir=tmp_path, client=client)
+    with pytest.raises(RuntimeError, match="no skybox"):
+        adapter.sweeps("m-empty")
+    assert not (tmp_path / "m-empty" / "sweeps.json").exists()
+
+
+def test_dinov2_is_pinned_to_a_commit():
+    import re
+
+    from snapback.vision.embed import DINOV2_REPO
+
+    assert re.fullmatch(r"facebookresearch/dinov2:[0-9a-f]{40}", DINOV2_REPO)
+
+
+def test_build_command_indexes_fixture_models_and_prints_counts_only(tmp_path, capsys):
+    from snapback.vision.locate.index import main
+
+    out = tmp_path / "idx"
+    code = main(
+        [
+            "build",
+            "fx-model-a",
+            "fx-model-b",
+            "--embedder",
+            "tiny",
+            "--out",
+            str(out),
+            "--cache",
+            str(tmp_path / "faces"),
+            "--source",
+            "fixture",
+        ]
+    )
+    assert code == 0
+    index = LocateIndex.load(out)
+    assert {entry.model_id for entry in index.entries} == {"fx-model-a", "fx-model-b"}
+    printed = capsys.readouterr().out
+    assert "models 2" in printed and "fx-model" not in printed
+
+
+def test_build_command_with_every_model_skipped_says_so(tmp_path, capsys):
+    from snapback.vision.locate.index import main
+
+    code = main(
+        [
+            "build",
+            "not-a-fixture-id",
+            "--embedder",
+            "tiny",
+            "--out",
+            str(tmp_path / "i"),
+            "--cache",
+            str(tmp_path / "faces"),
+            "--source",
+            "fixture",
+        ]
+    )
+    assert code == 1
+    assert "all 1 models were skipped" in capsys.readouterr().out
+    assert not (tmp_path / "i").exists()

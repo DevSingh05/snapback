@@ -519,28 +519,58 @@ button {
   display: grid;
   gap: 8px;
 }
-.aerial-tile {
-  margin: 0;
+.aerial-proof {
   display: grid;
   gap: 8px;
   padding: 12px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
 }
 .aerial-head {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.aerial-img {
+.aerial-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.aerial-single {
+  display: grid;
+}
+.aerial-cell {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.aerial-img,
+.aerial-missing {
   width: 100%;
   aspect-ratio: 8 / 5;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
 }
-.aerial-fact {
+.aerial-img {
+  object-fit: cover;
+}
+.aerial-missing {
+  display: grid;
+  place-items: center;
+  background: var(--line);
   color: var(--muted);
+}
+.aerial-caption {
+  font-weight: 700;
+}
+.aerial-distance {
+  margin: 0;
+  color: var(--muted);
+}
+@media (max-width: 480px) {
+  .aerial-pair {
+    grid-template-columns: 1fr;
+  }
 }
 .twin-trace {
   min-height: 120px;
@@ -708,4 +738,28 @@ button {
   .twin-stage {
     min-height: 45vh;
   }
+}
+
+.history {
+  margin: 12px clamp(18px, 4vw, 36px) 0;
+}
+.history ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-what {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
 }

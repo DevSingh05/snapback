@@ -188,7 +188,22 @@ def test_card_never_repeats_what_the_poster_called_themselves():
     card = card_for(VARIANTS["forged"])
     assert "John" not in all_text(card)
     allowed = line(card, CardRowKind.PERSON, "Allowed to rent it")
-    assert allowed.tone is CardTone.RED_FLAG
+    # Ruling, Sat 01:20: a name that is not the one on record is never a red flag by itself.
+    # The manager, the leasing office and a listing brokerage may all market a home.
+    assert allowed.tone is CardTone.NOT_SHOWN
+    assert allowed.text == "Not confirmed. Call the office on record yourself."
+
+
+def test_a_name_that_is_not_the_one_on_record_reads_like_a_name_we_could_not_check():
+    differs = modules(authority={"status": "mismatch", "manager_on_record": "Fixture Living LLC"})
+    unknown = modules(authority={"status": "unknown"})
+    for evidence in (differs, unknown):
+        verdict = decide(to_evidence(evidence))
+        assert verdict.state is VerdictState.HOLD
+        assert strings.text("reason.authority_unknown") in verdict.reasons
+        assert not any("does not match" in reason for reason in verdict.reasons)
+    tones = [item.tone for item in lines(card_for(differs), CardRowKind.PERSON)]
+    assert CardTone.RED_FLAG not in tones
 
 
 def test_recapture_block_asks_for_a_new_photo_without_a_red_flag():
@@ -334,3 +349,26 @@ def test_verify_link_uses_the_short_public_id():
 
 def test_card_carries_the_data_source_label():
     assert card_for(modules(source="live")).source == "live"
+
+
+# --- A7: the for-sale finding travels on the card, for the history strip -------------------
+
+
+def test_the_card_carries_a_for_sale_finding_with_its_dates():
+    found = {"status": "active", "site": "Homes.com", "listed_on": "2026-10-02"}
+    card = card_for(modules(for_sale=found))
+    assert card.for_sale is not None
+    assert (card.for_sale.status, card.for_sale.site) == ("active", "Homes.com")
+    assert card.for_sale.listed_on.isoformat() == "2026-10-02"
+    assert Card.model_validate_json(card.model_dump_json()).for_sale == card.for_sale
+
+    rented = card_for(modules(for_sale={"status": "recently_rented", "changed_on": "2026-11-01"}))
+    assert rented.for_sale.changed_on.isoformat() == "2026-11-01"
+
+
+def test_no_lookup_or_a_lookup_that_found_nothing_leaves_the_card_without_one():
+    assert card_for(modules()).for_sale is None
+    assert card_for(modules(for_sale={"status": "none"})).for_sale is None
+    old_card = json.loads((FIXTURES / "card_hold.json").read_text())
+    assert "for_sale" not in old_card  # cards written before this still parse
+    assert Card.model_validate(old_card).for_sale is None

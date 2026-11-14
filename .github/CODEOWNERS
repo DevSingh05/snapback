@@ -33,3 +33,5 @@
 
 # The Matterport adapter feeds the locate index, so vision owns it. Keep after adapters/.
 /src/snapback/adapters/matterport.py  @jeffrey-g05
+/eval/ @vs-githjk
+/fixtures/eval/ @vs-githjk

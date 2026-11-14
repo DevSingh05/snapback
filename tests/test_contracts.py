@@ -132,3 +132,42 @@ def test_the_a7_contact_fields_are_optional_and_their_fixtures_parse():
             evidence.unit_flag,
         )
     )
+
+
+def test_the_a10_join_fields_are_optional():
+    # A10: a card can mix a real record with stand-ins, so a line can say where it came from.
+    import snapback.contracts as contracts
+
+    card = contracts.Card.model_validate_json(load("card_hold.json"))
+    assert all(line.source is None for row in card.rows for line in row.lines)
+    line = card.rows[0].lines[0].model_copy(update={"source": contracts.DataSource.LIVE})
+    assert contracts.CardLine.model_validate_json(line.model_dump_json()).source == "live"
+
+    evidence = contracts.ModuleEvidence.model_validate_json(load("module_evidence_hold.json"))
+    assert evidence.record_source is None
+
+    request = contracts.CreateCaseRequest.model_validate_json(load("create_case_request.json"))
+    assert request.property_id is None
+    assert contracts.CreateCaseRequest(property_id="fx-prop-3").property_id == "fx-prop-3"
+
+
+def test_the_a14_reply_shapes_parse_and_waiting_for_a_reply_is_a_progress_value():
+    import snapback.contracts as contracts
+
+    reply = contracts.ReplyResponse.model_validate_json(load("reply_response.json"))
+    assert reply.check is contracts.ReplyCheck.COPY_OF_LISTING_PHOTO
+    assert (reply.presence, reply.state, reply.status) == ("forged", "dont_pay", "done")
+
+    waiting = contracts.ReplyResponse(
+        case_id="7Q2M",
+        source="fixture",
+        status=contracts.CaseProgress.WAITING_FOR_REPLY,
+        check=contracts.ReplyCheck.CODE_READ_SPOT_NOT_CHECKED,
+        presence=contracts.PresenceStatus.WAITING,
+    )
+    assert waiting.state is None and waiting.challenge_text is None
+    # The honest middle: a right code that is not a copy is never called proven.
+    assert contracts.ReplyCheck.CODE_READ_SPOT_NOT_CHECKED != contracts.ReplyCheck.PROVEN
+    # Cases made before this still report the three values they knew.
+    created = contracts.CreateCaseResponse.model_validate_json(load("create_case_response.json"))
+    assert created.status in set(contracts.CaseProgress)
