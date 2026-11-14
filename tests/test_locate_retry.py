@@ -207,6 +207,38 @@ def test_focus_scan_verifies_only_the_named_scans_side_faces(twins, locator):
     assert focused == side_faces  # 16 side faces <= top_k_claimed: all of them
 
 
+def test_focus_scan_keeps_the_other_scan_of_the_same_home_out(twins, monkeypatch):
+    """Review on #223: with two scans of one home, focus_scan on one keeps the other's side
+    faces off the claimed list, and a match only in the other scan cannot place the photo."""
+    sweeps, index, _ = twins
+    one_home = Catalog([ModelInfo("fx-model-a", "fx-prop-1"), ModelInfo("fx-model-b", "fx-prop-1")])
+    t = replace(THRESHOLDS, top_k=1)  # the global list adds at most one face
+    locator = Locator(index, sweeps, one_home, PatchMatcher(), t)
+    image = photo(sweeps)
+
+    def side_faces_of(model, hits):
+        return {(h.entry.sweep_id, h.entry.face) for h in hits if h.entry.model_id == model}
+
+    base = locator.candidates_for(image, "fx-prop-1", "deeper_claimed")
+    focus = locator.candidates_for(image, "fx-prop-1", "focus_scan", scan_model_id="fx-model-a")
+    every_b = {(s.sweep_id, f) for s in sweeps["fx-model-b"] for f in SIDE_FACES}
+    assert side_faces_of("fx-model-b", base) == every_b  # both scans are searched without focus
+    assert not side_faces_of("fx-model-b", focus)  # the global top_k=1 pick is fx-model-a's
+    assert side_faces_of("fx-model-a", focus) >= {
+        (s.sweep_id, f) for s in sweeps["fx-model-a"] for f in SIDE_FACES
+    }
+
+    # Only fx-model-b matches: the ordinary search places it, focus on fx-model-a does not.
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify", scripted({"fx-model-b": (300, 0.6)})
+    )
+    focused = locator.search(image, "focus_scan", "fx-prop-1", scan_model_id="fx-model-a")
+    assert focused.status is not LocateStatus.LOCATED_IN_CLAIMED
+    assert focused.model_id != "fx-model-b"
+    wider = locator.search(image, "deeper_claimed", "fx-prop-1")
+    assert wider.status is LocateStatus.LOCATED_IN_CLAIMED and wider.model_id == "fx-model-b"
+
+
 def test_focus_scan_needs_a_scan_of_the_claimed_home(twins, locator):
     sweeps, _, _ = twins
     with pytest.raises(ValueError, match="scan_model_id"):
