@@ -84,10 +84,19 @@
   color: var(--muted);
 }
 
+/* The nav takes the first row of the shell; the page wraps under it. */
+.shell {
+  flex-wrap: wrap;
+}
+
 .site-nav {
+  flex: 0 0 100%;
   display: flex;
   justify-content: flex-end;
+  width: min(1320px, 100%);
+  margin-inline: auto;
   padding-block: 12px 0;
+  white-space: nowrap;
 }
 
 .site-nav {
