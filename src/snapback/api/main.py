@@ -1170,7 +1170,11 @@ def create_app(
             return plan, None, {}, model
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(
-            plan, locate, scan_plan=scan_plan, ad_plan=ad_plan_word(ad_beds_of(case))
+            plan,
+            locate,
+            scan_plan=scan_plan,
+            ad_plan=ad_plan_word(ad_beds_of(case)),
+            model_id=model,
         )
         plan = attach_claims(plan, ad_notes_of(case))
         prefs = getattr(case, "preferences", None)
