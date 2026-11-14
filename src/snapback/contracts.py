@@ -22,7 +22,9 @@ class LocateStatus(StrEnum):
 
     LOCATED_IN_CLAIMED = "located_in_claimed"  # geometrically verified inside the claimed property
     LOCATED_ELSEWHERE = "located_elsewhere"  # verified inside a different indexed property
-    NOT_LOCATED = "not_located"  # the claimed property is indexed and the photo matches nowhere
+    NOT_LOCATED = (
+        "not_located"  # claimed home indexed, photo matches nowhere; or no claim and no single home
+    )
     NOT_INDEXED = "not_indexed"  # the claimed property has no twin in our index
 
 
@@ -128,6 +130,10 @@ class LocateResult(BaseModel):
     case_id: str
     photos: list[PhotoLocation]
     claimed_property_id: str | None = None
+    # True when the ad named no home and the scan identified it: claimed_property_id is then
+    # the home the photos were placed in.
+    identified_by_scan: bool = False
+    identified_photos: int = 0  # photos that placed in that home on the strict bar
     chosen: FloorPlanCandidate | None = None
     alternatives: list[FloorPlanCandidate] = Field(default_factory=list)
     poses: dict[str, Pose] = Field(default_factory=dict)  # photo_id -> pose, located photos only
@@ -490,6 +496,65 @@ class AerialProofResponse(BaseModel):
     claimed: AerialSideOut
     matched: AerialSideOut | None = None  # a photo located_elsewhere; None otherwise
     distance_m: float | None = None  # None when either record lacks lat/lon
+
+
+# ---------------------------------------------------------------------------------------------
+# The "Report this copy" pack (A20): what a listing agent takes to the platform.
+# ---------------------------------------------------------------------------------------------
+
+
+class ReportPlatform(StrEnum):
+    FACEBOOK = "facebook"
+    ZILLOW = "zillow"
+    CRAIGSLIST = "craigslist"
+
+
+class ReportStatusStrip(BaseModel):
+    """What the home's own record says. The same facts the card already carries in `for_sale`."""
+
+    status: ForSaleStatus
+    site: str  # where the record is listed, e.g. Homes.com
+    listed_on: date | None = None
+    changed_on: date | None = None
+    brokerage: str | None = None  # the listing office on record. A company, never a person
+
+
+class ReportPhotoPair(BaseModel):
+    """One listing photo something was found about. Pictures are references to OUR routes."""
+
+    listing_photo: int  # which listing photo, counting from 1
+    finding: str  # the fixed sentence for what was found about it
+    listing_image_url: str | None = None  # our route for the photo as posted, when one exists
+    match_image_url: str | None = None  # our route for the matching view, when one exists
+
+
+class ReportSteps(BaseModel):
+    platform: ReportPlatform
+    name: str  # "Facebook Marketplace", "Zillow", "Craigslist"
+    steps: list[str]  # what to click, in order, in the pack's language
+
+
+class ReportResponse(BaseModel):
+    """`GET /cases/{case_id}/report`: one pack for reporting a copied listing to a platform.
+
+    Listing facts only. No score, count or threshold; no hash or model id; no image bytes;
+    nothing about the renter; no word about any person."""
+
+    case_id: str  # short public id
+    source: DataSource
+    lang: str
+    checked_at: datetime
+    state: VerdictState
+    # True only on proof (DONT_PAY) or a record that shows the home for sale. Not on a hold
+    # for something that is merely not confirmed: the poster may be a real agent.
+    reportable: bool
+    status_strip: ReportStatusStrip | None = None
+    proof_lines: list[str]  # decide()'s own reasons, in order. Never model text
+    photo_pairs: list[ReportPhotoPair] = Field(default_factory=list)
+    twin_url: str | None = None  # our /case/{id}/twin page, where each photo was placed
+    aerial_url: str | None = None  # our /cases/{id}/aerial route, when the case names a building
+    platforms: list[ReportSteps] = Field(default_factory=list)
+    not_checked: list[str]  # the card's standing list: what this does not show
 
 
 # ---------------------------------------------------------------------------------------------
