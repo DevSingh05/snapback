@@ -16,7 +16,6 @@ import secrets
 import threading
 from collections.abc import Callable
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel
 
@@ -32,6 +31,7 @@ from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.card import strings
 from snapback.contracts import (
     Card,
+    CaseProgress,
     DataSource,
     ModuleEvidence,
     TraceEvent,
@@ -59,15 +59,20 @@ class ChallengeView(BaseModel):
 
 
 class CaseStatus(BaseModel):
-    """Where a case stands. Local to the API; the card and the trace are the shared contracts."""
+    """Where a case stands, for `GET /cases/{id}` and after an approval.
+
+    The same fields as `CreateCaseResponse` in contracts.py without the secret, plus the
+    drafted challenge in parts for a client that wants the spot and the code separately.
+    """
 
     case_id: str
     source: DataSource
-    status: Literal["running", "waiting_for_approval", "done"]
+    status: CaseProgress
     state: VerdictState | None = None  # set once the case is done
+    challenge_text: str | None = None  # the message the renter may forward
     photos: int = 0
-    screenshots: int = 0  # images that were read as text
-    injection_noticed: bool = False  # the listing had text written for an AI system
+    screenshots: int = 0
+    injection_noticed: bool = False
     challenge: ChallengeView | None = None
 
 
@@ -82,6 +87,7 @@ def _now() -> datetime:
 
 class RecordedCase:
     done = True
+    token = None  # a recorded case can never be written to, so it has no secret
 
     def __init__(
         self, case_id: str, card: Card, events: list[TraceEvent], evidence: ModuleEvidence
@@ -110,7 +116,7 @@ class RecordedCase:
         return CaseStatus(
             case_id=self.case_id,
             source=self._card.source,
-            status="done",
+            status=CaseProgress.DONE,
             state=self._card.state,
             photos=self._photos,
         )
@@ -127,7 +133,8 @@ class SessionCase:
         listing: Listing,
         runner: Callable[[CaseSession], object],
     ) -> None:
-        self.case_id = case_id
+        self.case_id = case_id  # short, shown to people, enough to read the case
+        self.token = secrets.token_urlsafe(24)  # 192 bits, needed for every write
         self.session = session
         self._listing = listing
         self._runner = runner
@@ -157,24 +164,27 @@ class SessionCase:
         )
 
     def status(self) -> CaseStatus:
-        draft = self.session.pending_challenge
         if self.session.done:
-            status = "done"
+            status = CaseProgress.DONE
         elif self.session.waiting_for_approval:
-            status = "waiting_for_approval"
+            status = CaseProgress.WAITING_FOR_APPROVAL
         else:
-            status = "running"
+            status = CaseProgress.RUNNING
+        draft = self.session.pending_challenge
+        if status is not CaseProgress.WAITING_FOR_APPROVAL:
+            draft = None
         return CaseStatus(
             case_id=self.case_id,
             source=self.session.trace.source,
             status=status,
             state=self.session.verdict.state if self.session.verdict else None,
+            challenge_text=draft.text if draft else None,
             photos=self._listing.photos,
             screenshots=self._listing.screenshots,
             injection_noticed=bool(self._listing.injection_spans),
             challenge=(
                 ChallengeView(text=draft.text, spot_label=draft.spot_label, code=draft.code)
-                if draft and status == "waiting_for_approval"
+                if draft
                 else None
             ),
         )
