@@ -526,6 +526,60 @@ def test_other_mentions_of_an_owner_in_spanish_are_not_a_claim(text):
     assert extract_contacts(text).says_owner is False
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Something the owner pays for or does is not the poster saying they are the owner.
+        "Water and trash paid by owner.",
+        "Lawn care covered by the owner.",
+        "Appliances provided by owner.",
+        "Yard maintained by owner.",
+        "Utilities paid for by owner.",
+        "Agua y basura pagadas por el dueño.",
+        "Luz pagada por el propietario.",
+        "El agua está incluida por el dueño.",
+        # Asking for the owner is not being the owner.
+        "Pregunte por el dueño en la oficina.",
+        "Pregunta por la dueña al llegar.",
+        # Where the home is, told from the poster's own house.
+        "A 5 minutos de mi casa.",
+        "Se ve desde mi casa.",
+        "Mi casa está a la vuelta.",
+        # A pet, with any article.
+        "Soy dueño del perro que ladra al lado.",
+        "Soy dueña de la gata, es muy tranquila.",
+        "Somos dueños de los perros.",
+        # "MI" and "Mi Casa" in listings written in English.
+        "Detroit, MI Townhouse, 3 bed.",
+        "Ann Arbor MI house near campus.",
+        "Mi Casa Apartments, 2 bed available.",
+        "Welcome to Mi Casa Townhomes.",
+    ],
+)
+def test_more_mentions_that_are_not_a_claim_in_either_language(text):
+    assert extract_contacts(text).says_owner is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The claims that were heard before are still heard.
+        "For rent by owner, no agents please.",
+        "For lease by owner.",
+        "Listed by the owner.",
+        "Se renta por dueño, sin agentes.",
+        "Se alquila por su propietario.",
+        "En renta por el dueño.",
+        "Casa en venta por su dueña.",
+        "Es mi casa y la estoy rentando.",
+        "Rento mi propiedad mientras trabajo fuera.",
+        "Alquilo mi casa por temporada.",
+    ],
+)
+def test_the_claims_are_still_heard_after_the_exclusions(text):
+    assert extract_contacts(text).says_owner is True
+
+
 def test_a_spanish_claim_holds_a_case_the_same_way_an_english_one_does():
     # The rule does not care which language the claim was made in.
     for text in ("I am the owner.", "Soy el dueño."):
