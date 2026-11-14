@@ -34,18 +34,6 @@ cases run on any machine, labelled FIXTURE.
 - **A `property_id` sent in fixture mode** makes the check use that record from lane D's
   synthetic kit with the shared stand-ins for the twin and the challenge, not this pack's.
 
-**What `DEMO_CASE` does depends on the data source.**
-
-- **With `SNAPBACK_DATA_SOURCE=fixture`** (the default) it runs on the stand-ins in this
-  folder and does not read the kit. The record on each card is the synthetic one here, the
-  card is labelled FIXTURE, and the three cases come out as in the table above.
-- **With `SNAPBACK_DATA_SOURCE=live`** it supplies only the listing text. No stand-in from
-  this folder is used: a live case never carries one. The photo and presence lines read "Not
-  checked", so case `a` comes out "could not place the photos" and LIVE, not "don't pay". The
-  server logs a warning at start when both are set, so this is not a surprise on demo day.
-- **A `property_id` sent in fixture mode** makes the check use that record from lane D's
-  synthetic kit with the shared stand-ins for the twin and the challenge, not this pack's.
-
 ## Run them
 
 ```
