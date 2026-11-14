@@ -521,3 +521,38 @@ def test_status_without_a_detail_gets_a_plain_sentence(app: Snapback, api: FakeA
     assert result.is_error
     assert text_of(result) == "SNAPBACK's API failed (HTTP 500). Try again."
     assert "Traceback" not in text_of(result)
+
+
+def test_bad_arguments_get_a_plain_sentence(app: Snapback) -> None:
+    accept, verdict = call(
+        app,
+        ("snapback_accept_preference", {"proposal_id": "pr-1", "yes": "true"}),
+        ("snapback_get_verdict", {}),
+    )
+    assert accept.is_error and verdict.is_error
+    assert text_of(accept).startswith("snapback_accept_preference needs a proposal_id and yes")
+    for result in (accept, verdict):
+        assert "pydantic" not in text_of(result) and "Error executing" not in text_of(result)
+
+
+def test_http_mode_needs_its_bearer_token(app: Snapback) -> None:
+    from snapback.mcp_server import BearerGate
+
+    async def inner(scope: Any, receive: Any, send: Any) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    gate = BearerGate(inner, "local-run-token")
+
+    async def run() -> list[int]:
+        transport = httpx.ASGITransport(app=gate)
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as c:
+            return [
+                (await c.post("/mcp")).status_code,
+                (await c.post("/mcp", headers={"Authorization": "Bearer wrong"})).status_code,
+                (
+                    await c.post("/mcp", headers={"Authorization": "Bearer local-run-token"})
+                ).status_code,
+            ]
+
+    assert asyncio.run(run()) == [401, 401, 200]

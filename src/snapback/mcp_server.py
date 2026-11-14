@@ -36,6 +36,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from snapback.card import strings
 
 log = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # request lines are noise on stderr
 
 MAX_PHOTOS = 10  # the API's own cap (SNAPBACK_MAX_PHOTOS)
 MAX_PHOTO_BYTES = 10 * 1024 * 1024  # the API's own cap per photo (SNAPBACK_MAX_PHOTO_MB)
@@ -513,6 +514,34 @@ def plainly(step: Callable[..., dict[str, Any]], *args: Any) -> Any:
     return CallToolResult(content=[TextContent(type="text", text=sentence)], is_error=True)
 
 
+class PlainArgumentErrors:
+    """Middleware: a call whose arguments fail the tool's schema gets one plain sentence naming
+    the arguments, in place of the SDK's validation dump."""
+
+    async def __call__(self, ctx: Any, call_next: Any) -> Any:
+        result = await call_next(ctx)  # the wire form: a dict with camelCase keys
+        if ctx.method != "tools/call" or not isinstance(result, dict) or not result.get("isError"):
+            return result
+        said = " ".join(str(block.get("text", "")) for block in result.get("content") or [])
+        if "validation error" in said:
+            name = (ctx.params or {}).get("name", "this tool")
+            given = (ctx.params or {}).get("arguments") or {}
+            wrong = [arg for arg in given if f"\n{arg}\n" in f"\n{said}\n"]
+            missing = "Field required" in said
+            sentence = (
+                f"{name} needs {', '.join(wrong) or 'its arguments'} in the right type"
+                f"{' (and every required argument)' if missing else ''}. "
+                "See the tool's input schema."
+            )
+            if name == "snapback_accept_preference":
+                sentence = (
+                    "snapback_accept_preference needs a proposal_id and yes as a real true or "
+                    "false, sent only after the renter has answered."
+                )
+            return {**result, "content": [{"type": "text", "text": sentence}]}
+        return result
+
+
 def build_server(app: Snapback) -> MCPServer:
     """The MCP server with SNAPBACK's five tools bound to `app`."""
     mcp = MCPServer(
@@ -520,7 +549,8 @@ def build_server(app: Snapback) -> MCPServer:
         title="SNAPBACK",
         description="Check a rental listing before you pay, and find places with a 3D scan.",
         instructions=INSTRUCTIONS,
-        website_url="https://github.com/vs-githjk/snapback",
+        website_url="https://github.com/DevSingh05/snapback",
+        middleware=[PlainArgumentErrors()],
     )
 
     @mcp.tool(name="snapback_check_listing")
