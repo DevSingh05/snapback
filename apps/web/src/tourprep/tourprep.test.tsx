@@ -29,20 +29,31 @@ describe("tour prep, fixture mode", () => {
     const facts = within(screen.getByTestId("tp-facts")).getAllByRole("listitem");
     expect(facts.length).toBeGreaterThan(0);
     expect(facts[0]).toHaveTextContent("CoStar record");
-    expect(screen.getByText(new RegExp(AS_OF))).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(AS_OF)).length).toBeGreaterThan(0);
+    // the as-of label sits beside the sources of a CoStar fact, not only inside its sentence
+    expect(facts[0]).toHaveTextContent(`CoStar record · ${AS_OF}`);
     expect(within(screen.getByTestId("tp-pay")).getAllByRole("listitem")).toHaveLength(3);
   });
 
-  it("flips to Spanish and back", async () => {
-    const user = userEvent.setup();
+  it("shows no language toggle on the demo path, which is English only", async () => {
     render(<TourPrepPage target={{ kind: "place", propertyId: "p", planKey: null }} back="/" />);
     await screen.findByRole("heading", { name: "Tour prep" });
+    expect(screen.queryByRole("button", { name: "Español" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Language" })).toBeNull();
+  });
+
+  it("flips to Spanish and back when the address asks for ?lang=es", async () => {
+    window.history.pushState({}, "", "/prep/place/p?lang=es");
+    const user = userEvent.setup();
+    render(<TourPrepPage target={{ kind: "place", propertyId: "p", planKey: null }} back="/" />);
+    expect(await screen.findByRole("heading", { name: "Prepara tu visita" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(await screen.findByRole("heading", { name: "Tour prep" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Español" }));
     expect(await screen.findByRole("heading", { name: "Prepara tu visita" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Antes de pagar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Imprimir" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "English" }));
-    expect(await screen.findByRole("heading", { name: "Tour prep" })).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
   });
 
   it("prints with the browser's print dialog and hides the tools in the print view", async () => {
@@ -113,8 +124,23 @@ describe("tour prep, live API", () => {
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer read-secret");
   });
 
-  it("says plainly when this browser holds no key for the case", async () => {
-    vi.stubGlobal("fetch", vi.fn());
+  it("asks without a header when this browser holds no key, and shows a case with no secret", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(pack)));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TourPrepPage target={{ kind: "case", caseId: "7Q2M" }} back="/" />);
+    expect(await screen.findByText("API TEXT AS GIVEN")).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/cases/7Q2M/tour-prep?lang=en");
+    expect(new Headers(init.headers).get("Authorization")).toBeNull();
+  });
+
+  it("says plainly when the server wants a key this browser does not hold", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ detail: "Key needed" }), { status: 401 })),
+    );
     render(<TourPrepPage target={{ kind: "case", caseId: "NOKEY" }} back="/" />);
     expect(await screen.findByRole("alert")).toHaveTextContent("result key");
   });
@@ -163,6 +189,21 @@ describe("tour prep entry points", () => {
       before_you_pay: ["pay"],
     });
     expect(text).toContain("- fact (CoStar record)");
+    const dated = packToText({
+      source: "fixture",
+      lang: "en",
+      title: "T",
+      subtitle: "S",
+      note: "N",
+      as_of: AS_OF,
+      facts_heading: "F",
+      questions_heading: "Q",
+      pay_heading: "P",
+      facts: [{ key: "a", text: "fact", sources: ["CoStar record"], as_of: AS_OF }],
+      questions: [],
+      before_you_pay: [],
+    });
+    expect(dated).toContain(`- fact (CoStar record, ${AS_OF})`);
     expect(text).toContain("1. ask");
     expect(text).toContain("FIXTURE. N");
   });

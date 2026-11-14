@@ -187,13 +187,11 @@ export async function fetchPack(
       signal,
     });
   } else {
-    const pending = apiFetchRead(
-      `/cases/${encodeURIComponent(target.caseId)}/tour-prep?lang=${lang}`,
-      target.caseId,
-      { signal },
-    );
-    if (!pending) throw new PackNeedsToken();
-    res = await pending;
+    const path = `/cases/${encodeURIComponent(target.caseId)}/tour-prep?lang=${lang}`;
+    // With no key in this browser we still ask, with no header: a recorded case has no secret
+    // and answers; a case that has one answers 401, which says "open it where you checked".
+    res = await (apiFetchRead(path, target.caseId, { signal }) ?? apiFetch(path, { signal }));
+    if (res.status === 401) throw new PackNeedsToken();
   }
   if (!res.ok) throw await failure(res);
   return (await res.json()) as TourPrepPack;
@@ -203,7 +201,9 @@ export async function fetchPack(
 export function packToText(pack: TourPrepPack): string {
   const lines = [pack.title, pack.subtitle, ""];
   lines.push(pack.facts_heading.toUpperCase());
-  for (const f of pack.facts) lines.push(`- ${f.text} (${f.sources.join(", ")})`);
+  for (const f of pack.facts) {
+    lines.push(`- ${f.text} (${[...f.sources, ...(f.as_of ? [f.as_of] : [])].join(", ")})`);
+  }
   lines.push("", pack.questions_heading.toUpperCase());
   pack.questions.forEach((q, i) => lines.push(`${i + 1}. ${q.text}`));
   lines.push("", pack.pay_heading.toUpperCase());

@@ -11,9 +11,11 @@ type Load =
   | { status: "error"; message: string };
 
 export function TourPrepPage({ target, back }: { target: PackTarget; back: string }) {
-  const [lang, setLang] = useState<Lang>(() =>
-    new URLSearchParams(window.location.search).get("lang") === "es" ? "es" : "en",
+  // The demo path is English only: Spanish, and its toggle, appear only with ?lang=es.
+  const [spanishAsked] = useState(
+    () => new URLSearchParams(window.location.search).get("lang") === "es",
   );
+  const [lang, setLang] = useState<Lang>(spanishAsked ? "es" : "en");
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -57,19 +59,21 @@ export function TourPrepPage({ target, back }: { target: PackTarget; back: strin
         <a className="tp-back" href={back}>
           Back
         </a>
-        <div className="tp-lang" role="group" aria-label="Language">
-          {(["en", "es"] as const).map((l) => (
-            <button
-              key={l}
-              type="button"
-              className="tp-lang-btn"
-              aria-pressed={lang === l}
-              onClick={() => setLang(l)}
-            >
-              {l === "en" ? "English" : "Español"}
-            </button>
-          ))}
-        </div>
+        {spanishAsked && (
+          <div className="tp-lang" role="group" aria-label="Language">
+            {(["en", "es"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                className="tp-lang-btn"
+                aria-pressed={lang === l}
+                onClick={() => setLang(l)}
+              >
+                {l === "en" ? "English" : "Español"}
+              </button>
+            ))}
+          </div>
+        )}
         {load.status === "ready" && (
           <div className="tp-tools">
             <button type="button" className="pf-action" onClick={() => void copy(load.pack)}>
@@ -122,7 +126,9 @@ function Pack({ pack }: { pack: TourPrepPack }) {
             {pack.facts.map((f) => (
               <li key={f.key}>
                 <p className="tp-text">{f.text}</p>
-                <p className="tp-src">{f.sources.join(" · ")}</p>
+                <p className="tp-src">
+                  {[...f.sources, ...(f.as_of ? [f.as_of] : [])].join(" · ")}
+                </p>
               </li>
             ))}
           </ul>
