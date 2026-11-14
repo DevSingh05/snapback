@@ -495,6 +495,9 @@ def test_adv8_real_licensees_are_never_not_found(tmp_path):
         assert _check(text, _client(db), tmp_path / str(i)).status is not LicenseStatus.NOT_FOUND, (
             label
         )
+    # "Fxjo" is a prefix of FXJOANNA and "Fxlee" of FXLEEDS: substrings are not a match
+    text, db = ADV8[0][1], ADV8[0][2]
+    assert _check(text, _client(db), tmp_path / "leeds").status is LicenseStatus.NOT_CHECKED
     # the shapes a name lookup can read are supporting evidence
     by_label = {label: (text, db) for label, text, db in ADV8}
     for j, label in enumerate(
@@ -532,6 +535,10 @@ def test_a_license_number_on_an_active_license_with_the_name_is_licensed(tmp_pat
     for i, number in enumerate(("123456-SA", "123456-B", "123456")):
         result = _check(NUMBER_AD, _client(_number_db(number=number)), tmp_path / str(i))
         assert result.status is LicenseStatus.LICENSED, number
+    # a number with no name in the ad cannot be tied to anyone: not an accusation, not support
+    assert _check("TREC 123456", _client(_number_db()), tmp_path / "n").status is (
+        LicenseStatus.NOT_CHECKED
+    )
     # the surname alone is enough of a match
     other = "My name is Janet Fxdoe, a licensed agent. TREC #123456"
     assert _check(other, _client(_number_db()), tmp_path / "x").status is LicenseStatus.LICENSED
