@@ -24,6 +24,7 @@ import asyncio
 import re
 import secrets
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -33,8 +34,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
+from snapback.adapters.vexcel import aerial_proof, aerial_side
 from snapback.agent.intake import read_listing
-from snapback.agent.join import KitMissing, Lookups
+from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
@@ -48,7 +50,17 @@ from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
-from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
+from snapback.contracts import (
+    AerialProofResponse,
+    AerialSideOut,
+    Card,
+    CreateCaseResponse,
+    DataSource,
+    Evidence,
+    LocateStatus,
+    Verdict,
+)
+from snapback.safety.paths import resolve_data_dir
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -85,6 +97,10 @@ def _after(last_event_id: str | None) -> int:
         return int(last_event_id) if last_event_id is not None else -1
     except ValueError:
         return -1
+
+
+NO_TILE = "No aerial tile for this building."
+AerialDirection = Literal["north", "east", "south", "west", "nadir"]
 
 
 def _bearer(authorization: str | None, case_token: str | None) -> str | None:
@@ -127,6 +143,8 @@ def create_app(
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
     started each case; the default is lane D's safety store."""
     settings = settings or get_settings()
+    # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
+    lookups = lookups or KitLookups(settings.snapback_data_source)
     store = CaseStore(settings, lookups)
     if registry is _DEFAULT:
         registry = SafetyRegistry(settings.snapback_data_dir)
@@ -381,6 +399,110 @@ def create_app(
         if if_none_match is not None and tag in if_none_match:
             return Response(status_code=304, headers=headers)
         return Response(content=pictures.png(card), media_type="image/png", headers=headers)
+
+    # --- D9 aerial proof (lane D builder in adapters/vexcel.py; contract approved on #41) ---
+
+    def kit_records_for_aerial() -> dict | None:
+        """The shared lookups' parsed kit, when they offer one (a test stand-in may not)."""
+        records = getattr(lookups, "records", None)
+        if not callable(records):
+            return None
+        try:
+            return records()
+        except KitMissing:
+            return {}  # live mode without the kit: no buildings, so no tiles, never a 500
+
+    def matched_id_of(case: RecordedCase | SessionCase) -> str | None:
+        """The building a photo was located in when it was not the claimed one (V2)."""
+        locate = case.evidence.locate
+        for photo in locate.photos if locate is not None else []:
+            if photo.status == LocateStatus.LOCATED_ELSEWHERE:
+                found = getattr(photo, "matched_property_id", None)
+                if found:
+                    return found
+        return None
+
+    def aerial_for(case: RecordedCase | SessionCase, case_id: str, direction: str):
+        """The two buildings for this case. The claimed one is the case's property id (A10); the
+        matched one is a photo located in another building (V2). Either may be missing."""
+        return aerial_proof(
+            case_id,
+            case.evidence.source,
+            case.property_id,
+            matched_id_of(case),
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+            image_url=lambda side: f"/cases/{case_id}/aerial/{side}.jpg?direction={direction}",
+        )
+
+    @app.get("/cases/{case_id}/aerial")
+    def get_aerial(
+        case_id: str,
+        direction: AerialDirection = "north",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> AerialProofResponse:
+        """The claimed building and the one the photos matched, from the air, with the distance.
+
+        Cases are private: this needs the case's read token in a header. Each tile is bounded at
+        20 s and cached for 7 days under data/vexcel/ (`make purge` deletes it)."""
+        case = find(case_id)
+        # check_read answers 401 for a case that has a secret and got none; the recorded fixture
+        # case has no secret, so it is readable without one, as for the trace.
+        check_read(case, _bearer(authorization, x_case_token), None)
+        proof = aerial_for(case, case_id, direction)
+
+        # The image is served by our own route; the client never sees where it sits on disk.
+        # A trimmed copy, so the builder's own object is never changed.
+        def trimmed(side: AerialSideOut | None) -> AerialSideOut | None:
+            if side is None or side.tile is None:
+                return side
+            name = Path(side.tile.path).name
+            return side.model_copy(update={"tile": side.tile.model_copy(update={"path": name})})
+
+        return proof.model_copy(
+            update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
+        )
+
+    @app.get("/cases/{case_id}/aerial/{side}.jpg")
+    def get_aerial_image(
+        case_id: str,
+        side: Literal["claimed", "matched"],
+        direction: AerialDirection = "north",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """One live tile's bytes. The token goes in a header only (ruling on #113): lane T fetches
+        the image with the header and shows it through a blob URL. Only the side asked for is
+        fetched."""
+        case = find(case_id)
+        check_read(case, _bearer(authorization, x_case_token), None)
+        property_id = case.property_id if side == "claimed" else matched_id_of(case)
+        if property_id is None:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        tile = aerial_side(
+            case.evidence.source,
+            property_id,
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+        )
+        if tile is None or tile.source != DataSource.LIVE:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        tile_path = Path(tile.path).resolve()
+        data_root = resolve_data_dir(settings.snapback_data_dir).resolve()
+        if not tile_path.is_relative_to(data_root):
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        try:
+            content = tile_path.read_bytes()
+        except FileNotFoundError:  # purged between the JSON call and this one
+            raise HTTPException(status_code=404, detail=NO_TILE) from None
+        return Response(
+            content=content,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=600"},
+        )
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(
