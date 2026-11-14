@@ -211,10 +211,11 @@ export function UploadPage({
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
           <h1 ref={heading} tabIndex={-1}>
-            Check a rental before you pay.
+            Trust the home, not the ad.
           </h1>
           <p className="upload-lead">
-            Paste the listing link, or add screenshots of it. We read it and check the place.
+            Paste any ad you found. We check it against CoStar&apos;s own record of the home, and
+            show you checked places that fit your budget.
           </p>
 
           <label htmlFor="listing" className="upload-label">

@@ -1,12 +1,16 @@
 # SNAPBACK
 
-**Check any rental before you pay.**
+**Trust the home, not the ad.**
 
-A renter sends SNAPBACK a rental ad: a link, a screenshot or the ad's text and photos. SNAPBACK
-reads the home's own record, checks what the ad claims against it, and answers with a card that
-says one of four things: **Hold off for now**, **Don't pay**, **Checks passed** or **Could not
-place these photos**. Every line on the card says where its facts came from, and code, not a
-language model, picks the verdict.
+SNAPBACK is a renter's agent. Paste any ad you found, from any site, and it checks the ad against
+CoStar's own record of the home: the 3D scan of the building, the owner of record, the license of
+the person posting and the office on record. It also searches CoStar's researched Houston
+buildings and shows checked places that fit your budget, each labelled "as of CoStar's last
+research". Code, not a language model, picks every verdict and every number. SNAPBACK never pays,
+books or texts anyone for you, and sends a message only after you approve it.
+
+A card answers with one of four things: **Hold off for now**, **Don't pay**, **Checks passed** or
+**Could not place these photos**. Every line on the card says where its facts came from.
 
 ## The problem
 
@@ -134,7 +138,7 @@ The full account is in [DATA_USE.md](DATA_USE.md). In short:
   `SNAPBACK_AGENT=deepagents`, a model sees only the renter's own text and yes/no facts we derive.
 - **Photos are kept as hashes, never pixels,** in the photo memory, with a 7-day limit.
 - **Phones are compared as keyed hashes.** No digits are stored.
-- **Owners are named only as companies.** A person is never named.
+- **Owners are named only when they are a known company.** A private owner reads "a private owner" and any other company reads "a company owner", with no name.
 - **Delete and purge.** `uv run python -m snapback.safety delete-case <case_id>` and
   `delete-renter <renter_id>` remove a renter's cases and their photo memory rows. `make purge`
   deletes everything under `data/`.
@@ -199,18 +203,23 @@ What is measured:
   another building are placed elsewhere. The locate gate is measured on unseen directions from the
   indexed scan points (renders, not photos), and every line it prints says so. A rerun with the
   merged thresholds is pending, so we quote no number here yet.
-- **Tests.** The verdict rules, card strings, demo cases, API routes, adapters, challenge, photo
+- **Tests.** The search, owner-of-record and license rules, the verdict rules, card strings, demo cases, API routes, adapters, challenge, photo
   memory and safety code are covered by tests that run in CI on fixtures.
 
-What is not measured yet: accuracy on real phone photos of these homes, the locator on house
+What is not measured yet: accuracy on real phone photos of these homes (the photo accuracy run, A8, has not been done), the locator on house
 scans, accuracy on real scam ads, and the deepagents path with a live model. No number goes in the
 demo or this README before the harness measures it, with n shown.
 
 ## Limits
 
-- **Live cases do not place photos yet.** The locator works on indexed scans and in fixture
-  cases, but a live case reads "Not checked" for the photos until it is wired in. So today a live
-  card can say Hold off or Could not place these photos, and not Don't pay or Checks passed.
+- **Photo placing on live cases needs an index.** The locator is wired into live cases (#155),
+  but it runs only where an index of the building's scan exists on the machine. With no index a
+  live card reads "Not checked" for the photos and can say Hold off or Could not place these
+  photos, not Don't pay or Checks passed on the photo evidence.
+- **Search is an API, not a screen yet.** `POST /search` takes a budget and must-haves and returns
+  checked places and a tour-request draft addressed to the office on record. Asking prices are
+  CoStar's, as of its last research; nothing is called "available now". The web app has no search
+  screen on `main` yet.
 - **A scan shows a floor plan, not a unit.** Apartment scans are model units. A match says "this
   building, this floor plan", never a unit number.
 - **The data covers Houston and Los Angeles.** That is what the CoStar kit holds.
@@ -224,11 +233,8 @@ demo or this README before the harness measures it, with n shown.
 
 ### In progress
 
-These are being built and are not on `main`:
+These are not on `main`:
 
-- Placing photos on live cases: the locator wired into live checks (#141).
-- A license line: whether a poster who claims to be an agent holds an active Texas license (#134, #137).
-- Owner of record: the owner as a company name, and the rule that owner publishes (#140, #130).
 - "Report this copy": an evidence pack a listing agent can send to the platform (#126).
 - The app restyle (#122).
 
