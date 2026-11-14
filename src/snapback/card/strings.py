@@ -44,8 +44,16 @@ EN: dict[str, str] = {
     "place.seen_before": "A listing photo also appeared in another check.",
     # For sale is a red flag, never proof: it holds a case and cannot set DON'T PAY by itself.
     "place.for_sale": "This home is listed for sale on {site}, not for rent. Red flag.",
-    "place.recently_rented": "The record shows this home was rented out recently.",
-    "place.recently_rented_dated": "This home was rented on {date}.",
+    # Lease status is something we do not know and never claim (ruling, Sat 01:20). This is
+    # an information line: it carries no flag and holds no case by itself.
+    "place.recently_rented": (
+        "Not confirmed. The record shows it was rented recently. "
+        "Ask the manager on record if it's still available."
+    ),
+    "place.recently_rented_dated": (
+        "Not confirmed. The record shows it was rented on {date}. "
+        "Ask the manager on record if it's still available."
+    ),
     # --- PERSON: is someone there now, and may they rent it? -------------------------------
     "here_now.proven_plan": (
         "Someone with access to a {floor_plan} unit here sent these just now "
@@ -72,20 +80,22 @@ EN: dict[str, str] = {
     "allowed.call_manager_unnamed": (
         "Not confirmed. Call the manager on record on a number you look up yourself before you pay."
     ),
-    "allowed.mismatch": (
-        "The name they gave does not match the manager on record for this building. Red flag."
-    ),
+    # A name that is not the one on record is never a red flag by itself (ruling, Sat 01:20):
+    # the manager, the leasing office and a listing brokerage may all market a home.
+    "allowed.call_office": "Not confirmed. Call the office on record yourself.",
     # Contact on record. The phone number itself and the record's web address are never shown.
     # A match is a supporting line only. It never counts as matching the record by itself.
     "contact.phone_match": (
         "The phone matches the leasing office on record. Call it yourself to confirm."
     ),
+    # The poster's own contact not matching the record is a real red flag (ruling, Sat 01:20).
     "contact.phone_mismatch": (
-        "The phone in the listing is not the leasing office on record. Call {manager} yourself."
+        "The phone in the listing is not the leasing office on record. "
+        "Call {manager} yourself. Red flag."
     ),
     "contact.phone_mismatch_unnamed": (
         "The phone in the listing is not the leasing office on record. "
-        "Call the manager on record yourself."
+        "Call the office on record yourself. Red flag."
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
@@ -201,12 +211,10 @@ EN: dict[str, str] = {
     "reason.forged_copy": "The reply is a copy of listing photo {n}.",
     "reason.forged_copy_unknown": "The reply is a copy of one of the listing photos.",
     "reason.photo_elsewhere": "At least one listing photo was taken in a different property.",
-    "reason.authority_mismatch": "The poster does not match the contact on the property record.",
     "reason.price_flag": "The rent is far below comparable units.",
     "reason.payment_flag": "Payment was requested before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
     "reason.for_sale": "This home is listed for sale, not for rent.",
-    "reason.recently_rented": "The record shows this home was rented out recently.",
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
@@ -280,8 +288,14 @@ ES: dict[str, str] = {
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
     "place.for_sale": "Esta vivienda está en venta en {site}, no en alquiler. Señal de alerta.",
-    "place.recently_rented": "El registro muestra que esta vivienda se alquiló hace poco.",
-    "place.recently_rented_dated": "Esta vivienda se alquiló el {date}.",
+    "place.recently_rented": (
+        "Sin confirmar. El registro muestra que se alquiló hace poco. "
+        "Pregunte al administrador que figura en el registro si sigue disponible."
+    ),
+    "place.recently_rented_dated": (
+        "Sin confirmar. El registro muestra que se alquiló el {date}. "
+        "Pregunte al administrador que figura en el registro si sigue disponible."
+    ),
     "here_now.proven_plan": (
         "Alguien con acceso a una unidad de {floor_plan} aquí las envió ahora mismo "
         "({matched} de {total} puntos, código leído, {time})."
@@ -315,9 +329,8 @@ ES: dict[str, str] = {
         "Sin confirmar. Llame al administrador que figura en el registro, a un número que "
         "usted mismo busque, antes de pagar."
     ),
-    "allowed.mismatch": (
-        "El nombre que dieron no coincide con el administrador que figura en el registro de "
-        "este edificio. Señal de alerta."
+    "allowed.call_office": (
+        "Sin confirmar. Llame usted mismo a la oficina que figura en el registro."
     ),
     "contact.phone_match": (
         "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
@@ -325,11 +338,11 @@ ES: dict[str, str] = {
     ),
     "contact.phone_mismatch": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a {manager}."
+        "Llame usted mismo a {manager}. Señal de alerta."
     ),
     "contact.phone_mismatch_unnamed": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo al administrador que figura en el registro."
+        "Llame usted mismo a la oficina que figura en el registro. Señal de alerta."
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
@@ -471,14 +484,10 @@ ES: dict[str, str] = {
     "reason.forged_copy": "La respuesta es una copia de la foto {n} del anuncio.",
     "reason.forged_copy_unknown": "La respuesta es una copia de una de las fotos del anuncio.",
     "reason.photo_elsewhere": "Al menos una foto del anuncio se tomó en otra propiedad.",
-    "reason.authority_mismatch": (
-        "Quien publicó el anuncio no coincide con el contacto del registro de la propiedad."
-    ),
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
     "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
     "reason.for_sale": "Esta vivienda está en venta, no en alquiler.",
-    "reason.recently_rented": "El registro muestra que esta vivienda se alquiló hace poco.",
     "reason.phone_flag": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),

@@ -40,6 +40,7 @@ FIXTURE_PHONE_SALT = "fx-phone-salt"
 _PROCESS_SALT = secrets.token_hex(16)
 
 MAX_PHONES = 10
+MAX_MARKETERS = 20
 MAX_LINKS = 20
 MAX_HOST = 253
 MAX_LABEL = 63
@@ -259,8 +260,17 @@ def check_link(links: Sequence[str], website: str | None) -> LinkDomain:
 # --- all three -----------------------------------------------------------------------------
 
 
-def check_authority(claims: Claims, record: PropertyRecord | None, salt: str) -> AuthorityResult:
+def check_authority(
+    claims: Claims,
+    record: PropertyRecord | None,
+    salt: str,
+    marketers: Sequence[str] = (),
+) -> AuthorityResult:
     """Compare what the listing says about the poster with the record. Yes/no only.
+
+    `marketers` are other company names on record that may market the home: the listing
+    brokerage or office (ruling, Sat 01:20). Naming any of them matches, as naming the
+    manager does.
 
     The status says whether the poster matches the contact on record, and only the company
     they named decides it. A phone match alone never does (XO ruling on #87): anyone can copy
@@ -271,7 +281,9 @@ def check_authority(claims: Claims, record: PropertyRecord | None, salt: str) ->
         return AuthorityResult(status=AuthorityStatus.UNKNOWN, poster_said=claims.company)
 
     phone = check_phone(claims.phones, record, salt)
-    company = same_company(claims.company, record.manager_company)
+    on_record = [name for name in (record.manager_company, *marketers[:MAX_MARKETERS]) if name]
+    answers = [same_company(claims.company, name) for name in on_record]
+    company = True if any(answers) else (False if False in answers else None)
     if company is None:
         status = AuthorityStatus.UNKNOWN
     else:
