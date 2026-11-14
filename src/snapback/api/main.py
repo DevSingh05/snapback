@@ -22,6 +22,7 @@ challenge and is the only one accepted as `?token=`, because servers log address
 import asyncio
 import secrets
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -31,6 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
+from snapback.adapters.vexcel import aerial_proof
 from snapback.agent.intake import read_listing
 from snapback.api.cases import (
     CaseStatus,
@@ -44,7 +46,15 @@ from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.card.render import render_card_png
-from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
+from snapback.contracts import (
+    AerialProofResponse,
+    Card,
+    CreateCaseResponse,
+    DataSource,
+    Evidence,
+    LocateStatus,
+    Verdict,
+)
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -67,6 +77,9 @@ def _after(last_event_id: str | None) -> int:
         return int(last_event_id) if last_event_id is not None else -1
     except ValueError:
         return -1
+
+
+AerialDirection = Literal["north", "east", "south", "west", "nadir"]
 
 
 def _bearer(authorization: str | None, case_token: str | None) -> str | None:
@@ -299,6 +312,78 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """The same card drawn as a PNG, with the verify link as a QR code."""
         card = find(case_id).card(settings.snapback_public_base_url, lang)
         return Response(content=render_card_png(card), media_type="image/png")
+
+    # --- D9 aerial proof (lane D builder in adapters/vexcel.py; contract approved on #41) ---
+
+    def aerial_for(case: RecordedCase | SessionCase, case_id: str, direction: str):
+        """The two buildings for this case. The claimed one is the case's property id (A10); the
+        matched one is a photo located in another building (V2). Either may be missing."""
+        evidence = getattr(getattr(case, "session", None), "evidence", None) or getattr(
+            case, "_evidence", None
+        )
+        matched_id = None
+        if evidence is not None and evidence.locate is not None:
+            for photo in evidence.locate.photos:
+                if photo.status == LocateStatus.LOCATED_ELSEWHERE:
+                    matched_id = getattr(photo, "matched_property_id", None)
+                    if matched_id:
+                        break
+        source = evidence.source if evidence is not None else settings.snapback_data_source
+        return aerial_proof(
+            case_id,
+            source,
+            getattr(case, "property_id", None),
+            matched_id,
+            direction=direction,
+            data_dir=settings.snapback_data_dir,
+            image_url=lambda side: f"/cases/{case_id}/aerial/{side}.jpg?direction={direction}",
+        )
+
+    @app.get("/cases/{case_id}/aerial")
+    def get_aerial(
+        case_id: str,
+        direction: AerialDirection = "north",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> AerialProofResponse:
+        """The claimed building and the one the photos matched, from the air, with the distance.
+
+        Cases are private: this needs the case's read token in a header. Each tile is bounded at
+        20 s and cached for 7 days under data/vexcel/ (`make purge` deletes it)."""
+        case = find(case_id)
+        token = _bearer(authorization, x_case_token)
+        if token is None:
+            raise HTTPException(status_code=401, detail="This needs the case's read token.")
+        check_read(case, token, None)
+        proof = aerial_for(case, case_id, direction)
+        # The image is served by our own route; the client never sees where it sits on disk.
+        for side in (proof.claimed, proof.matched):
+            if side is not None and side.tile is not None:
+                side.tile = side.tile.model_copy(update={"path": Path(side.tile.path).name})
+        return proof
+
+    @app.get("/cases/{case_id}/aerial/{side}.jpg")
+    def get_aerial_image(
+        case_id: str,
+        side: Literal["claimed", "matched"],
+        direction: AerialDirection = "north",
+        token: str | None = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """One live tile's bytes. An <img> cannot send headers, so the read-only token may be in
+        the address (`?token=`), exactly as for the trace; the write token never is."""
+        case = find(case_id)
+        check_read(case, _bearer(authorization, x_case_token), token)
+        proof = aerial_for(case, case_id, direction)
+        chosen = proof.claimed if side == "claimed" else proof.matched
+        if chosen is None or chosen.tile is None or chosen.tile.source != DataSource.LIVE:
+            raise HTTPException(status_code=404, detail="No aerial tile for this building.")
+        return Response(
+            content=Path(chosen.tile.path).read_bytes(),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=600"},
+        )
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(

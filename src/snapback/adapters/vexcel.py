@@ -29,6 +29,7 @@ import math
 import re
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -36,7 +37,13 @@ from typing import Any
 
 import httpx
 
-from snapback.contracts import AerialTile, DataSource, PropertyRecord
+from snapback.contracts import (
+    AerialProofResponse,
+    AerialSideOut,
+    AerialTile,
+    DataSource,
+    PropertyRecord,
+)
 from snapback.settings import get_settings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -281,4 +288,76 @@ def two_building_proof(
         claimed=get_tile(claimed, direction, **kwargs),
         matched=get_tile(matched, direction, **kwargs),
         distance_m=distance_m(claimed, matched),
+    )
+
+
+# --- D9: the aerial proof a case shows (GET /cases/{id}/aerial) -------------------------------
+
+PUBLIC_RECORD_FIELDS = {
+    "property_id",
+    "source",
+    "market",
+    "property_type",
+    "floors",
+    "year_built",
+    "lat",
+    "lon",
+    "manager_company",
+}
+
+
+def public_record(record: PropertyRecord) -> PropertyRecord:
+    """The record trimmed to what the card shows: building facts and the company name. The phone
+    hash, website host, units and rent bands never leave the server through this route."""
+    return PropertyRecord.model_validate(record.model_dump(include=PUBLIC_RECORD_FIELDS))
+
+
+def aerial_proof(
+    case_id: str,
+    source: DataSource,
+    claimed_id: str | None,
+    matched_id: str | None,
+    *,
+    direction: str = "north",
+    records: dict[str, PropertyRecord] | None = None,
+    image_url: Callable[[str], str] | None = None,
+    **tile_kwargs: Any,
+) -> AerialProofResponse:
+    """Both buildings, fetched at the same time, each within the 20 s tile budget.
+
+    `claimed_id` is the case's property id; `matched_id` the building a photo was located in when
+    it was not the claimed one (None otherwise). `image_url(side)` builds our own image route for
+    a live tile; fixture tiles get no URL (lane T draws its stand-in)."""
+    if records is None:
+        from snapback.adapters.costar_jsonl import KitNotFoundError, load_records
+
+        try:
+            records = load_records(source)
+        except KitNotFoundError:
+            records = {}
+    claimed_rec = records.get(claimed_id) if claimed_id else None
+    matched_rec = records.get(matched_id) if matched_id and matched_id != claimed_id else None
+
+    def tile(rec: PropertyRecord | None) -> AerialTile | None:
+        if rec is None:
+            return None
+        return get_tile(rec, direction, source=source, **tile_kwargs)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claimed_f, matched_f = pool.submit(tile, claimed_rec), pool.submit(tile, matched_rec)
+        claimed_tile, matched_tile = claimed_f.result(), matched_f.result()
+
+    def side(name: str, rec: PropertyRecord | None, t: AerialTile | None) -> AerialSideOut:
+        url = (
+            image_url(name) if image_url and t is not None and t.source == DataSource.LIVE else None
+        )
+        return AerialSideOut(tile=t, record=public_record(rec) if rec else None, image_url=url)
+
+    matched = side("matched", matched_rec, matched_tile) if matched_rec else None
+    return AerialProofResponse(
+        case_id=case_id,
+        source=source,
+        claimed=side("claimed", claimed_rec, claimed_tile),
+        matched=matched,
+        distance_m=distance_m(claimed_rec, matched_rec) if claimed_rec and matched_rec else None,
     )
