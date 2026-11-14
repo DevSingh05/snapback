@@ -51,7 +51,8 @@ CACHE_DAYS = 7
 MAX_RETRIES = 3
 MAX_WAIT_S = 30.0  # a longer Retry-After is over budget: give up, ship record facts only
 TIMEOUT_S = 60.0
-TOTAL_BUDGET_S = 20.0  # one tile, end to end, across every request and wait
+TOTAL_BUDGET_S = 20.0  # one tile, end to end, across every request, wait and byte read
+MAX_TILE_BYTES = 5 * 1024 * 1024  # a bigger reply is not a tile we want
 DIRECTIONS = ("north", "east", "south", "west", "nadir")
 _FROM_SETTINGS = object()
 _SAFE = re.compile(r"[^A-Za-z0-9_-]")
@@ -132,6 +133,43 @@ def _send(
         if wait is None or attempt == MAX_RETRIES or _monotonic() + wait >= deadline:
             return None
         sleep(wait)
+    return None
+
+
+def _fetch_image(
+    http: httpx.Client, path: str, key: str, sleep: Sleep, deadline: float, body: dict[str, Any]
+) -> bytes | None:
+    """POST an extract and stream the image back. None when rate limited past the budget, not
+    an image, over 5 MB, or not fully read before the deadline (a reply that trickles in)."""
+    for attempt in range(MAX_RETRIES + 1):
+        remaining = deadline - _monotonic()
+        if remaining <= 0:
+            return None
+        with http.stream(
+            "POST",
+            f"{BASE_URL}/{path}",
+            headers={"X-API-KEY": key},
+            json=body,
+            timeout=min(TIMEOUT_S, remaining),
+        ) as response:
+            if response.status_code == 429:
+                wait = _wait_s(response, attempt)
+                if wait is None or attempt == MAX_RETRIES or _monotonic() + wait >= deadline:
+                    return None
+                sleep(wait)
+                continue
+            if response.status_code != 200:
+                return None
+            if not response.headers.get("content-type", "").startswith("image/"):
+                return None
+            chunks: list[bytes] = []
+            size = 0
+            for chunk in response.iter_bytes():
+                size += len(chunk)
+                if size > MAX_TILE_BYTES or _monotonic() > deadline:
+                    return None
+                chunks.append(chunk)
+            return b"".join(chunks)
     return None
 
 
@@ -240,13 +278,11 @@ def get_tile(
                 "image-format": "jpeg",
             }
         body |= {"wkt": wkt, "srid": 4326, "buffer-meter": BUFFER_M}
-        r = _send(http, "POST", endpoint, key, sleep, deadline, json=body)
-        if r is None or r.status_code != 200:
-            return None
-        if not r.headers.get("content-type", "").startswith("image/"):
+        content = _fetch_image(http, endpoint, key, sleep, deadline, body)
+        if content is None:
             return None
         cache.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(r.content)
+        path.write_bytes(content)
         meta.write_text(json.dumps({"captured_on": captured.isoformat() if captured else None}))
         return AerialTile(
             property_id=record.property_id,

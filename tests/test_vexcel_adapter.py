@@ -241,3 +241,46 @@ def test_one_tile_never_takes_longer_than_the_total_budget(tmp_path, monkeypatch
     assert tile is None
     assert now[0] <= vexcel.TOTAL_BUDGET_S
     assert len(api.seen) == 2  # a second 15 s wait would pass the 20 s budget
+
+
+class _SlowBody(httpx.SyncByteStream):
+    """A reply that trickles in: each chunk advances the fake clock."""
+
+    def __init__(self, now: list[float], chunks: int, step: float, size: int = 1024) -> None:
+        self.now, self.chunks, self.step, self.size = now, chunks, step, size
+
+    def __iter__(self):
+        for _ in range(self.chunks):
+            self.now[0] += self.step
+            yield b"\xff" * self.size
+
+
+def _stream_api(now: list[float], body: httpx.SyncByteStream) -> Api:
+    return Api(
+        oriented__collections=[_coverage("north")],
+        oriented__extract=[
+            httpx.Response(200, headers={"content-type": "image/jpeg"}, stream=body)
+        ],
+    )
+
+
+def test_a_reply_that_trickles_past_the_budget_gives_no_tile_and_caches_nothing(
+    tmp_path, monkeypatch
+):
+    from snapback.adapters import vexcel
+
+    now = [0.0]
+    monkeypatch.setattr(vexcel, "_monotonic", lambda: now[0])
+    api = _stream_api(now, _SlowBody(now, chunks=8, step=3.0))  # 24 s of trickle
+    assert _live(tmp_path, api) is None
+    assert not list(tmp_path.rglob("*.jpg"))
+
+
+def test_a_reply_over_5_mb_gives_no_tile(tmp_path, monkeypatch):
+    from snapback.adapters import vexcel
+
+    now = [0.0]
+    monkeypatch.setattr(vexcel, "_monotonic", lambda: now[0])
+    big = _SlowBody(now, chunks=6, step=0.0, size=1024 * 1024)  # 6 MB, instantly
+    assert _live(tmp_path, _stream_api(now, big)) is None
+    assert not list(tmp_path.rglob("*.jpg"))
