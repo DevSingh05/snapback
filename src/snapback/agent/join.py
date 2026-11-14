@@ -70,7 +70,8 @@ class KitLookups:
         self._records: dict[str, PropertyRecord] | None = None
         self._lock = threading.Lock()
 
-    def record(self, property_id: str) -> PropertyRecord | None:
+    def records(self) -> dict[str, PropertyRecord]:
+        """Every record in the kit by our id, parsed once. For routes that need more than one."""
         from snapback.adapters import costar_jsonl
 
         with self._lock:
@@ -79,7 +80,10 @@ class KitLookups:
                     self._records = costar_jsonl.load_records(self.source, self._kit_dir)
                 except costar_jsonl.KitNotFoundError:
                     raise KitMissing from None
-            return self._records.get(property_id)
+            return self._records
+
+    def record(self, property_id: str) -> PropertyRecord | None:
+        return self.records().get(property_id)
 
     def for_sale(self, listing_text: str) -> ForSaleMatch | None:
         try:

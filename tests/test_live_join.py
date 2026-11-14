@@ -112,6 +112,23 @@ def test_the_kit_is_read_once_however_many_cases_ask(monkeypatch):
     assert len(calls) == 1
 
 
+def test_a_case_says_which_building_it_claims_and_shows_its_evidence(tmp_path):
+    # Asked for by lane D's aerial route (#113), so it need not reach into private state.
+    client = client_for(tmp_path)
+    made = client.post(
+        "/cases", data={"text": "2 bed, $1,900 a month.", "property_id": "fx-prop-3"}
+    ).json()
+    store = client.app.state.store
+    case = store.get(made["case_id"])
+    assert case.property_id == "fx-prop-3"
+    assert case.evidence is case.session.evidence
+    plain = store.get(client.post("/cases", data={"text": "2 bed."}).json()["case_id"])
+    assert plain.property_id is None
+    recorded = store.get("7Q2M")
+    assert recorded.property_id == "fx-prop-1" and recorded.evidence.locate is not None
+    assert set(KitLookups(DataSource.FIXTURE).records()) >= {"fx-prop-1", "fx-prop-3"}
+
+
 def test_a_missing_kit_is_a_clear_error_that_names_no_path(tmp_path):
     lookups = KitLookups(DataSource.LIVE, kit_dir=tmp_path / "nothing-here")
     with pytest.raises(KitMissing) as error:

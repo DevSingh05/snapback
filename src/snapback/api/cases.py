@@ -102,6 +102,16 @@ class RecordedCase:
         self._evidence = evidence
         self._photos = len(evidence.locate.photos) if evidence.locate else 0
 
+    @property
+    def evidence(self) -> ModuleEvidence:
+        """What the modules found for this case. Read-only for other lanes' routes."""
+        return self._evidence
+
+    @property
+    def property_id(self) -> str | None:
+        """Our id for the building the listing claims, if it named one."""
+        return self._evidence.locate.claimed_property_id if self._evidence.locate else None
+
     def events(self) -> list[TraceEvent]:
         return self._events
 
@@ -146,6 +156,7 @@ class SessionCase:
         self._listing = listing
         self._runner = runner
         self.staged = False  # made from a staged demo case (fixtures/demo)
+        self.property_id: str | None = None  # our id for the building the listing claims
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 
@@ -159,6 +170,11 @@ class SessionCase:
             self._runner(self.session)
             if self.session.done and self._checked_at is None:
                 self._checked_at = _now()
+
+    @property
+    def evidence(self) -> ModuleEvidence:
+        """What the modules found for this case so far. Read-only for other lanes' routes."""
+        return self.session.evidence
 
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
@@ -319,6 +335,7 @@ class CaseStore:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner)
             case.staged = demo is not None
+            case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()
         return case
