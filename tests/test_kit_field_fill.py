@@ -21,14 +21,23 @@ def _keys(obj, found: set[str]) -> set[str]:
     return found
 
 
-def test_the_fixture_uses_the_real_kit_key_names():
+def _file_keys(name: str) -> set[str]:
     keys: set[str] = set()
-    for name in ("commercial-property.jsonl", "apartment-listing.jsonl"):
-        for line in (FIXTURE_KIT / name).read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                _keys(json.loads(line), keys)
+    for line in (FIXTURE_KIT / name).read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            _keys(json.loads(line), keys)
+    return keys
+
+
+def test_the_fixture_uses_the_real_kit_key_names():
+    commercial = _file_keys("commercial-property.jsonl")
+    listing = _file_keys("apartment-listing.jsonl")
+    keys = commercial | listing
     assert keys >= REAL_KEYS
     assert not (INVENTED_KEYS & keys), INVENTED_KEYS & keys
+    # per file: year built lives in constructionEvents on commercial records; only the
+    # apartment listing has a top-level yearBuilt
+    assert "constructionEvents" in commercial and "yearBuilt" not in commercial
 
 
 def test_every_mapped_field_fills_at_least_one_fixture_record():
