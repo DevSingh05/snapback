@@ -24,9 +24,9 @@ from snapback.agent import (
     FixtureModules,
     PolicyChooser,
     Trace,
-    detect_scope,
     run_case,
 )
+from snapback.agent.intake import Listing
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.card import strings
 from snapback.contracts import (
@@ -88,6 +88,7 @@ def _now() -> datetime:
 class RecordedCase:
     done = True
     token = None  # a recorded case can never be written to, so it has no secret
+    read_token = None
 
     def __init__(self, case_id: str, card: Card, events: list[TraceEvent], photos: int) -> None:
         self.case_id = case_id
@@ -101,7 +102,7 @@ class RecordedCase:
     def card(self, verify_base_url: str) -> Card:
         return self._card
 
-    def status(self) -> CaseStatus:
+    def status(self, with_challenge: bool = False) -> CaseStatus:
         return CaseStatus(
             case_id=self.case_id,
             source=self._card.source,
@@ -119,13 +120,16 @@ class SessionCase:
         self,
         case_id: str,
         session: CaseSession,
-        photos: int,
+        listing: Listing,
         runner: Callable[[CaseSession], object],
     ) -> None:
         self.case_id = case_id  # short, shown to people, enough to read the case
         self.token = secrets.token_urlsafe(24)  # 192 bits, needed for every write
+        # A second secret that can only read. It is the one a browser may put in an address,
+        # where servers log it, so it must never be able to approve anything.
+        self.read_token = secrets.token_urlsafe(24)
         self.session = session
-        self._photos = photos
+        self._listing = listing
         self._runner = runner
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
@@ -152,7 +156,8 @@ class SessionCase:
             lang=self.session.lang,
         )
 
-    def status(self) -> CaseStatus:
+    def status(self, with_challenge: bool = False) -> CaseStatus:
+        """Where the case stands. The drafted challenge is left out unless asked for."""
         if self.session.done:
             status = CaseProgress.DONE
         elif self.session.waiting_for_approval:
@@ -160,7 +165,7 @@ class SessionCase:
         else:
             status = CaseProgress.RUNNING
         draft = self.session.pending_challenge
-        if status is not CaseProgress.WAITING_FOR_APPROVAL:
+        if status is not CaseProgress.WAITING_FOR_APPROVAL or not with_challenge:
             draft = None
         return CaseStatus(
             case_id=self.case_id,
@@ -168,7 +173,9 @@ class SessionCase:
             status=status,
             state=self.session.verdict.state if self.session.verdict else None,
             challenge_text=draft.text if draft else None,
-            photos=self._photos,
+            photos=self._listing.photos,
+            screenshots=self._listing.screenshots,
+            injection_noticed=bool(self._listing.injection_spans),
             challenge=(
                 ChallengeView(text=draft.text, spot_label=draft.spot_label, code=draft.code)
                 if draft
@@ -241,16 +248,24 @@ class CaseStore:
         if self._settings.snapback_data_source is not DataSource.FIXTURE:
             raise LiveModeNotWired
 
-    def create(self, listing_text: str, photos: int) -> SessionCase:
+    def create(self, listing: Listing) -> SessionCase:
         self.check_can_create()
         with self._lock:
             short_id = self._new_id()
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
-            # The fixture modules stand in for the evidence. The kind of listing is still read
-            # from the text that was posted, so an out-of-scope listing is treated as one.
-            modules = FixtureModules(listing_scope=detect_scope(listing_text))
+            # The fixture modules stand in for the twin, the record and the challenge. What
+            # the renter sent is real: its scope, its rule hits and its rent come from intake.
+            modules = FixtureModules(
+                listing_scope=listing.scope,
+                rules=listing.rule_hits if listing.text else None,
+                listed_rent=listing.listed_rent,
+            )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
-            case = SessionCase(short_id, session, photos, self._runner)
+            if listing.truncated:
+                session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
+            if listing.injection_spans:
+                session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
+            case = SessionCase(short_id, session, listing, self._runner)
             self._cases[short_id] = case
         case.advance()
         return case

@@ -9,6 +9,8 @@ link and wording. A sentence in the listing asking to skip the checks changes no
 import re
 from enum import StrEnum
 
+from snapback.agent.rules.apply import normalise
+
 
 class ListingScope(StrEnum):
     RENTAL = "rental"
@@ -31,6 +33,7 @@ _COMMERCIAL = re.compile(
 
 
 def detect_scope(listing_text: str) -> ListingScope:
+    listing_text = normalise(listing_text)  # bounded before any pattern reads it
     if _SHORT_TERM.search(listing_text):
         return ListingScope.SHORT_TERM
     if _COMMERCIAL.search(listing_text):

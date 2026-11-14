@@ -3,8 +3,10 @@
 A stand-in until the safety module (lane D, D5) lands with `check_limit(renter_id)`. It keeps
 counts in memory, so they reset when the server restarts.
 
-Checking and counting are separate on purpose: a check that could not start (bad upload, live
-mode not wired) must not use up someone's allowance.
+Taking a place and giving it back are separate steps, each one atomic. A request reserves its
+place before the check starts, so two requests arriving together cannot both take the last
+one, and releases it if the check could not start (bad upload, live mode not wired), so a
+failure costs nobody their allowance.
 """
 
 import threading
@@ -23,12 +25,20 @@ class DailyLimit:
         self._counts: dict[tuple[str, date], int] = {}
         self._lock = threading.Lock()
 
-    def has_room(self, key: str) -> bool:
-        with self._lock:
-            return self._counts.get((key, self._today()), 0) < self.per_day
-
-    def count(self, key: str) -> None:
-        """Record one check that did start."""
+    def reserve(self, key: str) -> bool:
+        """Take one of today's places for `key`, if there is one. Check and count in one step."""
         slot = (key, self._today())
         with self._lock:
-            self._counts[slot] = self._counts.get(slot, 0) + 1
+            used = self._counts.get(slot, 0)
+            if used >= self.per_day:
+                return False
+            self._counts[slot] = used + 1
+            return True
+
+    def release(self, key: str) -> None:
+        """Give back a place that was reserved for a check that did not start."""
+        slot = (key, self._today())
+        with self._lock:
+            used = self._counts.get(slot, 0)
+            if used > 0:
+                self._counts[slot] = used - 1
