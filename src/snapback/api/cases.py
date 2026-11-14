@@ -28,6 +28,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
+from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
 from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of, owner_of
@@ -176,6 +177,10 @@ class RecordedCase:
     def presence(self) -> PresenceStatus:
         return presence_of(self._evidence).status
 
+    def notes(self) -> CaseNotes:
+        """A recorded case was not worked by an agent here, so it has no working notes."""
+        return CaseNotes(case_id=self.case_id, source=self._evidence.source, notes=[])
+
 
 class SessionCase:
     def __init__(
@@ -270,6 +275,29 @@ class SessionCase:
             question=self.session.question,
         )
 
+    @property
+    def office_record(self) -> object | None:
+        """The property record this case runs on, if any. Read-only, for the office proof."""
+        return getattr(self.session.modules, "record", None)
+
+    @property
+    def office_confirmed_domain(self) -> str | None:
+        return self.session.evidence.office_confirmed_domain
+
+    @property
+    def office_declined_domain(self) -> str | None:
+        return self.session.evidence.office_declined_domain
+
+    def confirm_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Yes, ours"."""
+        with self._lock:
+            self.session.confirm_office(domain)
+
+    def decline_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Not ours"."""
+        with self._lock:
+            self.session.decline_office(domain)
+
     def approve(self, decision: str, text: str | None) -> None:
         with self._lock:
             try:
@@ -307,14 +335,29 @@ class SessionCase:
     def presence(self) -> PresenceStatus:
         return presence_of(self.session.evidence).status
 
+    def notes(self) -> CaseNotes:
+        """The notes the agent wrote for this case (read-only; see casework.py)."""
+        return notes_view(self.session)
+
 
 def _policy_runner(session: CaseSession) -> object:
-    return run_case(session, PolicyChooser())
+    try:
+        return run_case(session, PolicyChooser())
+    finally:
+        refresh_policy_notes(session)  # the same notes, written by code
 
 
-def _deepagents_runner() -> Callable[[CaseSession], object]:
+def _deepagents_runner(settings: Settings | None = None) -> Callable[[CaseSession], object]:
     """A runner that drives each case with its own deep agent, falling back to the policy."""
     agents: dict[str, object] = {}
+    if settings is not None:
+        try:
+            from snapback.agent.graph import enable_langsmith
+
+            key = settings.langsmith_api_key
+            enable_langsmith(key.get_secret_value() if key else None, settings.langsmith_project)
+        except Exception:
+            log.warning("LangSmith tracing could not be set up; carrying on without it")
 
     def run(session: CaseSession) -> object:
         try:
@@ -325,7 +368,10 @@ def _deepagents_runner() -> Callable[[CaseSession], object]:
         except Exception:
             # The extra is not installed, there is no key, or the graph could not be built.
             session.trace.emit(TraceKind.ERROR, strings.text("trace.error.model_failed"))
-            return run_case(session, PolicyChooser())
+            try:
+                return run_case(session, PolicyChooser())
+            finally:
+                refresh_policy_notes(session)
 
     return run
 
@@ -350,7 +396,9 @@ class CaseStore:
         self._lock = threading.Lock()
         self._memory: PhotoMemory | None = None
         self._runner = (
-            _deepagents_runner() if settings.snapback_agent == "deepagents" else _policy_runner
+            _deepagents_runner(settings)
+            if settings.snapback_agent == "deepagents"
+            else _policy_runner
         )
         if settings.snapback_data_source is DataSource.FIXTURE:
             self._add_recorded_fixture()
@@ -378,6 +426,25 @@ class CaseStore:
 
     def get(self, case_id: str) -> RecordedCase | SessionCase | None:
         return self._cases.get(public_id(case_id))
+
+    def _search_text_for(self, case: SessionCase) -> Callable[[], str]:
+        """The search sub-agent's source: the #195 planner over places near the checked ad, as
+        text. The chooser is the model when the agent setting says so, else the code policy."""
+
+        def search(use_model: bool = False) -> str:
+            from snapback.agent.search_agent import agentic_alternatives, search_chooser_for
+
+            response = agentic_alternatives(
+                case,
+                self._lookups,
+                search_chooser_for(self._settings.snapback_agent if use_model else "policy"),
+                3,
+                case.preferences,
+                self._settings.snapback_data_source,
+            )
+            return places_text(response)
+
+        return search
 
     def _new_id(self) -> str:
         while True:
@@ -506,6 +573,7 @@ class CaseStore:
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner, self._zone_of(record))
+            session.search_places = self._search_text_for(case)
             case.staged = demo is not None
             case.demo_case_id = demo.case_id if demo is not None else None
             case.property_id = property_id  # the building the listing claims, if it named one

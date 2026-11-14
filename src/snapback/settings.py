@@ -60,6 +60,10 @@ class Settings(BaseSettings):
 
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
+    # LangSmith tracing for the deepagents path. A human creates the key (AGENTS.md rule 8); with
+    # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
+    langsmith_api_key: SecretStr | None = None
+    langsmith_project: str = "snapback"
     # Checks one renter (or one browser) may start per day, and a ceiling per network address
     # so that clearing cookies is not a way around it.
     snapback_daily_limit: int = 3

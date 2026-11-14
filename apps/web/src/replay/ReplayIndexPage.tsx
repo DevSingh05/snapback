@@ -1,4 +1,5 @@
 import { SourceChip } from "../components/SourceChip";
+import { Wordmark } from "../components/HouseGlyph";
 import { replayLang, shortDate, words, type Lang } from "./text";
 import { useReplays } from "./useReplays";
 import type { Replay } from "./types";
@@ -16,7 +17,7 @@ export function ReplayIndexView({
     <article className="replay-page replay-index">
       <header className="replay-head">
         <div className="replay-masthead">
-          <span className="wordmark">SNAPBACK</span>
+          <Wordmark />
           <SourceChip source="fixture" />
         </div>
         <h1>{t.indexTitle}</h1>

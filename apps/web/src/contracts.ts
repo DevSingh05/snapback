@@ -75,7 +75,18 @@ export interface Card {
   lang: string;
 }
 
-export type TraceKind = "choice" | "tool" | "status" | "hitl" | "verdict" | "error";
+export type TraceKind =
+  | "choice"
+  | "tool"
+  | "status"
+  | "hitl"
+  | "verdict"
+  | "error"
+  // The deep agent's own steps (E0): todo list, sub-agent hand-off, file written, code-raised doubt.
+  | "todo"
+  | "agent"
+  | "file"
+  | "unsure";
 export type ChoiceKind =
   "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human" | "next_check";
 
@@ -95,6 +106,22 @@ export interface TraceEvent {
   reason: string;
   source: DataSource;
   chosen_by: ChosenBy;
+}
+
+// One working note the agent wrote (GET /cases/{id}/notes). Derived text only.
+export interface CaseNote {
+  path: string;
+  stem: string;
+  agent: string;
+  text: string;
+  written_by: ChosenBy;
+}
+
+export interface CaseNotes {
+  case_id: string;
+  source: DataSource;
+  notes: CaseNote[];
+  footer: string;
 }
 
 // Mirrors Pose and the parts of LocateResult the twin reads (src/snapback/contracts.py).
@@ -300,4 +327,29 @@ export interface TourDraft {
   status: "draft";
   sent: false;
   source: DataSource;
+}
+
+// Mirrors PackLine and TourPrepPack in src/snapback/pack.py (GET /cases/{id}/tour-prep and
+// GET /places/{property_id}/tour-prep). Every word is the API's, written by code in the language
+// asked for; render it as given.
+export interface PackLine {
+  key: string;
+  text: string;
+  sources: string[];
+  as_of?: string | null; // "as of CoStar's last research", on lines from CoStar's research
+}
+
+export interface TourPrepPack {
+  source: DataSource;
+  lang: "en" | "es";
+  title: string;
+  subtitle: string;
+  note: string;
+  as_of: string;
+  facts_heading: string;
+  questions_heading: string;
+  pay_heading: string;
+  facts: PackLine[];
+  questions: PackLine[];
+  before_you_pay: string[];
 }
