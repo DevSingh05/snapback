@@ -655,6 +655,15 @@ class CaseSession:
 
     # --- the end ---------------------------------------------------------------------------
 
+    def confirm_office(self, domain: str) -> None:
+        """Record that someone at the office's own website domain on record confirmed this case.
+
+        A finished case is decided again on the evidence it now has, by `decide` and nowhere
+        else. A case still running carries the domain into its eventual decision."""
+        self.evidence = self.evidence.model_copy(update={"office_confirmed_domain": domain})
+        if self.verdict is not None:
+            self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
+
     def _finish(self) -> None:
         """Decide on the evidence gathered. This is the only way a case gets a state."""
         if self._replied and presence_of(self.evidence).status is PresenceStatus.WAITING:

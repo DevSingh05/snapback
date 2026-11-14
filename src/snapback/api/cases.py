@@ -264,6 +264,20 @@ class SessionCase:
             question=self.session.question,
         )
 
+    @property
+    def office_record(self) -> object | None:
+        """The property record this case runs on, if any. Read-only, for the office proof."""
+        return getattr(self.session.modules, "record", None)
+
+    @property
+    def office_confirmed_domain(self) -> str | None:
+        return self.session.evidence.office_confirmed_domain
+
+    def confirm_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record opened the one-time link."""
+        with self._lock:
+            self.session.confirm_office(domain)
+
     def approve(self, decision: str, text: str | None) -> None:
         with self._lock:
             try:

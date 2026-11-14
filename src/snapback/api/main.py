@@ -27,14 +27,15 @@ valid or not.
 import asyncio
 import re
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from html import escape
 from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
@@ -56,6 +57,7 @@ from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
+from snapback.card import strings
 from snapback.contracts import (
     AerialProofResponse,
     AerialSideOut,
@@ -73,6 +75,9 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.office.domain import accepts_address, official_domain
+from snapback.office.models import OfficeRequest, OfficeRequested, OfficeStatus
+from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited
 from snapback.safety.paths import resolve_data_dir
 from snapback.search import (
     AmbiguousPlace,
@@ -123,6 +128,19 @@ class Answer(BaseModel):
     text: str | None = Field(default=None, max_length=500)
 
 
+def _confirm_page(status: int, title: str, message: str) -> HTMLResponse:
+    page = (
+        '<!doctype html><html lang="en"><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>{escape(title)}</title>"
+        '<body style="font:16px system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem">'
+        f"<h1>{escape(title)}</h1><p>{escape(message)}</p>"
+        "<p><small>SNAPBACK. A confirmation is information for the renter, not a guarantee."
+        "</small></p></body></html>"
+    )
+    return HTMLResponse(page, status_code=status, headers={"Cache-Control": "no-store"})
+
+
 def _after(last_event_id: str | None) -> int:
     """The last sequence number the client already has, or -1 for "from the start"."""
     try:
@@ -171,6 +189,7 @@ def create_app(
     lookups: Lookups | None = None,
     *,
     registry: CaseRegistry | None | object = _DEFAULT,
+    office_clock: Callable[[], float] | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
     started each case; the default is lane D's safety store."""
@@ -624,6 +643,108 @@ def create_app(
             return run_search(brief, lookups)
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
+
+    office = OfficeProofs(
+        resolve_data_dir(settings.snapback_data_dir) / "outbox",
+        settings.snapback_public_base_url,
+        **({"clock": office_clock} if office_clock else {}),
+    )
+
+    def office_state(case_id: str, case: RecordedCase | SessionCase) -> OfficeStatus:
+        domain = official_domain(getattr(case, "office_record", None))
+        confirmed = getattr(case, "office_confirmed_domain", None)
+        return OfficeStatus(
+            case_id=case_id,
+            source=case.evidence.source,
+            domain=domain,
+            offered=domain is not None and isinstance(case, SessionCase),
+            confirmed=bool(confirmed),
+            confirmed_domain=confirmed,
+            guidance=(
+                strings.text("office.call_yourself")
+                if domain is None
+                else f"Ask the poster for an email address at {domain}. A one-time link goes "
+                "there; in this demo it lands in a local outbox file, never a real inbox."
+            ),
+        )
+
+    @app.get("/cases/{case_id}/office")
+    def get_office(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> OfficeStatus:
+        """The website domain CoStar has on record for this case's office, and whether it was
+        confirmed. Needs the case's read token in a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        return office_state(case_id, case)
+
+    @app.post("/cases/{case_id}/confirm-office", status_code=202)
+    def post_confirm_office(
+        case_id: str,
+        body: OfficeRequest,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> OfficeRequested:
+        """Ask for a one-time link to an address the poster gave the renter.
+
+        Accepted only if the address is at the website domain CoStar has on record for this
+        office (never a domain from the ad). The "email" is written to a local outbox file;
+        nothing is sent. Needs the case's write token in a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_write(case, _bearer(authorization, x_case_token))
+        if not isinstance(case, SessionCase):
+            raise HTTPException(status_code=409, detail="A recorded example cannot be changed.")
+        state = office_state(case_id, case)
+        if state.domain is None:
+            raise HTTPException(status_code=422, detail=state.guidance)
+        if not accepts_address(body.address, state.domain):
+            raise HTTPException(
+                status_code=422,
+                detail=f"That address is not at {state.domain}, the website on record for this "
+                "office. Ask the poster for one that is.",
+            )
+        try:
+            office.request(case.case_id, body.address, state.domain)
+        except RateLimited:
+            raise HTTPException(
+                status_code=429, detail="Too many requests for this case. Try again in a while."
+            ) from None
+        return OfficeRequested(
+            case_id=case_id,
+            source=state.source,
+            domain=state.domain,
+            expires_in_minutes=TOKEN_TTL_SECONDS // 60,
+            detail="A one-time link was written to the outbox (nothing is sent in this demo).",
+        )
+
+    @app.get("/confirm/{token}", response_class=HTMLResponse)
+    def get_confirm(token: str) -> HTMLResponse:
+        """The page the one-time link opens. The first valid use marks the case confirmed."""
+        redeemed = office.redeem(token)
+        if redeemed.outcome is Outcome.CONFIRMED:
+            found = store.get(redeemed.case_id or "")
+            if found is None or not isinstance(found, SessionCase):
+                return _confirm_page(404, "This case is gone.", "")
+            found.confirm_office(redeemed.domain or "")
+            return _confirm_page(
+                200,
+                "Confirmed.",
+                f"Thank you. This listing is now confirmed through {redeemed.domain}, the "
+                "website on record for this office. You can close this page.",
+            )
+        if redeemed.outcome is Outcome.USED:
+            return _confirm_page(410, "Already used.", "This link was already used. It works once.")
+        if redeemed.outcome is Outcome.EXPIRED:
+            return _confirm_page(
+                410, "This link expired.", "Links last 30 minutes. Ask the renter for a new one."
+            )
+        return _confirm_page(404, "Link not found.", "This link is not one we issued.")
 
     @app.get("/cases/{case_id}/alternatives")
     def get_alternatives(

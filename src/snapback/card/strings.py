@@ -29,6 +29,7 @@ EN: dict[str, str] = {
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
+    "label.office": "Office confirmation",
     "label.link": "Link",
     "label.license": "License",
     "label.owner": "Owner of record",
@@ -152,6 +153,13 @@ EN: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    "contact.office_confirmed": (
+        "Confirmed through {domain}, the website CoStar has on record for this office."
+    ),
+    "office.call_yourself": (
+        "No website for this office is on record, so it cannot be confirmed here. Call the "
+        "office on a number you look up yourself."
     ),
     "license.licensed": "Licensed in Texas.",
     "license.licensed_sponsored": (
@@ -415,6 +423,12 @@ EN: dict[str, str] = {
     "reason.authority_matches_brokerage": (
         "The ad names the listing brokerage on record. Anyone can type that name."
     ),
+    # Vidyut, Sat 09:38: someone at the office's own website domain on CoStar's record opened
+    # a one-time link. Only the domain is named, never an address or a person.
+    "reason.office_confirmed": (
+        "Confirmed through {domain}, the website CoStar has on record for this office; "
+        "the photos are of this home."
+    ),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
@@ -464,6 +478,7 @@ ES: dict[str, str] = {
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
+    "label.office": "Confirmación de la oficina",
     "label.link": "Enlace",
     "label.license": "Licencia",
     "label.owner": "Propietario registrado",
@@ -583,6 +598,14 @@ ES: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "contact.office_confirmed": (
+        "Confirmado a través de {domain}, el sitio web que CoStar tiene registrado para esta "
+        "oficina."
+    ),
+    "office.call_yourself": (
+        "No hay un sitio web registrado para esta oficina, así que no se puede confirmar aquí. "
+        "Llame a la oficina a un número que usted mismo busque."
     ),
     "license.licensed": "Con licencia en Texas.",
     "license.licensed_sponsored": (
@@ -888,6 +911,10 @@ ES: dict[str, str] = {
     "reason.authority_matches_brokerage": (
         "El anuncio nombra a la agencia que figura en el registro. Cualquiera puede escribir "
         "ese nombre."
+    ),
+    "reason.office_confirmed": (
+        "Confirmado a través de {domain}, el sitio web que CoStar tiene registrado para esta "
+        "oficina; las fotos son de este hogar."
     ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",

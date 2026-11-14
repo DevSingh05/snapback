@@ -4,6 +4,7 @@ import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import { LabSection } from "../lab";
 import { loadBrief } from "../search/api";
+import { OfficeConfirm } from "../office/OfficeConfirm";
 import { PlacesStrip } from "../search/PlacesStrip";
 import { replayForCase } from "../replay";
 import { STATE_WORD, historySteps, shortDate, toneWord } from "../cardStrings";
@@ -222,6 +223,7 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     return variant === "result" ? (
       <div className="pf-stack">
         <CardView card={load.card} variant={variant} withLab />
+        <OfficeConfirm caseId={caseId} onChanged={() => setAttempt((n) => n + 1)} />
         <PlacesStrip caseId={caseId} brief={loadBrief(caseId)} />
       </div>
     ) : (

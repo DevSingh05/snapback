@@ -90,6 +90,10 @@ class Evidence(BaseModel):
     license_flag: bool = False  # the ad prints a license number that is not an active license
     license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
+    # Someone at the office's own website domain on CoStar's record opened a one-time link for
+    # this case. The domain, never an address. It stands in for phone_confirmed in VERIFIED
+    # (Vidyut, Sat 09:38), and only together with the photos placed and nothing else holding.
+    office_confirmed_domain: str | None = None
 
 
 class VerdictState(StrEnum):
@@ -394,6 +398,9 @@ class ModuleEvidence(BaseModel):
     # A14: a reply came, could not be accepted, and no further photo will be asked for. The
     # card then says "we could not confirm", not "ask for a new photo". It changes no state.
     no_retry_left: bool = False
+    # The domain, from CoStar's record, through which the office confirmed this case with a
+    # one-time link (snapback.office). None means nobody did.
+    office_confirmed_domain: str | None = None
 
 
 # ---------------------------------------------------------------------------------------------

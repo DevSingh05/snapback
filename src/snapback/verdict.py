@@ -173,6 +173,7 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
         ),
         owner_flag=_owner_is_not_the_poster(modules),
+        office_confirmed_domain=modules.office_confirmed_domain,
     )
 
 
@@ -190,6 +191,7 @@ REASON_ORDER = (
     # owner of record.
     "reason.authority_matches",
     "reason.authority_matches_brokerage",
+    "reason.office_confirmed",
     "reason.authority_unknown",
     "reason.phone_not_confirmed",
     "reason.phone_not_confirmed_brokerage",
@@ -316,7 +318,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             reasons = [proof]
         else:
             ordered = sorted(dict.fromkeys(keys), key=_REASON_RANK.__getitem__)
-            reasons = [strings.text(key, lang) for key in ordered]
+            reasons = [
+                strings.text(key, lang, domain=evidence.office_confirmed_domain or "")
+                for key in ordered
+            ]
         return Verdict(
             case_id=evidence.case_id, state=state, reasons=reasons, source=evidence.source
         )
@@ -393,6 +398,28 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             VerdictState.VERIFIED,
             "reason.located",
             "reason.authority_matches",
+            "reason.presence_proven",
+        )
+
+    # Vidyut, Sat 09:38: someone at the office's own website domain on CoStar's record opened
+    # a one-time link for this case. That stands in for the phone match, and only here: the
+    # photos are placed in the claimed home (above), presence is proven, the name matches the
+    # record, and nothing else holds the case (no red flag, no phone that is not the office's,
+    # no unconfirmed owner or licence). The field is set only by snapback.office from the
+    # record's website, so a domain from the ad cannot get here. Presence alone and a licence
+    # alone still never verify.
+    if (
+        evidence.office_confirmed_domain
+        and evidence.presence is PresenceStatus.PROVEN
+        and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and not red_flags
+        and not unconfirmed
+    ):
+        return verdict(
+            VerdictState.VERIFIED,
+            "reason.located",
+            "reason.authority_matches",
+            "reason.office_confirmed",
             "reason.presence_proven",
         )
 
@@ -809,12 +836,29 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
 
 
+def _office_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Someone at the office's own website domain on record confirmed this case (info line).
+
+    The domain is the one CoStar has on record for the office, never one from the ad."""
+    domain = modules.office_confirmed_domain
+    if not domain:
+        return []
+    return [_line(lang, "label.office", CardTone.OK, "contact.office_confirmed", domain=domain)]
+
+
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
     return CardRow(
         kind=CardRowKind.PERSON,
         lines=[
             _here_now_line(modules, lang, zone),
-            *_from_record(modules, [_allowed_line(modules, lang), *_contact_lines(modules, lang)]),
+            *_from_record(
+                modules,
+                [
+                    _allowed_line(modules, lang),
+                    *_contact_lines(modules, lang),
+                    *_office_lines(modules, lang),
+                ],
+            ),
             # Not from the record: the licence list is the state's, and public.
             *_license_lines(modules, lang),
             # Nor this: the owner roll is the county's, and public.
