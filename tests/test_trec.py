@@ -8,13 +8,21 @@ from snapback.adapters.trec import check_license, detect_claim
 from snapback.contracts import LicenseResult, LicenseStatus
 
 
-def _row(status: str, sponsor_type: str = "Broker Company", sponsor: str = "Fx Realty Group"):
+def _row(
+    status: str,
+    sponsor_type: str = "Broker Company",
+    sponsor: str = "Fx Realty Group",
+    first: str = "FXNAME",
+    middle: str = "",
+    last: str = "FXPERSON",
+):
     return {
         "license_type": "Sales Agent",
         "license_number": "000000",
-        "full_name": "Fxperson, Fxname",
-        "first_name": "FXNAME",
-        "last_name": "FXPERSON",
+        "full_name": f"{last.title()}, {first.title()}",
+        "first_name": first,
+        "middle_name": middle,
+        "last_name": last,
         "status": status,
         "related_license_type": sponsor_type,
         "related_license_full_name": sponsor,
@@ -93,11 +101,11 @@ def test_the_result_never_keeps_a_person_or_a_license_number(tmp_path):
     assert "fxname" not in text and "fxperson" not in text and "000000" not in text
 
 
-def test_the_query_asks_for_the_claimed_name_only(tmp_path):
+def test_the_query_asks_by_last_name_only(tmp_path):
     seen: list = []
     _check(CLAIM, _client([], seen=seen), tmp_path)
     where = seen[0].url.params["$where"]
-    assert "FXNAME" in where and "FXPERSON" in where
+    assert "FXPERSON" in where and "FXNAME" not in where
     assert seen[0].url.host == "data.texas.gov"
 
 
@@ -123,3 +131,54 @@ def test_claim_roles_and_names():
     found = detect_claim("My name is Fxname Fxperson and I am a real estate agent.")
     assert (found.role, found.first, found.last) == ("agent", "Fxname", "Fxperson")
     assert detect_claim("Lovely 2 bed, the agent fee is waived.") is None  # no self-claim
+
+
+def test_a_nickname_counts_as_licensed(tmp_path):
+    text = "Hi, I'm Mike Fxperson, a licensed realtor."
+    rows = [_row("Active", first="MICHAEL")]
+    assert _check(text, _client(rows), tmp_path).status is LicenseStatus.LICENSED
+
+
+def test_an_initial_or_a_middle_name_counts(tmp_path):
+    initial = _check(
+        "J. Fxperson here? No: I'm Jay Fxperson, a licensed realtor.",
+        _client([_row("Active", first="JAMES", middle="JAY")]),
+        tmp_path,
+    )
+    assert initial.status is LicenseStatus.LICENSED  # goes by the middle name
+
+
+def test_same_last_name_but_no_compatible_first_name_is_not_found(tmp_path):
+    rows = [_row("Active", first="ZORA"), _row("Active", first="QUINN")]
+    assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_FOUND
+
+
+def test_only_inactive_compatible_matches_is_not_found(tmp_path):
+    rows = [_row("Expired more than 6 months"), _row("Active", first="ZORA")]
+    assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_FOUND
+
+
+def test_more_than_25_rows_is_not_checked(tmp_path):
+    rows = [_row("Active", first=f"FX{i:02d}") for i in range(26)]
+    assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_CHECKED
+
+
+def test_an_initial_that_fits_two_different_people_is_not_checked(tmp_path):
+    text = "I'm F. Fxperson, a licensed realtor."
+    rows = [_row("Active", first="FRANK"), _row("Inactive", first="FIONA")]
+    assert _check(text, _client(rows), tmp_path).status is LicenseStatus.NOT_CHECKED
+
+
+def test_a_named_brokerage_is_checked_as_a_company(tmp_path):
+    seen: list = []
+    text = "Listed by Fxample Realty Group. Deposit by Zelle today."
+    company = {
+        "license_type": "Broker Company",
+        "full_name": "FXAMPLE REALTY GROUP, LLC",
+        "status": "Active",
+    }
+    result = _check(text, _client([company], seen=seen), tmp_path)
+    assert result.status is LicenseStatus.LICENSED and result.claimed_role == "company"
+    assert "Broker Company" in seen[0].url.params["$where"]
+    missing = _check("Managed by Fxnone Properties.", _client([]), tmp_path)
+    assert missing.status is LicenseStatus.NOT_FOUND
