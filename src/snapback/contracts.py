@@ -441,6 +441,9 @@ class ModuleEvidence(BaseModel):
     # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
     # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
     ad_notes: list[AdNote] = Field(default_factory=list)
+    # X1: when a photo was placed in a different home, that home's office on CoStar's record
+    # (company only). Information for the card; no verdict reads it.
+    matched_office: str | None = None
 
 
 # ---------------------------------------------------------------------------------------------

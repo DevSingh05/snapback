@@ -89,6 +89,21 @@ VARIANTS = {
             "thresholds_version": "fx-thresholds-0",
         }
     ),
+    "photo_elsewhere_office": modules(
+        locate={
+            "case_id": "fx-7Q2M",
+            "photos": [
+                {"photo_id": "l1", "status": "located_in_claimed"},
+                {
+                    "photo_id": "l2",
+                    "status": "located_elsewhere",
+                    "matched_property_id": "fx-prop-3",
+                },
+            ],
+            "thresholds_version": "fx-thresholds-0",
+        },
+        matched_office="Fixture Property Management Co",
+    ),
     "not_indexed": modules(
         locate={
             "case_id": "fx-7Q2M",
