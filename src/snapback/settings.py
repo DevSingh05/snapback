@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,22 @@ class Settings(BaseSettings):
     # from the fixture. "reply" waits for the poster's real reply photo, sent to
     # POST /cases/{id}/reply, and checks it.
     snapback_challenge: Literal["stand_in", "reply"] = "stand_in"
+    # The zone a card's times are shown in: the building's, not the server's. Houston is
+    # America/Chicago.
+    snapback_card_timezone: str = "America/Chicago"
+
+    @field_validator("snapback_card_timezone")
+    @classmethod
+    def _a_known_time_zone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError(
+                f"SNAPBACK_CARD_TIMEZONE is not a known time zone: {value!r}. "
+                "Use a name like America/Chicago."
+            ) from None
+        return value
+
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
     # Checks one renter (or one browser) may start per day, and a ceiling per network address

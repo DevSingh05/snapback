@@ -448,3 +448,45 @@ def test_the_local_reader_does_not_find_a_code_that_is_not_there(tmp_path):
     modules.challenge("fx-R3", spot, "K7P4", "the approved text", 0)
     check, _ = modules.check_reply("fx-R3", paper("M2Q9"))
     assert check is ReplyCheck.CODE_NOT_READ
+
+
+# --- together with the live join (#101) ----------------------------------------------------
+
+
+def test_reply_mode_works_on_a_fixture_case_that_names_a_record(tmp_path):
+    client = client_for(tmp_path, snapback_challenge="reply")
+    files = [("photos", (f"p{n}.jpg", data, "image/jpeg")) for n, data in enumerate(LISTING)]
+    made = client.post(
+        "/cases",
+        data={"text": "2 bed, $1,900 a month.", "property_id": "fx-prop-3"},
+        files=files,
+    ).json()
+    bearer = {"Authorization": f"Bearer {made['token']}"}
+    sent = client.post(
+        f"/cases/{made['case_id']}/challenge/approve", json={"decision": "send"}, headers=bearer
+    )
+    assert sent.json()["status"] == "waiting_for_reply"
+    reply = send_reply(client, made, copied(LISTING[0])).json()
+    assert (reply["check"], reply["state"]) == ("copy_of_listing_photo", "dont_pay")
+    # The record's lines are still on the card beside the reply's.
+    card = client.get(f"/cases/{made['case_id']}/card").json()
+    labels = [line["label"] for row in card["rows"] for line in row["lines"]]
+    assert "Rent vs record" in labels and "Here now" in labels
+
+
+def test_a_live_case_has_no_challenge_so_there_is_nothing_to_reply_to(tmp_path):
+    from snapback.agent.join import KitLookups
+
+    settings = Settings(
+        _env_file=None,
+        snapback_data_dir=tmp_path,
+        snapback_challenge="reply",
+        snapback_data_source="live",
+    )
+    lookups = KitLookups(DataSource.LIVE, kit_dir=tmp_path / "no-kit")
+    client = TestClient(create_app(settings, lookups))
+    files = [("photos", ("p.jpg", LISTING[0], "image/jpeg"))]
+    made = client.post("/cases", data={"text": "2 bed."}, files=files).json()
+    assert (made["status"], made["challenge_text"]) == ("done", None)
+    assert send_reply(client, made, copied(LISTING[0])).status_code == 409
+    assert not (tmp_path / "memory").exists()  # and no photo was put in the memory
