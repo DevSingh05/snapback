@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar
+.PHONY: setup lint format test hygiene check api web sidecar purge
 
 setup: ## install python and node dependencies
 	uv sync
@@ -34,3 +34,6 @@ web: ## run the web app on :5173 against the API on :8000 via the /api proxy (LI
 
 sidecar: ## run the intake sidecar stub
 	npm run dev -w apps/sidecar
+
+purge: ## delete everything under data/ (sponsor caches, memory DB); sponsor terms: by Sun 16:00
+	uv run python -m snapback.safety purge
