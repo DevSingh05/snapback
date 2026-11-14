@@ -9,7 +9,7 @@ import { PhotoLanding, type FlyFrom, type LandingPhase } from "./PhotoLanding";
 import { TraceStrip } from "./TraceStrip";
 import { FIXTURE_ROOM_LABELS, chooseLocate, landingFromLocate, type LandingState } from "./landing";
 import { poseToSdkCall } from "./pose";
-import { FIXTURE_CLAIMED, FIXTURE_MATCHED } from "./proofFixtures";
+import { COPIED_LOCATE, FIXTURE_CLAIMED, FIXTURE_MATCHED } from "./proofFixtures";
 import { connectShowcase, embedUrl, flyToPose, watchSweeps, type ShowcaseSdk } from "./showcase";
 import { usePrefersReducedMotion } from "./useReducedMotion";
 
@@ -37,6 +37,8 @@ interface ViewProps {
   /** The building the photo was matched to, and the building the listing claims. */
   matchedAerial?: AerialSide;
   claimedAerial?: AerialSide;
+  /** Fixture scenario: "copied" runs a fixture photo that was taken in a different building. */
+  demo?: "copied";
 }
 
 function TwinViewInner({
@@ -48,11 +50,13 @@ function TwinViewInner({
   roomLabels: roomLabelsProp,
   matchedAerial = FIXTURE_MATCHED,
   claimedAerial = FIXTURE_CLAIMED,
+  demo,
 }: ViewProps) {
-  const locate = chooseLocate(liveLocate, liveResult, fixtureLocate);
+  const fixtureBase = demo === "copied" ? COPIED_LOCATE : fixtureLocate;
+  const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
   // A photo placed in a different building than the claimed one: show both buildings.
   const mismatch = locate.photos.some((p) => p.status === "located_elsewhere");
-  const poseIsLive = locate !== fixtureLocate;
+  const poseIsLive = locate !== fixtureBase;
   // Fixture room names belong to the fixture pose only; a live result without labels shows none.
   const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
   const live = Boolean(sdkKey && modelId);
@@ -276,8 +280,14 @@ function locateKey(l: LocateResult): number {
 }
 
 export function TwinView(props: ViewProps) {
-  const locate = chooseLocate(props.liveLocate ?? false, props.locate, fixtureLocate);
+  const base = props.demo === "copied" ? COPIED_LOCATE : fixtureLocate;
+  const locate = chooseLocate(props.liveLocate ?? false, props.locate, base);
   return <TwinViewInner key={locateKey(locate)} {...props} />;
+}
+
+/** /case/:id/twin?demo=copied shows the two-building mismatch from fixtures. */
+export function demoFromSearch(search: string): "copied" | undefined {
+  return new URLSearchParams(search).get("demo") === "copied" ? "copied" : undefined;
 }
 
 export function TwinPage({ caseId }: { caseId: string }) {
@@ -287,6 +297,7 @@ export function TwinPage({ caseId }: { caseId: string }) {
       sdkKey={import.meta.env.VITE_MATTERPORT_SDK_KEY}
       modelId={import.meta.env.VITE_DEMO_MODEL_ID}
       liveLocate={import.meta.env.VITE_LIVE_LOCATE === "1"}
+      demo={demoFromSearch(window.location.search)}
     />
   );
 }

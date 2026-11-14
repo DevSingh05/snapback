@@ -1,6 +1,7 @@
 import aerialFixture from "../../../../fixtures/contracts/aerial_tile.json";
 import recordFixture from "../../../../fixtures/contracts/property_record.json";
-import type { AerialTile, PropertyRecord } from "../contracts";
+import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
+import type { AerialTile, LocateResult, PropertyRecord } from "../contracts";
 import type { AerialSide } from "./AerialProof";
 
 // Two synthetic buildings for the two-building proof. The coordinates are made up (about 0.4 miles
@@ -18,4 +19,11 @@ export const FIXTURE_MATCHED: AerialSide = {
     lat: 0.0058,
     lon: 0,
   },
+};
+
+/** Demo scenario "copied": the one listing photo is placed in a different building (fixture only). */
+export const COPIED_LOCATE: LocateResult = {
+  ...(hold.locate as unknown as LocateResult),
+  photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "fx-model-b" }],
+  poses: {},
 };

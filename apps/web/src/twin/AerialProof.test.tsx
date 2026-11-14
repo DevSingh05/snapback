@@ -86,10 +86,30 @@ describe("AerialProof source chip", () => {
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
   });
 
-  it("shows LIVE only when every shown tile is live", () => {
+  it("shows FIXTURE when the tiles are live but the records are fixture", () => {
+    const tilesOnly = (s: AerialSide): AerialSide => ({ ...live(s), record: s.record });
     render(
-      <AerialProof mismatch claimed={live(FIXTURE_CLAIMED)} matched={live(FIXTURE_MATCHED)} />,
+      <AerialProof
+        mismatch
+        claimed={tilesOnly(FIXTURE_CLAIMED)}
+        matched={tilesOnly(FIXTURE_MATCHED)}
+      />,
     );
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+  });
+
+  it("draws the two fixture buildings differently", () => {
+    render(<AerialProof mismatch claimed={FIXTURE_CLAIMED} matched={FIXTURE_MATCHED} />);
+    const [a, b] = screen.getAllByRole("img").map((i) => i.getAttribute("src"));
+    expect(a).not.toEqual(b);
+  });
+
+  it("shows LIVE only when every shown tile and record is live", () => {
+    const all = (s: AerialSide): AerialSide => ({
+      ...live(s),
+      record: s.record && { ...s.record, source: "live" },
+    });
+    render(<AerialProof mismatch claimed={all(FIXTURE_CLAIMED)} matched={all(FIXTURE_MATCHED)} />);
     expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE");
   });
 });

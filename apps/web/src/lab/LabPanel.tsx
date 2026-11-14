@@ -291,7 +291,13 @@ export function LabSection() {
       // The API does not serve results yet: show the synthetic sample, labelled FIXTURE.
       if (res.status === 404) return sample();
       if (!res.ok) throw new Error(String(res.status));
-      return { csv: await res.text(), source: "live" as const };
+      const csv = await res.text();
+      // A committed synthetic file starts with "# FIXTURE": never label that LIVE.
+      const first = csv.split(/\r?\n/, 1)[0] ?? "";
+      return {
+        csv,
+        source: /^#\s*FIXTURE/i.test(first) ? ("fixture" as const) : ("live" as const),
+      };
     };
     run()
       .then((r) => setLoad({ status: "ready", ...r }))

@@ -13,11 +13,14 @@ export interface AerialSide {
 
 // Synthetic stand-in tile (team-made, not Vexcel imagery): a plain block on a plain ground.
 function fixtureTileSrc(seed: string): string {
-  const tall = seed.length % 2 === 0 ? 150 : 110;
+  let h = 0;
+  for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const tall = 100 + (h % 7) * 12;
+  const left = 180 + (h % 5) * 20;
   return (
     "data:image/svg+xml;utf8," +
     encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dbe8f4"/><path d="M0 300 L640 250 L640 400 L0 400Z" fill="#cfe6dd"/><rect x="230" y="${280 - tall}" width="180" height="${tall}" fill="#ffffff"/><text x="320" y="370" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#3b5a7a">Aerial tile (fixture)</text></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dbe8f4"/><path d="M0 300 L640 250 L640 400 L0 400Z" fill="#cfe6dd"/><rect x="${left}" y="${280 - tall}" width="180" height="${tall}" fill="#ffffff"/><text x="320" y="370" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#3b5a7a">Aerial tile (fixture)</text></svg>`,
     )
   );
 }
@@ -58,8 +61,8 @@ interface Props {
 
 export function AerialProof({ matched, claimed, mismatch }: Props) {
   const shown = mismatch ? [claimed, matched] : [matched];
-  // LIVE only when every tile on show is live; anything else reads FIXTURE.
-  const allLive = shown.every((s) => s.tile?.source === "live");
+  // LIVE only when every tile and record on show (the distance comes from the records) is live; anything else reads FIXTURE.
+  const allLive = shown.every((s) => s.tile?.source === "live" && s.record?.source === "live");
   const away = mismatch ? distanceAway(claimed.record ?? {}, matched.record ?? {}) : null;
   return (
     <section className="aerial-proof" aria-label="Aerial view">
