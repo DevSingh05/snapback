@@ -22,6 +22,11 @@ cases run on any machine, labelled FIXTURE.
 | `b`  | The same listing, but one of its three photos was taken in a different building.                                                                                                                                                                       | Don't pay: a photo was taken in a different property.                                                                      |
 | `c`  | A house that is for sale, posted as a rental. There is no 3D scan of it.                                                                                                                                                                               | Could not place the photos, and the house is listed for sale. For sale is a red flag, not proof, so it is not "don't pay". |
 
+**Today `DEMO_CASE` runs on the stand-ins in this folder. It does not read the kit.** The
+record on each card is the synthetic one here, and the card is labelled FIXTURE. Running a
+staged listing against a real record is a separate step: post it with a `property_id` in live
+mode, and the photo and presence lines then read "not checked" until those checks are live.
+
 ## Run them
 
 ```
