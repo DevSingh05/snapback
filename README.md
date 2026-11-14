@@ -14,10 +14,10 @@ researched places that fit your budget.
 [About](#about) · [How it works](#how-it-works) · [Screenshots](#screenshots) ·
 [Quickstart](#quickstart) · [Limits and status](#limits-and-status)
 
-<img src="docs/images/paste-the-ad.png" width="760" alt="The first screen. The eyebrow reads 'Trust the home, not the ad.' and the heading 'Found a place online? Paste the ad.' The sub-head reads 'See the real listing, the real office and a fair price, plus researched places that fit your budget.' A short house ad is pasted in the box, the max rent is 1,800, beds is set to 3 or more and Pets is ticked, above the 'Check this listing' button. A FIXTURE badge sits in the corner." />
+<img src="docs/images/worlds-hero.webp" width="760" alt="The SNAPBACK landing page in the light theme. On the left, the heading 'Found a place online? Paste the ad.' with a short description, a Paste a link, Upload photos and Text it switch, a sample ad and a Check this ad button. On the right, an isometric 3D house cut open to show its rooms, a For Sale sign on the lawn and a 'Checking the record' label, standing among pale city blocks." />
 
-<sub>The first screen: paste the ad you found. Budget and must-haves are optional. Fixture data
-made by the team.</sub>
+<sub>The first screen: paste the ad you found, in a link, photos or text. The house is the
+place being checked. Sample ad, fixture data made by the team.</sub>
 
 </div>
 
@@ -97,6 +97,12 @@ that is not the owner's never says Don't pay by itself, and SNAPBACK never calls
 scammer. Cards come as a web page and as a PNG with a verify link.
 
 ## Screenshots
+
+<p align="center">
+  <img src="docs/images/map-glass-light.webp" width="900" alt="The Houston map in the Glass light theme, tilted to show extruded city blocks. Teal columns mark sample places, each with a white 'from' rent chip such as from $1,450. A brief panel sits on the left and a strip of sample place cards runs along the bottom." />
+  <br />
+  <sub>The map: sample places stand as columns on the city, with the lowest asking rent on each.</sub>
+</p>
 
 <table>
   <tr>
