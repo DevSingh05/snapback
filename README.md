@@ -196,9 +196,9 @@ What is measured:
   repo is the synthetic sample `fixtures/contracts/results_sample.csv`, labelled FIXTURE.
 - **The locate gate.** `uv run python -m snapback.eval.locate_gate --index data/index/<name> --n 20`
   counts how many held-out views of a building are placed in it, with pose, and how many views of
-  another building are placed elsewhere. The views are renders of the indexed scans at
-  viewpoints the index never stored, not phone photos, and every line it prints says so. A rerun
-  with the merged thresholds is pending, so we quote no number here yet.
+  another building are placed elsewhere. The locate gate is measured on unseen directions from the
+  indexed scan points (renders, not photos), and every line it prints says so. A rerun with the
+  merged thresholds is pending, so we quote no number here yet.
 - **Tests.** The verdict rules, card strings, demo cases, API routes, adapters, challenge, photo
   memory and safety code are covered by tests that run in CI on fixtures.
 

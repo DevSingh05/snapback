@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar purge eval eval-baseline
+.PHONY: setup lint format test hygiene check api web sidecar purge eval eval-baseline prefetch-weights
 
 setup: ## install python and node dependencies
 	uv sync
@@ -44,3 +44,6 @@ eval: ## eval harness: writes eval/results.csv (aggregate numbers only) and runs
 eval-baseline: ## rescore without the regression gate, then freeze it as the baseline (deliberate)
 	uv run python -m snapback.eval
 	cp eval/results.csv eval/baseline.csv
+
+prefetch-weights: ## download and sha256-check the DISK, LightGlue and DINOv2 weights (vision extra)
+	uv run python -m snapback.vision.locate.weights
