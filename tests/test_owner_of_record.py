@@ -207,6 +207,21 @@ def test_a_company_field_on_a_person_owner_is_never_shown():
     assert "Fx Person" not in said
 
 
+@pytest.mark.parametrize("company", [None, "", "   "])
+def test_a_company_owner_with_no_name_is_not_checked_and_does_not_hold(company):
+    nameless = OwnerResult(kind=OwnerKind.COMPANY, company=company)
+    found = check_owner(SAYS_OWNER, nameless, rules=FX_RULES)
+    assert found.poster_matches is OwnerMatch.NOT_CHECKED
+    assert found.published_rule is None
+
+
+def test_a_person_owner_loses_any_company_even_with_no_claims_to_compare():
+    from snapback.agent.modules import FixtureModules
+
+    odd = OwnerResult(kind=OwnerKind.PERSON, company="Fx Person")
+    assert FixtureModules(owner=odd).owner("c").company is None
+
+
 def test_a_person_owner_who_does_not_match_holds_a_poster_who_says_they_own_it():
     no = check_owner(
         SAYS_OWNER, PERSON.model_copy(update={"poster_matches": OwnerMatch.NO}), rules=()
@@ -416,6 +431,7 @@ def test_every_owner_line_follows_the_wording_rules_in_both_languages(claims, ow
         "Owner here. Available now.",
         "I own this property.",
         "I'm the property owner.",
+        "I am  the owner of this house.",
     ],
 )
 def test_a_poster_who_says_they_own_it_is_heard(text):
@@ -447,6 +463,9 @@ def test_a_poster_who_says_they_own_it_is_heard(text):
         "like it's my home",
         "Sold by owner in 2019.",
         "It was for rent by owner last year.",
+        "Previous owner here, new management now.",
+        "FORMER OWNER HERE",
+        "Former owner of the house",
     ],
 )
 def test_other_mentions_of_an_owner_are_not_a_claim(text):

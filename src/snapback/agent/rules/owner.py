@@ -103,6 +103,16 @@ def check_owner(
             update={"company": None, "poster_says_owner": says_owner, "published_rule": None}
         )
 
+    if not " ".join((owner.company or "").split()):
+        # A company owner with no name to show: nothing was compared, so no line and no rule.
+        return owner.model_copy(
+            update={
+                "poster_matches": OwnerMatch.NOT_CHECKED,
+                "poster_says_owner": says_owner,
+                "published_rule": None,
+            }
+        )
+
     matches = company_match(claims.company, owner.company)
     if matches is OwnerMatch.NOT_CHECKED and says_owner and not claims.company:
         # "I am the owner", and the owner is a company the poster does not name.

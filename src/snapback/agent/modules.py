@@ -24,6 +24,7 @@ from snapback.contracts import (
     LocateResult,
     MemoryResult,
     ModuleEvidence,
+    OwnerKind,
     OwnerResult,
     PriceResult,
     PropertyRecord,
@@ -208,8 +209,15 @@ class FixtureModules:
 
     def owner(self, case_id: str) -> OwnerResult | None:
         owner = self._owner if self._owner is not None else self.evidence.owner
-        if owner is None or self._contacts is None:
+        if owner is None:
             return owner
+        if self._contacts is None:
+            # No claims to compare, but a person's name still never travels onward.
+            return (
+                owner.model_copy(update={"company": None})
+                if owner.kind is OwnerKind.PERSON
+                else owner
+            )
         return check_owner(self._contacts, owner)
 
     def record_source(self, case_id: str) -> DataSource | None:
