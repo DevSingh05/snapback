@@ -6,9 +6,11 @@ import {
   FIXTURE_ROOM_LABELS,
   hasDifferentHome,
   chooseLocate,
+  floorOf,
   landingFromLocate,
   landingLine,
   landingNote,
+  viewAngles,
   viewCone,
 } from "./landing";
 
@@ -253,5 +255,38 @@ describe("chooseLocate", () => {
     expect(chooseLocate(false, live, locate)).toBe(locate);
     expect(chooseLocate(true, undefined, locate)).toBe(locate);
     expect(chooseLocate(true, live, locate)).toBe(live);
+  });
+});
+
+describe("one camera direction for every surface (#244 follow-up)", () => {
+  it("floorOf keeps (x, z) for y-up and gives (x, -y) for a z-up scan position", () => {
+    expect(floorOf([1, 2, 3], "y")).toEqual([1, 3]);
+    expect(floorOf([1, 2, 3], "z")).toEqual([1, -2]);
+  });
+
+  it("viewAngles prefers the locator's angles over the quaternion", () => {
+    expect(
+      viewAngles({ rotation_quat: [0.5, 0.5, 0.5, 0.5], yaw_deg: -175.3, pitch_deg: -13.2 }),
+    ).toEqual({
+      yaw: -175.3,
+      pitch: -13.2,
+    });
+    expect(viewAngles({ rotation_quat: null })).toBeNull();
+  });
+
+  it("landingFromLocate on a live z-up pose uses its angles and its viewer floor point", () => {
+    const locate = structuredClone(hold.locate) as unknown as LocateResult;
+    const id = locate.photos.find((p) => p.status === "located_in_claimed")!.photo_id;
+    locate.poses[id] = {
+      ...locate.poses[id]!,
+      position: [4, 5, 1.4],
+      yaw_deg: 30,
+      pitch_deg: -5,
+    };
+    const s = landingFromLocate(locate, id, {}, "z");
+    expect(s.kind).toBe("match");
+    if (s.kind !== "match") return;
+    expect([s.yaw, s.pitch]).toEqual([30, -5]);
+    expect(s.floor).toEqual([4, -5]);
   });
 });

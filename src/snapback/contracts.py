@@ -443,6 +443,9 @@ class ModuleEvidence(BaseModel):
     # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
     # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
     ad_notes: list[AdNote] = Field(default_factory=list)
+    # X1: when a photo was placed in a different home, that home's office on CoStar's record
+    # (company only). Information for the card; no verdict reads it.
+    matched_office: str | None = None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -846,6 +849,9 @@ class RentalHouse(BaseModel):
     available_on: date | None = None
     office: str | None = None  # the listing office, company name only
     has_scan: bool = False
+    # M1: where the home is, for the map only. Never shown as an address.
+    lat: float | None = None
+    lon: float | None = None
 
 
 class BudgetFit(StrEnum):

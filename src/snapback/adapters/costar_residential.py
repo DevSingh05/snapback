@@ -618,6 +618,11 @@ def _whole(value: Any) -> int | None:
     )
 
 
+def _coord(value: Any, limit: float) -> float | None:
+    ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+    return float(value) if ok and -limit <= value <= limit else None
+
+
 def rental_houses(
     source: DataSource | None = None, kit_dir: Path | None = None
 ) -> list[RentalHouse]:
@@ -671,6 +676,8 @@ def rental_houses(
                 available_on=_date(rec.get("availabilityDate")),
                 office=offices[0] if offices else None,
                 has_scan=bool(_matterport_models(rec)),
+                lat=_coord(_get_any(rec, RESIDENTIAL_FIELDS["lat"]), 90),
+                lon=_coord(_get_any(rec, RESIDENTIAL_FIELDS["lon"]), 180),
             ),
         )
     return sorted(out.values(), key=lambda h: h.property_id)

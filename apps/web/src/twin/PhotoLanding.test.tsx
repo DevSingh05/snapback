@@ -134,3 +134,14 @@ describe("TraceStrip", () => {
     expect(screen.getByText("trace body")).toBeInTheDocument();
   });
 });
+
+describe("the mini-map uses the viewer-frame floor point (#244 follow-up)", () => {
+  it("places the camera at state.floor when it is set", () => {
+    const { container } = render(
+      <PhotoLanding {...base} state={{ ...match, position: [1, 2, 9], floor: [1, -2] }} />,
+    );
+    const g = container.querySelector(".landing-map > g")!;
+    // CENTER 120, 20 px per metre: (1, -2) -> (140, 80); the raw z of 9 would have drawn 180+.
+    expect(g.getAttribute("transform")).toBe("translate(140 80)");
+  });
+});

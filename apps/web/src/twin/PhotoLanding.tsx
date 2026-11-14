@@ -33,6 +33,10 @@ const clamp = (n: number, lim: number) => Math.max(-lim, Math.min(lim, n));
 export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, from }: Props) {
   const fov = state.kind === "match" ? state.fovDeg : null;
   const coneD = useMemo(() => viewCone(fov, CONE_RADIUS), [fov]);
+  // Where the camera sits on the mini-map: the viewer-frame floor point, so the dot and the cone
+  // agree with the 3D view on z-up scans (older states: x and z).
+  const [planX, planY] =
+    state.kind === "match" ? (state.floor ?? [state.position[0], state.position[2]]) : [0, 0];
   const flying = phase === "flying" && !reduced;
   const style = from
     ? ({
@@ -66,8 +70,8 @@ export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, fr
             aria-hidden="true"
           >
             <g
-              transform={`translate(${CENTER + clamp(state.position[0] * PX_PER_M, 60)} ${
-                CENTER + clamp(state.position[2] * PX_PER_M, 60)
+              transform={`translate(${CENTER + clamp(planX * PX_PER_M, 60)} ${
+                CENTER + clamp(planY * PX_PER_M, 60)
               })`}
             >
               <g
