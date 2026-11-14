@@ -18,4 +18,8 @@ describe("matchRoute", () => {
       slug: "zelle-deposit-copied-tour",
     });
   });
+
+  it("routes /tour/:propertyId to the walk-it-first tour", () => {
+    expect(matchRoute("/tour/fx-prop-3")).toEqual({ name: "tour", propertyId: "fx-prop-3" });
+  });
 });

@@ -36,6 +36,7 @@ from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
+from snapback.api.casefiles import CaseFiles
 from snapback.card import strings
 from snapback.contracts import (
     Card,
@@ -206,6 +207,7 @@ class SessionCase:
         # What the renter rejected in this case ("no walk-ups", a place), code-defined keys only.
         self.preferences = CasePreferences()
         self.property_id: str | None = None  # our id for the building the listing claims
+        self.files: CaseFiles | None = None  # evidence file, notes and pictures (E3 serves them)
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 

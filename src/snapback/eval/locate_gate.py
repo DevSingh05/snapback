@@ -60,6 +60,25 @@ def claimed_outcome_lines(statuses: Sequence[LocateStatus]) -> list[str]:
     ]
 
 
+def gate_catalog(model_ids, records, rooms=None) -> Catalog:
+    """Twins grouped by property as the product groups them: a twin listed in a CoStar record
+    belongs to that record's property; a twin no record lists is its own property."""
+    owner = {}
+    for rec in records:
+        for model_id in rec.model_ids:
+            owner.setdefault(model_id, rec.property_id)
+    rooms = rooms or {}
+    return Catalog(
+        ModelInfo(m, owner.get(m, f"gate-prop-{m}"), None, rooms.get(m, {})) for m in model_ids
+    )
+
+
+def other_property_models(catalog: Catalog, model_ids, claimed: str) -> list[str]:
+    """Twins of every other property: never a sister floor plan of the claimed building."""
+    mine = catalog.property_of(claimed)
+    return [m for m in model_ids if catalog.property_of(m) != mine]
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m snapback.eval.locate_gate")
     parser.add_argument("--index", type=Path, default=REPO_ROOT / "data" / "index" / "demo")
@@ -70,6 +89,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--matcher", choices=("disk", "patch"), default="disk")
     parser.add_argument("--source", choices=[s.value for s in DataSource])
+    parser.add_argument(
+        "--catalog",
+        choices=("kit", "twin"),
+        default="kit",
+        help="kit: group twins by CoStar property (as the product does); twin: one per twin",
+    )
+    parser.add_argument("--kit", type=Path, help="CoStar kit folder (default: the adapter's)")
     args = parser.parse_args(argv)
 
     settings = MatterportSettings()
@@ -88,11 +114,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("the claimed demo twin is not in this index")
         return 2
     sweeps = {m: adapter.sweeps(m) for m in model_ids}
-    # Gate catalog: one property per twin (the kit's grouping is lane D's; this gate only asks
-    # "this twin or another one").
-    catalog = Catalog(
-        ModelInfo(m, f"gate-prop-{m}", None, adapter.room_labels(m)) for m in model_ids
-    )
+    # Twins grouped by property, as the product groups them (sister floor plans of the claimed
+    # building are claimed twins, never "another building"); one per twin if the kit is absent.
+    records = []
+    if args.catalog == "kit":
+        try:
+            from snapback.adapters.costar_jsonl import load_records
+
+            records = list(load_records(settings.snapback_data_source, args.kit).values())
+        except FileNotFoundError:
+            print("catalog: no CoStar kit here, one property per twin")
+            args.catalog = "twin"
+    catalog = gate_catalog(model_ids, records, {m: adapter.room_labels(m) for m in model_ids})
+    claimed_property = catalog.property_of(claimed)
     if args.matcher == "disk":
         from snapback.vision.locate.verify import DiskLightGlue
 
@@ -110,7 +144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sweep = rng.choice(sweeps[claimed])
         photo, truth, _ = held_out_view(sweep, rng)
         started = time.monotonic()
-        result = locator.locate(f"gate-{number}", {"p": photo}, f"gate-prop-{claimed}")
+        result = locator.locate(f"gate-{number}", {"p": photo}, claimed_property)
         seconds.append(time.monotonic() - started)
         placed = result.photos[0]
         false_placed += placed.status is LocateStatus.LOCATED_ELSEWHERE
@@ -125,12 +159,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 errors.append(error)
                 pose_ok += error < 15
 
-    others = [m for m in model_ids if m != claimed]
+    others = other_property_models(catalog, model_ids, claimed)
     elsewhere = 0
     for number in range(args.n_other if others else 0):
         model = rng.choice(others)
         photo, _, _ = held_out_view(rng.choice(sweeps[model]), rng)
-        result = locator.locate(f"gate-o{number}", {"p": photo}, f"gate-prop-{claimed}")
+        result = locator.locate(f"gate-o{number}", {"p": photo}, claimed_property)
         elsewhere += result.photos[0].status is LocateStatus.LOCATED_ELSEWHERE
         false_placed += result.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED
 
@@ -140,6 +174,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"embedder {index.embedder_name}; matcher {matcher.name}; "
         f"thresholds {locator.thresholds.version}"
     )
+    properties = len({catalog.property_of(m) for m in model_ids})
+    print(f"catalog: {args.catalog}, {len(model_ids)} twins in {properties} properties")
     print(f"placed in the claimed twin: {located} of {args.n}")
     print(f"  at the sweep it was rendered from: {right_sweep} of {args.n}")
     print(
