@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -394,6 +395,14 @@ def house_records(
             lon=float(lon) if isinstance(lon, (int, float)) else None,
             model_ids=models,
         )
+    # A model on more than one house cannot say which house a photo is in, and the catalog
+    # would keep the last owner: such a model belongs to none of them, so it can place no
+    # photo anywhere (never "elsewhere", never an identification).
+    owners = Counter(model for record in out.values() for model in record.model_ids)
+    for property_id, record in list(out.items()):
+        record.model_ids = [model for model in record.model_ids if owners[model] == 1]
+        if not record.model_ids:
+            del out[property_id]
     return out
 
 
