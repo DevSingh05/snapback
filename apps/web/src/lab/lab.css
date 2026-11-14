@@ -53,7 +53,7 @@
   font-family: var(--font-body);
 }
 .lab-bar {
-  fill: var(--blue);
+  fill: var(--act);
 }
 .lab-whisker {
   stroke: var(--ink);
@@ -64,11 +64,11 @@
   stroke-dasharray: 4 4;
 }
 .lab-line {
-  stroke: var(--teal);
+  stroke: var(--act);
   stroke-width: 2;
 }
 .lab-dot {
-  fill: var(--teal);
+  fill: var(--act);
 }
 .lab-rule {
   margin: 16px 0 0;
@@ -76,13 +76,13 @@
   font-size: 0.95rem;
 }
 .lab-s0 {
-  --series: var(--teal);
+  --series: var(--act);
 }
 .lab-s1 {
-  --series: var(--blue);
+  --series: var(--ink);
 }
 .lab-s2 {
-  --series: var(--amber);
+  --series: var(--scan);
 }
 .lab-s0 .lab-line,
 .lab-s1 .lab-line,

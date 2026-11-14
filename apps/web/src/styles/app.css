@@ -219,23 +219,27 @@ th {
 .tone-ok {
   color: var(--teal);
   background: var(--teal-soft);
+  --tone-bg: var(--teal-soft);
 }
 .tone-hold,
 .tone-not_shown {
   color: var(--amber);
   background: var(--amber-soft);
+  --tone-bg: var(--amber-soft);
 }
 .tone-red_flag {
   color: var(--coral);
   background: var(--coral-soft);
+  --tone-bg: var(--coral-soft);
 }
 .tone-not_checked {
-  color: var(--blue);
-  background: var(--blue-soft);
+  color: var(--unchecked);
+  background: var(--unchecked-soft);
+  --tone-bg: var(--unchecked-soft);
 }
 /* the icon glyph is knocked out of the filled disc */
 .tone-icon {
-  -webkit-text-fill-color: var(--surface);
+  -webkit-text-fill-color: var(--tone-bg, var(--surface));
 }
 
 .not-checked {
@@ -300,6 +304,7 @@ th {
 }
 button {
   align-self: flex-start;
+  border: 0;
   font: inherit;
   font-weight: 700;
   padding: 10px 20px;
@@ -658,11 +663,11 @@ button {
   transform-origin: 0 0;
 }
 .view-cone path {
-  fill: var(--teal);
+  fill: var(--act);
   fill-opacity: 0.3;
 }
 .camera-marker {
-  fill: var(--teal);
+  fill: var(--act);
 }
 .landing-line {
   position: absolute;

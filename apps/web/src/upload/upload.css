@@ -18,6 +18,7 @@
 }
 .upload-input {
   width: 100%;
+  border: 0;
   font: inherit;
   padding: 12px 14px;
   border-radius: 0;
