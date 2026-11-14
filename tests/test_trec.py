@@ -732,3 +732,15 @@ def test_a_license_next_to_a_role_word_counts_as_a_license_number(tmp_path):
     assert _check("Pool license 123456", _client([]), tmp_path / "c").status is (
         LicenseStatus.NOT_CHECKED
     )
+
+
+def test_a_number_in_other_words_after_trec_is_not_a_license_number():
+    from snapback.adapters.trec import _license_number
+
+    for text in (
+        "I'm Fxjohn Fxdoe, a licensed realtor. TREC licensed, 555012 sq ft",
+        "TREC approved, 1234567 views",
+    ):
+        assert _license_number(text) is None, text
+    assert _license_number("TREC lic. no. 0123456") == "123456"
+    assert _license_number("Realtor, license: 1234567-B") == "1234567"

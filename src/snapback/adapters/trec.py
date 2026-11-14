@@ -106,7 +106,11 @@ _COMPANY = re.compile(
 )
 
 # "TREC license # 860257-SA", "Lic. 0123456": the digits only, never an MLS or unit "#"
-_LIC_NUMBER = re.compile(r"(?i:\btrec\b|\blic(?:ense|ence)?\b)[^\d\n]{0,25}?\b(\d{6,7})\b(?!\d)")
+_LIC_NUMBER = re.compile(
+    r"(?i:\btrec\b|\blic(?:ense|ence)?\b)"
+    r"(?:[ \t#:.\-]|\b(?:trec|licen[sc]e|lic|number|num|no|is)\b)*?"  # only license-ish filler
+    r"\b(\d{6,7})\b(?![ \t]*(?:sq|sf|ft|square))"  # not "555012 sq ft"
+)
 _NOT_TREC = re.compile(
     r"(?i:driver|plate|vehicle|permit|marriage|insurance|business|\bmls\b|\bid\b)"
 )
