@@ -402,21 +402,34 @@ def place_for(
 ) -> PlaceMatch | None:
     """One place by id, whatever the budget: the renter picked it. A plan is found by its
     `plan_key`; with only a label it must be unique in the building, else `AmbiguousPlace`."""
+    found = place_and_raw_for(property_id, floor_plan, lookups, brief, plan_key_)
+    return found[0] if found else None
+
+
+def place_and_raw_for(
+    property_id: str,
+    floor_plan: str | None,
+    lookups: Any,
+    brief: RenterBrief | None = None,
+    plan_key_: str | None = None,
+) -> tuple[PlaceMatch, _Raw] | None:
+    """`place_for`, plus the record facts the match was made from (the tour-prep pack needs
+    the numbers, not just the lines of text)."""
     source = _source_of(lookups)
     # Only the renter's stated needs shape the must-have lines; no budget or size removes it.
     needs = brief or RenterBrief()
     open_brief = RenterBrief(pets=needs.pets, needs_parking=needs.needs_parking, max_results=50)
     found = [
-        m
+        (m, raw)
         for raw in _supply(lookups)
         if raw.property_id == property_id
         and (plan_key_ is None or plan_key(raw) == plan_key_)
         and (floor_plan is None or raw.floor_plan == floor_plan)
         if (m := _match(raw, open_brief, source)) is not None
     ]
-    if plan_key_ is None and len({m.plan_key for m in found}) > 1:  # no silent cheapest pick
+    if plan_key_ is None and len({m.plan_key for m, _ in found}) > 1:  # no silent cheapest pick
         raise AmbiguousPlace(property_id)
-    found.sort(key=order_key)
+    found.sort(key=lambda pair: order_key(pair[0]))
     return found[0] if found else None
 
 
