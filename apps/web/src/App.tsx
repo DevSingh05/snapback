@@ -1,29 +1,42 @@
 import { useEffect, useState } from "react";
 
-type Health = { status: string; data_source: "live" | "fixture" };
+import { CardPage } from "./pages/CardPage";
 
-// Skeleton only: proves the web app can reach the API and shows which data source is active.
-// Every real screen must carry the same LIVE / FIXTURE label.
+type Route = { name: "result"; id: string } | { name: "verify"; id: string } | { name: "home" };
+
+export function matchRoute(path: string): Route {
+  const result = /^\/case\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (result?.[1]) return { name: "result", id: result[1] };
+  const verify = /^\/c\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (verify?.[1]) return { name: "verify", id: verify[1] };
+  return { name: "home" };
+}
+
+// Two routes and no router library: /case/:id is the renter's result page and /c/:id is the
+// verify page the QR code points to. Both read the same Card.
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
+  const [path, setPath] = useState(window.location.pathname);
   useEffect(() => {
-    fetch("/api/healthz")
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((body: Health) => setHealth(body))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  let apiLine = "checking…";
-  if (health) apiLine = `${health.status} · ${health.data_source.toUpperCase()}`;
-  else if (error) apiLine = `unreachable (${error})`;
-
+  const route = matchRoute(path);
   return (
-    <main>
-      <h1>SNAPBACK</h1>
-      <p>Skeleton only. Nothing on this page is a product screen yet.</p>
-      <p>API: {apiLine}</p>
+    <main className="shell">
+      {route.name === "home" ? (
+        <div className="card-page notice">
+          <span className="wordmark">SNAPBACK</span>
+          <h1>Check any rental before you pay.</h1>
+          <p>
+            Open a result at <span className="mono">/case/7Q2M</span> or a verify page at{" "}
+            <span className="mono">/c/7Q2M</span>.
+          </p>
+        </div>
+      ) : (
+        <CardPage key={`${route.name}-${route.id}`} caseId={route.id} variant={route.name} />
+      )}
     </main>
   );
 }
