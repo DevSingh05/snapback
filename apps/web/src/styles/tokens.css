@@ -1,7 +1,6 @@
-/* SNAPBACK design tokens: "Day and Dusk". Day (light plaster) is the default and the hero
-   theme; it is what loads first and what "system" falls back to (locked Nov 14). Dusk is opt in
-   through data-theme="dark" and lives in ONE block at the foot of this file, so a new Dusk set
-   is a one place change. Atkinson Hyperlegible Next, IBM Plex Mono for record facts, sharp
+/* SNAPBACK design tokens. The app is Day only (light plaster), locked Nov 14. The one exception
+   is the city map, which also has a dark look: it is opt in through data-theme="dark" on the map
+   wrapper (.city), never on the root, and lives in ONE block at the foot of this file. Atkinson Hyperlegible Next, IBM Plex Mono for record facts, sharp
    corners. Every colour, font and radius lives here; component CSS only uses var(--...). A
    vitest (styles.test.ts) fails if component CSS hard-codes a colour or a rounded corner, or if
    text and control edges here fall under their contrast floors.
@@ -116,7 +115,7 @@
        --h-wall-shade. --h-wood and --h-leaf below are its --w-floor and --w-leaf.
      One difference is kept on purpose: in dark, --h-roof and --h-lawn are a step lighter here,
      because a flat drawing has no 3D lighting to lift a dark roof off a dark ground.
-     The theme itself is one choice shared by both (shell/theme.ts, key "snapback-theme"). */
+     The app is light only; only the map has a dark look (map/mapTheme.ts). */
   --h-wood: #cdae86;
   --h-leaf: #86a886;
   /* Surfaces by depth: 0 the ground, 1 a page or card, 2 a block set into a card, 3 a quiet
@@ -201,10 +200,10 @@
   --on-photo-stamp: #f0ebe1;
   --bar-bg: var(--paper);
 
-  /* Day and Dusk (design v3 1.1, v4 1.1). Two materials: plaster (the page) and matte (the band
+  /* Day (design v3 1.1, v4 1.1). Two materials: plaster (the page) and matte (the band
      that holds photos, the verdict and the walk). --act marks the next step on plaster and
      --act-matte marks it on matte and on photos. --edge is the 1px outline on quiet controls and
-     --hi the 1px top highlight on lifted blocks at Dusk. Photos take --photo-filter, the hero --hero-filter under a scrim at --scrim-o. */
+     --hi the 1px top highlight on lifted blocks on the map at night. Photos take --photo-filter, the hero --hero-filter under a scrim at --scrim-o. */
   --matte: #131516;
   --on-matte: #f0ebe1;
   --on-matte-muted: rgb(240 235 225 / 0.74);
@@ -222,11 +221,12 @@
   --mark-off: var(--st-unchecked);
 }
 
-/* Dusk (design v4 1.1, values from plan/theme-refs.md): a deep blue-slate ground, lifted
-   surfaces edged by a hairline and a top highlight, bone ink far above a blue-grey muted, 1px
-   edges on quiet controls. The night band sits close to the ground, so always close it with a
-   --line rule. The ONLY place a Dusk value is written. */
-:root[data-theme="dark"] {
+/* The map at night (design v4 1.1, values from plan/theme-refs.md): a deep blue-slate ground,
+   lifted surfaces edged by a hairline and a top highlight, bone ink far above a blue-grey muted,
+   1px edges on quiet controls. Scoped to the map wrapper, so nothing else can turn dark. The
+   night band sits close to the ground, so always close it with a --line rule. The ONLY place a
+   dark value is written. */
+.city[data-theme="dark"] {
   color-scheme: dark;
 
   --paper: #141d28;
@@ -243,9 +243,6 @@
   --act: #86d3d1;
   --on-act: #081417;
   --on-act-matte: #081417;
-  --photo-filter: saturate(1) contrast(1.02);
-  --hero-filter: saturate(1.02) contrast(1);
-  --scrim-o: 0.8;
 
   --st-ok: #8fdcb0;
   --st-mismatch: #ff9f8e;
@@ -254,15 +251,6 @@
   --st-unchecked: #aab3b6;
   --on-st: #081417;
   --on-st-unconfirmed: #081417;
-
-  --home-ground: #141d28;
-  --home-surface: #212e3f;
-  --home-raised: #2f425a;
-  --home-line: rgb(245 241 232 / 0.14);
-  --hero-scrim-top: rgb(5 8 12 / 0.5);
-  --hero-scrim-bottom: rgb(5 8 12 / 0.9);
-  --stage-top: var(--surface);
-  --match-stage-2: #0d131b;
 
   /* Older pair tokens, kept readable on slate until their screens move to the state squares. */
   --scan: #f2c14e;
@@ -282,16 +270,9 @@
   --panel: rgb(33 46 63 / 0.94);
   --shadow: 0 1px 2px rgb(5 8 12 / 0.4), 0 14px 34px rgb(5 8 12 / 0.45);
   --sweep: rgb(255 255 255 / 0.05);
-  --heat: #5fd4dc;
-  --heat-box: #9af5f1;
-  --rival-this: #5fd4dc;
-  --rival-other: #8e9aa6;
-  --pick-chosen: #86d3d1;
-  --on-pick-chosen: #081417;
-  --pick-glow: 0 0 0 3px rgb(95 212 220 / 0.3);
   --glow-line: 0 0 16px rgb(95 212 220 / 0.75);
 
-  /* The drawn house and the city map at Dusk: approved, unchanged. */
+  /* The drawn house and the city map at night: approved, unchanged. */
   --h-wood: #b08d62;
   --h-leaf: #4b6652;
   --h-wall: #e4dfd5;

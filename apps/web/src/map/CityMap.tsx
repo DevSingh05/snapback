@@ -15,6 +15,7 @@ import {
   styleImage,
 } from "./mapStyle";
 import type { Look } from "./mapStyle";
+import type { MapTheme } from "./mapTheme";
 import { S } from "./strings";
 import type { PlaceFeature } from "./types";
 
@@ -25,6 +26,8 @@ interface Props {
   passed: ReadonlySet<string>;
   selectedPid: string | null;
   look: Look;
+  /** The map wrapper carries this as data-theme; the palette is read from it. */
+  theme: MapTheme;
   forceRaster?: boolean;
   reducedMotion: boolean;
   // Screen space covered by panels, so a picked place lands in the part of the map still in view.
@@ -76,8 +79,8 @@ export function CityMap(props: Props) {
       const p = live.current;
       const data = { places: p.places, passed: p.passed };
       return vector.current
-        ? buildStyle(readPalette(), p.look, data)
-        : rasterStyle(readPalette(), data);
+        ? buildStyle(readPalette(box.current ?? undefined), p.look, data)
+        : rasterStyle(readPalette(box.current ?? undefined), data);
     };
 
     const hitLayers = () =>
@@ -237,7 +240,9 @@ export function CityMap(props: Props) {
         const paintImages = () => {
           if (!map) return;
           for (const id of Object.values(IMG)) {
-            const made = map.hasImage(id) ? null : styleImage(id, readPalette());
+            const made = map.hasImage(id)
+              ? null
+              : styleImage(id, readPalette(box.current ?? undefined));
             if (made) map.addImage(id, made.image, made.options);
           }
         };
@@ -267,17 +272,6 @@ export function CityMap(props: Props) {
           const hit = map!.queryRenderedFeatures(e.point, { layers: hitLayers() }).length > 0;
           map!.getCanvas().style.cursor = hit ? "pointer" : "";
         });
-
-        // Follow the theme: rebuild the style from the tokens when the colour scheme flips.
-        const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-        const restyle = () => api.current?.restyle();
-        mq?.addEventListener("change", restyle);
-        const mo = new MutationObserver(restyle);
-        mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-        cleanups.push(
-          () => mq?.removeEventListener("change", restyle),
-          () => mo.disconnect(),
-        );
       } catch {
         if (!dead) live.current.onStatus("failed");
       }
@@ -314,9 +308,10 @@ export function CityMap(props: Props) {
     syncPick();
   }, [props.places, props.passed]);
 
+  // The look or the map's own theme changed: rebuild the style from the tokens now in force.
   useEffect(() => {
     api.current?.restyle();
-  }, [props.look]);
+  }, [props.look, props.theme]);
 
   useEffect(() => {
     syncPick();

@@ -57,9 +57,9 @@ describe("locked design rules", () => {
   });
 });
 
-// Contrast floors for Day and Dusk, computed from tokens.css itself (WCAG relative luminance).
+// Contrast floors for Day and the map at night, computed from tokens.css itself (WCAG relative luminance).
 // Text (ink, muted, the accent) must reach 4.5:1 on the ground, the surface and the raised
-// step; the Dusk control edge must reach 3:1 on the ground and on the raised step.
+// step; the night control edge must reach 3:1 on the ground and on the raised step.
 type Rgba = [number, number, number, number];
 
 function block(css: string, selector: string): Map<string, string> {
@@ -107,16 +107,16 @@ function ratio(fg: Rgba, bg: Rgba): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe("Day and Dusk contrast", () => {
+describe("Day, and the map at night, contrast", () => {
   const css = strip(readFileSync(TOKENS, "utf8"));
   const day = block(css, ":root");
-  const dusk = new Map([...day, ...block(css, ':root[data-theme="dark"]')]);
+  const night = new Map([...day, ...block(css, '.city[data-theme="dark"]')]);
   const grounds = ["--paper", "--surface", "--layer-2"] as const;
   const report: string[] = [];
 
   for (const [theme, vars] of [
     ["Day", day],
-    ["Dusk", dusk],
+    ["Map night", night],
   ] as const) {
     it(`${theme}: ink, muted and the accent read at 4.5:1 on ground, surface and raised`, () => {
       for (const fg of ["--ink", "--muted", "--act"])
@@ -152,10 +152,10 @@ describe("Day and Dusk contrast", () => {
     });
   }
 
-  it("control edges read at 3:1 in both themes, and Dusk surfaces lift off the ground", () => {
+  it("control edges read at 3:1 in both themes, and night surfaces lift off the ground", () => {
     for (const [theme, vars] of [
       ["Day", day],
-      ["Dusk", dusk],
+      ["Map night", night],
     ] as const)
       for (const bg of grounds) {
         const r = ratio(colour(vars, "--edge"), colour(vars, bg));
@@ -170,8 +170,8 @@ describe("Day and Dusk contrast", () => {
       ["--matte", "--paper", 1.15],
     ] as const;
     for (const [a, b, floor] of steps) {
-      const r = ratio(colour(dusk, a), colour(dusk, b));
-      report.push(`Dusk ${a} against ${b}: ${r.toFixed(2)}`);
+      const r = ratio(colour(night, a), colour(night, b));
+      report.push(`Map night ${a} against ${b}: ${r.toFixed(2)}`);
       expect(r, `${a} against ${b}`).toBeGreaterThanOrEqual(floor);
     }
   });
@@ -185,7 +185,7 @@ describe("Day and Dusk contrast", () => {
     }
     for (const [theme, vars] of [
       ["Day", day],
-      ["Dusk", dusk],
+      ["Map night", night],
     ] as const) {
       for (const bg of grounds) {
         const r = ratio(colour(vars, "--focus"), colour(vars, bg));
@@ -198,9 +198,10 @@ describe("Day and Dusk contrast", () => {
     }
   });
 
-  it("keeps Dusk in one block and Day as the default", () => {
+  it("keeps the dark look in one block, scoped to the map, and Day as the default", () => {
     expect(css.match(/color-scheme:\s*dark/g)).toHaveLength(1);
     expect(css).not.toMatch(/prefers-color-scheme/);
+    expect(css).not.toMatch(/:root\[data-theme/);
     // CONTRAST_REPORT=<file> writes every ratio computed above, for the handoff.
     if (process.env.CONTRAST_REPORT) writeFileSync(process.env.CONTRAST_REPORT, report.join("\n"));
   });
