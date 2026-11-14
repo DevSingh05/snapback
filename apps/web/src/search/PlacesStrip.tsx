@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { HouseGlyph } from "../components/HouseGlyph";
 import { SourceChip } from "../components/SourceChip";
 import type { PlaceMatch, RenterBrief, TourDraft } from "../contracts";
 import {
@@ -28,6 +29,18 @@ interface Props {
   caseId: string | null;
   brief: RenterBrief | null;
   heading?: string;
+}
+
+// The guided walkthrough of a researched place. The plan is picked by its key, never its label.
+function tourHref(place: PlaceMatch): string {
+  const q = place.plan_key ? `?plan_key=${encodeURIComponent(place.plan_key)}` : "";
+  return `/tour/${encodeURIComponent(place.property_id)}${q}`;
+}
+
+// The tour-prep pack for a researched place. The plan is picked by its key, never its label.
+function prepHref(place: PlaceMatch): string {
+  const q = place.plan_key ? `?plan_key=${encodeURIComponent(place.plan_key)}` : "";
+  return `/prep/place/${encodeURIComponent(place.property_id)}${q}`;
 }
 
 const SCAN_LABEL = "a 3D scan in this building";
@@ -69,7 +82,7 @@ function PlaceRow({
   }
 
   return (
-    <li className="pf-row" data-testid="place-row">
+    <li className="pf-row" data-testid="place-row" data-fit={place.budget_fit}>
       <div className="pf-row-head">
         <h3 className="pf-row-title">{title}</h3>
         <SourceChip source={place.source} />
@@ -86,12 +99,20 @@ function PlaceRow({
         </ul>
       )}
       {place.has_3d_scan && <p className="pf-scan">{place.scan_text ?? SCAN_LABEL}</p>}
+      {place.has_3d_scan && (
+        <a className="pf-action" href={tourHref(place)} data-testid="walk-it-first-link">
+          Walk it first
+        </a>
+      )}
       {place.office_on_record && (
         <p className="pf-office">
           Leasing office on record: <strong>{place.office_on_record}</strong>
         </p>
       )}
 
+      <a className="pf-action pf-link" href={prepHref(place)} data-testid="tour-prep-link">
+        Tour prep
+      </a>
       {caseId && place.office_on_record && draft.status !== "ready" && (
         <button
           type="button"
@@ -192,6 +213,7 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
       )}
       {load.status === "ready" && load.places.matches.length === 0 && (
         <div className="pf-empty" data-testid="places-empty">
+          <HouseGlyph className="pf-empty-house" lit={false} />
           <p>No researched places fit this budget and these must-haves.</p>
           {load.places.tradeoff_question && (
             <p className="pf-tradeoff">{load.places.tradeoff_question}</p>

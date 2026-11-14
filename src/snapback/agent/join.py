@@ -335,12 +335,22 @@ class JoinedModules:
         # Lane D says who owns the home. What the poster says about owning it is added here.
         return check_owner(self._listing.contacts, self._owner)
 
+    @property
+    def record(self) -> PropertyRecord | None:
+        """The property record this case runs on, if it has one (read-only)."""
+        return self._record
+
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
         self._identify(case_id)
         if self._record is None and self._for_sale is None:
             return None
         return self._record_source
+
+    def property_type(self, case_id: str) -> str | None:
+        """The record's kind of home, once the home is known. None with no record."""
+        self._identify(case_id)
+        return self._record.property_type if self._record is not None else None
 
     # --- the twin and the challenge: stand-ins, and only in a fixture case -----------------
 

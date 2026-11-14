@@ -8,7 +8,9 @@ Owner: lane A.
 - `scope.py`: whether a listing is a rental, a short-term stay or a commercial space.
 - `trace.py`: the trace events the web app streams.
 - `rules/`: code-owned rules over the renter's own text.
-- `graph.py`: the deepagents wiring. It is not imported here, so this package works without the
+- `casework.py`: the case's working notes per check family (derived text, never read by decide()).
+- `graph.py`: the deepagents wiring (todos, a sub-agent per check family, notes in its file
+  system). It is not imported here, so this package works without the
   `agent` extra installed.
 """
 

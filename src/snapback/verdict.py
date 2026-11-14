@@ -173,6 +173,8 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
         ),
         owner_flag=_owner_is_not_the_poster(modules),
+        office_confirmed_domain=modules.office_confirmed_domain,
+        office_declined_domain=modules.office_declined_domain,
     )
 
 
@@ -190,6 +192,8 @@ REASON_ORDER = (
     # owner of record.
     "reason.authority_matches",
     "reason.authority_matches_brokerage",
+    "reason.office_confirmed",
+    "reason.office_declined",
     "reason.authority_unknown",
     "reason.phone_not_confirmed",
     "reason.phone_not_confirmed_brokerage",
@@ -324,7 +328,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             reasons = [proof]
         else:
             ordered = sorted(dict.fromkeys(keys), key=_REASON_RANK.__getitem__)
-            reasons = [strings.text(key, lang, **values) for key in ordered]
+            # {domain} is only in the office reasons; the declined one is the default.
+            fill = {"domain": evidence.office_declined_domain or "", **values}
+            reasons = [strings.text(key, lang, **fill) for key in ordered]
         return Verdict(
             case_id=evidence.case_id, state=state, reasons=reasons, source=evidence.source
         )
@@ -365,6 +371,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
         # confirmed and HOLD, never a red flag, and never in a report pack.
         unconfirmed = [*unconfirmed, "reason.license_not_found_given"]
+    if evidence.office_declined_domain:
+        # The office at the website on record said this ad is not theirs. Not confirmed, and
+        # it holds the case; it is an answer, not proof, so never a red flag.
+        unconfirmed = [*unconfirmed, "reason.office_declined"]
     if evidence.owner_flag:
         # A19 (#125): the poster says they own it and the owner of record is someone else.
         # Not confirmed, like any name that does not match (ruling, Sat 01:20): owners rent
@@ -404,6 +414,29 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             "reason.presence_proven",
         )
 
+    # Vidyut, Sat 09:38: someone at the office's own website domain on CoStar's record opened
+    # a one-time link for this case. That stands in for the phone match, and only here: the
+    # photos are placed in the claimed home (above), presence is proven, the name matches the
+    # record, and nothing else holds the case (no red flag, no phone that is not the office's,
+    # no unconfirmed owner or licence). The field is set only by snapback.office from the
+    # record's website, so a domain from the ad cannot get here. Presence alone and a licence
+    # alone still never verify.
+    if (
+        evidence.office_confirmed_domain
+        and evidence.presence is PresenceStatus.PROVEN
+        and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and not red_flags
+        and not unconfirmed
+    ):
+        return verdict(
+            VerdictState.VERIFIED,
+            "reason.located",
+            "reason.authority_matches",
+            "reason.office_confirmed",
+            "reason.presence_proven",
+            domain=evidence.office_confirmed_domain or "",
+        )
+
     # A name that is not the one on record is not confirmed, and nothing worse: the manager,
     # the leasing office and a listing brokerage may all market a home.
     matches = evidence.authority is AuthorityStatus.MATCHES_RECORD
@@ -439,6 +472,16 @@ def _line(lang: str, label_key: str, tone: CardTone, text_key: str, **values: ob
     return CardLine(
         label=strings.text(label_key, lang), text=strings.text(text_key, lang, **values), tone=tone
     )
+
+
+# What a record calls a house: the kit's residential adapter says "house", and the staged
+# cases say "single family".
+_HOUSE_KINDS = frozenset({"house", "single family"})
+
+
+def _is_a_house(modules: ModuleEvidence) -> bool:
+    kind = (modules.property_type or "").lower().replace("_", " ").replace("-", " ")
+    return " ".join(kind.split()) in _HOUSE_KINDS
 
 
 def _floor_plan(modules: ModuleEvidence) -> str | None:
@@ -505,7 +548,8 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
             total=total,
         )
     elif located:
-        main = _line(lang, "label.real", CardTone.OK, "place.located", located=located, total=total)
+        key = "place.located_home" if _is_a_house(modules) else "place.located"
+        main = _line(lang, "label.real", CardTone.OK, key, located=located, total=total)
     elif all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
         # A photo that names a model belongs to a building whose scan exists and is not in
         # our index. With no model named, there is no scan of the building at all.
@@ -769,6 +813,20 @@ def _payment_ask_flagged(modules: ModuleEvidence) -> bool:
     return any(hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules)
 
 
+# The one rule that is not a red flag and still shows on the card (agent/rules/table.py).
+MONEY_BEFORE_MOVE_IN = "fee.money_before_move_in"
+
+
+def _asks_before_move_in(modules: ModuleEvidence) -> bool:
+    return any(hit.rule_id == MONEY_BEFORE_MOVE_IN for hit in modules.rules)
+
+
+def _rule_sits_beside_payment(modules: ModuleEvidence) -> bool:
+    """The owner's rule is quoted once: beside the payment line whenever the ad asks for
+    money (a flagged ask, or rent or a deposit before move-in), and on the owner line if not."""
+    return _payment_ask_flagged(modules) or _asks_before_move_in(modules)
+
+
 def _quoted_rule(rule: PublishedRule, lang: str, key: str) -> str:
     """The owner's own rule in its own words, with where it is published and when we read it."""
     source = rule.source_url.split("://", 1)[-1].removeprefix("www.").rstrip("/")
@@ -819,9 +877,37 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     text = strings.text(key, lang, company=company)
     # The owner's rule is quoted once. Beside a flagged payment ask when there is one (it is
     # what the rule speaks to), and here otherwise.
-    if owner.published_rule is not None and not _payment_ask_flagged(modules):
+    if owner.published_rule is not None and not _rule_sits_beside_payment(modules):
         text = f"{text} {_quoted_rule(owner.published_rule, lang, 'owner.rule')}"
     return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
+
+
+def _office_declined_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    domain = modules.office_declined_domain
+    if not domain:
+        return []
+    return [
+        _line(lang, "label.office", CardTone.NOT_SHOWN, "contact.office_declined", domain=domain)
+    ]
+
+
+def _office_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Someone at the office's own website domain on record confirmed this case (info line).
+
+    The domain is the one CoStar has on record for the office, never one from the ad."""
+    domain = modules.office_confirmed_domain
+    if not domain:
+        return []
+    lines = [_line(lang, "label.office", CardTone.OK, "contact.office_confirmed", domain=domain)]
+    authority = modules.authority
+    if (
+        authority is not None
+        and authority.office_phone_match is PhoneMatch.NO
+        and not modules.office_declined_domain
+    ):
+        # The office said yes, the headline stays Hold off, and the card says why in plain words.
+        lines.append(_line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.office_still_hold"))
+    return lines
 
 
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
@@ -829,7 +915,15 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
         kind=CardRowKind.PERSON,
         lines=[
             _here_now_line(modules, lang, zone),
-            *_from_record(modules, [_allowed_line(modules, lang), *_contact_lines(modules, lang)]),
+            *_from_record(
+                modules,
+                [
+                    _allowed_line(modules, lang),
+                    *_office_lines(modules, lang),
+                    *_office_declined_lines(modules, lang),
+                    *_contact_lines(modules, lang),
+                ],
+            ),
             # Not from the record: the licence list is the state's, and public.
             *_license_lines(modules, lang),
             # Nor this: the owner roll is the county's, and public.
@@ -853,10 +947,25 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         label = _RULE_LABELS[hit.category]
         by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
     if not by_label["label.payment_ask"]:
-        by_label["label.payment_ask"].append(
-            _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
-        )
+        by_label["label.payment_ask"].append(_quiet_payment_line(modules, lang))
     return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
+
+
+def _quiet_payment_line(modules: ModuleEvidence, lang: str) -> CardLine:
+    """The payment line when no payment ask is a red flag.
+
+    An ad that asks for rent or a deposit before move-in never reads "Matches" (conductor,
+    Sat 10:03). It is a warning when the owner of record publishes how it takes money, or is
+    not the poster, and "Not confirmed" otherwise. Only the tone differs: honest listings
+    ask for the same thing, so this is never a flag and no verdict reads it.
+    """
+    if not _asks_before_move_in(modules):
+        return _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
+    not_poster = _owner_is_not_the_poster(modules)
+    has_rule = modules.owner is not None and modules.owner.published_rule is not None
+    tone = CardTone.HOLD if (not_poster or has_rule) else CardTone.NOT_SHOWN
+    key = "payment.before_move_in_not_owner" if not_poster else "payment.before_move_in"
+    return _line(lang, "label.payment_ask", tone, key)
 
 
 def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
@@ -911,10 +1020,11 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     lines = _rule_lines(modules, lang)
     rule = modules.owner.published_rule if modules.owner else None
-    if rule is not None and _payment_ask_flagged(modules):
+    if rule is not None and _rule_sits_beside_payment(modules):
         # Conductor, Sat 03:00: when the ad asks for money in a way the owner's own rule
         # does not allow, the rule is quoted next to the payment line. It adds no flag and
         # changes no state: the payment ask is the flag, and DONT_PAY still needs proof.
+        # Sat 10:03: the same for rent or a deposit asked before move-in, which is no flag.
         payment = strings.text("label.payment_ask", lang)
         places = [index for index, line in enumerate(lines) if line.label == payment]
         lines.insert(

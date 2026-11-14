@@ -389,3 +389,21 @@ def test_cached_room_labels_read_the_cache_and_never_the_network(tmp_path, monke
     assert cached_room_labels("never-fetched", cache_dir=tmp_path) == {}
     (tmp_path / "m7" / "rooms.json").write_text("{not json")
     assert cached_room_labels("m7", cache_dir=tmp_path) == {}
+
+
+def test_cached_room_labels_keep_only_string_labels(tmp_path):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m8").mkdir()
+    (tmp_path / "m8" / "rooms.json").write_text(
+        json.dumps({"sw1": "Kitchen", "sw2": None, "sw3": 7, "sw4": ["Bedroom"], "sw5": {"x": 1}})
+    )
+    assert cached_room_labels("m8", cache_dir=tmp_path) == {"sw1": "Kitchen", "sw2": None}
+
+
+def test_cached_room_labels_survive_a_deeply_nested_file(tmp_path):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m9").mkdir()
+    (tmp_path / "m9" / "rooms.json").write_text("[" * 100_000 + "]" * 100_000)
+    assert cached_room_labels("m9", cache_dir=tmp_path) == {}
