@@ -150,17 +150,25 @@ export function openLiveTrace(
       );
     });
 
-  // Resolves true when a stream opened (so the next failure starts the backoff over).
-  async function attempt(): Promise<boolean> {
+  // Set once a stream opened, even if it later errors, so the next failure starts the backoff over.
+  let opened = false;
+  async function attempt(): Promise<void> {
     const headers: Record<string, string> = { Accept: "text/event-stream" };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (lastId !== undefined) headers["Last-Event-ID"] = lastId;
     const res = await fetch(url, { headers, signal, credentials: "include" });
+    const type = res.headers.get("Content-Type") ?? "";
+    if (res.ok && !type.toLowerCase().startsWith("text/event-stream")) {
+      // A proxy or SPA fallback answering 200 with a page: retrying would never help.
+      finish("lost");
+      return;
+    }
     if (!res.ok || !res.body) {
       if (res.status === 401 || res.status === 403) finish("locked");
       else if (res.status >= 400 && res.status < 500) finish("lost");
-      return false;
+      return;
     }
+    opened = true;
     onStatus("live");
     const parse = createSseParser((m) => {
       if (m.id !== undefined) lastId = m.id;
@@ -179,19 +187,19 @@ export function openLiveTrace(
     }
     parse(decoder.decode());
     await reader.cancel().catch(() => {});
-    return true;
   }
 
   async function run() {
     onStatus("connecting");
     for (let tries = 0; !finished && !signal.aborted; tries++) {
       try {
-        const healthy = await attempt();
+        opened = false;
+        await attempt();
         if (finished) return;
-        if (healthy) tries = 0; // it was streaming, then ended without a verdict
       } catch {
         if (signal.aborted) return;
       }
+      if (opened) tries = 0; // it was streaming, then ended or broke without a verdict
       if (tries >= RETRY_LIMIT) {
         finish("lost");
         return;

@@ -320,6 +320,37 @@ describe("live stream", () => {
     expect(got).toEqual([0, 1, 2]);
     close();
   });
+  it("never gives up while each reconnect opens and delivers, even when reads error", async () => {
+    vi.useFakeTimers();
+    let n = 0;
+    const f = vi.fn(async () => {
+      const i = n++;
+      let c!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start(ctl) {
+          c = ctl;
+        },
+      });
+      c.enqueue(enc.encode(frame(0).replace(/id: 0/, `id: ${i}`)));
+      queueMicrotask(() => c.error(new Error("reset")));
+      return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
+    });
+    vi.stubGlobal("fetch", f);
+    const status: string[] = [];
+    const close = openLiveTrace("http://api", "x", noop, (s) => status.push(s), "T");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(f.mock.calls.length).toBeGreaterThan(12);
+    expect(status).not.toContain("lost");
+    close();
+  });
+  it("treats a 200 that is not an event stream as lost, without retrying", async () => {
+    const f = stub(new Response("<html></html>", { headers: { "Content-Type": "text/html" } }));
+    const status: string[] = [];
+    openLiveTrace("http://api", "x", noop, (s) => status.push(s), "T");
+    await tick();
+    expect(status.at(-1)).toBe("lost");
+    expect(f).toHaveBeenCalledTimes(1);
+  });
   it("retries a 503 and gives up as lost after the retry limit", async () => {
     vi.useFakeTimers();
     const f = vi.fn(async () => new Response(null, { status: 503 }));
