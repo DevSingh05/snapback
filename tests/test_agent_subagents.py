@@ -495,3 +495,15 @@ def test_the_place_retry_prompt_and_tools_exist_only_when_the_case_can_retry():
     live = next(x for x in build_subagents(case) if x["name"] == "place")
     assert "could not be placed" in live["system_prompt"]
     assert [t.name for t in live["tools"]][1:] == ["place_open_choice", "place_choose_option"]
+
+
+def test_a_finished_case_still_tells_the_model_to_delegate_until_the_notes_are_the_agents():
+    from snapback.agent.graph import describe
+
+    session = demo_session("a")
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    assert session.step.value == "done"
+    assert json.loads(describe(session))["notes_missing_delegate_to"] == CHECK_AGENTS
+    for stem in casework.STEMS:
+        casework.keep_note(session, casework.note_path(session.case_id, stem), "x", "model")
+    assert json.loads(describe(session)) == {"finished": True}

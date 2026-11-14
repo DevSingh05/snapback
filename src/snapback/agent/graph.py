@@ -101,13 +101,8 @@ def describe(case: CaseSession) -> str:
             }
         )
     if case.step is Step.SPOT:
-        missing = [
-            casework.AGENT_NAMES[stem]
-            for stem in _stems_of(case)
-            if stem not in case.notes or case.notes[stem].by != "model"
-        ]
         hint: dict[str, Any] = {"next": "call draw_spot"}
-        if missing:
+        if missing := _missing_notes(case):
             hint["notes_missing_delegate_to"] = missing
         return json.dumps(hint)
     if case.step is Step.APPROVAL:
@@ -116,7 +111,20 @@ def describe(case: CaseSession) -> str:
         return json.dumps({"waiting": "the poster has not replied yet; nothing to do now"})
     if case.step is Step.ASK:
         return json.dumps({"waiting": "the renter was asked for the license number; nothing to do"})
-    return json.dumps({"finished": True})
+    done: dict[str, Any] = {"finished": True}
+    if missing := _missing_notes(case):
+        # A live case has no challenge step, so it is finished before anyone has delegated.
+        done["notes_missing_delegate_to"] = missing
+    return json.dumps(done)
+
+
+def _missing_notes(case: CaseSession) -> list[str]:
+    """The sub-agents that have not yet written their note (code notes do not count)."""
+    return [
+        casework.AGENT_NAMES[stem]
+        for stem in _stems_of(case)
+        if stem not in case.notes or case.notes[stem].by != "model"
+    ]
 
 
 def _stems_of(case: CaseSession) -> tuple[str, ...]:
