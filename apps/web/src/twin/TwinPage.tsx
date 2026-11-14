@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import aerialFixture from "../../../../fixtures/contracts/aerial_tile.json";
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
-import recordFixture from "../../../../fixtures/contracts/property_record.json";
 import { SourceChip } from "../components/SourceChip";
-import type { AerialTile as AerialTileData, LocateResult, PropertyRecord } from "../contracts";
+import type { LocateResult } from "../contracts";
 import { TracePanel } from "../trace";
-import { AerialTile } from "./AerialTile";
+import { AerialProof, type AerialSide } from "./AerialProof";
 import { PhotoLanding, type FlyFrom, type LandingPhase } from "./PhotoLanding";
 import { TraceStrip } from "./TraceStrip";
 import { FIXTURE_ROOM_LABELS, chooseLocate, landingFromLocate, type LandingState } from "./landing";
 import { poseToSdkCall } from "./pose";
+import { FIXTURE_CLAIMED, FIXTURE_MATCHED } from "./proofFixtures";
 import { connectShowcase, embedUrl, flyToPose, watchSweeps, type ShowcaseSdk } from "./showcase";
 import { usePrefersReducedMotion } from "./useReducedMotion";
 
@@ -26,8 +25,6 @@ const FLIGHT_MS = 900;
 const LANDED_OPACITY = 0.6;
 
 const fixtureLocate = hold.locate as unknown as LocateResult;
-const fixtureAerial = aerialFixture as AerialTileData;
-const fixtureRecord = recordFixture as PropertyRecord;
 
 interface ViewProps {
   caseId: string;
@@ -37,9 +34,9 @@ interface ViewProps {
   locate?: LocateResult;
   liveLocate?: boolean;
   roomLabels?: Record<string, string>;
-  aerial?: AerialTileData;
-  record?: PropertyRecord;
-  aerialImageUrl?: string;
+  /** The building the photo was matched to, and the building the listing claims. */
+  matchedAerial?: AerialSide;
+  claimedAerial?: AerialSide;
 }
 
 function TwinViewInner({
@@ -49,11 +46,12 @@ function TwinViewInner({
   locate: liveResult,
   liveLocate = false,
   roomLabels: roomLabelsProp,
-  aerial = fixtureAerial,
-  record = fixtureRecord,
-  aerialImageUrl,
+  matchedAerial = FIXTURE_MATCHED,
+  claimedAerial = FIXTURE_CLAIMED,
 }: ViewProps) {
   const locate = chooseLocate(liveLocate, liveResult, fixtureLocate);
+  // A photo placed in a different building than the claimed one: show both buildings.
+  const mismatch = locate.photos.some((p) => p.status === "located_elsewhere");
   const poseIsLive = locate !== fixtureLocate;
   // Fixture room names belong to the fixture pose only; a live result without labels shows none.
   const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
@@ -258,7 +256,7 @@ function TwinViewInner({
             </label>
             <p className="twin-status">{status}</p>
           </div>
-          <AerialTile tile={aerial} record={record} imageUrl={aerialImageUrl} />
+          <AerialProof matched={matchedAerial} claimed={claimedAerial} mismatch={mismatch} />
         </aside>
       </div>
       <TraceStrip>

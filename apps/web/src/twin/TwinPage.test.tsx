@@ -120,3 +120,30 @@ describe("TwinView photo landing", () => {
     expect(screen.getAllByTestId("source-chip")[1]).toHaveTextContent("LIVE");
   });
 });
+
+describe("TwinView aerial proof", () => {
+  it("shows one tile when the photo is in the claimed building", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(screen.queryByTestId("aerial-distance")).toBeNull();
+    expect(screen.queryByText("The listing says here.")).toBeNull();
+  });
+
+  it("shows both buildings and the distance when a photo is located elsewhere", () => {
+    const elsewhere = {
+      ...(hold.locate as unknown as LocateResult),
+      photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "fx-model-b" }],
+    } as LocateResult;
+    render(
+      <TwinView
+        caseId="fx-7Q2M"
+        sdkKey={undefined}
+        modelId={undefined}
+        locate={elsewhere}
+        liveLocate
+      />,
+    );
+    expect(screen.getByText("The listing says here.")).toBeInTheDocument();
+    expect(screen.getByText("This photo was taken here.")).toBeInTheDocument();
+    expect(screen.getByTestId("aerial-distance")).toHaveTextContent("0.4 miles away");
+  });
+});
