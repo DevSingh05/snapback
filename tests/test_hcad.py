@@ -162,6 +162,19 @@ def test_kit_lookups_owner_reads_the_hcad_lookup(tmp_path, monkeypatch):
         "CHURCH FXJON",
         "STATE FXJON",
         "CITY FXJON Q",
+        # round 2: a company marker plus a person segment is still a private owner
+        "FIRST FXBANK TRUST COMPANY TR FXDOE FXJON FAMILY TRUST",
+        "FXAMPLE TRUST COMPANY TRUSTEE FOR FXDOE FXJON",
+        "FXDOE FXJON & FXCO PROPERTIES LLC",
+        "FXDOE FXJON DBA FXDOE HOMES",
+        "FXDOE FXJON C/O FXCO MANAGEMENT",
+        "FXDOE N A TRUST",
+        "BANK FXJON",
+        "FXDOE FXJON & FXMARY CHURCH",
+        "FXDOE FXJON ET AL",
+        "FXBANK NATIONAL ASSOCIATION TRUSTEE",
+        "FXBANK N.A. TR",
+        "FXAMPLE RENTAL TRUST LLC",
     ],
 )
 def test_a_name_that_carries_a_person_is_a_private_owner(name):
@@ -174,10 +187,9 @@ def test_a_name_that_carries_a_person_is_a_private_owner(name):
     "name",
     [
         "FXAMPLE TRUST COMPANY",
-        "FXBANK NATIONAL ASSOCIATION TRUSTEE",
-        "FXBANK N.A. TR",
+        "FXBANK N.A.",
         "FXAMPLE HOMES LLC",
-        "FXAMPLE RENTAL TRUST LLC",
+        "FXAMPLE CHURCH OF CHRIST",
         "CITY OF FXTOWN",
         "STATE OF TEXAS",
         "FIRST FXAMPLE CHURCH",
@@ -234,3 +246,20 @@ def test_a_different_salt_gives_not_checked_never_no(tmp_path):
     subset = _subset(tmp_path)
     result = owner("200 Sample St. My name is Fxbob Fxsmith.", subset, salt="fx-other-salt")
     assert result is not None and result.poster_matches is OwnerMatch.NOT_CHECKED
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "200 Sample St. I'm the owner. Pets ok - No Smoking",
+        "200 Sample St. I'm the owner. Rent includes - Water Paid",
+    ],
+)
+def test_a_signature_never_gives_no(tmp_path, text):
+    result = owner(text, _subset(tmp_path), salt="fx-salt")
+    assert result is not None and result.poster_matches is not OwnerMatch.NO
+
+
+def test_a_signature_can_still_say_yes(tmp_path):
+    result = owner("200 Sample St, call me. - Fxname Fxperson", _subset(tmp_path), salt="fx-salt")
+    assert result.poster_matches is OwnerMatch.YES

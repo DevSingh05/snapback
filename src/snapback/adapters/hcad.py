@@ -55,10 +55,6 @@ _COMPANY_WORDS = {
     "FUND", "HOLDINGS", "INVESTMENTS", "CAPITAL", "GROUP", "REALTY", "MANAGEMENT", "AUTHORITY",
     "DISTRICT", "VENTURES", "ENTERPRISES", "SERVICES", "BORROWER", "OPENDOOR", "OFFERPAD",
 }  # fmt: skip
-# Any of these makes the name a trust, and a trust is a private owner (it carries a person's
-# name) unless an unambiguous institution marker is also there
-_TRUST_WORDS = {"TRUST", "TR", "TRUSTEE", "TRUSTEES", "TRS"}
-_INSTITUTION_MARKERS = {"BANK", "LLC", "INC", "LP", "REIT"}
 _MY_NAME = re.compile(
     r"(?i:\bmy[ \t]+name[ \t]+is)[ \t]+([A-Z][A-Za-z'\-]{1,30})[ \t]+([A-Z][A-Za-z'\-]{1,30})"
 )
@@ -90,20 +86,30 @@ def _salt_fingerprint(salt: str) -> str:
 def classify(owner_name: str) -> OwnerKind:
     """A company or institution, or a private owner. When in doubt, a private owner: then the
     card says "a private owner" and no name can be shown."""
-    tokens = re.findall(r"[A-Z0-9&]+", owner_name.upper())  # hyphens and dots split words
-    words = set(tokens)
+    upper = owner_name.upper()
+    tokens = re.findall(r"[A-Z0-9&]+", upper)  # hyphens and dots split words
+    if not tokens:
+        return OwnerKind.PERSON
     joined = " ".join(tokens)
-    if words & _TRUST_WORDS:
-        institution = (
-            words & _INSTITUTION_MARKERS
-            or "TRUST COMPANY" in joined
-            or "NATIONAL ASSOCIATION" in joined
-            or re.search(r"\bN A\b", joined) is not None  # N.A.
-        )
-        return OwnerKind.COMPANY if institution else OwnerKind.PERSON
-    if re.match(r"(CITY|STATE|COUNTY) OF\b", joined) or (tokens and tokens[-1] == "CHURCH"):
+    # A COMPANY only when the whole name is one company entity (conductor's call, #160 r2):
+    # anything joining or naming a second party, or any trust that is not a trust company,
+    # is a private owner, so a person's name can never reach the card.
+    if (
+        "&" in upper
+        or "C/O" in upper
+        or {"DBA", "FOR", "TR", "TRS", "TRUSTEE", "TRUSTEES"} & set(tokens)
+        or re.search(r"\bET AL\b", joined)
+        or re.search(r"\bTRUST\b(?! COMPANY\b)", joined)
+    ):
+        return OwnerKind.PERSON
+    if re.match(r"(CITY|STATE|COUNTY) OF\b", joined) or re.search(r"\bCHURCH OF \w+", joined):
         return OwnerKind.COMPANY
-    return OwnerKind.COMPANY if words & _COMPANY_WORDS else OwnerKind.PERSON
+    if tokens[-1] == "CHURCH" or "TRUST COMPANY" in joined:
+        return OwnerKind.COMPANY
+    if re.search(r"\bBANK N A$|\bN A$", joined) and tokens[0] != "BANK":
+        return OwnerKind.COMPANY  # N.A. only after BANK or as the last tokens
+    company_words = set(tokens[1:] if tokens[0] == "BANK" else tokens)  # BANK first: a surname
+    return OwnerKind.COMPANY if company_words & _COMPANY_WORDS else OwnerKind.PERSON
 
 
 def _rows(source: Path, name: str) -> Iterator[dict[str, str]]:
@@ -172,12 +178,16 @@ def build_subset(source: Path, kit_streets: Iterable[str], out: Path, salt: str)
     return count
 
 
-def _poster_name(text: str) -> tuple[str, str] | None:
+def _poster_name(text: str) -> tuple[str, str, bool] | None:
     """The poster's own name: only 'my name is' or a signature at the end, never a bare
-    "I'm" / "this is" (which read 'I'm Relocating For Work' as a name)."""
-    for m in (_MY_NAME.search(text), _SIGNATURE.search(text.strip())):
+    "I'm" / "this is" (which read 'I'm Relocating For Work' as a name). The flag says it came
+    from a signature, which can be a slogan ('- No Smoking') and so may never give NO."""
+    for m, from_signature in (
+        (_MY_NAME.search(text), False),
+        (_SIGNATURE.search(text.strip()), True),
+    ):
         if m and not {m.group(1).upper(), m.group(2).upper()} & _NOT_NAMES:
-            return m.group(1), m.group(2)
+            return m.group(1), m.group(2), from_signature
     return None
 
 
@@ -215,11 +225,13 @@ def owner(listing_text: str, subset: Path, salt: str) -> OwnerResult | None:
         # no name to compare, or the lookup was keyed with another salt: never a false NO
         return OwnerResult(kind=OwnerKind.PERSON)
     owned = set(entry.get("name_words") or [])
-    first, last = (_token_hash(n, salt) in owned for n in name)
+    first, last = (_token_hash(n, salt) in owned for n in name[:2])
     if first and last:
         matches = OwnerMatch.YES
     elif first or last:
         matches = OwnerMatch.NOT_CHECKED  # a nickname, or a shared last name: not a NO
+    elif name[2]:
+        matches = OwnerMatch.NOT_CHECKED  # a signature can be a slogan: it never gives NO
     else:
         matches = OwnerMatch.NO
     return OwnerResult(kind=OwnerKind.PERSON, poster_matches=matches)
