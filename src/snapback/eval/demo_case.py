@@ -159,7 +159,8 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
         records = KitLookups(DataSource.LIVE).records()
     except (FileNotFoundError, KeyError, KitMissing):
         print(
-            "No locate index or kit under data/. Unzip the team data handoff (or build the index) first.",
+            "No locate index or kit under data/. "
+            "Unzip the team data handoff (or build the index) first.",
             file=sys.stderr,
         )
         return 2
