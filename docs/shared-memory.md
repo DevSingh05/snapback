@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 03:58. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 03:55. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
 
 ## Decisions (locked)
 
@@ -99,10 +99,10 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Live facts
 
-- Nothing deployed yet (NOT re-checked at 03:58). **main = e89a3f1, CI green** (python, node, hygiene; run 43577695228); 767dbdd and da50c7b hygiene red cleared by clean commits on top. Merged 03:35-03:46: #147 H6 web card, #150 CI eval gate, #142 V2 weights + thresholds + seam fix (46 since midnight). Earlier merges: see git log.
+- Nothing deployed yet (NOT re-checked at 03:55). **main = e89a3f1, CI green** (python, node, hygiene; run 43577695228); 767dbdd and da50c7b hygiene red cleared by clean commits on top. Merged 03:35-03:46: #147 H6 web card, #150 CI eval gate, #142 V2 weights + thresholds + seam fix (46 since midnight). Earlier merges: see git log.
 - Published (private, Vidyut's account): realtor second-look page https://claude.ai/code/artifact/753dbcf2-8571-4a45-9915-bfce03ecaada (new; Vidyut decides whether to send; the first realtor page is unchanged); team page https://claude.ai/code/artifact/02692146-1751-437c-a78e-276c9f94c586; landing (worlds) https://claude.ai/code/artifact/a96c4cf3-27b3-4c6d-a2fc-b4f0ea616aee. All three republished about 03:35 with the red-team text fixes (landing r10b).
 - TREC licensee data (Socrata `data.texas.gov/resource/s7ft-44qi.json`) is live with no key: 327,540 rows (conductor, 02:18). Use lightly and cache demo answers locally.
-- Open at 03:58: #153@fcac543 A20 (python CI pending; merges on green), #148@49275d9 V2 semantics r2 in review (green), #112@4cda2b1 V4 r3 in review (green), #151@8d3db1e picker FIX (node CI red), #149@d8877d4 A23 FIX (conductor builder, CONFLICTING), #140@ac13182 A19 FIX (Dev), #114@e861ff5 V3 FIX, #134@cd66533 D10 FIX r3 (stalled), #137@d4ee744 A18 (after #134), #96@3152d07 A8 (Dev after #140). Draft held: #122 T10. Closed: #145 (-> #153), #116 (-> #151). Reviews and merges: conductor only.
+- Open at 03:55: #153@fcac543 A20 (python CI pending; merges on green), #148@49275d9 V2 semantics r2 in review (green), #112@4cda2b1 V4 r3 in review (green), #151@8d3db1e picker FIX (node CI red), #149@d8877d4 A23 FIX (conductor builder, CONFLICTING), #140@ac13182 A19 FIX (Dev), #114@e861ff5 V3 FIX, #134@cd66533 D10 FIX r3 (stalled), #137@d4ee744 A18 (after #134), #96@3152d07 A8 (Dev after #140). Draft held: #122 T10. Closed: #145 (-> #153), #116 (-> #151). Reviews and merges: conductor only.
 - Contract fields on main (#88, #92), additive and optional: `PropertyRecord.site_phone_hash` (keyed hash, never digits; both lanes use the same phone hash helper), `website_host` (host only), `floor_plan_rents[]` (name, beds 0=studio, rent_min, rent_max, per_bed), `units[]` (unit, beds, floor_plan); `AuthorityResult.office_phone_match`, `link_domain` (yes/no only); `ForSaleMatch` (status active / recently_rented / none, site, listed_on, changed_on) on `ModuleEvidence.for_sale` and `Card.for_sale`. Pending in #87: `PriceResult.compared_beds`.
 - Fri 22:10 data gate GO: 3/3 Houston multifamily Matterport models load on Vidyut's key (issue #5); apartment-listing has min/max rent per floor plan and the management company.
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace, status, aerial, images; header only since the 02:27 ruling, no `?token=`). `/c/:id` card stays public.

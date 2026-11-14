@@ -20,7 +20,7 @@ Old items moved out of docs/shared-memory.md. Newest at the bottom.
 
 - Merged 01:04-01:45: #61 V5, #82 D3, #83 D4, #84 D5, #87 A7 rules, #90 T8, #91 A9, #94 T9, #98 A10 contract, #99 V1 follow-ups, #105 CODEOWNERS, #108 T housekeeping, #110 A14 contract.
 
-## Decisions archived Sat 03:58 (from shared-memory.md)
+## Decisions archived Sat 03:55 (from shared-memory.md)
 
 - Sat 00:35 Plan v3.2 (plan/snapback-v3.2.md, planner summary): one product, three proofs (PLACE, PERSON, PRICE), plus replays of real reported scams (#71, LOCKED 00:35). (Vidyut)
 - Sat 00:35 New issues #66-#79: D7 #66, A7 #67, V8 #68, eval route #69, D8 #71, A8 #72, A9 #73, V9 #74, T7-T11 #75-#79. #18, #19, #34 closed as design-only.
