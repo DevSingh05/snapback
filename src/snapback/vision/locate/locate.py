@@ -187,15 +187,19 @@ class Locator:
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
         building places it only on the stricter elsewhere bar (it can lead to DON'T PAY).
-        `identify` (the ad names no home): any building places it on the normal bar, because
-        nothing is claimed that the photo could contradict."""
+        `identify` (the ad names no home): any building places it, but only on the strict bar,
+        because the answer puts that home's record on the card."""
         t = self.thresholds
         hits = self._candidates(photo, claimed_models)
         if identify:
             return self._best(
                 photo,
                 hits,
-                lambda c: c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio,
+                lambda c: (
+                    c.inliers >= t.elsewhere_min_inliers
+                    and c.ratio >= t.min_inlier_ratio
+                    and c.spread >= t.elsewhere_min_spread
+                ),
             )
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
         other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
@@ -251,7 +255,7 @@ class Locator:
         # Where a photo may be placed:
         #   claimed home set and indexed -> claimed first, strict bar elsewhere (can say elsewhere)
         #   claimed home set, not indexed -> nothing is placed: NOT_INDEXED, never elsewhere
-        #   no claimed home -> identify: the normal bar in any building ("identified as P")
+        #   no claimed home -> identify: the strict bar in any building ("identified as P")
         identify = claimed_property_id is None
         locations: list[PhotoLocation] = []
         poses: dict[str, Pose] = {}
@@ -275,11 +279,23 @@ class Locator:
             placements[photo_id] = placed
 
         identified_by_scan = conflict = False
+        identified_photos = 0
         if identify:
             found = {
                 self.catalog.property_of(p.model_id) for p in placements.values() if p is not None
             }
-            if len(found) > 1:
+            strict_placed = sum(p is not None for p in placements.values())
+            if found and len(photos) >= 2 and strict_placed < 2:
+                # One lone strict match among several photos is not enough to name a home.
+                log.warning(
+                    "case %s: only %d of %d photos identify a home",
+                    case_id,
+                    strict_placed,
+                    len(photos),
+                )
+                placements = dict.fromkeys(placements)
+                conflict = True
+            elif len(found) > 1:
                 # Photos from different homes: do not pick one.
                 log.warning(
                     "case %s: photos identify different properties %s", case_id, sorted(found)
@@ -292,12 +308,13 @@ class Locator:
                     self.catalog.models_of(claimed_property_id) & self.index.model_ids()
                 )
                 identified_by_scan = True
+                identified_photos = strict_placed
 
         for photo_id, placed in placements.items():
             if placed is None:
                 status = (
                     LocateStatus.NOT_LOCATED
-                    if claimed_models or conflict
+                    if claimed_models or conflict or (identify and self.index.model_ids())
                     else LocateStatus.NOT_INDEXED
                 )
                 locations.append(PhotoLocation(photo_id=photo_id, status=status))
@@ -347,6 +364,7 @@ class Locator:
             photos=locations,
             claimed_property_id=claimed_property_id,
             identified_by_scan=identified_by_scan,
+            identified_photos=identified_photos,
             chosen=chosen,
             alternatives=[c for c in candidates if c is not chosen],
             poses=poses,

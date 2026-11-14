@@ -131,6 +131,7 @@ class LocateResult(BaseModel):
     # True when the ad named no home and the scan identified it: claimed_property_id is then
     # the home the photos were placed in.
     identified_by_scan: bool = False
+    identified_photos: int = 0  # photos that placed in that home on the strict bar
     chosen: FloorPlanCandidate | None = None
     alternatives: list[FloorPlanCandidate] = Field(default_factory=list)
     poses: dict[str, Pose] = Field(default_factory=dict)  # photo_id -> pose, located photos only

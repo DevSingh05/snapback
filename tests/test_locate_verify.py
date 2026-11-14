@@ -429,3 +429,49 @@ def test_verdicts_on_identified_and_unindexed_results_are_never_dont_pay(twins, 
     for result in (identified, unindexed):
         evidence = Evidence(case_id=result.case_id, source=DataSource.FIXTURE, photos=result.photos)
         assert decide(evidence).state in {VerdictState.HOLD, VerdictState.UNVERIFIED}
+
+
+# --- identification is strict and needs agreement (coordinator tightening) ---------------------
+
+
+def test_single_weak_match_does_not_identify(twins):
+    sweeps, index, catalog = twins
+    strict = replace(
+        THRESHOLDS, elsewhere_min_inliers=40
+    )  # a match that clears only the normal bar
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), strict)
+    result = locator.locate("fx-weak", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    assert result.identified_by_scan is False and result.claimed_property_id is None
+    assert result.identified_photos == 0
+
+
+def test_one_strict_photo_identifies_with_count_one(twins, locator):
+    sweeps, _, _ = twins
+    result = locator.locate("fx-one", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.identified_by_scan is True and result.identified_photos == 1
+
+
+def test_two_photos_agreeing_identify_with_count_two(twins, locator):
+    sweeps, _, _ = twins
+    photos = {
+        "p1": listing_photo(sweeps, "fx-model-a", 2, 1),
+        "p2": listing_photo(sweeps, "fx-model-a", 0, 3),
+    }
+    result = locator.locate("fx-two", photos, None)
+    assert result.identified_by_scan is True and result.identified_photos == 2
+    assert result.claimed_property_id == "fx-prop-1"
+    assert [p.status for p in result.photos] == [LocateStatus.LOCATED_IN_CLAIMED] * 2
+
+
+def test_two_photos_with_one_strict_and_one_weak_do_not_identify(twins, locator):
+    # Rule: with 2 or more photos, at least 2 must place strictly in the same home.
+    sweeps, _, _ = twins
+    noise = Image.fromarray(
+        np.random.default_rng(11).integers(0, 255, (180, 220, 3), dtype=np.uint8), "RGB"
+    )
+    photos = {"p1": listing_photo(sweeps, "fx-model-a", 2, 1), "p2": noise}
+    result = locator.locate("fx-lone", photos, None)
+    assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * 2
+    assert result.identified_by_scan is False and result.identified_photos == 0
+    assert result.claimed_property_id is None
