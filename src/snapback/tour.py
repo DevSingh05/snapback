@@ -32,7 +32,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from snapback.contracts import AS_OF, DataSource, PlaceMatch, PropertyRecord
+from snapback.contracts import AS_OF, DataSource, LocateResult, PlaceMatch, PropertyRecord
 
 ROOM_LINK_M = 4.0  # same-label sweeps closer than this (metres) belong to one room
 MAX_ROOM_STOPS = 12
@@ -69,7 +69,7 @@ _TIPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("bed",), "Check the windows, the closet and the outlets, and your phone signal."),
     (
         ("living", "family", "great room"),
-        "Turn on the AC and look at the vents; check the outlets and the street noise.",
+        "Turn on the AC and look at the vents; check the outlets and the outside noise.",
     ),
     (("dining",), "Check the light and the outlets; picture where your table would go."),
     (("laundry", "utility"), "Look for washer and dryer hookups, the vent, and any water stains."),
@@ -106,6 +106,30 @@ class TourPhoto(BaseModel):
     fov_deg: float | None = None
 
 
+class WalkCoverage(BaseModel):
+    """How much of the scan the ad's photos cover. Filled by the locate-to-stops task (W1);
+    `counted` says whether rooms, spots or nothing were counted, and `line` is the code-written
+    sentence the page shows."""
+
+    counted: Literal["rooms", "spots", "none"] = "none"
+    total: int = 0
+    with_photo: int = 0
+    placed: int = 0
+    elsewhere: int = 0
+    unplaced: int = 0
+    line: str | None = None
+
+
+class TourDirector(BaseModel):
+    """What the tour director picked among options code wrote (W6): stops to dwell on and the
+    checks that lead. `stamp` says who chose. Facts never depend on it."""
+
+    dwell: list[str] = Field(default_factory=list)  # stop keys
+    lead_checks: list[str] = Field(default_factory=list)
+    stamp: Literal["model", "policy"] = "policy"
+    reason: str | None = None
+
+
 class TourStop(BaseModel):
     kind: Literal["arrive", "door", "room", "stop", "outro"]
     key: str
@@ -115,6 +139,9 @@ class TourStop(BaseModel):
     sweep_count: int = 0  # sweeps of this room the scan holds
     sweep_ids: list[str] = Field(default_factory=list)  # every sweep of this room
     photos: list[TourPhoto] = Field(default_factory=list)  # the renter's ad photos placed here
+    # Whether an ad photo was placed in this room; "unknown" until the locate result is mapped.
+    ad_view: Literal["placed", "none_placed", "unknown"] = "unknown"
+    claims: list[TourFact] = Field(default_factory=list)  # what the ad claimed for this room
     position: tuple[float, float, float] | None = None
     rotation_quat: tuple[float, float, float, float] | None = None  # x, y, z, w
     facts: list[TourFact] = Field(default_factory=list)
@@ -146,6 +173,15 @@ class TourPlan(BaseModel):
     aerial: TourAerial | None = None
     stops: list[TourStop]
     links: TourLinks
+    coverage: WalkCoverage | None = None
+    director: TourDirector | None = None
+
+
+class WalkResponse(BaseModel):
+    """`GET /cases/{id}/walk`: the plan with the case's placed photos, and the locate result."""
+
+    plan: TourPlan
+    locate: LocateResult | None = None
 
 
 @dataclass(frozen=True)

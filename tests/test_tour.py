@@ -271,3 +271,29 @@ def test_case_tour_route_needs_the_read_token_in_a_header(client):
     ok = client.get(url, headers={"Authorization": f"Bearer {made['read_token']}"})
     assert ok.status_code in (200, 404)  # 404 only if the case names no building
     assert client.get("/cases/NOPE/tour").status_code == 404
+
+
+def test_new_fields_default_so_later_tasks_can_fill_them():
+    p = plan(fixture_sweeps("fx-model-a"))
+    assert p.coverage is None and p.director is None
+    assert all(s.ad_view == "unknown" and s.claims == [] for s in p.stops)
+    from snapback.tour import TourDirector, WalkCoverage
+
+    assert WalkCoverage().counted == "none" and TourDirector().stamp == "policy"
+
+
+def test_the_living_room_tip_says_outside_noise_not_street_noise():
+    p = plan(fixture_sweeps("fx-model-a"))
+    living = next(s for s in p.stops if s.room_label == "Living room")
+    assert "outside noise" in living.tip and "street" not in p.model_dump_json().lower()
+
+
+def test_case_walk_route_needs_the_read_token_and_returns_plan_and_locate(client):
+    made = client.post("/cases", data={"text": "Nice 1 bed, $1,500 a month"}).json()
+    url = f"/cases/{made['case_id']}/walk"
+    assert client.get(url).status_code == 401
+    assert client.get(f"{url}?token={made['read_token']}").status_code == 401
+    ok = client.get(url, headers={"Authorization": f"Bearer {made['read_token']}"})
+    assert ok.status_code in (200, 404)
+    if ok.status_code == 200:
+        assert set(ok.json()) == {"plan", "locate"}

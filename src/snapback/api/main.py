@@ -83,6 +83,7 @@ from snapback.settings import Settings, get_settings
 from snapback.tour import (
     TourPhoto,
     TourPlan,
+    WalkResponse,
     attach_photos,
     build_tour,
     cached_sweeps,
@@ -758,15 +759,7 @@ def create_app(
             raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
         return tour_for(property_id, plan_key)
 
-    @app.get("/cases/{case_id}/tour")
-    def get_case_tour(
-        case_id: str,
-        request: Request,
-        authorization: Annotated[str | None, Header()] = None,
-        x_case_token: Annotated[str | None, Header()] = None,
-    ) -> TourPlan:
-        """The same walkthrough for the ad's own building, with the case's placed photos on the
-        rooms they were taken in. Needs the case's read token in a header."""
+    def case_tour(case_id: str, request: Request, authorization, x_case_token) -> tuple:
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
@@ -775,7 +768,7 @@ def create_app(
         plan = tour_for(case.property_id, None)
         locate = case.evidence.locate
         if locate is None:
-            return plan
+            return plan, None
         placed = [
             TourPhoto(
                 photo_id=p.photo_id,
@@ -788,7 +781,31 @@ def create_app(
             if p.status is LocateStatus.LOCATED_IN_CLAIMED
             and (pose := locate.poses.get(p.photo_id)) is not None
         ]
-        return attach_photos(plan, placed)
+        return attach_photos(plan, placed), locate
+
+    @app.get("/cases/{case_id}/tour")
+    def get_case_tour(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> TourPlan:
+        """The same walkthrough for the ad's own building, with the case's placed photos on the
+        rooms they were taken in. Needs the case's read token in a header."""
+        return case_tour(case_id, request, authorization, x_case_token)[0]
+
+    @app.get("/cases/{case_id}/walk")
+    def get_case_walk(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> WalkResponse:
+        """The case-scoped walk: the tour plan plus the case's locate result, so the page can
+        show which ad photos were placed, which were taken elsewhere and which could not be
+        placed. Needs the case's read token in a header."""
+        plan, locate = case_tour(case_id, request, authorization, x_case_token)
+        return WalkResponse(plan=plan, locate=locate)
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(

@@ -326,11 +326,36 @@ export interface TourStop {
   sweep_count: number;
   sweep_ids: string[];
   photos: TourPhoto[]; // the renter's own ad photos placed in this room (case tour only)
+  ad_view: "placed" | "none_placed" | "unknown"; // whether an ad photo was placed in this room
+  claims: TourFact[]; // what the ad claimed for this room
   position?: [number, number, number] | null;
   rotation_quat?: [number, number, number, number] | null;
   facts: TourFact[];
   tip?: string | null; // "check this in person"
   note?: string | null;
+}
+
+export interface WalkCoverage {
+  counted: "rooms" | "spots" | "none";
+  total: number;
+  with_photo: number;
+  placed: number;
+  elsewhere: number;
+  unplaced: number;
+  line?: string | null;
+}
+
+export interface TourDirector {
+  dwell: string[]; // stop keys
+  lead_checks: string[];
+  stamp: "model" | "policy";
+  reason?: string | null;
+}
+
+// GET /cases/{id}/walk: the plan with the case's placed photos, and its locate result.
+export interface WalkResponse {
+  plan: TourPlan;
+  locate?: LocateResult | null;
 }
 
 export interface TourPlan {
@@ -345,4 +370,6 @@ export interface TourPlan {
   aerial?: { source: DataSource; captured_on?: string | null; has_image: boolean } | null;
   stops: TourStop[];
   links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
+  coverage?: WalkCoverage | null;
+  director?: TourDirector | null;
 }

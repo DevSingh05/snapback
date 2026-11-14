@@ -5,7 +5,15 @@ import type { TourPlan, TourStop } from "../contracts";
 const Q: [number, number, number, number] = [0, 0, 0, 1];
 
 function stop(over: Partial<TourStop> & Pick<TourStop, "kind" | "key" | "title">): TourStop {
-  return { sweep_count: 0, sweep_ids: [], photos: [], facts: [], ...over };
+  return {
+    sweep_count: 0,
+    sweep_ids: [],
+    photos: [],
+    ad_view: "unknown",
+    claims: [],
+    facts: [],
+    ...over,
+  };
 }
 
 export const FIXTURE_TOUR: TourPlan = {
@@ -55,7 +63,7 @@ export const FIXTURE_TOUR: TourPlan = {
       sweep_ids: ["fx-sweep-01", "fx-sweep-02"],
       position: [3, 1.4, 0],
       rotation_quat: Q,
-      tip: "Turn on the AC and look at the vents; check the outlets and the street noise.",
+      tip: "Turn on the AC and look at the vents; check the outlets and the outside noise.",
     }),
     stop({
       kind: "room",

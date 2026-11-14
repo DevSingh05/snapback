@@ -30,6 +30,8 @@ export function evenStops(ids: string[]): TourStop[] {
     sweep_count: 1,
     sweep_ids: [id],
     photos: [],
+    ad_view: "unknown",
+    claims: [],
     facts: [],
   });
   return [
