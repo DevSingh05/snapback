@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar mcp purge eval eval-baseline prefetch-weights eval-locate-real
+.PHONY: eval-ads setup lint format test hygiene check api web sidecar mcp purge eval eval-baseline prefetch-weights eval-locate-real
 
 setup: ## install python and node dependencies
 	uv sync
@@ -47,6 +47,9 @@ eval: ## eval harness: writes eval/results.csv (aggregate numbers only) and runs
 eval-baseline: ## rescore without the regression gate, then freeze it as the baseline (deliberate)
 	uv run python -m snapback.eval
 	cp eval/results.csv eval/baseline.csv
+
+eval-ads: ## measured batch: composed ads + 49 labelled messages through the real pipeline; writes eval/ads_results.csv (FIXTURE) or data/eval/ads_results.live.csv (LIVE kit)
+	uv run python -m snapback.eval.ads
 
 eval-locate-real: ## A8: locate accuracy on the kit's own photos; writes totals to eval/locate_real.csv
 	uv run python -m snapback.agent.locate_eval

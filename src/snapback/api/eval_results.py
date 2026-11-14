@@ -15,6 +15,20 @@ from pathlib import Path
 # fixtures/contracts/results_sample.csv. Lines starting with "#" are comments, and the first
 # one says FIXTURE or LIVE.
 RESULTS_COLUMNS = ("condition", "metric", "k", "n", "rate", "ci_low", "ci_high", "frozen_at")
+# The measured ad batch (`make eval-ads`): one row per ad type and verdict, with a miss flag.
+ADS_COLUMNS = (
+    "ad_type",
+    "origin",
+    "expected",
+    "got",
+    "k",
+    "n",
+    "rate",
+    "ci_low",
+    "ci_high",
+    "miss",
+    "frozen_at",
+)
 MAX_RESULTS_BYTES = 1024 * 1024
 
 
@@ -22,8 +36,11 @@ class NotTheAgreedCsv(Exception):
     """There is a file at the results path, but it is not the eval results CSV."""
 
 
-def read_results(path: Path) -> bytes | None:
-    """The results file exactly as written, or None if there is no file yet."""
+def read_results(path: Path, columns: tuple[str, ...] = RESULTS_COLUMNS) -> bytes | None:
+    """The results file exactly as written, or None if there is no file yet.
+
+    `columns` is the agreed header: the eval results by default, or `ADS_COLUMNS`.
+    """
     if not path.is_file():
         return None
     if path.stat().st_size > MAX_RESULTS_BYTES:
@@ -36,11 +53,13 @@ def read_results(path: Path) -> bytes | None:
 
     rows = csv.reader(line for line in lines if line.strip() and not line.startswith("#"))
     header = next(rows, [])
-    if tuple(column.strip() for column in header) != RESULTS_COLUMNS:
+    if tuple(column.strip() for column in header) != columns:
         raise NotTheAgreedCsv(path)
     # Every row has the agreed fields, and the counts are counts. A file caught half written
     # ends in a short row and is refused, as is any other CSV that borrowed the header.
     for row in rows:
-        if len(row) != len(RESULTS_COLUMNS) or not (row[2].isdigit() and row[3].isdigit()):
+        if len(row) != len(columns) or not (
+            row[columns.index("k")].isdigit() and row[columns.index("n")].isdigit()
+        ):
             raise NotTheAgreedCsv(path)
     return raw

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Locate accuracy on the kit's own photos, written by `make eval-locate-real` (A8):
     # totals only. Served read-only at GET /eval/locate_real.csv.
     snapback_eval_locate_real: Path = Path("eval/locate_real.csv")
+    # The measured ad batch written by `make eval-ads` (FIXTURE results are committed):
+    snapback_eval_ads: Path = Path("eval/ads_results.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
     # M3: what opens GET /events/stream, sent in a header. Unset closes the stream to everyone.

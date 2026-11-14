@@ -13,6 +13,7 @@ Routes the web app and the iMessage sidecar call:
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
+    GET  /eval/ads.csv                    measured ad batch: ad type by verdict, n, misses
     GET  /healthz                         liveness and the data source
     POST /voice/tts, POST /voice/stt      the Finder's voice (ElevenLabs; see api/voice.py)
     POST /verdict                         decide() on evidence the caller already has
@@ -58,7 +59,7 @@ from snapback.api.cases import (
     SessionCase,
     UnknownProperty,
 )
-from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.eval_results import ADS_COLUMNS, RESULTS_COLUMNS, NotTheAgreedCsv, read_results
 from snapback.api.finder import make_router as finder_router
 from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
@@ -1441,10 +1442,10 @@ def create_app(
             challenge_text=status.challenge_text,
         )
 
-    def eval_file(path: Path, missing: str) -> Response:
+    def eval_file(path: Path, missing: str, columns: tuple[str, ...] = RESULTS_COLUMNS) -> Response:
         """One of the eval harness's CSVs, as written. Only the agreed format is served."""
         try:
-            results = read_results(path)
+            results = read_results(path, columns)
         except NotTheAgreedCsv:
             raise HTTPException(
                 status_code=500, detail="The results file is not the agreed eval results CSV."
@@ -1475,6 +1476,19 @@ def create_app(
         return eval_file(
             settings.snapback_eval_locate_real,
             "No locate results yet. Run `make eval-locate-real`.",
+        )
+
+    @app.get("/eval/ads.csv")
+    def get_eval_ads() -> Response:
+        """The measured ad batch (`make eval-ads`): ad type by verdict, with n and a miss flag.
+
+        Same rules as `/eval/results.csv`: public, read-only, a fixed path, only the agreed CSV.
+        Composed ads are labelled composed in the file; it holds counts only, no ad text.
+        """
+        return eval_file(
+            settings.snapback_eval_ads,
+            "No ad results yet. Run `make eval-ads`.",
+            ADS_COLUMNS,
         )
 
     return app
