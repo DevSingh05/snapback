@@ -183,15 +183,20 @@ EN: dict[str, str] = {
     "row.place": "PLACE",
     "row.person": "PERSON",
     "row.price": "PRICE",
-    "tone.ok": "Held up",
-    "tone.hold": "On hold",
-    "tone.red_flag": "Red flag",
-    "tone.not_shown": "Not shown",
+    # LOCKED wording (decisions Fri 22:40, XO review of #59). Five row states: Matches,
+    # Doesn't match, Not confirmed, Warning, Not checked. Three headlines. Do not reword.
+    # A row state is chosen by `tone_word`: by the line's tone, and for two tones by its row.
+    "tone.ok": "Matches",
+    "tone.hold": "Warning",
+    "tone.hold.person": "Not confirmed",  # no reply yet is not a warning about anyone
+    "tone.red_flag": "Doesn't match",
+    "tone.red_flag.price": "Warning",  # a risky ask is a warning, not a mismatch
+    "tone.not_shown": "Not confirmed",
     "tone.not_checked": "Not checked",
-    "state.hold": "Hold",
-    "state.dont_pay": "Don't pay · could not verify",
+    "state.hold": "Hold off for now",
+    "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
-    "state.verified": "Checks held up",
+    "state.verified": "Checks passed. Still follow the two rules.",
     "card.case": "Case {case_id}",
     "card.checked": "Checked {time}",
     "card.expires": "Expires {time}",
@@ -410,15 +415,18 @@ ES: dict[str, str] = {
     "row.place": "LUGAR",
     "row.person": "PERSONA",
     "row.price": "PRECIO",
-    "tone.ok": "Se sostuvo",
-    "tone.hold": "En espera",
-    "tone.red_flag": "Señal de alerta",
-    "tone.not_shown": "No demostrado",
+    # The locked English wording, in Spanish. Same keys, same rule for choosing a row state.
+    "tone.ok": "Coincide",
+    "tone.hold": "Advertencia",
+    "tone.hold.person": "Sin confirmar",
+    "tone.red_flag": "No coincide",
+    "tone.red_flag.price": "Advertencia",
+    "tone.not_shown": "Sin confirmar",
     "tone.not_checked": "No comprobado",
-    "state.hold": "En espera",
-    "state.dont_pay": "No pague · no se pudo comprobar",
+    "state.hold": "Espere por ahora",
+    "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
-    "state.verified": "Las revisiones se sostuvieron",
+    "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",
     "card.case": "Caso {case_id}",
     "card.checked": "Revisado {time}",
     "card.expires": "Vence {time}",
@@ -442,3 +450,16 @@ def has(key: str, lang: str = DEFAULT_LANG) -> bool:
 def text(key: str, lang: str = DEFAULT_LANG, **values: object) -> str:
     """The wording for `key`, with `{placeholders}` filled in. A missing key is a bug: KeyError."""
     return _table(lang)[key].format(**values)
+
+
+def tone_word(tone: str, row: str, lang: str = DEFAULT_LANG) -> str:
+    """The locked word shown beside a card line: its row state.
+
+    One word per tone, except where the row changes what the tone means. A red flag on the
+    PRICE row is a risky ask ("Warning"); on PLACE or PERSON it is something that contradicts
+    the listing ("Doesn't match"). A hold on the PERSON row is someone not heard from yet
+    ("Not confirmed"); elsewhere it is something to ask about ("Warning"). `tone` and `row`
+    are the values of `CardTone` and `CardRowKind`.
+    """
+    by_row = f"tone.{tone}.{row}"
+    return text(by_row if has(by_row, lang) else f"tone.{tone}", lang)

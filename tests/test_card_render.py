@@ -5,6 +5,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from PIL import Image
@@ -20,7 +21,7 @@ from snapback.card.render import (
     render_card_png,
     wrap,
 )
-from snapback.contracts import Card, CardTone, ModuleEvidence, VerdictState
+from snapback.contracts import Card, CardRowKind, CardTone, ModuleEvidence, VerdictState
 from snapback.verdict import build_card
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
@@ -128,6 +129,83 @@ def test_every_tone_has_an_icon_and_a_word_in_both_languages():
     for lang in ("en", "es"):
         words = [strings.text(f"tone.{tone.value}", lang) for tone in CardTone]
         assert len(set(words)) == len(CardTone)
+
+
+LOCKED_ROW_STATES = {"Matches", "Doesn't match", "Not confirmed", "Warning", "Not checked"}
+LOCKED_HEADLINES = {
+    VerdictState.HOLD: "Hold off for now",
+    VerdictState.DONT_PAY: "Don't pay. Something here doesn't match.",
+    VerdictState.VERIFIED: "Checks passed. Still follow the two rules.",
+}
+BEFORE_THE_LOCK = ("Held up", "On hold", "Not shown", "Checks held up", "could not verify")
+
+
+def test_row_states_and_headlines_use_the_locked_wording():
+    # Decisions Fri 22:40, XO review of #59. These words are not to be reworded.
+    for state, words in LOCKED_HEADLINES.items():
+        assert strings.text(f"state.{state.value}") == words
+    said = {strings.tone_word(tone.value, row.value) for tone in CardTone for row in CardRowKind}
+    assert said == LOCKED_ROW_STATES
+    for key, words in strings.TABLES["en"].items():
+        if key.startswith(("tone.", "state.")):
+            assert not any(old in words for old in BEFORE_THE_LOCK), key
+            assert words != "Red flag" and words != "Hold", key
+
+
+@pytest.mark.parametrize(
+    ("tone", "row", "word"),
+    [
+        (CardTone.OK, CardRowKind.PLACE, "Matches"),
+        (CardTone.OK, CardRowKind.PRICE, "Matches"),
+        (CardTone.NOT_SHOWN, CardRowKind.PERSON, "Not confirmed"),
+        (CardTone.NOT_CHECKED, CardRowKind.PRICE, "Not checked"),
+        # A red flag that contradicts the listing, against one that is a risky ask.
+        (CardTone.RED_FLAG, CardRowKind.PLACE, "Doesn't match"),
+        (CardTone.RED_FLAG, CardRowKind.PERSON, "Doesn't match"),
+        (CardTone.RED_FLAG, CardRowKind.PRICE, "Warning"),
+        # No reply yet is nobody's fault: it is not confirmed, and it is not a warning.
+        (CardTone.HOLD, CardRowKind.PERSON, "Not confirmed"),
+        (CardTone.HOLD, CardRowKind.PRICE, "Warning"),
+        (CardTone.HOLD, CardRowKind.PLACE, "Warning"),
+    ],
+)
+def test_the_row_state_follows_the_tone_and_for_two_tones_the_row(tone, row, word):
+    assert strings.tone_word(tone.value, row.value) == word
+
+
+def test_spanish_has_a_row_state_for_everything_english_does():
+    for tone in CardTone:
+        for row in CardRowKind:
+            english = strings.tone_word(tone.value, row.value, "en")
+            spanish = strings.tone_word(tone.value, row.value, "es")
+            assert spanish and spanish != english
+    same_in_english = {(t, r) for t in CardTone for r in CardRowKind}
+    for first in same_in_english:
+        for second in same_in_english:
+            if strings.tone_word(first[0].value, first[1].value) == strings.tone_word(
+                second[0].value, second[1].value
+            ):
+                assert strings.tone_word(first[0].value, first[1].value, "es") == (
+                    strings.tone_word(second[0].value, second[1].value, "es")
+                )
+
+
+def test_waiting_for_a_reply_is_never_labelled_a_mismatch_or_a_warning():
+    raw = json.loads((FIXTURES / "module_evidence_hold.json").read_text())
+    waiting = evidence(challenge=raw["challenge"] | {"presence": "waiting"})
+    card = build_card(waiting, checked_at=CHECKED_AT)
+    person = next(row for row in card.rows if row.kind is CardRowKind.PERSON)
+    here_now = person.lines[0]
+    assert here_now.tone is CardTone.HOLD
+    assert strings.tone_word(here_now.tone.value, person.kind.value) == "Not confirmed"
+
+
+def test_the_card_time_names_its_zone():
+    from snapback.card.render import _stamp
+
+    assert _stamp(CHECKED_AT) == "2026-11-13 21:42 UTC-05:00"
+    houston = CHECKED_AT.astimezone(ZoneInfo("America/Chicago"))
+    assert _stamp(houston) == "2026-11-13 20:42 CST"
 
 
 def test_every_state_has_words_in_both_languages():

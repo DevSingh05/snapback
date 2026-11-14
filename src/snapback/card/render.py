@@ -19,6 +19,7 @@ import os
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cache
 
 import qrcode
@@ -225,6 +226,12 @@ def _draw_qr(pen: Pen, url: str, left: int, top: int) -> tuple[int, int, int]:
     return origin_x, origin_y, len(matrix) * QR_MODULE
 
 
+def _stamp(moment: datetime) -> str:
+    """A time with the zone it is in, so a card read in another city is not misread."""
+    zone = moment.tzname()
+    return moment.strftime("%Y-%m-%d %H:%M") + (f" {zone}" if zone else "")
+
+
 def render_card(card: Card) -> RenderedCard:
     lang = card.lang
 
@@ -259,15 +266,11 @@ def render_card(card: Card) -> RenderedCard:
     y += band_height + 24
 
     # Case id and how long the card stands.
-    stamp = "%Y-%m-%d %H:%M"
     meta = "   ·   ".join(
         [
             say("card.case", case_id=card.case_id),
-            say("card.checked", time=card.checked_at.strftime(stamp)),
-            say(
-                "card.expires",
-                time=card.expires_at.astimezone(card.checked_at.tzinfo).strftime(stamp),
-            ),
+            say("card.checked", time=_stamp(card.checked_at)),
+            say("card.expires", time=_stamp(card.expires_at.astimezone(card.checked_at.tzinfo))),
         ]
     )
     y = _paragraph(pen, meta, 26, MUTED, MARGIN, y, CONTENT) + 14
@@ -284,7 +287,8 @@ def render_card(card: Card) -> RenderedCard:
             label = drawable(item.label)
             pen.text((TEXT_LEFT, y - 2), label, fill=INK, font=_font(34))
             tone_x = TEXT_LEFT + pen.textlength(label, font=_font(34)) + 20
-            tone_word = drawable(say(f"tone.{item.tone.value}").upper())
+            word = strings.tone_word(item.tone.value, row.kind.value, lang)
+            tone_word = drawable(word.upper())
             pen.text((tone_x, y + 8), tone_word, fill=colour, font=_font(22))
             y = _paragraph(pen, item.text, 28, INK, TEXT_LEFT, y + 46, WIDTH - MARGIN - TEXT_LEFT)
             y += 20
