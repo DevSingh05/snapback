@@ -9,7 +9,7 @@ A condition decides which module outputs the verdict code may see:
 Every number comes from `snapback.verdict`, so the harness measures the product as shipped.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from snapback.contracts import MemoryHitKind, ModuleEvidence, PresenceStatus
 from snapback.eval.bank import BankCase, CaseKind
@@ -23,6 +23,9 @@ COPY_ATTACK_PREFIX = "copy"  # attacks that reuse a listing photo: copy, copy_cr
 
 # Metrics where a higher rate is worse; the regression gate watches these.
 GATED_METRICS = (FORGED_FALSE_ACCEPT,)
+
+# TODO(#93): emit `calibration_bin:LO-HI` rows (condition place_real_after) once
+# locate produces calibrated scores (V2 #28, V7 #33). Schema: the comment on #32.
 
 Condition = Callable[[ModuleEvidence], ModuleEvidence]
 
@@ -59,6 +62,14 @@ def evaluate(
 ) -> list[ResultRow]:
     """Rows for results.csv. `split=None` scores every case (dev runs only, never quoted)."""
     scored = [case for case in cases if split is None or case.split == split]
+    versions = {r.model_version for case in scored for r in case.evidence.recapture}
+    for model in models:
+        if model not in versions:
+            # A model with no results would draw a bar equal to rules_only: refuse instead.
+            have = ", ".join(sorted(versions)) or "none"
+            raise ValueError(
+                f"no recapture results for model {model!r} in this split (have: {have})"
+            )
     forged = [case.evidence for case in scored if case.kind is CaseKind.FORGED_REPLY]
     genuine = [case.evidence for case in scored if case.kind is CaseKind.GENUINE_REPLY]
 
@@ -101,15 +112,58 @@ def check_injections(cases: Sequence[BankCase]) -> list[str]:
     return failures
 
 
-def check_regression(rows: Sequence[ResultRow], baseline: Sequence[ResultRow]) -> list[str]:
-    """One failure line per gated (condition, metric) whose rate rose over the baseline."""
-    before = {(row.condition, row.metric): row for row in baseline}
+def check_regression(
+    rows: Sequence[ResultRow],
+    baseline: Sequence[ResultRow],
+    *,
+    meta: Mapping[str, str] | None = None,
+    baseline_meta: Mapping[str, str] | None = None,
+) -> list[str]:
+    """One failure line per way this run is worse than the baseline, or not comparable to it.
+
+    Fails when a gated (condition, metric) rose, went missing, or was measured on a different
+    frozen set (frozen_at), and when the run used a different split than the baseline.
+    """
     failures = []
-    for row in rows:
-        old = before.get((row.condition, row.metric))
-        if row.metric in GATED_METRICS and old is not None and row.rate > old.rate:
+    if meta is not None and baseline_meta is not None:
+        old_split, new_split = baseline_meta.get("split"), meta.get("split")
+        if old_split != new_split:
+            failures.append(f"split changed from {old_split} to {new_split}; runs not comparable")
+
+    now = {(row.condition, row.metric): row for row in rows}
+    for old in baseline:
+        if old.metric not in GATED_METRICS:
+            continue
+        row = now.get((old.condition, old.metric))
+        if row is None:
+            failures.append(f"{old.condition} {old.metric} is in the baseline but missing now")
+        elif row.frozen_at != old.frozen_at:
+            failures.append(
+                f"{old.condition} {old.metric} frozen_at changed from {old.frozen_at} "
+                f"to {row.frozen_at}; runs not comparable"
+            )
+        elif row.rate > old.rate:
             failures.append(
                 f"{row.condition} {row.metric} rose from {old.rate:.4f} (n={old.n}) "
                 f"to {row.rate:.4f} (n={row.n})"
             )
+    return failures
+
+
+def check_holdout(cases: Sequence[BankCase], held_out: str = "h0") -> list[str]:
+    """One failure line per device or room that is in the held-out split and also in dev."""
+    seen = {
+        "device": {case.device for case in cases if case.split == "dev"},
+        "room": {case.room for case in cases if case.split == "dev"},
+    }
+    failures = []
+    for case in cases:
+        if case.split != held_out:
+            continue
+        for field in ("device", "room"):
+            value = getattr(case, field)
+            if value in seen[field]:
+                failures.append(
+                    f"{held_out} case {case.case_id} uses {field} {value}, which dev also uses"
+                )
     return failures

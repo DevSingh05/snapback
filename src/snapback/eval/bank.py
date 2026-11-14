@@ -4,7 +4,11 @@ One JSON object per line. Each case names a base evidence file in `fixtures/cont
 patch over it, so a synthetic case is a few lines and still parses as `ModuleEvidence`:
 
     {"case_id": "fx-ev-f01", "kind": "forged_reply", "attack": "screen", "synthetic": true,
-     "split": "h0", "base": "module_evidence_hold.json", "patch": {...}}
+     "split": "h0", "device": "fx-phone-c", "room": "fx-room-3",
+     "base": "module_evidence_hold.json", "patch": {...}}
+
+`device` and `room` say which phone took the reply and in which room, so the held-out split
+can be held out honestly: no device and no room in H0 appears in dev (`check_holdout`).
 
 Patches merge into dicts and replace lists. An injection case also carries `injected_patch`,
 applied on top of the patched evidence: the same case with injected text seen somewhere.
@@ -41,6 +45,8 @@ class BankCase(BaseModel):
     attack: str | None = None
     synthetic: bool
     split: str  # "dev", "h0" or "h1"
+    device: str  # the phone that took the reply photo
+    room: str  # the room it was taken in
     evidence: ModuleEvidence
     injected: ModuleEvidence | None = None
 
@@ -59,6 +65,8 @@ def _case(row: dict[str, Any], bases_dir: Path) -> BankCase:
     evidence = merge(base, row.get("patch", {}))
     evidence["case_id"] = row["case_id"]
     injected = None
+    if row["kind"] == CaseKind.INJECTION and "injected_patch" not in row:
+        raise ValueError(f"injection case {row['case_id']} has no injected_patch")
     if "injected_patch" in row:
         injected = merge(evidence, row["injected_patch"])
     return BankCase(
@@ -67,6 +75,8 @@ def _case(row: dict[str, Any], bases_dir: Path) -> BankCase:
         attack=row.get("attack"),
         synthetic=row["synthetic"],
         split=row["split"],
+        device=row["device"],
+        room=row["room"],
         evidence=ModuleEvidence.model_validate(evidence),
         injected=None if injected is None else ModuleEvidence.model_validate(injected),
     )

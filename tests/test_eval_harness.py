@@ -12,15 +12,17 @@ from snapback.eval import (
     BankCase,
     CaseKind,
     ResultRow,
+    check_holdout,
     check_injections,
     check_regression,
     evaluate,
     load_bank,
+    read_meta,
     read_results,
     wilson,
     write_results,
 )
-from snapback.eval.__main__ import main
+from snapback.eval.__main__ import DEFAULT_OUT, main
 
 REPO = Path(__file__).resolve().parent.parent
 BANK = REPO / "fixtures" / "eval" / "case_bank.jsonl"
@@ -129,9 +131,9 @@ def test_injection_case_state_change_fails_gate():
 
 def test_false_accept_rise_fails_gate():
     baseline = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 4, 40, "a")]
-    same = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 4, 40, "b")]
-    worse = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 6, 40, "b")]
-    better = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 2, 40, "b")]
+    same = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 4, 40, "a")]
+    worse = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 6, 40, "a")]
+    better = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 2, 40, "a")]
 
     assert check_regression(same, baseline) == []
     assert check_regression(better, baseline) == []
@@ -162,7 +164,7 @@ def test_command_fails_on_regression_against_baseline(tmp_path):
     with baseline.open("w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(RESULTS_COLUMNS)
-        writer.writerow(["rules_only", "forged_false_accept", 0, 4, "0.0000", 0, 0.49, "old"])
+        writer.writerow(["rules_only", "forged_false_accept", 0, 4, "0.0000", 0, 0.49, "FIXTURE"])
     out = tmp_path / "results.csv"
     code = main(["--bank", str(BANK), "--out", str(out), "--baseline", str(baseline)])
     assert code == 1
@@ -172,3 +174,95 @@ def test_bank_rows_are_plain_json_lines():
     for line in BANK.read_text().splitlines():
         if line.strip() and not line.startswith("#"):
             json.loads(line)
+
+
+# --- review fixes (#62) ------------------------------------------------------------------------
+
+
+def test_requested_model_with_no_results_raises():
+    cases = load_bank(BANK)
+    with pytest.raises(ValueError, match="V1"):
+        evaluate(cases, ["v0", "V1"], frozen_at="FIXTURE")
+
+
+def test_command_refuses_a_phantom_model(tmp_path, capsys):
+    out = tmp_path / "results.csv"
+    assert main(["--bank", str(BANK), "--out", str(out), "--models", "v0", "v9"]) == 2
+    assert not out.exists()
+    assert "v9" in capsys.readouterr().out
+
+
+def test_exactly_one_memory_row_for_the_latest_model():
+    rows = evaluate(load_bank(BANK), ["v0", "v1"], frozen_at="FIXTURE")
+    memory = {r.condition for r in rows if r.condition.endswith("_memory")}
+    assert memory == {"rules_plus_model_v1_memory"}
+
+
+def test_gate_fails_when_a_gated_row_goes_missing():
+    baseline = [
+        ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 4, 40, "a"),
+        ResultRow.measure("rules_plus_model_v1", "forged_false_accept", 3, 40, "a"),
+    ]
+    run = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 4, 40, "a")]
+    failures = check_regression(run, baseline)
+    assert len(failures) == 1 and "rules_plus_model_v1" in failures[0] and "missing" in failures[0]
+
+
+def test_gate_fails_when_frozen_at_changes():
+    baseline = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 4, 40, "h0-a")]
+    run = [ResultRow.measure("rules_plus_model_v0", "forged_false_accept", 1, 40, "h0-b")]
+    failures = check_regression(run, baseline)
+    assert len(failures) == 1 and "frozen_at" in failures[0]
+
+
+def test_gate_fails_when_the_split_changes(tmp_path):
+    rows = [ResultRow.measure("rules_only", "forged_false_accept", 1, 4, "FIXTURE")]
+    write_results(rows, tmp_path / "a.csv", comment="x", meta={"split": "h0"})
+    write_results(rows, tmp_path / "b.csv", comment="x", meta={"split": "all"})
+    assert read_meta(tmp_path / "a.csv") == {"split": "h0"}
+    failures = check_regression(
+        rows, rows, meta=read_meta(tmp_path / "b.csv"), baseline_meta=read_meta(tmp_path / "a.csv")
+    )
+    assert len(failures) == 1 and "split" in failures[0]
+
+
+def test_injection_case_without_injected_patch_is_rejected(tmp_path):
+    bank = tmp_path / "bank.jsonl"
+    row = {
+        "case_id": "fx-i",
+        "kind": "injection",
+        "synthetic": True,
+        "split": "h0",
+        "device": "fx-phone-c",
+        "room": "fx-room-3",
+        "base": "module_evidence_hold.json",
+    }
+    bank.write_text(json.dumps(row) + "\n")
+    with pytest.raises(ValueError, match="injected_patch"):
+        load_bank(bank)
+
+
+def test_bank_cases_carry_device_and_room():
+    cases = load_bank(BANK)
+    assert all(case.device and case.room for case in cases)
+
+
+def test_holdout_shares_no_device_or_room_with_dev():
+    assert check_holdout(load_bank(BANK)) == []
+    cases = load_bank(BANK)
+    dev = next(case for case in cases if case.split == "dev")
+    leaky = [*cases, dev.model_copy(update={"case_id": "fx-leak", "split": "h0"})]
+    failures = check_holdout(leaky)
+    assert failures and all("fx-leak" not in f or "dev" in f for f in failures)
+
+
+def test_results_are_written_where_the_api_reads_them():
+    assert DEFAULT_OUT.parts[-2:] == ("eval", "results.csv")
+
+
+def test_committed_results_pass_the_gate_against_the_frozen_baseline(tmp_path):
+    """What CI runs: the harness on the committed bank, gated on eval/baseline.csv."""
+    baseline = REPO / "eval" / "baseline.csv"
+    out = tmp_path / "results.csv"
+    assert main(["--bank", str(BANK), "--out", str(out), "--baseline", str(baseline)]) == 0
+    assert read_results(REPO / "eval" / "results.csv") == read_results(out)

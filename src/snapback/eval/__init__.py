@@ -5,8 +5,20 @@ No number appears in the pitch unless this package produced it, with n shown. Ru
 """
 
 from snapback.eval.bank import BankCase, CaseKind, load_bank
-from snapback.eval.harness import check_injections, check_regression, conditions, evaluate
-from snapback.eval.results import RESULTS_COLUMNS, ResultRow, read_results, write_results
+from snapback.eval.harness import (
+    check_holdout,
+    check_injections,
+    check_regression,
+    conditions,
+    evaluate,
+)
+from snapback.eval.results import (
+    RESULTS_COLUMNS,
+    ResultRow,
+    read_meta,
+    read_results,
+    write_results,
+)
 from snapback.eval.stats import wilson
 
 __all__ = [
@@ -14,11 +26,13 @@ __all__ = [
     "BankCase",
     "CaseKind",
     "ResultRow",
+    "check_holdout",
     "check_injections",
     "check_regression",
     "conditions",
     "evaluate",
     "load_bank",
+    "read_meta",
     "read_results",
     "wilson",
     "write_results",
