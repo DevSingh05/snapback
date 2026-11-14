@@ -90,6 +90,7 @@ from snapback.office.models import (
     OfficeTokenBody,
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
+from snapback.places_map import PlacesIndex, PlacesMap
 from snapback.preferences import merge as merge_preferences
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
@@ -658,6 +659,20 @@ def create_app(
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    places_index = PlacesIndex(lookups)
+
+    @app.post("/places/map")
+    def post_places_map(request: Request, brief: RenterBrief | None = None) -> PlacesMap:
+        """The map's pins: one GeoJSON feature per researched place, with `fits_brief` set from
+        the optional brief. Public and read only; no address, office or name in any feature."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            return places_index.feed(brief)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
 
     @app.post("/search")
     def post_search(
