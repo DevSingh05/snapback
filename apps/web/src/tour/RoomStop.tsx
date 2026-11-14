@@ -7,6 +7,12 @@ import { quatToYawPitch } from "../twin/pose";
 // Structure only: every colour, size and border is a class in tour.css, so a design pass can
 // restyle without touching this logic.
 
+/** The source line of a fact. "As of CoStar's last research" goes on CoStar's own lines only: it
+ *  would be wrong beside a Vexcel date or a Matterport label. */
+export function sourceLine(source: string, asOf: string): string {
+  return source.startsWith("CoStar") ? `${source}, ${asOf}` : source;
+}
+
 /** What the empty frame says for a stop with no placed ad photo. Null: say nothing. */
 export function emptyFrameText(stop: TourStop, plan: TourPlan): string | null {
   if (stop.photos.length > 0) return null;
@@ -58,7 +64,7 @@ export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, photoNote,
         <ul className="tour-facts" aria-label="What the record says">
           {stop.facts.map((f) => (
             <li key={f.text}>
-              {f.text} <span className="tour-src">{f.source}</span>
+              {f.text} <span className="tour-src">{sourceLine(f.source, plan.as_of)}</span>
             </li>
           ))}
         </ul>
@@ -67,7 +73,7 @@ export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, photoNote,
         <ul className="tour-claims" aria-label="What the ad claimed">
           {stop.claims.map((c) => (
             <li key={c.text}>
-              {c.text} <span className="tour-src">{c.source}</span>
+              {c.text} <span className="tour-src">{sourceLine(c.source, plan.as_of)}</span>
             </li>
           ))}
         </ul>

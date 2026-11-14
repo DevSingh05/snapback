@@ -105,3 +105,20 @@ def test_claims_never_change_a_verdict_or_the_other_fields():
         for s in d["stops"]:
             s.pop("claims")
     assert a == b
+
+
+def test_count_line_uses_the_kind_word_and_pluralises_on_the_ads_number():
+    from snapback.tour import count_line
+
+    assert count_line("Bedroom", "1", 2, "bedroom") == (
+        "The ad says 1 bedroom. This scan has 2 rooms labelled Bedroom. "
+        "Labels can be wrong, so count them in person."
+    )
+    assert count_line("Bathroom", "2", 1, "bathroom").startswith(
+        "The ad says 2 bathrooms. This scan has 1 room labelled Bathroom."
+    )
+
+
+def test_the_aerial_date_claim_is_sourced_to_vexcel():
+    out = attach_claims(plan_of(), [note("aerial_date", "pool", ad_value="2025-03-02")])
+    assert [c.source for c in stop(out, "Arrive outside").claims] == ["Vexcel"]

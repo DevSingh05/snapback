@@ -15,7 +15,7 @@ import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
 import { useWalkLive } from "../walk/useWalkLive";
 import { photoAt, walkLook } from "../walk/walkLook";
-import { fetchTour, type TourTarget } from "./api";
+import { fetchTour, type TourResult, type TourTarget } from "./api";
 import { RoomStop, landingOfStop } from "./RoomStop";
 import { useAdPhoto } from "./useAdPhoto";
 import { stopMove } from "./walkMove";
@@ -24,40 +24,23 @@ import "./tour.css";
 export const AUTOPLAY_MS = 6000;
 const LANDED_OPACITY = 0.6;
 
-// Synthetic stand-in for an ad photo (team-made, not sponsor imagery), as on the twin page.
-const PLACEHOLDER_PHOTO =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dff3ee"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0b7a6c">Listing photo (fixture)</text></svg>`,
-  );
-const MAX_LOCAL_STOPS = 8;
+// Synthetic stand-in for an ad photo (team-made, not sponsor imagery). An image cannot read page
+// CSS variables, so the design tokens are resolved here and written into the picture.
+function token(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
 
-/** Stops from the 3D view's own sweeps, evenly spaced, when the plan's sweeps are not in the
- *  loaded model. Never labelled with room names, and the plan's note says so. */
-export function evenStops(ids: string[]): TourStop[] {
-  if (ids.length === 0) return [];
-  const rest = ids.slice(1);
-  const n = Math.min(MAX_LOCAL_STOPS, rest.length);
-  const picks =
-    n > 1
-      ? Array.from({ length: n }, (_, i) => rest[Math.round((i * (rest.length - 1)) / (n - 1))]!)
-      : rest.slice(0, n);
-  const mk = (kind: TourStop["kind"], key: string, title: string, id: string): TourStop => ({
-    kind,
-    key,
-    title,
-    sweep_id: id,
-    sweep_count: 1,
-    sweep_ids: [id],
-    photos: [],
-    ad_view: "unknown",
-    claims: [],
-    facts: [],
-  });
-  return [
-    { ...mk("door", "door", "Front door", ids[0]!), note: "Start of the 3D scan" },
-    ...picks.map((id, i) => mk("stop", `stop-${i + 1}`, `Stop ${i + 1}`, id)),
-  ];
+function placeholderPhoto(): string {
+  const bg = token("--teal-soft", "white");
+  const ink = token("--teal", "gray");
+  return (
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="${bg}"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="${ink}">Listing photo (fixture)</text></svg>`,
+    )
+  );
 }
 
 interface ViewProps {
@@ -67,9 +50,11 @@ interface ViewProps {
   caseId?: string | null;
   /** Where the agent rail mounts (the walk's real trace); nothing is shown until it exists. */
   rail?: ReactNode;
+  /** Said above the tour when the case's own photos could not be loaded. */
+  notice?: string | null;
 }
 
-export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewProps) {
+export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }: ViewProps) {
   const live = Boolean(sdkKey && modelId);
   const reduced = usePrefersReducedMotion();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -104,23 +89,15 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
     };
   }, [live, sdkKey]);
 
-  // When the loaded model holds none of the plan's sweeps, walk the model's own sweeps instead.
-  const plan = useMemo<TourPlan>(() => {
-    const walk = given.stops.filter((s) => s.sweep_id);
-    if (!sdk || sweeps.length === 0 || walk.some((s) => sweeps.includes(s.sweep_id!))) return given;
-    const mid = evenStops(sweeps);
-    return {
-      ...given,
-      rooms_labelled: false,
-      rooms_note:
-        "Rooms are not labelled for the loaded 3D model, so the stops are numbered along its path.",
-      stops: [
-        ...given.stops.filter((s) => s.kind === "arrive"),
-        ...mid,
-        ...given.stops.filter((s) => s.kind === "outro"),
-      ],
-    };
-  }, [given, sdk, sweeps]);
+  // The loaded model must be this home's scan. When the plan has sweep stops and the model holds
+  // none of them, the 3D view is some other home: show the placeholder and say so. Never walk
+  // another home's sweeps in its place.
+  const plan = given;
+  const wrongModel =
+    Boolean(sdk) &&
+    sweeps.length > 0 &&
+    given.stops.some((s) => s.sweep_id) &&
+    !given.stops.some((s) => s.sweep_id && sweeps.includes(s.sweep_id));
 
   const last = plan.stops.length - 1;
   const stop = plan.stops[Math.min(index, last)]!;
@@ -135,7 +112,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
   useEffect(() => setShowPhoto(true), [stop.key]);
   useEffect(() => {
     const move = stopMove(stop, reduced);
-    if (!sdk || !move || sweeps.length === 0) return;
+    if (!sdk || !move || sweeps.length === 0 || wrongModel) return;
     if (!sweeps.includes(move.sweepId)) {
       setStatus("This stop is not in the loaded 3D model");
       return;
@@ -150,7 +127,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
     return () => {
       current = false;
     };
-  }, [sdk, sweeps, stop, reduced]);
+  }, [sdk, sweeps, stop, reduced, wrongModel]);
 
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, last)), [last]);
   const back = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
@@ -194,15 +171,16 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
     <>
       <iframe
         ref={iframeRef}
+        hidden={wrongModel}
         className="tour-frame"
         title="Matterport 3D view"
         src={embedUrl(modelId!, sdkKey!)}
         allow="fullscreen; xr-spatial-tracking"
       />
-      {landing && (
+      {landing && !wrongModel && (
         <PhotoLanding
           state={landing}
-          photoSrc={realPhoto ?? PLACEHOLDER_PHOTO}
+          photoSrc={realPhoto ?? placeholderPhoto()}
           opacity={showPhoto ? LANDED_OPACITY : 0}
           phase="landed"
           sdk={sdk ? "ready" : "unavailable"}
@@ -254,6 +232,11 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
           {look.mismatch.banner}
         </p>
       )}
+      {notice && (
+        <p className="tour-banner" data-testid="tour-notice" role="alert">
+          {notice}
+        </p>
+      )}
       {plan.mode === "elsewhere" && (
         <p className="tour-mode" data-testid="elsewhere-heading">
           Where the photos were taken: the home in these photos.
@@ -302,6 +285,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
               key={liveScan ? "live" : stop.key}
               reduced={reduced}
               real={realView}
+              realHidden={wrongModel}
               drawing={
                 <>
                   <StopStage
@@ -319,7 +303,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
                     <div hidden>
                       <PhotoLanding
                         state={landing}
-                        photoSrc={realPhoto ?? PLACEHOLDER_PHOTO}
+                        photoSrc={realPhoto ?? placeholderPhoto()}
                         opacity={showPhoto ? LANDED_OPACITY : 0}
                         phase="landed"
                         sdk="unavailable"
@@ -330,6 +314,11 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
                 </>
               }
             />
+          )}
+          {wrongModel && (
+            <p className="tour-wrong-model" data-testid="wrong-model" role="status">
+              The 3D view here is not this home&apos;s scan
+            </p>
           )}
           <StageCaption
             stop={stop}
@@ -441,7 +430,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
 
 type Load =
   | { status: "loading" }
-  | { status: "ready"; plan: TourPlan }
+  | { status: "ready"; result: TourResult }
   | { status: "error"; message: string };
 
 export function TourPage({ target }: { target: TourTarget }) {
@@ -450,7 +439,7 @@ export function TourPage({ target }: { target: TourTarget }) {
     const ctl = new AbortController();
     setLoad({ status: "loading" });
     fetchTour(target, ctl.signal)
-      .then((plan) => !ctl.signal.aborted && setLoad({ status: "ready", plan }))
+      .then((result) => !ctl.signal.aborted && setLoad({ status: "ready", result }))
       .catch((e: unknown) => {
         if (!ctl.signal.aborted)
           setLoad({ status: "error", message: e instanceof Error ? e.message : String(e) });
@@ -460,10 +449,17 @@ export function TourPage({ target }: { target: TourTarget }) {
   if (load.status === "ready")
     return (
       <TourView
-        plan={load.plan}
+        plan={load.result.plan}
         sdkKey={import.meta.env.VITE_MATTERPORT_SDK_KEY}
-        modelId={import.meta.env.VITE_DEMO_MODEL_ID}
-        caseId={target.caseId}
+        // A case walk loads the scan the walk was built from, and no other. The configured demo
+        // model is only for a place tour with no case.
+        modelId={
+          load.result.fromCase
+            ? (load.result.modelId ?? undefined)
+            : import.meta.env.VITE_DEMO_MODEL_ID
+        }
+        caseId={load.result.fromCase ? target.caseId : null}
+        notice={load.result.notice}
       />
     );
   return (

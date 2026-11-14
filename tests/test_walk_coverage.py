@@ -1,7 +1,7 @@
 """W1: the ad's photos on the stops, coverage wording, stop aliases (walk-plan section 5)."""
 
 from snapback.contracts import DataSource, LocateResult, LocateStatus, PhotoLocation, Pose
-from snapback.tour import build_tour, fixture_sweeps, map_locate
+from snapback.tour import TourSweep, build_tour, fixture_sweeps, map_locate
 
 L = LocateStatus
 
@@ -20,9 +20,9 @@ def photo(pid, status, pano=None, label=None):
     return PhotoLocation(photo_id=pid, status=status, pano_id=pano, room_label=label)
 
 
-def locate(*photos):
+def locate(*photos, at=(1.0, 1.4, 2.0)):
     poses = {
-        p.photo_id: Pose(sweep_id=p.pano_id, position=(1.0, 1.4, 2.0), rotation_quat=(0, 0, 0, 1))
+        p.photo_id: Pose(sweep_id=p.pano_id, position=at, rotation_quat=(0, 0, 0, 1))
         for p in photos
         if p.status in (L.LOCATED_IN_CLAIMED, L.LOCATED_ELSEWHERE) and p.pano_id
     }
@@ -110,7 +110,7 @@ def test_apartment_floor_plan_mismatch_is_not_counted_and_has_no_count_line():
     )
     assert plan.coverage.counted == "none"
     assert plan.coverage.line == (
-        "This scan is a 2 bed / 2 bath floor plan and the ad is for a 1 bed / 1 bath, "
+        "This scan is a 2-bed floor plan and the ad is for a 1-bed, "
         "so we show the scan without counting rooms."
     )
     assert plan.coverage.total == 0 and plan.coverage.with_photo == 0
@@ -129,7 +129,8 @@ def test_no_room_labels_count_spots_not_rooms():
 
 def test_a_placed_photo_in_a_sweep_that_is_no_stop_is_not_forced_onto_a_room():
     plan, fields = map_locate(
-        base_plan(), locate(photo("p1", L.LOCATED_IN_CLAIMED, "no-such-sweep"))
+        base_plan(),
+        locate(photo("p1", L.LOCATED_IN_CLAIMED, "no-such-sweep"), at=(300.0, 1.4, 300.0)),
     )
     assert sum(len(s.photos) for s in plan.stops) == 0
     assert fields["p1"].stop_alias is None and plan.coverage.placed == 1
@@ -175,3 +176,104 @@ def test_each_placed_photo_carries_its_evidence_alias_in_the_case_photo_order():
     )
     kitchen = next(s for s in plan.stops if s.title == "Kitchen")
     assert [p.alias for p in kitchen.photos] == ["P2"]  # second photo of the case
+
+
+def test_a_photo_on_no_stop_never_lets_an_empty_room_say_the_ad_showed_none():
+    # Unlabelled scan: only some sweeps become stops, so a placed photo can sit off every stop.
+    sweeps = [TourSweep(f"s{i}", (i * 2.0, 1.4, 0.0), (0, 0, 0, 1), None) for i in range(30)]
+    plan = base_plan(sweeps)
+    stop_sweeps = {s.sweep_id for s in plan.stops if s.sweep_id}
+    off = next(f"s{i}" for i in range(30) if f"s{i}" not in stop_sweeps)
+    out, fields = map_locate(
+        plan, locate(photo("p1", L.LOCATED_IN_CLAIMED, off), at=(500.0, 1.4, 500.0))
+    )
+    assert fields["p1"].stop_alias is None and out.coverage.placed == 1
+    assert all(s.ad_view != "none_placed" for s in out.stops)
+    assert all(s.ad_view == "unknown" for s in out.stops if s.kind in ("door", "stop"))
+
+
+def test_a_photo_07_m_from_the_kitchen_sweep_is_in_the_kitchen():
+    kitchen = next(s for s in base_plan().stops if s.title == "Kitchen")
+    x, y, z = kitchen.position
+    plan, fields = map_locate(
+        base_plan(),
+        locate(photo("p1", L.LOCATED_IN_CLAIMED, "off-sweep"), at=(x + 0.7, y, z)),
+    )
+    assert [p.photo_id for p in next(s for s in plan.stops if s.title == "Kitchen").photos] == [
+        "p1"
+    ]
+    assert fields["p1"].stop_alias is not None
+
+
+def test_the_start_sweep_door_gives_its_photo_to_the_room_and_stays_out_of_the_total():
+    sweeps = [
+        TourSweep("a", (0.0, 1.4, 0.0), (0, 0, 0, 1), "Kitchen"),
+        TourSweep("b", (2.0, 1.4, 0.0), (0, 0, 0, 1), "Kitchen"),
+        TourSweep("c", (30.0, 1.4, 0.0), (0, 0, 0, 1), "Bedroom"),
+    ]
+    plan = base_plan(sweeps)
+    door = next(s for s in plan.stops if s.kind == "door")
+    assert door.note == "Start of the 3D scan" and door.sweep_id == "a"
+    out, _ = map_locate(plan, locate(photo("p1", L.LOCATED_IN_CLAIMED, "a")))
+    assert [p.photo_id for p in next(s for s in out.stops if s.title == "Kitchen").photos] == ["p1"]
+    assert not next(s for s in out.stops if s.kind == "door").photos
+    assert out.coverage.total == 2  # Kitchen and Bedroom; the start door is no room
+    assert out.coverage.line == "The ad showed 1 of the 2 rooms in this scan."
+
+
+def test_the_case_walk_uses_the_scan_the_photos_were_placed_in(monkeypatch):
+    import snapback.api.main as api
+    from snapback.tour import fixture_sweeps as real
+
+    asked = []
+
+    def spy(model_id):
+        asked.append(model_id)
+        return real(model_id)
+
+    monkeypatch.setattr(api, "fixture_sweeps", spy)
+    from fastapi.testclient import TestClient  # noqa: F401
+
+    client = _walk_client()
+    body = client.get("/cases/fx-7Q2M/walk").json()
+    assert body["model_id"] == "fx-model-a"  # the chosen floor plan's scan
+    assert asked[0] == "fx-model-a"
+    # A building with two scans: the second one is used when the photos were placed in it.
+    asked.clear()
+    monkeypatch.setattr(api, "scan_model_of", lambda _l, _p=None: "fx-model-b")
+    body = client.get("/cases/fx-7Q2M/walk").json()
+    assert body["model_id"] == "fx-model-b" and asked[0] == "fx-model-b"
+
+
+def test_the_case_walk_derives_the_ad_floor_plan_so_a_mismatch_is_not_counted(monkeypatch):
+    import snapback.api.main as api
+
+    monkeypatch.setattr(api, "ad_beds_of", lambda _case: 1)  # the ad says 1 bed
+    body = _walk_client().get("/cases/fx-7Q2M/walk").json()  # the scan is 2 bed / 2 bath
+    cov = body["plan"]["coverage"]
+    assert cov["plan_mismatch"] is True and cov["counted"] == "none"
+    assert cov["line"] == (
+        "This scan is a 2-bed floor plan and the ad is for a 1-bed, "
+        "so we show the scan without counting rooms."
+    )
+
+
+def _walk_client():
+    import pathlib
+    import tempfile
+
+    from fastapi.testclient import TestClient
+
+    from snapback.agent.join import KitLookups
+    from snapback.api.main import create_app
+    from snapback.settings import Settings
+
+    settings = Settings(_env_file=None, snapback_data_dir=pathlib.Path(tempfile.mkdtemp()))
+    return TestClient(create_app(settings, lookups=KitLookups(DataSource.FIXTURE)))
+
+
+def test_recorded_case_has_photos_off_every_stop_so_no_room_says_none_placed():
+    # fx-7Q2M: three placed photos, two of them in sweeps this scan does not have.
+    body = _walk_client().get("/cases/fx-7Q2M/walk").json()
+    assert body["plan"]["coverage"]["placed"] == 3
+    assert all(s["ad_view"] != "none_placed" for s in body["plan"]["stops"])
