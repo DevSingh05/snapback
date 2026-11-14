@@ -205,6 +205,7 @@ class CaseSession:
             "authority": self.modules.authority(self.case_id),
             "for_sale": self.modules.for_sale(self.case_id),
             "license": self.modules.license(self.case_id),
+            "owner": self.modules.owner(self.case_id),
             "record_source": self.modules.record_source(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:
@@ -410,8 +411,10 @@ class CaseSession:
     def reply(self, outcome: ChallengeOutcome) -> None:
         """Take the poster's reply, already checked. The retry-or-stop choice comes next.
 
-        An outcome that is still `awaiting_reply` (the photo came too late to count, say)
-        leaves the case waiting.
+        A reply that came too late to count and is not a copy (`outcome.late`) is not judged;
+        the choice that follows asks again once (decision 4, Sat 02:45). A copy is proof
+        whenever it arrives. Only an outcome that is still `awaiting_reply` leaves the case
+        waiting, and no check returns one today.
         """
         if self.step is not Step.REPLY:
             raise RuntimeError("no reply is awaited now")
