@@ -48,7 +48,10 @@ _SAYS_OWNER = re.compile(
     r"\b(?i:"
     r"(?:i\s{0,2}am|i['’]m|im|we\s{0,2}are|we['’]re)\s{1,3}(?:the\s{1,3})?"
     r"(?:(?:home|property)\s?)?owners?\b(?!['’])"
-    r"|(?<!sold )by\s{1,3}(?:the\s{1,3})?owner\b(?!['’])"
+    # "For rent by owner", not something the owner pays for or does ("water paid by owner").
+    r"|(?<!sold )(?<!paid )(?<!paid for )(?<!covered )(?<!provided )(?<!supplied )"
+    r"(?<!maintained )(?<!handled )(?<!included )(?<!occupied )"
+    r"by\s{1,3}(?:the\s{1,3})?owner\b(?!['’])"
     rf"(?!\s{{1,3}}(?:last\s{{1,3}}year|(?:{_OWNER_COMPANY})\b))"
     r"|(?<!the )(?<!a )(?<!an )(?<!pet )(?<!its )"
     r"(?<!previous )(?<!former )owner\s{1,3}(?:here|speaking)\b"
@@ -58,24 +61,35 @@ _SAYS_OWNER = re.compile(
 )
 
 # The same claim in Spanish: "soy el dueño", "somos los propietarios", "se renta por dueño",
-# "trato directo con el dueño", "dueño directo", "es mi casa". Not "no soy el dueño", "el
-# agente del dueño", "dueño de un perro", "vendido por el dueño", "el dueño anterior", "como
-# en mi casa". "Dueno" without the ñ is how it is often typed.
+# "trato directo con el dueño", "dueño directo", "es mi casa", "rento mi casa". "Dueno"
+# without the ñ is how it is often typed.
+#
+# Two of the forms are common words in other sentences, so they count only beside a word that
+# makes them about renting or selling the home:
+#   "por (el) dueño"  after renta / alquila / venta ..., with the home between them or not
+#                     ("se renta por dueño", "se renta casa por dueño"); not "pagadas por el
+#                     dueño", "pregunte por el dueño", "vendido por el dueño", nor "se renta
+#                     casa pagada por el dueño"
+#   "mi casa"         after es / rento / alquilo ...      not "cerca de mi casa", "desde mi
+#                     casa", "mi casa es su casa", "Mi Casa Apartments", "Detroit, MI Townhouse"
 _DUENO = r"(?:due[ñn][oa]s?|propietari[oa]s?)"
-_CASA = r"(?:casa|propiedad|vivienda|condominio|d[úu]plex|townhouse)"
+_CASA_WORDS = r"casa|propiedad|vivienda|condominio|d[úu]plex|townhouse"
+_CASA = r"(?:" + _CASA_WORDS + r")"
+_RENTS_OR_SELLS = r"(?:renta|rento|alquila|alquilo|alquiler|vende|vendo|venta)"
+_OFFERS_MINE = r"(?:es|rento|alquilo|ofrezco|vendo|rentando|alquilando|renta|alquila|vende)"
+# What is offered may sit between the verb and "por": "se renta CASA por dueño".
+_OFFERED = r"(?:" + _CASA_WORDS + r"|departamento|depa|cuarto|habitaci[óo]n|terreno|local)"
 _SAYS_OWNER_ES = re.compile(
     r"(?i:"
     r"(?<!no )\b(?:soy|somos)\s{1,3}(?:(?:el|la|los|las)\s{1,3})?" + _DUENO + r"\b"
-    r"(?!\s{1,3}de\s{1,3}(?:(?:un|una|mi|mis|dos|tres)\s{1,3})?(?:perr|gat|mascota))"
-    r"|(?<!vendido )(?<!vendida )\bpor\s{1,3}(?:(?:el|la|su|los)\s{1,3})?" + _DUENO + r"\b"
-    r"(?!\s{1,3}(?:anterior|pasad))"
+    # Not a pet's owner: "dueño de un perro", "del perro", "de la gata", "de mascotas".
+    r"(?!\s{1,3}del?\s{1,3}(?:(?:la|las|los|un|una|mi|mis|dos|tres)\s{1,3})?(?:perr|gat|mascota))"
+    r"|\b" + _RENTS_OR_SELLS + r"\s{1,3}(?:(?:de\s{1,3})?" + _OFFERED + r"\s{1,3})?"
+    r"(?:direct[oa]\s{1,3})?por\s{1,3}"
+    r"(?:(?:el|la|su|los)\s{1,3})?" + _DUENO + r"\b(?!\s{1,3}(?:anterior|pasad))"
     r"|\btrato\s{1,3}directo\s{1,3}con\s{1,3}(?:(?:el|la)\s{1,3})?" + _DUENO + r"\b"
     r"|\b" + _DUENO + r"\s{1,3}direct[oa]\b"
-    r"|(?<!no es )(?<!como )(?<!como en )(?<!cerca de )\bmi\s{1,3}(?:propia\s{1,3})?"
-    + _CASA
-    + r"\b"
-    # "Mi casa es su casa" is a welcome, not a claim.
-    r"(?!\s{1,3}es\s{1,3}(?:su|tu)\s{1,3}casa)"
+    r"|(?<!no )\b" + _OFFERS_MINE + r"\s{1,3}mi\s{1,3}(?:propia\s{1,3})?" + _CASA + r"\b"
     r")"
 )
 
