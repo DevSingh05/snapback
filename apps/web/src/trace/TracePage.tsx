@@ -1,11 +1,12 @@
 import { TracePanel } from "./TracePanel";
+import { Wordmark } from "../components/HouseGlyph";
 
 // Standalone route /case/:id/trace. T2's twin page mounts <TracePanel caseId=... /> directly.
 export function TracePage({ caseId }: { caseId: string }) {
   return (
     <div className="card-page trace-page">
       <div className="masthead">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <span className="mono">
           Case <span className="case-id">{caseId}</span>
         </span>

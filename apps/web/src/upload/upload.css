@@ -140,3 +140,121 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Zing pass. The first screen opens on a block of sky with the house standing in it. */
+.upload-intro {
+  position: relative;
+  margin: calc(-1 * clamp(18px, 4vw, 36px)) calc(-1 * clamp(18px, 4vw, 36px)) 8px;
+  padding: clamp(24px, 5vw, 44px) clamp(18px, 4vw, 36px) clamp(22px, 4vw, 34px);
+  padding-right: clamp(170px, 30vw, 300px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(180deg, var(--sky), var(--paper));
+  overflow: hidden;
+}
+.upload-intro h1 {
+  font-size: clamp(1.9rem, 4.6vw, 2.75rem);
+  line-height: 1.08;
+}
+.upload-intro .upload-lead {
+  color: var(--ink);
+  max-width: 44ch;
+}
+.upload-eyebrow {
+  padding-bottom: 6px;
+  background: linear-gradient(var(--scan), var(--scan)) 0 100% / 100% 4px no-repeat;
+}
+.upload-house {
+  position: absolute;
+  right: clamp(8px, 3vw, 36px);
+  bottom: -6px;
+  width: clamp(150px, 25vw, 250px);
+}
+
+/* The primary button: a teal block on an amber block. Pressing it sets it down. */
+.upload-submit {
+  padding: 12px 26px;
+  font-size: 1.08rem;
+  margin: 4px 6px 6px 0;
+  box-shadow: 6px 6px 0 var(--scan);
+}
+.upload-submit:disabled {
+  box-shadow: none;
+}
+.upload-secondary:active:not(:disabled),
+.upload-remove:active:not(:disabled) {
+  background: color-mix(in srgb, var(--sky) 82%, var(--ink));
+}
+@media (hover: hover) {
+  .upload-submit:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 7px 7px 0 var(--scan);
+  }
+  .upload-secondary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--sky) 90%, var(--ink));
+  }
+}
+.upload-submit:active:not(:disabled) {
+  transform: translate(6px, 6px);
+  box-shadow: 0 0 0 var(--scan);
+  background: color-mix(in srgb, var(--act) 86%, var(--ink));
+}
+
+@media (max-width: 640px) {
+  .upload-intro {
+    padding-right: clamp(18px, 4vw, 36px);
+    padding-top: 92px;
+  }
+  .upload-house {
+    top: 6px;
+    bottom: auto;
+    right: 10px;
+    width: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .upload-house {
+    animation: house-down 0.7s var(--ease-out) 0.15s backwards;
+  }
+  .upload-eyebrow {
+    animation: underline-in 0.6s var(--ease-out) 0.45s backwards;
+  }
+  @keyframes underline-in {
+    from {
+      background-size: 0 4px;
+    }
+  }
+  .upload-intro h1,
+  .upload-intro .upload-lead {
+    animation: land 0.5s var(--ease-out) 0.2s backwards;
+  }
+  .upload-intro .upload-lead {
+    animation-delay: 0.28s;
+  }
+}
+
+/* The file picker and the ticks take the palette: a filled sharp block, no browser grey. */
+.upload-drop input[type="file"] {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--muted);
+  max-width: 100%;
+}
+.upload-drop input[type="file"]::file-selector-button {
+  min-height: 44px;
+  margin-right: 12px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.upload-body input[type="checkbox"] {
+  accent-color: var(--act);
+}

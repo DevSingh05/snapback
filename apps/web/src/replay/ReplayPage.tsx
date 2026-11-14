@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 
 import { SourceChip } from "../components/SourceChip";
+import { Wordmark } from "../components/HouseGlyph";
 import { FINDING_WORDS, getReplay, REPLAY_VERDICT_WORDS } from "./index";
 import type { Replay } from "./types";
 import "./replay.css";
@@ -56,7 +57,7 @@ export function ReplayView({ replay }: { replay: Replay }) {
     <article className="replay-page">
       <header className="replay-head">
         <div className="replay-masthead">
-          <span className="wordmark">SNAPBACK</span>
+          <Wordmark />
           <SourceChip source="fixture" />
         </div>
         <p className="replay-label">
