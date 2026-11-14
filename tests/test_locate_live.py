@@ -289,3 +289,21 @@ def test_a_fixture_case_never_uses_the_live_locator(world):
         photo_bytes=[photo(sweeps, "fx-model-a", 2, 1)],
     )
     assert modules._live_locate is None
+
+
+def test_a_timeout_with_no_claimed_home_leaves_every_photo_not_located(world, tmp_path):
+    data, sweeps, adapter = world
+    (tmp_path / "index").symlink_to(data / "index")
+    slow = LiveLocate(
+        data_dir=tmp_path,
+        records=lambda: RECORDS,
+        sweeps_for=adapter.sweeps,
+        matcher_factory=lambda: SlowMatcher(0.4),
+        budget_s=0.05,
+        thresholds=THRESHOLDS,
+    )
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    outcome = slow.locate("c", blobs, None)
+    assert outcome.identified_property_id is None
+    assert [p.status for p in outcome.result.photos] == [LocateStatus.NOT_LOCATED] * 2
+    assert not (tmp_path / "locate").exists()

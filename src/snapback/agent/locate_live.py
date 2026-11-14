@@ -9,9 +9,9 @@ Rules this module keeps:
 
 - One time budget per case. A photo that is not finished when the budget runs out is
   NOT_LOCATED, never an error and never "located elsewhere". Nothing is cached after that.
-- Claimed home first (the Locator does that). With no claimed home, photos that all land in
-  one indexed building identify it ("identified by scan"); photos that land in two different
-  buildings identify nothing. Identification alone is never DON'T PAY.
+- Claimed home first (the Locator does that). With no claimed home the Locator is called once
+  with every photo and decides whether they identify a building (`identified_by_scan`); this
+  module only reads its answer. Identification alone is never DON'T PAY.
 - The cache under `data/locate/` is keyed on the photo hashes and the claimed id. An entry is
   read only if it says it came from live data, and is written only by a live run.
 
@@ -205,46 +205,63 @@ class LiveLocate:
             )
 
         deadline = time.monotonic() + self.budget_s
-        found: dict[str, PhotoLocation] = {}
+        blobs = {f"l{number}": blob for number, blob in enumerate(photos, start=1)}
+
+        if claimed_property_id is None:
+            # No home claimed: ONE call with every photo, so lane V's identification rules
+            # apply (strict bar, two photos must agree, tangled twins identify nothing). A
+            # timeout leaves every photo not located.
+            whole = self._run(ready, case_id, blobs, None, deadline - time.monotonic())
+            if whole is None:
+                return LiveOutcome(self._not_located(case_id, blobs))
+            found = whole.claimed_property_id if whole.identified_by_scan else None
+            outcome = LiveOutcome(whole, found)
+            self._write_cache(path, outcome)
+            return outcome
+
+        found_photos: dict[str, PhotoLocation] = {}
         poses: dict[str, Pose] = {}
         versions: list[str] = []
         complete = True
-        for number, blob in enumerate(photos, start=1):
-            photo_id = f"l{number}"
-            remaining = deadline - time.monotonic()
-            one = self._one(ready, case_id, photo_id, blob, claimed_property_id, remaining)
+        for photo_id, blob in blobs.items():
+            one = self._run(
+                ready, case_id, {photo_id: blob}, claimed_property_id, deadline - time.monotonic()
+            )
             if one is None:
                 complete = False
-                found[photo_id] = PhotoLocation(photo_id=photo_id, status=LocateStatus.NOT_LOCATED)
+                found_photos[photo_id] = PhotoLocation(
+                    photo_id=photo_id, status=LocateStatus.NOT_LOCATED
+                )
                 continue
-            found[photo_id] = one.photos[0]
+            found_photos[photo_id] = one.photos[0]
             poses.update(one.poses)
             versions.append(one.thresholds_version)
 
-        outcome = self._assemble(
-            ready,
-            case_id,
-            list(found.values()),
-            poses,
-            claimed_property_id,
-            versions[0] if versions else "live-budget",
+        outcome = LiveOutcome(
+            self._merge(
+                ready,
+                case_id,
+                list(found_photos.values()),
+                poses,
+                claimed_property_id,
+                versions[0] if versions else "live-budget",
+            )
         )
         if complete:
             self._write_cache(path, outcome)
         return outcome
 
-    def _one(
+    def _run(
         self,
         ready: _Ready,
         case_id: str,
-        photo_id: str,
-        blob: bytes,
+        blobs: dict[str, bytes],
         claimed: str | None,
         remaining: float,
     ) -> LocateResult | None:
-        """One photo through the locator on a worker thread, or None if it ran out of time,
-        could not be read, or broke. A worker still running at the deadline is left to finish
-        by itself; its answer is dropped."""
+        """The locator on a worker thread, or None if it ran out of time, a photo could not
+        be read, or it broke. A worker still running at the deadline is left to finish by
+        itself; its answer is dropped."""
         if remaining <= 0:
             return None
         box: list[LocateResult] = []
@@ -253,11 +270,13 @@ class LiveLocate:
             try:
                 from PIL import Image
 
-                with Image.open(io.BytesIO(blob)) as opened:
-                    image = opened.convert("RGB")
-                box.append(ready.locator.locate(case_id, {photo_id: image}, claimed))  # type: ignore[attr-defined]
+                images = {}
+                for photo_id, blob in blobs.items():
+                    with Image.open(io.BytesIO(blob)) as opened:
+                        images[photo_id] = opened.convert("RGB")
+                box.append(ready.locator.locate(case_id, images, claimed))  # type: ignore[attr-defined]
             except Exception as error:  # noqa: BLE001 - a bad photo or a broken matcher
-                log.warning("a photo could not be placed (%s)", type(error).__name__)
+                log.warning("photos could not be placed (%s)", type(error).__name__)
 
         worker = threading.Thread(target=work, daemon=True)
         worker.start()
@@ -266,68 +285,49 @@ class LiveLocate:
             return None
         return box[0]
 
-    def _assemble(
+    @staticmethod
+    def _not_located(case_id: str, blobs: dict[str, bytes]) -> LocateResult:
+        return LocateResult(
+            case_id=case_id,
+            photos=[PhotoLocation(photo_id=p, status=LocateStatus.NOT_LOCATED) for p in blobs],
+            thresholds_version="live-budget",
+        )
+
+    def _merge(
         self,
         ready: _Ready,
         case_id: str,
         photos: list[PhotoLocation],
         poses: Mapping[str, Pose],
-        claimed: str | None,
+        claimed: str,
         version: str,
-    ) -> LiveOutcome:
+    ) -> LocateResult:
+        """Per-photo results for a claimed home, joined into one case result."""
         catalog = ready.locator.catalog  # type: ignore[attr-defined]
-        identified: str | None = None
-        if claimed is None:
-            # No home was claimed, so "elsewhere" has no meaning here (ruling, Sat 03:25).
-            # Photos that land in one indexed building identify it; two buildings identify
-            # nothing, and a photo that landed nowhere is not located.
-            placed = [
+        candidates = []
+        for model_id in sorted(catalog.models_of(claimed) & ready.model_ids):
+            mine = [
                 p
                 for p in photos
-                if p.status in (LocateStatus.LOCATED_IN_CLAIMED, LocateStatus.LOCATED_ELSEWHERE)
-                and p.matched_property_id
+                if p.status is LocateStatus.LOCATED_IN_CLAIMED and p.matched_model_id == model_id
             ]
-            owners = {p.matched_property_id for p in placed}
-            if len(owners) == 1:
-                identified = next(iter(owners))
-            photos = [
-                p.model_copy(update={"status": LocateStatus.LOCATED_IN_CLAIMED})
-                if identified and p in placed
-                else PhotoLocation(photo_id=p.photo_id, status=LocateStatus.NOT_LOCATED)
-                for p in photos
-            ]
-        target = claimed or identified
-        if claimed is None:
-            kept = {p.photo_id for p in photos if p.status is LocateStatus.LOCATED_IN_CLAIMED}
-            poses = {k: v for k, v in poses.items() if k in kept}
-
-        candidates = []
-        if target:
-            for model_id in sorted(catalog.models_of(target) & ready.model_ids):
-                mine = [
-                    p
-                    for p in photos
-                    if p.status is LocateStatus.LOCATED_IN_CLAIMED
-                    and p.matched_model_id == model_id
-                ]
-                candidates.append(
-                    FloorPlanCandidate(
-                        property_id=target,
-                        model_id=model_id,
-                        floor_plan=catalog.models[model_id].floor_plan,
-                        photos_located=len(mine),
-                        total_inliers=sum(p.inliers or 0 for p in mine),
-                    )
+            candidates.append(
+                FloorPlanCandidate(
+                    property_id=claimed,
+                    model_id=model_id,
+                    floor_plan=catalog.models[model_id].floor_plan,
+                    photos_located=len(mine),
+                    total_inliers=sum(p.inliers or 0 for p in mine),
                 )
-            candidates.sort(key=lambda c: (-c.photos_located, -c.total_inliers, c.model_id))
+            )
+        candidates.sort(key=lambda c: (-c.photos_located, -c.total_inliers, c.model_id))
         chosen = candidates[0] if candidates and candidates[0].photos_located else None
-        result = LocateResult(
+        return LocateResult(
             case_id=case_id,
             photos=photos,
-            claimed_property_id=target,
+            claimed_property_id=claimed,
             chosen=chosen,
             alternatives=[c for c in candidates if c is not chosen],
             poses=dict(poses),
             thresholds_version=version,
         )
-        return LiveOutcome(result, identified)
