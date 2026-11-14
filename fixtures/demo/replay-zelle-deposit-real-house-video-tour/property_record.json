@@ -1,0 +1,16 @@
+{
+  "property_id": "fx-demo-house-1",
+  "source": "fixture",
+  "market": "Houston",
+  "property_type": "single family",
+  "floors": 1,
+  "year_built": 1998,
+  "lat": 0.0,
+  "lon": 0.0,
+  "model_ids": ["fx-model-house"],
+  "floor_plans": [],
+  "manager_company": null,
+  "rent_min": null,
+  "rent_median": null,
+  "rent_max": null
+}
