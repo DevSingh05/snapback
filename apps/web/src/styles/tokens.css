@@ -46,6 +46,40 @@
   --radius: 0;
   --radius-sm: 0;
   --gutter: clamp(16px, 4vw, 32px);
+
+  /* Zing: the aqua accent, one ink band for every verdict with a bright state colour on it,
+     the state tiles on the chips, the house glyph, the sky sweep, paper grain and the lift. */
+  --zing: #1fb6c1;
+  --on-zing: #14242d;
+  --v-band: #14242d;
+  --on-v-band: #f1f6f8;
+  --v-dont-pay: #ff9f8e;
+  --v-hold: #f5d98b;
+  --v-ok: #8fdcb0;
+  --v-slate: #b9c9d4;
+  --on-v: #14242d;
+  --st-ok: #0e7a4a;
+  --st-mismatch: #b4472f;
+  --st-warn: #a9760a;
+  --st-unconfirmed: #f0d98a;
+  --st-unchecked: #5b6b76;
+  --on-st: #ffffff;
+  --on-st-unconfirmed: #14242d;
+  --h-wall: #fbfaf7;
+  --h-wall-shade: #d8cfc0;
+  --h-roof: #5f7483;
+  --h-lawn: #c5d6ba;
+  --h-path: #efebe3;
+  --h-roof-far: #8194a3;
+  --h-roof-edge: #3a4a54;
+  --h-lit: #ffe9a8;
+  --h-unlit: #b4d3e6;
+  --h-door: #0d6672;
+  --h-shade: rgb(20 36 45 / 0.16);
+  --sweep: rgb(255 255 255 / 0.55);
+  --shadow-lift: 0 2px 4px rgb(20 36 45 / 0.1), 0 18px 36px rgb(20 36 45 / 0.2);
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,6 +111,26 @@
     --glass: rgb(44 47 54 / 0.76);
     --focus: #f2c14e;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 34px rgb(0 0 0 / 0.6);
+    --zing: #5fd4dc;
+    --v-band: #0f1114;
+    --st-ok: #8fdcb0;
+    --st-mismatch: #ff9f8e;
+    --st-warn: #e9b949;
+    --st-unconfirmed: #f5e3a8;
+    --st-unchecked: #c9cdd3;
+    --on-st: #14242d;
+    --h-wall: #e4dfd5;
+    --h-wall-shade: #a1988a;
+    --h-roof: #77899a;
+    --h-roof-far: #93a3b2;
+    --h-roof-edge: #2c333c;
+    --h-lawn: #3d4f43;
+    --h-path: #8e887c;
+    --h-unlit: #6c9ab3;
+    --h-door: #14242d;
+    --h-shade: rgb(0 0 0 / 0.35);
+    --sweep: rgb(255 255 255 / 0.05);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 36px rgb(0 0 0 / 0.7);
   }
 }
 
@@ -108,4 +162,24 @@
   --glass: rgb(44 47 54 / 0.76);
   --focus: #f2c14e;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 34px rgb(0 0 0 / 0.6);
+  --zing: #5fd4dc;
+  --v-band: #0f1114;
+  --st-ok: #8fdcb0;
+  --st-mismatch: #ff9f8e;
+  --st-warn: #e9b949;
+  --st-unconfirmed: #f5e3a8;
+  --st-unchecked: #c9cdd3;
+  --on-st: #14242d;
+  --h-wall: #e4dfd5;
+  --h-wall-shade: #a1988a;
+  --h-roof: #77899a;
+  --h-roof-far: #93a3b2;
+  --h-roof-edge: #2c333c;
+  --h-lawn: #3d4f43;
+  --h-path: #8e887c;
+  --h-unlit: #6c9ab3;
+  --h-door: #14242d;
+  --h-shade: rgb(0 0 0 / 0.35);
+  --sweep: rgb(255 255 255 / 0.05);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 36px rgb(0 0 0 / 0.7);
 }

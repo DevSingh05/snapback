@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { HouseGlyph } from "../components/HouseGlyph";
 import { SourceChip } from "../components/SourceChip";
 import type { PlaceMatch, RenterBrief, TourDraft } from "../contracts";
 import {
@@ -69,7 +70,7 @@ function PlaceRow({
   }
 
   return (
-    <li className="pf-row" data-testid="place-row">
+    <li className="pf-row" data-testid="place-row" data-fit={place.budget_fit}>
       <div className="pf-row-head">
         <h3 className="pf-row-title">{title}</h3>
         <SourceChip source={place.source} />
@@ -192,6 +193,7 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
       )}
       {load.status === "ready" && load.places.matches.length === 0 && (
         <div className="pf-empty" data-testid="places-empty">
+          <HouseGlyph className="pf-empty-house" lit={false} />
           <p>No researched places fit this budget and these must-haves.</p>
           {load.places.tradeoff_question && (
             <p className="pf-tradeoff">{load.places.tradeoff_question}</p>
