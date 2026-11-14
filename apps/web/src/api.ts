@@ -28,9 +28,8 @@ export function saveCaseToken(caseId: string, token: string): void {
   }
 }
 
-// The read-only secret (POST /cases `read_token`). Like the write token above it travels in
-// the Authorization header only and is never put in a URL (locked ruling, Sat 02:27): the API
-// answers 401 to a token in an address, on every case route, the trace stream included.
+// The read-only secret (POST /cases `read_token`). It opens the SSE trace, sent in an
+// Authorization header by fetch. It is never put in a URL, and the write token above never is.
 const READ_TOKEN_PREFIX = "snapback.case-read-token.";
 
 export function saveCaseReadToken(caseId: string, token: string): void {
