@@ -418,10 +418,40 @@ def test_a_live_case_reads_not_checked_whatever_photos_are_sent(tmp_path, photos
     assert card["state"] == "unverified"
     real = said_on(card)["Real"]
     if photos:
-        # Photos were sent and there is nothing to place them in: say that, not "none sent".
-        assert real["text"] == "Not checked (we have no 3D scan of this building)."
+        # Photos were sent and nothing can place them: say that, not "none sent". This record
+        # has a scan, so the reason is that it is not indexed.
+        assert real["text"] == "Not checked (this building's scan is not indexed yet)."
     else:
         assert real["text"] == "Not checked (no listing photos were sent)."
+
+
+def test_a_live_text_only_case_on_a_home_that_is_for_sale_is_held(tmp_path):
+    # Conductor ruling, Sat 02:00. No photo, no twin, and still not "could not check".
+    card = live_card(
+        tmp_path,
+        contact_record(),
+        {"text": "3 bed house, $1,400 a month."},
+        for_sale=ForSaleMatch(status="active"),
+    )
+    assert card["state"] == "hold" and card["source"] == "live"
+    assert said_on(card)["For sale"]["tone"] == "red_flag"
+
+
+def test_a_scan_that_exists_but_is_not_indexed_is_said_differently_from_no_scan(tmp_path):
+    jpeg = b"\xff\xd8\xff\xe0" + b"synthetic jpeg body" * 4
+    files = [("photos", ("p.jpg", jpeg, "image/jpeg"))]
+    text = {"text": "2 bed, $1,700 a month."}
+    with_scan = contact_record()
+    assert with_scan.model_ids
+    card = live_card(tmp_path, with_scan, text, files)
+    assert said_on(card)["Real"]["text"] == (
+        "Not checked (this building's scan is not indexed yet)."
+    )
+    no_scan = contact_record(model_ids=[], floor_plans=[])
+    card = live_card(tmp_path / "b", no_scan, text, files)
+    assert said_on(card)["Real"]["text"] == "Not checked (we have no 3D scan of this building)."
+    # Neither names the model: it is the sponsor's id.
+    assert with_scan.model_ids[0] not in str(card)
 
 
 def test_a_live_case_still_runs_the_record_rules_and_the_whole_card_is_live(tmp_path):
