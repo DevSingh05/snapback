@@ -418,6 +418,12 @@ button {
   gap: 8px;
   font-weight: 700;
 }
+.trace-by {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
 .trace-time {
   color: var(--muted);
   font-weight: 400;

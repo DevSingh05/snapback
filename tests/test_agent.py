@@ -136,7 +136,14 @@ def test_retry_capped_at_two():
 def test_trace_for_the_hold_fixture_has_the_shape_of_the_fixture_trace():
     case = session()
     run_case(case, PolicyChooser(), always("send"))
-    events = case.trace.events
+    # The shared fixture predates the planner (A24): its steps are the same, in the same order,
+    # with the plan's own lines (next-check choices and skipped options) left out.
+    events = [
+        e
+        for e in case.trace.events
+        if e.choice is not ChoiceKind.NEXT_CHECK
+        and not (e.kind is TraceKind.STATUS and e.reason.startswith("Skipped "))
+    ]
 
     assert [(e.kind, e.choice) for e in events] == [(e.kind, e.choice) for e in FIXTURE_TRACE]
     for built, expected in zip(events, FIXTURE_TRACE, strict=True):

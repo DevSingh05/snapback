@@ -13,6 +13,7 @@ export const CHOICE_LABELS: Record<ChoiceKind, string> = {
   which_spot: "Which spot",
   retry_or_stop: "Retry or stop",
   ask_human: "Ask the human",
+  next_check: "Which check next",
 };
 
 const KIND_LABELS: Record<TraceEvent["kind"], string> = {
@@ -67,6 +68,11 @@ export function TraceLine({ event }: { event: TraceEvent }) {
     >
       <div className="trace-head">
         <span className="trace-title">{title}</span>
+        {event.kind === "choice" && (
+          <span className="mono trace-by" data-testid="trace-by" data-by={event.chosen_by}>
+            {event.chosen_by === "model" ? "picked by model" : "picked by rules"}
+          </span>
+        )}
         <span className="mono trace-time">{timeOf(event.at)}</span>
       </div>
       {event.options.length > 0 && (

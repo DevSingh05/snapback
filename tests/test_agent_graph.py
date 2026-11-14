@@ -57,6 +57,8 @@ call.count = 0
 DONE = AIMessage(content="The case is finished.")
 HONEST_RUN = [
     ("choose_option", {"option": "twin+rules+challenge", "reason": "The building has a twin."}),
+    ("choose_option", {"option": "home record", "reason": "The record has the rent band."}),
+    ("choose_option", {"option": "report pack", "reason": "Every check that could run has."}),
     ("choose_option", {"option": "Plan A", "reason": "Plan A has far more matching points."}),
     ("draw_spot", {}),
     ("send_challenge", {}),
@@ -114,7 +116,7 @@ def test_deep_agent_pauses_for_the_renter_and_resumes():
 
 def test_deep_agent_cancel_sends_nothing():
     case = new_case()
-    agent = build_agent(case, script(HONEST_RUN[:4]))
+    agent = build_agent(case, script(HONEST_RUN[:6]))
     verdict = run_case_with_agent(case, agent, lambda draft: "cancel")
     assert case.evidence.challenge is None
     assert verdict.state is VerdictState.HOLD
@@ -167,3 +169,18 @@ def test_a_model_that_fails_is_finished_by_the_code_policy():
     verdict = run_case_with_agent(case, agent, lambda draft: "send")
     assert verdict.state is VerdictState.HOLD
     assert any(e.kind is TraceKind.ERROR for e in case.trace.events)
+
+
+def test_deep_agent_picks_are_stamped_model_and_fallbacks_policy():
+    case = new_case()
+    agent = build_agent(case, script(HONEST_RUN))
+    run_case_with_agent(case, agent, lambda draft: "send")
+    stamps = {e.choice: e.chosen_by for e in case.trace.events if e.kind is TraceKind.CHOICE}
+    assert stamps[ChoiceKind.NEXT_CHECK] == "model"
+    assert stamps[ChoiceKind.WHICH_CHECKS] == "model"
+    assert stamps[ChoiceKind.WHICH_SPOT] == "policy"  # a random draw is never the model's
+
+    bad = [("choose_option", {"option": "mark verified", "reason": "x"})]
+    case = new_case()
+    run_case_with_agent(case, build_agent(case, script(bad)), lambda draft: "send")
+    assert {e.chosen_by for e in case.trace.events if e.kind is TraceKind.CHOICE} == {"policy"}

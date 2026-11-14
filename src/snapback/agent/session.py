@@ -18,8 +18,10 @@ import random
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from typing import Literal
 
 from snapback.agent.modules import ChallengeOutcome, Modules
+from snapback.agent.planner import PICK_REASON, Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -56,6 +58,7 @@ DECISIONS = (SEND, EDIT, CANCEL)
 
 class Step(StrEnum):
     CHECKS = "checks"
+    PLAN = "plan"  # A24: which evidence-gated check runs next (order only)
     FLOOR_PLAN = "floor_plan"
     SPOT = "spot"
     APPROVAL = "approval"
@@ -127,6 +130,8 @@ class CaseSession:
         self._decision: tuple[str, str | None] | None = None
         self._said_waiting = False
         self._skipped_spot: str | None = None
+        self._plan: Plan | None = None
+        self._after_plan: Step | None = None  # where the case goes when the plan is done
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -155,6 +160,8 @@ class CaseSession:
         """The choice that is open now, or None when the next step is not a choice to make."""
         if self.step is Step.CHECKS:
             return self._checks_offer()
+        if self.step is Step.PLAN:
+            return self._plan_offer()
         if self.step is Step.FLOOR_PLAN:
             return self._floor_plan_offer()
         if self.step is Step.RETRY:
@@ -201,9 +208,6 @@ class CaseSession:
 
         update: dict[str, object] = {
             "rules": self.modules.rules(self.case_id),
-            "price": self.modules.price(self.case_id),
-            "authority": self.modules.authority(self.case_id),
-            "for_sale": self.modules.for_sale(self.case_id),
             "record_source": self.modules.record_source(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:
@@ -230,13 +234,56 @@ class CaseSession:
         self.evidence = self.evidence.model_copy(update=update)
 
         if pick == RULES_ONLY:
-            self._finish()
+            self._after_plan = None
         elif self._candidates:
-            self.step = Step.FLOOR_PLAN
+            self._after_plan = Step.FLOOR_PLAN
         elif self._model_id:
-            self.step = Step.SPOT  # photos were placed but no floor plans were ranked
+            self._after_plan = Step.SPOT  # photos were placed but no floor plans were ranked
         else:
-            self._finish()  # nothing to challenge against
+            self._after_plan = None  # nothing to challenge against
+        self._begin_plan()
+
+    # --- choice 1b: which check next (A24) -------------------------------------------------
+
+    def _begin_plan(self) -> None:
+        self._plan = Plan(self.modules, self.case_id)
+        for skipped in self._plan.skipped():
+            self.trace.emit(
+                TraceKind.STATUS,
+                f"Skipped {skipped.kind.value}: {skipped.reason}.",
+                pick=skipped.kind.value,
+            )
+        self.step = Step.PLAN
+        self._advance_plan()
+
+    def _advance_plan(self) -> None:
+        """Leave the plan when no option can run any more."""
+        assert self._plan is not None
+        if self._plan.open_options():
+            return
+        if self._after_plan is None:
+            self._finish()
+        else:
+            self.step = self._after_plan
+
+    def _plan_offer(self) -> Offer:
+        assert self._plan is not None
+        kinds = self._plan.open_options()
+        labels = tuple(kind.value for kind in kinds)
+        return Offer(
+            kind=ChoiceKind.NEXT_CHECK,
+            options=labels,
+            aliases=labels,
+            facts=self._plan.facts(),
+            default=labels[0],
+            default_reason=PICK_REASON[kinds[0]],
+        )
+
+    def _apply_plan(self, pick: str) -> None:
+        assert self._plan is not None
+        update = self._plan.run(PlanKind(pick))
+        self.evidence = self.evidence.model_copy(update=update)
+        self._advance_plan()
 
     # --- choice 2: which floor plan --------------------------------------------------------
 
@@ -509,7 +556,13 @@ class CaseSession:
 
     # --- making a choice -------------------------------------------------------------------
 
-    def choose(self, pick: object, reason: object = None) -> str:
+    def choose(
+        self,
+        pick: object,
+        reason: object = None,
+        *,
+        by: Literal["model", "policy"] = "policy",
+    ) -> str:
         """Take a pick for the open choice. Returns the label that was applied.
 
         A pick that is not on the list is not an error to raise: the default is applied and the
@@ -522,17 +575,20 @@ class CaseSession:
         label = offer.resolve(pick)
         if label is None:
             self.trace.emit(TraceKind.ERROR, self._say("trace.error.bad_pick"))
-            label, reason = offer.default, offer.default_reason
+            label, reason, by = offer.default, offer.default_reason, "policy"
         self.trace.emit(
             TraceKind.CHOICE,
             clean_reason(reason, offer.default_reason),
             choice=offer.kind,
             options=offer.options,
             pick=label,
+            chosen_by=by,
         )
 
         if offer.kind is ChoiceKind.WHICH_CHECKS:
             self._apply_checks(label)
+        elif offer.kind is ChoiceKind.NEXT_CHECK:
+            self._apply_plan(label)
         elif offer.kind is ChoiceKind.WHICH_FLOOR_PLAN:
             self._apply_floor_plan(label)
         else:

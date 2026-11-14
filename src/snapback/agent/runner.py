@@ -6,7 +6,7 @@ either way, and a chooser that fails or answers off the list never stalls or ste
 """
 
 from collections.abc import Callable
-from typing import Protocol
+from typing import Literal, Protocol
 
 from snapback.agent.session import CaseSession, ChallengeDraft, Offer, Step
 from snapback.contracts import Verdict
@@ -22,6 +22,8 @@ class Chooser(Protocol):
 
 class PolicyChooser:
     """The code policy: always the default pick, with its code-written reason."""
+
+    chosen_by: Literal["model", "policy"] = "policy"
 
     def choose(self, offer: Offer) -> tuple[str, str]:
         return offer.default, offer.default_reason
@@ -56,5 +58,5 @@ def run_case(
                 # A model that is down, refuses or times out must not stall a renter's case.
                 case.choose_default(failed=True)
             else:
-                case.choose(pick, reason)
+                case.choose(pick, reason, by=getattr(chooser, "chosen_by", "policy"))
     return case.verdict

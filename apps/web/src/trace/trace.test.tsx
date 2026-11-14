@@ -62,6 +62,27 @@ describe("TracePanel with a duplicate seq", () => {
     expect(within(spot).getAllByTestId("trace-option")).toHaveLength(5);
     expect(within(spot).getByText(/overlaps listing photo 2/)).toBeInTheDocument();
   });
+  it("says on every choice line who picked, and treats an unstamped line as the rules", () => {
+    const stamped = (by: "model" | "policy"): TraceEvent => ({ ...at(0), chosen_by: by });
+    render(
+      <TracePanel
+        caseId="fx-7Q2M"
+        initialEvents={[stamped("model"), { ...stamped("policy"), seq: 1 }]}
+        mode="static"
+      />,
+    );
+    const labels = screen.getAllByTestId("trace-by");
+    expect(labels.map((l) => l.textContent)).toEqual(["picked by model", "picked by rules"]);
+    expect(parseTraceEvent(MIN)?.chosen_by).toBe("policy");
+    expect(parseTraceEvent(MIN.replace('"source"', '"chosen_by":"model","source"'))?.chosen_by).toBe(
+      "model",
+    );
+  });
+  it("labels the plan's choice", () => {
+    const next: TraceEvent = { ...at(0), choice: "next_check", chosen_by: "model" };
+    render(<TracePanel caseId="fx-7Q2M" initialEvents={[next]} mode="static" />);
+    expect(screen.getByText("Which check next")).toBeInTheDocument();
+  });
   it("shows the FIXTURE chip", () => {
     render(<TracePanel caseId="fx-7Q2M" initialEvents={events} mode="static" />);
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
