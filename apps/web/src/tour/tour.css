@@ -23,7 +23,7 @@
 }
 .tour-stage {
   background: var(--surface);
-  border-radius: var(--radius);
+
   min-height: 360px;
   overflow: hidden;
   display: flex;
@@ -44,11 +44,10 @@
   background: var(--teal-soft);
   color: var(--teal);
   padding: 32px;
-  border-radius: var(--radius-sm);
 }
 .tour-panel {
   background: var(--surface);
-  border-radius: var(--radius);
+
   padding: clamp(16px, 3vw, 24px);
   display: flex;
   flex-direction: column;
@@ -130,8 +129,14 @@
 .tour-empty-frame {
   margin: 0;
   padding: 14px;
-  border: 2px dashed var(--line);
-  border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper),
+    var(--paper) 8px,
+    var(--line) 8px,
+    var(--line) 9px
+  );
+
   color: var(--muted);
 }
 .tour-details > summary {
@@ -140,7 +145,7 @@
 }
 .tour-stop[data-dwell="true"] {
   background: var(--teal-soft);
-  border-radius: var(--radius-sm);
+
   padding: 10px;
 }
 .tour-claims {
@@ -156,7 +161,6 @@
   background: var(--amber-soft);
   color: var(--amber);
   padding: 10px 14px;
-  border-radius: var(--radius-sm);
 }
 .tour-agent-slot:empty {
   display: none;
