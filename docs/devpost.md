@@ -15,10 +15,10 @@ copies one, wherever it shows up, and sends them back to the real listing on Apa
 
 ## Scam prevention first
 
-Rental scams don't happen on the listing sites. They happen on the copy: a real home's photos,
-reposted somewhere else, with a stranger's phone number and a request for money.
+Many rental scams happen on the copy: a real home's photos, reposted somewhere else, with a
+stranger's phone number and a request for money.
 
-- **The listing sites can't see the copy.** CoStar's own scam page warns renters that "Scammers
+- **The renter is the one holding the copy.** CoStar's own scam page warns renters that "Scammers
   may impersonate Apartments.com or Apartment Finder to make it seem like we participate in the
   lease transaction or transfer of funds", and that "we do not participate in any rental
   transactions and cannot refund your money if you are scammed" (apartmenthomeliving.com, "Avoid
@@ -28,7 +28,7 @@ reposted somewhere else, with a stranger's phone number and a request for money.
   $65 million lost. About half of people reporting in the 12 months ending June 2025 said it
   began with a fake Facebook ad.
 - **It is costly.** The FBI's Boston office (Aug 11 2026) reported that 12,368 people lost
-  $275,110,419 to real estate scams in 2025.
+  $275,110,419 to real estate scams in 2025 (all real estate scams, not only rentals).
 
 SNAPBACK meets the renter where the copy is: they paste it, upload it or text it, and the home's
 own record answers before any money moves. CoStar could ship this beside its listings.
@@ -91,6 +91,10 @@ or sends anything for you.
   a prompt-injection guard.
 - **Front end:** Vite, React and TypeScript, with a MapLibre 3D city map, an isometric 3D house
   and a walkthrough tour. Every screen says LIVE or FIXTURE.
+- **The one box:** the home page is a single box. Type, talk, paste or drop an ad; code routes it
+  and answers inline (#243).
+- **MCP server:** SNAPBACK as tools for any agent, over local stdio: six tools, and the tour
+  request stays a draft (#241).
 - **iMessage:** a Node sidecar on Photon's Spectrum SDK. A renter texts the ad and gets the card
   back as text plus a link. Only allowlisted threads are answered, and thread ids are kept as
   keyed hashes.
@@ -158,7 +162,7 @@ Built, not yet on `main`, so not claimed above:
 - **The real listing:** a panel that shows the home's real listing, a hand-off link back to it on
   Apartments.com, and an alert when an ad looks copied from it (#250).
 - **New rules,** and a **batch run** over many ads at once.
-- **MCP** (#241), **the one box** (#243) and the **Stories** page.
+- The **Stories** page.
 - **Voice in iMessage:** merged in the sidecar (#245); the live round trip from a phone is next.
 
 ## What's next
