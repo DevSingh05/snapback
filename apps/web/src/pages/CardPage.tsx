@@ -194,7 +194,8 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     return () => ctrl.abort();
   }, [caseId, attempt]);
 
-  if (load.status === "ready") return <CardView card={load.card} variant={variant} withLab />;
+  if (load.status === "ready")
+    return <CardView card={load.card} variant={variant} withLab={variant === "result"} />;
   return (
     <div className="card-page notice" role="status">
       <span className="wordmark">SNAPBACK</span>

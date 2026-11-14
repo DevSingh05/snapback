@@ -76,3 +76,43 @@
   color: var(--muted);
   font-size: 0.95rem;
 }
+.lab-s0 {
+  --series: var(--teal);
+}
+.lab-s1 {
+  --series: var(--blue);
+}
+.lab-s2 {
+  --series: var(--amber);
+}
+.lab-s0 .lab-line,
+.lab-s1 .lab-line,
+.lab-s2 .lab-line {
+  stroke: var(--series);
+}
+.lab-s0 .lab-dot,
+.lab-s1 .lab-dot,
+.lab-s2 .lab-dot {
+  fill: var(--series);
+}
+.lab-legend {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.9rem;
+}
+.lab-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: var(--series);
+}
+.lab-memory {
+  margin: 16px 0 0;
+  font-weight: 700;
+}

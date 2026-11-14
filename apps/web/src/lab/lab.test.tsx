@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import sample from "../../../../fixtures/contracts/results_sample.csv?raw";
 import { LabPanel } from "./LabPanel";
-import { ResultsError, calibrationPoints, curveBars, linearScale, parseResults } from "./results";
+import {
+  ResultsError,
+  calibrationPoints,
+  curveBars,
+  linearScale,
+  niceTicks,
+  parseResults,
+} from "./results";
 
 const HEADER = "condition,metric,k,n,rate,ci_low,ci_high,frozen_at";
 
@@ -97,5 +104,53 @@ describe("LabPanel", () => {
     render(<LabPanel csv={only} source="fixture" />);
     expect(screen.getAllByTestId("curve-bar")).toHaveLength(1);
     expect(screen.getByTestId("calibration-empty")).toBeInTheDocument();
+  });
+});
+
+describe("review fixes", () => {
+  const twoSeries = `${HEADER}
+a_before,calibration_bin:0.80-0.90,5,10,0.5,0.2366,0.7634,FIXTURE
+a_after,calibration_bin:0.80-0.90,9,10,0.9,0.5958,0.9821,FIXTURE
+`;
+
+  it("keeps conditions sharing a bin as separate series with a legend", () => {
+    render(<LabPanel csv={twoSeries} source="fixture" />);
+    expect(screen.getAllByTestId("cal-series")).toHaveLength(2);
+    expect(screen.getAllByTestId("cal-point")).toHaveLength(2);
+    const legend = screen.getByTestId("cal-legend");
+    expect(within(legend).getByText("a_before")).toBeInTheDocument();
+    expect(within(legend).getByText("a_after")).toBeInTheDocument();
+  });
+
+  it("shows memory catches k of n with its interval", () => {
+    render(<LabPanel csv={sample} source="fixture" />);
+    expect(screen.getByTestId("memory-catch")).toHaveTextContent(
+      "Memory catches 12 of 15 (80.0%, 95% CI 54.8% to 93.0%)",
+    );
+  });
+
+  it("does not claim the attackers were unseen", () => {
+    render(<LabPanel csv={sample} source="fixture" />);
+    expect(screen.queryByText(/never trained/)).toBeNull();
+    expect(screen.getByText(/on the held-out set/)).toBeInTheDocument();
+  });
+
+  it("plots calibration on a 0 to 100% x axis", () => {
+    render(<LabPanel csv={sample} source="fixture" />);
+    const svg = screen.getByTestId("calibration-chart");
+    const labels = Array.from(svg.querySelectorAll("text.lab-tick")).map((t) => t.textContent);
+    expect(labels.filter((l) => l === "0.0%")).toHaveLength(2);
+    expect(calibrationPoints(parseResults(sample))[0]!.x).toBeCloseTo(0.55, 9);
+  });
+
+  it("rejects a rate that does not match k / n", () => {
+    expect(() => parseResults(`${HEADER}\na,m,4,10,0.5,0.2,0.8,t`)).toThrow(/line 2/);
+    expect(() => parseResults(`${HEADER}\na,m,0,0,0,0,0,t`)).toThrow(/line 2/);
+    expect(() => parseResults(`${HEADER}\na,m,4,10,0.4,0.2,0.8,t`)).not.toThrow();
+  });
+
+  it("uses round axis ticks", () => {
+    expect(niceTicks(0.375)).toEqual([0, 0.1, 0.2, 0.3, 0.4]);
+    expect(niceTicks(1)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1]);
   });
 });

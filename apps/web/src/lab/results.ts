@@ -62,7 +62,9 @@ export function parseResults(text: string): ResultRow[] {
       row.metric === "" ||
       nums.some((v) => !Number.isFinite(v)) ||
       row.k < 0 ||
+      row.n <= 0 ||
       row.k > row.n ||
+      Math.abs(row.rate - row.k / row.n) > 0.0005 ||
       row.rate < 0 ||
       row.rate > 1 ||
       row.ci_low > row.rate + 1e-9 ||
@@ -125,3 +127,25 @@ export function linearScale(
 }
 
 export const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+export const MEMORY_METRIC = "memory_catch";
+
+export function memoryCatch(rows: ResultRow[]): ResultRow | undefined {
+  return rows.find((r) => r.metric === MEMORY_METRIC);
+}
+
+// One series per condition, so two conditions that share a confidence bin never merge.
+export function calibrationSeries(rows: ResultRow[]): Map<string, CalibrationPoint[]> {
+  const out = new Map<string, CalibrationPoint[]>();
+  for (const p of calibrationPoints(rows)) {
+    out.set(p.condition, [...(out.get(p.condition) ?? []), p]);
+  }
+  return out;
+}
+
+// Round axis ticks: the smallest "nice" step that covers `top` in at most 5 steps.
+export function niceTicks(top: number): number[] {
+  const step = [0.05, 0.1, 0.2, 0.25, 0.5, 1].find((s) => Math.ceil(top / s - 1e-9) <= 5) ?? 1;
+  const n = Math.max(1, Math.ceil(top / step - 1e-9));
+  return Array.from({ length: n + 1 }, (_, i) => Math.round(i * step * 1000) / 1000);
+}

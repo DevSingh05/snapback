@@ -5,8 +5,11 @@ import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
 import {
   CONDITION_LABEL,
+  type CalibrationPoint,
   ResultsError,
-  calibrationPoints,
+  calibrationSeries,
+  memoryCatch,
+  niceTicks,
   curveBars,
   linearScale,
   parseResults,
@@ -18,12 +21,9 @@ const W = 760;
 const H = 290;
 const M = { top: 12, right: 16, bottom: 72, left: 52 };
 
-function ticks(max: number): number[] {
-  return [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
-}
-
 function CurveChart({ bars }: { bars: ResultRow[] }) {
-  const max = Math.min(1, Math.max(0.1, ...bars.map((b) => b.ci_high)) * 1.1);
+  const tickVals = niceTicks(Math.max(0.05, ...bars.map((b) => b.ci_high)));
+  const max = tickVals[tickVals.length - 1]!;
   const y = linearScale([0, max], [H - M.bottom, M.top]);
   const slot = (W - M.left - M.right) / bars.length;
   return (
@@ -37,7 +37,7 @@ function CurveChart({ bars }: { bars: ResultRow[] }) {
       <title id="curve-title">
         Forged-reply false-accept rate by condition, with 95% interval and n
       </title>
-      {ticks(max).map((t) => (
+      {tickVals.map((t) => (
         <g key={t}>
           <line x1={M.left} x2={W - M.right} y1={y(t)} y2={y(t)} className="lab-grid" />
           <text x={M.left - 8} y={y(t)} className="lab-tick" textAnchor="end" dy="0.32em">
@@ -116,67 +116,81 @@ function CurveChart({ bars }: { bars: ResultRow[] }) {
   );
 }
 
-function CalibrationChart({ rows }: { rows: ResultRow[] }) {
-  const pts = calibrationPoints(rows);
+const SERIES_CLASS = ["lab-s0", "lab-s1", "lab-s2"];
+
+function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> }) {
   const S = 280;
   const m = { top: 12, right: 16, bottom: 40, left: 48 };
-  const x = linearScale([0.5, 1], [m.left, S - m.right]);
+  const x = linearScale([0, 1], [m.left, S - m.right]);
   const y = linearScale([0, 1], [S - m.bottom, m.top]);
+  const entries = [...series.entries()];
   return (
-    <svg
-      viewBox={`0 0 ${S} ${S}`}
-      role="img"
-      aria-labelledby="cal-title"
-      className="lab-svg lab-svg-square"
-      data-testid="calibration-chart"
-    >
-      <title id="cal-title">
-        Reliability diagram: stated confidence against how often the place check was right
-      </title>
-      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-        <g key={t}>
-          <line x1={m.left} x2={S - m.right} y1={y(t)} y2={y(t)} className="lab-grid" />
-          <text x={m.left - 6} y={y(t)} className="lab-tick" textAnchor="end" dy="0.32em">
-            {pct(t)}
-          </text>
-        </g>
-      ))}
-      {[0.5, 0.75, 1].map((t) => (
-        <text key={t} x={x(t)} y={S - m.bottom + 14} className="lab-tick" textAnchor="middle">
-          {pct(t)}
-        </text>
-      ))}
-      <line x1={x(0.5)} y1={y(0.5)} x2={x(1)} y2={y(1)} className="lab-diagonal" />
-      <text x={(m.left + S - m.right) / 2} y={S - 6} className="lab-axis" textAnchor="middle">
-        Stated confidence
-      </text>
-      <text
-        transform={`translate(10 ${(m.top + S - m.bottom) / 2}) rotate(-90)`}
-        className="lab-axis"
-        textAnchor="middle"
+    <div className="lab-cal">
+      <svg
+        viewBox={`0 0 ${S} ${S}`}
+        role="img"
+        aria-labelledby="cal-title"
+        className="lab-svg lab-svg-square"
+        data-testid="calibration-chart"
       >
-        Right this often
-      </text>
-      <polyline
-        points={pts.map((p) => `${x(p.x)},${y(p.rate)}`).join(" ")}
-        className="lab-line"
-        fill="none"
-      />
-      {pts.map((p) => (
-        <g key={p.metric} data-testid="cal-point">
-          <line
-            x1={x(p.x)}
-            x2={x(p.x)}
-            y1={y(p.ci_low)}
-            y2={y(p.ci_high)}
-            className="lab-whisker"
-          />
-          <circle cx={x(p.x)} cy={y(p.rate)} r={4} className="lab-dot">
-            <title>{`${pct(p.rate)} right, n = ${p.n}, 95% CI ${pct(p.ci_low)} to ${pct(p.ci_high)}`}</title>
-          </circle>
-        </g>
-      ))}
-    </svg>
+        <title id="cal-title">
+          Reliability diagram: stated confidence against how often the place check was right
+        </title>
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+          <g key={t}>
+            <line x1={m.left} x2={S - m.right} y1={y(t)} y2={y(t)} className="lab-grid" />
+            <text x={m.left - 6} y={y(t)} className="lab-tick" textAnchor="end" dy="0.32em">
+              {pct(t)}
+            </text>
+            <text x={x(t)} y={S - m.bottom + 14} className="lab-tick" textAnchor="middle">
+              {pct(t)}
+            </text>
+          </g>
+        ))}
+        <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} className="lab-diagonal" />
+        <text x={(m.left + S - m.right) / 2} y={S - 6} className="lab-axis" textAnchor="middle">
+          Stated confidence
+        </text>
+        <text
+          transform={`translate(10 ${(m.top + S - m.bottom) / 2}) rotate(-90)`}
+          className="lab-axis"
+          textAnchor="middle"
+        >
+          Right this often
+        </text>
+        {entries.map(([cond, pts], si) => (
+          <g key={cond} className={SERIES_CLASS[si % SERIES_CLASS.length]} data-testid="cal-series">
+            <polyline
+              points={pts.map((p) => `${x(p.x)},${y(p.rate)}`).join(" ")}
+              className="lab-line"
+              fill="none"
+            />
+            {pts.map((p) => (
+              <g key={`${p.condition}${p.metric}`} data-testid="cal-point">
+                <line
+                  x1={x(p.x)}
+                  x2={x(p.x)}
+                  y1={y(p.ci_low)}
+                  y2={y(p.ci_high)}
+                  className="lab-whisker"
+                />
+                <circle cx={x(p.x)} cy={y(p.rate)} r={4} className="lab-dot">
+                  <title>{`${pct(p.rate)} right, n = ${p.n}, 95% CI ${pct(p.ci_low)} to ${pct(p.ci_high)}`}</title>
+                </circle>
+              </g>
+            ))}
+          </g>
+        ))}
+      </svg>
+      <ul className="lab-legend" data-testid="cal-legend">
+        {entries.map(([cond], si) => (
+          <li key={cond} className={SERIES_CLASS[si % SERIES_CLASS.length]}>
+            <span className="lab-swatch" aria-hidden="true" />
+            {cond}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -193,7 +207,8 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
   }, [csv]);
 
   const bars = curveBars(parsed.rows);
-  const cal = calibrationPoints(parsed.rows);
+  const cal = calibrationSeries(parsed.rows);
+  const mem = memoryCatch(parsed.rows);
   const frozen = parsed.rows.find((r) => r.frozen_at && r.frozen_at !== "FIXTURE")?.frozen_at;
 
   return (
@@ -218,7 +233,7 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
       ) : (
         <>
           <div className="lab-block">
-            <h3>Forged replies we let through, on attackers never trained on</h3>
+            <h3>Forged replies we let through, on the held-out set</h3>
             {bars.length > 0 ? (
               <div className="lab-scroll">
                 <CurveChart bars={bars} />
@@ -229,10 +244,15 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
               </p>
             )}
           </div>
+          {mem ? (
+            <p className="lab-memory" data-testid="memory-catch">
+              {`Memory catches ${mem.k} of ${mem.n} (${pct(mem.rate)}, 95% CI ${pct(mem.ci_low)} to ${pct(mem.ci_high)})`}
+            </p>
+          ) : null}
           <div className="lab-block">
             <h3>Calibration: when we say 90%, how often are we right</h3>
-            {cal.length > 0 ? (
-              <CalibrationChart rows={cal} />
+            {cal.size > 0 ? (
+              <CalibrationChart series={cal} />
             ) : (
               <p className="lab-note" data-testid="calibration-empty">
                 No calibration rows in this file.
