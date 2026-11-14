@@ -8,6 +8,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card            the Card (?lang=en|es)
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
+    GET  /cases/{case_id}/notes           the agent's working notes (read-only)
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
@@ -39,6 +40,7 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from snapback.adapters.vexcel import aerial_proof, aerial_side
+from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
@@ -750,6 +752,21 @@ def create_app(
                 content=fixture_tile_jpeg(property_id), media_type="image/jpeg", headers=headers
             )
         raise HTTPException(status_code=404, detail=NO_TILE)
+
+    @app.get("/cases/{case_id}/notes", response_model=CaseNotes)
+    def get_notes(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseNotes:
+        """The working notes the agent wrote for this case, read-only: one note per check
+        family, plus the explanation and tour questions when a model wrote them. Derived text
+        only, each stamped with who wrote it. Same read token as the trace, in a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        return case.notes()
 
     @app.post("/search")
     def post_search(

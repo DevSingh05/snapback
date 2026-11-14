@@ -14,7 +14,7 @@ from snapback.search import _all_matches
 from snapback.settings import Settings
 
 ROOT = Path(__file__).resolve().parent.parent
-FIXTURE = ROOT / "fixtures" / "demo" / "places-map.fixture.geojson"
+FIXTURE = ROOT / "fixtures" / "map" / "places-map.fixture.geojson"
 BANNED_KEYS = {
     "address",
     "office",
