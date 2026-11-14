@@ -6,8 +6,7 @@ in a fixed order and works out, from evidence it already holds, which of them ca
 - `home record`: the home's own record (rent band, who is on record, sale history);
 - `listing brokerage`: the listing office behind an ACTIVE for-sale match;
 - `TREC license`: the license the ad names, looked up with the state (D10);
-- `owner of record`: the public owner file (D12, not merged yet: it shows as skipped until a
-  module offers it);
+- `owner of record`: the public owner file (D12) and how the poster compares (A19);
 - `report pack`: the closing step, open once every other check has run or been skipped.
 
 An option whose evidence is missing is not offered; it is shown as skipped, with the reason.
@@ -29,7 +28,7 @@ from snapback.contracts import (
     ForSaleStatus,
     LicenseResult,
     LicenseStatus,
-    ModuleEvidence,
+    OwnerResult,
     PriceResult,
 )
 
@@ -74,11 +73,11 @@ class Plan:
         # Optional lookups: a Modules implementation may offer these two. Until one does, the
         # option is shown as skipped. Nothing here imports the code that will provide them.
         license_fn = getattr(modules, "license", None)
-        owner_fn = getattr(modules, "owner_of_record", None)
+        owner_fn = getattr(modules, "owner", None)
         self._license_offered = callable(license_fn)
         self._owner_offered = callable(owner_fn)
         self._license: LicenseResult | None = license_fn(case_id) if callable(license_fn) else None
-        self._owner: object | None = owner_fn(case_id) if callable(owner_fn) else None
+        self._owner: OwnerResult | None = owner_fn(case_id) if callable(owner_fn) else None
         self.ran: list[PlanKind] = []
 
     @property
@@ -176,8 +175,6 @@ class Plan:
             return {"for_sale": self._for_sale}
         if kind is PlanKind.LICENSE:
             return {"license": self._license}
-        if kind is PlanKind.OWNER and "owner" in ModuleEvidence.model_fields:
-            # The owner file's evidence field arrives with D12. Until it does, an owner module
-            # can still be offered and run; there is just nothing on ModuleEvidence to hold it.
+        if kind is PlanKind.OWNER:
             return {"owner": self._owner}
         return {}

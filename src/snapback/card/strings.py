@@ -31,6 +31,8 @@ EN: dict[str, str] = {
     "label.contact": "Contact on record",
     "label.link": "Link",
     "label.license": "License",
+    "label.owner": "Owner of record",
+    "label.owner_rule": "Owner's rule",
     "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
@@ -150,6 +152,27 @@ EN: dict[str, str] = {
     "license.not_checked_claimed": (
         "Says they're licensed. Ask for their Texas license number and look it up at "
         "trec.texas.gov."
+    ),
+    "owner.company_not_poster": "Not confirmed. Owner of record: {company}, not the poster.",
+    "owner.company": "Not confirmed. Owner of record: {company}.",
+    "owner.company_matches": "The company they named is the owner of record: {company}.",
+    "owner.person_matches": "The owner of record is a private owner, and the name given matches.",
+    "owner.person_mismatch": (
+        "Not confirmed. The owner of record is a private owner, and the name given doesn't "
+        "match. Owners can rent through family or a trust; check with the owner of record or "
+        "the county records yourself."
+    ),
+    "owner.person_no_claim": (
+        "Not checked (a private owner is on record, and the poster does not say they are the "
+        "owner)."
+    ),
+    "owner.person_no_name": (
+        "Not checked (a private owner is on record, and the poster gave no name to compare)."
+    ),
+    # The owner's own published rule, quoted, with where it is from and the day we read it.
+    "owner.rule": '{company} says: "{rule}" ({source}, read {date}).',
+    "owner.rule_beside_payment": (
+        '{company}, the owner of record, says: "{rule}" ({source}, read {date}).'
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -331,6 +354,9 @@ EN: dict[str, str] = {
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
     "reason.license_not_found": "The license number in the ad is not an active Texas license.",
+    "reason.owner_not_poster": (
+        "The poster says they are the owner, and the owner of record is someone else."
+    ),
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
@@ -389,6 +415,8 @@ ES: dict[str, str] = {
     "label.contact": "Contacto en el registro",
     "label.link": "Enlace",
     "label.license": "Licencia",
+    "label.owner": "Propietario registrado",
+    "label.owner_rule": "Regla del propietario",
     "label.unit": "Unidad en el registro",
     "place.located_plan": (
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
@@ -504,6 +532,32 @@ ES: dict[str, str] = {
     ),
     "license.not_checked_claimed": (
         "Dice tener licencia. Pídale su número de licencia de Texas y búsquelo en trec.texas.gov."
+    ),
+    "owner.company_not_poster": (
+        "Sin confirmar. Propietario registrado: {company}, no quien publica."
+    ),
+    "owner.company": "Sin confirmar. Propietario registrado: {company}.",
+    "owner.company_matches": "La empresa que nombró es la propietaria registrada: {company}.",
+    "owner.person_matches": (
+        "El propietario registrado es un particular, y el nombre dado coincide."
+    ),
+    "owner.person_mismatch": (
+        "Sin confirmar. El propietario registrado es un particular, y el nombre dado no "
+        "coincide. Los propietarios pueden alquilar a través de familiares o de un "
+        "fideicomiso; consulte usted mismo con el propietario registrado o en los registros "
+        "del condado."
+    ),
+    "owner.person_no_claim": (
+        "No comprobado (hay un propietario particular registrado, y quien publica no dice "
+        "ser el propietario)."
+    ),
+    "owner.person_no_name": (
+        "No comprobado (hay un propietario particular registrado, y quien publica no dio un "
+        "nombre para comparar)."
+    ),
+    "owner.rule": '{company} dice: "{rule}" ({source}, leído el {date}).',
+    "owner.rule_beside_payment": (
+        '{company}, el propietario registrado, dice: "{rule}" ({source}, leído el {date}).'
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
@@ -720,6 +774,9 @@ ES: dict[str, str] = {
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
     "reason.license_not_found": (
         "El número de licencia del anuncio no es una licencia activa de Texas."
+    ),
+    "reason.owner_not_poster": (
+        "Quien publica dice ser el propietario, y el propietario registrado es otro."
     ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
     "reason.not_indexed": (

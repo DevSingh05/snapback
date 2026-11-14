@@ -18,6 +18,8 @@ from snapback.contracts import (
     ForSaleStatus,
     LicenseResult,
     LicenseStatus,
+    OwnerKind,
+    OwnerResult,
     TraceEvent,
     TraceKind,
     VerdictState,
@@ -34,8 +36,8 @@ class WithLicense(FixtureModules):
 
 
 class WithOwner(FixtureModules):
-    def owner_of_record(self, case_id):
-        return "a company"  # opaque to the plan
+    def owner(self, case_id):
+        return OwnerResult(kind=OwnerKind.COMPANY, company="Example Holdings LLC")
 
 
 def make(modules) -> CaseSession:
@@ -80,7 +82,7 @@ def test_record_is_offered_and_the_unavailable_options_are_skipped_with_reasons(
     lines = skipped_lines(case)
     assert "Skipped listing brokerage: the home is not listed for sale right now." in lines
     assert "Skipped TREC license: the ad names no license to look up." in lines
-    assert "Skipped owner of record: owner lookup not available." in lines
+    assert "Skipped owner of record: no owner on record to read." in lines
 
 
 def test_brokerage_needs_an_active_for_sale_listing():
@@ -94,11 +96,23 @@ def test_license_option_needs_a_module_that_looked_up_a_license():
     assert "TREC license" not in offered(make(FixtureModules()))
 
 
-def test_owner_option_shows_as_skipped_until_a_module_offers_it():
+def test_owner_option_needs_an_owner_on_record_and_reaches_the_evidence():
     case = make(FixtureModules())
     assert "owner of record" not in offered(case)
+    assert any("no owner on record to read" in line for line in skipped_lines(case))
+    withheld = make(WithOwner())
+    assert "owner of record" in offered(withheld)
+    run_case(withheld, PolicyChooser(), lambda draft: "send")
+    assert withheld.evidence.owner == WithOwner().owner("x")  # A19 still reaches the card
+
+
+def test_a_module_with_no_owner_lookup_shows_the_option_as_skipped():
+    class Old(FixtureModules):
+        owner = None  # an implementation from before D12
+
+    case = make(Old())
+    assert "owner of record" not in offered(case)
     assert any("owner lookup not available" in line for line in skipped_lines(case))
-    assert "owner of record" in offered(make(WithOwner()))
 
 
 def test_report_pack_opens_only_after_every_other_check_has_run():

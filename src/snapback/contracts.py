@@ -83,6 +83,7 @@ class Evidence(BaseModel):
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
     license_flag: bool = False  # claims a real estate license; no active one holds that name
+    owner_flag: bool = False  # says they are the owner; the owner of record is someone else
 
 
 class VerdictState(StrEnum):
@@ -317,6 +318,42 @@ class LicenseResult(BaseModel):
     state: str = "TX"
 
 
+class OwnerKind(StrEnum):
+    COMPANY = "company"  # a company or institution: LLC, REIT, iBuyer, brokerage, trust company
+    PERSON = "person"  # an individual. The card says "a private owner"; the name stays in lane D
+
+
+class OwnerMatch(StrEnum):
+    YES = "yes"
+    NO = "no"
+    NOT_CHECKED = "not_checked"
+
+
+class PublishedRule(BaseModel):
+    """A rule a company publishes about where it takes applications and money, quoted (A19).
+
+    From lane A's table of verified rows. It travels with the case, so a recorded case is
+    redrawn with the rule it had."""
+
+    company: str  # the company, as it names itself
+    rule: str  # its own words, quoted
+    source_url: str  # where it is published
+    checked_on: date  # the day one of us read it there
+
+
+class OwnerResult(BaseModel):
+    """The owner of record of the home the listing claims (D12, #130), and how the poster
+    compares (A19, #125). Never a person's name, anywhere."""
+
+    kind: OwnerKind
+    company: str | None = None  # COMPANY only. A company name, never a person's
+    # Does what the poster calls themselves match the owner of record? Yes or no, nothing
+    # more. For a person owner lane D compares inside its adapter and sends only this.
+    poster_matches: OwnerMatch = OwnerMatch.NOT_CHECKED
+    poster_says_owner: bool = False  # lane A: the poster's own words say they are the owner
+    published_rule: PublishedRule | None = None  # lane A: the owner's own rule, if verified
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -331,6 +368,8 @@ class ModuleEvidence(BaseModel):
     authority: AuthorityResult | None = None
     for_sale: ForSaleMatch | None = None  # D7; None means not looked up
     license: LicenseResult | None = None  # D10; None means not looked up
+    # D12 + A19; None means no owner data (LA, an unknown address, or not looked up)
+    owner: OwnerResult | None = None
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
