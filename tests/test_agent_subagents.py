@@ -554,3 +554,19 @@ def test_a_run_without_todos_and_the_policy_path_still_work():
     run_case(policy, PolicyChooser(), lambda draft: "send")
     assert not [e for e in policy.trace.events if e.kind.value == "todo"]
     assert policy.verdict == verdict  # same result with or without a plan
+
+
+def test_the_main_agent_really_has_a_write_todos_tool_and_it_works():
+    """deepagents 0.7 adds no planner by itself. Without this the model's write_todos call hit
+    'not a valid tool' and the earlier tests still passed on the call alone."""
+    session = demo_session("a")
+    agent = build_agent(session, FakeCrew(case=session))
+    assert "write_todos" in agent.nodes["tools"].bound.tools_by_name
+    config = {"configurable": {"thread_id": "todos"}, "recursion_limit": 60}
+    agent.invoke({"messages": [("user", "go")]}, config)
+    state = agent.get_state(config).values
+    assert [t["content"] for t in state["todos"]][0] == "Work the open choices"
+    replies = [
+        m for m in state["messages"] if isinstance(m, ToolMessage) and m.name == "write_todos"
+    ]
+    assert replies and all(m.status != "error" for m in replies)

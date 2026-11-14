@@ -30,6 +30,7 @@ import os
 from typing import Any
 
 from deepagents import FilesystemPermission, create_deep_agent
+from langchain.agents.middleware import TodoListMiddleware
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
@@ -202,6 +203,9 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
         tools=[open_choice, choose_option, draw_spot, send_challenge],
         system_prompt=SYSTEM_PROMPT + plan_instruction(case),
         subagents=build_subagents(case),
+        # deepagents 0.7 does not add a planner by itself: this is what gives the main agent
+        # its `write_todos` tool (the prompt asks for a plan, and the trace shows the todos).
+        middleware=[TodoListMiddleware()],
         # The main agent may write its own two notes and nothing else: the family notes belong
         # to the sub-agents.
         permissions=[
