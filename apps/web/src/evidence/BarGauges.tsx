@@ -9,12 +9,12 @@ const verdict = (g: Gauge) => (g.pass ? "Met" : "Short of the bar");
 interface MeterProps {
   photo: EvidencePhoto;
   bars: Record<string, number>;
-  /** The live count while the lines draw in. Left out, the meter shows the final number. */
+  /** The live count while the spots are circled. Left out, the meter shows the final number. */
   count?: number;
 }
 
 // The one meter that matters: matched points against the bar, with the bar's tick, the count
-// and one plain sentence. The fill follows `count`, so it rises with the lines.
+// and one plain sentence. The fill follows `count`, so it rises with the spots.
 export function PointsMeter({ photo, bars, count }: MeterProps) {
   const g = gauges(photo, bars).find((x) => x.key === "points");
   if (!g) return null;
