@@ -25,6 +25,8 @@ from snapback.contracts import (
     CardRowKind,
     CardTone,
     Evidence,
+    ForSaleMatch,
+    ForSaleStatus,
     LocateStatus,
     MemoryHitKind,
     ModuleEvidence,
@@ -431,4 +433,13 @@ def build_card(
         ],
         verify_url=verify_url,
         lang=lang,
+        for_sale=_for_sale_finding(modules),
     )
+
+
+def _for_sale_finding(modules: ModuleEvidence) -> ForSaleMatch | None:
+    """The for-sale lookup, when it found something. "Looked up, nothing" is not a finding."""
+    found = modules.for_sale
+    if found is None or found.status is ForSaleStatus.NONE:
+        return None
+    return found
