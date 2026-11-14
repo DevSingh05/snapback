@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 01:10. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 01:47. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
 
 ## Decisions (locked)
 
@@ -26,6 +26,13 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - Sat 00:44 Ruling: eval results are public and read-only (`GET /eval/results.csv`, no token, aggregate only). (conductor, #70)
 - Sat 01:03 Ruling: the `unverified` headline is the locked "Could not place these photos" (strings.py), in every surface incl. iMessage (#83). (conductor)
 - Sat 01:03 Ruling: Dev does A10 live modules join (CoStar record #80 + D7 lookup #95 into the price, unit and contact rules) BEFORE the A8 harness; then A11 register_case, A12 card.png cache + zone label, A13 end-to-end API test of DEMO_CASE a/b/c. (conductor, #8)
+- Sat 01:08 Ruling: a poster phone that matches the leasing office on record is a supporting yes/no line only ("call that number yourself"); it never sets authority to MATCHES_RECORD on its own. A phone-only match never verifies. (conductor)
+- Sat 01:20 **Realtor reframe (LOCKED):** (1) premise: scammers copy real listings, swap in their own contact, and ask for a deposit before you tour or sign; SNAPBACK checks the listing against the building's own records and tells you who to call (never "pay to view"); (2) PERSON: property manager, leasing office or listing agent/brokerage on record all count; a name mismatch alone is Not confirmed + "call the office on record yourself", never a red flag; (3) never claim lease status; "recently rented" is an informational prompt, no flag; (4) the pitch and demo lead with real sourced cases; (5) second realtor check Sat 10-11:00. (Vidyut, #41)
+- Sat 01:28 Overnight: master-planner drafts 2-3 reframe directions, master-council judges (budget about $2.50), conductor decides; result for Vidyut at 07:30. (Vidyut)
+- Sat 01:31 Ruling: A9 (#91) stays a staged poster on real records, labelled "Staged example" on screen and in the README; D8 replays land next to it as `fixtures/demo/replay-*`, never replacing it. (conductor, #73)
+- Sat 01:31 Ruling: A14 approved, the poster's reply for real (#109): reply route + "waiting for a reply" state, joining D3 challenge and V5 photo memory. A right code that is not a copy stays Not confirmed until V2. Contract merged (#110). (conductor, #8)
+- Sat 01:34 Ruling: V2 contract approved: optional `PhotoLocation.matched_model_id`, `matched_property_id`, `room_label`; set for located_in_claimed and located_elsewhere (elsewhere names the OTHER building). (conductor, #41)
+- Sat 01:42 Ruling: D9 aerial route contract approved: `GET /cases/{id}/aerial` -> `AerialProofResponse` (claimed + matched side, tile, record, image_url on our route; Vexcel key server side), 20 s bound, 7-day cache covered by `make purge`; `record` trimmed to company names and building facts (no phone hash, no site host); read token on both routes. Rishit builds builder + routes in ONE PR, Dev reviews api/. (conductor, #41)
 - No "SAFE", "VERIFIED" or "SCAM" state anywhere. Card words come from code, never from a model. Say "could not verify", never "scam", about a person. (spec v3)
 
 ## Who is doing what
@@ -33,12 +40,12 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
 `epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                                                          |
-| ------- | ----------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Dev     | DevSingh05  | A. agent and backend                 | A1-A6 merged, eval route #70, contracts #88 #92 merged. Open: #87 A7 rules (in review), #91 A9 demo cases (stacked on #87), #96 A8 harness (not run; needs V2 + kit). Next: A10 live join, then A11-A13 (#8) |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | T7 hero #86, T11 replay #89 merged. Open: #90 T8 card rows, #94 T9 two-building aerial proof (in review); design r6 artifact                                                                                 |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | V1 #63 merged. Open: #61 V5 (264900f), #62 V6 (4c88e6d) in review. Overnight queue (#10): V8 #68 probes, V2 pose #28 (02:00: 5 photos on 1 building), locate JSON, V9 #74                                    |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | Claude Pro. D1 #80, D2 #81, D6 #85 merged. Open: D3 #82, D4 #83, D5 #84 (FIX posted), D7 #95 (queued). Blocked: kit download, Vexcel docs (morning)                                                          |
+| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                                                                                                                                     |
+| ------- | ----------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dev     | DevSingh05  | A. agent and backend                 | A7 #87, A9 #91, A10 contract #98, A14 contract #110 merged. Open: #101 A10 live join, #106 A12 card cache, #107 A11 register_case (FIX posted on all three), #96 A8 harness (run blocked on V2 + kit). Next: A14 flow #109, then A15 (ForSaleMatch.offices as marketers), then A13 #104 |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | T8 #90, T9 #94, housekeeping #108 merged; T7/T8/T9/T11 done on fixtures. Next: T7 live wiring on V2 names (#111), T9 live on D9, T10 #79 locked design; design r8 artifact                                                                                                              |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | V5 #61, V1 follow-ups #99 merged. Open: #111 V2 verify and pose (gate: 14 of 20 placed, pose for 5 met, on renders), #62 V6 (FIX open). Queue (#10): DINOv2 rerun, #62, V9 #74, secure_delete, V3 #29                                                                                   |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | Claude Pro. D3 #82, D4 #83, D5 #84 merged. Open: #95 D7 (FIX done at ef2c153), #100 D2b Vexcel flow (FIX open). Next: D9 aerial route (one PR), D8 replays #71                                                                                                                          |
 
 ## Data facts (REPORTED until our probe confirms)
 
@@ -76,9 +83,9 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Live facts
 
-- Nothing deployed yet (NOT re-checked at 01:10). main = afdf692 (Sat 01:04).
-- Merged 00:34-01:04: #59 A6 card, #70 eval route, #80 D1 CoStar adapter, #81 D2 Vexcel tile, #85 D6 red team, #86 T7 hero, #88 A7 contract stub, #89 T11 replay, #92 Card.for_sale.
-- Open PRs at 01:04: #61 #62 (Jeffrey, in review), #82 #83 #84 (Rishit, FIX posted), #87 #91 #96 (Dev, #87 in review), #90 #94 (lane T, in review), #95 (D7, queued).
+- Nothing deployed yet (NOT re-checked at 01:47). main = cd65e3d (Sat 01:45).
+- Merged 01:04-01:45: #61 V5, #82 D3, #83 D4, #84 D5, #87 A7 rules, #90 T8, #91 A9, #94 T9, #98 A10 contract, #99 V1 follow-ups, #105 CODEOWNERS, #108 T housekeeping, #110 A14 contract.
+- Open PRs at 01:46: #62 (Jeffrey V6, FIX open), #95 (D7, FIX answered), #96 (A8, blocked on V2), #100 (D2b, FIX), #101 (A10 live join, FIX), #106 (A12, FIX), #107 (A11, FIX), #111 (V2, new). Reviews and merges: conductor only.
 - Contract fields on main (#88, #92), additive and optional: `PropertyRecord.site_phone_hash` (keyed hash, never digits; both lanes use the same phone hash helper), `website_host` (host only), `floor_plan_rents[]` (name, beds 0=studio, rent_min, rent_max, per_bed), `units[]` (unit, beds, floor_plan); `AuthorityResult.office_phone_match`, `link_domain` (yes/no only); `ForSaleMatch` (status active / recently_rented / none, site, listed_on, changed_on) on `ModuleEvidence.for_sale` and `Card.for_sale`. Pending in #87: `PriceResult.compared_beds`.
 - Fri 22:10 data gate GO: 3/3 Houston multifamily Matterport models load on Vidyut's key (issue #5); apartment-listing has min/max rent per floor plan and the management company.
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace/status; may go in `?token=`). `/c/:id` card stays public.
@@ -100,3 +107,5 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 - Sat 00:58 New user-facing strings need Spanish too: a test holds the English and Spanish tables to the same keys (#59, #87).
 - Sat 01:00 `.github/` is owned by Vidyut and the XO; lane PRs must not touch `ci.yml` (pushing it needs the `workflow` token scope anyway).
 - Per-bed rents (`per_bed`) are never compared with a whole-unit rent.
+- Sat 01:45 V2 gate numbers (#28) are on RENDERS of the scans at unseen viewpoints, not phone photos. Say "renders" in any claim until real photos are run (A8).
+- Sat 01:31 #91 and #101 both touch `CaseStore.create`; A13 waits until both merge.
