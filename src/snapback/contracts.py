@@ -4,6 +4,7 @@ Every lane reads and writes these shapes, so a change here can break three other
 Change this file only through a pull request reviewed by the integrator lane.
 """
 
+from datetime import date, datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -77,4 +78,241 @@ class Verdict(BaseModel):
     case_id: str
     state: VerdictState
     reasons: list[str]
+    source: DataSource
+
+
+# ---------------------------------------------------------------------------------------------
+# Cross-lane module evidence (XO, Fri Nov 13 22:00).
+#
+# Each module hands verdict.py one of the shapes below. Fixtures for every shape live in
+# fixtures/contracts/ and tests/test_contracts.py proves they parse, so every lane can build
+# against them before the producing lane exists. Adding an optional field is fine in a lane PR;
+# renaming or removing a field needs an issue first (AGENTS.md, "Shared contracts").
+# ---------------------------------------------------------------------------------------------
+
+
+class Pose(BaseModel):
+    """Camera pose of a photo inside a Matterport model, in the model's own frame."""
+
+    sweep_id: str | None = None
+    position: tuple[float, float, float]
+    rotation_quat: tuple[float, float, float, float]  # x, y, z, w
+    fov_deg: float | None = None
+
+
+class FloorPlanCandidate(BaseModel):
+    """One building and floor plan the photos could belong to, with the evidence for it."""
+
+    property_id: str  # our own id for the record (never an address)
+    model_id: str
+    floor_plan: str | None = None  # "2 bed / 2 bath"; model units, never a unit number
+    photos_located: int
+    total_inliers: int
+
+
+class LocateResult(BaseModel):
+    """locate/ (lane V) output for one case: every listing photo, placed or not."""
+
+    case_id: str
+    photos: list[PhotoLocation]
+    claimed_property_id: str | None = None
+    chosen: FloorPlanCandidate | None = None
+    alternatives: list[FloorPlanCandidate] = Field(default_factory=list)
+    poses: dict[str, Pose] = Field(default_factory=dict)  # photo_id -> pose, located photos only
+    thresholds_version: str  # hash or tag of thresholds.toml used
+
+
+class SpotResult(BaseModel):
+    """One spot of the presence challenge (two-step: 10 min, then 90 s)."""
+
+    spot_id: str
+    step: int = Field(ge=1, le=2)
+    revealed_at: datetime
+    deadline_s: int  # 600 for step 1, 90 for step 2
+    replied_at: datetime | None = None
+    reply_photo_id: str | None = None
+    code_read: bool | None = None  # local OCR matched the drawn code
+    located: bool | None = None  # reply placed at this spot in the twin
+    inliers: int | None = None
+
+
+class ChallengeResult(BaseModel):
+    """challenge/ (lane D) output. `presence` is the only field verdict.py may lift from it."""
+
+    case_id: str
+    challenge_id: str
+    code: str = Field(min_length=4, max_length=4)
+    spots: list[SpotResult]
+    retries: int = Field(default=0, ge=0, le=2)
+    presence: PresenceStatus
+    injection_text_seen: bool = False  # paper held text other than the code; logged, ignored
+
+
+class RecaptureLabel(StrEnum):
+    GENUINE = "genuine"
+    SCREEN = "screen"  # photo of a screen
+    PRINT = "print"  # photo of a printout
+    PASTE = "paste"  # code digitally pasted in
+    UNKNOWN = "unknown"
+
+
+class RecaptureResult(BaseModel):
+    """recapture/ (lane V) output for one reply photo. It can only block a pass, never accuse."""
+
+    photo_id: str
+    label: RecaptureLabel
+    score: float = Field(ge=0.0, le=1.0)  # calibrated probability the photo is not genuine
+    blocks_pass: bool  # score over the frozen threshold
+    model_version: str  # "v0", "v1", ... or "off" when RECAPTURE_MODEL is not on
+
+
+class MemoryHitKind(StrEnum):
+    NONE = "none"
+    SAME_CASE_LISTING = "same_case_listing"  # reply copies a listing photo of this case
+    OTHER_CHECK = "other_check"  # seen in another check; never reveal which
+
+
+class MemoryResult(BaseModel):
+    """memory/ (lane V) output for one photo. Hashes only, no pixels kept, 7-day TTL."""
+
+    photo_id: str
+    hit: MemoryHitKind
+    method: str  # "phash", "dhash", "embedding"
+    distance: float | None = None
+    matched_listing_photo_id: str | None = None  # SAME_CASE_LISTING only
+    first_seen_on: date | None = None  # OTHER_CHECK only; a date, never a case id
+
+
+class RuleCategory(StrEnum):
+    PAYMENT_METHOD = "payment_method"  # Zelle, wire, gift card, crypto before a viewing
+    FEE_ASK = "fee_ask"  # application or holding fee to a person before a viewing
+    DATA_ASK = "data_ask"  # SSN, bank login or ID before a viewing
+    PRESSURE = "pressure"  # urgency, "many people interested", abroad story
+    LINK = "link"  # payment or lease link from the poster
+
+
+class RuleHit(BaseModel):
+    """One code-owned rule that fired (agent/rules, lane A). Card text comes from the rule id."""
+
+    rule_id: str  # e.g. "payment.zelle_before_viewing"
+    category: RuleCategory
+    red_flag: bool
+    lang: str = "en"
+    evidence_span: str | None = None  # the renter's own text that fired it, never sponsor data
+
+
+class PriceStatus(StrEnum):
+    WITHIN_RANGE = "within_range"
+    BELOW_RANGE = "below_range"  # never DONT_PAY on its own; concessions happen
+    NOT_CHECKED = "not_checked"  # no rent in our data for this building
+
+
+class PriceResult(BaseModel):
+    """Rent vs record (lane A rules, from lane D's record), plus refund-the-difference input."""
+
+    status: PriceStatus
+    listed_rent: int | None = None  # whole dollars per month, from the renter's listing
+    record_median: int | None = None
+    record_min: int | None = None
+    record_max: int | None = None
+    n_floor_plans: int | None = None
+
+
+class AuthorityResult(BaseModel):
+    """Manager-on-record yes/no. Company names only, never a person or a phone number."""
+
+    status: AuthorityStatus
+    manager_on_record: str | None = None  # company name, or None when the record has none
+    poster_said: str | None = None  # what the renter typed the poster claimed
+
+
+class ModuleEvidence(BaseModel):
+    """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
+
+    case_id: str
+    source: DataSource
+    locate: LocateResult | None = None
+    challenge: ChallengeResult | None = None
+    recapture: list[RecaptureResult] = Field(default_factory=list)
+    memory: list[MemoryResult] = Field(default_factory=list)
+    rules: list[RuleHit] = Field(default_factory=list)
+    price: PriceResult | None = None
+    authority: AuthorityResult | None = None
+
+
+# ---------------------------------------------------------------------------------------------
+# Card (what S3, the PNG card and iMessage render) and the SSE trace (S2 trace panel).
+# ---------------------------------------------------------------------------------------------
+
+
+class CardRowKind(StrEnum):
+    PLACE = "place"
+    PERSON = "person"
+    PRICE = "price"
+
+
+class CardTone(StrEnum):
+    """Colour never carries meaning alone: every tone also has words on the line."""
+
+    OK = "ok"
+    HOLD = "hold"
+    RED_FLAG = "red_flag"
+    NOT_SHOWN = "not_shown"
+    NOT_CHECKED = "not_checked"
+
+
+class CardLine(BaseModel):
+    label: str  # "Here now", "Allowed to rent it", "Payment ask", "Rent vs record"
+    text: str  # code-owned string from the string table, never model output
+    tone: CardTone
+
+
+class CardRow(BaseModel):
+    kind: CardRowKind
+    lines: list[CardLine]
+
+
+class Card(BaseModel):
+    case_id: str  # short public id, e.g. "7Q2M"
+    source: DataSource
+    state: VerdictState
+    checked_at: datetime
+    expires_at: datetime
+    rows: list[CardRow]  # always PLACE, PERSON, PRICE in that order
+    not_checked: list[str]  # "ID", "lease", "ownership"
+    footer: list[str]
+    verify_url: str | None = None
+    lang: str = "en"
+
+
+class ChoiceKind(StrEnum):
+    """The agent's five bounded choices (v3.1 section 6)."""
+
+    WHICH_CHECKS = "which_checks"
+    WHICH_FLOOR_PLAN = "which_floor_plan"
+    WHICH_SPOT = "which_spot"
+    RETRY_OR_STOP = "retry_or_stop"
+    ASK_HUMAN = "ask_human"
+
+
+class TraceKind(StrEnum):
+    CHOICE = "choice"  # one of the five choices, with options, pick and reason
+    TOOL = "tool"  # a tool call started or finished
+    STATUS = "status"  # waiting for a reply, timer running
+    HITL = "hitl"  # waiting for the renter to approve
+    VERDICT = "verdict"  # decide() ran; payload carries the state
+    ERROR = "error"
+
+
+class TraceEvent(BaseModel):
+    """One line of the agent trace, sent as SSE `event: trace` with this JSON as `data`."""
+
+    case_id: str
+    seq: int = Field(ge=0)  # strictly increasing per case; the client drops repeats
+    at: datetime
+    kind: TraceKind
+    choice: ChoiceKind | None = None  # CHOICE only
+    options: list[str] = Field(default_factory=list)
+    pick: str | None = None
+    reason: str  # one plain sentence; may be model-written, never sets a state
     source: DataSource

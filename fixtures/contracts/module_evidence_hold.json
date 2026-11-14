@@ -1,0 +1,125 @@
+{
+  "case_id": "fx-7Q2M",
+  "source": "fixture",
+  "locate": {
+    "case_id": "fx-7Q2M",
+    "photos": [
+      {
+        "photo_id": "l1",
+        "status": "located_in_claimed",
+        "model_id": "fx-model-a",
+        "pano_id": "fx-sweep-03",
+        "inliers": 212,
+        "inlier_ratio": 0.61
+      },
+      {
+        "photo_id": "l2",
+        "status": "located_in_claimed",
+        "model_id": "fx-model-a",
+        "pano_id": "fx-sweep-07",
+        "inliers": 148,
+        "inlier_ratio": 0.52
+      },
+      {
+        "photo_id": "l3",
+        "status": "located_in_claimed",
+        "model_id": "fx-model-a",
+        "pano_id": "fx-sweep-11",
+        "inliers": 97,
+        "inlier_ratio": 0.44
+      }
+    ],
+    "claimed_property_id": "fx-prop-1",
+    "chosen": {
+      "property_id": "fx-prop-1",
+      "model_id": "fx-model-a",
+      "floor_plan": "2 bed / 2 bath",
+      "photos_located": 3,
+      "total_inliers": 457
+    },
+    "alternatives": [
+      {
+        "property_id": "fx-prop-1",
+        "model_id": "fx-model-b",
+        "floor_plan": "1 bed / 1 bath",
+        "photos_located": 1,
+        "total_inliers": 9
+      }
+    ],
+    "poses": {
+      "l1": {
+        "sweep_id": "fx-sweep-03",
+        "position": [1.2, 1.5, -3.4],
+        "rotation_quat": [0.0, 0.38, 0.0, 0.92],
+        "fov_deg": 70.0
+      }
+    },
+    "thresholds_version": "fx-thresholds-0"
+  },
+  "challenge": {
+    "case_id": "fx-7Q2M",
+    "challenge_id": "fx-ch-1",
+    "code": "K7P4",
+    "spots": [
+      {
+        "spot_id": "fx-spot-window-n",
+        "step": 1,
+        "revealed_at": "2026-11-13T21:40:00-05:00",
+        "deadline_s": 600,
+        "replied_at": "2026-11-13T21:43:10-05:00",
+        "reply_photo_id": "r1",
+        "code_read": true,
+        "located": true,
+        "inliers": 131
+      },
+      {
+        "spot_id": "fx-spot-door-b",
+        "step": 2,
+        "revealed_at": "2026-11-13T21:43:15-05:00",
+        "deadline_s": 90,
+        "replied_at": "2026-11-13T21:44:20-05:00",
+        "reply_photo_id": "r2",
+        "code_read": true,
+        "located": true,
+        "inliers": 88
+      }
+    ],
+    "retries": 0,
+    "presence": "proven",
+    "injection_text_seen": false
+  },
+  "recapture": [
+    {
+      "photo_id": "r1",
+      "label": "genuine",
+      "score": 0.04,
+      "blocks_pass": false,
+      "model_version": "v0"
+    },
+    {
+      "photo_id": "r2",
+      "label": "genuine",
+      "score": 0.07,
+      "blocks_pass": false,
+      "model_version": "v0"
+    }
+  ],
+  "memory": [
+    { "photo_id": "r1", "hit": "none", "method": "phash" },
+    { "photo_id": "r2", "hit": "none", "method": "phash" }
+  ],
+  "rules": [
+    {
+      "rule_id": "payment.zelle_before_viewing",
+      "category": "payment_method",
+      "red_flag": true,
+      "evidence_span": "send the deposit by Zelle and I will mail the keys"
+    }
+  ],
+  "price": { "status": "not_checked" },
+  "authority": {
+    "status": "unknown",
+    "manager_on_record": null,
+    "poster_said": "Fixture Living LLC"
+  }
+}

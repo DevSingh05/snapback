@@ -1,0 +1,70 @@
+{
+  "case_id": "fx-9X1B",
+  "source": "fixture",
+  "locate": {
+    "case_id": "fx-9X1B",
+    "photos": [
+      {
+        "photo_id": "l1",
+        "status": "located_in_claimed",
+        "model_id": "fx-model-a",
+        "inliers": 190,
+        "inlier_ratio": 0.58
+      }
+    ],
+    "claimed_property_id": "fx-prop-1",
+    "thresholds_version": "fx-thresholds-0"
+  },
+  "challenge": {
+    "case_id": "fx-9X1B",
+    "challenge_id": "fx-ch-2",
+    "code": "M2Q8",
+    "spots": [
+      {
+        "spot_id": "fx-spot-window-n",
+        "step": 1,
+        "revealed_at": "2026-11-13T21:50:00-05:00",
+        "deadline_s": 600,
+        "replied_at": "2026-11-13T21:52:00-05:00",
+        "reply_photo_id": "r1",
+        "code_read": true,
+        "located": true,
+        "inliers": 175
+      }
+    ],
+    "retries": 0,
+    "presence": "forged"
+  },
+  "recapture": [
+    {
+      "photo_id": "r1",
+      "label": "paste",
+      "score": 0.91,
+      "blocks_pass": true,
+      "model_version": "v0"
+    }
+  ],
+  "memory": [
+    {
+      "photo_id": "r1",
+      "hit": "same_case_listing",
+      "method": "dhash",
+      "distance": 3.0,
+      "matched_listing_photo_id": "l1"
+    }
+  ],
+  "rules": [],
+  "price": {
+    "status": "below_range",
+    "listed_rent": 900,
+    "record_median": 1850,
+    "record_min": 1600,
+    "record_max": 2300,
+    "n_floor_plans": 4
+  },
+  "authority": {
+    "status": "mismatch",
+    "manager_on_record": "Fixture Residential Co",
+    "poster_said": "John's Rentals"
+  }
+}
