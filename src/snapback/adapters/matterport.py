@@ -37,6 +37,7 @@ from snapback.contracts import DataSource
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LIVE_CACHE = REPO_ROOT / "data" / "matterport"
+INDEX_CACHE = REPO_ROOT / "data" / "index"  # embeddings derived from the faces (terms 2.3)
 FIXTURE_CACHE = REPO_ROOT / "data" / "fixture-matterport"
 GRAPH_URL = "https://api.matterport.com/api/models/graph"
 FACES = 6
@@ -253,6 +254,11 @@ class LiveMatterport:
                 position = (p["x"], p["y"], p["z"]) if p else None
                 rotation = (r["x"], r["y"], r["z"], r["w"]) if r else None
             sweeps.append(Sweep(model_id, sweep_id, tuple(faces), position, rotation))
+        if not sweeps:
+            # Never cache an empty model: a later call should ask the API again.
+            raise RuntimeError(
+                f"model has no skybox sweeps ({len(locations)} locations, none with faces)"
+            )
         _write_manifest(folder, sweeps)
         return sweeps
 
@@ -285,9 +291,11 @@ class LiveMatterport:
         return response
 
 
-def purge(cache_dir: Path = LIVE_CACHE) -> None:
-    """Delete every cached face (sponsor terms: all copies deleted after the event)."""
+def purge(cache_dir: Path = LIVE_CACHE, *, index_dir: Path = INDEX_CACHE) -> None:
+    """Delete every cached face and every index built from them (sponsor terms: all copies
+    and derivatives deleted after the event)."""
     shutil.rmtree(cache_dir, ignore_errors=True)
+    shutil.rmtree(index_dir, ignore_errors=True)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -295,12 +303,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     fetch = sub.add_parser("fetch", help="fetch skybox faces into data/ (counts printed only)")
     fetch.add_argument("model_ids", nargs="*", help="defaults to DEMO_MODEL_IDS from .env")
-    sub.add_parser("purge", help="delete the live face cache")
+    sub.add_parser("purge", help="delete the live face cache and the locate index")
     args = parser.parse_args(argv)
 
     if args.command == "purge":
         purge()
-        print("purged the live Matterport cache")
+        print("purged the live Matterport cache and the locate index")
         return 0
 
     settings = MatterportSettings()
