@@ -45,7 +45,7 @@ REPEATS = (sre.MAX_REPEAT, sre.MIN_REPEAT, sre.POSSESSIVE_REPEAT)
 def all_patterns() -> dict[str, re.Pattern[str]]:
     """Every compiled pattern in the modules that read renter text, and every rule's."""
     found: dict[str, re.Pattern[str]] = {}
-    for module in (apply, contact, fields, injection, scope):
+    for module in (apply, claims, contact, fields, injection, scope):
         short = module.__name__.rsplit(".", 1)[-1]
         for name, value in vars(module).items():
             if isinstance(value, re.Pattern):

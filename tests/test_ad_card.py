@@ -115,7 +115,7 @@ def test_a_quiet_confirming_line_reads_plainly_and_is_alone():
     (tone, text) = shown[0]
     # one confirming line, then the aerial date the exterior claims earn (a date, not a claim)
     assert len(shown) == 2 and tone is CardTone.OK
-    assert shown[1][1].startswith("Not checked. Aerial photo of this property from 2025-06-01")
+    assert shown[1][1].startswith("Not checked. An aerial photo of this property from 2025-06-01")
     assert text == (
         "The ad says hardwood floors. CoStar's record of this home also names hardwood floors "
         "(as of CoStar's last research)."
@@ -326,11 +326,13 @@ def test_a_buildings_parking_and_the_aerial_date_in_both_languages():
     assert en[0].startswith("Not confirmed. The ad says a pool.")
     assert "about 1.5 spaces per unit (as of CoStar's last research)" in en[1]
     assert en[2] == (
-        "Not checked. Aerial photo of this property from 2025-06-01 (Vexcel). It is on this "
-        "place's page for you to look at; nothing is read from it."
+        "Not checked. An aerial photo of this property from 2025-06-01 (Vexcel) is on file; "
+        "nothing is read from it."
     )
     assert "unos 1.5 lugares por unidad" in es[1]
-    assert es[2].startswith("No comprobado. Foto aérea de esta propiedad del 2025-06-01 (Vexcel).")
+    assert es[2].startswith(
+        "No comprobado. Hay una foto aérea de esta propiedad del 2025-06-01 (Vexcel)"
+    )
 
 
 def test_the_aerial_line_has_a_neutral_tone_and_the_pool_line_names_no_photos():

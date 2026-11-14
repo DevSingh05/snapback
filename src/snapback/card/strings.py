@@ -1009,8 +1009,8 @@ EN.update(
             "{record_value} spaces per unit (as of CoStar's last research)."
         ),
         "claims.aerial_date": (
-            "Not checked. Aerial photo of this property from {ad_value} (Vexcel). It is on this "
-            "place's page for you to look at; nothing is read from it."
+            "Not checked. An aerial photo of this property from {ad_value} (Vexcel) is on file; "
+            "nothing is read from it."
         ),
         "claims.yard_match": (
             "The ad says {claim}. CoStar's record of this home shows one "
@@ -1149,8 +1149,8 @@ ES.update(
             "investigación de CoStar)."
         ),
         "claims.aerial_date": (
-            "No comprobado. Foto aérea de esta propiedad del {ad_value} (Vexcel). Está en la "
-            "página de este lugar para que usted la mire; no se lee nada de ella."
+            "No comprobado. Hay una foto aérea de esta propiedad del {ad_value} (Vexcel) en el "
+            "archivo; no se lee nada de ella."
         ),
         "claims.yard_match": (
             "El anuncio dice {claim}. El registro de CoStar de esta casa muestra uno "
