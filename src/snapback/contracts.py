@@ -300,6 +300,9 @@ class ModuleEvidence(BaseModel):
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
+    # A14: a reply came, could not be accepted, and no further photo will be asked for. The
+    # card then says "we could not confirm", not "ask for a new photo". It changes no state.
+    no_retry_left: bool = False
 
 
 # ---------------------------------------------------------------------------------------------
@@ -533,9 +536,13 @@ class CreateCaseResponse(BaseModel):
 class ReplyCheck(StrEnum):
     """What checking one reply photo found. Each is a fact about the photo, not about a person."""
 
-    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"  # one of the listing's own photos: forged
-    CODE_NOT_READ = "code_not_read"  # the code is not on the paper in the photo: forged
-    LATE = "late"  # it came after the deadline, so it was not checked
+    # One of the listing's own photos: forged, whenever it arrives. The only proof here.
+    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"
+    # The code could not be read on the photo (wrong, missing or unreadable). Not confirmed,
+    # ask again up to the retry cap, then HOLD. Never forged: it is not proof.
+    CODE_NOT_READ = "code_not_read"
+    # It came after the deadline and is not a copy, so it was not counted. Asked again once.
+    LATE = "late"
     # The code is there and the photo is not a copy, but nothing has checked that it was taken
     # at the spot (that needs locate, V2). Not confirmed, never proven.
     CODE_READ_SPOT_NOT_CHECKED = "code_read_spot_not_checked"
@@ -550,7 +557,10 @@ class ReplyResponse(BaseModel):
 
     case_id: str  # short public id
     source: DataSource
-    status: CaseProgress  # waiting_for_reply while another photo is wanted, else done
+    # While another photo is wanted this is waiting_for_approval: the next message is in
+    # `challenge_text` for the renter to approve. It is waiting_for_reply once that is sent,
+    # and done when nothing more will be asked.
+    status: CaseProgress
     check: ReplyCheck
     presence: PresenceStatus
     state: VerdictState | None = None  # set once the case is done

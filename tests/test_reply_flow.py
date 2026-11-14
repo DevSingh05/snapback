@@ -73,13 +73,13 @@ class Clock:
         self.now += timedelta(seconds=seconds)
 
 
-def waiting_case(tmp_path, ocr=lambda data: "", clock=None, locator=None):
+def waiting_case(tmp_path, ocr=lambda data: "", clock=None, locator=None, listing=None):
     """A case run up to the point where the challenge is sent and a reply is awaited."""
     memory = PhotoMemory(tmp_path / "memory" / "photo_memory.sqlite")
     modules = ReplyModules(
         FixtureModules(), memory, ocr=ocr, clock=clock or Clock(), locator=locator
     )
-    modules.remember_listing_photos("fx-R1", LISTING)
+    modules.remember_listing_photos("fx-R1", LISTING if listing is None else listing)
     case = CaseSession("fx-R1", modules, Trace("fx-R1", DataSource.FIXTURE))
     assert run_case(case, PolicyChooser(), lambda draft: "send") is None  # paused, no verdict
     return case, modules
@@ -135,7 +135,48 @@ def test_a_reply_that_copies_a_listing_photo_is_forged_and_says_which_photo(tmp_
     assert verdict.state is VerdictState.DONT_PAY
     line, _ = here_now(case)
     assert line.tone is CardTone.RED_FLAG
-    assert line.text == strings.text("here_now.forged_copy_unknown") or "copy" in line.text
+    assert line.text == "The reply is a copy of listing photo 2. Red flag."
+    assert verdict.reasons == ["The reply is a copy of listing photo 2."]
+
+
+def test_the_copied_photo_s_number_is_right_past_the_third_photo(tmp_path):
+    # The stand-in twin places three photos and the renter may send more, so the number is
+    # read from the listing photo's own id (l1, l2, ...), not looked up among the placed ones.
+    listing = [room(seed) for seed in range(11, 17)]  # six photos
+    case, modules = waiting_case(tmp_path, listing=listing)
+    check, outcome = modules.check_reply("fx-R1", copied(listing[4]))
+    assert check is ReplyCheck.COPY_OF_LISTING_PHOTO
+    assert outcome.memory[0].matched_listing_photo_id == "l5"
+
+    case.reply(outcome)
+    verdict = finish(case)
+    assert verdict.state is VerdictState.DONT_PAY
+    assert verdict.reasons == ["The reply is a copy of listing photo 5."]
+    line, _ = here_now(case)
+    assert line.text == "The reply is a copy of listing photo 5. Red flag."
+
+
+def test_a_photo_id_that_carries_no_number_is_still_looked_up_among_the_placed_photos():
+    from snapback.contracts import ModuleEvidence
+    from snapback.verdict import _photo_number
+
+    modules = ModuleEvidence.model_validate(
+        {
+            "case_id": "fx-1",
+            "source": "fixture",
+            "locate": {
+                "case_id": "fx-1",
+                "thresholds_version": "t",
+                "photos": [
+                    {"photo_id": "front", "status": "not_indexed"},
+                    {"photo_id": "kitchen", "status": "not_indexed"},
+                ],
+            },
+        }
+    )
+    assert _photo_number(modules, "kitchen") == 2
+    assert _photo_number(modules, "l7") == 7  # its own number, placed or not
+    assert _photo_number(modules, "l0") is None and _photo_number(modules, None) is None
 
 
 def test_the_very_same_file_is_a_copy_too(tmp_path):
@@ -198,10 +239,49 @@ def test_no_code_three_times_ends_in_hold_never_dont_pay(tmp_path):
     for attempt in range(3):
         check, outcome = modules.check_reply("fx-R1", room(200 + attempt))
         assert check is ReplyCheck.CODE_NOT_READ
+        assert outcome.challenge.presence is PresenceStatus.WAITING  # never forged
         case.reply(outcome)
         if finish(case) is not None:
             break
     assert case.done and case.verdict.state is VerdictState.HOLD
+    assert case.retries == 2
+
+
+def test_when_no_retry_is_left_the_card_stops_telling_the_renter_to_ask_for_a_photo(tmp_path):
+    case, modules = waiting_case(tmp_path, ocr=lambda data: "")
+    said = []
+    for attempt in range(3):
+        _, outcome = modules.check_reply("fx-R1", room(300 + attempt))
+        case.reply(outcome)
+        said.append(here_now(case)[0].text)
+        finish(case)
+    # While another photo can still be asked for, the card says to ask for one.
+    assert said[0] == said[1] == strings.text("here_now.code_missing")
+    assert "Ask for a new photo" in said[0]
+
+    assert case.done and case.evidence.no_retry_left is True
+    line, card = here_now(case)
+    assert card.state is VerdictState.HOLD
+    assert line.tone is CardTone.HOLD
+    assert line.text == "We could not confirm they are there. Call the office on record yourself."
+    spanish = build_card(
+        case.evidence, checked_at=datetime(2026, 11, 14, 0, 30, tzinfo=UTC), lang="es"
+    )
+    assert spanish.rows[1].lines[0].text == (
+        "No pudimos confirmar que están allí. Llame usted mismo a la oficina que figura en "
+        "el registro."
+    )
+
+
+def test_a_case_that_only_ever_waited_keeps_its_no_reply_yet_line(tmp_path):
+    # "No retry left" is said only after a reply came and could not be accepted. A case
+    # nobody answered is still "No reply yet": no reply is HOLD, never a failure.
+    case, _ = waiting_case(tmp_path)
+    assert case.evidence.no_retry_left is False
+    assert here_now(case)[0].text == strings.text("here_now.waiting")
+    stand_in = CaseSession("fx-R9", FixtureModules(), Trace("fx-R9", DataSource.FIXTURE))
+    run_case(stand_in, PolicyChooser(), lambda draft: "send")
+    assert stand_in.done and stand_in.evidence.no_retry_left is False
 
 
 def test_text_beside_the_code_is_noticed_and_changes_nothing(tmp_path):
@@ -216,14 +296,78 @@ def test_text_beside_the_code_is_noticed_and_changes_nothing(tmp_path):
 # --- timing and order ----------------------------------------------------------------------
 
 
-def test_a_reply_after_the_deadline_is_not_counted_and_the_case_keeps_waiting(tmp_path):
+def test_a_copy_of_a_listing_photo_is_forged_even_when_it_comes_after_the_deadline(tmp_path):
+    # Proof does not expire. Lane D's engine calls a copy forged whenever it arrives, and a
+    # copy that came 11 minutes after the send must not leave the case on HOLD for good.
     clock = Clock()
     case, modules = waiting_case(tmp_path, clock=clock)
-    clock.advance(601)  # the first spot allows ten minutes
-    check, outcome = modules.check_reply("fx-R1", copied(LISTING[0]))
-    assert check is ReplyCheck.LATE and outcome.awaiting_reply
+    clock.advance(11 * 60)  # the first spot allows ten minutes
+    check, outcome = modules.check_reply("fx-R1", copied(LISTING[1]))
+    assert check is ReplyCheck.COPY_OF_LISTING_PHOTO
+    assert outcome.challenge.presence is PresenceStatus.FORGED
+    assert not outcome.awaiting_reply and not outcome.late
+
     case.reply(outcome)
-    assert case.step is Step.REPLY  # still waiting; nothing was judged
+    verdict = finish(case)
+    assert verdict.state is VerdictState.DONT_PAY
+    line, _ = here_now(case)
+    assert (line.tone, line.text) == (
+        CardTone.RED_FLAG,
+        "The reply is a copy of listing photo 2. Red flag.",
+    )
+
+
+def test_a_late_reply_that_is_not_a_copy_is_asked_again_once_and_then_holds(tmp_path):
+    # Decision 4 (Sat 02:45): too late to count and not a copy asks again once. No dead end.
+    clock = Clock()
+    case, modules = waiting_case(tmp_path, clock=clock)
+    first_code = case.evidence.challenge.code
+    modules._ocr = lambda data: first_code  # the right code changes nothing: it is too late
+    clock.advance(601)
+    check, outcome = modules.check_reply("fx-R1", room(95))
+    assert check is ReplyCheck.LATE and outcome.late and not outcome.awaiting_reply
+    assert outcome.challenge.presence is PresenceStatus.WAITING
+    assert outcome.challenge.spots[-1].replied_at is None  # not counted as an answer
+
+    case.reply(outcome)
+    assert finish(case) is None  # not finished: a new message went out, and the case waits
+    assert case.step is Step.REPLY and case.retries == 1
+    assert len(modules.sent_messages) == 2
+    assert case.evidence.challenge.code != first_code
+    reasons = [event.reason for event in case.trace.events]
+    assert strings.text("trace.reply.late") in reasons
+    assert strings.text("trace.retry.late") in reasons
+
+    # A second late reply is not asked about again. The case holds, and accuses nobody.
+    clock.advance(601)
+    check, outcome = modules.check_reply("fx-R1", room(94))
+    assert check is ReplyCheck.LATE
+    case.reply(outcome)
+    verdict = finish(case)
+    assert case.done and verdict.state is VerdictState.HOLD
+    assert case.retries == 1 and len(modules.sent_messages) == 2
+    line, _ = here_now(case)
+    assert (line.tone, line.text) == (
+        CardTone.HOLD,
+        "We could not confirm they are there. Call the office on record yourself.",
+    )
+
+
+def test_a_late_reply_and_a_missing_code_share_one_cap_on_asking_again(tmp_path):
+    # One late reply, then replies in time with no code. Each ask-again counts toward the
+    # same cap (MAX_RETRIES), so the poster is never asked more than three times in all.
+    clock = Clock()
+    case, modules = waiting_case(tmp_path, clock=clock)
+    clock.advance(601)
+    _, outcome = modules.check_reply("fx-R1", room(93))
+    case.reply(outcome)
+    assert finish(case) is None and case.retries == 1
+    _, outcome = modules.check_reply("fx-R1", room(92))  # in time, no code on it
+    case.reply(outcome)
+    assert finish(case) is None and case.retries == 2
+    _, outcome = modules.check_reply("fx-R1", room(91))
+    case.reply(outcome)
+    assert finish(case).state is VerdictState.HOLD
 
 
 def test_a_reply_after_the_challenge_is_over_changes_nothing(tmp_path):
@@ -328,7 +472,8 @@ def test_a_copied_listing_photo_sent_as_the_reply_gives_dont_pay(reply_client):
     card = reply_client.get(f"/cases/{case['case_id']}/card").json()
     assert card["state"] == "dont_pay"
     person = card["rows"][1]["lines"][0]
-    assert person["tone"] == "red_flag" and "copy" in person["text"]
+    assert person["tone"] == "red_flag"
+    assert person["text"] == "The reply is a copy of listing photo 2. Red flag."
 
 
 def test_a_new_photo_with_the_code_stays_not_confirmed_over_the_api(reply_client, monkeypatch):
@@ -355,6 +500,36 @@ def test_a_reply_without_the_code_brings_back_a_new_message_to_approve(reply_cli
     assert body["status"] == "waiting_for_approval"
     assert body["challenge_text"] and body["challenge_text"] != case["challenge_text"]
     assert body["state"] is None
+
+
+def test_over_the_api_a_late_reply_is_asked_again_and_a_late_copy_is_still_dont_pay(
+    reply_client, monkeypatch
+):
+    import snapback.agent.reply as reply_module
+
+    # No time is allowed, so every reply in this test comes after its deadline.
+    monkeypatch.setattr(reply_module, "STEP_DEADLINE_S", {1: 0, 2: 0})
+    case = start(reply_client)
+    bearer = {"Authorization": f"Bearer {case['token']}"}
+
+    body = send_reply(reply_client, case, room(61)).json()
+    assert (body["check"], body["presence"], body["state"]) == ("late", "waiting", None)
+    # No dead end: a new message comes back for the renter to approve.
+    assert body["status"] == "waiting_for_approval"
+    assert body["challenge_text"] and body["challenge_text"] != case["challenge_text"]
+
+    sent = reply_client.post(
+        f"/cases/{case['case_id']}/challenge/approve", json={"decision": "send"}, headers=bearer
+    )
+    assert sent.json()["status"] == "waiting_for_reply"
+    # Late again, and this time it is one of the listing's own photos. Proof does not expire.
+    body = send_reply(reply_client, case, copied(LISTING[2])).json()
+    assert (body["check"], body["presence"]) == ("copy_of_listing_photo", "forged")
+    assert (body["status"], body["state"]) == ("done", "dont_pay")
+    card = reply_client.get(f"/cases/{case['case_id']}/card").json()
+    assert (
+        card["rows"][1]["lines"][0]["text"] == "The reply is a copy of listing photo 3. Red flag."
+    )
 
 
 def test_the_reply_route_needs_the_write_secret_and_a_waiting_case(reply_client):

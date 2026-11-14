@@ -561,8 +561,10 @@ def create_app(
 
         Needs the case's write secret in a header, as the approval does. The photo is checked
         on this machine: is it a copy of one of the listing's own photos, and is the code on
-        it? A copy is forged. A right code is not yet "proven": whether it was taken at the
-        spot needs locate, so it stays not confirmed. 409 unless a reply is awaited.
+        it? A copy is forged, whenever it arrives. A code that cannot be read is not proof:
+        another photo is asked for, up to the cap. A right code is not yet "proven": whether
+        it was taken at the spot needs locate, so it stays not confirmed. A reply that comes
+        too late and is not a copy is asked for again once. 409 unless a reply is awaited.
         """
         case = find(case_id)
         check_write(case, _bearer(authorization, x_case_token))

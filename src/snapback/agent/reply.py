@@ -10,12 +10,14 @@
 
 What comes out, and what it means for the state:
 
-    copy of a listing photo   forged. This is proof, and the only thing here that is.
-    code not on the photo     not confirmed; ask again. Never "forged": the reader can miss
-                              handwriting, and a wrong "Don't pay" is the worst mistake.
+    copy of a listing photo   forged, whenever it arrives, deadline or not. This is proof,
+                              and the only thing here that is.
+    code not on the photo     not confirmed; ask again, up to the retry cap, then HOLD. Never
+                              "forged": the reader can miss handwriting, and a wrong "Don't
+                              pay" is the worst mistake (ruling, Sat 02:45).
     code read, not a copy     not confirmed. Whether it was taken AT THE SPOT needs locate
                               (lane V, V2). Until a locator is given, nothing says "proven".
-    too late                  not counted; the case keeps waiting.
+    too late, not a copy      not counted; ask again once (ruling, Sat 02:45). No dead end.
 
 The spot and the code are the ones the session drew and the renter approved. Lane D's
 `Challenge` keeps the state (spots, deadlines) and decides everything once a locator exists.
@@ -24,6 +26,7 @@ The spot and the code are the ones the session drew and the renter approved. Lan
 import io
 import threading
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from PIL import Image
@@ -162,21 +165,27 @@ class ReplyModules:
 
             now = self._clock()
             current = challenge.spots[-1]
-            if now > current.revealed_at + timedelta(seconds=current.deadline_s):
-                # Too late to count, as in lane D's engine. The case keeps waiting.
-                return ReplyCheck.LATE, self._outcome(challenge.result(), [], waiting=True)
+            late = now > current.revealed_at + timedelta(seconds=current.deadline_s)
 
             self._replies += 1
             photo_id = f"r{self._replies}"
             memory = self._memory.check(case_id, photo_id, picture, PhotoRole.REPLY)
 
-            # A copy of one of this case's listing photos. Proof, whatever else is on it.
+            # A copy of one of this case's listing photos. Proof, whatever else is on it and
+            # whenever it arrives: this is checked before the deadline, as lane D's engine
+            # does, so a late copy cannot leave the case on HOLD for good.
             if memory.hit is MemoryHitKind.SAME_CASE_LISTING:
                 challenge.reply(Reply(photo_id=photo_id, ocr_text="", located=False, memory=memory))
                 return (
                     ReplyCheck.COPY_OF_LISTING_PHOTO,
                     self._outcome(challenge.result(), [memory], waiting=False),
                 )
+
+            if late:
+                # Too late to count, and not a copy. Nothing on it is judged, and the spot
+                # is left unanswered. The session asks again once (decision 4, Sat 02:45).
+                outcome = self._outcome(challenge.result(), [memory], waiting=False)
+                return ReplyCheck.LATE, replace(outcome, late=True)
 
             ocr = self._ocr or read_image
             code_read, other_text = compare(challenge.code, ocr(photo))
