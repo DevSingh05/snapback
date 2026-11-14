@@ -25,6 +25,14 @@ from snapback.contracts import (  # noqa: E402
 )
 from snapback.verdict import decide, to_evidence  # noqa: E402
 
+# these choices exist only when a case has a place searcher (E1) or a walk plan (E5)
+RETRY_ONLY = {
+    ChoiceKind.NEXT_SEARCH,
+    ChoiceKind.WHICH_PHOTO,
+    ChoiceKind.DWELL_ROOMS,
+    ChoiceKind.LEAD_CHECKS,
+}
+
 
 class ScriptedChat(BaseChatModel):
     """Plays back a list of assistant turns, one per call, then repeats the last."""
@@ -82,7 +90,7 @@ def test_deep_agent_makes_all_five_choices_and_code_sets_the_state():
 
     assert verdict.state is VerdictState.HOLD
     assert verdict == decide(to_evidence(case.evidence))
-    assert {e.choice for e in case.trace.events if e.choice} == set(ChoiceKind)
+    assert {e.choice for e in case.trace.events if e.choice} == set(ChoiceKind) - RETRY_ONLY
     assert case.trace.events[-1].kind is TraceKind.VERDICT
     floor_plan = next(e for e in case.trace.events if e.choice is ChoiceKind.WHICH_FLOOR_PLAN)
     assert floor_plan.pick == "2 bed / 2 bath"  # the alias was mapped back to its label
@@ -154,7 +162,7 @@ def test_a_model_that_stops_early_is_finished_by_the_code_policy():
     quits = script(HONEST_RUN[:1])  # makes one choice, then says it is done
     verdict = run_case_with_agent(case, build_agent(case, quits), lambda draft: "send")
     assert verdict.state is VerdictState.HOLD
-    assert {e.choice for e in case.trace.events if e.choice} == set(ChoiceKind)
+    assert {e.choice for e in case.trace.events if e.choice} == set(ChoiceKind) - RETRY_ONLY
 
 
 def test_a_model_that_fails_is_finished_by_the_code_policy():

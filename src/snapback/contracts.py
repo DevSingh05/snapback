@@ -504,6 +504,10 @@ class ChoiceKind(StrEnum):
     RETRY_OR_STOP = "retry_or_stop"
     ASK_HUMAN = "ask_human"
     NEXT_CHECK = "next_check"  # A24: which evidence-gated check to run next (order only)
+    NEXT_SEARCH = "next_search"  # E1: which retry search to spend on an unplaced photo
+    WHICH_PHOTO = "which_photo"  # E1: which unplaced photo gets the short search budget
+    DWELL_ROOMS = "dwell_rooms"  # E5: which rooms of the walk open expanded (walk sub-agent, D3)
+    LEAD_CHECKS = "lead_checks"  # E5: which checks lead the summary and tour request (D4)
 
 
 class TraceKind(StrEnum):

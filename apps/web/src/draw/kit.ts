@@ -8,6 +8,7 @@
 //     part("house", [s.contact(0, 0, 60, 40), ...s.box("white", 0, 0, 0, 60, 40, 30)]),
 //     part("siding", s.sidingY(40, 0, 60, 0, 30), true),  // fine detail: hidden when small
 //     ...s.gableRoof("slate", 0, 0, 30, 60, 40, 18),
+//     ...s.house(80, 0, 60, 46, 24),                      // or a whole small house in one call
 //   ];
 //   <svg viewBox="..."><Parts parts={parts} /></svg>        // draw/Parts.tsx; import draw/draw.css
 //
@@ -296,6 +297,24 @@ export function makeScene(o: Origin) {
     ]),
   ];
 
+  /** A small gabled house: shaded walls with a ground shadow, two windows on the long wall, a
+   *  door on the gable end and a shingled roof. `roof` picks the roof tone ("teal" lights it). */
+  const house = (
+    x: number,
+    y: number,
+    w: number,
+    d: number,
+    h: number,
+    walls: Tone = "white",
+    roof: Tone = "slate",
+  ): Part[] => [
+    part("house", [contact(x, y, w, d, 10), ...box(walls, x, y, 0, w, d, h)]),
+    ...windowY(y + d, x + w * 0.16, x + w * 0.4, h * 0.4, h * 0.78, 1),
+    ...windowY(y + d, x + w * 0.6, x + w * 0.84, h * 0.4, h * 0.78, 1),
+    ...doorX(x + w, y + d * 0.55, y + d * 0.8, h * 0.66, 1),
+    ...gableRoof(roof, x, y, h, w, d, h * 0.7, 3, walls),
+  ];
+
   // ---- Outdoors ----
 
   /** A blocky tree: a trunk and stacked crowns. `s` scales it. */
@@ -348,6 +367,7 @@ export function makeScene(o: Origin) {
     doorX,
     gableRoof,
     flatRoof,
+    house,
     tree,
     shrub,
     parking,

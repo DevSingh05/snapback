@@ -428,6 +428,21 @@ EN: dict[str, str] = {
         "writes its findings to a note."
     ),
     "trace.agent.note": "Note written: {path} ({chars} characters).",
+    "trace.agent.returned": "The {name} sub-agent finished and handed back its findings.",
+    "trace.unsure.inliers": "{photo} fell short: {n} matched points, the bar is {bar}.",
+    "trace.unsure.ratio": "{photo} fell short: too few of its points agreed, the bar is {bar}.",
+    "trace.unsure.spread": "{photo} fell short: its matched points cover too little of the photo.",
+    "trace.unsure.ambiguity": (
+        "Another building matched far more strongly, so {photo} was not placed."
+    ),
+    "trace.place.searched": "{photo}: searched {option} ({seconds} s). {result}",
+    "place.option.focus_scan": "one scan more closely",
+    "place.option.wider_index": "more buildings",
+    "place.option.deeper_claimed": "more views of this home",
+    "place.result.placed": "Placed.",
+    "place.result.not_placed": "Still could not place it.",
+    "place.result.elsewhere": "It matched a different building.",
+    "place.result.skipped": "Skipped.",
     "trace.intake.injection": (
         "The listing has text written for an AI system. It was ignored, and the checks go on."
     ),
@@ -945,6 +960,19 @@ ES: dict[str, str] = {
         "herramientas y escribe lo que encuentra en una nota."
     ),
     "trace.agent.note": "Nota escrita: {path} ({chars} caracteres).",
+    "trace.agent.returned": "El subagente de {name} terminó y devolvió lo que encontró.",
+    "trace.unsure.inliers": "{photo} no llegó: {n} puntos coincidentes, el mínimo es {bar}.",
+    "trace.unsure.ratio": "{photo} no llegó: pocos puntos coincidieron, el mínimo es {bar}.",
+    "trace.unsure.spread": "{photo} no llegó: sus puntos cubren muy poco de la foto.",
+    "trace.unsure.ambiguity": ("Otro edificio coincidió mucho más, así que {photo} no se ubicó."),
+    "trace.place.searched": "{photo}: búsqueda de {option} ({seconds} s). {result}",
+    "place.option.focus_scan": "un escaneo más de cerca",
+    "place.option.wider_index": "más edificios",
+    "place.option.deeper_claimed": "más vistas de este hogar",
+    "place.result.placed": "Ubicada.",
+    "place.result.not_placed": "Aún no se pudo ubicar.",
+    "place.result.elsewhere": "Coincidió con otro edificio.",
+    "place.result.skipped": "Omitida.",
     "trace.intake.injection": (
         "El anuncio tiene texto escrito para un sistema de IA. Se ignoró y las revisiones "
         "continúan."

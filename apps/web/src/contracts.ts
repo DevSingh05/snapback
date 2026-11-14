@@ -88,7 +88,16 @@ export type TraceKind =
   | "file"
   | "unsure";
 export type ChoiceKind =
-  "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human" | "next_check";
+  | "which_checks"
+  | "which_floor_plan"
+  | "which_spot"
+  | "retry_or_stop"
+  | "ask_human"
+  | "next_check"
+  | "next_search"
+  | "which_photo"
+  | "dwell_rooms"
+  | "lead_checks";
 
 // Who made a trace step happen: a language model picking from code-written options, or the
 // code policy (also every fallback, random draw and tool code ran).

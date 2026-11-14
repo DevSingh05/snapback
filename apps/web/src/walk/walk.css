@@ -1,0 +1,998 @@
+/* The walk's own pieces: the drawn room on the stage (rs), the agent rail (ar) and the two
+   aerials of the copied-ad case (ma). Colours are tokens only; every corner is sharp. */
+
+/* ---------- Two views of a stop: one fills the stage, one sits in the corner ---------- */
+.sv {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: clamp(360px, 31vw, 450px);
+}
+.sv-pane {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+  background: linear-gradient(180deg, var(--sky), var(--paper));
+}
+.sv-pane[data-role="corner"] {
+  right: 16px;
+  bottom: 16px;
+  width: max(22%, 150px);
+  height: max(22%, 96px);
+  z-index: 3;
+  outline: 2px solid var(--ink);
+  box-shadow: var(--shadow-lift);
+}
+/* In the real view, a room the ad never showed is framed in dashes. */
+.tour-stage[data-unshown] .sv-pane[data-view="real"][data-role="main"]::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  outline: 3px dashed var(--surface);
+}
+.sv-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.sv-content .tour-frame,
+.sv-content .tour-aerial {
+  min-height: 0;
+  height: 100%;
+}
+.sv-swap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  background: transparent;
+  color: inherit;
+}
+.sv-swap:active:not(:disabled) {
+  transform: none;
+}
+.sv-label {
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--surface);
+}
+.sv-switch {
+  position: absolute;
+  z-index: 4;
+  right: 14px;
+  top: 14px;
+}
+.sv-pane[data-role="corner"] .rs-standin,
+.sv-pane[data-role="corner"] .sv-still-label,
+.sv-pane[data-role="corner"] .landing-line,
+.sv-pane[data-role="corner"] .landing-note {
+  display: none;
+}
+.sv-still {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+}
+.sv-still-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.sv-still-label {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  padding: 3px 8px;
+  background: var(--glass);
+}
+@media (hover: hover) {
+  .sv-swap:hover .sv-label {
+    background: var(--act);
+    color: var(--on-act);
+  }
+}
+
+/* ---------- Listing photos from CoStar's record ---------- */
+.lp {
+  padding: 16px clamp(16px, 2.4vw, 28px) 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+.lp-title {
+  font-size: 1.2rem;
+}
+.lp-source {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.lp-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.lp-item {
+  flex: none;
+  width: clamp(160px, 22vw, 260px);
+  aspect-ratio: 4 / 3;
+  background: var(--paper);
+}
+.lp-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+/* ---------- The stage: a cutaway room, standing in the sky ---------- */
+.rs {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+}
+.rs-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 540px;
+  display: block;
+}
+.rs-ground {
+  fill: color-mix(in srgb, var(--surface) 46%, transparent);
+}
+.rs-shadow {
+  fill: var(--h-shade);
+  filter: blur(16px);
+}
+/* The same teal light the map puts under a researched place. */
+.rs-glow {
+  fill: color-mix(in srgb, var(--map-glow, var(--act)) 34%, transparent);
+  filter: blur(26px);
+}
+
+/* ---------- The walk map: the stops as a small lit model ---------- */
+.wm {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 14px;
+}
+.wm-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.wm-path {
+  stroke: var(--map-col, var(--act));
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  fill: none;
+}
+.wm-room {
+  cursor: pointer;
+}
+.wm-room[data-state="here"] .dk-teal {
+  --c: var(--map-col, var(--act));
+}
+.wm-room[data-state="here"] {
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--map-glow, var(--act)) 75%, transparent));
+}
+.wm-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.wm-caption strong {
+  font-size: 1rem;
+  color: var(--ink);
+}
+.rs-floor {
+  fill: var(--h-path);
+}
+.rs-wall-left {
+  fill: color-mix(in srgb, var(--h-wall-shade) 58%, var(--h-wall));
+}
+.rs-wall-right {
+  fill: var(--h-wall);
+}
+.rs-wall-cap {
+  fill: color-mix(in srgb, var(--h-wall) 80%, var(--surface));
+}
+.rs-wall-end-left {
+  fill: color-mix(in srgb, var(--h-wall-shade) 30%, var(--h-wall));
+}
+.rs-wall-end-right {
+  fill: color-mix(in srgb, var(--h-wall-shade) 86%, var(--ink));
+}
+.rs-base-left {
+  fill: color-mix(in srgb, var(--h-wall-shade) 88%, var(--ink));
+}
+.rs-base-right {
+  fill: color-mix(in srgb, var(--h-wall-shade) 70%, var(--h-wall));
+}
+.rs-tile-left {
+  fill: color-mix(in srgb, var(--h-unlit) 30%, var(--h-wall-shade));
+}
+.rs-tile-right {
+  fill: color-mix(in srgb, var(--h-unlit) 26%, var(--h-wall));
+}
+.rs-mullion,
+.rs-blind {
+  fill: none;
+}
+.rs-mullion {
+  stroke: var(--h-wall);
+  stroke-width: 3;
+}
+.rs-blind {
+  stroke: color-mix(in srgb, var(--h-wall) 80%, transparent);
+  stroke-width: 2;
+}
+.rs-light {
+  fill: color-mix(in srgb, var(--surface) 42%, transparent);
+}
+.rs-trim {
+  fill: color-mix(in srgb, var(--h-wall) 70%, var(--surface));
+}
+.rs-glass {
+  fill: var(--h-unlit);
+}
+.rs-blind-band {
+  fill: color-mix(in srgb, var(--h-wall) 58%, var(--h-unlit));
+}
+.rs-door,
+.rs-closet {
+  fill: var(--h-door);
+}
+.rs-closet {
+  fill: color-mix(in srgb, var(--h-wall) 62%, var(--h-wall-shade));
+}
+.rs-door-panel {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--surface));
+}
+.rs-rug {
+  fill: color-mix(in srgb, var(--act) 26%, var(--h-path));
+}
+.rs-rug-inner {
+  fill: color-mix(in srgb, var(--act) 14%, var(--h-path));
+}
+.rs-handle {
+  fill: color-mix(in srgb, var(--h-wall) 70%, var(--h-roof));
+}
+.rs-basin {
+  fill: color-mix(in srgb, var(--h-roof) 38%, var(--h-wall));
+}
+.rs-water,
+.rs-mirror {
+  fill: var(--h-unlit);
+}
+.rs-shine {
+  fill: color-mix(in srgb, var(--surface) 50%, transparent);
+}
+.rs-cooktop,
+.rs-oven {
+  fill: color-mix(in srgb, var(--band) 74%, var(--h-roof));
+}
+.rs-burner {
+  fill: color-mix(in srgb, var(--h-roof) 70%, var(--h-wall));
+}
+/* At the corner size the small detail would only be noise. */
+.sv-pane[data-role="corner"] .dk-fine {
+  display: none;
+}
+
+/* The ad photo, set on the wall where it was taken. */
+.rs-photo,
+.rs-missing {
+  transform: translate(var(--rs-x), var(--rs-y)) skewY(-30deg) scale(0.866, 1);
+}
+.rs-photo {
+  filter: drop-shadow(0 8px 10px var(--h-shade));
+}
+.rs-photo-mat {
+  fill: var(--h-wall);
+}
+.rs-photo-wall {
+  fill: var(--h-unlit);
+}
+.rs-photo-floor {
+  fill: var(--h-path);
+}
+.rs-photo-window {
+  fill: var(--h-wall);
+}
+.rs-photo-block {
+  fill: var(--h-roof);
+}
+.rs-photo-tag {
+  fill: var(--act);
+}
+.rs-photo-tag-text {
+  fill: var(--on-act);
+  font-size: 11px;
+  font-weight: 700;
+}
+.rs-cone {
+  fill: color-mix(in srgb, var(--act) 20%, transparent);
+}
+.rs-camera .dk-teal {
+  --c: var(--act);
+}
+.rs-missing-frame {
+  fill: color-mix(in srgb, var(--surface) 30%, transparent);
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-dasharray: 10 7;
+}
+
+.rs-outside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px;
+}
+.rs-house {
+  width: clamp(200px, 30vw, 340px);
+}
+.rs-aerial-date {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.rs-standin {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 3px 8px;
+  background: var(--glass);
+}
+
+.rs-caption {
+  position: absolute;
+  z-index: 4;
+  left: 16px;
+  bottom: 16px;
+  margin: 0;
+  max-width: min(400px, calc(78% - 64px));
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border-left: 6px solid var(--act);
+  font-size: 0.92rem;
+}
+.rs-caption strong {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.rs-caption span {
+  color: var(--muted);
+}
+.rs-caption-unshown {
+  border-left: 0;
+  padding-left: 22px;
+}
+.rs-caption-dash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: repeating-linear-gradient(180deg, var(--ink) 0 8px, transparent 8px 14px);
+}
+
+/* ---------- The agent rail: a relay, led by what was measured ---------- */
+.ar {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--paper);
+}
+.ar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 18px 20px 10px;
+}
+.ar-title {
+  font-size: 1.2rem;
+  margin-right: auto;
+}
+.ar-count {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.ar-sheet {
+  display: none;
+}
+.ar-fold {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.ar-empty {
+  margin: 0;
+  padding: 8px 20px 20px;
+  color: var(--muted);
+}
+.ar-relay {
+  list-style: none;
+  margin: 0;
+  padding: 0 20px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+}
+.ar-runner {
+  position: relative;
+  padding: 5px 12px 5px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: var(--sky);
+  color: var(--ink);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%);
+}
+.ar-runner:first-child {
+  padding-left: 12px;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+}
+.ar-runner[aria-current="true"] {
+  background: var(--act);
+  color: var(--on-act);
+  font-weight: 700;
+}
+.ar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ar-line {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 0 10px;
+  padding: 11px 20px;
+  border-top: 1px solid var(--line);
+}
+.ar-tag {
+  padding-top: 3px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ar-body p {
+  margin: 0;
+}
+.ar-reason {
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.ar-agent {
+  background: var(--surface);
+}
+.ar-handoff {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ar-handoff-arrow {
+  width: 18px;
+  height: 12px;
+  background: var(--act);
+  clip-path: polygon(0 35%, 55% 35%, 55% 0, 100% 50%, 55% 100%, 55% 65%, 0 65%);
+}
+.ar-agent-name {
+  font-size: 1.1rem;
+}
+.ar-agent .ar-reason {
+  color: var(--muted);
+}
+.ar-tool,
+.ar-file-path {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.ar-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.ar-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.ar-pick-what {
+  overflow-wrap: anywhere;
+}
+.ar-stamp {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  background: var(--sky);
+  color: var(--ink);
+}
+.ar-stamp[data-by="model"] {
+  background: var(--act);
+  color: var(--on-act);
+  transform: rotate(-2deg);
+}
+.ar-options {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.ar-reason-quoted {
+  padding-left: 10px;
+  border-left: 3px solid var(--act);
+}
+.ar-unsure {
+  background: var(--unchecked-soft);
+  color: var(--unchecked);
+}
+.ar-unsure .ar-tag {
+  color: var(--unchecked);
+  font-weight: 700;
+}
+.ar-unsure .ar-reason {
+  font-weight: 700;
+}
+.ar-proof {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  align-self: stretch;
+  width: 100%;
+  padding: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  text-align: left;
+}
+.ar-proof-text {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.ar-rule {
+  margin: 0;
+  padding: 12px 20px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+.ar-files {
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ar-files-toggle {
+  min-height: 44px;
+  background: var(--surface);
+  color: var(--ink);
+}
+@media (hover: hover) {
+  .ar-files-toggle:hover,
+  button.ar-proof:hover {
+    background: var(--sky);
+  }
+}
+
+@media (min-width: 761px) {
+  /* Fill the column beside the stage and the facts, and scroll inside it. */
+  .ar {
+    height: 0;
+    min-height: 100%;
+  }
+}
+@media (max-width: 760px) {
+  /* A bottom sheet: the latest step and the count; tap to open the whole relay. */
+  .ar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    max-height: 78vh;
+    background: var(--surface);
+    box-shadow: var(--shadow-lift);
+  }
+  .ar-head {
+    padding: 0;
+  }
+  .ar-title,
+  .ar-head .chip,
+  .ar-count {
+    display: none;
+  }
+  .ar-sheet {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    min-height: 64px;
+    padding: 10px 44px 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--band);
+    color: var(--band-ink);
+    text-align: left;
+    position: relative;
+  }
+  .ar-sheet::after {
+    content: "";
+    position: absolute;
+    right: 18px;
+    top: 26px;
+    width: 12px;
+    height: 8px;
+    background: currentColor;
+    clip-path: polygon(0 100%, 50% 0, 100% 100%);
+  }
+  .ar[data-open="true"] .ar-sheet::after {
+    transform: rotate(180deg);
+  }
+  .ar-sheet-last {
+    font-weight: 700;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ar-sheet-count {
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+  .ar-fold {
+    display: none;
+    padding-top: 14px;
+  }
+  .ar[data-open="true"] .ar-fold {
+    display: flex;
+  }
+  .sv {
+    flex: none;
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+  .sv-pane[data-role="corner"] {
+    right: 10px;
+    bottom: 10px;
+    width: 36%;
+    height: 34%;
+  }
+  .sv-switch {
+    right: 10px;
+    top: 10px;
+  }
+  .rs-standin,
+  .sv-still-label {
+    left: 10px;
+    top: 10px;
+    max-width: calc(100% - 150px);
+  }
+  .rs-caption {
+    position: relative;
+    left: 0;
+    bottom: 0;
+    max-width: none;
+    box-shadow: none;
+  }
+}
+
+/* ---------- Two aerials: the home the ad names, the home in its photos ---------- */
+.ma {
+  flex: 1;
+  min-width: 0;
+  padding: clamp(16px, 2.4vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ma-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.ma-title {
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  line-height: 1.15;
+  margin-right: auto;
+}
+.ma-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  align-items: stretch;
+}
+.ma-pane {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+.ma-label {
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  background: var(--sky);
+  color: var(--ink);
+}
+.ma-pictured .ma-label {
+  background: var(--band);
+  color: var(--band-ink);
+}
+.ma-tile {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  max-width: 100%;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface), var(--paper));
+}
+.ma-img,
+.ma-standin {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.ma-lot {
+  fill: color-mix(in srgb, var(--surface) 55%, var(--h-lawn));
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-dasharray: 9 6;
+}
+.ma-pictured .ma-lot {
+  fill: color-mix(in srgb, var(--act) 26%, var(--h-lawn));
+  stroke: var(--act);
+  stroke-dasharray: none;
+}
+.ma-date {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.ma-versus {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.ma-versus-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: repeating-linear-gradient(180deg, var(--ink) 0 6px, transparent 6px 12px);
+}
+.ma-versus::after {
+  content: "\2260";
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.ma-office {
+  padding: 14px 18px;
+  background: var(--surface);
+  border-left: 6px solid var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 28px;
+}
+.ma-office p {
+  margin: 0;
+}
+.ma-office-line {
+  flex: 1 1 320px;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+.ma-office-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.15rem;
+}
+.ma-office-key {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .ma-pair {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 40px auto;
+  }
+  .ma-versus-line {
+    top: calc(50% - 1px);
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 12px);
+  }
+  .ma-tile {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+/* ---------- Motion: the photo flies home, the rest settles. Off under reduced motion. ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .sv[data-motion="full"] .sv-pane {
+    transition:
+      width 0.42s var(--ease-out),
+      height 0.42s var(--ease-out),
+      right 0.42s var(--ease-out),
+      bottom 0.42s var(--ease-out);
+  }
+  .sv[data-motion="full"] .sv-pane[data-role="main"] {
+    animation: sv-main 0.42s ease-out;
+  }
+  .sv[data-motion="full"] .sv-pane[data-role="corner"] {
+    animation: sv-corner 0.42s ease-out;
+  }
+  @keyframes sv-main {
+    from {
+      opacity: 0.35;
+    }
+  }
+  @keyframes sv-corner {
+    from {
+      opacity: 0.35;
+    }
+  }
+  .rs-sway {
+    animation: rs-sway 6s ease-in-out infinite alternate;
+  }
+  /* Arriving at a stop: the room settles into place, as if you had just walked in. */
+  .rs-room {
+    transform-origin: 400px 346px;
+    animation: rs-arrive 0.6s var(--ease-out) backwards;
+  }
+  @keyframes rs-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(26px) scale(0.94);
+    }
+  }
+  .wm-room {
+    transition: filter 0.3s ease-out;
+  }
+  @keyframes rs-sway {
+    from {
+      transform: translateY(-3px);
+    }
+    to {
+      transform: translateY(4px);
+    }
+  }
+  .rs-photo[data-fly] {
+    animation: rs-fly 1.2s cubic-bezier(0.6, 0, 0.2, 1) 0.35s backwards;
+  }
+  @keyframes rs-fly {
+    0% {
+      opacity: 0;
+      transform: translate(96px, 372px) skewY(0deg) scale(1.7, 1.7);
+    }
+    14% {
+      opacity: 1;
+      transform: translate(96px, 356px) skewY(0deg) scale(1.7, 1.7);
+    }
+  }
+  .rs-cone,
+  .rs-camera {
+    animation: rs-show 0.5s ease-out 1.5s backwards;
+  }
+  .rs-caption {
+    animation: rs-rise 0.45s var(--ease-out) 1.55s backwards;
+  }
+  .rs-caption-unshown {
+    animation-delay: 0.5s;
+  }
+  .rs-missing-frame {
+    animation: rs-march 1.6s linear infinite;
+  }
+  @keyframes rs-march {
+    to {
+      stroke-dashoffset: -17;
+    }
+  }
+  @keyframes rs-show {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rs-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  .ar-line {
+    animation: rs-rise 0.35s var(--ease-out) backwards;
+  }
+  .ma-pane {
+    animation: rs-rise 0.5s var(--ease-out) 0.1s backwards;
+  }
+  .ma-pictured {
+    animation-delay: 0.45s;
+  }
+  .ma-versus::after {
+    animation: ma-pop 0.4s var(--ease-out) 0.85s backwards;
+  }
+  @keyframes ma-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+  }
+  .ma-office {
+    animation: rs-rise 0.5s var(--ease-out) 1.05s backwards;
+  }
+}

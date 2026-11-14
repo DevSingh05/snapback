@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { DataSource, RenterBrief } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
-import { HouseGlyph, Wordmark } from "../components/HouseGlyph";
+import { Wordmark } from "../components/HouseGlyph";
 import { TracePanel } from "../trace";
 import { BudgetFields, EMPTY_BUDGET, budgetToBrief, type BudgetForm } from "../search/BudgetFields";
 import { briefIsEmpty, saveBrief } from "../search/api";
@@ -19,6 +19,8 @@ import {
 } from "./api";
 import { initialState, reduce } from "./machine";
 import { MAX_FILES, addFiles, classifyListingText, validateSubmission } from "./validate";
+import { HeroStreet } from "../landing/HeroStreet";
+import { HowItWorks } from "../landing/HowItWorks";
 import "./upload.css";
 
 export function goToCase(caseId: string) {
@@ -221,7 +223,7 @@ export function UploadPage({
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
           <div className="upload-intro">
-            <HouseGlyph className="upload-house" />
+            <HeroStreet />
             <p className="upload-eyebrow">Trust the home, not the ad.</p>
             <h1 ref={heading} tabIndex={-1}>
               Found a place online? Paste the ad.
@@ -351,6 +353,7 @@ export function UploadPage({
           {shownBrief && !briefIsEmpty(shownBrief) && (
             <PlacesStrip caseId={null} brief={shownBrief} />
           )}
+          <HowItWorks />
         </form>
       </div>
     );
