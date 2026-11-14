@@ -4,8 +4,10 @@ For each photo:
 
 1. Retrieve the closest views over every indexed building, plus the closest views in the
    claimed property's own twins (so the claimed building is always tried).
-2. Verify each candidate face with the matcher and a RANSAC homography. The best face with
-   enough inliers places the photo; otherwise it is not placed.
+2. Verify each candidate face with the matcher and a RANSAC homography. The claimed property's
+   twins are verified first and the best face with enough inliers places the photo there. Only
+   when none does, another building places it, and only on a stricter bar (more inliers,
+   spread over the photo); otherwise it is not placed.
 3. Status: placed in a twin of the claimed property is `located_in_claimed`; placed in any other
    building is `located_elsewhere`, with that building's ids; not placed is `not_located`, or
    `not_indexed` when the claimed property has no twin in the index.
@@ -153,27 +155,49 @@ class Locator:
                 out.append(hit)
         return out
 
-    def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
+    def _best(self, photo: Image.Image, hits: list, passes: Callable[[Verification], bool]):
+        """The passing candidate with the most inliers, or None. Stops at a very strong one."""
         t = self.thresholds
         best = None
-        for hit in self._candidates(photo, claimed_models):
+        for hit in hits:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
             check = verify(self.matcher, photo, face, t.ransac_px)
-            if best is None or check.inliers > best.check.inliers:
+            if passes(check) and (best is None or check.inliers > best.check.inliers):
                 best = _Placement(
                     entry.model_id,
                     self._sweeps[(entry.model_id, entry.sweep_id)],
                     entry.face,
                     check,
                 )
-            if check.inliers >= t.stop_at_inliers:
+            if check.inliers >= t.stop_at_inliers and passes(check):
                 break
-        if best is None:
-            return None
-        if best.check.inliers < t.min_inliers or best.check.ratio < t.min_inlier_ratio:
-            return None
         return best
+
+    def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
+        """Claimed twins first, always: a twin of the claimed building that passes places the
+        photo there, whatever else matches and whatever order the index was built in. Another
+        building places it only on the stricter elsewhere bar (it can lead to DON'T PAY)."""
+        t = self.thresholds
+        hits = self._candidates(photo, claimed_models)
+        claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
+        other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
+        placed = self._best(
+            photo,
+            claimed_hits,
+            lambda c: c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio,
+        )
+        if placed is not None:
+            return placed
+        return self._best(
+            photo,
+            other_hits,
+            lambda c: (
+                c.inliers >= t.elsewhere_min_inliers
+                and c.ratio >= t.min_inlier_ratio
+                and c.spread >= t.elsewhere_min_spread
+            ),
+        )
 
     def _pose(self, photo: Image.Image, placed: _Placement) -> Pose | None:
         if placed.check.homography is None:

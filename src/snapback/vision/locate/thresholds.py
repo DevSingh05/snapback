@@ -16,6 +16,8 @@ class Thresholds:
     min_inlier_ratio: float
     ransac_px: float
     stop_at_inliers: int
+    elsewhere_min_inliers: int
+    elsewhere_min_spread: float
     default_hfov_deg: float
     spots_top_n: int
     spots_overlap_deg: float
@@ -32,6 +34,8 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
         min_inlier_ratio=data["verify"]["min_inlier_ratio"],
         ransac_px=data["verify"]["ransac_px"],
         stop_at_inliers=data["verify"]["stop_at_inliers"],
+        elsewhere_min_inliers=data["verify"]["elsewhere_min_inliers"],
+        elsewhere_min_spread=data["verify"]["elsewhere_min_spread"],
         default_hfov_deg=data["pose"]["default_hfov_deg"],
         spots_top_n=data["spots"]["top_n"],
         spots_overlap_deg=data["spots"]["overlap_deg"],

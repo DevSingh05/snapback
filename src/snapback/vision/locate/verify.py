@@ -41,6 +41,7 @@ class Verification:
     matches: int
     inliers: int
     homography: np.ndarray | None  # maps a pixels to b pixels
+    spread: float = 0.0  # bounding box of the inliers in a, as a fraction of a's area
 
     @property
     def ratio(self) -> float:
@@ -52,7 +53,16 @@ def verify(matcher: Matcher, a: Image.Image, b: Image.Image, ransac_px: float) -
     if len(pa) < 4:
         return Verification(len(pa), 0, None)
     h, mask = ransac_homography(pa, pb, ransac_px)
-    return Verification(len(pa), int(mask.sum()), h)
+    return Verification(len(pa), int(mask.sum()), h, _spread(pa[mask], a.size))
+
+
+def _spread(points: np.ndarray, size: tuple[int, int]) -> float:
+    """How much of the image the inliers cover. One planar object (a poster, an appliance)
+    puts all of them in a small box; a real room match spreads across the view."""
+    if len(points) < 2:
+        return 0.0
+    width, height = points.max(axis=0) - points.min(axis=0)
+    return float(width * height) / float(size[0] * size[1])
 
 
 def _shrink(image: Image.Image, side: int = MATCH_SIDE) -> tuple[Image.Image, float]:
