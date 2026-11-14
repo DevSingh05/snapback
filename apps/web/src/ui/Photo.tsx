@@ -25,8 +25,8 @@ interface PhotoProps {
   src: string | null;
   // Describes what is in the frame. Never claims a stock photo is the listed home.
   alt: string;
-  // Which stamp to print. Every photo carries one.
-  stamp: StampKind;
+  // Which stamp to print; null prints none (only for a photo whose caption already says it).
+  stamp: StampKind | null;
   // Extra words after the stamp, such as a capture date the API returned.
   stampNote?: string;
   stampAt?: "bottom" | "top";
@@ -49,23 +49,25 @@ export function Photo({
   className,
   children,
 }: PhotoProps) {
-  const kind = src ? stamp : "drawn";
+  const kind = stamp === null ? null : src ? stamp : "drawn";
   return (
     <span
       className={`ui-photo${hero ? " ui-photo-hero" : ""}${className ? ` ${className}` : ""}`}
-      data-stamp={kind}
+      data-stamp={kind ?? undefined}
     >
       {src ? (
         <img src={src} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" />
       ) : (
         <span className="ui-photo-none" role="img" aria-label={alt} />
       )}
-      <span
-        className={`ui-stamp${stampAt === "top" ? " ui-stamp-top" : ""}${LIVE_STAMPS.has(kind) ? " ui-stamp-live" : ""}`}
-      >
-        {LIVE_STAMPS.has(kind) && <i aria-hidden="true" />}
-        {stampNote ? `${STAMP_TEXT[kind]} · ${stampNote}` : STAMP_TEXT[kind]}
-      </span>
+      {kind && (
+        <span
+          className={`ui-stamp${stampAt === "top" ? " ui-stamp-top" : ""}${LIVE_STAMPS.has(kind) ? " ui-stamp-live" : ""}`}
+        >
+          {LIVE_STAMPS.has(kind) && <i aria-hidden="true" />}
+          {stampNote ? `${STAMP_TEXT[kind]} · ${stampNote}` : STAMP_TEXT[kind]}
+        </span>
+      )}
       {children}
     </span>
   );
