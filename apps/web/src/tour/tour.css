@@ -670,7 +670,7 @@
   background: var(--matte);
   color: var(--on-matte);
 }
-/* The aerial opens the walk: sharp, under the matte finish, the building marked in 1px bone. */
+/* The aerial opens the walk: sharp, under the matte finish, . */
 .tour-aerial-frame {
   position: relative;
   flex: 1;
@@ -685,19 +685,6 @@
 .tour-aerial-photo > img {
   position: absolute;
   inset: 0;
-}
-.tour-footprint {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.tour-footprint rect {
-  fill: none;
-  stroke: var(--on-matte);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
 }
 /* On this stop: two rows under the stage, a label and a sentence each. They change with the stop. */
 .tour-panel > .tour-onstop {
@@ -801,9 +788,11 @@
 }
 /* The player's controls sit over the bottom of the stage, so the aerial's stamp rides under the
    3D | Real switch instead. */
-.tour-aerial-photo .ui-stamp {
-  top: 64px;
-  bottom: auto;
-  left: auto;
-  right: 0;
+@media (min-width: 761px) {
+  .tour-aerial-photo .ui-stamp {
+    top: 64px;
+    bottom: auto;
+    left: auto;
+    right: 0;
+  }
 }

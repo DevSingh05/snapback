@@ -15,8 +15,7 @@ interface AerialProps {
   seed: string;
 }
 
-/** The opening frame of the walk: the building from above, under the matte finish, with its place
- *  marked in 1px bone and a stamp. Kit imagery arrives only from the API at runtime; with none
+/** The opening frame of the walk: the building from above, under the matte finish, with a stamp. Kit imagery arrives only from the API at runtime; with none
  *  (FIXTURE) the licensed stock exterior shows, stamped SAMPLE PHOTO. */
 export function AerialOpening({ src, capturedOn, seed }: AerialProps) {
   const chosen = src
@@ -40,18 +39,7 @@ export function AerialOpening({ src, capturedOn, seed }: AerialProps) {
         stampNote={src && capturedOn ? capturedOn : undefined}
         hero
         eager
-      >
-        {/* A marker for where the building sits in the tile, not a surveyed footprint. */}
-        <svg
-          className="tour-footprint"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <rect x="36" y="34" width="28" height="32" />
-        </svg>
-      </Photo>
+      />
       {!src && chosen?.credit && <figcaption className="sr-only">{chosen.credit}</figcaption>}
     </figure>
   );
