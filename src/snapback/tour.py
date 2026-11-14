@@ -182,6 +182,10 @@ class TourPlan(BaseModel):
     aerial: TourAerial | None = None
     stops: list[TourStop]
     links: TourLinks
+    # "claimed": the ad's own home. "elsewhere": the building the ad's photos were taken in (X1);
+    # then `mode_line` says what that is, and no coverage is counted for the claimed home.
+    mode: Literal["claimed", "elsewhere"] = "claimed"
+    mode_line: str | None = None
     coverage: WalkCoverage | None = None
     director: TourDirector | None = None
 
@@ -1068,3 +1072,57 @@ def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> 
         for s in plan.stops
     ]
     return plan.model_copy(update={"stops": stops})
+
+
+# --- where the photos were taken (X1) ------------------------------------------------------------
+
+ELSEWHERE_LINE = (
+    "The home in these photos is listed by {office} on CoStar's record. "
+    "We can't tell you if it is for rent, or at this price."
+)
+ELSEWHERE_NO_OFFICE = (
+    "The home in these photos has no leasing office on CoStar's record. "
+    "We can't tell you if it is for rent, or at this price."
+)
+
+
+def elsewhere_property(locate: LocateResult) -> str | None:
+    """The building most of the case's `located_elsewhere` photos were verified in (ties go to
+    the id that sorts first), or None when no photo names one. Never a guess."""
+    names = [
+        p.matched_property_id
+        for p in locate.photos
+        if p.status is LocateStatus.LOCATED_ELSEWHERE and p.matched_property_id
+    ]
+    if not names:
+        return None
+    return min(set(names), key=lambda n: (-names.count(n), n))
+
+
+def map_elsewhere(
+    plan: TourPlan, locate: LocateResult, property_id: str, office: str | None
+) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
+    """The tour of the building the ad's photos were taken in. Only photos verified in THIS
+    building enter its rooms; photos of the claimed home never do (they are another walk). No
+    coverage is counted, and an empty room never says "the ad showed no photo of this room"
+    (the ad was for a different home). The line names the office on record and says nothing about
+    rent, availability, an address or the ad being fake."""
+    mine = [
+        p.model_copy(update={"status": LocateStatus.LOCATED_IN_CLAIMED})
+        for p in locate.photos
+        if p.status is LocateStatus.LOCATED_ELSEWHERE and p.matched_property_id == property_id
+    ]
+    shadow = locate.model_copy(update={"photos": mine})
+    out, fields = map_locate(plan, shadow)
+    stops = [
+        s.model_copy(update={"ad_view": "unknown"}) if s.ad_view == "none_placed" else s
+        for s in out.stops
+    ]
+    coverage = WalkCoverage(counted="none", placed=len(mine))
+    line = ELSEWHERE_LINE.format(office=office) if office else ELSEWHERE_NO_OFFICE
+    return (
+        out.model_copy(
+            update={"stops": stops, "coverage": coverage, "mode": "elsewhere", "mode_line": line}
+        ),
+        fields,
+    )

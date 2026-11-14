@@ -89,7 +89,9 @@ from snapback.tour import (
     build_tour,
     cached_sweeps,
     choose_walk,
+    elsewhere_property,
     fixture_sweeps,
+    map_elsewhere,
     map_locate,
     must_have_kinds_of,
 )
@@ -811,13 +813,31 @@ def create_app(
         except Exception:
             return []
 
-    def case_tour(case_id: str, request: Request, authorization, x_case_token) -> tuple:
+    def case_tour(
+        case_id: str, request: Request, authorization, x_case_token, mode: str = "claimed"
+    ) -> tuple:
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
+        locate = case.evidence.locate
+        if mode == "elsewhere":
+            other = elsewhere_property(locate) if locate else None
+            if other is None or locate is None:
+                raise HTTPException(
+                    status_code=404, detail="No photo of this case was placed in another building."
+                )
+            plan = tour_for(other, None, any_plan=True)
+            office = None
+            try:
+                found = place_for(other, None, lookups, None, None)
+            except Exception:  # an ambiguous or missing plan: the office is simply not named
+                found = None
+            if found is not None:
+                office = found.office_on_record
+            plan, fields = map_elsewhere(plan, locate, other, office)
+            return choose_walk(plan), locate, fields
         if case.property_id is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
-        locate = case.evidence.locate
         plan = tour_for(case.property_id, None, any_plan=True)
         if locate is None:
             return plan, None, {}
@@ -842,13 +862,14 @@ def create_app(
     def get_case_walk(
         case_id: str,
         request: Request,
+        mode: Annotated[Literal["claimed", "elsewhere"], Query()] = "claimed",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> WalkResponse:
         """The case-scoped walk: the tour plan plus the case's locate result, so the page can
         show which ad photos were placed, which were taken elsewhere and which could not be
         placed. Needs the case's read token in a header."""
-        plan, locate, fields = case_tour(case_id, request, authorization, x_case_token)
+        plan, locate, fields = case_tour(case_id, request, authorization, x_case_token, mode)
         return WalkResponse(plan=plan, locate=locate, photos=fields)
 
     @app.post("/cases/{case_id}/tour-draft")
