@@ -216,7 +216,7 @@
 }
 
 /* Zing pass. Each place is a block with a colour key for how it sits against the budget:
-   green fits, amber starts within it, slate has no full price on record. The words say it too. */
+   green fits, aqua starts within it, slate has no full price on record. The words say it too. */
 .pf-row {
   position: relative;
   padding-left: 26px;
@@ -232,13 +232,13 @@
   background: var(--key, var(--act));
 }
 .pf-row[data-fit="within"] {
-  --key: var(--v-ok);
+  --key: var(--st-ok);
 }
 .pf-row[data-fit="starts_within"] {
-  --key: var(--scan);
+  --key: var(--zing);
 }
 .pf-row[data-fit="no_full_price"] {
-  --key: var(--unchecked);
+  --key: var(--st-unchecked);
 }
 @media (hover: hover) {
   .pf-row:hover {
@@ -251,8 +251,10 @@
   line-height: 1.25;
 }
 
-/* The scan tag: a warm amber block with an isometric tile, and one pass of light. */
+/* The scan tag: an aqua block with an isometric tile, and one pass of light. */
 .pf-scan {
+  background: var(--zing);
+  color: var(--on-zing);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -267,7 +269,7 @@
   width: 12px;
   height: 12px;
   flex: none;
-  background: var(--on-scan);
+  background: var(--on-zing);
   transform: scaleY(0.58) rotate(45deg);
 }
 .pf-scan::after {

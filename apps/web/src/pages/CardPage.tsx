@@ -35,13 +35,31 @@ export function expiryText(expiresAt: string, now: Date = new Date()): string {
   return `Expires in ${Math.max(1, Math.round(ms / 60_000))} min`;
 }
 
+// The chip's colour and icon follow the word it shows, so one word always looks one way.
+const WORD_KIND: Record<string, { kind: string; icon: string }> = {
+  Matches: { kind: "ok", icon: "✓" },
+  "Doesn't match": { kind: "mismatch", icon: "✕" },
+  Warning: { kind: "warn", icon: "!" },
+  "Not confirmed": { kind: "unconfirmed", icon: "?" },
+  "Not checked": { kind: "unchecked", icon: "–" },
+};
+
+const STATE_ICON: Record<VerdictState, string> = {
+  dont_pay: "✕",
+  hold: "!",
+  unverified: "?",
+  verified: "✓",
+};
+
 function ToneMark({ tone, row }: { tone: CardTone; row: CardRowKind }) {
+  const word = toneWord(tone, row);
+  const { kind, icon } = WORD_KIND[word] ?? { kind: "unchecked", icon: "–" };
   return (
-    <span className={`tone tone-${tone}`}>
+    <span className={`tone tone-${tone} tone-is-${kind}`}>
       <span className="tone-icon" aria-hidden="true">
-        {tone === "ok" ? "✓" : tone === "red_flag" ? "!" : tone === "hold" ? "…" : "–"}
+        {icon}
       </span>
-      {toneWord(tone, row)}
+      {word}
     </span>
   );
 }
@@ -100,6 +118,9 @@ export function CardView({
 
       <section className={`hero hero-${stateTone}`} aria-labelledby="card-title">
         <HouseGlyph className="hero-house" />
+        <span className="hero-mark" aria-hidden="true">
+          {STATE_ICON[card.state]}
+        </span>
         <p className="eyebrow">
           Case{" "}
           <span className="mono case-id" data-testid="case-id">
