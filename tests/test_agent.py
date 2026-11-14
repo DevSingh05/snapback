@@ -39,6 +39,9 @@ FIXTURE_TRACE = [
 ]
 BANNED = ("scam", "safe", "verified")
 
+# the retry choices exist only when a case has a place searcher (E1)
+RETRY_ONLY = {ChoiceKind.NEXT_SEARCH, ChoiceKind.WHICH_PHOTO}
+
 
 class ScriptedModel:
     """Stands in for the language model: answers each offer from a script, else the default."""
@@ -85,7 +88,7 @@ def test_agent_on_hold_fixture_emits_all_five_choices():
     verdict = run_case(case, ScriptedModel(), always("send"))
 
     events = case.trace.events
-    assert {event.choice for event in events if event.choice} == set(ChoiceKind)
+    assert {event.choice for event in events if event.choice} == set(ChoiceKind) - RETRY_ONLY
     assert [event.seq for event in events] == list(range(len(events)))
     assert events[-1].kind is TraceKind.VERDICT
     assert events[-1].pick == verdict.state.value == "hold"

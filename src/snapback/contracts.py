@@ -498,6 +498,8 @@ class ChoiceKind(StrEnum):
     RETRY_OR_STOP = "retry_or_stop"
     ASK_HUMAN = "ask_human"
     NEXT_CHECK = "next_check"  # A24: which evidence-gated check to run next (order only)
+    NEXT_SEARCH = "next_search"  # E1: which retry search to spend on an unplaced photo
+    WHICH_PHOTO = "which_photo"  # E1: which unplaced photo gets the short search budget
 
 
 class TraceKind(StrEnum):
