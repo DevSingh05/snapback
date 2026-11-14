@@ -14,7 +14,7 @@ Every rule here has a test in tests/test_verdict.py or tests/test_card_rows.py.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 
 from snapback.card import strings
 from snapback.contracts import (
@@ -52,6 +52,7 @@ _RULE_LABELS = {
     RuleCategory.DATA_ASK: "label.data_ask",
     RuleCategory.PRESSURE: "label.pressure",
 }
+_RULE_LABEL_ORDER = ("label.payment_ask", "label.data_ask", "label.pressure")
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,7 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
         payment_flag=any(
             hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules
         ),
+        rule_flag=any(hit.red_flag for hit in modules.rules),
     )
 
 
@@ -122,11 +124,14 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """Turn the evidence for one case into a verdict with plain-language reasons.
 
     The order of the checks is the policy:
-    1. Proof of a problem gives DONT_PAY (forged reply, photos from another property, or a
-       record mismatch together with a price or payment red flag).
+    1. Only proof gives DONT_PAY: a forged reply, or a photo taken in another property. A record
+       mismatch is not proof (owners live elsewhere, agents act for them), with or without a
+       red flag beside it.
     2. No photo placed in the claimed property gives UNVERIFIED.
-    3. Presence proven and authority matching the record gives VERIFIED.
-    4. Everything else is HOLD, including "no reply yet" and "present but not on the record".
+    3. Presence proven, authority matching the record and no red flag of any kind gives
+       VERIFIED.
+    4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
+       (price, payment, fee, data ask, pressure, link, overpayment).
     """
     statuses = {photo.status for photo in evidence.photos}
 
@@ -144,22 +149,23 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     if LocateStatus.LOCATED_ELSEWHERE in statuses:
         return verdict(VerdictState.DONT_PAY, say("reason.photo_elsewhere"))
 
-    red_flags = []
-    if evidence.price_flag:
-        red_flags.append(say("reason.price_flag"))
-    if evidence.payment_flag:
-        red_flags.append(say("reason.payment_flag"))
-    if evidence.authority is AuthorityStatus.MISMATCH and red_flags:
-        return verdict(VerdictState.DONT_PAY, say("reason.authority_mismatch"), *red_flags)
-
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
         if statuses <= {LocateStatus.NOT_INDEXED}:
             return verdict(VerdictState.UNVERIFIED, say("reason.not_indexed"))
         return verdict(VerdictState.UNVERIFIED, say("reason.not_located"))
 
+    red_flags = []
+    if evidence.price_flag:
+        red_flags.append(say("reason.price_flag"))
+    if evidence.payment_flag:
+        red_flags.append(say("reason.payment_flag"))
+    elif evidence.rule_flag:
+        red_flags.append(say("reason.rule_flag"))
+
     if (
         evidence.presence is PresenceStatus.PROVEN
         and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and not red_flags
     ):
         return verdict(
             VerdictState.VERIFIED,
@@ -179,7 +185,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         reasons.append(say("reason.presence_proven_not_authority"))
     else:
         reasons.append(say("reason.presence_missing"))
-    return verdict(VerdictState.HOLD, *reasons)
+    return verdict(VerdictState.HOLD, *reasons, *red_flags)
 
 
 # --- the card ----------------------------------------------------------------------------------
@@ -266,7 +272,13 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     )
 
 
-def _here_now_line(modules: ModuleEvidence, lang: str) -> CardLine:
+def _aware(moment: datetime, what: str) -> datetime:
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError(f"{what} must carry a timezone, got a naive datetime: {moment!r}")
+    return moment
+
+
+def _here_now_line(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardLine:
     presence = _presence(modules)
     label = "label.here_now"
 
@@ -288,8 +300,10 @@ def _here_now_line(modules: ModuleEvidence, lang: str) -> CardLine:
     if presence.status is PresenceStatus.NOT_REQUESTED:
         return _line(lang, label, CardTone.NOT_CHECKED, "here_now.not_requested")
 
+    # Replies can arrive stamped in different zones. Compare them as instants, then show the
+    # latest one on the card's own clock.
     spots = modules.challenge.spots if modules.challenge else []
-    replied = [spot.replied_at for spot in spots if spot.replied_at is not None]
+    replied = [spot.replied_at.astimezone(zone) for spot in spots if spot.replied_at is not None]
     if not replied:
         return _line(lang, label, CardTone.OK, "here_now.proven_bare")
     details = {
@@ -308,17 +322,24 @@ def _allowed_line(modules: ModuleEvidence, lang: str) -> CardLine:
     # themselves, which may be a person's name.
     status = modules.authority.status if modules.authority else AuthorityStatus.UNKNOWN
     if status is AuthorityStatus.MATCHES_RECORD:
-        return _line(lang, "label.allowed", CardTone.OK, "allowed.matches")
+        # A match does not lift this line: anyone can type a company's public name. The card
+        # names the manager on record (a company, never a person) so the renter can call them.
+        manager = modules.authority.manager_on_record if modules.authority else None
+        if manager:
+            return _line(
+                lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.call_manager", manager=manager
+            )
+        return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.call_manager_unnamed")
     if status is AuthorityStatus.MISMATCH:
         return _line(lang, "label.allowed", CardTone.RED_FLAG, "allowed.mismatch")
     return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.not_shown")
 
 
-def _person_row(modules: ModuleEvidence, lang: str) -> CardRow:
+def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
     return CardRow(
         kind=CardRowKind.PERSON,
         lines=[
-            _here_now_line(modules, lang),
+            _here_now_line(modules, lang, zone),
             _allowed_line(modules, lang),
             *_seen_before_lines(modules, lang, replies=True),
         ],
@@ -326,7 +347,8 @@ def _person_row(modules: ModuleEvidence, lang: str) -> CardRow:
 
 
 def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
-    lines = []
+    """Red-flag rules, grouped under their labels. "Payment ask" is always there, and first."""
+    by_label: dict[str, list[CardLine]] = {label: [] for label in _RULE_LABEL_ORDER}
     shown = set()
     for hit in modules.rules:
         if not hit.red_flag or hit.rule_id in shown:
@@ -335,10 +357,13 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         key = f"rule.{hit.rule_id}"
         if not strings.has(key, lang):
             key = f"rule_category.{hit.category.value}"
-        lines.append(_line(lang, _RULE_LABELS[hit.category], CardTone.RED_FLAG, key))
-    if not lines:
-        lines.append(_line(lang, "label.payment_ask", CardTone.OK, "payment.none"))
-    return lines
+        label = _RULE_LABELS[hit.category]
+        by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
+    if not by_label["label.payment_ask"]:
+        by_label["label.payment_ask"].append(
+            _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
+        )
+    return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
 
 
 def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
@@ -367,12 +392,18 @@ def build_card(
 ) -> Card:
     """Lay one case out as the three-row card. The state comes from `decide`, nowhere else.
 
-    `checked_at` defaults to now (UTC); pass it to get a reproducible card. `verify_base_url`
-    is the web app's address; without it the card carries no verify link.
+    `checked_at` defaults to now (UTC); pass it to get a reproducible card. Its timezone is the
+    card's clock: every time printed on the card is shown in it. `verify_base_url` is the web
+    app's address; without it the card carries no verify link.
+
+    Raises ValueError if `checked_at` or any reply time has no timezone.
     """
     verdict = decide(to_evidence(modules, lang), lang)
     public_id = modules.case_id.removeprefix(FIXTURE_ID_PREFIX)
-    checked = checked_at or datetime.now(UTC)
+    checked = _aware(checked_at, "checked_at") if checked_at is not None else datetime.now(UTC)
+    for spot in modules.challenge.spots if modules.challenge else []:
+        if spot.replied_at is not None:
+            _aware(spot.replied_at, f"replied_at of spot {spot.spot_id}")
 
     verify_url = None
     if verify_base_url:
@@ -384,7 +415,11 @@ def build_card(
         state=verdict.state,
         checked_at=checked,
         expires_at=checked + CARD_TTL,
-        rows=[_place_row(modules, lang), _person_row(modules, lang), _price_row(modules, lang)],
+        rows=[
+            _place_row(modules, lang),
+            _person_row(modules, lang, checked.tzinfo),
+            _price_row(modules, lang),
+        ],
         not_checked=[
             strings.text("not_checked.id", lang),
             strings.text("not_checked.lease", lang),

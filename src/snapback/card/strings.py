@@ -8,7 +8,8 @@ Conventions (tests/test_card_rows.py enforces them):
 - No entry contains "safe", "verified" or "scam". About a person we say what was or was not
   shown, never what they are.
 - Tone is never carried by colour alone. A red-flag line ends with "Red flag.", a `not_shown`
-  line starts with "NOT SHOWN." and a `not_checked` line starts with "Not checked".
+  line starts with "NOT SHOWN." or "Not confirmed." and a `not_checked` line starts with
+  "Not checked".
 - A rule that fires is worded under `rule.<rule_id>`. A rule id with no entry of its own falls
   back to `rule_category.<category>`, so a new rule can never put raw text on a card.
 """
@@ -55,7 +56,13 @@ EN: dict[str, str] = {
     "here_now.seen_before_dated": "A reply photo also appeared in another check on {date}.",
     "here_now.seen_before": "A reply photo also appeared in another check.",
     "allowed.not_shown": "NOT SHOWN. Being inside does not mean they may rent it.",
-    "allowed.matches": "The company they named matches the manager on record for this building.",
+    # A match never lifts this line: anyone can type a company's public name.
+    "allowed.call_manager": (
+        "Not confirmed. Call {manager} on a number you look up yourself before you pay."
+    ),
+    "allowed.call_manager_unnamed": (
+        "Not confirmed. Call the manager on record on a number you look up yourself before you pay."
+    ),
     "allowed.mismatch": (
         "The name they gave does not match the manager on record for this building. Red flag."
     ),
@@ -92,6 +99,7 @@ EN: dict[str, str] = {
     "reason.authority_mismatch": "The poster does not match the contact on the property record.",
     "reason.price_flag": "The rent is far below comparable units.",
     "reason.payment_flag": "Payment was requested before any viewing.",
+    "reason.rule_flag": "Something in the text you sent is a red flag.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
