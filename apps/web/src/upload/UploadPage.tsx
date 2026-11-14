@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { DataSource, RenterBrief } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
+import { HouseGlyph, Wordmark } from "../components/HouseGlyph";
 import { TracePanel } from "../trace";
 import { BudgetFields, EMPTY_BUDGET, budgetToBrief, type BudgetForm } from "../search/BudgetFields";
 import { briefIsEmpty, saveBrief } from "../search/api";
@@ -215,18 +216,21 @@ export function UploadPage({
     return (
       <div className="card-page upload" data-testid="upload-page">
         <header className="masthead">
-          <span className="wordmark">SNAPBACK</span>
+          <Wordmark />
           <SourceChip source={shownMode} />
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
-          <p className="upload-eyebrow">Trust the home, not the ad.</p>
-          <h1 ref={heading} tabIndex={-1}>
-            Found a place online? Paste the ad.
-          </h1>
-          <p className="upload-lead">
-            See the real listing, the real office and a fair price, plus researched places that fit
-            your budget.
-          </p>
+          <div className="upload-intro">
+            <HouseGlyph className="upload-house" />
+            <p className="upload-eyebrow">Trust the home, not the ad.</p>
+            <h1 ref={heading} tabIndex={-1}>
+              Found a place online? Paste the ad.
+            </h1>
+            <p className="upload-lead">
+              See the real listing, the real office and a fair price, plus researched places that
+              fit your budget.
+            </p>
+          </div>
 
           <label htmlFor="listing" className="upload-label">
             Paste the ad you found <span className="upload-hint">(listing link or text)</span>
@@ -356,7 +360,7 @@ export function UploadPage({
     return (
       <div className="card-page upload" data-testid="upload-page">
         <header className="masthead">
-          <span className="wordmark">SNAPBACK</span>
+          <Wordmark />
           <SourceChip source={shownMode} />
         </header>
         <div className="upload-body">
@@ -385,7 +389,7 @@ export function UploadPage({
   return (
     <div className="card-page upload" data-testid="upload-page">
       <header className="masthead">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <SourceChip source={source} />
       </header>
       <div className="upload-body">

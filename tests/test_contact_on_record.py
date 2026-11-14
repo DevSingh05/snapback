@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from leakcheck import leaked
 from snapback.agent.intake import read_listing
 from snapback.agent.intake.fields import ContactClaims, extract_beds, extract_contacts, extract_unit
 from snapback.agent.rules import check_price, check_unit
@@ -222,9 +223,8 @@ def test_no_phone_number_or_hash_or_web_address_reaches_card_verdict_or_evidence
     authority = check_authority(claims, record(), SALT)
     modules = evidence(authority=authority.model_dump(mode="json"))
     out = everything_on(modules)
-    for secret in ("0142", "0177", phone_hash(OFFICE, SALT), phone_hash(OTHER, SALT), SITE):
-        assert secret not in out
-    assert "fixtureliving-apply" not in out
+    secrets = ("0142", "0177", phone_hash(OFFICE, SALT), phone_hash(OTHER, SALT), SITE)
+    assert leaked([*secrets, "fixtureliving-apply"], out) == []
 
 
 # --- the name they gave --------------------------------------------------------------------
@@ -818,8 +818,8 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
 
     said = " ".join([card.model_dump_json(), verdict.model_dump_json()])
     said += " ".join(event.model_dump_json() for event in case.trace.events)
-    for secret in ("0177", "0142", "999", SITE, "fixtureliving-apply", phone_hash(OFFICE, SALT)):
-        assert secret not in said
+    secrets = ("0177", "0142", "999", SITE, "fixtureliving-apply", phone_hash(OFFICE, SALT))
+    assert leaked(secrets, said) == []
 
 
 def test_the_shared_fixture_record_has_nothing_to_compare_so_nothing_changes(tmp_path):

@@ -447,6 +447,22 @@ button {
 .trace-reason {
   margin: 4px 0 0;
 }
+.case-notes {
+  margin-top: 20px;
+}
+.case-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.case-note-text {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
 .trace-waiting {
   padding: 10px 14px;
   background: var(--amber-soft);
@@ -804,5 +820,306 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .aerial-skeleton {
     animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Zing pass: carry the worlds page inside. Fills, shadows and motion only; corners stay sharp,
+   nothing gets an outline, and no wording changes. All motion sits behind
+   prefers-reduced-motion: no-preference, so with reduced motion every screen is simply at rest.
+   --------------------------------------------------------------------------------------------- */
+
+/* The sky behind every screen: the worlds gradient, a slow light sweep and paper grain. */
+.shell {
+  position: relative;
+  isolation: isolate;
+}
+.shell::before,
+.shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.shell::before {
+  background: linear-gradient(104deg, transparent 42%, var(--sweep) 50%, transparent 58%);
+  background-size: 320% 100%;
+  background-position: 100% 0;
+}
+.shell::after {
+  background-image: var(--grain);
+  opacity: 0.09;
+}
+
+/* The house glyph. */
+.house {
+  display: block;
+  width: 96px;
+  height: auto;
+  flex: none;
+  overflow: visible;
+}
+.house-lawn {
+  fill: var(--h-lawn);
+}
+.house-shade {
+  fill: var(--h-shade);
+}
+.house-path {
+  fill: var(--h-path);
+}
+.house-wall-left {
+  fill: var(--h-wall-shade);
+}
+.house-wall-right {
+  fill: var(--h-wall);
+}
+.house-roof {
+  fill: var(--h-roof);
+}
+.house-door {
+  fill: var(--h-door);
+}
+.house-window {
+  fill: var(--h-unlit);
+}
+.house-lit .house-window {
+  fill: var(--h-lit);
+}
+.house-roof-far {
+  fill: var(--h-roof-far);
+}
+.house-fascia,
+.house-verge {
+  fill: var(--h-roof-edge);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.wordmark-house {
+  width: 34px;
+  margin-block: -6px;
+}
+
+/* The verdict: one deep ink band for every state. The state is carried by a bright tile with
+   its icon, a bar of the same colour along the foot of the band, and the words. */
+.hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: clamp(14px, 2.4vw, 22px);
+  align-items: start;
+  padding-bottom: clamp(30px, 4.6vw, 40px);
+  padding-right: clamp(150px, 24vw, 215px);
+  background: var(--v-band);
+  color: var(--on-v-band);
+  box-shadow: inset 0 -8px 0 var(--state);
+}
+.hero-coral {
+  --state: var(--v-dont-pay);
+}
+.hero-amber {
+  --state: var(--v-hold);
+}
+.hero-teal {
+  --state: var(--v-ok);
+}
+.hero-blue {
+  --state: var(--v-slate);
+}
+.hero-mark {
+  grid-row: 1 / span 4;
+  display: grid;
+  place-items: center;
+  width: clamp(52px, 6vw, 68px);
+  aspect-ratio: 1;
+  margin-top: 4px;
+  background: var(--state);
+  color: var(--on-v);
+  font-size: clamp(1.7rem, 3.2vw, 2.3rem);
+  font-weight: 800;
+  line-height: 1;
+}
+.hero > .eyebrow,
+.hero > .state,
+.hero > .meta,
+.hero > .summary {
+  grid-column: 2;
+}
+.hero .state,
+.hero .eyebrow,
+.hero .meta {
+  color: inherit;
+}
+.hero .state {
+  font-size: clamp(2rem, 6vw, 3rem);
+  margin-bottom: 14px;
+}
+.hero .case-id {
+  background: color-mix(in srgb, var(--on-v-band) 16%, transparent);
+  color: inherit;
+}
+
+/* Row chips, one system: the same block for every state, the colour only in the icon tile. */
+.tone {
+  min-width: 9.4rem;
+  padding: 0 12px 0 0;
+  gap: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.tone-icon {
+  width: 30px;
+  height: 30px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  background: var(--st, var(--st-unchecked));
+  -webkit-text-fill-color: var(--on-st);
+}
+.tone-is-ok {
+  --st: var(--st-ok);
+}
+.tone-is-mismatch {
+  --st: var(--st-mismatch);
+}
+.tone-is-warn {
+  --st: var(--st-warn);
+}
+.tone-is-unconfirmed {
+  --st: var(--st-unconfirmed);
+}
+.tone-is-unconfirmed .tone-icon {
+  -webkit-text-fill-color: var(--on-st-unconfirmed);
+}
+.tone-is-unchecked {
+  --st: var(--st-unchecked);
+}
+.hero-house {
+  position: absolute;
+  right: clamp(14px, 3vw, 30px);
+  bottom: 18px;
+  width: clamp(120px, 19vw, 180px);
+}
+.evidence {
+  padding-top: 12px;
+}
+.notice-house {
+  width: 112px;
+}
+
+button {
+  transition:
+    transform 0.12s var(--ease-out),
+    box-shadow 0.12s var(--ease-out),
+    background-color 0.12s linear;
+}
+button:active:not(:disabled) {
+  transform: translate(1px, 1px);
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding-right: clamp(18px, 4vw, 36px);
+    padding-top: 22px;
+  }
+  .hero-house {
+    top: 12px;
+    bottom: auto;
+    right: 10px;
+    width: 104px;
+  }
+  .hero-mark {
+    grid-row: 1;
+    width: 48px;
+    margin: 0 0 14px;
+    font-size: 1.6rem;
+  }
+  .hero > .eyebrow {
+    align-self: center;
+    margin: 0 0 14px;
+    padding-right: 104px;
+  }
+  .hero > .state,
+  .hero > .meta,
+  .hero > .summary {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell::before {
+    animation: sky-sweep 18s linear infinite;
+  }
+  @keyframes sky-sweep {
+    to {
+      background-position: -100% 0;
+    }
+  }
+
+  /* The band wipes in, the house sets down, then the headline and each check land in turn. */
+  .hero {
+    animation: band-in 0.5s var(--ease-out) backwards;
+  }
+  @keyframes band-in {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+    to {
+      clip-path: inset(0);
+    }
+  }
+  .hero-house {
+    animation: house-down 0.6s var(--ease-out) 0.18s backwards;
+  }
+  @keyframes house-down {
+    from {
+      opacity: 0;
+      transform: translateY(-14px);
+    }
+  }
+  .hero-mark {
+    animation: stamp 0.4s var(--ease-out) 0.3s backwards;
+  }
+  .hero > .eyebrow,
+  .hero > .state,
+  .hero > .meta,
+  .hero > .summary {
+    animation: land 0.45s var(--ease-out) backwards;
+  }
+  .hero > .eyebrow {
+    animation-delay: 0.2s;
+  }
+  .hero > .state {
+    animation-delay: 0.26s;
+  }
+  .hero > .meta {
+    animation-delay: 0.32s;
+  }
+  .hero > .summary {
+    animation-delay: 0.38s;
+  }
+  .evidence tr > * {
+    animation: land 0.45s var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 60ms + 0.44s);
+  }
+  .evidence .tone {
+    animation: stamp 0.32s var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 60ms + 0.6s);
+  }
+  @keyframes land {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  @keyframes stamp {
+    from {
+      opacity: 0;
+      transform: scale(1.18);
+    }
   }
 }

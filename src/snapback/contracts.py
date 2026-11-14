@@ -95,6 +95,13 @@ class Evidence(BaseModel):
     license_flag: bool = False  # the ad prints a license number that is not an active license
     license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
+    # Someone at the office's own website domain on CoStar's record opened a one-time link for
+    # this case. The domain, never an address. It stands in for phone_confirmed in VERIFIED
+    # (Vidyut, Sat 09:38), and only together with the photos placed and nothing else holding.
+    office_confirmed_domain: str | None = None
+    # The office at that domain said the ad is NOT theirs. A reason that holds the case
+    # (never a red flag, never DONT_PAY: it is an answer, not proof).
+    office_declined_domain: str | None = None
 
 
 class VerdictState(StrEnum):
@@ -417,6 +424,12 @@ class ModuleEvidence(BaseModel):
     # A14: a reply came, could not be accepted, and no further photo will be asked for. The
     # card then says "we could not confirm", not "ask for a new photo". It changes no state.
     no_retry_left: bool = False
+    # The domain, from CoStar's record, through which the office confirmed this case with a
+    # one-time link (snapback.office). None means nobody did.
+    office_confirmed_domain: str | None = None
+    # The office at that domain said the ad is NOT theirs. A reason that holds the case
+    # (never a red flag, never DONT_PAY: it is an answer, not proof).
+    office_declined_domain: str | None = None
     # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
     # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
     ad_notes: list[AdNote] = Field(default_factory=list)
@@ -586,6 +599,9 @@ class PropertyRecord(BaseModel):
     # snapback.agent.rules.contact.phone_hash(number, phone_salt()), a keyed hash.
     site_phone_hash: str | None = None
     website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
+    # Shown only to the office, in the confirm email and page, so it can tell which ad this is.
+    building_name: str | None = None
+    street_address: str | None = None
     floor_plan_rents: list[FloorPlanRent] = Field(default_factory=list)
     units: list[UnitOnRecord] = Field(default_factory=list)
     # Search (council 4): building facts for must-haves. None means the record does not say.
