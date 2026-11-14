@@ -36,6 +36,18 @@ uv sync --extra vision   # torch, kornia, faiss, opencv
 uv sync --extra agent    # deepagents, langchain-anthropic
 ```
 
+## Get the CoStar kit
+
+1. Open the kit portal: https://beta-app.matterport.com/2026-princeton-hackathon
+2. Get the sponsor keys from the CoStar track Discord (`/costar-keys` in `#costar-group`) and put
+   them in `.env` only (names in `.env.example`).
+3. Unzip the kit under `data/` (git-ignored), for example `data/raw/costar/costar-hackathon-kit/`.
+4. Run `python3 scripts/probe_kit.py`. It prints field names and counts only, never record values,
+   so its output is safe to paste into an issue.
+
+**Do not click "I Agree" on the sponsor Terms until Vidyut confirms the team decision** (the Terms
+include an IP assignment to CoStar).
+
 ## Layout
 
 | Path                        | What it is                                            | Lane       |
