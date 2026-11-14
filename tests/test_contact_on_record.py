@@ -115,12 +115,18 @@ def test_a_phone_that_is_not_the_office_holds_the_case_even_if_the_name_matches(
     assert to_evidence(modules).phone_flag is True
     assert state(modules) is VerdictState.HOLD
 
+    # Ruling, Sat 01:20: the poster's own contact not matching the record is a real red flag.
     tone, text = card_lines(modules, CardRowKind.PERSON)["Contact on record"]
-    assert tone is CardTone.HOLD
+    assert tone is CardTone.RED_FLAG
     assert text == (
         "The phone in the listing is not the leasing office on record. "
-        "Call Fixture Living LLC yourself."
+        "Call Fixture Living LLC yourself. Red flag."
     )
+    unnamed = check_authority(ContactClaims(phones=[OTHER]), record(manager_company=None), SALT)
+    _, said = card_lines(evidence(authority=unnamed.model_dump(mode="json")), CardRowKind.PERSON)[
+        "Contact on record"
+    ]
+    assert said.endswith("Call the office on record yourself. Red flag.")
 
 
 def test_a_matching_phone_is_a_supporting_line_and_never_authority():
@@ -301,19 +307,51 @@ def test_for_sale_alone_is_never_dont_pay_whatever_else_is_true():
     assert state(evidence(for_sale={"status": "active"}, challenge=None)) is VerdictState.HOLD
 
 
-def test_recently_rented_holds_the_case_without_a_red_flag():
-    modules = evidence(for_sale={"status": "recently_rented"})
-    assert state(modules) is VerdictState.HOLD
+def verified_but_for(**sections) -> ModuleEvidence:
+    """A case that would be VERIFIED: presence proven, the company matches, nothing flagged."""
+    matches = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    return evidence(authority=matches, rules=[], price=None, **sections)
+
+
+def test_recently_rented_is_information_and_holds_nothing_by_itself():
+    # Ruling, Sat 01:20: lease status is something we do not know and never claim.
+    assert state(verified_but_for()) is VerdictState.VERIFIED
+    rented = verified_but_for(for_sale={"status": "recently_rented", "changed_on": "2026-11-01"})
+    verdict = decide(to_evidence(rented))
+    assert verdict.state is VerdictState.VERIFIED
+    assert not any("rented" in reason for reason in verdict.reasons)
+
     # Lane T replaces its own line by these two labels: "For sale" and "Rental history".
-    tone, text = card_lines(modules, CardRowKind.PLACE)["Rental history"]
-    assert tone is CardTone.HOLD
+    assert card_lines(rented, CardRowKind.PLACE)["Rental history"] == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. The record shows it was rented on 2026-11-01. "
+        "Ask the manager on record if it's still available.",
+    )
+    undated = verified_but_for(for_sale={"status": "recently_rented"})
+    tone, text = card_lines(undated, CardRowKind.PLACE)["Rental history"]
+    assert tone is CardTone.NOT_SHOWN and text.startswith("Not confirmed.")
     assert "Red flag" not in text
 
-    dated = evidence(for_sale={"status": "recently_rented", "changed_on": "2026-11-01"})
-    assert card_lines(dated, CardRowKind.PLACE)["Rental history"] == (
-        CardTone.HOLD,
-        "This home was rented on 2026-11-01.",
+
+def test_for_sale_still_holds_a_case_that_would_otherwise_pass():
+    assert state(verified_but_for(for_sale={"status": "active"})) is VerdictState.HOLD
+
+
+def test_naming_a_listing_brokerage_on_record_matches_as_naming_the_manager_does():
+    # Ruling, Sat 01:20: the manager, the leasing office and the listing brokerage on record
+    # may all market a home. Lane D passes the brokerage names (D7, `ForSaleMatch.offices`).
+    claims = ContactClaims(company="Fixture Realty Group")
+    assert check_authority(claims, record(), SALT).status is AuthorityStatus.MISMATCH
+    offices = ["Fixture Realty Group LLC", "Another Brokerage Inc"]
+    assert check_authority(claims, record(), SALT, offices).status is (
+        AuthorityStatus.MATCHES_RECORD
     )
+    # With no manager on the record, a brokerage on record is still something to match.
+    no_manager = record(manager_company=None)
+    assert check_authority(claims, no_manager, SALT, offices).status is (
+        AuthorityStatus.MATCHES_RECORD
+    )
+    assert check_authority(claims, no_manager, SALT).status is AuthorityStatus.UNKNOWN
 
 
 def test_the_card_carries_the_for_sale_finding_and_its_line_together():
@@ -527,8 +565,12 @@ def test_every_new_line_follows_the_card_wording_rules():
             assert "—" not in item.text
             if item.tone is CardTone.RED_FLAG:
                 assert item.text.endswith("Red flag.")
+            else:
+                assert "red flag" not in item.text.lower()
             if item.tone is CardTone.NOT_CHECKED:
                 assert item.text.startswith("Not checked")
+            if item.tone is CardTone.NOT_SHOWN:
+                assert item.text.startswith(("NOT SHOWN.", "Not confirmed."))
     assert card.state is VerdictState.HOLD
 
 
@@ -594,7 +636,7 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
     lines = {item.label: item for row in card.rows for item in row.lines}
     assert lines["For sale"].tone is CardTone.RED_FLAG
     assert lines["Link"].tone is CardTone.RED_FLAG
-    assert lines["Contact on record"].tone is CardTone.HOLD
+    assert lines["Contact on record"].tone is CardTone.RED_FLAG
     assert lines["Unit on record"].tone is CardTone.HOLD
     assert lines["Rent vs record"].tone is CardTone.HOLD
 

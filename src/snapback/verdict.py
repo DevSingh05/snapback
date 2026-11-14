@@ -153,8 +153,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     3. Presence proven, authority matching the record and no red flag of any kind gives
        VERIFIED.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
-       (price, payment, fee, data ask, pressure, link, overpayment, for sale, recently
-       rented, phone, lookalike link, unit).
+       (price, payment, fee, data ask, pressure, link, overpayment, for sale, phone,
+       lookalike link, unit).
+
+    Two things hold nothing by themselves (ruling, Sat 01:20): a name that is not the one on
+    record reads "not confirmed", and "recently rented" is information, since lease status
+    is something we do not know.
     """
     statuses = {photo.status for photo in evidence.photos}
 
@@ -178,7 +182,6 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         say(key)
         for key, raised in (
             ("reason.for_sale", evidence.for_sale_flag),
-            ("reason.recently_rented", evidence.recently_rented_flag),
             ("reason.phone_flag", evidence.phone_flag),
             ("reason.lookalike_link", evidence.lookalike_link_flag),
             ("reason.unit_flag", evidence.unit_flag),
@@ -215,9 +218,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     reasons = [say("reason.located")]
     if evidence.authority is AuthorityStatus.MATCHES_RECORD:
         reasons.append(say("reason.authority_matches"))
-    elif evidence.authority is AuthorityStatus.MISMATCH:
-        reasons.append(say("reason.authority_mismatch"))
     else:
+        # A name that is not the one on record is not confirmed, and nothing worse: the
+        # manager, the leasing office and a listing brokerage may all market a home.
         reasons.append(say("reason.authority_unknown"))
     if evidence.presence is PresenceStatus.PROVEN:
         reasons.append(say("reason.presence_proven_not_authority"))
@@ -334,17 +337,18 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         return [_line(lang, "label.for_sale", CardTone.RED_FLAG, "place.for_sale", site=site)]
     if status is ForSaleStatus.RECENTLY_RENTED:
         rented_on = modules.for_sale.changed_on if modules.for_sale else None
+        # Information, not a flag: we do not know whether it is rented now.
         if rented_on is not None:
             return [
                 _line(
                     lang,
                     "label.recently_rented",
-                    CardTone.HOLD,
+                    CardTone.NOT_SHOWN,
                     "place.recently_rented_dated",
                     date=rented_on.isoformat(),
                 )
             ]
-        return [_line(lang, "label.recently_rented", CardTone.HOLD, "place.recently_rented")]
+        return [_line(lang, "label.recently_rented", CardTone.NOT_SHOWN, "place.recently_rented")]
     return []
 
 
@@ -407,7 +411,8 @@ def _allowed_line(modules: ModuleEvidence, lang: str) -> CardLine:
             )
         return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.call_manager_unnamed")
     if status is AuthorityStatus.MISMATCH:
-        return _line(lang, "label.allowed", CardTone.RED_FLAG, "allowed.mismatch")
+        # Not a red flag: the name they gave may be a brokerage or an office we do not hold.
+        return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.call_office")
     return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.not_shown")
 
 
@@ -421,19 +426,20 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         # Supporting only: the number is public, so this is not who the poster is.
         lines.append(_line(lang, "label.contact", CardTone.OK, "contact.phone_match"))
     elif authority.office_phone_match is PhoneMatch.NO:
+        # The poster's own contact is not the one on record: a real red flag.
         if authority.manager_on_record:
             lines.append(
                 _line(
                     lang,
                     "label.contact",
-                    CardTone.HOLD,
+                    CardTone.RED_FLAG,
                     "contact.phone_mismatch",
                     manager=authority.manager_on_record,
                 )
             )
         else:
             lines.append(
-                _line(lang, "label.contact", CardTone.HOLD, "contact.phone_mismatch_unnamed")
+                _line(lang, "label.contact", CardTone.RED_FLAG, "contact.phone_mismatch_unnamed")
             )
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
