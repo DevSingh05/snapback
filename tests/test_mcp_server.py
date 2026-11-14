@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 from typing import Any
 
 import httpx
 import pytest
 from mcp import Client
 
-from snapback.mcp_server import TOKEN_HELD, Snapback, build_server
+from snapback.mcp_server import TOKEN_HELD, Snapback, build_server, vetted_address
 
 WRITE = "write-secret-0123456789abcdef"
 READ = "read-secret-0123456789abcdef"
@@ -232,7 +233,7 @@ def app(api: FakeApi) -> Snapback:
         httpx.Client(base_url="http://api.test", transport=httpx.MockTransport(api)),
         httpx.Client(transport=httpx.MockTransport(photo_host)),
         "http://localhost:5173",
-        is_public=lambda host: host == "photos.example",
+        resolve=lambda host, port: "93.184.216.34" if host == "photos.example" else None,
     )
 
 
@@ -556,3 +557,95 @@ def test_http_mode_needs_its_bearer_token(app: Snapback) -> None:
             ]
 
     assert asyncio.run(run()) == [401, 401, 200]
+
+
+# --- photo fetches cannot be rebound to a private address ---------------------------------------
+
+
+def answers(*addresses: str):
+    """A stand-in for socket.getaddrinfo that gives each lookup the next address in turn."""
+    queue = list(addresses)
+    calls: list[str] = []
+
+    def getaddrinfo(host: str, port: Any, *args: Any, **kwargs: Any) -> list[Any]:
+        calls.append(host)
+        ip = queue.pop(0) if len(queue) > 1 else queue[0]
+        family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        return [(family, socket.SOCK_STREAM, 6, "", (ip, port))]
+
+    return getaddrinfo, calls
+
+
+def real_resolver_app(seen: list[httpx.Request]) -> Snapback:
+    def host(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/hop":
+            return httpx.Response(302, headers={"location": "/second.jpg"})
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=JPEG)
+
+    return Snapback(  # the real vetted_address, the default
+        httpx.Client(base_url="http://api.test", transport=httpx.MockTransport(FakeApi())),
+        httpx.Client(transport=httpx.MockTransport(host)),
+        "http://localhost:5173",
+    )
+
+
+def test_a_rebinding_name_is_fetched_from_the_address_that_was_vetted(monkeypatch) -> None:
+    # The first lookup says public, every later one says localhost: the fetch must still go
+    # to the public address, with the name only in the Host header and SNI.
+    lookup, calls = answers("93.184.216.34", "127.0.0.1")
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    seen: list[httpx.Request] = []
+    name, data, kind = real_resolver_app(seen).fetch_photo("https://rebind.example/a.jpg?w=2", 1)
+    assert data == JPEG and kind == "image/jpeg"
+    assert calls == ["rebind.example"]  # resolved once
+    [request] = seen
+    assert str(request.url) == "https://93.184.216.34/a.jpg?w=2"  # port 443, normalised away
+    assert request.headers["host"] == "rebind.example"
+    assert request.extensions["sni_hostname"] == "rebind.example"  # TLS checks the name
+
+
+def test_each_redirect_hop_is_resolved_and_vetted_again(monkeypatch) -> None:
+    lookup, calls = answers("93.184.216.34", "127.0.0.1")
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    seen: list[httpx.Request] = []
+    with pytest.raises(Exception, match="private or unknown address"):
+        real_resolver_app(seen).fetch_photo("http://rebind.example/hop", 1)
+    assert calls == ["rebind.example", "rebind.example"]
+    assert [r.url.host for r in seen] == ["93.184.216.34"]  # localhost was never reached
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "127.0.0.1",
+        "10.0.0.5",
+        "169.254.169.254",
+        "::1",
+        "::ffff:127.0.0.1",
+        "64:ff9b::7f00:1",  # NAT64 of 127.0.0.1
+        "2002:7f00:1::1",  # 6to4 of 127.0.0.1
+        "::7f00:1",  # IPv4-compatible 127.0.0.1
+    ],
+)
+def test_private_and_tunnelled_addresses_are_refused(monkeypatch, address: str) -> None:
+    lookup, _ = answers(address)
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    assert vetted_address("photos.example", 443) is None
+
+
+def test_a_name_with_any_private_answer_is_refused(monkeypatch) -> None:
+    def mixed(host: str, port: Any, *args: Any, **kwargs: Any) -> list[Any]:
+        return [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.1", port)),
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", mixed)
+    assert vetted_address("photos.example", 443) is None
+
+
+def test_a_public_address_is_kept(monkeypatch) -> None:
+    lookup, _ = answers("2606:2800:220:1:248:1893:25c8:1946")
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    assert vetted_address("photos.example", 443) == "2606:2800:220:1:248:1893:25c8:1946"

@@ -105,8 +105,11 @@ What every tool keeps to:
 - **Plain errors.** A failure comes back as one sentence, such as "No case with that id." or
   "SNAPBACK's API is not reachable at http://localhost:8000. Start it with `make api`."
 - **Photos only from the renter.** `photo_urls` must be links the renter gave. Each is fetched
-  over http or https from a public host (no private or loopback addresses, redirects checked
-  too), must be an image, and is capped at 10 MB; 10 photos at most.
+  over http or https from a public host: the name is resolved once, every address it gives is
+  vetted (no private, loopback, link-local, NAT64, 6to4 or IPv4-compatible addresses), and the
+  fetch connects to that vetted address with the name in the Host header and TLS SNI, so a
+  second lookup cannot rebind it. Each redirect hop is vetted the same way. It must be an image,
+  capped at 10 MB; 10 photos at most.
 - **The renter decides.** A Finder proposal changes nothing until `snapback_accept_preference`
   carries the renter's own yes. A tour request is a draft the renter sends, or not.
 

@@ -96,18 +96,34 @@ def label(source: Any) -> str:
     return "LIVE" if str(source).lower() == "live" else "FIXTURE"
 
 
-def public_address(host: str) -> bool:
-    """True when every address `host` resolves to is a public one (no loopback, private,
-    link-local or reserved range), so a photo link cannot reach into the renter's network."""
+# Ranges `is_global` lets through on Python 3.12 that still reach a private or local address:
+# NAT64 (64:ff9b::/96), 6to4 (2002::/16, which embeds any IPv4 address) and the old
+# IPv4-compatible block (::/96).
+UNSAFE_V6 = tuple(ipaddress.ip_network(n) for n in ("64:ff9b::/96", "2002::/16", "::/96"))
+
+
+def unsafe(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True for any address a photo fetch must never reach."""
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if not ip.is_global or ip.is_multicast:
+        return True
+    return ip.version == 6 and any(ip in net for net in UNSAFE_V6)
+
+
+def vetted_address(host: str, port: int) -> str | None:
+    """Resolve `host` once and vet every address it gave. Returns one address to connect to,
+    or None when it did not resolve or any answer is private, loopback, link-local or reserved.
+    The fetch then connects to this address itself, so a second lookup (DNS rebinding) can
+    never send it somewhere else."""
     try:
-        infos = socket.getaddrinfo(host, None)
-    except OSError:
-        return False
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if not ip.is_global or ip.is_multicast:
-            return False
-    return bool(infos)
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except (OSError, UnicodeError):
+        return None
+    addresses = [ipaddress.ip_address(info[4][0].split("%")[0]) for info in infos]
+    if not addresses or any(unsafe(ip) for ip in addresses):
+        return None
+    return str(addresses[0])
 
 
 @dataclass
@@ -132,19 +148,20 @@ class SnapbackError(ToolError):
 
 class Snapback:
     """The calls behind each tool. `api` talks to SNAPBACK's API; `web` fetches the renter's
-    own photo links; `is_public` vets a photo link's host before any fetch."""
+    own photo links; `resolve` turns a photo link's host into one vetted address to connect to
+    (see `vetted_address`)."""
 
     def __init__(
         self,
         api: httpx.Client,
         web: httpx.Client,
         web_url: str,
-        is_public: Callable[[str], bool] = public_address,
+        resolve: Callable[[str, int], str | None] = vetted_address,
     ) -> None:
         self.api = api
         self.web = web
         self.web_url = web_url.rstrip("/")
-        self.is_public = is_public
+        self.resolve = resolve
         self.vault = Vault()
 
     # --- plumbing ---------------------------------------------------------------------------
@@ -199,10 +216,29 @@ class Snapback:
             parts = urlsplit(url)
             if parts.scheme not in ("http", "https") or not parts.hostname:
                 raise SnapbackError(f"Photo {n} is not an http or https link.")
-            if not self.is_public(parts.hostname):
-                raise SnapbackError(f"Photo {n} points at a private or unknown address.")
             try:
-                with self.web.stream("GET", url, timeout=PHOTO_TIMEOUT_S) as reply:
+                port = parts.port or (443 if parts.scheme == "https" else 80)
+            except ValueError:
+                raise SnapbackError(f"Photo {n} is not an http or https link.") from None
+            host = parts.hostname
+            address = self.resolve(host, port)
+            if address is None:
+                raise SnapbackError(f"Photo {n} points at a private or unknown address.")
+            # Connect to the address vetted above, never to a fresh lookup of the name. The
+            # name still goes in the Host header and, over https, in SNI, so TLS checks the
+            # certificate against the name the renter gave.
+            literal = f"[{address}]" if ":" in address else address
+            target = f"{parts.scheme}://{literal}:{port}{parts.path or '/'}"
+            if parts.query:
+                target += f"?{parts.query}"
+            default = port == (443 if parts.scheme == "https" else 80)
+            named = f"[{host}]" if ":" in host else host
+            headers = {"Host": named if default else f"{named}:{port}"}
+            extensions = {"sni_hostname": host} if parts.scheme == "https" else {}
+            try:
+                with self.web.stream(
+                    "GET", target, headers=headers, extensions=extensions, timeout=PHOTO_TIMEOUT_S
+                ) as reply:
                     if reply.is_redirect and "location" in reply.headers:
                         url = urljoin(url, reply.headers["location"])
                         continue
@@ -543,7 +579,7 @@ class PlainArgumentErrors:
 
 
 def build_server(app: Snapback) -> MCPServer:
-    """The MCP server with SNAPBACK's five tools bound to `app`."""
+    """The MCP server with SNAPBACK's six tools bound to `app`."""
     mcp = MCPServer(
         name="snapback",
         title="SNAPBACK",
