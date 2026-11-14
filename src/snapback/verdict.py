@@ -13,6 +13,7 @@ Three steps, each usable on its own:
 Every rule here has a test in tests/test_verdict.py or tests/test_card_rows.py.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 
@@ -72,8 +73,22 @@ class Presence:
     needs_new_photo: bool = False  # a recapture flag stopped a pass; ask again, accuse nobody
 
 
+# Listing photos are named l1, l2, ... in the order the renter sent them.
+_LISTING_PHOTO_ID = re.compile(r"l([1-9][0-9]{0,3})")
+
+
 def _photo_number(modules: ModuleEvidence, photo_id: str | None) -> int | None:
-    if photo_id is None or modules.locate is None:
+    """Which listing photo this is, counting from 1.
+
+    The id carries its own number. It is not looked up among the photos the twin placed:
+    that list can be shorter than what the renter sent, and the number would be lost.
+    """
+    if photo_id is None:
+        return None
+    named = _LISTING_PHOTO_ID.fullmatch(photo_id)
+    if named:
+        return int(named.group(1))
+    if modules.locate is None:
         return None
     for number, photo in enumerate(modules.locate.photos, start=1):
         if photo.photo_id == photo_id:
@@ -136,6 +151,40 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
     )
 
 
+# The order reasons are given in (A21, #127). A renter asks two things first: "is this person
+# allowed to rent it to me?" and "is this home even for rent?". Where the photos were taken
+# and what the rent is come after. Every reason the verdict can give is listed here once; a
+# test fails if a new one is added to the string table and not placed.
+REASON_ORDER = (
+    # Proof. It stands alone when there is any, so its place only matters for completeness.
+    "reason.forged",
+    "reason.forged_copy",
+    "reason.forged_copy_unknown",
+    "reason.photo_elsewhere",
+    # Who: authority first, then the poster's contact. (Licence and owner of record go here.)
+    "reason.authority_matches",
+    "reason.authority_unknown",
+    "reason.phone_flag",
+    "reason.lookalike_link",
+    # Availability: is the home for rent at all?
+    "reason.for_sale",
+    # Presence: was someone inside, which is not the same as being allowed to rent it.
+    "reason.presence_proven",
+    "reason.presence_proven_not_authority",
+    "reason.presence_missing",
+    # Place.
+    "reason.located",
+    "reason.not_located",
+    "reason.not_indexed",
+    "reason.unit_flag",
+    # Price, and what the renter's own text raised.
+    "reason.price_flag",
+    "reason.payment_flag",
+    "reason.rule_flag",
+)
+_REASON_RANK = {key: rank for rank, key in enumerate(REASON_ORDER)}
+
+
 def _for_sale(modules: ModuleEvidence) -> ForSaleStatus:
     return modules.for_sale.status if modules.for_sale else ForSaleStatus.NONE
 
@@ -148,85 +197,107 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
        mismatch is not proof (owners live elsewhere, agents act for them), with or without a
        red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
        leasing office's and a unit that does not fit the record are not proof either.
-    2. No photo placed in the claimed property gives UNVERIFIED. What the record flagged is
-       still listed among the reasons.
+    2. No photo placed in the claimed property gives UNVERIFIED, with what the record
+       flagged listed among the reasons. One thing outranks it: a home listed for sale is
+       HOLD, with that reason first, whether or not any photo could be placed.
     3. Presence proven, authority matching the record and no red flag of any kind gives
        VERIFIED.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
-       (price, payment, fee, data ask, pressure, link, overpayment, for sale, phone,
-       lookalike link, unit).
+       (price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike
+       link, unit), or a phone that is not the leasing office's (not a red flag, but not
+       confirmed either).
 
     Two things hold nothing by themselves (ruling, Sat 01:20): a name that is not the one on
     record reads "not confirmed", and "recently rented" is information, since lease status
     is something we do not know.
+
+    The reasons come out in `REASON_ORDER`: who and availability first, then presence, place
+    and price. That is only the order they are read in; it changes no state.
     """
     statuses = {photo.status for photo in evidence.photos}
 
-    def say(key: str) -> str:
-        return strings.text(key, lang)
-
-    def verdict(state: VerdictState, *reasons: str) -> Verdict:
+    def verdict(state: VerdictState, *keys: str, proof: str | None = None) -> Verdict:
+        """The verdict, with its reasons in the order a renter asks about them."""
+        if proof is not None:
+            reasons = [proof]
+        else:
+            ordered = sorted(dict.fromkeys(keys), key=_REASON_RANK.__getitem__)
+            reasons = [strings.text(key, lang) for key in ordered]
         return Verdict(
-            case_id=evidence.case_id, state=state, reasons=list(reasons), source=evidence.source
+            case_id=evidence.case_id, state=state, reasons=reasons, source=evidence.source
         )
 
+    # Proof is the whole reason for DONT_PAY. Nothing is put beside it.
     if evidence.presence is PresenceStatus.FORGED:
-        return verdict(VerdictState.DONT_PAY, evidence.forgery_reason or say("reason.forged"))
+        forged = evidence.forgery_reason or strings.text("reason.forged", lang)
+        return verdict(VerdictState.DONT_PAY, proof=forged)
 
     if LocateStatus.LOCATED_ELSEWHERE in statuses:
-        return verdict(VerdictState.DONT_PAY, say("reason.photo_elsewhere"))
+        return verdict(VerdictState.DONT_PAY, "reason.photo_elsewhere")
 
     # What the record says against the listing. None of it is proof, so none of it sets
     # DONT_PAY, but it is said whatever the state turns out to be.
     on_record = [
-        say(key)
+        key
         for key, raised in (
             ("reason.for_sale", evidence.for_sale_flag),
-            ("reason.phone_flag", evidence.phone_flag),
             ("reason.lookalike_link", evidence.lookalike_link_flag),
             ("reason.unit_flag", evidence.unit_flag),
         )
         if raised
     ]
+    # A phone that is not the leasing office's is not a red flag (ruling, Sat 02:10, #121):
+    # a licensed locator or listing agent posting with their own number is normal. It still
+    # holds a case, because the card cannot say "Checks passed" while the contact is
+    # unconfirmed, and it is still said whatever the state turns out to be.
+    # D10: when the licence check finds the poster is NOT licensed, a phone mismatch is a red
+    # flag again. That plugs in here (A18, #124).
+    unconfirmed = ["reason.phone_flag"] if evidence.phone_flag else []
 
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
-        if statuses <= {LocateStatus.NOT_INDEXED}:
-            return verdict(VerdictState.UNVERIFIED, say("reason.not_indexed"), *on_record)
-        return verdict(VerdictState.UNVERIFIED, say("reason.not_located"), *on_record)
+        unplaced = (
+            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
+        )
+        # For sale outranks "could not place" (conductor ruling, Sat 02:00). A home that is
+        # for sale usually has no scan to place photos in, and "we could not check" is the
+        # wrong thing to lead with. Still HOLD, never DONT_PAY: it is not proof.
+        state = VerdictState.HOLD if evidence.for_sale_flag else VerdictState.UNVERIFIED
+        return verdict(state, unplaced, *on_record, *unconfirmed)
 
     red_flags = []
     if evidence.price_flag:
-        red_flags.append(say("reason.price_flag"))
+        red_flags.append("reason.price_flag")
     if evidence.payment_flag:
-        red_flags.append(say("reason.payment_flag"))
+        red_flags.append("reason.payment_flag")
     elif evidence.rule_flag:
-        red_flags.append(say("reason.rule_flag"))
+        red_flags.append("reason.rule_flag")
     red_flags.extend(on_record)
 
     if (
         evidence.presence is PresenceStatus.PROVEN
         and evidence.authority is AuthorityStatus.MATCHES_RECORD
         and not red_flags
+        and not unconfirmed
     ):
         return verdict(
             VerdictState.VERIFIED,
-            say("reason.located"),
-            say("reason.authority_matches"),
-            say("reason.presence_proven"),
+            "reason.located",
+            "reason.authority_matches",
+            "reason.presence_proven",
         )
 
-    reasons = [say("reason.located")]
-    if evidence.authority is AuthorityStatus.MATCHES_RECORD:
-        reasons.append(say("reason.authority_matches"))
-    else:
-        # A name that is not the one on record is not confirmed, and nothing worse: the
-        # manager, the leasing office and a listing brokerage may all market a home.
-        reasons.append(say("reason.authority_unknown"))
-    if evidence.presence is PresenceStatus.PROVEN:
-        reasons.append(say("reason.presence_proven_not_authority"))
-    else:
-        reasons.append(say("reason.presence_missing"))
-    return verdict(VerdictState.HOLD, *reasons, *red_flags)
+    # A name that is not the one on record is not confirmed, and nothing worse: the manager,
+    # the leasing office and a listing brokerage may all market a home.
+    matches = evidence.authority is AuthorityStatus.MATCHES_RECORD
+    proven = evidence.presence is PresenceStatus.PROVEN
+    return verdict(
+        VerdictState.HOLD,
+        "reason.located",
+        "reason.authority_matches" if matches else "reason.authority_unknown",
+        "reason.presence_proven_not_authority" if proven else "reason.presence_missing",
+        *red_flags,
+        *unconfirmed,
+    )
 
 
 # --- the card ----------------------------------------------------------------------------------
@@ -304,7 +375,11 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     elif located:
         main = _line(lang, "label.real", CardTone.OK, "place.located", located=located, total=total)
     elif all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
-        main = _line(lang, "label.real", CardTone.NOT_CHECKED, "place.not_indexed")
+        # A photo that names a model belongs to a building whose scan exists and is not in
+        # our index. With no model named, there is no scan of the building at all.
+        has_scan = any(photo.model_id for photo in photos)
+        key = "place.not_indexed_yet" if has_scan else "place.not_indexed"
+        main = _line(lang, "label.real", CardTone.NOT_CHECKED, key)
     else:
         main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
 
@@ -312,11 +387,22 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         kind=CardRowKind.PLACE,
         lines=[
             main,
-            *_for_sale_lines(modules, lang),
-            *_unit_lines(modules, lang),
+            *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_seen_before_lines(modules, lang, replies=False),
         ],
     )
+
+
+def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLine]:
+    """Mark lines that came from the record, when the record is not from where the case is.
+
+    A case can hold a real record beside stand-ins for the twin and the challenge. The card
+    as a whole then stays FIXTURE, and these lines say for themselves that they are LIVE.
+    """
+    source = modules.record_source
+    if source is None or source is modules.source:
+        return lines
+    return [line.model_copy(update={"source": source}) for line in lines]
 
 
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
@@ -361,9 +447,23 @@ def _here_now_line(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardLine
         )
 
     if presence.needs_new_photo:
-        return _line(lang, label, CardTone.HOLD, "here_now.retry")
+        # With no retry left, do not tell the renter to ask for a photo nobody will check.
+        key = "here_now.no_retry_left" if modules.no_retry_left else "here_now.retry"
+        return _line(lang, label, CardTone.HOLD, key)
 
     if presence.status is PresenceStatus.WAITING:
+        # A reply may have come and settled nothing (A14). Say what it showed.
+        answered = [
+            spot
+            for spot in (modules.challenge.spots if modules.challenge else [])
+            if spot.replied_at is not None
+        ]
+        if answered and answered[-1].code_read and answered[-1].located is None:
+            return _line(lang, label, CardTone.NOT_SHOWN, "here_now.code_only")
+        if modules.no_retry_left:
+            return _line(lang, label, CardTone.HOLD, "here_now.no_retry_left")
+        if answered and answered[-1].code_read is False:
+            return _line(lang, label, CardTone.HOLD, "here_now.code_missing")
         return _line(lang, label, CardTone.HOLD, "here_now.waiting")
 
     if presence.status is PresenceStatus.NOT_REQUESTED:
@@ -415,20 +515,23 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         # Supporting only: the number is public, so this is not who the poster is.
         lines.append(_line(lang, "label.contact", CardTone.OK, "contact.phone_match"))
     elif authority.office_phone_match is PhoneMatch.NO:
-        # The poster's own contact is not the one on record: a real red flag.
+        # Not confirmed, never a red flag by itself (ruling, Sat 02:10, #121): agents and
+        # locators often post with their own number.
+        # D10: with a licence check that finds the poster is NOT licensed, this line goes
+        # back to RED_FLAG (A18, #124).
         if authority.manager_on_record:
             lines.append(
                 _line(
                     lang,
                     "label.contact",
-                    CardTone.RED_FLAG,
+                    CardTone.NOT_SHOWN,
                     "contact.phone_mismatch",
                     manager=authority.manager_on_record,
                 )
             )
         else:
             lines.append(
-                _line(lang, "label.contact", CardTone.RED_FLAG, "contact.phone_mismatch_unnamed")
+                _line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.phone_mismatch_unnamed")
             )
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
@@ -440,8 +543,7 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
         kind=CardRowKind.PERSON,
         lines=[
             _here_now_line(modules, lang, zone),
-            _allowed_line(modules, lang),
-            *_contact_lines(modules, lang),
+            *_from_record(modules, [_allowed_line(modules, lang), *_contact_lines(modules, lang)]),
             *_seen_before_lines(modules, lang, replies=True),
         ],
     )
@@ -497,6 +599,14 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
 
 
+def _rent_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    line = _rent_line(modules, lang)
+    price = modules.price
+    # A rent line that compared nothing says nothing about the record.
+    compared = price is not None and (price.status is not PriceStatus.NOT_CHECKED or price.per_bed)
+    return _from_record(modules, [line]) if compared else [line]
+
+
 def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     # The line never repeats the unit number: it is the renter's own text, and the card is
     # passed around.
@@ -511,7 +621,7 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     return CardRow(
         kind=CardRowKind.PRICE,
-        lines=[*_rule_lines(modules, lang), _rent_line(modules, lang)],
+        lines=[*_rule_lines(modules, lang), *_rent_lines(modules, lang)],
     )
 
 

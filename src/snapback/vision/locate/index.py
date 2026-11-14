@@ -88,6 +88,13 @@ class LocateIndex:
     def __len__(self) -> int:
         return len(self.entries)
 
+    @property
+    def embedder(self) -> Embedder | None:
+        return self._embedder
+
+    def model_ids(self) -> set[str]:
+        return {entry.model_id for entry in self.entries}
+
     @classmethod
     def build(cls, name: str, sweeps: Sequence[Sweep], embedder: Embedder) -> "LocateIndex":
         entries: list[Entry] = []
@@ -109,9 +116,15 @@ class LocateIndex:
         return index
 
     def search(
-        self, image: Image.Image, k: int = 10, embedder: Embedder | None = None
+        self,
+        image: Image.Image,
+        k: int = 10,
+        embedder: Embedder | None = None,
+        model_ids: set[str] | None = None,
+        vector: np.ndarray | None = None,
     ) -> list[Hit]:
-        """The k closest views, best first, at most one per (sweep, face)."""
+        """The k closest views, best first, at most one per (sweep, face). `model_ids` keeps
+        only those twins; `vector` reuses an embedding already computed for `image`."""
         embedder = embedder or self._embedder
         if embedder is None:
             raise ValueError("pass the embedder this index was built with")
@@ -119,10 +132,13 @@ class LocateIndex:
             raise ValueError(
                 f"index built with embedder {self.embedder_name!r}, queried with {embedder.name!r}"
             )
-        scores = self.vectors @ unit(embedder.embed(image))
+        query = unit(embedder.embed(image)) if vector is None else vector
+        scores = self.vectors @ query
         hits, seen = [], set()
         for row in np.argsort(-scores):
             entry = self.entries[row]
+            if model_ids is not None and entry.model_id not in model_ids:
+                continue
             key = (entry.model_id, entry.sweep_id, entry.face)
             if key in seen:
                 continue

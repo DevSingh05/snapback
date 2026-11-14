@@ -91,3 +91,15 @@ def test_an_unreadable_photo_is_skipped_and_reported_not_fatal(sources, tmp_path
 
 def test_the_copy_attack_is_named_for_the_harness_copy_prefix():
     assert AttackType.COPY_CROP.value.startswith("copy")
+
+
+def test_manifest_paths_are_relative_to_the_manifest(sources, tmp_path, monkeypatch):
+    out = tmp_path / "data" / "redteam"
+    rows = generate(sources, out, seed=1)
+    manifest = write_manifest(rows, out / "manifest.csv")
+    monkeypatch.chdir(tmp_path)  # resolution must not depend on where a reader runs
+    with manifest.open(newline="", encoding="utf-8") as fh:
+        paths = [r["path"] for r in csv.DictReader(fh)]
+    assert all(not Path(p).is_absolute() and not p.startswith("data") for p in paths)
+    assert all((manifest.parent / p).is_file() for p in paths)
+    assert all("\\" not in p for p in paths)  # the same on every OS

@@ -42,11 +42,11 @@ describe("AerialProof match", () => {
 });
 
 describe("AerialProof missing tile", () => {
-  it("shows Tile unavailable, not an img, when a tile is missing", () => {
+  it("shows No aerial image for this building yet, not an img, when a tile is missing", () => {
     render(
       <AerialProof mismatch claimed={{ tile: null, record: null }} matched={FIXTURE_MATCHED} />,
     );
-    expect(screen.getByText("Tile unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No aerial image for this building yet")).toBeInTheDocument();
     expect(screen.getAllByRole("img")).toHaveLength(1);
     expect(screen.queryByTestId("aerial-distance")).toBeNull();
   });
@@ -59,16 +59,16 @@ describe("AerialProof missing tile", () => {
         matched={{ ...live(FIXTURE_MATCHED), imageUrl: undefined }}
       />,
     );
-    expect(screen.getByText("Tile unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No aerial image for this building yet")).toBeInTheDocument();
     expect(screen.queryByRole("img")).toBeNull();
   });
 
-  it("swaps a broken image for Tile unavailable", () => {
+  it("swaps a broken image for No aerial image for this building yet", () => {
     render(
       <AerialProof mismatch={false} claimed={FIXTURE_CLAIMED} matched={live(FIXTURE_MATCHED)} />,
     );
     fireEvent.error(screen.getByRole("img"));
-    expect(screen.getByText("Tile unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No aerial image for this building yet")).toBeInTheDocument();
     expect(screen.queryByRole("img")).toBeNull();
   });
 });
