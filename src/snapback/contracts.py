@@ -721,6 +721,38 @@ class RealListing(BaseModel):
     cta_url: str | None = None  # the availability link, else https://<website_host>; with figures
 
 
+class CopyAlert(BaseModel):
+    """`GET /cases/{case_id}/copy-alert`: a DRAFT note for the leasing office on record when a
+    check placed the ad's photos in that office's building. Nothing is ever sent: the renter or
+    the office decides what to do with the text. Only proof or record facts: photos placed in
+    the building's scan, and the ad's number not being the office's. No phone digits, no street
+    address, no person named, no record rent figure (the percent only)."""
+
+    case_id: str
+    source: DataSource
+    fires: bool  # False: nothing to draft; `why_not` says why
+    why_not: (
+        Literal["no_record", "no_photos_in_scan", "phone_not_checked", "phone_is_office"] | None
+    ) = None
+    which: Literal["claimed", "matched"] | None = None
+    property_id: str | None = None
+    manager_company: str | None = None  # company only: who the note is for
+    website_host: str | None = None
+    photos_in_scan: int = 0
+    photos_total: int = 0
+    phone_is_office: PhoneMatch = PhoneMatch.NOT_CHECKED  # "no" when it fires on the claimed one
+    rent_percent_under: int | None = None  # the ad's rent under the listed plan, percent only
+    draft_only: bool = True  # always: this API has no way to send
+    sent: bool = False  # always False
+    draft_subject: str | None = None
+    draft_body: str | None = None
+    # The existing "Report this copy" pack for this case (GET /cases/{id}/report). Its steps
+    # are handed out only when `report_ready` (proof, or a home the record shows for sale).
+    report_url: str | None = None
+    report_ready: bool = False
+    as_of: str = ""
+
+
 class ReportPlatform(StrEnum):
     FACEBOOK = "facebook"
     ZILLOW = "zillow"

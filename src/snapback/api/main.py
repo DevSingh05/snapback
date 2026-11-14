@@ -74,6 +74,7 @@ from snapback.contracts import (
     AlternativesResponse,
     Card,
     CasePreferences,
+    CopyAlert,
     CreateCaseResponse,
     DataSource,
     Evidence,
@@ -89,6 +90,7 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.copy_alert import copy_alert
 from snapback.events import EventBus
 from snapback.events.bus import seq_of
 from snapback.office.context import listing_context
@@ -649,6 +651,21 @@ def create_app(
             update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
         )
 
+    def proof_inputs(case: RecordedCase | SessionCase):
+        """The claimed and the matched building's records and the ad's beds and unit, for the
+        real-listing panel and the copy alert. 503 when the kit is missing."""
+        try:
+            claimed = lookups.record(case.property_id) if case.property_id else None
+            matched_id = matched_id_of(case)
+            matched = lookups.record(matched_id) if matched_id else None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        listing = getattr(case, "listing", None)
+        beds = getattr(listing, "beds", None)
+        if beds is None and case.evidence.price is not None:
+            beds = case.evidence.price.compared_beds
+        return claimed, matched, beds, getattr(listing, "unit", None)
+
     @app.get("/cases/{case_id}/real-listing")
     def get_real_listing(
         case_id: str,
@@ -667,28 +684,55 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         response.headers["Cache-Control"] = "no-store"
         modules = case.evidence
-        try:
-            claimed = lookups.record(case.property_id) if case.property_id else None
-            matched_id = matched_id_of(case)
-            matched = lookups.record(matched_id) if matched_id else None
-        except KitMissing as missing:
-            raise HTTPException(status_code=503, detail=str(missing)) from None
-        listing = getattr(case, "listing", None)
-        beds = getattr(listing, "beds", None)
-        if beds is None and modules.price is not None:
-            beds = modules.price.compared_beds
+        claimed, matched, beds, unit = proof_inputs(case)
         panel = real_listing(
             modules,
             claimed,
             matched,
             settings,
             ad_beds=beds,
-            ad_unit=getattr(listing, "unit", None),
+            ad_unit=unit,
             lang=lang,
         )
         if panel is None:
             raise HTTPException(status_code=404, detail=strings.text("real.no_record", lang))
         return panel.model_copy(update={"case_id": case_id})
+
+    @app.get("/cases/{case_id}/copy-alert")
+    def get_copy_alert(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CopyAlert:
+        """A DRAFT note for the leasing office on record when the ad's photos sit in its
+        building's scan and the ad's number is not the office's. Nothing is ever sent. Same
+        token rule as the real-listing route: header only, never in the address. Never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers["Cache-Control"] = "no-store"
+        claimed, matched, beds, unit = proof_inputs(case)
+        pack = build_report(
+            case.evidence,
+            case.card(settings.snapback_public_base_url, lang),
+            case_id=case_id,
+            lang=lang,
+            aerial=case.property_id is not None,
+        )
+        return copy_alert(
+            case.evidence,
+            claimed,
+            matched,
+            settings,
+            case_id=case_id,
+            ad_beds=beds,
+            ad_unit=unit,
+            report_ready=pack.reportable,
+            lang=lang,
+        )
 
     @app.get("/cases/{case_id}/aerial/{side}.jpg")
     def get_aerial_image(

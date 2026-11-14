@@ -11,6 +11,7 @@ Rules held here:
 """
 
 from snapback.agent.rules.apply import _plans_to_compare
+from snapback.agent.rules.table import BELOW_RANGE_RATIO
 from snapback.card import strings
 from snapback.contracts import (
     DataSource,
@@ -211,3 +212,25 @@ def real_listing(
         cta_label=strings.text("real.cta", lang) if cta else None,
         cta_url=cta,
     )
+
+
+def rent_percent_under(
+    record: PropertyRecord, ad_rent: int | None, beds: int | None, unit: str | None
+) -> int | None:
+    """How far the ad's rent is under the lowest matching whole-unit plan on the record, as a
+    whole percent, when it is under by the same bar the rent check uses. The percent is ours; the
+    record's rents are not returned."""
+    if not ad_rent:
+        return None
+    whole = [p for p in record.floor_plan_rents if not p.per_bed]
+    lows = [
+        p.rent_min if p.rent_min is not None else p.rent_max
+        for p in _plans_to_compare(whole, unit, beds, record)
+    ]
+    lows = [v for v in lows if v]
+    if not lows:
+        return None
+    low = min(lows)
+    if ad_rent >= BELOW_RANGE_RATIO * low:
+        return None
+    return round(100 * (low - ad_rent) / low)

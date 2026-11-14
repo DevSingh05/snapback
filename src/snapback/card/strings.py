@@ -1379,6 +1379,26 @@ EN.update(
         "real.phone_not_office": "The ad's number is not the office's on record.",
         "real.cta": "See the real listing",
         "real.no_record": "CoStar has no record of the building this ad names.",
+        "copy.subject": "An ad using photos of your building was checked",
+        "copy.to_company": "To the leasing office at {company},",
+        "copy.to_office": "To the leasing office,",
+        "copy.photos_claimed": (
+            "SNAPBACK checked an ad today. {n} of its {m} photos sit in CoStar's own 3D scan "
+            "of your building."
+        ),
+        "copy.photos_matched": (
+            "SNAPBACK checked an ad today. {n} of its {m} photos sit in CoStar's own 3D scan "
+            "of your building, though the ad names a different one."
+        ),
+        "copy.phone_not_office": "The number in the ad is not the office's number on record.",
+        "copy.rent_under": "Its asked rent is {percent}% under your listed plan.",
+        "copy.ask": (
+            "This may be a copy of your listing, or an agent you work with. Please confirm "
+            "whether you posted it."
+        ),
+        "copy.report_line": "If you did not, the {report} for this check shows where to report it.",
+        "copy.report_name": "evidence pack",
+        "copy.draft_only": "This is a draft. Nothing has been sent.",
         "handoff.listing": "Its listing on Apartments.com",
         "handoff.site": "The building's own site",
         "summary.price_gap": "The rent is {percent}% under this building's {plan} listing.",
@@ -1430,6 +1450,26 @@ ES.update(
         "real.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
         "real.cta": "Ver el anuncio real",
         "real.no_record": "CoStar no tiene registro del edificio que nombra este anuncio.",
+        "copy.subject": "Se revisó un anuncio que usa fotos de su edificio",
+        "copy.to_company": "A la oficina de arrendamiento de {company}:",
+        "copy.to_office": "A la oficina de arrendamiento:",
+        "copy.photos_claimed": (
+            "SNAPBACK revisó hoy un anuncio. {n} de sus {m} fotos están en el escaneo 3D "
+            "propio de CoStar de su edificio."
+        ),
+        "copy.photos_matched": (
+            "SNAPBACK revisó hoy un anuncio. {n} de sus {m} fotos están en el escaneo 3D "
+            "propio de CoStar de su edificio, aunque el anuncio nombra otro."
+        ),
+        "copy.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
+        "copy.rent_under": "La renta que pide está {percent}% por debajo de su plano publicado.",
+        "copy.ask": (
+            "Puede ser una copia de su anuncio, o de un agente con quien trabajan. Confirme "
+            "si lo publicaron."
+        ),
+        "copy.report_line": "Si no fue así, el {report} de esta revisión muestra dónde reportarlo.",
+        "copy.report_name": "paquete de evidencia",
+        "copy.draft_only": "Este es un borrador. No se ha enviado nada.",
         "handoff.listing": "Su anuncio en Apartments.com",
         "handoff.site": "El sitio del propio edificio",
         "summary.price_gap": (

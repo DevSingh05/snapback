@@ -269,6 +269,32 @@ export interface RealListing {
   cta_url?: string | null; // availability link, else https://<website_host>; only with figures
 }
 
+// Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a
+// header, never in the address; no-store). A DRAFT for the leasing office on record: nothing is
+// ever sent, `sent` is always false. Show it only when `fires`. Words are in the asked language
+// (?lang=en|es). No phone digits, no street address, no person named, rent as a percent only.
+export interface CopyAlert {
+  case_id: string;
+  source: DataSource; // show the LIVE or FIXTURE chip from this
+  fires: boolean;
+  why_not?: "no_record" | "no_photos_in_scan" | "phone_not_checked" | "phone_is_office" | null;
+  which?: "claimed" | "matched" | null;
+  property_id?: string | null;
+  manager_company?: string | null; // who the note is for
+  website_host?: string | null;
+  photos_in_scan: number;
+  photos_total: number;
+  phone_is_office: "yes" | "no" | "not_checked"; // "no" when it fires on the claimed building
+  rent_percent_under?: number | null;
+  draft_only: true;
+  sent: false;
+  draft_subject?: string | null;
+  draft_body?: string | null; // plain text with blank lines between paragraphs
+  report_url?: string | null; // GET it with the read token header: the "Report this copy" pack
+  report_ready: boolean; // the pack hands out report steps only when true
+  as_of: string;
+}
+
 // Mirrors RenterBrief, PlaceMatch, SearchResponse, AlternativesResponse, TourDraftRequest and
 // TourDraft in src/snapback/contracts.py (POST /search, GET /cases/{id}/alternatives,
 // POST /cases/{id}/tour-draft). Every price and availability line ends "as of CoStar's last
