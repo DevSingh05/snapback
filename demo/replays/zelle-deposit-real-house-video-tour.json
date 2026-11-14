@@ -1,0 +1,71 @@
+{
+  "slug": "zelle-deposit-real-house-video-tour",
+  "case_id": "7Q2M",
+  "title": "A $2,500 Zelle deposit for a real house that was never for rent",
+  "pattern": "price",
+  "fictional": false,
+  "source": {
+    "name": "Los Angeles Times",
+    "url": "https://www.latimes.com/california/story/2026-07-31/online-rental-scams-sweeping-social-media",
+    "published_on": "2026-07-31"
+  },
+  "amount_usd": 2575,
+  "steps": [
+    {
+      "id": "listing",
+      "kind": "listing",
+      "reported_on": "2026-07-31",
+      "label": "Listing seen",
+      "detail": "A real house is listed for rent online. The owner still lives there and never offered it for rent."
+    },
+    {
+      "id": "chat",
+      "kind": "chat",
+      "reported_on": "2026-07-31",
+      "label": "Asked to see it",
+      "detail": "The poster says the occupants will not move out for weeks and sends a link to a professional video tour instead of a viewing."
+    },
+    {
+      "id": "hold",
+      "kind": "hold_request",
+      "reported_on": "2026-07-31",
+      "label": "Asked to pay to secure it",
+      "detail": "The renter is asked for an application fee and a security deposit to secure the house."
+    },
+    {
+      "id": "payment",
+      "kind": "payment",
+      "reported_on": "2026-07-31",
+      "label": "Paid by Zelle",
+      "detail": "The renter sends a $75 fee and a $2,500 deposit by Zelle, without ever seeing inside."
+    },
+    {
+      "id": "discovery",
+      "kind": "discovery",
+      "reported_on": "2026-07-31",
+      "label": "Found out",
+      "detail": "The poster stops answering. The video tour had been copied from an older real estate listing."
+    }
+  ],
+  "snapback": {
+    "verdict": "hold",
+    "stop_before": "payment",
+    "findings": [
+      {
+        "step_id": "listing",
+        "status": "matches",
+        "text": "The photos and the tour were taken in this house. Real photos do not mean the poster may rent it."
+      },
+      {
+        "step_id": "chat",
+        "status": "not_confirmed",
+        "text": "The poster could not be confirmed as someone who may rent this house, and offers no viewing."
+      },
+      {
+        "step_id": "hold",
+        "status": "warning",
+        "text": "A Zelle deposit before a viewing. Red flag."
+      }
+    ]
+  }
+}
