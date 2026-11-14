@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     snapback_eval_locate_real: Path = Path("eval/locate_real.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
+    # M3: what opens GET /events/stream, sent in a header. Unset closes the stream to everyone.
+    snapback_events_token: SecretStr | None = None
     # What happens after the renter approves the challenge (A14). "stand_in" answers at once
     # from the fixture. "reply" waits for the poster's real reply photo, sent to
     # POST /cases/{id}/reply, and checks it.
@@ -60,6 +62,10 @@ class Settings(BaseSettings):
 
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
+    # LangSmith tracing for the deepagents path. A human creates the key (AGENTS.md rule 8); with
+    # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
+    langsmith_api_key: SecretStr | None = None
+    langsmith_project: str = "snapback"
     # Checks one renter (or one browser) may start per day, and a ceiling per network address
     # so that clearing cookies is not a way around it.
     snapback_daily_limit: int = 3

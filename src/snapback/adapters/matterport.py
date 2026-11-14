@@ -223,6 +223,20 @@ class FixtureMatterport:
 # --- live backend ------------------------------------------------------------------------------
 
 
+MAX_RETRY_SLEEP_S = 30.0
+
+
+def _retry_delay(header: str | None, attempt: int) -> float:
+    """Seconds to wait before retrying a 429: the server's Retry-After in seconds when it is a
+    number, else exponential backoff; never longer than MAX_RETRY_SLEEP_S (an HTTP-date or a
+    value like 3600 must not stall a case)."""
+    try:
+        delay = float(header) if header is not None else float(2**attempt)
+    except ValueError:
+        delay = float(2**attempt)
+    return min(max(delay, 0.0), MAX_RETRY_SLEEP_S)
+
+
 class LiveMatterport:
     RETRIES = 4
 
@@ -323,11 +337,27 @@ class LiveMatterport:
                 continue
             if response.status_code != 429 or attempt == self.RETRIES:
                 break
-            time.sleep(float(response.headers.get("retry-after", 2**attempt)))
+            time.sleep(_retry_delay(response.headers.get("retry-after"), attempt))
         if response.status_code >= 400:
             # Status only: the URL may carry a signature, and the body may echo the request.
             raise RuntimeError(f"Matterport request failed: HTTP {response.status_code}")
         return response
+
+
+def cached_room_labels(model_id: str, cache_dir: Path = LIVE_CACHE) -> dict[str, str | None]:
+    """Sweep id -> room label from the local cache only (rooms.json, written by room_labels).
+    No network and no key, for the live path; an empty dict when nothing is cached."""
+    path = Path(cache_dir) / _safe(model_id) / "rooms.json"
+    try:
+        labels = json.loads(path.read_text())
+    except (OSError, ValueError, RecursionError):  # a deeply nested file must not stop locate
+        return {}
+    if not isinstance(labels, dict):
+        return {}
+    # A drifted file (a number, a list) must not reach the catalog: string labels or None only.
+    return {
+        k: v for k, v in labels.items() if isinstance(k, str) and (v is None or isinstance(v, str))
+    }
 
 
 def purge(cache_dir: Path = LIVE_CACHE, *, index_dir: Path = INDEX_CACHE) -> None:

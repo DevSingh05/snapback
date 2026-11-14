@@ -29,6 +29,7 @@ EN: dict[str, str] = {
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
+    "label.office": "Office confirmation",
     "label.link": "Link",
     "label.license": "License",
     "label.owner": "Owner of record",
@@ -39,6 +40,8 @@ EN: dict[str, str] = {
         "Taken in this building, in the {floor_plan} floor plan ({located} of {total} photos)."
     ),
     "place.located": "Taken in this building ({located} of {total} photos).",
+    # A house is a home, not a building.
+    "place.located_home": "Taken in this home ({located} of {total} photos).",
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
@@ -153,6 +156,27 @@ EN: dict[str, str] = {
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
+    "contact.office_confirmed": (
+        "Confirmed by the office: someone at {domain}, the website CoStar has on record for "
+        "this office, said this ad is theirs."
+    ),
+    # Vidyut, Sat 11:06: the office said yes but the phone in the ad is not the office's, so the
+    # card still reads Hold off. Said plainly, right under the confirmation.
+    "contact.office_still_hold": (
+        "Still hold off: the phone in the ad is not the office's number on record. Call the "
+        "office on a number you look up yourself before you pay."
+    ),
+    "contact.office_declined": (
+        "Not confirmed. Someone at {domain}, the website CoStar has on record for this "
+        "office, said the office does not recognise this ad."
+    ),
+    "reason.office_declined": (
+        "The office at {domain}, the website CoStar has on record, did not recognise this ad."
+    ),
+    "office.call_yourself": (
+        "No website for this office is on record, so it cannot be confirmed here. Call the "
+        "office on a number you look up yourself."
+    ),
     "license.licensed": "Licensed in Texas.",
     "license.licensed_sponsored": (
         "An active Texas license exists under the name in the ad, sponsored by {broker}."
@@ -203,6 +227,16 @@ EN: dict[str, str] = {
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
+    # The ad asks you to pay rent or a deposit before move-in. Honest listings do too, so it is
+    # never a red flag; the line just must not read "Matches" (conductor, Sat 10:03).
+    "payment.before_move_in": (
+        "The ad asks you to pay rent or a deposit before move-in. "
+        "We could not confirm who it would go to."
+    ),
+    "payment.before_move_in_not_owner": (
+        "The ad asks you to pay rent or a deposit before move-in, "
+        "and the owner of record is not the poster."
+    ),
     # One entry per red-flag rule in agent/rules/table.py, keyed by its rule id.
     "rule.payment.zelle_before_viewing": "Zelle before a viewing. Red flag.",
     "rule.payment.wire_before_viewing": "Wire transfer before a viewing. Red flag.",
@@ -288,6 +322,11 @@ EN: dict[str, str] = {
         "Staged example. The SNAPBACK team wrote this listing to show the checks. "
         "It is not a real poster."
     ),
+    # On a card made from a replay demo case (fixtures/demo/replay-*), instead of footer.staged.
+    "footer.replay": (
+        "Replay of a reported case ({source}, {date}). "
+        "The listing and house are re-created; no real names."
+    ),
     # --- the challenge message the renter relays, and the agent's own trace lines ----------
     "challenge.text": (
         "Before you pay, ask them to send a photo of {spot} with the code {code} written on paper."
@@ -327,6 +366,10 @@ EN: dict[str, str] = {
     "plan.pick.brokerage": "The home is listed for sale right now. Check the listing office.",
     "plan.pick.license": "The ad names a license. Look it up with the state.",
     "plan.pick.owner": "An owner is on public record. Compare it with who is posting.",
+    "plan.pick.claims": (
+        "The ad makes claims the record can answer. Compare what the ad says with CoStar's "
+        "record of the home."
+    ),
     "plan.pick.ask": (
         "The ad says they're licensed but gives no number. Ask the renter for the license number."
     ),
@@ -348,6 +391,8 @@ EN: dict[str, str] = {
     "plan.skip.license_none": "the ad names no license to look up",
     "plan.skip.owner_off": "owner lookup not available",
     "plan.skip.owner_none": "no owner on record to read",
+    "plan.skip.claims_off": "ad claims are not compared here",
+    "plan.skip.claims_none": "nothing in the ad that the record answers",
     "plan.skipped": "Skipped {option}: {reason}.",
     "plan.only_option": "Only one option was open.",
     "trace.retry.accept_both": "Both spots matched with the code read and no recapture flag.",
@@ -372,6 +417,12 @@ EN: dict[str, str] = {
         "The model answered with something that was not on the list, so the default was used."
     ),
     "trace.error.model_failed": "The model could not be used, so the default was used.",
+    "trace.agent.todos": "The agent wrote its plan: {count} steps, {done} done.",
+    "trace.agent.delegate": (
+        "Handed the {name} checks to a sub-agent that sees only its own tools and "
+        "writes its findings to a note."
+    ),
+    "trace.agent.note": "Note written: {path} ({chars} characters).",
     "trace.intake.injection": (
         "The listing has text written for an AI system. It was ignored, and the checks go on."
     ),
@@ -414,6 +465,12 @@ EN: dict[str, str] = {
     "reason.authority_matches": ("The ad names the manager on record. Anyone can type that name."),
     "reason.authority_matches_brokerage": (
         "The ad names the listing brokerage on record. Anyone can type that name."
+    ),
+    # Vidyut, Sat 09:38: someone at the office's own website domain on CoStar's record opened
+    # a one-time link. Only the domain is named, never an address or a person.
+    "reason.office_confirmed": (
+        "Confirmed through {domain}, the website CoStar has on record for this office; "
+        "the photos are of this home."
     ),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
@@ -464,6 +521,7 @@ ES: dict[str, str] = {
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
+    "label.office": "Confirmación de la oficina",
     "label.link": "Enlace",
     "label.license": "Licencia",
     "label.owner": "Propietario registrado",
@@ -473,6 +531,7 @@ ES: dict[str, str] = {
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
     ),
     "place.located": "Tomadas en este edificio ({located} de {total} fotos).",
+    "place.located_home": "Tomadas en esta vivienda ({located} de {total} fotos).",
     "place.elsewhere": "Tomadas en otro edificio ({elsewhere} de {total} fotos). Señal de alerta.",
     "place.not_located": (
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
@@ -584,6 +643,26 @@ ES: dict[str, str] = {
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
+    "contact.office_confirmed": (
+        "Confirmado por la oficina: alguien en {domain}, el sitio web que CoStar tiene "
+        "registrado para esta oficina, dijo que este anuncio es suyo."
+    ),
+    "contact.office_still_hold": (
+        "Aún en espera: el teléfono del anuncio no es el número de la oficina en el registro. "
+        "Llame a la oficina a un número que usted mismo busque antes de pagar."
+    ),
+    "contact.office_declined": (
+        "No confirmado. Alguien en {domain}, el sitio web que CoStar tiene registrado para "
+        "esta oficina, dijo que la oficina no reconoce este anuncio."
+    ),
+    "reason.office_declined": (
+        "La oficina en {domain}, el sitio web que CoStar tiene registrado, no reconoció este "
+        "anuncio."
+    ),
+    "office.call_yourself": (
+        "No hay un sitio web registrado para esta oficina, así que no se puede confirmar aquí. "
+        "Llame a la oficina a un número que usted mismo busque."
+    ),
     "license.licensed": "Con licencia en Texas.",
     "license.licensed_sponsored": (
         "Existe una licencia activa de Texas a nombre de quien firma el anuncio, patrocinada "
@@ -635,6 +714,13 @@ ES: dict[str, str] = {
         '{company}, el propietario registrado, dice: "{rule}" ({source}, leído el {date}).'
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
+    "payment.before_move_in": (
+        "El anuncio pide renta o depósito antes de la mudanza. No pudimos confirmar a quién iría."
+    ),
+    "payment.before_move_in_not_owner": (
+        "El anuncio pide renta o depósito antes de la mudanza, "
+        "y el propietario registrado no es quien publica."
+    ),
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
     "rule.payment.wire_before_viewing": (
         "Transferencia bancaria antes de una visita. Señal de alerta."
@@ -735,6 +821,10 @@ ES: dict[str, str] = {
         "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
         "revisiones. No es un anunciante real."
     ),
+    "footer.replay": (
+        "Repetición de un caso denunciado ({source}, {date}). "
+        "El anuncio y la casa están recreados; no hay nombres reales."
+    ),
     "challenge.text": (
         "Antes de pagar, pídales que envíen una foto de {spot} con el código {code} escrito "
         "en papel."
@@ -780,6 +870,10 @@ ES: dict[str, str] = {
     "plan.pick.brokerage": "La vivienda está en venta ahora. Revisar la oficina que la anuncia.",
     "plan.pick.license": "El anuncio menciona una licencia. Buscarla en el estado.",
     "plan.pick.owner": "Hay un propietario en el registro público. Compararlo con quien publica.",
+    "plan.pick.claims": (
+        "El anuncio afirma cosas que el registro puede responder. Comparar lo que dice el "
+        "anuncio con el registro de CoStar de la casa."
+    ),
     "plan.pick.ask": (
         "El anuncio dice que tienen licencia pero no da el número. Pedirle el número al inquilino."
     ),
@@ -803,6 +897,8 @@ ES: dict[str, str] = {
     "plan.skip.license_none": "el anuncio no menciona ninguna licencia que buscar",
     "plan.skip.owner_off": "la búsqueda de propietarios no está disponible",
     "plan.skip.owner_none": "no hay propietario en el registro que leer",
+    "plan.skip.claims_off": "aquí no se comparan las afirmaciones del anuncio",
+    "plan.skip.claims_none": "nada en el anuncio que el registro responda",
     "plan.skipped": "Omitido {option}: {reason}.",
     "plan.only_option": "Solo había una opción abierta.",
     "trace.retry.accept_both": (
@@ -833,6 +929,12 @@ ES: dict[str, str] = {
         " defecto."
     ),
     "trace.error.model_failed": "No se pudo usar el modelo, así que se usó la opción por defecto.",
+    "trace.agent.todos": "El agente escribió su plan: {count} pasos, {done} hechos.",
+    "trace.agent.delegate": (
+        "Pasó las comprobaciones de {name} a un subagente que solo ve sus propias "
+        "herramientas y escribe lo que encuentra en una nota."
+    ),
+    "trace.agent.note": "Nota escrita: {path} ({chars} caracteres).",
     "trace.intake.injection": (
         "El anuncio tiene texto escrito para un sistema de IA. Se ignoró y las revisiones "
         "continúan."
@@ -889,6 +991,10 @@ ES: dict[str, str] = {
         "El anuncio nombra a la agencia que figura en el registro. Cualquiera puede escribir "
         "ese nombre."
     ),
+    "reason.office_confirmed": (
+        "Confirmado a través de {domain}, el sitio web que CoStar tiene registrado para esta "
+        "oficina; las fotos son de este hogar."
+    ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",
     "reason.presence_proven_not_authority": (
@@ -919,6 +1025,291 @@ ES: dict[str, str] = {
     "card.source.fixture": "DATOS DE PRUEBA",
     "card.source.live": "EN VIVO",
 }
+
+# --- ad vs record: what the ad says and what CoStar's record shows (information only) ---------
+# These lines hold no case and set no state. Each says what the ad claims, then what the record
+# shows, "as of CoStar's last research". A line that doubts the ad starts "Not confirmed."
+# (Spanish: "Sin confirmar."); a line that agrees with it says so plainly and is the only one.
+EN.update(
+    {
+        "row.claims": "WHAT THE AD CLAIMS",
+        "label.ad_claim": "Ad vs record",
+        "label.ad_pretext": "Ad's explanation",
+        "label.aerial": "Aerial photo",
+        "claimword.floor_wood": "hardwood floors",
+        "claimword.floor_carpet": "carpet",
+        "claimword.floor_tile": "tile floors",
+        "claimword.floor_laminate": "laminate floors",
+        "claimword.washer_dryer": "a washer and dryer",
+        "claimword.pool": "a pool",
+        "claimword.garage": "a garage or parking",
+        "claimword.yard": "a yard",
+        "claimword.pets": "pets are allowed",
+        "claimword.beds": "{ad_value} bedrooms",
+        "claimword.beds_studio": "a studio",
+        "claimword.baths": "{ad_value} bathrooms",
+        "claimword.sqft": "{ad_value} square feet",
+        "claimword.new_management": "new management",
+        "claimword.new_ownership": "new ownership",
+        "claimword.just_sold": "the home just sold",
+        "claimword.owner_away": "the owner is away",
+        "claimword.cant_show": "the home can't be shown",
+        "kind.wood": "hardwood",
+        "kind.carpet": "carpet",
+        "kind.tile": "tile",
+        "kind.laminate": "laminate or vinyl",
+        "kind.hookup": "washer and dryer hookups",
+        "kind.machine": "a washer and dryer",
+        "kind.room": "a laundry room",
+        "list.and": " and ",
+        "claims.floor_photos": (
+            "Not confirmed. The ad says {claim}. CoStar's photos of this home are labelled "
+            "{record} (as of CoStar's last research)."
+        ),
+        "claims.floor_listing": (
+            "Not confirmed. The ad says {claim}. CoStar's listing features for this home name "
+            "{record} floors (as of CoStar's last research)."
+        ),
+        "claims.floor_match": (
+            "The ad says {claim}. CoStar's record of this home also names {record} floors "
+            "(as of CoStar's last research)."
+        ),
+        "claims.wd_listing": (
+            "Not confirmed. The ad says {claim}. CoStar's listing features for this home list "
+            "{record}, not a washer or dryer (as of CoStar's last research)."
+        ),
+        "claims.wd_match": (
+            "The ad says {claim}. CoStar's listing features for this home list one "
+            "(as of CoStar's last research)."
+        ),
+        "claims.pool_none": (
+            "Not confirmed. The ad says {claim}. CoStar's record of this home does not list or "
+            "show a pool (as of CoStar's last research)."
+        ),
+        "claims.pool_match": (
+            "The ad says {claim}. CoStar's record of this home shows one "
+            "(as of CoStar's last research)."
+        ),
+        "claims.parking_none": (
+            "Not confirmed. The ad says {claim}. CoStar's record shows no parking spaces for "
+            "this home (as of CoStar's last research)."
+        ),
+        "claims.parking_match": (
+            "The ad says {claim}. CoStar's record of this home shows parking spaces "
+            "(as of CoStar's last research)."
+        ),
+        "claims.parking_ratio_match": (
+            "The ad says {claim}. CoStar's record of this building shows parking, about "
+            "{record_value} spaces per unit (as of CoStar's last research)."
+        ),
+        "claims.aerial_date": (
+            "Not checked. An aerial photo of this property from {ad_value} (Vexcel) is on file; "
+            "nothing is read from it."
+        ),
+        "claims.yard_match": (
+            "The ad says {claim}. CoStar's record of this home shows one "
+            "(as of CoStar's last research)."
+        ),
+        "claims.pets_no": (
+            "Not confirmed. The ad says {claim}. CoStar's record of this home says pets are not "
+            "allowed (as of CoStar's last research)."
+        ),
+        "claims.pets_match": (
+            "The ad says {claim}. CoStar's record of this home agrees (as of CoStar's last "
+            "research)."
+        ),
+        "claims.beds_differ": (
+            "Not confirmed. The ad says {claim}. CoStar's record of this home shows "
+            "{record_value} (as of CoStar's last research)."
+        ),
+        "claims.beds_match": (
+            "The ad says {claim}. CoStar's record of this home agrees (as of CoStar's last "
+            "research)."
+        ),
+        "claims.baths_differ": (
+            "Not confirmed. The ad says {claim}. CoStar's record of this home shows "
+            "{record_value} (as of CoStar's last research)."
+        ),
+        "claims.baths_match": (
+            "The ad says {claim}. CoStar's record of this home agrees (as of CoStar's last "
+            "research)."
+        ),
+        "claims.sqft_differ": (
+            "Not confirmed. The ad says {claim}. CoStar's record of this home shows "
+            "{record_value} square feet (as of CoStar's last research)."
+        ),
+        "claims.sqft_match": (
+            "The ad says {claim}. CoStar's record of this home agrees (as of CoStar's last "
+            "research)."
+        ),
+        "claims.manager_same": (
+            "Not confirmed. The ad says {claim}. CoStar's record shows the same property "
+            "manager since {year} (as of CoStar's last research)."
+        ),
+        "claims.manager_new": (
+            "The ad says {claim}. CoStar's record shows a property manager starting in {year} "
+            "(as of CoStar's last research)."
+        ),
+        "claims.sale_none": (
+            "Not confirmed. The ad says {claim}. CoStar's record shows no sale in the last 12 "
+            "months (as of CoStar's last research)."
+        ),
+        "claims.sale_older": (
+            "Not confirmed. The ad says {claim}. CoStar's record shows the last sale in {year}, "
+            "not in the last 12 months (as of CoStar's last research)."
+        ),
+        "claims.sale_recent": (
+            "The ad says {claim}. CoStar's record shows a sale in {year} "
+            "(as of CoStar's last research)."
+        ),
+        "claims.office_listed": (
+            "Not confirmed. The ad says {claim}. CoStar's record lists a leasing office for "
+            "this property (as of CoStar's last research). Ask the office to show the home."
+        ),
+    }
+)
+ES.update(
+    {
+        "row.claims": "LO QUE DICE EL ANUNCIO",
+        "label.ad_claim": "Anuncio frente al registro",
+        "label.ad_pretext": "Explicación del anuncio",
+        "label.aerial": "Foto aérea",
+        "claimword.floor_wood": "pisos de madera",
+        "claimword.floor_carpet": "alfombra",
+        "claimword.floor_tile": "pisos de azulejo",
+        "claimword.floor_laminate": "pisos laminados",
+        "claimword.washer_dryer": "lavadora y secadora",
+        "claimword.pool": "piscina",
+        "claimword.garage": "cochera o estacionamiento",
+        "claimword.yard": "patio o jardín",
+        "claimword.pets": "se aceptan mascotas",
+        "claimword.beds": "{ad_value} recámaras",
+        "claimword.beds_studio": "un estudio",
+        "claimword.baths": "{ad_value} baños",
+        "claimword.sqft": "{ad_value} pies cuadrados",
+        "claimword.new_management": "nueva administración",
+        "claimword.new_ownership": "nuevos dueños",
+        "claimword.just_sold": "la casa se acaba de vender",
+        "claimword.owner_away": "el dueño está fuera",
+        "claimword.cant_show": "no se puede mostrar la casa",
+        "kind.wood": "madera",
+        "kind.carpet": "alfombra",
+        "kind.tile": "azulejo",
+        "kind.laminate": "laminado o vinilo",
+        "kind.hookup": "conexiones para lavadora y secadora",
+        "kind.machine": "lavadora y secadora",
+        "kind.room": "un cuarto de lavandería",
+        "list.and": " y ",
+        "claims.floor_photos": (
+            "Sin confirmar. El anuncio dice {claim}. Las fotos de esta casa en CoStar están "
+            "etiquetadas como {record} (según la última investigación de CoStar)."
+        ),
+        "claims.floor_listing": (
+            "Sin confirmar. El anuncio dice {claim}. Las características del anuncio de esta "
+            "casa en CoStar indican pisos de {record} (según la última investigación de CoStar)."
+        ),
+        "claims.floor_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa también indica pisos "
+            "de {record} (según la última investigación de CoStar)."
+        ),
+        "claims.wd_listing": (
+            "Sin confirmar. El anuncio dice {claim}. Las características del anuncio de esta "
+            "casa en CoStar indican {record}, no una lavadora ni una secadora (según la última "
+            "investigación de CoStar)."
+        ),
+        "claims.wd_match": (
+            "El anuncio dice {claim}. Las características del anuncio de esta casa en CoStar "
+            "indican que hay (según la última investigación de CoStar)."
+        ),
+        "claims.pool_none": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar de esta casa no indica "
+            "ni muestra una piscina (según la última investigación de CoStar)."
+        ),
+        "claims.pool_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa muestra una "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.parking_none": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar no muestra lugares "
+            "de estacionamiento para esta casa (según la última investigación de CoStar)."
+        ),
+        "claims.parking_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa muestra lugares de "
+            "estacionamiento (según la última investigación de CoStar)."
+        ),
+        "claims.parking_ratio_match": (
+            "El anuncio dice {claim}. El registro de CoStar de este edificio muestra "
+            "estacionamiento, unos {record_value} lugares por unidad (según la última "
+            "investigación de CoStar)."
+        ),
+        "claims.aerial_date": (
+            "No comprobado. Hay una foto aérea de esta propiedad del {ad_value} (Vexcel) en el "
+            "archivo; no se lee nada de ella."
+        ),
+        "claims.yard_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa muestra uno "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.pets_no": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar de esta casa dice que "
+            "no se permiten mascotas (según la última investigación de CoStar)."
+        ),
+        "claims.pets_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa coincide "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.beds_differ": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar de esta casa muestra "
+            "{record_value} (según la última investigación de CoStar)."
+        ),
+        "claims.beds_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa coincide "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.baths_differ": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar de esta casa muestra "
+            "{record_value} (según la última investigación de CoStar)."
+        ),
+        "claims.baths_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa coincide "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.sqft_differ": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar de esta casa muestra "
+            "{record_value} pies cuadrados (según la última investigación de CoStar)."
+        ),
+        "claims.sqft_match": (
+            "El anuncio dice {claim}. El registro de CoStar de esta casa coincide "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.manager_same": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar muestra al mismo "
+            "administrador desde {year} (según la última investigación de CoStar)."
+        ),
+        "claims.manager_new": (
+            "El anuncio dice {claim}. El registro de CoStar muestra un administrador que empezó "
+            "en {year} (según la última investigación de CoStar)."
+        ),
+        "claims.sale_none": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar no muestra ninguna "
+            "venta en los últimos 12 meses (según la última investigación de CoStar)."
+        ),
+        "claims.sale_older": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar muestra la última "
+            "venta en {year}, no en los últimos 12 meses (según la última investigación de "
+            "CoStar)."
+        ),
+        "claims.sale_recent": (
+            "El anuncio dice {claim}. El registro de CoStar muestra una venta en {year} "
+            "(según la última investigación de CoStar)."
+        ),
+        "claims.office_listed": (
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar muestra una oficina "
+            "de arrendamiento para esta propiedad (según la última investigación de CoStar). "
+            "Pida a la oficina que le muestre la casa."
+        ),
+    }
+)
 
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
 

@@ -301,3 +301,78 @@ def test_live_adapter_gives_up_after_repeated_drops_with_a_clear_error(tmp_path,
     client = httpx.Client(transport=httpx.MockTransport(handler))
     with pytest.raises(RuntimeError, match="network"):
         LiveMatterport("k", "s", cache_dir=tmp_path, client=client).sweeps("m4")
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_an_auth_refusal_is_one_call_no_sleep_and_no_secret_in_the_error(
+    tmp_path, monkeypatch, status
+):
+    slept = []
+    monkeypatch.setattr("snapback.adapters.matterport.time.sleep", slept.append)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(status)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with pytest.raises(RuntimeError) as caught:
+        LiveMatterport("key-id-123", "secret-xyz", cache_dir=tmp_path, client=client).sweeps("m5")
+    assert len(calls) == 1 and slept == []
+    message = str(caught.value)
+    assert "api.matterport.com" not in message and "key-id-123" not in message
+    assert "secret-xyz" not in message and str(status) in message
+
+
+@pytest.mark.parametrize(
+    ("retry_after", "expected"),
+    [("2", 2.0), ("Wed, 21 Oct 2015 07:28:00 GMT", 1.0), ("3600", 30.0), ("nonsense", 1.0)],
+)
+def test_retry_after_is_parsed_safely_and_capped(tmp_path, monkeypatch, retry_after, expected):
+    slept = []
+    monkeypatch.setattr("snapback.adapters.matterport.time.sleep", slept.append)
+    replies = iter(
+        [
+            httpx.Response(429, headers={"retry-after": retry_after}),
+            httpx.Response(200, json=_graph(with_pose=True)),
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.matterport.com":
+            return next(replies)
+        return httpx.Response(200, content=_face_bytes((5, 5, 5)))
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    LiveMatterport("k", "s", cache_dir=tmp_path, client=client).sweeps("m6")
+    assert slept == [expected]
+
+
+def test_cached_room_labels_read_the_cache_and_never_the_network(tmp_path, monkeypatch):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m7").mkdir()
+    (tmp_path / "m7" / "rooms.json").write_text(json.dumps({"sw1": "Kitchen", "sw2": None}))
+    monkeypatch.setattr(httpx.Client, "request", lambda *a, **k: pytest.fail("network used"))
+    assert cached_room_labels("m7", cache_dir=tmp_path) == {"sw1": "Kitchen", "sw2": None}
+    assert cached_room_labels("never-fetched", cache_dir=tmp_path) == {}
+    (tmp_path / "m7" / "rooms.json").write_text("{not json")
+    assert cached_room_labels("m7", cache_dir=tmp_path) == {}
+
+
+def test_cached_room_labels_keep_only_string_labels(tmp_path):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m8").mkdir()
+    (tmp_path / "m8" / "rooms.json").write_text(
+        json.dumps({"sw1": "Kitchen", "sw2": None, "sw3": 7, "sw4": ["Bedroom"], "sw5": {"x": 1}})
+    )
+    assert cached_room_labels("m8", cache_dir=tmp_path) == {"sw1": "Kitchen", "sw2": None}
+
+
+def test_cached_room_labels_survive_a_deeply_nested_file(tmp_path):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m9").mkdir()
+    (tmp_path / "m9" / "rooms.json").write_text("[" * 100_000 + "]" * 100_000)
+    assert cached_room_labels("m9", cache_dir=tmp_path) == {}

@@ -5,9 +5,11 @@ on:
   push:
     branches: [main]
 
+# PR branches: a new push cancels the older run. Main: every merge gets its own group (by commit),
+# so a later merge never cancels or drops the run for an earlier one.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'latest' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   hygiene:

@@ -8,7 +8,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DataSource(StrEnum):
@@ -43,6 +43,11 @@ class PhotoLocation(BaseModel):
     matched_model_id: str | None = None
     matched_property_id: str | None = None
     room_label: str | None = None  # Matterport's room classification, e.g. "Kitchen"
+    # E0 (plan/ml-agent-plan.md 3b): what the verification measured, kept so the evidence file
+    # can show it. All optional: None means "not recorded", never "zero".
+    spread: float | None = None  # how widely the matched points cover the photo (0 to 1)
+    rival_ratio: float | None = None  # best rival building's inliers over this one's
+    bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
 
 
 class AuthorityStatus(StrEnum):
@@ -90,6 +95,13 @@ class Evidence(BaseModel):
     license_flag: bool = False  # the ad prints a license number that is not an active license
     license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
+    # Someone at the office's own website domain on CoStar's record opened a one-time link for
+    # this case. The domain, never an address. It stands in for phone_confirmed in VERIFIED
+    # (Vidyut, Sat 09:38), and only together with the photos placed and nothing else holding.
+    office_confirmed_domain: str | None = None
+    # The office at that domain said the ad is NOT theirs. A reason that holds the case
+    # (never a red flag, never DONT_PAY: it is an answer, not proof).
+    office_declined_domain: str | None = None
 
 
 class VerdictState(StrEnum):
@@ -372,6 +384,24 @@ class OwnerResult(BaseModel):
     published_rule: PublishedRule | None = None  # lane A: the owner's own rule, if verified
 
 
+class AdNote(BaseModel):
+    """One ad-vs-record line, as facts. The words live in card/strings.py (`claims.<key>`).
+
+    `claim` names what the ad says (a `ClaimKind` value). `record` holds word keys for what
+    the record says (floor kinds and the like). `year` and `number` carry a date or a count.
+    `matches` is True for the one quiet confirming line. It carries no flag and holds no case.
+    """
+
+    key: str
+    claim: str
+    matches: bool = False
+    pretext: bool = False  # the ad explains why nothing can be seen (new management, away...)
+    record: list[str] = Field(default_factory=list)
+    year: int | None = None
+    ad_value: str | None = None
+    record_value: str | None = None
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -391,9 +421,21 @@ class ModuleEvidence(BaseModel):
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
+    # The record's own kind of home ("house", "multifamily"), when there is a record. The
+    # card says "this home" about a house and "this building" otherwise. It changes no state.
+    property_type: str | None = None
     # A14: a reply came, could not be accepted, and no further photo will be asked for. The
     # card then says "we could not confirm", not "ask for a new photo". It changes no state.
     no_retry_left: bool = False
+    # The domain, from CoStar's record, through which the office confirmed this case with a
+    # one-time link (snapback.office). None means nobody did.
+    office_confirmed_domain: str | None = None
+    # The office at that domain said the ad is NOT theirs. A reason that holds the case
+    # (never a red flag, never DONT_PAY: it is an answer, not proof).
+    office_declined_domain: str | None = None
+    # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
+    # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
+    ad_notes: list[AdNote] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -405,6 +447,8 @@ class CardRowKind(StrEnum):
     PLACE = "place"
     PERSON = "person"
     PRICE = "price"
+    # Ad vs record: info lines only, drawn after PRICE and only when there is something to say.
+    CLAIMS = "claims"
 
 
 class CardTone(StrEnum):
@@ -438,7 +482,7 @@ class Card(BaseModel):
     state: VerdictState
     checked_at: datetime
     expires_at: datetime
-    rows: list[CardRow]  # always PLACE, PERSON, PRICE in that order
+    rows: list[CardRow]  # PLACE, PERSON, PRICE always; CLAIMS after them only when it has a line
     not_checked: list[str]  # "ID", "lease", "ownership"
     footer: list[str]
     verify_url: str | None = None
@@ -466,6 +510,11 @@ class TraceKind(StrEnum):
     HITL = "hitl"  # waiting for the renter to approve
     VERDICT = "verdict"  # decide() ran; payload carries the state
     ERROR = "error"
+    # E0: the deep agent's own steps, bridged from its stream (never invented by the trace)
+    TODO = "todo"  # the agent's todo list was written or changed
+    AGENT = "agent"  # a hand-off to a sub-agent started or returned (name in `pick`)
+    FILE = "file"  # a file was written in the agent's file system (path in `pick`)
+    UNSURE = "unsure"  # code-raised: a measured thing is close to or past a line
 
 
 class TraceEvent(BaseModel):
@@ -553,6 +602,9 @@ class PropertyRecord(BaseModel):
     # snapback.agent.rules.contact.phone_hash(number, phone_salt()), a keyed hash.
     site_phone_hash: str | None = None
     website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
+    # Shown only to the office, in the confirm email and page, so it can tell which ad this is.
+    building_name: str | None = None
+    street_address: str | None = None
     floor_plan_rents: list[FloorPlanRent] = Field(default_factory=list)
     units: list[UnitOnRecord] = Field(default_factory=list)
     # Search (council 4): building facts for must-haves. None means the record does not say.
@@ -560,6 +612,22 @@ class PropertyRecord(BaseModel):
     has_elevator: bool | None = None  # True only when an elevator is on record
     metering: str | None = None  # "individual" or "master"
     parking_ratio: float | None = None  # spaces per unit, as reported
+    # What the ad can be held to (ad vs record). Derived words and numbers only, never a
+    # photo, a caption or a sentence from the kit. Empty or None means the record does not say.
+    floors_photos: list[str] = Field(default_factory=list)  # "wood", "carpet", "tile", "laminate"
+    floor_photo_count: int = 0  # photos whose labels name a floor
+    floors_listing: list[str] = Field(default_factory=list)  # the same words, from listing features
+    laundry_listing: list[str] = Field(default_factory=list)  # "machine", "hookup", "room"
+    pool_on_record: bool | None = None  # True: seen or listed; False: listed features name none
+    parking_spaces: int | None = None
+    yard_on_record: bool | None = None  # True only; the record never says "no yard"
+    pets_ok: bool | None = None
+    beds_range: tuple[int, int] | None = None
+    baths_range: tuple[float, float] | None = None
+    sqft_range: tuple[int, int] | None = None
+    manager_since: date | None = None  # the latest start of a property manager on record
+    sale_history_known: bool = False  # the record covers sales, so "no sale" is a finding
+    last_sale: date | None = None
 
 
 class AerialTile(BaseModel):
@@ -801,7 +869,44 @@ class PlaceMatch(BaseModel):
     has_3d_scan: bool = False
     scan_text: str | None = None  # "a 3D scan in this building"
     office_on_record: str | None = None  # company name only
+    # True only for a place that got the record-side deep check (the model picks up to three
+    # per search); every other place is "researched" only. The line is built by code from the
+    # record, so it is the same for the same place whoever chose it.
+    checked: bool = False
+    check_line: str | None = None
     source: DataSource
+
+
+class SearchDecision(BaseModel):
+    """One choice the search agent made, in the trace's own shape. `chosen_by` is "model" only
+    when a language model picked from the options code wrote; a menu of one is always "policy"."""
+
+    kind: Literal["deep_check", "tradeoff", "tour_gate"]
+    options: list[str]
+    pick: str
+    reason: str
+    chosen_by: Literal["model", "policy"]
+
+
+class CasePreferences(BaseModel):
+    """What the agent remembers about one renter's session. Code-defined keys only: a rejected
+    walk-up, a parking need, a lower budget, places to stop showing. Never free text."""
+
+    no_walkup: bool = False
+    needs_parking: bool = False
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class PreferencesUpdate(BaseModel):
+    """`POST /cases/{id}/preferences`: the renter rejected something. Each field is optional."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    no_walkup: bool | None = None
+    needs_parking: bool | None = None
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class SearchResponse(BaseModel):
@@ -810,6 +915,11 @@ class SearchResponse(BaseModel):
     n_considered: int  # priced places looked at before the brief's filters
     n_matches: int  # places that passed, before max_results cut the list
     matches: list[PlaceMatch]
+    # What the agent decided, in order, each stamped model or policy with a reason.
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None  # the one trade-off question to put to the renter
+    ask_first: bool = False  # ask it before drafting a tour request
+    remembered: list[str] = Field(default_factory=list)  # preference keys applied to this search
 
 
 class AlternativesResponse(BaseModel):
@@ -817,6 +927,10 @@ class AlternativesResponse(BaseModel):
     source: DataSource
     as_of: str = AS_OF
     matches: list[PlaceMatch]
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None
+    ask_first: bool = False
+    remembered: list[str] = Field(default_factory=list)
 
 
 class TourDraftRequest(BaseModel):
@@ -835,3 +949,54 @@ class TourDraft(BaseModel):
     status: Literal["draft"] = "draft"
     sent: Literal[False] = False
     source: DataSource
+
+
+# ---------------------------------------------------------------------------------------------
+# E0: the evidence file (plan/ml-agent-plan.md 3b). Written by code only, read by the card, the
+# "How we know" drawer and the walk. A model never sees `points`; it is stripped before any
+# chooser payload (allow-list test in E6).
+# ---------------------------------------------------------------------------------------------
+
+
+class PlaceStep(BaseModel):
+    """One search spent on one photo: the base search, or a retry the place sub-agent picked."""
+
+    option: str  # "base", "focus_scan:S2", "wider_index", "deeper_claimed" or "stop"
+    chosen_by: Literal["model", "policy"]  # "base" is always policy; a menu of one is policy
+    seconds: float | None = None
+    result: Literal["placed", "not_placed", "elsewhere", "skipped"]
+
+
+class EvidencePoints(BaseModel):
+    """Matched points for the drawing. A sample: `n_total` says how many matched in all."""
+
+    n_total: int = Field(ge=0)
+    # Pairs (ad x, ad y, scan x, scan y), each normalised to 0..1. At most 48.
+    sampled: list[tuple[float, float, float, float]] = Field(default_factory=list, max_length=48)
+
+
+class EvidencePhoto(BaseModel):
+    alias: str  # "P1", "P2", ...: what a model and the drawer call the photo
+    status: LocateStatus
+    inliers: int | None = None
+    inlier_ratio: float | None = None
+    spread: float | None = None
+    rival_ratio: float | None = None
+    bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
+    room_label: str | None = None
+    scan_alias: str | None = None  # "S1", "S2": the scan it was placed in
+    stop_alias: str | None = None  # the walk stop it belongs to (W1), if any
+    searches: list[PlaceStep] = Field(default_factory=list)
+    points: EvidencePoints | None = None
+
+
+class EvidenceFile(BaseModel):
+    """`/evidence/photos.json`: every photo's measurements, the bars they were held to and
+    which thresholds file those bars came from. Numbers shown on screen are read from here."""
+
+    case_id: str
+    source: DataSource
+    thresholds_version: str
+    bars: dict[str, float]  # e.g. {"min_inliers": 30, "min_inlier_ratio": 0.25, ...}
+    photos: list[EvidencePhoto]
+    written_by: Literal["code"] = "code"

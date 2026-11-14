@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import { SourceChip } from "../components/SourceChip";
+import { Wordmark } from "../components/HouseGlyph";
 import type { LocateResult } from "../contracts";
 import { TracePanel } from "../trace";
 import { AerialProof, type AerialSide } from "./AerialProof";
@@ -23,7 +24,7 @@ import { usePrefersReducedMotion } from "./useReducedMotion";
 const PLACEHOLDER_PHOTO =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dff3ee"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0b7a6c">Listing photo (fixture)</text></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#d3eedc"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0e5630">Listing photo (fixture)</text></svg>`,
   );
 
 const NO_LABELS: Record<string, string> = {};
@@ -62,6 +63,9 @@ function TwinViewInner({
   const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
   // A photo placed in a different building than the claimed one: show both buildings.
   const mismatch = hasDifferentHome(locate);
+  const otherHome = locate.photos.find(
+    (p) => p.status === "located_elsewhere" && p.matched_property_id,
+  )?.matched_property_id;
   const poseIsLive = locate !== fixtureBase;
   // Fixture room names belong to the fixture pose only; a live result without labels shows none.
   const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
@@ -204,7 +208,7 @@ function TwinViewInner({
   return (
     <div className="twin-page">
       <header className="twin-head">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <span className="mono">Model</span>
         {live && sdkFailed ? (
           <span className="chip chip-fixture" data-testid="source-chip">
@@ -218,6 +222,24 @@ function TwinViewInner({
         <span className="mono">Photo poses</span>
         <SourceChip source={poseIsLive ? "live" : "fixture"} />
         <span className="mono">{caseId}</span>
+        {mismatch && otherHome && (
+          <a
+            className="mono"
+            href={`/tour/${encodeURIComponent(otherHome)}?case=${encodeURIComponent(caseId)}&where=photos`}
+            data-testid="where-photos-link"
+          >
+            Where the photos were taken
+          </a>
+        )}
+        {locate.claimed_property_id && (
+          <a
+            className="mono"
+            href={`/tour/${encodeURIComponent(locate.claimed_property_id)}?case=${encodeURIComponent(caseId)}`}
+            data-testid="walk-it-first-link"
+          >
+            Walk it first
+          </a>
+        )}
       </header>
       <div className="twin-body">
         <section className="twin-stage" aria-label="3D view" ref={stageRef}>

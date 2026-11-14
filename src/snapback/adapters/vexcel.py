@@ -238,6 +238,32 @@ def _oblique_capture(
     return bool(dates), max(found, default=None)
 
 
+def known_capture(
+    record: PropertyRecord,
+    source: DataSource,
+    direction: str = "north",
+    *,
+    data_dir: Path | None = None,
+) -> date | None:
+    """The capture date of an aerial tile we already hold for this property, or None.
+
+    Reads the fixture tile, or the live cache beside a tile that is still fresh. It never calls
+    Vexcel and needs no key, so a check can show the date without a network wait. Nothing is
+    read from the picture. A missing, stale or damaged cache is None."""
+    if source == DataSource.FIXTURE:
+        return _fixture(record, direction).captured_on
+    if direction not in DIRECTIONS:
+        return None
+    cache = resolve_data_dir(data_dir or get_settings().snapback_data_dir) / "vexcel"
+    path = cache / f"{_SAFE.sub('_', record.property_id)}-{_SAFE.sub('_', direction)}.jpg"
+    try:
+        if not path.is_file() or time.time() - path.stat().st_mtime >= CACHE_DAYS * 24 * 3600:
+            return None
+        return _capture_date(json.loads(path.with_suffix(".json").read_text()).get("captured_on"))
+    except (*_BAD_REPLY, OSError):
+        return None
+
+
 def get_tile(
     record: PropertyRecord,
     direction: str = "north",
@@ -323,6 +349,31 @@ def get_tile(
     finally:
         if owns_client:
             http.close()
+
+
+def known_capture_date(
+    record: PropertyRecord,
+    *,
+    source: DataSource,
+    data_dir: Path | None = None,
+    direction: str = "north",
+) -> date | None:
+    """The aerial capture date for a building when it is already known, and never a fetch.
+
+    Fixture: the synthetic tile's date. Live: the date saved beside a tile already cached in
+    the last `CACHE_DAYS` days, else None. A damaged or missing meta file is "not known"."""
+    if source == DataSource.FIXTURE:
+        return _fixture(record, direction).captured_on
+    root = resolve_data_dir(data_dir or get_settings().snapback_data_dir) / "vexcel"
+    path = root / f"{_SAFE.sub('_', record.property_id)}-{_SAFE.sub('_', direction)}.jpg"
+    meta = path.with_suffix(".json")
+    try:
+        fresh = path.is_file() and time.time() - path.stat().st_mtime < CACHE_DAYS * 24 * 3600
+        if not fresh or not meta.is_file():
+            return None
+        return _capture_date(json.loads(meta.read_text()).get("captured_on"))
+    except (*_BAD_REPLY, OSError):
+        return None
 
 
 @dataclass(frozen=True)

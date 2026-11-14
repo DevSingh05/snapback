@@ -173,6 +173,8 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
         ),
         owner_flag=_owner_is_not_the_poster(modules),
+        office_confirmed_domain=modules.office_confirmed_domain,
+        office_declined_domain=modules.office_declined_domain,
     )
 
 
@@ -190,6 +192,8 @@ REASON_ORDER = (
     # owner of record.
     "reason.authority_matches",
     "reason.authority_matches_brokerage",
+    "reason.office_confirmed",
+    "reason.office_declined",
     "reason.authority_unknown",
     "reason.phone_not_confirmed",
     "reason.phone_not_confirmed_brokerage",
@@ -250,12 +254,15 @@ def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
 def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
     """The brokerage on record, when an active licence clears the contact line (Vidyut, Sat 07:35).
 
-    All four must hold: the licence is active (LICENSED); it was checked by NUMBER (the ad's or
-    the renter's, never a name lookup); its sponsor is a company; and that company is the
-    brokerage or office on record (the authority's, or a listing office of an ACTIVE
-    for-sale match), by the same matcher as everywhere else. Then a phone that is not the
-    office's is information, not "Not confirmed". It never verifies a case: the phone is
-    still not the office's, the owner line and the for-sale hold are not touched.
+    All five must hold: presence is PROVEN (a fresh in-home photo with the code, Vidyut Sat
+    09:05: a copied licence is defeated only by that); the licence is active (LICENSED); it
+    was checked by NUMBER (the ad's or the renter's, never a name lookup); its sponsor is a
+    company; and that company is the brokerage or office on record (the authority's, or a
+    listing office of an ACTIVE for-sale match), by the same matcher as everywhere else. Then
+    a phone that is not the office's is information, not "Not confirmed". It verifies
+    nothing, even with presence (a door code or a copied name and number can pass all of it,
+    Vidyut Sat 09:30); the owner line and the for-sale hold are
+    not touched.
     Returns that brokerage's name from the record, or None.
     """
     # Imported here: snapback.agent imports this module while it loads.
@@ -264,6 +271,9 @@ def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
     found = modules.license
     if (
         found is None
+        # Presence PROVEN is needed too (Vidyut, Sat 09:05): a real agent's name and number are
+        # public, so only a fresh in-home photo with the code separates them from a copier.
+        or presence_of(modules).status is not PresenceStatus.PROVEN
         or found.status is not LicenseStatus.LICENSED
         or found.number_from not in ("ad", "renter")
         or not found.sponsor_broker
@@ -310,13 +320,17 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """
     statuses = {photo.status for photo in evidence.photos}
 
-    def verdict(state: VerdictState, *keys: str, proof: str | None = None) -> Verdict:
+    def verdict(
+        state: VerdictState, *keys: str, proof: str | None = None, **values: str
+    ) -> Verdict:
         """The verdict, with its reasons in the order a renter asks about them."""
         if proof is not None:
             reasons = [proof]
         else:
             ordered = sorted(dict.fromkeys(keys), key=_REASON_RANK.__getitem__)
-            reasons = [strings.text(key, lang) for key in ordered]
+            # {domain} is only in the office reasons; the declined one is the default.
+            fill = {"domain": evidence.office_declined_domain or "", **values}
+            reasons = [strings.text(key, lang, **fill) for key in ordered]
         return Verdict(
             case_id=evidence.case_id, state=state, reasons=reasons, source=evidence.source
         )
@@ -357,6 +371,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
         # confirmed and HOLD, never a red flag, and never in a report pack.
         unconfirmed = [*unconfirmed, "reason.license_not_found_given"]
+    if evidence.office_declined_domain:
+        # The office at the website on record said this ad is not theirs. Not confirmed, and
+        # it holds the case; it is an answer, not proof, so never a red flag.
+        unconfirmed = [*unconfirmed, "reason.office_declined"]
     if evidence.owner_flag:
         # A19 (#125): the poster says they own it and the owner of record is someone else.
         # Not confirmed, like any name that does not match (ruling, Sat 01:20): owners rent
@@ -396,6 +414,29 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             "reason.presence_proven",
         )
 
+    # Vidyut, Sat 09:38: someone at the office's own website domain on CoStar's record opened
+    # a one-time link for this case. That stands in for the phone match, and only here: the
+    # photos are placed in the claimed home (above), presence is proven, the name matches the
+    # record, and nothing else holds the case (no red flag, no phone that is not the office's,
+    # no unconfirmed owner or licence). The field is set only by snapback.office from the
+    # record's website, so a domain from the ad cannot get here. Presence alone and a licence
+    # alone still never verify.
+    if (
+        evidence.office_confirmed_domain
+        and evidence.presence is PresenceStatus.PROVEN
+        and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and not red_flags
+        and not unconfirmed
+    ):
+        return verdict(
+            VerdictState.VERIFIED,
+            "reason.located",
+            "reason.authority_matches",
+            "reason.office_confirmed",
+            "reason.presence_proven",
+            domain=evidence.office_confirmed_domain or "",
+        )
+
     # A name that is not the one on record is not confirmed, and nothing worse: the manager,
     # the leasing office and a listing brokerage may all market a home.
     matches = evidence.authority is AuthorityStatus.MATCHES_RECORD
@@ -431,6 +472,16 @@ def _line(lang: str, label_key: str, tone: CardTone, text_key: str, **values: ob
     return CardLine(
         label=strings.text(label_key, lang), text=strings.text(text_key, lang, **values), tone=tone
     )
+
+
+# What a record calls a house: the kit's residential adapter says "house", and the staged
+# cases say "single family".
+_HOUSE_KINDS = frozenset({"house", "single family"})
+
+
+def _is_a_house(modules: ModuleEvidence) -> bool:
+    kind = (modules.property_type or "").lower().replace("_", " ").replace("-", " ")
+    return " ".join(kind.split()) in _HOUSE_KINDS
 
 
 def _floor_plan(modules: ModuleEvidence) -> str | None:
@@ -497,7 +548,8 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
             total=total,
         )
     elif located:
-        main = _line(lang, "label.real", CardTone.OK, "place.located", located=located, total=total)
+        key = "place.located_home" if _is_a_house(modules) else "place.located"
+        main = _line(lang, "label.real", CardTone.OK, key, located=located, total=total)
     elif all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
         # A photo that names a model belongs to a building whose scan exists and is not in
         # our index. With no model named, there is no scan of the building at all.
@@ -532,6 +584,24 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
 MAX_BROKERAGE_CHARS = 80
 
 
+def for_sale_record(found: ForSaleMatch, lang: str) -> tuple[str, str | None]:
+    """What the for-sale record says, in the card's LOCKED words, and the brokerage it names.
+    One place builds this sentence, so a search line and the card never word it differently."""
+    offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
+    brokerage = next((name for name in offices if name), None)
+    since = found.listed_on.isoformat() if found.listed_on else None
+    record_key = {
+        (True, True): "place.for_sale_record",
+        (True, False): "place.for_sale_record_no_date",
+        (False, True): "place.for_sale_record_no_brokerage",
+        (False, False): "place.for_sale_record_bare",
+    }[(brokerage is not None, since is not None)]
+    record = strings.text(
+        record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
+    )
+    return record, brokerage
+
+
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     status = _for_sale(modules)
     if status is ForSaleStatus.ACTIVE:
@@ -539,18 +609,7 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         # for sale are sometimes also offered for lease, and whether this one is leased is
         # something we do not know. The line says what the record says and who to ask.
         found = modules.for_sale
-        offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
-        brokerage = next((name for name in offices if name), None)
-        since = found.listed_on.isoformat() if found.listed_on else None
-        record_key = {
-            (True, True): "place.for_sale_record",
-            (True, False): "place.for_sale_record_no_date",
-            (False, True): "place.for_sale_record_no_brokerage",
-            (False, False): "place.for_sale_record_bare",
-        }[(brokerage is not None, since is not None)]
-        record = strings.text(
-            record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
-        )
+        record, brokerage = for_sale_record(found, lang)
         if _the_ad_is_the_office_s(modules):
             # The brokerage itself is offering the home (ruling, Sat 03:36). Information
             # only: it holds nothing, and the renter is told who to ask.
@@ -754,6 +813,20 @@ def _payment_ask_flagged(modules: ModuleEvidence) -> bool:
     return any(hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules)
 
 
+# The one rule that is not a red flag and still shows on the card (agent/rules/table.py).
+MONEY_BEFORE_MOVE_IN = "fee.money_before_move_in"
+
+
+def _asks_before_move_in(modules: ModuleEvidence) -> bool:
+    return any(hit.rule_id == MONEY_BEFORE_MOVE_IN for hit in modules.rules)
+
+
+def _rule_sits_beside_payment(modules: ModuleEvidence) -> bool:
+    """The owner's rule is quoted once: beside the payment line whenever the ad asks for
+    money (a flagged ask, or rent or a deposit before move-in), and on the owner line if not."""
+    return _payment_ask_flagged(modules) or _asks_before_move_in(modules)
+
+
 def _quoted_rule(rule: PublishedRule, lang: str, key: str) -> str:
     """The owner's own rule in its own words, with where it is published and when we read it."""
     source = rule.source_url.split("://", 1)[-1].removeprefix("www.").rstrip("/")
@@ -804,9 +877,37 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     text = strings.text(key, lang, company=company)
     # The owner's rule is quoted once. Beside a flagged payment ask when there is one (it is
     # what the rule speaks to), and here otherwise.
-    if owner.published_rule is not None and not _payment_ask_flagged(modules):
+    if owner.published_rule is not None and not _rule_sits_beside_payment(modules):
         text = f"{text} {_quoted_rule(owner.published_rule, lang, 'owner.rule')}"
     return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
+
+
+def _office_declined_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    domain = modules.office_declined_domain
+    if not domain:
+        return []
+    return [
+        _line(lang, "label.office", CardTone.NOT_SHOWN, "contact.office_declined", domain=domain)
+    ]
+
+
+def _office_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Someone at the office's own website domain on record confirmed this case (info line).
+
+    The domain is the one CoStar has on record for the office, never one from the ad."""
+    domain = modules.office_confirmed_domain
+    if not domain:
+        return []
+    lines = [_line(lang, "label.office", CardTone.OK, "contact.office_confirmed", domain=domain)]
+    authority = modules.authority
+    if (
+        authority is not None
+        and authority.office_phone_match is PhoneMatch.NO
+        and not modules.office_declined_domain
+    ):
+        # The office said yes, the headline stays Hold off, and the card says why in plain words.
+        lines.append(_line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.office_still_hold"))
+    return lines
 
 
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
@@ -814,7 +915,15 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
         kind=CardRowKind.PERSON,
         lines=[
             _here_now_line(modules, lang, zone),
-            *_from_record(modules, [_allowed_line(modules, lang), *_contact_lines(modules, lang)]),
+            *_from_record(
+                modules,
+                [
+                    _allowed_line(modules, lang),
+                    *_office_lines(modules, lang),
+                    *_office_declined_lines(modules, lang),
+                    *_contact_lines(modules, lang),
+                ],
+            ),
             # Not from the record: the licence list is the state's, and public.
             *_license_lines(modules, lang),
             # Nor this: the owner roll is the county's, and public.
@@ -838,10 +947,25 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         label = _RULE_LABELS[hit.category]
         by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
     if not by_label["label.payment_ask"]:
-        by_label["label.payment_ask"].append(
-            _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
-        )
+        by_label["label.payment_ask"].append(_quiet_payment_line(modules, lang))
     return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
+
+
+def _quiet_payment_line(modules: ModuleEvidence, lang: str) -> CardLine:
+    """The payment line when no payment ask is a red flag.
+
+    An ad that asks for rent or a deposit before move-in never reads "Matches" (conductor,
+    Sat 10:03). It is a warning when the owner of record publishes how it takes money, or is
+    not the poster, and "Not confirmed" otherwise. Only the tone differs: honest listings
+    ask for the same thing, so this is never a flag and no verdict reads it.
+    """
+    if not _asks_before_move_in(modules):
+        return _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
+    not_poster = _owner_is_not_the_poster(modules)
+    has_rule = modules.owner is not None and modules.owner.published_rule is not None
+    tone = CardTone.HOLD if (not_poster or has_rule) else CardTone.NOT_SHOWN
+    key = "payment.before_move_in_not_owner" if not_poster else "payment.before_move_in"
+    return _line(lang, "label.payment_ask", tone, key)
 
 
 def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
@@ -896,10 +1020,11 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     lines = _rule_lines(modules, lang)
     rule = modules.owner.published_rule if modules.owner else None
-    if rule is not None and _payment_ask_flagged(modules):
+    if rule is not None and _rule_sits_beside_payment(modules):
         # Conductor, Sat 03:00: when the ad asks for money in a way the owner's own rule
         # does not allow, the rule is quoted next to the payment line. It adds no flag and
         # changes no state: the payment ask is the flag, and DONT_PAY still needs proof.
+        # Sat 10:03: the same for rent or a deposit asked before move-in, which is no flag.
         payment = strings.text("label.payment_ask", lang)
         places = [index for index, line in enumerate(lines) if line.label == payment]
         lines.insert(
@@ -911,6 +1036,49 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
             ),
         )
     return CardRow(kind=CardRowKind.PRICE, lines=[*lines, *_rent_lines(modules, lang)])
+
+
+def _join_words(words: list[str], lang: str) -> str:
+    return strings.text("list.and", lang).join(strings.text(f"kind.{word}", lang) for word in words)
+
+
+def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Ad vs record: one line per note, as facts turned into the table's words. Information
+    only: `decide` never reads these, and a note the table has no words for is not shown."""
+    lines = []
+    for note in modules.ad_notes:
+        if not strings.has(f"claims.{note.key}", lang):
+            continue
+        claim_key = note.claim
+        if note.claim == "beds" and note.ad_value == "0":
+            claim_key = "beds_studio"
+        claim = strings.text(
+            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
+        )
+        label = "label.ad_claim"
+        if note.pretext:
+            label = "label.ad_pretext"
+        elif note.key == "aerial_date":
+            label = "label.aerial"
+        tone = CardTone.OK if note.matches else CardTone.NOT_SHOWN
+        if note.key == "aerial_date":
+            tone = CardTone.NOT_CHECKED  # a date to look at, not a finding
+        lines.append(
+            CardLine(
+                label=strings.text(label, lang),
+                text=strings.text(
+                    f"claims.{note.key}",
+                    lang,
+                    claim=claim,
+                    record=_join_words(note.record, lang),
+                    year=note.year if note.year is not None else "",
+                    ad_value=note.ad_value or "",
+                    record_value=note.record_value or "",
+                ),
+                tone=tone,
+            )
+        )
+    return _from_record(modules, lines)
 
 
 def build_card(
@@ -939,17 +1107,22 @@ def build_card(
     if verify_base_url:
         verify_url = f"{verify_base_url.rstrip('/')}/c/{public_id}"
 
+    rows = [
+        _place_row(modules, lang),
+        _person_row(modules, lang, checked.tzinfo),
+        _price_row(modules, lang),
+    ]
+    claims = _claims_lines(modules, lang)
+    if claims:  # only when there is something to say; the three rows above are always there
+        rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
+
     return Card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
         checked_at=checked,
         expires_at=checked + CARD_TTL,
-        rows=[
-            _place_row(modules, lang),
-            _person_row(modules, lang, checked.tzinfo),
-            _price_row(modules, lang),
-        ],
+        rows=rows,
         not_checked=[
             strings.text("not_checked.id", lang),
             strings.text("not_checked.lease", lang),

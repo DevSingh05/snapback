@@ -1,15 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
+import { HouseGlyph, Wordmark } from "../components/HouseGlyph";
 import { LabSection } from "../lab";
 import { loadBrief } from "../search/api";
+import { OfficeConfirm } from "../office/OfficeConfirm";
 import { PlacesStrip } from "../search/PlacesStrip";
 import { replayForCase } from "../replay";
 import { STATE_WORD, historySteps, shortDate, toneWord } from "../cardStrings";
 import type { Card, CardLine, CardRowKind, CardTone, VerdictState } from "../contracts";
 
-const ROW_LABEL = { place: "PLACE", person: "PERSON", price: "PRICE" } as const;
+const ROW_LABEL = {
+  place: "PLACE",
+  person: "PERSON",
+  price: "PRICE",
+  claims: "WHAT THE AD CLAIMS",
+} as const;
 
 const STATE_TONE: Record<VerdictState, string> = {
   hold: "amber",
@@ -34,13 +41,31 @@ export function expiryText(expiresAt: string, now: Date = new Date()): string {
   return `Expires in ${Math.max(1, Math.round(ms / 60_000))} min`;
 }
 
+// The chip's colour and icon follow the word it shows, so one word always looks one way.
+const WORD_KIND: Record<string, { kind: string; icon: string }> = {
+  Matches: { kind: "ok", icon: "✓" },
+  "Doesn't match": { kind: "mismatch", icon: "✕" },
+  Warning: { kind: "warn", icon: "!" },
+  "Not confirmed": { kind: "unconfirmed", icon: "?" },
+  "Not checked": { kind: "unchecked", icon: "–" },
+};
+
+const STATE_ICON: Record<VerdictState, string> = {
+  dont_pay: "✕",
+  hold: "!",
+  unverified: "?",
+  verified: "✓",
+};
+
 function ToneMark({ tone, row }: { tone: CardTone; row: CardRowKind }) {
+  const word = toneWord(tone, row);
+  const { kind, icon } = WORD_KIND[word] ?? { kind: "unchecked", icon: "–" };
   return (
-    <span className={`tone tone-${tone}`}>
+    <span className={`tone tone-${tone} tone-is-${kind}`}>
       <span className="tone-icon" aria-hidden="true">
-        {tone === "ok" ? "✓" : tone === "red_flag" ? "!" : tone === "hold" ? "…" : "–"}
+        {icon}
       </span>
-      {toneWord(tone, row)}
+      {word}
     </span>
   );
 }
@@ -50,14 +75,17 @@ function EvidenceRow({
   first,
   label,
   row,
+  index,
 }: {
   line: CardLine;
   first: boolean;
   label: string;
   row: CardRowKind;
+  // Where this line sits in the whole card: the lines land one after another.
+  index: number;
 }) {
   return (
-    <tr className={first ? "row-first" : undefined}>
+    <tr className={first ? "row-first" : undefined} style={{ "--i": index } as CSSProperties}>
       <th scope="row" className="cell-kind">
         {first ? (
           <span className="kind" data-testid="row-label">
@@ -86,14 +114,19 @@ export function CardView({
   const rows = card.rows;
   const history = historySteps(card.for_sale);
   const stateTone = STATE_TONE[card.state];
+  const firstIndex = rows.map((_, r) => rows.slice(0, r).reduce((n, g) => n + g.lines.length, 0));
   return (
     <article className={`card-page variant-${variant}`}>
       <header className="masthead">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <SourceChip source={card.source} />
       </header>
 
-      <section className="hero" aria-labelledby="card-title">
+      <section className={`hero hero-${stateTone}`} aria-labelledby="card-title">
+        <HouseGlyph className="hero-house" />
+        <span className="hero-mark" aria-hidden="true">
+          {STATE_ICON[card.state]}
+        </span>
         <p className="eyebrow">
           Case{" "}
           <span className="mono case-id" data-testid="case-id">
@@ -131,7 +164,7 @@ export function CardView({
                 <th>Status</th>
               </tr>
             </thead>
-            {rows.map((row) => (
+            {rows.map((row, r) => (
               <tbody key={row.kind} className={`group group-${row.kind}`}>
                 {row.lines.map((line, i) => (
                   <EvidenceRow
@@ -140,6 +173,7 @@ export function CardView({
                     first={i === 0}
                     label={ROW_LABEL[row.kind]}
                     row={row.kind}
+                    index={(firstIndex[r] ?? 0) + i}
                   />
                 ))}
               </tbody>
@@ -222,6 +256,10 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     return variant === "result" ? (
       <div className="pf-stack">
         <CardView card={load.card} variant={variant} withLab />
+        <OfficeConfirm caseId={caseId} onChanged={() => setAttempt((n) => n + 1)} />
+        <a className="pf-action pf-link" href={`/case/${caseId}/prep`} data-testid="card-prep-link">
+          Tour prep: be your own realtor
+        </a>
         <PlacesStrip caseId={caseId} brief={loadBrief(caseId)} />
       </div>
     ) : (
@@ -229,10 +267,11 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     );
   return (
     <div className="card-page notice" role="status">
-      <span className="wordmark">SNAPBACK</span>
+      <Wordmark />
       {load.status === "loading" && <p>Loading the result for case {caseId}…</p>}
       {load.status === "missing" && (
         <>
+          <HouseGlyph className="notice-house" lit={false} />
           <h1>No result for case {caseId}</h1>
           <p>Check the code on your message. Results are kept for 24 hours, then removed.</p>
         </>

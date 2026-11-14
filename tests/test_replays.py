@@ -132,17 +132,94 @@ def _status_of(kind: str, tone: str) -> str:
 @pytest.mark.parametrize("path", REPLAYS, ids=[p.stem for p in REPLAYS])
 def test_every_finding_is_a_line_the_real_card_shows(path):
     from snapback.agent.demo import run_demo_case
+    from snapback.agent.rules.published import PUBLISHED_RULES
+    from snapback.verdict import _quoted_rule
 
     r = _load(path)
     verdict, card = run_demo_case(r["case_id"])
     assert verdict.state.value == r["snapback"]["verdict"]
-    shown = {
+    lines = [
         (line.text, _status_of(row.kind.value, line.tone.value))
         for row in card.rows
         for line in row.lines
-    }
+    ]
+    # The owner's rule beside the payment step is the card's own beside-payment wording for
+    # the owner of record on THIS card; the staged ad asks for no risky payment, so the card
+    # omits that line.
+    owners = [rule for rule in PUBLISHED_RULES if any(rule.company in text for text, _ in lines)]
+    beside_payment = (
+        {_quoted_rule(owners[0], "en", "owner.rule_beside_payment")} if len(owners) == 1 else set()
+    )
     for finding in r["snapback"]["findings"]:
-        assert (finding["text"], finding["status"]) in shown, finding["text"]
+        assert finding_is_on_card(finding, lines, beside_payment), finding["text"]
+
+
+def finding_is_on_card(
+    finding: dict, lines: list[tuple[str, str]], beside_payment: set[str]
+) -> bool:
+    """A finding is a whole card line, or the start of one (the owner line is shown split
+    over two steps), with the status that line has. The only other thing allowed is the
+    owner's rule beside the payment step, as a warning on the hold step."""
+    text, status = finding["text"], finding["status"]
+    # a start of a line must end at a sentence boundary: it ends in . ? or !, and the line
+    # either is exactly it or goes on after a space
+    whole_sentence = text.endswith((".", "?", "!"))
+    if whole_sentence and any(
+        st == status and (line == text or line.startswith(text + " ")) for line, st in lines
+    ):
+        return True
+    return finding["step_id"] == "hold" and status == "warning" and text in beside_payment
+
+
+_OWNER = (
+    "Not confirmed. Owner of record: Invitation Homes, not the poster. "
+    'Invitation Homes says: "a rule" (example.org, read 2026-11-14).'
+)
+_CARD = [(_OWNER, "not_confirmed"), ("NOT SHOWN. Inside is not allowed.", "not_confirmed")]
+
+
+def test_the_finding_check_accepts_a_whole_line_and_the_start_of_one():
+    start = _OWNER.split(" Invitation Homes says")[0]
+    for text in (_OWNER, start):
+        assert finding_is_on_card(
+            {"step_id": "chat", "status": "not_confirmed", "text": text}, _CARD, set()
+        )
+
+
+@pytest.mark.parametrize(
+    "finding",
+    [
+        {"step_id": "chat", "status": "matches", "text": "Not confirmed. Owner of record"},
+        {"step_id": "chat", "status": "matches", "text": "NOT SHOWN. Inside is not allowed."},
+        # a start of a line that stops mid-sentence, dropping "not the poster"
+        {
+            "step_id": "chat",
+            "status": "not_confirmed",
+            "text": "Not confirmed. Owner of record: Invitation Homes",
+        },
+        {
+            "step_id": "chat",
+            "status": "not_confirmed",
+            "text": "Not confirmed. Owner of record: Invitation Homes,",
+        },
+        # a fragment from the middle of a line
+        {"step_id": "chat", "status": "not_confirmed", "text": "Invitation Homes"},
+        {"step_id": "chat", "status": "not_confirmed", "text": "Owner of record: Invitation Homes"},
+        # a line that is not on the card at all
+        {"step_id": "chat", "status": "not_confirmed", "text": "Something the card never says."},
+        # the owner's rule on any step but the hold step, or with any status but warning
+        {"step_id": "chat", "status": "warning", "text": "RULE"},
+        {"step_id": "hold", "status": "matches", "text": "RULE"},
+    ],
+)
+def test_the_finding_check_refuses_a_wrong_status_a_mid_line_fragment_or_an_invented_line(finding):
+    assert finding_is_on_card(finding, _CARD, {"RULE"}) is False
+
+
+def test_the_finding_check_allows_only_the_owners_rule_as_a_hold_step_warning():
+    rule = {"step_id": "hold", "status": "warning", "text": "RULE"}
+    assert finding_is_on_card(rule, _CARD, {"RULE"}) is True
+    assert finding_is_on_card(rule, _CARD, set()) is False
 
 
 @pytest.mark.parametrize(
@@ -163,3 +240,34 @@ def test_the_guard_catches_every_phone_number_format(phone):
 
 def test_the_guard_does_not_flag_ordinary_amounts_or_dates():
     assert not NEVER.search("A $2,500 deposit and a $75 fee in 2026.")
+
+
+def test_the_owner_replay_holds_on_the_owner_line_and_quotes_the_owner_s_rule():
+    """#11 (14:11): the owner-not-poster replay stops at HOLD, never DON'T PAY, on the line
+    'Owner of record: <company>, not the poster' with that company's own quoted rule."""
+    from snapback.agent.demo import run_demo_case
+    from snapback.agent.rules.published import PUBLISHED_RULES
+    from snapback.card import strings
+
+    verdict, card = run_demo_case("replay-owner-not-poster-door-code")
+    assert verdict.state.value == "hold"
+    assert strings.text("reason.owner_not_poster") in verdict.reasons
+    owner = [
+        line.text
+        for row in card.rows
+        for line in row.lines
+        if line.label == strings.text("label.owner")
+    ]
+    row = PUBLISHED_RULES[0]
+    assert len(owner) == 1
+    assert owner[0] == f"Not confirmed. Owner of record: {row.company}, not the poster."
+    # Conductor, Sat 10:03: the ad names rent and a deposit, so the owner's rule is quoted
+    # once, beside the payment ask it speaks to, and both of those lines are warnings.
+    price = next(found for found in card.rows if found.kind.value == "price")
+    labels = [line.label for line in price.lines]
+    at = labels.index(strings.text("label.owner_rule"))
+    assert labels[at - 1] == strings.text("label.payment_ask")
+    assert [price.lines[at - 1].tone.value, price.lines[at].tone.value] == ["hold", "hold"]
+    assert f'"{row.rule}"' in price.lines[at].text
+    quoted = [line for found in card.rows for line in found.lines if f'"{row.rule}"' in line.text]
+    assert len(quoted) == 1

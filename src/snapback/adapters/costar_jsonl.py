@@ -20,6 +20,7 @@ import argparse
 import json
 import statistics
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -34,6 +35,8 @@ DEFAULT_KIT = REPO_ROOT / "data" / "raw" / "costar" / "costar-hackathon-kit"
 
 PROPERTY_FILE = "commercial-property.jsonl"
 LISTING_FILE = "apartment-listing.jsonl"
+SALES_FILE = "commercial-sale-comp.jsonl"
+PROPERTY_MANAGER = 4  # enums.json ContactRole
 
 MATTERPORT_REF_TYPES = {36, 234}
 PROPERTY_TYPES = {11: "multifamily"}
@@ -377,11 +380,73 @@ def _building_facts(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _text(value: Any) -> str | None:
+    """A short plain string from the kit, or None."""
+    return " ".join(value.split())[:120] or None if isinstance(value, str) else None
+
+
+def _street_address(address: Any) -> str | None:
+    """ "100 Fixture Way, Houston, TX 77002" from the record's primary address, if it has one.
+
+    Used only to tell the office which building an ad is about (never on the card)."""
+    if not isinstance(address, dict):
+        return None
+
+    def part(key: str) -> str:
+        return " ".join(str(address.get(key) or "").split())
+
+    street = " ".join(
+        p for p in (part("streetNumber"), part("streetName"), part("streetType")) if p
+    )
+    state = " ".join(p for p in (part("state"), part("postcode")) if p)
+    text = ", ".join(p for p in (street, part("city"), state) if p)
+    return text[:160] or None
+
+
+def _day(value: Any) -> date | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+def _manager_since(record: dict[str, Any]) -> date | None:
+    """The latest start among the property managers on the record (`contacts[]` with role
+    PropertyManager). The kit keeps current contacts only. Owners and brokers are not managers."""
+    starts = [
+        _day(c.get("startDate"))
+        for c in record.get("contacts") or []
+        if isinstance(c, dict) and c.get("contactRole") == PROPERTY_MANAGER
+    ]
+    return max((d for d in starts if d), default=None)
+
+
+def latest_sales(kit_dir: Path) -> dict[str, date] | None:
+    """The date of each property's latest sale in `commercial-sale-comp.jsonl`, by property id.
+    None when the kit has no sale file: then "no sale" is not a finding."""
+    path = _find(kit_dir, SALES_FILE)
+    if path is None:
+        return None
+    out: dict[str, date] = {}
+    for comp in _iter_jsonl(path):
+        sold = _day(comp.get("soldDate"))
+        if sold is None:
+            continue
+        for entity in comp.get("entities") or []:
+            pid = entity.get("propertyId") if isinstance(entity, dict) else None
+            if pid is not None and (str(pid) not in out or sold > out[str(pid)]):
+                out[str(pid)] = sold
+    return out
+
+
 def parse_record(
     record: dict[str, Any],
     source: DataSource,
     listing: dict[str, Any] | None = None,
     enums: dict[str, dict[str, str]] | None = None,
+    sales: dict[str, date] | None = None,
 ) -> PropertyRecord | None:
     """One kit record (plus its apartment listing, if any) to a `PropertyRecord`."""
     pid = _first(record, FIELDS["property_id"])
@@ -405,9 +470,15 @@ def parse_record(
         "lon": _as_float(_get_any(record, FIELDS["lon"])),
         "model_ids": _model_ids(record),
         "website_host": _host(_first(record, FIELDS["website"])),
+        "building_name": _text(record.get("buildingName")),
+        "street_address": _street_address(record.get("primaryAddress")),
         "units": _property_units(record),
     }
     fields.update(_building_facts(record))
+    fields["manager_since"] = _manager_since(record)
+    if sales is not None:
+        fields["sale_history_known"] = True
+        fields["last_sale"] = sales.get(str(pid))
     # The leasing office's phone is kept only as a keyed hash; the digits never leave here.
     phone = _first(record, FIELDS["site_phone"])
     fields["site_phone_hash"] = phone_hash(str(phone), phone_salt()) if phone else None
@@ -431,11 +502,12 @@ def load_records(
         )
     listings = _listings(kit)
     enums = _load_enums(kit)
+    sales = latest_sales(kit)
     out: dict[str, PropertyRecord] = {}
     for obj in _iter_jsonl(path):
         pid = _first(obj, FIELDS["property_id"])
         listing = listings.get(str(pid)) if pid is not None else None
-        rec = parse_record(obj, source, listing, enums)
+        rec = parse_record(obj, source, listing, enums, sales)
         if rec is not None:
             out.setdefault(rec.property_id, rec)
     return out

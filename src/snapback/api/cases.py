@@ -28,6 +28,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
+from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
 from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of, owner_of
@@ -35,9 +36,11 @@ from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
+from snapback.api.casefiles import CaseFiles
 from snapback.card import strings
 from snapback.contracts import (
     Card,
+    CasePreferences,
     CaseProgress,
     DataSource,
     ModuleEvidence,
@@ -107,6 +110,8 @@ class RecordedCase:
     done = True
     token = None  # a recorded case can never be written to, so it has no secret
     read_token = None
+    # What the renter rejected; a recorded case is read-only, so this stays empty.
+    preferences = CasePreferences()
 
     def __init__(
         self,
@@ -173,6 +178,10 @@ class RecordedCase:
     def presence(self) -> PresenceStatus:
         return presence_of(self._evidence).status
 
+    def notes(self) -> CaseNotes:
+        """A recorded case was not worked by an agent here, so it has no working notes."""
+        return CaseNotes(case_id=self.case_id, source=self._evidence.source, notes=[])
+
 
 class SessionCase:
     def __init__(
@@ -194,7 +203,11 @@ class SessionCase:
         self._listing = listing
         self._runner = runner
         self.staged = False  # made from a staged demo case (fixtures/demo)
+        self.demo_case_id: str | None = None  # which one, so a replay can name its source
+        # What the renter rejected in this case ("no walk-ups", a place), code-defined keys only.
+        self.preferences = CasePreferences()
         self.property_id: str | None = None  # our id for the building the listing claims
+        self.files: CaseFiles | None = None  # evidence file, notes and pictures (E3 serves them)
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 
@@ -230,7 +243,7 @@ class SessionCase:
             lang=lang,
         )
         # A card made from a staged demo case says so on the card itself.
-        return staged(card) if self.staged else card
+        return staged(card, self.demo_case_id) if self.staged else card
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         """Where the case stands. The drafted challenge is left out unless asked for."""
@@ -263,6 +276,29 @@ class SessionCase:
             ),
             question=self.session.question,
         )
+
+    @property
+    def office_record(self) -> object | None:
+        """The property record this case runs on, if any. Read-only, for the office proof."""
+        return getattr(self.session.modules, "record", None)
+
+    @property
+    def office_confirmed_domain(self) -> str | None:
+        return self.session.evidence.office_confirmed_domain
+
+    @property
+    def office_declined_domain(self) -> str | None:
+        return self.session.evidence.office_declined_domain
+
+    def confirm_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Yes, ours"."""
+        with self._lock:
+            self.session.confirm_office(domain)
+
+    def decline_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Not ours"."""
+        with self._lock:
+            self.session.decline_office(domain)
 
     def approve(self, decision: str, text: str | None) -> None:
         with self._lock:
@@ -301,14 +337,29 @@ class SessionCase:
     def presence(self) -> PresenceStatus:
         return presence_of(self.session.evidence).status
 
+    def notes(self) -> CaseNotes:
+        """The notes the agent wrote for this case (read-only; see casework.py)."""
+        return notes_view(self.session)
+
 
 def _policy_runner(session: CaseSession) -> object:
-    return run_case(session, PolicyChooser())
+    try:
+        return run_case(session, PolicyChooser())
+    finally:
+        refresh_policy_notes(session)  # the same notes, written by code
 
 
-def _deepagents_runner() -> Callable[[CaseSession], object]:
+def _deepagents_runner(settings: Settings | None = None) -> Callable[[CaseSession], object]:
     """A runner that drives each case with its own deep agent, falling back to the policy."""
     agents: dict[str, object] = {}
+    if settings is not None:
+        try:
+            from snapback.agent.graph import enable_langsmith
+
+            key = settings.langsmith_api_key
+            enable_langsmith(key.get_secret_value() if key else None, settings.langsmith_project)
+        except Exception:
+            log.warning("LangSmith tracing could not be set up; carrying on without it")
 
     def run(session: CaseSession) -> object:
         try:
@@ -319,7 +370,10 @@ def _deepagents_runner() -> Callable[[CaseSession], object]:
         except Exception:
             # The extra is not installed, there is no key, or the graph could not be built.
             session.trace.emit(TraceKind.ERROR, strings.text("trace.error.model_failed"))
-            return run_case(session, PolicyChooser())
+            try:
+                return run_case(session, PolicyChooser())
+            finally:
+                refresh_policy_notes(session)
 
     return run
 
@@ -344,7 +398,9 @@ class CaseStore:
         self._lock = threading.Lock()
         self._memory: PhotoMemory | None = None
         self._runner = (
-            _deepagents_runner() if settings.snapback_agent == "deepagents" else _policy_runner
+            _deepagents_runner(settings)
+            if settings.snapback_agent == "deepagents"
+            else _policy_runner
         )
         if settings.snapback_data_source is DataSource.FIXTURE:
             self._add_recorded_fixture()
@@ -372,6 +428,25 @@ class CaseStore:
 
     def get(self, case_id: str) -> RecordedCase | SessionCase | None:
         return self._cases.get(public_id(case_id))
+
+    def _search_text_for(self, case: SessionCase) -> Callable[[], str]:
+        """The search sub-agent's source: the #195 planner over places near the checked ad, as
+        text. The chooser is the model when the agent setting says so, else the code policy."""
+
+        def search(use_model: bool = False) -> str:
+            from snapback.agent.search_agent import agentic_alternatives, search_chooser_for
+
+            response = agentic_alternatives(
+                case,
+                self._lookups,
+                search_chooser_for(self._settings.snapback_agent if use_model else "policy"),
+                3,
+                case.preferences,
+                self._settings.snapback_data_source,
+            )
+            return places_text(response)
+
+        return search
 
     def _new_id(self) -> str:
         while True:
@@ -406,9 +481,11 @@ class CaseStore:
         register: Callable[[str], None] | None = None,
         *,
         photos: list[bytes] | None = None,
+        demo_case: str | None = None,
     ) -> SessionCase:
         """Start a check. `property_id` is our id for the building the listing claims, and
-        `photos` are the listing photos as sent, in order.
+        `photos` are the listing photos as sent, in order. `demo_case` names one staged case
+        (a replay's) for this request alone; without it the server's DEMO_CASE setting applies.
 
         `register` is told the new case's id before anything runs. If it raises, there is no
         case: a check that could not be recorded for later deletion is not started.
@@ -430,22 +507,30 @@ class CaseStore:
             if record is None:
                 raise UnknownProperty
 
-        demo = load_demo_case(self._settings.demo_case) if self._settings.demo_case else None
+        demo_id = demo_case or self._settings.demo_case
+        demo = load_demo_case(demo_id) if demo_id else None
         if demo is not None and not listing.text:
             # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
             own = read_listing(demo.listing_text)
             listing = own.model_copy(
                 update={"photos": listing.photos, "screenshots": listing.screenshots}
             )
-        for_sale = self._lookups.for_sale(listing.text) if listing.text else None
-        # D10: only a live run calls the licence list, and a lookup that breaks is "not
-        # looked up". It reads the poster's own claim in the text and keeps no name.
-        license = license_of(self._lookups, listing.text)
-        # D12: the owner of record of the home the listing claims, when lane D holds one.
-        owner = owner_of(self._lookups, listing.text)
+        # A case asked for by name (a replay's "Run this case") always runs on its own
+        # fixtures, on any server: it is a staged example, so it is never a LIVE card and
+        # calls no lookup.
+        asked_by_name = demo_case is not None
+        for_sale = license = owner = None
+        if not asked_by_name:
+            for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+            # D10: only a live run calls the licence list, and a lookup that breaks is "not
+            # looked up". It reads the poster's own claim in the text and keeps no name.
+            license = license_of(self._lookups, listing.text)
+            # D12: the owner of record of the home the listing claims, when lane D holds one.
+            owner = owner_of(self._lookups, listing.text)
 
-        live = self._settings.snapback_data_source is DataSource.LIVE or (
-            record is not None and record.source is DataSource.LIVE
+        live = not asked_by_name and (
+            self._settings.snapback_data_source is DataSource.LIVE
+            or (record is not None and record.source is DataSource.LIVE)
         )
         source = DataSource.LIVE if live else DataSource.FIXTURE
 
@@ -490,7 +575,9 @@ class CaseStore:
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner, self._zone_of(record))
+            session.search_places = self._search_text_for(case)
             case.staged = demo is not None
+            case.demo_case_id = demo.case_id if demo is not None else None
             case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()

@@ -16,14 +16,18 @@ import threading
 from pathlib import Path
 from typing import Protocol
 
+from snapback.adapters.vexcel import known_capture
 from snapback.agent.intake import Listing
+from snapback.agent.intake.claims import extract_claims
 from snapback.agent.locate_live import LiveLocate, LiveOutcome
 from snapback.agent.modules import ChallengeOutcome, FixtureModules
 from snapback.agent.rules import check_price
+from snapback.agent.rules.ad_vs_record import compare_ad_to_record
 from snapback.agent.rules.contact import check_authority
 from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
+    AdNote,
     AuthorityResult,
     DataSource,
     FloorPlanCandidate,
@@ -296,6 +300,18 @@ class JoinedModules:
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
 
+    def ad_notes(self, case_id: str) -> list[AdNote]:
+        """Ad vs record: the ad's claims against the home's record. No record, no notes."""
+        self._identify(case_id)
+        record = self._record
+        aerial_on = None
+        if record is not None:
+            try:  # the date of a tile already held; never a network call
+                aerial_on = known_capture(record, self._record_source or DataSource.LIVE)
+            except Exception as error:
+                log.warning("aerial date not read (%s)", type(error).__name__)
+        return compare_ad_to_record(extract_claims(self._listing.text), record, aerial_on=aerial_on)
+
     def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
         """D10 again, with the number the renter gave (A24 stretch): the number goes straight to
         the lookup, with the ad's words for the name the poster claims, so the ad's length
@@ -319,12 +335,22 @@ class JoinedModules:
         # Lane D says who owns the home. What the poster says about owning it is added here.
         return check_owner(self._listing.contacts, self._owner)
 
+    @property
+    def record(self) -> PropertyRecord | None:
+        """The property record this case runs on, if it has one (read-only)."""
+        return self._record
+
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
         self._identify(case_id)
         if self._record is None and self._for_sale is None:
             return None
         return self._record_source
+
+    def property_type(self, case_id: str) -> str | None:
+        """The record's kind of home, once the home is known. None with no record."""
+        self._identify(case_id)
+        return self._record.property_type if self._record is not None else None
 
     # --- the twin and the challenge: stand-ins, and only in a fixture case -----------------
 

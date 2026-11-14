@@ -2,7 +2,7 @@
 
 export type DataSource = "live" | "fixture";
 export type VerdictState = "verified" | "hold" | "dont_pay" | "unverified";
-export type CardRowKind = "place" | "person" | "price";
+export type CardRowKind = "place" | "person" | "price" | "claims"; // claims: ad vs record, only when it has lines
 export type CardTone = "ok" | "hold" | "red_flag" | "not_shown" | "not_checked";
 
 export interface CardLine {
@@ -75,7 +75,18 @@ export interface Card {
   lang: string;
 }
 
-export type TraceKind = "choice" | "tool" | "status" | "hitl" | "verdict" | "error";
+export type TraceKind =
+  | "choice"
+  | "tool"
+  | "status"
+  | "hitl"
+  | "verdict"
+  | "error"
+  // The deep agent's own steps (E0): todo list, sub-agent hand-off, file written, code-raised doubt.
+  | "todo"
+  | "agent"
+  | "file"
+  | "unsure";
 export type ChoiceKind =
   "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human" | "next_check";
 
@@ -95,6 +106,22 @@ export interface TraceEvent {
   reason: string;
   source: DataSource;
   chosen_by: ChosenBy;
+}
+
+// One working note the agent wrote (GET /cases/{id}/notes). Derived text only.
+export interface CaseNote {
+  path: string;
+  stem: string;
+  agent: string;
+  text: string;
+  written_by: ChosenBy;
+}
+
+export interface CaseNotes {
+  case_id: string;
+  source: DataSource;
+  notes: CaseNote[];
+  footer: string;
 }
 
 // Mirrors Pose and the parts of LocateResult the twin reads (src/snapback/contracts.py).
@@ -232,7 +259,19 @@ export interface PlaceMatch {
   has_3d_scan: boolean;
   scan_text?: string | null; // "a 3D scan in this building"
   office_on_record?: string | null; // company name only
+  checked?: boolean; // true only for a place that got the deep check; the rest are "researched"
+  check_line?: string | null; // built by code: "Checked: listed for rent by ...; ..."
   source: DataSource;
+}
+
+// One choice the search agent made. "model" only when a language model picked from options
+// code wrote; a menu of one is always "policy". Show "picked by model" from chosen_by.
+export interface SearchDecision {
+  kind: "deep_check" | "tradeoff" | "tour_gate";
+  options: string[];
+  pick: string;
+  reason: string;
+  chosen_by: "model" | "policy";
 }
 
 export interface SearchResponse {
@@ -241,6 +280,10 @@ export interface SearchResponse {
   n_considered: number;
   n_matches: number;
   matches: PlaceMatch[];
+  decisions?: SearchDecision[];
+  question?: string | null; // the one trade-off question to put to the renter
+  ask_first?: boolean; // ask it before drafting a tour request
+  remembered?: string[]; // preference keys applied to this search
 }
 
 export interface AlternativesResponse {
@@ -248,6 +291,25 @@ export interface AlternativesResponse {
   source: DataSource;
   as_of: string;
   matches: PlaceMatch[];
+  decisions?: SearchDecision[];
+  question?: string | null;
+  ask_first?: boolean;
+  remembered?: string[];
+}
+
+// POST /cases/{id}/preferences (write token header). Code-defined keys only.
+export interface PreferencesUpdate {
+  no_walkup?: boolean | null;
+  needs_parking?: boolean | null;
+  max_rent?: number | null;
+  avoid_property_id?: string | null;
+}
+
+export interface CasePreferences {
+  no_walkup: boolean;
+  needs_parking: boolean;
+  max_rent: number | null;
+  avoid_property_ids: string[];
 }
 
 export interface TourDraftRequest {
@@ -265,4 +327,107 @@ export interface TourDraft {
   status: "draft";
   sent: false;
   source: DataSource;
+}
+
+// Mirrors TourPlan in src/snapback/tour.py (GET /places/{id}/tour and /cases/{id}/tour): the
+// "Walk it first" tour, built by code. Every fact has a source line.
+export interface TourFact {
+  text: string;
+  source: string;
+}
+
+export interface TourPhoto {
+  photo_id: string;
+  alias?: string | null; // P1, P2...: the key of /cases/{id}/evidence/{alias}/photo.jpg
+  sweep_id?: string | null;
+  position?: [number, number, number] | null;
+  rotation_quat?: [number, number, number, number] | null;
+  fov_deg?: number | null;
+}
+
+export interface TourStop {
+  kind: "arrive" | "door" | "room" | "stop" | "outro";
+  key: string;
+  title: string;
+  room_label?: string | null;
+  sweep_id?: string | null;
+  sweep_count: number;
+  sweep_ids: string[];
+  photos: TourPhoto[]; // the renter's own ad photos placed in this room (case tour only)
+  ad_view: "placed" | "none_placed" | "unknown"; // whether an ad photo was placed in this room
+  claims: TourFact[]; // what the ad claimed for this room
+  position?: [number, number, number] | null;
+  rotation_quat?: [number, number, number, number] | null;
+  facts: TourFact[];
+  tip?: string | null; // "check this in person"
+  note?: string | null;
+}
+
+export interface WalkCoverage {
+  counted: "rooms" | "spots" | "none";
+  total: number;
+  with_photo: number;
+  placed: number;
+  elsewhere: number;
+  unplaced: number;
+  plan_mismatch?: boolean;
+  line?: string | null;
+}
+
+export interface TourDirector {
+  dwell: string[]; // stop keys
+  lead_checks: string[];
+  stamp: "model" | "policy";
+  reason?: string | null;
+}
+
+// GET /cases/{id}/walk: the plan with the case's placed photos, and its locate result.
+export interface WalkResponse {
+  plan: TourPlan;
+  model_id?: string | null; // the scan the walk was built from
+  locate?: LocateResult | null;
+}
+
+export interface TourPlan {
+  property_id: string;
+  kind: "apartment" | "house";
+  source: DataSource;
+  as_of: string;
+  has_scan: boolean;
+  scan_label?: string | null;
+  rooms_labelled: boolean;
+  rooms_note: string;
+  aerial?: { source: DataSource; captured_on?: string | null; has_image: boolean } | null;
+  stops: TourStop[];
+  links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
+  up_axis?: "y" | "z"; // which model axis is vertical in the stops' positions
+  mode?: "claimed" | "elsewhere"; // "elsewhere": the building the ad's photos were taken in
+  mode_line?: string | null;
+  coverage?: WalkCoverage | null;
+  director?: TourDirector | null;
+}
+
+// Mirrors PackLine and TourPrepPack in src/snapback/pack.py (GET /cases/{id}/tour-prep and
+// GET /places/{property_id}/tour-prep). Every word is the API's, written by code in the language
+// asked for; render it as given.
+export interface PackLine {
+  key: string;
+  text: string;
+  sources: string[];
+  as_of?: string | null; // "as of CoStar's last research", on lines from CoStar's research
+}
+
+export interface TourPrepPack {
+  source: DataSource;
+  lang: "en" | "es";
+  title: string;
+  subtitle: string;
+  note: string;
+  as_of: string;
+  facts_heading: string;
+  questions_heading: string;
+  pay_heading: string;
+  facts: PackLine[];
+  questions: PackLine[];
+  before_you_pay: string[];
 }

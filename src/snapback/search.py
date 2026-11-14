@@ -24,6 +24,7 @@ The kit stays in memory; this module logs and prints no record value.
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -32,6 +33,8 @@ from snapback.contracts import (
     AS_OF,
     BudgetFit,
     DataSource,
+    ForSaleMatch,
+    ForSaleStatus,
     MustHaveLine,
     PlaceMatch,
     PropertyRecord,
@@ -362,6 +365,14 @@ def _all_matches(brief: RenterBrief, lookups: Any) -> tuple[int, list[PlaceMatch
     source = _source_of(lookups)
     supply = _supply(lookups)
     matches = [m for raw in supply if (m := _match(raw, brief, source)) is not None]
+    seen: set[tuple[str, str]] = set()
+    unique: list[PlaceMatch] = []
+    for m in matches:  # the record may repeat a floor plan row: one place, shown once
+        key = (m.property_id, m.plan_key or "")
+        if key not in seen:
+            seen.add(key)
+            unique.append(m)
+    matches = unique
     matches.sort(key=order_key)
     return len(supply), matches
 
@@ -391,21 +402,34 @@ def place_for(
 ) -> PlaceMatch | None:
     """One place by id, whatever the budget: the renter picked it. A plan is found by its
     `plan_key`; with only a label it must be unique in the building, else `AmbiguousPlace`."""
+    found = place_and_raw_for(property_id, floor_plan, lookups, brief, plan_key_)
+    return found[0] if found else None
+
+
+def place_and_raw_for(
+    property_id: str,
+    floor_plan: str | None,
+    lookups: Any,
+    brief: RenterBrief | None = None,
+    plan_key_: str | None = None,
+) -> tuple[PlaceMatch, _Raw] | None:
+    """`place_for`, plus the record facts the match was made from (the tour-prep pack needs
+    the numbers, not just the lines of text)."""
     source = _source_of(lookups)
     # Only the renter's stated needs shape the must-have lines; no budget or size removes it.
     needs = brief or RenterBrief()
     open_brief = RenterBrief(pets=needs.pets, needs_parking=needs.needs_parking, max_results=50)
     found = [
-        m
+        (m, raw)
         for raw in _supply(lookups)
         if raw.property_id == property_id
         and (plan_key_ is None or plan_key(raw) == plan_key_)
         and (floor_plan is None or raw.floor_plan == floor_plan)
         if (m := _match(raw, open_brief, source)) is not None
     ]
-    if plan_key_ is None and len({m.plan_key for m in found}) > 1:  # no silent cheapest pick
+    if plan_key_ is None and len({m.plan_key for m, _ in found}) > 1:  # no silent cheapest pick
         raise AmbiguousPlace(property_id)
-    found.sort(key=order_key)
+    found.sort(key=lambda pair: order_key(pair[0]))
     return found[0] if found else None
 
 
@@ -424,27 +448,44 @@ def ad_facts(case: Any) -> tuple[int | None, int | None, str | None]:
     return rent, beds, getattr(case, "property_id", None)
 
 
+def alternatives_brief(case: Any, brief: RenterBrief | None) -> RenterBrief | None:
+    """The brief the alternatives are searched with: the renter's wins where it speaks; the ad
+    fills what it leaves out (its rent is the budget, its beds the size). None: no anchor."""
+    rent, beds, _own = ad_facts(case)
+    brief = brief or RenterBrief()
+    budget = brief.max_rent_month if brief.max_rent_month is not None else rent
+    if budget is None:
+        return None
+    want_beds = brief.beds_min if brief.beds_min is not None else beds
+    return brief.model_copy(
+        update={"max_rent_month": budget, "beds_min": want_beds, "max_results": 50}
+    )
+
+
 def alternatives_for(
-    case: Any, brief: RenterBrief | None, lookups: Any, n: int = 3
+    case: Any,
+    brief: RenterBrief | None,
+    lookups: Any,
+    n: int = 3,
+    exclude: Collection[str] = (),
 ) -> list[PlaceMatch]:
-    """Up to `n` places near a checked ad's price and size, never the ad's own building.
+    """Up to `n` places near a checked ad's price and size, never the ad's own building and never
+    a building in `exclude` (places the renter rejected).
 
     The renter's brief wins where it speaks; the ad fills what it leaves out: the budget is the
     ad's rent, and the size is the ad's beds. Closest to the ad's price first."""
     rent, beds, own = ad_facts(case)
     brief = brief or RenterBrief()
-    budget = brief.max_rent_month if brief.max_rent_month is not None else rent
-    if budget is None:
+    widened = alternatives_brief(case, brief)
+    if widened is None:
         return []  # nothing to anchor on: no guess
-    want_beds = brief.beds_min if brief.beds_min is not None else beds
-    widened = brief.model_copy(
-        update={"max_rent_month": budget, "beds_min": want_beds, "max_results": 50}
-    )
+    budget = widened.max_rent_month
     _, matches = _all_matches(widened, lookups)
     near = [
         m
         for m in matches
         if m.property_id != own
+        and m.property_id not in exclude
         and (beds is None or m.beds is None or m.beds == beds or brief.beds_min is not None)
         and m.budget_fit in (BudgetFit.WITHIN, BudgetFit.NO_BUDGET, BudgetFit.STARTS_WITHIN)
     ]
@@ -505,3 +546,71 @@ def draft_tour_request(place: PlaceMatch, brief: RenterBrief | None = None) -> T
     return TourDraft(
         property_id=place.property_id, addressee=office, text=text, source=place.source
     )
+
+
+# --- the deep check: record-side facts for the places the agent picked ------------------------
+
+_AS_OF = "as of CoStar's last research"
+
+
+def deep_check(place: PlaceMatch, lookups: Any) -> PlaceMatch:
+    """The record-side check for one place, set by code from the record alone.
+
+    A house is looked up in the for-sale and recently-rented records by its position; an
+    apartment building is not (those records cover homes), so it gets only the office on record.
+    The line says what was looked at and, when a lookup could not be made, that it could not.
+    The same place always gets the same line, whoever chose it. No photo is involved."""
+    office = (place.office_on_record or "").strip() or None
+    sale: ForSaleMatch | None = None
+    if place.kind == "house":
+        record_of = getattr(lookups, "record", None)
+        at = getattr(lookups, "for_sale_at", None)
+        record = record_of(place.property_id) if callable(record_of) else None
+        if (
+            callable(at)
+            and record is not None
+            and record.lat is not None
+            and record.lon is not None
+        ):
+            try:
+                sale = at("", record.lat, record.lon)
+            except Exception as error:  # a lookup that broke did not happen
+                log.warning("for-sale check failed (%s)", type(error).__name__)
+    rent = f"listed for rent by {office}" if office else "listed for rent (no office on record)"
+    # "Checked" only when a record lookup actually ran (today: the for-sale lookup for a house
+    # with a position). Anything else is "On record": what the data says, not a check.
+    checked = sale is not None
+    if place.kind == "apartment":
+        line = (
+            f"On record: {rent}; for-sale records cover homes, not apartment buildings, {_AS_OF}."
+        )
+    elif sale is None:
+        line = f"On record: {rent}; no for-sale lookup was possible for this home, {_AS_OF}."
+    elif sale.status is ForSaleStatus.ACTIVE:
+        from snapback.verdict import for_sale_record
+
+        record, brokerage = for_sale_record(sale, "en")
+        ask = "that brokerage" if brokerage else "the listing brokerage"
+        line = (
+            f"Checked: {record} Homes for sale are sometimes also offered for lease, so "
+            f"confirm with {ask} before you pay, {_AS_OF}."
+        )
+    elif sale.status is ForSaleStatus.RECENTLY_RENTED:
+        line = f"Checked: {rent}; the record shows it was rented out recently, {_AS_OF}."
+    else:
+        line = f"Checked: {rent}; not listed for sale, {_AS_OF}."
+    has_line = checked or office is not None
+    return place.model_copy(update={"checked": checked, "check_line": line if has_line else None})
+
+
+def place_key(place: PlaceMatch) -> tuple[str, str]:
+    """A place is one floor plan of one building (a house is its own plan)."""
+    return place.property_id, place.plan_key or place.floor_plan or ""
+
+
+def apply_deep_checks(
+    matches: list[PlaceMatch], targets: Collection[tuple[str, str]], lookups: Any
+) -> list[PlaceMatch]:
+    """`matches` with the chosen places deep-checked; every other place stays "researched"."""
+    wanted = set(targets)
+    return [deep_check(m, lookups) if place_key(m) in wanted else m for m in matches]

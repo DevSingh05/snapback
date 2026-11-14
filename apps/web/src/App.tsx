@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 
+import { ConfirmPage } from "./office/ConfirmPage";
 import { CardPage } from "./pages/CardPage";
+import { ReplayIndexPage } from "./replay/ReplayIndexPage";
+import { ReplayNav } from "./replay/ReplayNav";
 import { ReplayPage } from "./replay/ReplayPage";
+import { TourPage } from "./tour/TourPage";
+import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
 import { UploadPage } from "./upload/UploadPage";
@@ -12,11 +17,24 @@ type Route =
   | { name: "twin"; id: string }
   | { name: "verify"; id: string }
   | { name: "replay"; slug: string }
+  | { name: "tour"; propertyId: string }
+  | { name: "prep-case"; id: string }
+  | { name: "prep-place"; propertyId: string }
+  | { name: "confirm" }
+  | { name: "replays" }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
+  if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
+  const tour = /^\/tour\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
+  if (tour?.[1]) return { name: "tour", propertyId: tour[1] };
+  const prepCase = /^\/case\/([A-Za-z0-9_-]+)\/prep\/?$/.exec(path);
+  if (prepCase?.[1]) return { name: "prep-case", id: prepCase[1] };
+  const prepPlace = /^\/prep\/place\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
+  if (prepPlace?.[1]) return { name: "prep-place", propertyId: prepPlace[1] };
   const trace = /^\/case\/([A-Za-z0-9_-]+)\/trace\/?$/.exec(path);
   if (trace?.[1]) return { name: "trace", id: trace[1] };
   const twin = /^\/case\/([A-Za-z0-9_-]+)\/twin\/?$/.exec(path);
@@ -41,10 +59,44 @@ export default function App() {
   const route = matchRoute(path);
   return (
     <main className="shell">
+      <ReplayNav />
       {route.name === "home" ? (
         <UploadPage />
+      ) : route.name === "confirm" ? (
+        <ConfirmPage />
+      ) : route.name === "replays" ? (
+        <ReplayIndexPage />
       ) : route.name === "replay" ? (
         <ReplayPage key={route.slug} slug={route.slug} />
+      ) : route.name === "tour" ? (
+        <TourPage
+          key={`tour-${route.propertyId}-${window.location.search}`}
+          target={{
+            propertyId: route.propertyId,
+            planKey: new URLSearchParams(window.location.search).get("plan_key"),
+            caseId: new URLSearchParams(window.location.search).get("case"),
+            mode:
+              new URLSearchParams(window.location.search).get("where") === "photos"
+                ? "elsewhere"
+                : "claimed",
+          }}
+        />
+      ) : route.name === "prep-case" ? (
+        <TourPrepPage
+          key={`prep-${route.id}`}
+          target={{ kind: "case", caseId: route.id }}
+          back={`/case/${route.id}`}
+        />
+      ) : route.name === "prep-place" ? (
+        <TourPrepPage
+          key={`prep-place-${route.propertyId}-${window.location.search}`}
+          target={{
+            kind: "place",
+            propertyId: route.propertyId,
+            planKey: new URLSearchParams(window.location.search).get("plan_key"),
+          }}
+          back="/"
+        />
       ) : route.name === "trace" ? (
         <TracePage key={`trace-${route.id}`} caseId={route.id} />
       ) : route.name === "twin" ? (
