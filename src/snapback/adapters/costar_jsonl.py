@@ -22,8 +22,10 @@ import statistics
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
-from snapback.contracts import DataSource, PropertyRecord
+from snapback.agent.rules.contact import phone_hash, phone_salt
+from snapback.contracts import DataSource, FloorPlanRent, PropertyRecord, UnitOnRecord
 from snapback.settings import get_settings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -47,6 +49,14 @@ FIELDS: dict[str, list[str]] = {
     "market_name": ["primaryAddress.researchMarketName", "researchMarketName"],
     "market_id": ["primaryAddress.researchMarketId", "researchMarketId"],
     "property_type": ["propertyType"],
+    "site_phone": ["propertyApartment.sitePhoneNumber", "sitePhoneNumber"],
+    "website": [
+        "propertyApartment.websiteUrl",
+        "propertyApartment.webSiteUrl",
+        "websiteUrl",
+        "webSiteUrl",
+        "website",
+    ],
 }
 LISTING_FIELDS: dict[str, list[str]] = {
     "property_id": ["propertyId", "commercialPropertyId"],
@@ -54,13 +64,22 @@ LISTING_FIELDS: dict[str, list[str]] = {
     "rent_min": ["minRent"],
     "rent_max": ["maxRent"],
     "models": ["apartmentModels"],
+    "units": ["apartmentUnits", "units"],
+    "rent_pricing": ["rentPricingType"],
 }
 MODEL_FIELDS: dict[str, list[str]] = {
     "beds": ["beds", "bedrooms", "bedroomCount"],
     "baths": ["baths", "bathrooms", "bathroomCount"],
     "rent_min": ["minRent"],
     "rent_max": ["maxRent"],
+    "rent_pricing": ["rentPricingType"],
 }
+UNIT_FIELDS: dict[str, list[str]] = {
+    "unit": ["unitNumber", "unit", "name"],
+    "beds": ["beds", "bedrooms", "bedroomCount"],
+    "floor_plan": ["floorPlanName", "floorPlan", "modelName"],
+}
+ENUMS_FILE = "enums.json"
 
 
 class KitNotFoundError(FileNotFoundError):
@@ -176,7 +195,93 @@ def _listings(kit_dir: Path) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _apply_listing(fields: dict[str, Any], listing: dict[str, Any]) -> None:
+def _load_enums(kit_dir: Path) -> dict[str, dict[str, str]]:
+    """`schemas/enums.json` as {enum name: {code: label}}. Accepts a code->label map or a list
+    of {value, name} entries per enum. Missing file: no decoding, raw values are used."""
+    path = _find(kit_dir, ENUMS_FILE)
+    if path is None:
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for name, values in raw.items() if isinstance(raw, dict) else []:
+        if isinstance(values, dict):
+            out[name] = {str(k): str(v) for k, v in values.items()}
+        elif isinstance(values, list):
+            out[name] = {
+                str(v.get("value")): str(v.get("name") or v.get("label"))
+                for v in values
+                if isinstance(v, dict) and "value" in v
+            }
+    return out
+
+
+def decode(enums: dict[str, dict[str, str]], enum: str, value: Any) -> str | None:
+    """The label for an enum code, or the raw value as text when the kit has no table."""
+    if value is None:
+        return None
+    return enums.get(enum, {}).get(str(value), str(value))
+
+
+def _per_bed(value: Any, enums: dict[str, dict[str, str]]) -> bool:
+    label = decode(enums, "RentPricingType", value)
+    return bool(label) and "bed" in str(label).lower()
+
+
+def _host(url: Any) -> str | None:
+    if not isinstance(url, str) or not url.strip():
+        return None
+    text = url.strip()
+    host = urlparse(text if "//" in text else f"//{text}").hostname
+    if not host:
+        return None
+    return host.lower().removeprefix("www.")
+
+
+def _floor_plan_rents(
+    models: list[dict[str, Any]], listing_per_bed: bool, enums: dict[str, dict[str, str]]
+) -> list[FloorPlanRent]:
+    out = []
+    for m in models:
+        beds = _as_float(_get_any(m, MODEL_FIELDS["beds"]))
+        out.append(
+            FloorPlanRent(
+                name=_floor_plan(m),
+                beds=int(beds) if beds is not None else None,
+                rent_min=_as_int(_first(m, MODEL_FIELDS["rent_min"])),
+                rent_max=_as_int(_first(m, MODEL_FIELDS["rent_max"])),
+                per_bed=listing_per_bed or _per_bed(_first(m, MODEL_FIELDS["rent_pricing"]), enums),
+            )
+        )
+    return out
+
+
+def _units(listing: dict[str, Any]) -> list[UnitOnRecord]:
+    out = []
+    for u in _first(listing, LISTING_FIELDS["units"]) or []:
+        if not isinstance(u, dict):
+            continue
+        name = _first(u, UNIT_FIELDS["unit"])
+        if name is None:
+            continue
+        beds = _as_float(_get_any(u, UNIT_FIELDS["beds"]))
+        plan = _first(u, UNIT_FIELDS["floor_plan"])
+        out.append(
+            UnitOnRecord(
+                unit=str(name),
+                beds=int(beds) if beds is not None else None,
+                floor_plan=str(plan) if plan is not None else _floor_plan(u),
+            )
+        )
+    return out
+
+
+def _apply_listing(
+    fields: dict[str, Any], listing: dict[str, Any], enums: dict[str, dict[str, str]] | None = None
+) -> None:
+    enums = enums or {}
     models = [m for m in (_first(listing, LISTING_FIELDS["models"]) or []) if isinstance(m, dict)]
     plans = [p for p in (_floor_plan(m) for m in models) if p]
     fields["floor_plans"] = list(dict.fromkeys(plans))
@@ -184,22 +289,30 @@ def _apply_listing(fields: dict[str, Any], listing: dict[str, Any]) -> None:
     company = _first(listing, LISTING_FIELDS["manager_company"])
     fields["manager_company"] = str(company) if company is not None else None
 
-    lows = [_as_int(_first(m, MODEL_FIELDS["rent_min"])) for m in models]
-    highs = [_as_int(_first(m, MODEL_FIELDS["rent_max"])) for m in models]
-    mids = [(lo + hi) / 2 for lo, hi in zip(lows, highs, strict=True) if lo and hi]
-    rent_min = _as_int(_first(listing, LISTING_FIELDS["rent_min"])) or min(
-        (x for x in lows if x), default=None
-    )
-    rent_max = _as_int(_first(listing, LISTING_FIELDS["rent_max"])) or max(
-        (x for x in highs if x), default=None
-    )
-    fields["rent_min"] = rent_min
-    fields["rent_max"] = rent_max
+    listing_per_bed = _per_bed(_first(listing, LISTING_FIELDS["rent_pricing"]), enums)
+    bands = _floor_plan_rents(models, listing_per_bed, enums)
+    fields["floor_plan_rents"] = bands
+    fields["units"] = _units(listing)
+
+    # The building's rent range is whole-unit rent only: a per-bed price is never mixed in.
+    whole = [b for b in bands if not b.per_bed]
+    lows = [b.rent_min for b in whole if b.rent_min]
+    highs = [b.rent_max for b in whole if b.rent_max]
+    mids = [(b.rent_min + b.rent_max) / 2 for b in whole if b.rent_min and b.rent_max]
+    listing_min = None if listing_per_bed else _as_int(_first(listing, LISTING_FIELDS["rent_min"]))
+    listing_max = None if listing_per_bed else _as_int(_first(listing, LISTING_FIELDS["rent_max"]))
+    if any(b.per_bed for b in bands):
+        listing_min = listing_max = None  # a listing-wide range may include per-bed prices
+    fields["rent_min"] = min(lows, default=None) or listing_min
+    fields["rent_max"] = max(highs, default=None) or listing_max
     fields["rent_median"] = _as_int(statistics.median(mids)) if mids else None
 
 
 def parse_record(
-    record: dict[str, Any], source: DataSource, listing: dict[str, Any] | None = None
+    record: dict[str, Any],
+    source: DataSource,
+    listing: dict[str, Any] | None = None,
+    enums: dict[str, dict[str, str]] | None = None,
 ) -> PropertyRecord | None:
     """One kit record (plus its apartment listing, if any) to a `PropertyRecord`."""
     pid = _first(record, FIELDS["property_id"])
@@ -222,9 +335,13 @@ def parse_record(
         "lat": _as_float(_get_any(record, FIELDS["lat"])),
         "lon": _as_float(_get_any(record, FIELDS["lon"])),
         "model_ids": _model_ids(record),
+        "website_host": _host(_first(record, FIELDS["website"])),
     }
+    # The leasing office's phone is kept only as a keyed hash; the digits never leave here.
+    phone = _first(record, FIELDS["site_phone"])
+    fields["site_phone_hash"] = phone_hash(str(phone), phone_salt()) if phone else None
     if listing is not None:
-        _apply_listing(fields, listing)
+        _apply_listing(fields, listing, enums)
     return PropertyRecord(**fields)
 
 
@@ -242,10 +359,12 @@ def load_records(
             "or set SNAPBACK_DATA_SOURCE=fixture."
         )
     listings = _listings(kit)
+    enums = _load_enums(kit)
     out: dict[str, PropertyRecord] = {}
     for obj in _iter_jsonl(path):
         pid = _first(obj, FIELDS["property_id"])
-        rec = parse_record(obj, source, listings.get(str(pid)) if pid is not None else None)
+        listing = listings.get(str(pid)) if pid is not None else None
+        rec = parse_record(obj, source, listing, enums)
         if rec is not None:
             out.setdefault(rec.property_id, rec)
     return out
@@ -277,7 +396,16 @@ def coverage(kit_dir: Path) -> dict[str, Any]:
             for name, paths in LISTING_FIELDS.items():
                 for p in paths:
                     listing_fields[name][p] += _present(_get(obj, p))
+    pricing: dict[str, int] = {}
+    if listing_path is not None:
+        for obj in _iter_jsonl(listing_path):
+            models = _first(obj, LISTING_FIELDS["models"]) or []
+            for m in [obj, *[m for m in models if isinstance(m, dict)]]:
+                code = _get_any(m, MODEL_FIELDS["rent_pricing"])
+                if code is not None:
+                    pricing[str(code)] = pricing.get(str(code), 0) + 1
     return {
+        "rent_pricing_codes": pricing,
         "records": records,
         "records_with_model_ids": with_models,
         "fields": fields,
@@ -292,7 +420,9 @@ def main() -> None:
     parser.add_argument("--kit", type=Path, default=DEFAULT_KIT)
     args = parser.parse_args()
     if args.coverage:
-        print(json.dumps(coverage(args.kit), indent=2))
+        from snapback.adapters.costar_residential import coverage_residential
+
+        print(json.dumps(coverage(args.kit) | coverage_residential(args.kit), indent=2))
     else:
         records = load_records(DataSource.LIVE, kit_dir=args.kit)
         print(f"records parsed: {len(records)}")
