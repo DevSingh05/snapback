@@ -92,7 +92,16 @@ export const approveChallenge: ApproveChallenge = async (caseId, decision, text)
 
 // GET /cases/{id}: where the case stands. Live mode only.
 export const getCaseStatus: GetCaseStatus = async (caseId, signal) => {
-  const res = await apiFetch(`/cases/${encodeURIComponent(caseId)}`, { signal });
+  const res = await apiFetch(`/cases/${encodeURIComponent(caseId)}`, { signal, tokenFor: caseId });
   if (!res.ok) throw await failure(res);
   return (await res.json()) as CaseStatus;
 };
+
+// GET /healthz: which data the API itself is serving. A web app wired to an API that runs on
+// fixtures must still say FIXTURE, so the chip before a case exists comes from here.
+export async function fetchApiSource(signal?: AbortSignal): Promise<DataSource> {
+  const res = await apiFetch("/healthz", { signal });
+  if (!res.ok) throw await failure(res);
+  const body = (await res.json()) as { data_source?: string };
+  return body.data_source === "live" ? "live" : "fixture";
+}

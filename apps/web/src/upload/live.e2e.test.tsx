@@ -41,6 +41,9 @@ function installServer(opts: { challenge: string | null }) {
       credentials: init?.credentials,
       body: init?.body,
     });
+    if (method === "GET" && path === "/api/healthz") {
+      return json({ status: "ok", data_source: "live" });
+    }
     if (method === "POST" && path === "/api/cases") {
       return json(
         {
@@ -99,7 +102,8 @@ describe("web against the API route shapes", () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     render(<UploadPage mode="live" navigate={navigate} pollMs={5} />);
-    expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE");
+    // FIXTURE until /healthz says the API serves live data.
+    await waitFor(() => expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE"));
 
     await user.type(screen.getByLabelText(/listing link or text/i), "zillow.com/x/1");
     await user.click(screen.getByRole("button", { name: /check this listing/i }));
@@ -110,7 +114,7 @@ describe("web against the API route shapes", () => {
     // The token is kept in sessionStorage by case id and is not in any URL.
     expect(loadCaseToken("7Q2M")).toBe(TOKEN);
     expect(calls.some((c) => c.path.includes(TOKEN))).toBe(false);
-    const create = calls[0]!;
+    const create = calls.find((c) => c.method === "POST" && c.path === "/api/cases")!;
     expect(create).toMatchObject({ method: "POST", path: "/api/cases", credentials: "include" });
     expect(create.body).toBeInstanceOf(FormData);
     // Nothing was approved by creating the case.
@@ -125,8 +129,10 @@ describe("web against the API route shapes", () => {
     expect(approve.headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
     expect(JSON.parse(approve.body as string)).toEqual({ decision: "send" });
     // The page followed the real case: the trace stream and the status poll.
-    expect(FakeEventSource.urls).toContain("/api/cases/7Q2M/trace");
-    expect(calls.some((c) => c.method === "GET" && c.path === "/api/cases/7Q2M")).toBe(true);
+    // EventSource cannot send headers, so the trace carries the secret as ?token= (API PR #60).
+    expect(FakeEventSource.urls).toContain(`/api/cases/7Q2M/trace?token=${TOKEN}`);
+    const poll = calls.find((c) => c.method === "GET" && c.path === "/api/cases/7Q2M")!;
+    expect(poll.headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
   });
 
   it("a card read from the API shows LIVE", async () => {

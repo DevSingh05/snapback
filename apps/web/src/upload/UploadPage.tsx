@@ -5,6 +5,7 @@ import { SourceChip } from "../components/SourceChip";
 import { TracePanel } from "../trace";
 import {
   MODE,
+  fetchApiSource,
   approveChallenge as defaultApprove,
   createCase as defaultCreateCase,
   getCaseStatus as defaultStatus,
@@ -50,6 +51,17 @@ export function UploadPage({
   mode = MODE,
 }: Props) {
   const [state, dispatch] = useReducer(reduce, initialState);
+  // Until the API says what it serves, a wired page claims only FIXTURE, never LIVE.
+  const [apiSource, setApiSource] = useState<DataSource>("fixture");
+  useEffect(() => {
+    if (mode !== "live") return;
+    const ctrl = new AbortController();
+    fetchApiSource(ctrl.signal)
+      .then(setApiSource)
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [mode]);
+  const shownMode: DataSource = mode === "live" ? apiSource : mode;
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +198,7 @@ export function UploadPage({
       <div className="card-page upload" data-testid="upload-page">
         <header className="masthead">
           <span className="wordmark">SNAPBACK</span>
-          <SourceChip source={mode} />
+          <SourceChip source={shownMode} />
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
           <h1 ref={heading} tabIndex={-1}>
@@ -309,7 +321,7 @@ export function UploadPage({
       <div className="card-page upload" data-testid="upload-page">
         <header className="masthead">
           <span className="wordmark">SNAPBACK</span>
-          <SourceChip source={mode} />
+          <SourceChip source={shownMode} />
         </header>
         <div className="upload-body">
           <h1 ref={heading} tabIndex={-1}>
@@ -332,7 +344,7 @@ export function UploadPage({
   }
 
   const activeIndex = STEPS.findIndex((s) => s.key === state.step);
-  const source: DataSource = "source" in state ? state.source : mode;
+  const source: DataSource = "source" in state ? state.source : shownMode;
 
   return (
     <div className="card-page upload" data-testid="upload-page">
