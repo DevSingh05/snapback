@@ -1,0 +1,21 @@
+# Lane ownership. A PR that touches a path asks that lane's human for review.
+
+# Integrator lane: shared contracts, verdict rules, API, agent orchestration
+/src/snapback/contracts.py  @vs-githjk
+/src/snapback/verdict.py    @vs-githjk
+/src/snapback/settings.py   @vs-githjk
+/src/snapback/api/          @vs-githjk
+/src/snapback/agent/        @vs-githjk
+/AGENTS.md                  @vs-githjk
+/.github/                   @vs-githjk
+
+# Vision + eval lane
+/src/snapback/vision/       @DevSingh05
+/src/snapback/eval/         @DevSingh05
+
+# Web lane
+/apps/web/                  @jeffrey-g05
+
+# Data + intake lane
+/src/snapback/adapters/     @RishitRai
+/apps/sidecar/              @RishitRai

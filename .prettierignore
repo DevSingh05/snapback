@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.venv
+.ruff_cache
+.pytest_cache
+data
+mp_out
+package-lock.json
+uv.lock

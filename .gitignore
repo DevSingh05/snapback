@@ -1,0 +1,42 @@
+# --- secrets ---
+.env
+.env.*
+!.env.example
+
+# --- sponsor data: must never be committed (sponsor terms; this repo goes public) ---
+data/
+mp_out/
+models_index.csv
+residential-listings.csv
+*.faiss
+*.index
+*.npy
+*.npz
+*.pt
+*.pth
+*.ply
+*.xyz
+*.obj
+*.dxf
+*.zip
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+.ipynb_checkpoints/
+
+# --- node ---
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# --- os / editors ---
+.DS_Store
+.idea/
+.vscode/
