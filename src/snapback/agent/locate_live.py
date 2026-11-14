@@ -25,6 +25,8 @@ import logging
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -59,6 +61,7 @@ class LiveOutcome:
 class _Ready:
     locator: object
     model_ids: set[str]
+    key: str  # what a cached answer depends on: index, thresholds, matcher
 
 
 def _default_sweeps(model_id: str):
@@ -66,12 +69,6 @@ def _default_sweeps(model_id: str):
     from snapback.adapters.matterport import LIVE_CACHE, _read_manifest, _safe
 
     return _read_manifest(model_id, LIVE_CACHE / _safe(model_id)) or []
-
-
-def _default_matcher():  # pragma: no cover - needs torch, kornia and the weights
-    from snapback.vision.locate.verify import DiskLightGlue
-
-    return DiskLightGlue(feature_dir=Path("data") / "index" / "features")
 
 
 def _default_embedder(name: str):  # pragma: no cover - needs torch
@@ -88,7 +85,7 @@ class LiveLocate:
         records: Callable[[], Iterable[PropertyRecord]],
         index_name: str = DEFAULT_INDEX,
         sweeps_for: Callable[[str], list] = _default_sweeps,
-        matcher_factory: Callable[[], object] = _default_matcher,
+        matcher_factory: Callable[[], object] | None = None,
         embedder_factory: Callable[[str], object] = _default_embedder,
         budget_s: float = DEFAULT_BUDGET_S,
         thresholds: object | None = None,
@@ -102,6 +99,7 @@ class LiveLocate:
         self.budget_s = budget_s
         self._thresholds = thresholds
         self._ready: _Ready | None = None
+        self._pool: ThreadPoolExecutor | None = None
         self._lock = threading.Lock()
 
     # --- building the locator, once ---------------------------------------------------------
@@ -133,12 +131,24 @@ class LiveLocate:
                     return None
                 catalog = catalog_from_records(list(self._records()))
                 sweeps = {m: self._sweeps_for(m) for m in sorted(model_ids)}
-                locator = Locator(index, sweeps, catalog, self._matcher_factory(), self._thresholds)
+                locator = Locator(index, sweeps, catalog, self._make_matcher(), self._thresholds)
             except Exception as error:  # noqa: BLE001 - extra missing, kit missing, bad files
                 log.warning("live locate unavailable (%s)", type(error).__name__)
                 return None
-            self._ready = _Ready(locator, model_ids)
+            matcher = locator.matcher
+            version = getattr(matcher, "version", matcher.name)
+            index_hash = hashlib.sha256((self._index_dir / "index.json").read_bytes()).hexdigest()
+            key = f"{self._index_name}|{index_hash}|{locator.thresholds!r}|{version}"
+            self._ready = _Ready(locator, model_ids, key)
             return self._ready
+
+    def _make_matcher(self):
+        if self._matcher_factory is not None:
+            return self._matcher_factory()
+        # pragma: no cover - needs torch, kornia and the weights
+        from snapback.vision.locate.verify import DiskLightGlue
+
+        return DiskLightGlue(feature_dir=self._data_dir / "index" / "features")
 
     def available(self, claimed_property_id: str | None, claimed_model_ids: list[str]) -> bool:
         """Is there a twin to place photos in? True for a claimed home that is indexed, and
@@ -152,9 +162,9 @@ class LiveLocate:
 
     # --- the cache ---------------------------------------------------------------------------
 
-    def _cache_path(self, photos: list[bytes], claimed: str | None) -> Path:
+    def _cache_path(self, ready: _Ready, photos: list[bytes], claimed: str | None) -> Path:
         digest = hashlib.sha256()
-        digest.update(f"{self._index_name}|{claimed or '-'}".encode())
+        digest.update(f"{ready.key}|{claimed or '-'}".encode())
         for blob in photos:
             digest.update(hashlib.sha256(blob).digest())
         return self._data_dir / "locate" / f"{digest.hexdigest()[:40]}.json"
@@ -195,7 +205,7 @@ class LiveLocate:
         ready = self._load()
         if ready is None or not photos:
             return None
-        path = self._cache_path(photos, claimed_property_id)
+        path = self._cache_path(ready, photos, claimed_property_id)
         cached = self._read_cache(path)
         if cached is not None:
             return LiveOutcome(
@@ -211,11 +221,20 @@ class LiveLocate:
             # No home claimed: ONE call with every photo, so lane V's identification rules
             # apply (strict bar, two photos must agree, tangled twins identify nothing). A
             # timeout leaves every photo not located.
-            whole = self._run(ready, case_id, blobs, None, deadline - time.monotonic())
+            def finished(result: LocateResult) -> LiveOutcome:
+                found = result.claimed_property_id if result.identified_by_scan else None
+                return LiveOutcome(result, found)
+
+            def late(result: LocateResult) -> None:
+                # Too late for this case, but a COMPLETE answer: keep it for the next one.
+                self._write_cache(path, finished(result))
+
+            whole = self._run(
+                ready, case_id, blobs, None, deadline - time.monotonic(), on_late=late
+            )
             if whole is None:
                 return LiveOutcome(self._not_located(case_id, blobs))
-            found = whole.claimed_property_id if whole.identified_by_scan else None
-            outcome = LiveOutcome(whole, found)
+            outcome = finished(whole)
             self._write_cache(path, outcome)
             return outcome
 
@@ -251,6 +270,14 @@ class LiveLocate:
             self._write_cache(path, outcome)
         return outcome
 
+    def _executor(self) -> ThreadPoolExecutor:
+        """One worker for every locate: a timed-out locate cannot pile threads up or race the
+        matcher's feature cache. A new locate waits its turn inside its own budget."""
+        with self._lock:
+            if self._pool is None:
+                self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="locate")
+            return self._pool
+
     def _run(
         self,
         ready: _Ready,
@@ -258,32 +285,42 @@ class LiveLocate:
         blobs: dict[str, bytes],
         claimed: str | None,
         remaining: float,
+        on_late: Callable[[LocateResult], None] | None = None,
     ) -> LocateResult | None:
-        """The locator on a worker thread, or None if it ran out of time, a photo could not
-        be read, or it broke. A worker still running at the deadline is left to finish by
-        itself; its answer is dropped."""
+        """The locator on the shared worker, or None if it ran out of time, a photo could not
+        be read, or it broke. A run still going at the deadline is left to finish; if it
+        completes, `on_late` gets the answer (it is never used for the case that timed out)."""
         if remaining <= 0:
             return None
-        box: list[LocateResult] = []
 
-        def work() -> None:
-            try:
-                from PIL import Image
+        def job() -> LocateResult:
+            from PIL import Image
 
-                images = {}
-                for photo_id, blob in blobs.items():
-                    with Image.open(io.BytesIO(blob)) as opened:
-                        images[photo_id] = opened.convert("RGB")
-                box.append(ready.locator.locate(case_id, images, claimed))  # type: ignore[attr-defined]
-            except Exception as error:  # noqa: BLE001 - a bad photo or a broken matcher
-                log.warning("photos could not be placed (%s)", type(error).__name__)
+            images = {}
+            for photo_id, blob in blobs.items():
+                with Image.open(io.BytesIO(blob)) as opened:
+                    images[photo_id] = opened.convert("RGB")
+            return ready.locator.locate(case_id, images, claimed)  # type: ignore[attr-defined]
 
-        worker = threading.Thread(target=work, daemon=True)
-        worker.start()
-        worker.join(remaining)
-        if worker.is_alive() or not box:
+        future = self._executor().submit(job)
+        try:
+            return future.result(timeout=remaining)
+        except FutureTimeout:
+            if not future.cancel() and on_late is not None:
+                future.add_done_callback(lambda done: self._late(done, on_late))
             return None
-        return box[0]
+        except Exception as error:  # noqa: BLE001 - a bad photo or a broken matcher
+            log.warning("photos could not be placed (%s)", type(error).__name__)
+            return None
+
+    @staticmethod
+    def _late(done: Future, on_late: Callable[[LocateResult], None]) -> None:
+        if done.cancelled() or done.exception() is not None:
+            return
+        try:
+            on_late(done.result())
+        except Exception as error:  # noqa: BLE001 - a cache write must never break the worker
+            log.warning("late locate result not kept (%s)", type(error).__name__)
 
     @staticmethod
     def _not_located(case_id: str, blobs: dict[str, bytes]) -> LocateResult:

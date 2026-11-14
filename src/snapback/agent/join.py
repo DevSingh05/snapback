@@ -79,9 +79,21 @@ class KitLookups:
         with self._lock:
             if self._records is None:
                 try:
-                    self._records = costar_jsonl.load_records(self.source, self._kit_dir)
+                    records = costar_jsonl.load_records(self.source, self._kit_dir)
                 except costar_jsonl.KitNotFoundError:
                     raise KitMissing from None
+                # Houses (residential listings with a Matterport model) join the buildings,
+                # so a house photo can be identified and a house id can be claimed.
+                try:
+                    from snapback.adapters import costar_residential
+
+                    houses = costar_residential.house_records(self.source, self._kit_dir)
+                except Exception as error:  # a broken residential file must not hide buildings
+                    log.warning("house records not read (%s)", type(error).__name__)
+                    houses = {}
+                for property_id, house in houses.items():
+                    records.setdefault(property_id, house)
+                self._records = records
             return self._records
 
     def record(self, property_id: str) -> PropertyRecord | None:

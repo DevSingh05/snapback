@@ -6,9 +6,11 @@ network, no weights, no torch. The real DISK+LightGlue timing is not measured he
 
 import io
 import json
+import shutil
 import time
 from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -16,7 +18,7 @@ from PIL import Image
 from snapback.adapters.matterport import FixtureMatterport
 from snapback.agent import CaseSession, PolicyChooser, Trace, run_case
 from snapback.agent.intake import read_listing
-from snapback.agent.join import JoinedModules
+from snapback.agent.join import JoinedModules, KitLookups
 from snapback.agent.locate_live import LiveLocate
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT
 from snapback.contracts import (
@@ -307,3 +309,139 @@ def test_a_timeout_with_no_claimed_home_leaves_every_photo_not_located(world, tm
     assert outcome.identified_property_id is None
     assert [p.status for p in outcome.result.photos] == [LocateStatus.NOT_LOCATED] * 2
     assert not (tmp_path / "locate").exists()
+
+
+class GatedMatcher(PatchMatcher):
+    """Blocks every match until the test opens the gate."""
+
+    def __init__(self, gate) -> None:
+        super().__init__()
+        self.gate = gate
+
+    def match(self, a, b):
+        self.gate.wait(10)
+        return super().match(a, b)
+
+
+def test_a_late_complete_answer_writes_the_cache_for_the_next_case(world, tmp_path):
+    import threading
+
+    data, sweeps, adapter = world
+    (tmp_path / "index").symlink_to(data / "index")
+    gate = threading.Event()
+    live = LiveLocate(
+        data_dir=tmp_path,
+        records=lambda: RECORDS,
+        sweeps_for=adapter.sweeps,
+        matcher_factory=lambda: GatedMatcher(gate),
+        budget_s=0.05,
+        thresholds=THRESHOLDS,
+    )
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    first = live.locate("c1", blobs, None)
+    assert {p.status for p in first.result.photos} == {LocateStatus.NOT_LOCATED}
+    assert not (tmp_path / "locate").exists()  # nothing yet: the run is still going
+    gate.set()
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline and not list((tmp_path / "locate").glob("*.json")):
+        time.sleep(0.1)
+    second = live.locate("c2", blobs, None)
+    assert second.from_cache is True
+    assert second.identified_property_id == "fx-prop-1"
+
+
+def test_changed_thresholds_or_index_miss_the_cache(world, tmp_path):
+    data, sweeps, adapter = world
+    (tmp_path / "index").symlink_to(data / "index")
+    blob = [photo(sweeps, "fx-model-a", 2, 1)]
+    make_live(tmp_path, adapter).locate("c1", blob, "fx-prop-1")
+    assert make_live(tmp_path, adapter).locate("c2", blob, "fx-prop-1").from_cache is True
+
+    stricter = LiveLocate(
+        data_dir=tmp_path,
+        records=lambda: RECORDS,
+        sweeps_for=adapter.sweeps,
+        matcher_factory=PatchMatcher,
+        thresholds=replace(THRESHOLDS, min_inliers=THRESHOLDS.min_inliers + 1),
+    )
+    assert stricter.locate("c3", blob, "fx-prop-1").from_cache is False
+
+
+# --- houses: residential listings with a Matterport model are in the catalog -------------------
+
+HOUSE_KIT = Path(__file__).resolve().parents[1] / "fixtures" / "adapters" / "costar-house-kit"
+BUILDING_KIT = Path(__file__).resolve().parents[1] / "fixtures" / "adapters" / "costar-kit"
+
+
+@pytest.fixture(scope="module")
+def house_world(tmp_path_factory):
+    root = tmp_path_factory.mktemp("houses")
+    kit = root / "kit"
+    kit.mkdir()
+    for name in ("residential-listings.jsonl", "enums.json"):
+        shutil.copy(HOUSE_KIT / name, kit / name)
+    shutil.copy(BUILDING_KIT / "commercial-property.jsonl", kit / "commercial-property.jsonl")
+    adapter = FixtureMatterport(root / "faces")
+    models = ("fx-fs-a", "fx-fs-b", "fx-fs-c")
+    sweeps = {m: adapter.sweeps(m) for m in models}
+    index = LocateIndex.build("demo", [s for ss in sweeps.values() for s in ss], TinyEmbedder())
+    index.save(root / "data" / "index" / "demo")
+    return root / "data", kit, sweeps, adapter
+
+
+class HouseLookups(KitLookups):
+    def __init__(self, kit) -> None:
+        super().__init__(DataSource.FIXTURE, kit_dir=kit)
+        self.at: list[tuple[float, float]] = []
+
+    def for_sale_at(self, text, lat, lon):
+        self.at.append((lat, lon))
+        return ForSaleMatch(status=ForSaleStatus.ACTIVE, site="Homes.com")
+
+
+def house_live(world):
+    data, kit, sweeps, adapter = world
+    lookups = HouseLookups(kit)
+    live = LiveLocate(
+        data_dir=data,
+        records=lambda: lookups.records().values(),
+        sweeps_for=adapter.sweeps,
+        matcher_factory=PatchMatcher,
+        thresholds=THRESHOLDS,
+    )
+    return live, lookups, sweeps
+
+
+def test_house_records_come_from_the_residential_file(house_world):
+    _, kit, _, _ = house_world
+    records = KitLookups(DataSource.FIXTURE, kit_dir=kit).records()
+    house = records["9001"]
+    assert house.property_type == "house" and house.market == "Houston"
+    assert house.model_ids == ["fx-fs-b", "fx-fs-a"]  # two listings of one house, one record
+    assert (house.lat, house.lon) == (29.7604, -95.3698)
+    assert "9010" not in records  # not public on Homes.com
+    assert "9011" not in records  # a condo
+    assert "9012" not in records  # no Matterport model
+    assert "fx-prop-1" in records  # buildings are still there
+
+
+def test_a_house_photo_is_identified_and_for_sale_is_read_at_its_position(house_world):
+    live, lookups, sweeps = house_live(house_world)
+    photos = [photo(sweeps, "fx-fs-a", 2, 1), photo(sweeps, "fx-fs-a", 0, 3)]
+    modules = joined(live, photos, claimed=None, lookups=lookups)
+    assert modules.has_twin("c")
+    verdict, _, case = run(modules)
+    assert lookups.at == [(29.7604, -95.3698)]
+    assert case.evidence.locate.claimed_property_id == "9001"
+    assert case.evidence.locate.identified_by_scan is True
+    assert case.evidence.for_sale.status is ForSaleStatus.ACTIVE
+    assert verdict.state is VerdictState.HOLD
+
+
+def test_a_claimed_house_id_is_located_in_claimed(house_world):
+    live, lookups, sweeps = house_live(house_world)
+    modules = joined(live, [photo(sweeps, "fx-fs-c", 2, 1)], claimed="9002", lookups=lookups)
+    assert modules.has_twin("c")
+    _, card, case = run(modules)
+    assert [p.status for p in case.evidence.locate.photos] == [LocateStatus.LOCATED_IN_CLAIMED]
+    assert place_line(card).tone is CardTone.OK
