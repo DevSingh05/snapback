@@ -222,6 +222,9 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     return variant === "result" ? (
       <div className="pf-stack">
         <CardView card={load.card} variant={variant} withLab />
+        <a className="pf-action pf-link" href={`/case/${caseId}/prep`} data-testid="card-prep-link">
+          Tour prep: be your own realtor
+        </a>
         <PlacesStrip caseId={caseId} brief={loadBrief(caseId)} />
       </div>
     ) : (
