@@ -14,6 +14,7 @@ the sponsor's description; check them with one live call once a key is in `.env`
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
 from collections.abc import Callable
@@ -31,6 +32,7 @@ BASE_URL = "https://api.vexcelgroup.com/v2"
 TILE_PATH = "/images/oblique"
 CACHE_DAYS = 7
 MAX_RETRIES = 3
+MAX_WAIT_S = 30.0  # a longer Retry-After is over budget: give up, ship record facts only
 TIMEOUT_S = 15.0
 _FROM_SETTINGS = object()
 _SAFE = re.compile(r"[^A-Za-z0-9_-]")
@@ -49,11 +51,18 @@ def _params(record: PropertyRecord, direction: str) -> dict[str, str]:
     return {"lat": str(record.lat), "lon": str(record.lon), "orientation": direction}
 
 
-def _wait_s(response: httpx.Response, attempt: int) -> float:
+def _wait_s(response: httpx.Response, attempt: int) -> float | None:
+    """Seconds to wait before retrying, or None when the wait is over budget (or not a number)."""
+    header = response.headers.get("Retry-After")
+    if header is None:
+        return float(2**attempt)
     try:
-        return max(0.0, float(response.headers.get("Retry-After", "")))
+        wait = float(header)
     except ValueError:
         return float(2**attempt)
+    if not math.isfinite(wait) or wait > MAX_WAIT_S:
+        return None
+    return max(0.0, wait)
 
 
 def get_tile(
@@ -79,7 +88,7 @@ def get_tile(
         raise VexcelKeyMissingError("VEXCEL_API_KEY is not set in .env; live tiles need it.")
 
     cache = Path(data_dir or settings.snapback_data_dir) / "vexcel"
-    path = cache / f"{_SAFE.sub('_', record.property_id)}-{direction}.jpg"
+    path = cache / f"{_SAFE.sub('_', record.property_id)}-{_SAFE.sub('_', direction)}.jpg"
     tile = AerialTile(
         property_id=record.property_id, source=DataSource.LIVE, direction=direction, path=str(path)
     )
@@ -96,8 +105,11 @@ def get_tile(
                 headers={"X-API-KEY": str(api_key)},
             )
             if response.status_code == 429:
+                wait = _wait_s(response, attempt)
+                if wait is None:
+                    return None
                 if attempt < MAX_RETRIES:
-                    sleep(_wait_s(response, attempt))
+                    sleep(wait)
                 continue
             if response.status_code != 200:
                 return None

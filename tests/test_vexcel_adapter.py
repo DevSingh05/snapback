@@ -107,3 +107,36 @@ def test_non_image_reply_is_not_cached(tmp_path):
     )
     assert tile is None
     assert not list(tmp_path.rglob("*.jpg"))
+
+
+@pytest.mark.parametrize("retry_after", ["86400", "inf", "nan"])
+def test_retry_after_over_budget_gives_up_without_sleeping(tmp_path, retry_after):
+    seen: list[httpx.Request] = []
+    sleeps: list[float] = []
+    tile = get_tile(
+        RECORD,
+        source=DataSource.LIVE,
+        data_dir=tmp_path,
+        api_key="fx-key",
+        client=_client([httpx.Response(429, headers={"Retry-After": retry_after})], seen),
+        sleep=sleeps.append,
+    )
+    assert tile is None
+    assert sleeps == []
+    assert len(seen) == 1
+
+
+def test_direction_cannot_walk_out_of_the_cache(tmp_path):
+    seen: list[httpx.Request] = []
+    ok = httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
+    tile = get_tile(
+        RECORD,
+        "../../evil",
+        source=DataSource.LIVE,
+        data_dir=tmp_path,
+        api_key="fx-key",
+        client=_client([ok], seen),
+        sleep=lambda s: None,
+    )
+    assert tile is not None
+    assert Path(tile.path).resolve().parent == (tmp_path / "vexcel").resolve()
