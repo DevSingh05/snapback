@@ -1,18 +1,23 @@
 """D10 (lane D, #128): does a poster who claims to be a real estate agent hold a Texas license?
 
 Runs only when the poster's own words claim the role (agent, realtor, broker or locator) and
-give a name. One filtered query to TREC's public licensee data on Socrata
-(`data.texas.gov/resource/s7ft-44qi.json`, no key), a 5 s budget, no retry on 429. Field names
-were read from the source (`$limit=1`), not guessed: `first_name`, `last_name`, `status`,
-`related_license_type`, `related_license_full_name`.
+give a name, or name a brokerage or management company ("listed by Fxample Realty"). One query
+to TREC's public licensee data on Socrata (`data.texas.gov/resource/s7ft-44qi.json`, no key),
+5 s budget, no retry on 429. Field names were read from the source (`$limit=1`), not guessed.
 
-- An ACTIVE license (status "Active", or one of the "... - Active" variants) -> LICENSED, with
-  the sponsoring broker only when the sponsor is a company.
-- A claim and no active license under that name -> NOT_FOUND.
-- No claim, no name, or any failure (timeout, error, rate limit) -> NOT_CHECKED.
+A false NOT_FOUND becomes a red flag against a real agent, so it must be rare (#41 ruling):
+- A person is looked up by LAST name only, then first names are compared allowing initials,
+  common nicknames and middle names.
+- LICENSED: an ACTIVE license (status "Active" or a "... - Active" variant) with a compatible
+  first name. The sponsoring broker is named only when the sponsor is a company.
+- NOT_FOUND: a claim, and no active licensee with that last name and a compatible first name
+  (inactive or expired matches only count as not found).
+- NOT_CHECKED: no claim, no name, more than 25 rows, an initial that fits different people, or
+  any failure (timeout, error, rate limit).
+- A named company is looked up among Broker Company licenses by its name, with the same outcomes.
 
 Never kept anywhere (result, cache, trace, log): the license number or any person's name. The
-cache under `data/trec/` is keyed by a hash of the name and holds only the answer.
+cache under `data/trec/` is keyed by a hash of the query and holds only the answer.
 """
 
 from __future__ import annotations
@@ -34,19 +39,191 @@ TIMEOUT_S = 5.0
 MAX_TEXT = 2_000  # the claim is in the poster's message, not in a 2 MB paste
 MAX_ROWS = 25
 
-_NAME = r"([A-Z][A-Za-z'\-]{1,30})\s+([A-Z][A-Za-z'\-]{1,30})"
+# A first name may be an initial ("F."); a last name is a word.
+_NAME = r"([A-Z](?:[A-Za-z'\-]{1,30}|\.))\s+([A-Z][A-Za-z'\-]{1,30})"
 _ROLE = r"(?i:(?:licensed\s+)?(?:real\s+estate\s+)?(agent|realtor|broker|locator))\b"
 _ARTICLE = r"(?i:(?:a|an|the|your)\s+)?"
-# "I'm a licensed realtor", "I am the broker"
 _SELF_ROLE = re.compile(r"(?i:\b(?:i'?m|i\s+am|as)\s+)" + _ARTICLE + _ROLE)
-# "Fxname Fxperson, a licensed realtor"
 _NAMED_ROLE = re.compile(_NAME + r",?\s+" + _ARTICLE + _ROLE)
-# "Broker: Fxname Fxperson"
 _LABEL = re.compile(r"(?i:\b(agent|realtor|broker|locator))\s*:\s*" + _NAME)
-# "My name is Fxname Fxperson", "I'm Fxname Fxperson"
 _NAME_INTRO = re.compile(r"(?i:\b(?:my\s+name\s+is|i'?m|i\s+am|this\s+is)\s+)" + _NAME)
-# a signature at the end: "- Fxname Fxperson"
 _SIGNATURE = re.compile(r"[-\u2013\u2014]\s*" + _NAME + r"\s*$")
+# "Listed by Fxample Realty Group" (capitalised words; a sentence's full stop ends it)
+_COMPANY = re.compile(
+    r"(?i:\b(?:listed|managed|marketed|represented|offered)\s+by\s+)"
+    r"([A-Z][\w&'\-]*(?:\s+(?:[A-Z&][\w&'\-]*|of|and)){0,6})"
+)
+
+_ROLE_OF = {"realtor": "agent", "agent": "agent", "broker": "broker", "locator": "locator"}
+_NICKNAMES = [
+    {"MICHAEL", "MIKE", "MICKEY"},
+    {"ROBERT", "BOB", "ROB", "BOBBY", "ROBBIE"},
+    {"ELIZABETH", "LIZ", "BETH", "LIZZIE", "BETTY", "ELIZA"},
+    {"WILLIAM", "BILL", "WILL", "BILLY", "LIAM"},
+    {"RICHARD", "RICK", "RICH", "DICK", "RICKY"},
+    {"JAMES", "JIM", "JIMMY", "JAMIE"},
+    {"JOHN", "JACK", "JOHNNY"},
+    {"JOSEPH", "JOE", "JOEY"},
+    {"KATHERINE", "CATHERINE", "KATE", "KATIE", "KATHY", "CATHY", "KAT"},
+    {"MARGARET", "MAGGIE", "PEGGY", "MEG"},
+    {"JENNIFER", "JEN", "JENNY"},
+    {"CHRISTOPHER", "CHRIS"},
+    {"CHRISTINA", "CHRISTINE", "CHRIS", "TINA"},
+    {"ANTHONY", "TONY"},
+    {"DANIEL", "DAN", "DANNY"},
+    {"DAVID", "DAVE"},
+    {"EDWARD", "ED", "EDDIE", "TED"},
+    {"THOMAS", "TOM", "TOMMY"},
+    {"STEVEN", "STEPHEN", "STEVE"},
+    {"PATRICIA", "PAT", "PATTY", "TRISH"},
+    {"ALEXANDER", "ALEX", "XANDER"},
+    {"ALEXANDRA", "ALEX", "SASHA"},
+    {"SAMUEL", "SAM", "SAMANTHA"},
+    {"BENJAMIN", "BEN"},
+    {"NICHOLAS", "NICK"},
+    {"JOSHUA", "JOSH"},
+    {"MATTHEW", "MATT"},
+    {"ANDREW", "ANDY", "DREW"},
+    {"DEBORAH", "DEBRA", "DEB", "DEBBIE"},
+    {"SUSAN", "SUE", "SUZY"},
+    {"ROSA", "ROSIE"},
+    {"JOSE", "PEPE"},
+    {"FRANCISCO", "PANCHO", "FRANK", "PACO"},
+]
+_COMPANY_SUFFIXES = {"LLC", "INC", "LP", "LLP", "CO", "LTD", "PLLC", "CORP", "COMPANY"}
+
+
+@dataclass(frozen=True)
+class Claim:
+    role: str
+    first: str | None = None
+    last: str | None = None
+    company: str | None = None
+
+
+def detect_claim(text: str) -> Claim | None:
+    """The poster's own claim to be an agent, broker or locator (and the name they give), or a
+    brokerage they say lists the home. Only the first 2,000 characters are read, and no pattern
+    can backtrack badly."""
+    text = text[:MAX_TEXT]
+    for pattern, role_group, first_group in ((_NAMED_ROLE, 3, 1), (_LABEL, 1, 2)):
+        m = pattern.search(text)
+        if m:
+            role = _ROLE_OF[m.group(role_group).lower()]
+            return Claim(role, m.group(first_group), m.group(first_group + 1))
+    m = _SELF_ROLE.search(text)
+    if m:
+        role = _ROLE_OF[m.group(1).lower()]
+        named = _NAME_INTRO.search(text) or _SIGNATURE.search(text.strip())
+        return Claim(role, named.group(1), named.group(2)) if named else Claim(role)
+    m = _COMPANY.search(text)
+    if m:
+        return Claim("company", company=m.group(1).strip())
+    return None
+
+
+def _active(status: str) -> bool:
+    s = status.strip()
+    return s == "Active" or s.endswith("- Active")
+
+
+def _first_names(name: str) -> set[str]:
+    """A first name and its common nicknames, upper case."""
+    name = name.upper()
+    out = {name}
+    for group in _NICKNAMES:
+        if name in group:
+            out |= group
+    return out
+
+
+def _compatible(claimed: str, row: dict) -> bool:
+    """Could this licensee be the person who signed with `claimed`? Initials, nicknames, the
+    middle name, and a shortened first name ('Chris' for 'Christopher') all count."""
+    first = str(row.get("first_name") or "").upper().strip()
+    middle = str(row.get("middle_name") or "").upper().strip()
+    claimed = claimed.upper().rstrip(".")
+    if len(claimed) == 1:
+        return first.startswith(claimed) or middle.startswith(claimed)
+    for candidate in (first, middle):
+        if not candidate:
+            continue
+        if candidate in _first_names(claimed):
+            return True
+        if len(claimed) >= 3 and (candidate.startswith(claimed) or claimed.startswith(candidate)):
+            return True
+    return False
+
+
+def _company_key(name: str) -> str:
+    words = re.findall(r"[A-Z0-9&]+", name.upper())
+    return " ".join(w for w in words if w not in _COMPANY_SUFFIXES)
+
+
+def _soql(value: str) -> str:
+    return value.upper().replace("'", "''")
+
+
+def _get_rows(where: str, client: httpx.Client) -> list[dict] | None:
+    try:
+        r = client.get(
+            TREC_URL,
+            params={"$where": where, "$limit": str(MAX_ROWS + 1)},
+            timeout=httpx.Timeout(TIMEOUT_S),
+        )
+        if r.status_code != 200:
+            return None
+        rows = r.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [row for row in rows if isinstance(row, dict)]
+
+
+Answer = tuple[LicenseStatus, str | None]
+
+
+def _lookup_person(first: str, last: str, client: httpx.Client) -> Answer:
+    rows = _get_rows(f"upper(last_name)='{_soql(last)}'", client)
+    if rows is None or len(rows) > MAX_ROWS:
+        return LicenseStatus.NOT_CHECKED, None  # failed, or too common a name to say
+    fits = [row for row in rows if _compatible(first, row)]
+    if len(first.rstrip(".")) == 1:
+        people = {
+            (str(r.get("first_name", "")).upper(), str(r.get("middle_name", "")).upper())
+            for r in fits
+        }
+        if len(people) > 1:
+            return LicenseStatus.NOT_CHECKED, None  # an initial that fits different people
+    active = [row for row in fits if _active(str(row.get("status", "")))]
+    if not active:
+        return LicenseStatus.NOT_FOUND, None
+    sponsor = next(
+        (
+            str(row["related_license_full_name"]).strip()
+            for row in active
+            if row.get("related_license_type") == "Broker Company"
+            and row.get("related_license_full_name")
+        ),
+        None,
+    )
+    return LicenseStatus.LICENSED, sponsor
+
+
+def _lookup_company(company: str, client: httpx.Client) -> Answer:
+    key = _company_key(company)
+    if not key:
+        return LicenseStatus.NOT_CHECKED, None
+    prefix = re.sub(r"[%_']", "", key.split(" ")[0])
+    rows = _get_rows(f"license_type='Broker Company' AND upper(full_name) like '{prefix}%'", client)
+    if rows is None or len(rows) > MAX_ROWS:
+        return LicenseStatus.NOT_CHECKED, None
+    same = [row for row in rows if _company_key(str(row.get("full_name", ""))) == key]
+    if any(_active(str(row.get("status", ""))) for row in same):
+        return LicenseStatus.LICENSED, None
+    return LicenseStatus.NOT_FOUND, None
+
 
 _shared_client: httpx.Client | None = None
 
@@ -60,104 +237,44 @@ def _client() -> httpx.Client:
     return _shared_client
 
 
-_ROLE_OF = {"realtor": "agent", "agent": "agent", "broker": "broker", "locator": "locator"}
-
-
-@dataclass(frozen=True)
-class Claim:
-    role: str
-    first: str | None = None
-    last: str | None = None
-
-
-def detect_claim(text: str) -> Claim | None:
-    """The poster's own claim to be an agent, broker or locator, and the name they give.
-    Bounded: only the first 2,000 characters are read, and no pattern can backtrack badly."""
-    text = text[:MAX_TEXT]
-    for pattern, role_group, first_group in ((_NAMED_ROLE, 3, 1), (_LABEL, 1, 2)):
-        m = pattern.search(text)
-        if m:
-            role = _ROLE_OF[m.group(role_group).lower()]
-            return Claim(role, m.group(first_group), m.group(first_group + 1))
-    m = _SELF_ROLE.search(text)
-    if not m:
-        return None
-    role = _ROLE_OF[m.group(1).lower()]
-    named = _NAME_INTRO.search(text) or _SIGNATURE.search(text.strip())
-    return Claim(role, named.group(1), named.group(2)) if named else Claim(role)
-
-
-def _active(status: str) -> bool:
-    s = status.strip()
-    return s == "Active" or s.endswith("- Active")
-
-
-def _cache_path(cache_dir: Path, first: str, last: str) -> Path:
-    key = hashlib.sha256(f"{first.upper()}|{last.upper()}".encode()).hexdigest()[:32]
-    return cache_dir / f"{key}.json"
-
-
-def _soql(value: str) -> str:
-    return value.upper().replace("'", "''")
-
-
-def _lookup(first: str, last: str, client: httpx.Client) -> tuple[bool, str | None] | None:
-    """(an active license exists, the sponsoring broker company or None). None: lookup failed."""
-    where = f"upper(first_name)='{_soql(first)}' AND upper(last_name)='{_soql(last)}'"
-    try:
-        r = client.get(
-            TREC_URL,
-            params={"$where": where, "$limit": str(MAX_ROWS)},
-            timeout=httpx.Timeout(TIMEOUT_S),
-        )
-        if r.status_code != 200:
-            return None
-        rows = r.json()
-    except (httpx.HTTPError, ValueError):
-        return None
-    if not isinstance(rows, list):
-        return None
-    active = [row for row in rows if isinstance(row, dict) and _active(str(row.get("status", "")))]
-    sponsor = next(
-        (
-            str(row["related_license_full_name"]).strip()
-            for row in active
-            if row.get("related_license_type") == "Broker Company"
-            and row.get("related_license_full_name")
-        ),
-        None,
-    )
-    return bool(active), sponsor
-
-
 def check_license(
     text: str, *, client: httpx.Client | None = None, cache_dir: Path | None = None
 ) -> LicenseResult:
     claim = detect_claim(text)
     if claim is None:
         return LicenseResult(status=LicenseStatus.NOT_CHECKED)
-    if not claim.first or not claim.last:
+    if claim.company is None and (not claim.first or not claim.last):
         return LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role=claim.role)
 
+    query = (
+        f"company|{claim.company.upper()}"
+        if claim.company
+        else (f"person|{claim.first.upper()}|{claim.last.upper()}")
+    )
     cache_dir = cache_dir or resolve_data_dir(get_settings().snapback_data_dir) / "trec"
-    cached = _cache_path(cache_dir, claim.first, claim.last)
-    found: tuple[bool, str | None] | None = None
+    cached = cache_dir / f"{hashlib.sha256(query.encode()).hexdigest()[:32]}.json"
+    answer: Answer | None = None
     try:
         if cached.is_file():
             saved = json.loads(cached.read_text(encoding="utf-8"))
-            found = (bool(saved["active"]), saved.get("sponsor"))
+            answer = (LicenseStatus(saved["status"]), saved.get("sponsor"))
     except (OSError, ValueError, KeyError, TypeError):
-        found = None
-    if found is None:
-        found = _lookup(claim.first, claim.last, client or _client())
-        if found is None:
-            return LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role=claim.role)
-        cached.parent.mkdir(parents=True, exist_ok=True)
-        cached.write_text(json.dumps({"active": found[0], "sponsor": found[1]}), encoding="utf-8")
+        answer = None
+    if answer is None:
+        http = client or _client()
+        if claim.company:
+            answer = _lookup_company(claim.company, http)
+        else:
+            answer = _lookup_person(claim.first or "", claim.last or "", http)
+        if answer[0] is not LicenseStatus.NOT_CHECKED:
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            cached.write_text(
+                json.dumps({"status": answer[0].value, "sponsor": answer[1]}), encoding="utf-8"
+            )
 
-    active, sponsor = found
-    if not active:
-        return LicenseResult(status=LicenseStatus.NOT_FOUND, claimed_role=claim.role)
+    status, sponsor = answer
     return LicenseResult(
-        status=LicenseStatus.LICENSED, claimed_role=claim.role, sponsor_broker=sponsor
+        status=status,
+        claimed_role=claim.role,
+        sponsor_broker=sponsor if status is LicenseStatus.LICENSED else None,
     )
