@@ -137,7 +137,7 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
         data-testid="calibration-chart"
       >
         <title id="cal-title">
-          Reliability diagram: stated confidence against how often the place check was right
+          Reliability diagram: locate score against how often the place check was right
         </title>
         {[0, 0.25, 0.5, 0.75, 1].map((t) => (
           <g key={t}>
@@ -152,7 +152,7 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
         ))}
         <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} className="lab-diagonal" />
         <text x={(m.left + S - m.right) / 2} y={S - 6} className="lab-axis" textAnchor="middle">
-          Stated confidence
+          Locate score
         </text>
         <text
           transform={`translate(10 ${(m.top + S - m.bottom) / 2}) rotate(-90)`}
@@ -180,15 +180,6 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
                 <circle cx={x(p.x)} cy={y(p.rate)} r={4} className="lab-dot">
                   <title>{`${pct(p.rate)} right, n = ${p.n}, 95% CI ${pct(p.ci_low)} to ${pct(p.ci_high)}`}</title>
                 </circle>
-                <text
-                  x={x(p.x)}
-                  y={Math.max(m.top + 8, y(p.ci_high) - 3)}
-                  className="lab-tick lab-n"
-                  textAnchor="middle"
-                  data-testid="cal-point-n"
-                >
-                  {`n=${p.n}`}
-                </text>
               </g>
             ))}
           </g>
@@ -224,6 +215,7 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
   const bars = curveBars(parsed.rows);
   const cal = calibrationSeries(parsed.rows);
   const mem = memoryCatch(parsed.rows);
+  const calN = [...cal.values()].flat().reduce((a, p) => a + p.n, 0);
   const frozen = heldOutFrozenAt(parsed.rows);
 
   return (
@@ -267,7 +259,12 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
           <div className="lab-block">
             <h3>Locate score calibration (renders of our scans)</h3>
             {cal.size > 0 ? (
-              <CalibrationChart series={cal} />
+              <>
+                <p className="lab-note" data-testid="cal-chip">
+                  {`Measured on renders of our scans, n=${calN}`}
+                </p>
+                <CalibrationChart series={cal} />
+              </>
             ) : (
               <p className="lab-note" data-testid="calibration-empty">
                 No calibration rows in this file.

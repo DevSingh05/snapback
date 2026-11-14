@@ -229,13 +229,16 @@ describe("calibration rows from renders (PR #181)", () => {
     expect(within(legend).getByTestId("cal-legend-n")).toHaveTextContent(
       "n per bin: 37, 4, 3, 6, 30",
     );
-    expect(screen.getAllByTestId("cal-point-n").map((t) => t.textContent)).toEqual([
-      "n=37",
-      "n=4",
-      "n=3",
-      "n=6",
-      "n=30",
-    ]);
+    expect(screen.queryAllByTestId("cal-point-n")).toHaveLength(0);
+  });
+
+  it("marks the calibration block as measured on renders, with n from the rows", () => {
+    render(<LabPanel csv={pr181} source="fixture" />);
+    expect(screen.getByTestId("cal-chip")).toHaveTextContent(
+      "Measured on renders of our scans, n=80",
+    );
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    expect(screen.queryByText(/Stated confidence/)).toBeNull();
   });
 
   it("retitles the heading and never frames a stated probability", () => {
