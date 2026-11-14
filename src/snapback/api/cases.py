@@ -258,11 +258,23 @@ class CaseStore:
         if self._settings.snapback_data_source is not DataSource.FIXTURE:
             raise LiveModeNotWired
 
-    def create(self, listing: Listing) -> SessionCase:
+    def __len__(self) -> int:
+        return len(self._cases)
+
+    def create(
+        self, listing: Listing, register: Callable[[str], None] | None = None
+    ) -> SessionCase:
+        """Start a check. `register` is told the new case's id before anything runs.
+
+        If `register` raises, there is no case: a check that could not be recorded for later
+        deletion is not started.
+        """
         self.check_can_create()
         with self._lock:
             short_id = self._new_id()
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
+            if register is not None:
+                register(full_id)
             # The fixture modules stand in for the twin, the record and the challenge. What
             # the renter sent is real: its scope, its rule hits and its rent come from intake.
             modules = FixtureModules(

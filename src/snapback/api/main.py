@@ -20,6 +20,7 @@ challenge and is the only one accepted as `?token=`, because servers log address
 """
 
 import asyncio
+import re
 import secrets
 from collections.abc import AsyncIterator
 from typing import Annotated, Literal
@@ -42,6 +43,7 @@ from snapback.api.cases import (
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
+from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.card.render import render_card_png
 from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
@@ -51,6 +53,13 @@ from snapback.verdict import decide
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
+# What the sidecar sends: a keyed hash of the thread. Short, and nothing like a sentence.
+RENTER_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+_DEFAULT = object()
+
+
+class NotRegistered(Exception):
+    """The case could not be recorded with its renter, so it must not be started."""
 
 
 Language = Literal["en", "es"]
@@ -100,9 +109,14 @@ async def _trace_stream(
                 quiet = 0.0
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, *, registry: CaseRegistry | None | object = _DEFAULT
+) -> FastAPI:
+    """The API. `registry` records who started each case; the default is lane D's store."""
     settings = settings or get_settings()
     store = CaseStore(settings)
+    if registry is _DEFAULT:
+        registry = SafetyRegistry(settings.snapback_data_dir)
     # One allowance per renter or per browser, and a ceiling per network address so that
     # clearing cookies is not a way around it.
     per_client = DailyLimit(settings.snapback_daily_limit)
@@ -181,12 +195,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
-    def start_case(text: str, link: str, photos: list[UploadFile]) -> SessionCase:
+    def start_case(text: str, link: str, photos: list[UploadFile], owner: str) -> SessionCase:
         images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
         listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
+
+        def register(case_id: str) -> None:
+            # So lane D's delete finds every case this renter started (A11).
+            if registry is None:
+                return
+            try:
+                registry.register_case(case_id, owner)
+            except Exception:
+                raise NotRegistered from None
+
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
-        return store.create(read_listing(listing_text, images))
+        try:
+            return store.create(read_listing(listing_text, images), register)
+        except NotRegistered:
+            raise HTTPException(
+                status_code=503,
+                detail="The check could not be recorded, so it was not started. Try again.",
+            ) from None
 
     @app.post(
         "/cases",
@@ -236,12 +266,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
+            if renter_id and not RENTER_ID.fullmatch(renter_id):
+                raise HTTPException(status_code=422, detail="That is not a renter id.")
 
             # Who is asking. The sidecar names its renter; a browser is known by a cookie.
             address = request.client.host if request.client else "unknown"
             cookie = request.cookies.get(CLIENT_COOKIE)
             new_cookie = None if renter_id or cookie else secrets.token_urlsafe(16)
             client = f"renter:{renter_id}" if renter_id else f"browser:{cookie or new_cookie}"
+            # Who the case is registered under, for delete: the sidecar's own renter id as
+            # it sent it, or the browser's client cookie.
+            owner = renter_id or client
 
             # A place is taken before the check starts, in one step, so two requests arriving
             # together cannot both take the last one. It is given back if nothing starts.
@@ -251,7 +286,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 per_client.release(client)
                 raise HTTPException(status_code=429, detail=limit_reached)
             try:
-                case = await run_in_threadpool(start_case, text, link, photos)
+                case = await run_in_threadpool(start_case, text, link, photos, owner)
             except BaseException:
                 per_client.release(client)
                 per_address.release(address)
