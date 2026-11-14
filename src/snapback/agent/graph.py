@@ -41,6 +41,8 @@ live, so each decision comes with one plain sentence saying why.
 
 How a case runs:
 
+- Some decisions are the order of the checks: every check that can run will run, so pick the \
+one whose result would tell the renter the most first. Checks that cannot run are not listed.
 - Call `open_choice` to see the decision that is open: its options and the facts derived so \
 far. Then call `choose_option` with one of the listed options and a one-sentence reason that \
 rests on those facts.
@@ -62,6 +64,7 @@ KICKOFF = "A new case is ready. Work through it."
 
 def describe(case: CaseSession) -> str:
     """What the model is told about where the case stands. Aliases and derived facts only."""
+    case.settle()  # a menu of one is not the model's to pick from
     offer = case.offer()
     if offer is not None:
         return json.dumps(
@@ -101,7 +104,7 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
         """
         if case.offer() is None:
             return "No decision is open right now. " + describe(case)
-        case.choose(option, reason)
+        case.choose(option, reason, by="model")
         return describe(case)
 
     @tool
@@ -152,6 +155,7 @@ def run_case_with_agent(
     To carry on after a pause, record the answer with `case.approve(...)` and call this again
     with the same agent and thread id.
     """
+    case.settle()
     if case.step is Step.REPLY:
         return None  # the poster has not replied; there is nothing for a model to choose
     config = {

@@ -43,6 +43,8 @@ BANNED = ("scam", "safe", "verified")
 class ScriptedModel:
     """Stands in for the language model: answers each offer from a script, else the default."""
 
+    chosen_by = "model"
+
     def __init__(self, picks: dict[ChoiceKind, str] | None = None, reason: str | None = None):
         self.picks = picks or {}
         self.reason = reason
@@ -136,7 +138,14 @@ def test_retry_capped_at_two():
 def test_trace_for_the_hold_fixture_has_the_shape_of_the_fixture_trace():
     case = session()
     run_case(case, PolicyChooser(), always("send"))
-    events = case.trace.events
+    # The shared fixture predates the planner (A24): its steps are the same, in the same order,
+    # with the plan's own lines (next-check choices and skipped options) left out.
+    events = [
+        e
+        for e in case.trace.events
+        if e.choice is not ChoiceKind.NEXT_CHECK
+        and not (e.kind is TraceKind.STATUS and e.reason.startswith("Skipped "))
+    ]
 
     assert [(e.kind, e.choice) for e in events] == [(e.kind, e.choice) for e in FIXTURE_TRACE]
     for built, expected in zip(events, FIXTURE_TRACE, strict=True):
@@ -204,6 +213,8 @@ def test_an_alias_pick_is_recorded_under_its_real_label():
 
 def test_a_model_that_crashes_falls_back_to_the_default():
     class Broken:
+        chosen_by = "model"
+
         def choose(self, offer: Offer) -> tuple[str, str]:
             raise RuntimeError("no connection")
 
@@ -390,8 +401,10 @@ def test_no_twin_still_reads_the_text():
     case = session(has_twin=False)
     model = ScriptedModel()
     verdict = run_case(case, model, always("send"))
-    checks = next(o for o in model.offers if o.kind is ChoiceKind.WHICH_CHECKS)
-    assert checks.options == ("rules only",)
+    # A menu of one is never sent to the model (A24); the trace says nothing was chosen.
+    assert all(o.kind is not ChoiceKind.WHICH_CHECKS for o in model.offers)
+    checks = next(e for e in case.trace.events if e.choice is ChoiceKind.WHICH_CHECKS)
+    assert checks.options == ["rules only"] and checks.chosen_by == "policy"
     assert case.evidence.rules
     assert verdict.state is VerdictState.UNVERIFIED
     assert all(e.kind is not TraceKind.HITL for e in case.trace.events)

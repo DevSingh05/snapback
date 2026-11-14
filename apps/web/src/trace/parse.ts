@@ -29,6 +29,8 @@ export function parseTraceEvent(raw: string): TraceEvent | null {
   return {
     ...(d as unknown as TraceEvent),
     options: Array.isArray(d.options) ? (d.options as string[]) : [],
+    // An older line with no stamp was made by the code policy (the API's own default).
+    chosen_by: d.chosen_by === "model" ? "model" : "policy",
   };
 }
 

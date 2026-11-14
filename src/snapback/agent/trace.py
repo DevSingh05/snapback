@@ -7,6 +7,7 @@
 import threading
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
+from typing import Literal
 
 from snapback.contracts import ChoiceKind, DataSource, TraceEvent, TraceKind
 
@@ -54,6 +55,7 @@ class Trace:
         choice: ChoiceKind | None = None,
         options: Iterable[str] = (),
         pick: str | None = None,
+        chosen_by: Literal["model", "policy"] = "policy",
     ) -> TraceEvent:
         with self._lock:
             event = TraceEvent(
@@ -66,6 +68,7 @@ class Trace:
                 pick=pick,
                 reason=reason,
                 source=self.source,
+                chosen_by=chosen_by,
             )
             self.events.append(event)
         for listener in self._listeners:

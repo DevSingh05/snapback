@@ -167,3 +167,18 @@ def test_a_model_that_fails_is_finished_by_the_code_policy():
     verdict = run_case_with_agent(case, agent, lambda draft: "send")
     assert verdict.state is VerdictState.HOLD
     assert any(e.kind is TraceKind.ERROR for e in case.trace.events)
+
+
+def test_deep_agent_picks_are_stamped_model_and_fallbacks_policy():
+    case = new_case()
+    agent = build_agent(case, script(HONEST_RUN))
+    run_case_with_agent(case, agent, lambda draft: "send")
+    stamps = {e.choice: e.chosen_by for e in case.trace.events if e.kind is TraceKind.CHOICE}
+    assert stamps[ChoiceKind.NEXT_CHECK] == "policy"  # each plan menu here held one option
+    assert stamps[ChoiceKind.WHICH_CHECKS] == "model"
+    assert stamps[ChoiceKind.WHICH_SPOT] == "policy"  # a random draw is never the model's
+
+    bad = [("choose_option", {"option": "mark verified", "reason": "x"})]
+    case = new_case()
+    run_case_with_agent(case, build_agent(case, script(bad)), lambda draft: "send")
+    assert {e.chosen_by for e in case.trace.events if e.kind is TraceKind.CHOICE} == {"policy"}
