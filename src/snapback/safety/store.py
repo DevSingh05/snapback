@@ -8,12 +8,14 @@ from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
+from snapback.safety.paths import resolve_data_dir
+
 DB_NAME = "safety.sqlite"
 
 
 class SafetyStore:
     def __init__(self, data_dir: Path) -> None:
-        self.path = Path(data_dir) / DB_NAME
+        self.path = resolve_data_dir(data_dir) / DB_NAME
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as con, con:
             con.execute(
@@ -26,7 +28,9 @@ class SafetyStore:
             )
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.path)
+        con = sqlite3.connect(self.path)
+        con.execute("pragma secure_delete = on")  # deleted rows are overwritten, not left behind
+        return con
 
     def checks_on(self, renter_id: str, day: str) -> int:
         with closing(self._connect()) as con:

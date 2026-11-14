@@ -7,6 +7,8 @@ The sponsor terms say all copies, caches and derivatives are deleted when the ev
 import shutil
 from pathlib import Path
 
+from snapback.safety import paths
+
 KEEP = {".gitkeep"}
 
 
@@ -16,11 +18,11 @@ class PurgeRefusedError(RuntimeError):
 
 def purge(data_dir: Path) -> int:
     """Remove everything inside `data_dir`. Returns how many top-level entries went."""
-    data_dir = Path(data_dir).resolve()
+    data_dir = paths.resolve_data_dir(data_dir).resolve()
     if data_dir.name != "data":
         raise PurgeRefusedError(f"refusing to purge {data_dir}: only a folder named data/")
     if not data_dir.is_dir():
-        return 0
+        raise FileNotFoundError(f"nothing to purge: {data_dir} does not exist")
     removed = 0
     for entry in data_dir.iterdir():
         if entry.name in KEEP:

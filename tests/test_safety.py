@@ -135,3 +135,50 @@ def test_purge_refuses_a_folder_not_named_data(tmp_path):
     with pytest.raises(PurgeRefusedError):
         purge(other)
     assert (other / "keep.py").exists()
+
+
+def test_delete_clears_the_real_photo_memory_store(tmp_path):
+    from snapback.vision.memory import PhotoMemory
+
+    data = tmp_path / "data"
+    db = data / "memory" / "photo_memory.sqlite"
+    memory = PhotoMemory(db)
+    calls: list[str] = []
+    original = PhotoMemory.delete_case
+
+    def spy(self, case_id):
+        calls.append(case_id)
+        return original(self, case_id)
+
+    PhotoMemory.delete_case = spy
+    try:
+        report = delete_case("fx-a", data)
+    finally:
+        PhotoMemory.delete_case = original
+    assert calls == ["fx-a"]
+    assert report.memory_cleared is True
+    assert memory.path == db
+
+
+def test_a_relative_data_dir_is_resolved_against_the_repo_root(tmp_path, monkeypatch):
+    from snapback.safety import paths
+
+    monkeypatch.setattr(paths, "REPO_ROOT", tmp_path)
+    (tmp_path / "data" / "x").mkdir(parents=True)
+    monkeypatch.chdir(tmp_path / "data")  # run from somewhere else, as from apps/web
+    assert purge(Path("data")) == 1
+    assert paths.resolve_data_dir(Path("data")) == tmp_path / "data"
+
+
+def test_purging_a_missing_folder_is_an_error_not_zero(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        purge(tmp_path / "data")
+
+
+def test_deletes_use_secure_delete(tmp_path):
+    store = SafetyStore(tmp_path / "data")
+    con = store._connect()
+    try:
+        assert con.execute("pragma secure_delete").fetchone()[0] == 1
+    finally:
+        con.close()
