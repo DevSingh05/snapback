@@ -26,7 +26,7 @@ while IFS= read -r path; do
 done < <(printf '%s\n' "$files" | grep -E '(^|/)\.env($|\.)' | grep -v -E '(^|/)\.env\.example$' || true)
 
 # 3. Filled-in credentials anywhere in tracked text.
-secret_names='MATTERPORT_API_KEY|MATTERPORT_API_TOKEN|VEXCEL_API_KEY|COSTAR_ZIP_PASSWORD|ANTHROPIC_API_KEY'
+secret_names='MATTERPORT_API_KEY|MATTERPORT_API_TOKEN|MATTERPORT_SDK_KEY|VEXCEL_API_KEY|COSTAR_ZIP_PASSWORD|ANTHROPIC_API_KEY'
 while IFS= read -r hit; do
   [ -n "$hit" ] && report "credential value is tracked: ${hit%%=*}=<redacted>"
 done < <(git grep -n -I -E "^[[:space:]]*(export[[:space:]]+)?(${secret_names})=[^[:space:]]+" -- . || true)
@@ -39,6 +39,12 @@ while IFS= read -r path; do
     report "file over 1 MB is tracked ($size bytes): $path"
   fi
 done < <(printf '%s\n' "$files")
+
+# 5. No AI co-author or attribution lines in any commit message (team rule, no exceptions).
+attr='co-authored-by|generated with \[?claude|noreply@anthropic\.com|🤖'
+while IFS= read -r sha; do
+  [ -n "$sha" ] && report "commit $sha has an AI co-author or attribution line; reword it (git rebase -i, then push)"
+done < <(git log --format='%h %B%x00' 2>/dev/null | tr '\n' ' ' | tr '\0' '\n' | grep -iE "$attr" | cut -d' ' -f1 || true)
 
 if [ "$fail" -ne 0 ]; then
   echo "hygiene: FAILED. Remove the files above from git (and from history if already pushed)." >&2
