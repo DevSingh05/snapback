@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 
 import { CardPage } from "./pages/CardPage";
+import { TracePage } from "./trace/TracePage";
 
-type Route = { name: "result"; id: string } | { name: "verify"; id: string } | { name: "home" };
+type Route =
+  | { name: "result"; id: string }
+  | { name: "trace"; id: string }
+  | { name: "verify"; id: string }
+  | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  const trace = /^\/case\/([A-Za-z0-9_-]+)\/trace\/?$/.exec(path);
+  if (trace?.[1]) return { name: "trace", id: trace[1] };
   const result = /^\/case\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (result?.[1]) return { name: "result", id: result[1] };
   const verify = /^\/c\/([A-Za-z0-9_-]+)\/?$/.exec(path);
@@ -34,6 +41,8 @@ export default function App() {
             <span className="mono">/c/7Q2M</span>.
           </p>
         </div>
+      ) : route.name === "trace" ? (
+        <TracePage key={`trace-${route.id}`} caseId={route.id} />
       ) : (
         <CardPage key={`${route.name}-${route.id}`} caseId={route.id} variant={route.name} />
       )}
