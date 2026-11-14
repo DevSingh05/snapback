@@ -1,74 +1,130 @@
-import { Parts } from "../draw/Parts";
-import { makeScene, part, type Part } from "../draw/kit";
-import { HouseGlyph } from "../components/HouseGlyph";
-import { drawRoom } from "../walk/rooms";
+import heroBalconies from "../assets/hero-dusk-balconies.webp";
+import sampleBuilding from "../assets/sample-building.webp";
+import sampleKitchen from "../assets/sample-kitchen.webp";
+import sampleLivingRoom from "../assets/sample-living-room.webp";
+import { ChapterStrip, Photo, type Chapter } from "../ui";
 import "./landing.css";
 
-// Three real steps, in order, each with a small drawing in the kit's style.
+// The four-step path on Home: from an ad to a visit you can trust. Each step is a photograph
+// and one sentence; the ones the box can run are buttons that run it. "Walk it first" is the
+// wide one and carries a small chapter strip, so it reads as a player before it opens. Every
+// photo here is licensed stock, stamped as a sample (credits: src/assets/CREDITS.md).
 
-const s = makeScene({ ox: 60, oy: 26 });
+export type StepKey = "check" | "walk" | "find" | "tour";
 
-// Step 1: the ad as you were sent it: a card with three photos and lines of text.
-const AD: Part[] = [
-  part("card", [s.contact(0, 0, 70, 96, 8), ...s.box("white", 0, 0, 0, 70, 96, 4)]),
-  part("photos", [
-    s.onZ("dk-glass", 4.2, 6, 6, 58, 30),
-    s.onZ("hiw-thumb", 4.2, 6, 40, 27, 18),
-    s.onZ("hiw-thumb", 4.2, 37, 40, 27, 18),
-  ]),
-  part(
-    "text",
-    [64, 71, 78].map((y, i) => s.onZ("hiw-text", 4.2, 6, y, i === 2 ? 34 : 58, 3)),
-    true,
-  ),
-  part("price", s.box("teal", 44, 82, 4, 20, 9, 2)),
+interface Step {
+  key: StepKey;
+  note: string;
+  title: string;
+  text: string;
+  src: string;
+  alt: string;
+}
+
+export const STEPS: readonly Step[] = [
+  {
+    key: "check",
+    note: "Start here",
+    title: "Check the ad",
+    text: "Its photos, price and payment ask, set against the record of the real home.",
+    src: sampleLivingRoom,
+    alt: "A living room with a grey sofa and plants",
+  },
+  {
+    key: "walk",
+    note: "The real 3D scan",
+    title: "Walk it first",
+    text: "Move through the real rooms, one by one, before you go or pay. It plays like a video; tap to stop and look around.",
+    src: sampleKitchen,
+    alt: "A white apartment kitchen with an island and steel appliances",
+  },
+  {
+    key: "find",
+    note: "If the check fails",
+    title: "Find safer places",
+    text: "Leave that ad. Look at verified listings on Apartments.com, or ask for researched homes you can walk first.",
+    src: heroBalconies,
+    alt: "An apartment building with glass balconies under a pink sky",
+  },
+  {
+    key: "tour",
+    note: "You send it, not us",
+    title: "Ask for a tour",
+    text: "We draft the message and the questions to ask. You read it, then send.",
+    src: sampleBuilding,
+    alt: "An apartment building seen from below",
+  },
 ];
 
-const ROOM = drawRoom("living");
+const ROOMS: Chapter[] = [
+  { id: "living", label: "Living room" },
+  { id: "kitchen", label: "Kitchen" },
+  { id: "bedroom", label: "Bedroom" },
+  { id: "bath", label: "Bath" },
+];
 
-const STEPS = [
-  {
-    title: "Paste the ad",
-    text: "The link, the text or screenshots, just as you were sent it.",
-  },
-  {
-    title: "We check it against the record",
-    text: "CoStar's record, the owner and the licence, and the ad's photos placed in the home's 3D scan.",
-  },
-  {
-    title: "Walk it, then contact the office on record",
-    text: "See what the ad showed and what it left out, before you pay anything.",
-  },
-] as const;
-
-export function HowItWorks() {
+function StepBody({ step, i, runs }: { step: Step; i: number; runs: boolean }) {
   return (
-    <section className="hiw" aria-label="How it works" data-testid="how-it-works">
-      <h2 className="hiw-title">How it works</h2>
+    <>
+      <span className="hiw-meta ui-mono">
+        <span>{String(i + 1).padStart(2, "0")}</span>
+        <span>{step.note}</span>
+      </span>
+      <Photo src={step.src} alt={step.alt} stamp="sample" stampAt="top" className="hiw-photo">
+        {step.key === "walk" && (
+          <ChapterStrip
+            chapters={ROOMS}
+            current="kitchen"
+            onMatte
+            label="Rooms in the walk"
+            className="hiw-rooms"
+          />
+        )}
+      </Photo>
+      <span className="hiw-text">
+        <span className="hiw-step-title">
+          {step.title}
+          {runs && (
+            <span className="hiw-arrow" aria-hidden="true">
+              {"\u00a0"}→
+            </span>
+          )}
+        </span>
+        <span className="hiw-line">{step.text}</span>
+      </span>
+    </>
+  );
+}
+
+export function HowItWorks({
+  actions = {},
+}: {
+  // What tapping a step does. A step with no action is shown as text, not as a button.
+  actions?: Partial<Record<StepKey, () => void>>;
+}) {
+  return (
+    <section className="hiw" aria-labelledby="hiw-title" data-testid="how-it-works">
+      <h2 id="hiw-title" className="hiw-title">
+        From an ad to a visit you can trust.
+      </h2>
+      <p className="hiw-sub">Four steps. Start at any of them; the box above runs them all.</p>
       <ol className="hiw-steps">
-        {STEPS.map((step, i) => (
-          <li key={step.title} className="hiw-step">
-            <div className="hiw-art" data-detail="low">
-              {i === 0 && (
-                <svg viewBox="-36 -8 140 110" aria-hidden="true" focusable="false">
-                  <Parts parts={AD} />
-                </svg>
+        {STEPS.map((step, i) => {
+          const run = actions[step.key];
+          return (
+            <li key={step.key} className="hiw-step" data-step={step.key}>
+              {run ? (
+                <button type="button" className="hiw-go" onClick={run}>
+                  <StepBody step={step} i={i} runs />
+                </button>
+              ) : (
+                <div className="hiw-go">
+                  <StepBody step={step} i={i} runs={false} />
+                </div>
               )}
-              {i === 1 && (
-                <svg viewBox="110 20 580 500" aria-hidden="true" focusable="false">
-                  <Parts parts={ROOM.base} />
-                  <Parts parts={ROOM.things} />
-                </svg>
-              )}
-              {i === 2 && <HouseGlyph className="hiw-house" detail="low" />}
-            </div>
-            <p className="hiw-n mono" aria-hidden="true">
-              {i + 1}
-            </p>
-            <h3 className="hiw-step-title">{step.title}</h3>
-            <p className="hiw-text">{step.text}</p>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

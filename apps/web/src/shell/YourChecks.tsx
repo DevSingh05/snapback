@@ -4,6 +4,15 @@ import { apiBase, fetchCard } from "../api";
 import { STATE_WORD, shortDate } from "../cardStrings";
 import { SourceChip } from "../components/SourceChip";
 import type { Card } from "../contracts";
+import { EmptyRows, Loading, State, type StateKind } from "../ui";
+
+// The square beside each verdict. The words are the card's own (cardStrings.ts).
+const STATE_KIND: Record<Card["state"], StateKind> = {
+  hold: "warn",
+  dont_pay: "mismatch",
+  unverified: "unconfirmed",
+  verified: "ok",
+};
 
 const READ_PREFIX = "snapback.case-read-token.";
 const FIXTURE_CASE = "7Q2M";
@@ -24,9 +33,10 @@ export function knownCaseIds(): string[] {
 
 type Row = { id: string; card: Card | null };
 
-// Home's dashboard: the ads you have checked in this browser, each with the verdict the code
-// set, and the way to check another. With no live server it shows the one team-made sample
-// case, labelled as a sample.
+// Home's dashboard: the ads you have checked in this browser, as rows, each with the verdict the
+// code set, and the way to check another. With no live server it shows the one team-made sample
+// case, labelled as a sample. A row never carries a stock photo: a picture here would read as
+// the renter's own.
 export function YourChecks() {
   const [rows, setRows] = useState<Row[] | null>(null);
   useEffect(() => {
@@ -44,38 +54,47 @@ export function YourChecks() {
 
   const sample = !apiBase();
   return (
-    <section className="yc" aria-label="Your checks" data-testid="your-checks">
+    <section className="yc" aria-labelledby="yc-title" data-testid="your-checks">
       <header className="yc-head">
-        <h2 className="yc-title">Your checks</h2>
-        <p className="yc-sub">
-          {sample
-            ? "A sample case made by the team. Your own checks appear here."
-            : "The ads you checked in this browser, this visit."}
-        </p>
+        <h2 id="yc-title" className="yc-title">
+          Your checks
+        </h2>
         <a className="yc-new" href="#listing">
           Check another ad
         </a>
       </header>
+      <p className="yc-sub">
+        {sample
+          ? "A sample case made by the team. Your own checks appear here."
+          : "The ads you checked in this browser, this visit."}
+      </p>
       {rows === null ? (
-        <p className="yc-empty" role="status">
-          Loading your checks...
-        </p>
+        <Loading label="Loading your checks" rows={2} className="yc-wait" />
       ) : rows.length === 0 ? (
-        <p className="yc-empty" data-testid="checks-empty">
-          No checks yet. Paste an ad below and its result is kept here for this visit.
-        </p>
+        <div data-testid="checks-empty">
+          <EmptyRows
+            message="Nothing checked yet. Paste an ad above and it will be kept here for this visit."
+            examples={["A Marketplace or Craigslist ad, pasted as text", "A link, or screenshots"]}
+          />
+        </div>
       ) : (
         <ul className="yc-list">
           {rows.map(({ id, card }) => (
             <li key={id} className="yc-row" data-state={card?.state ?? "unknown"}>
               <a className="yc-link" href={`/case/${encodeURIComponent(id)}`}>
-                <span className="yc-verdict">
-                  {card ? STATE_WORD[card.state] : "Could not load this check"}
+                <span className="yc-main">
+                  <State kind={card ? STATE_KIND[card.state] : "unchecked"} className="yc-verdict">
+                    {card ? STATE_WORD[card.state] : "Could not load this check"}
+                  </State>
+                  <span className="yc-meta ui-mono">
+                    <span className="yc-id">Case {id}</span>
+                    {card && <span className="yc-date">Checked {shortDate(card.checked_at)}</span>}
+                    {card && <SourceChip source={card.source} />}
+                  </span>
                 </span>
-                <span className="yc-id mono">Case {id}</span>
-                {card && <span className="yc-date">Checked {shortDate(card.checked_at)}</span>}
-                {card && <SourceChip source={card.source} />}
-                <span className="yc-open">Open</span>
+                <span className="yc-open" aria-hidden="true">
+                  →
+                </span>
               </a>
             </li>
           ))}
