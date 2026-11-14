@@ -24,9 +24,10 @@ export function hexagon(centre: [number, number], radiusM: number): [number, num
 }
 
 // Column height in metres. It is a data mark, not the building: height says how many priced
-// floor plans are on record. `boost` exaggerates it at city zoom so the skyline reads.
+// floor plans are on record, in four capped steps, so the tallest column is never more than
+// about one and a half times the shortest. `boost` scales the whole set for a zoom band.
 export function columnHeight(nPlans: number, boost: number): number {
-  return (40 + Math.min(nPlans, 6) * 26) * boost;
+  return (64 + Math.min(Math.max(nPlans, 1), 4) * 12) * boost;
 }
 
 export interface ColumnFeature {
@@ -63,7 +64,7 @@ export function columns(
           scan: f.properties.has_scan,
           passed: passed.has(f.properties.pid),
           h,
-          cap: h + 14 * boost,
+          cap: h + 12 * boost,
         },
       };
     }),

@@ -4,6 +4,7 @@ import { nearestPlace, pickPolygon } from "./geometry";
 import { loadMapLibre } from "./maplibre";
 import type { MapApi, MapClick, RenderedFeature } from "./maplibre";
 import {
+  IMG,
   L,
   TILEJSON,
   buildStyle,
@@ -11,6 +12,7 @@ import {
   placeSources,
   rasterStyle,
   readPalette,
+  styleImage,
 } from "./mapStyle";
 import type { Look } from "./mapStyle";
 import { S } from "./strings";
@@ -64,6 +66,11 @@ export function CityMap(props: Props) {
     let dead = false;
     let map: MapApi | null = null;
     const cleanups: (() => void)[] = [];
+    let orbiting = false;
+    const orbit = () => {
+      if (!map || !orbiting || live.current.selectedPid) return;
+      map.easeTo({ bearing: map.getBearing() + 9, duration: 20000, easing: (t) => t });
+    };
 
     const style = () => {
       const p = live.current;
@@ -111,6 +118,7 @@ export function CityMap(props: Props) {
       bearing?: number;
     }) => {
       if (!map) return;
+      orbiting = false;
       const target = { ...to, padding: live.current.padding };
       if (live.current.reducedMotion) map.jumpTo(target);
       else map.flyTo({ ...target, duration: 1200, essential: true });
@@ -144,6 +152,9 @@ export function CityMap(props: Props) {
           }
         }
       }
+      // For tests and screenshots: whether the picked place has a building of its own lit.
+      if (box.current)
+        box.current.dataset.picked = f ? (found && shape ? "building" : "point") : "none";
       map.getSource("picked")?.setData(
         found && shape
           ? {
@@ -152,7 +163,7 @@ export function CityMap(props: Props) {
                 {
                   type: "Feature",
                   geometry: shape,
-                  properties: { h: Number(found.properties.render_height ?? 8) },
+                  properties: { h: Math.max(7, Number(found.properties.render_height ?? 7)) },
                 },
               ],
             }
@@ -187,6 +198,8 @@ export function CityMap(props: Props) {
         }
       },
       restyle: () => {
+        // The two painted images follow the palette, so they are dropped and painted again.
+        for (const id of Object.values(IMG)) if (map?.hasImage(id)) map.removeImage(id);
         map?.setStyle(style());
         map?.once("idle", showPicked);
       },
@@ -216,8 +229,40 @@ export function CityMap(props: Props) {
           if (dead) return;
           live.current.onStatus(ok ? "ready" : "raster");
           ready.current();
+          orbiting = ok && live.current.look === "glass" && !live.current.reducedMotion;
+          if (orbiting && !live.current.selectedPid) orbit();
         });
+        // The style names two small images; paint them from the tokens as soon as a style is in,
+        // and again whenever MapLibre says one is missing.
+        const paintImages = () => {
+          if (!map) return;
+          for (const id of Object.values(IMG)) {
+            const made = map.hasImage(id) ? null : styleImage(id, readPalette());
+            if (made) map.addImage(id, made.image, made.options);
+          }
+        };
+        map.on("styledata", paintImages);
+        map.on("styleimagemissing", paintImages);
         map.on("click", onClick);
+        // A slow turn of the city while nobody is touching it. It ends at the first touch, key
+        // or pick, and never starts under reduced motion.
+        const stopOrbit = () => {
+          if (!orbiting) return;
+          orbiting = false;
+          map?.stop();
+        };
+        const boxEl = box.current;
+        for (const ev of ["pointerdown", "wheel", "touchstart", "keydown"] as const) {
+          boxEl.addEventListener(ev, stopOrbit, { passive: true });
+        }
+        cleanups.push(() => {
+          for (const ev of ["pointerdown", "wheel", "touchstart", "keydown"] as const) {
+            boxEl.removeEventListener(ev, stopOrbit);
+          }
+        });
+        map.on("moveend", () => {
+          if (orbiting) orbit();
+        });
         map.on("mousemove", (e: MapClick) => {
           const hit = map!.queryRenderedFeatures(e.point, { layers: hitLayers() }).length > 0;
           map!.getCanvas().style.cursor = hit ? "pointer" : "";
@@ -225,7 +270,7 @@ export function CityMap(props: Props) {
 
         // Follow the theme: rebuild the style from the tokens when the colour scheme flips.
         const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-        const restyle = () => map?.setStyle(style());
+        const restyle = () => api.current?.restyle();
         mq?.addEventListener("change", restyle);
         const mo = new MutationObserver(restyle);
         mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });

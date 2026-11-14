@@ -315,7 +315,7 @@ export function PlaceLedger({
               </span>
               <span className="lcard-body">
                 <span className="lcard-kicker mono">
-                  {S.kind(p.kind)} · {S.plans(p.n_plans)}
+                  {S.kindShort(p.kind)} · {S.plansShort(p.n_plans)}
                 </span>
                 <span className="lcard-rent">
                   {p.rent_from != null ? <small>{S.rentLead} </small> : null}

@@ -23,6 +23,10 @@ const TOKENS = [
   "bldg",
   "bldg-flat",
   "roof",
+  "win",
+  "chip",
+  "on-chip",
+  "road-glow",
   "label",
   "halo",
   "sky",
@@ -61,7 +65,7 @@ export const L = {
 } as const;
 
 type Layer = Record<string, unknown>;
-const FAR_SWITCH = 12.7; // below: wide, tall columns that read as a skyline
+const FAR_SWITCH = 12.2; // below: wide, tall columns that read as a skyline
 const NEAR_SWITCH = 14.6; // above: slim beacons beside the real buildings
 
 export function placeSources(data: PlaceData): Record<string, unknown> {
@@ -79,9 +83,9 @@ export function placeSources(data: PlaceData): Record<string, unknown> {
       clusterMaxZoom: 10,
       clusterRadius: 48,
     },
-    "columns-far": { type: "geojson", data: columns(data.places, 90, 6, data.passed) },
-    "columns-mid": { type: "geojson", data: columns(data.places, 34, 2.3, data.passed) },
-    "columns-near": { type: "geojson", data: columns(data.places, 9, 0.5, data.passed) },
+    "columns-far": { type: "geojson", data: columns(data.places, 90, 3.4, data.passed) },
+    "columns-mid": { type: "geojson", data: columns(data.places, 32, 1.9, data.passed) },
+    "columns-near": { type: "geojson", data: columns(data.places, 6, 0.3, data.passed) },
     picked: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     "picked-point": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   };
@@ -106,6 +110,22 @@ function placeLayers(p: Palette, look: Look, vector: boolean): Layer[] {
         "circle-radius": ["interpolate", ["exponential", 1.8], ["zoom"], 10, 10, 13, 34, 17, 120],
       },
     },
+    // A crisp ring on the ground at every place, so each one reads as a marked spot.
+    {
+      id: "place-ring",
+      type: "circle",
+      source: "places",
+      filter: ["!", ["has", "point_count"]],
+      paint: {
+        "circle-color": p.glow,
+        "circle-opacity": ["case", ["get", "fits_brief"], 0.14, 0],
+        "circle-stroke-color": pointColour,
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 11, 1, 15, 2],
+        "circle-stroke-opacity": ["case", ["get", "passed"], 0.3, 0.9],
+        "circle-pitch-alignment": "map",
+        "circle-radius": ["interpolate", ["exponential", 1.8], ["zoom"], 10, 4, 13, 13, 17, 62],
+      },
+    },
     {
       id: "picked-ring",
       type: "circle",
@@ -127,7 +147,7 @@ function placeLayers(p: Palette, look: Look, vector: boolean): Layer[] {
         ? { "fill-color": p.pick, "fill-opacity": 0.85 }
         : {
             "fill-extrusion-color": p.pick,
-            "fill-extrusion-height": ["+", ["get", "h"], 6],
+            "fill-extrusion-height": tall(["get", "h"], 3),
             "fill-extrusion-base": 0,
             "fill-extrusion-opacity": 0.96,
           },
@@ -237,6 +257,36 @@ function placeLayers(p: Palette, look: Look, vector: boolean): Layer[] {
     );
   }
   out.push(
+    // At close zoom each place carries its lowest asking rent on a chip; the map key says what
+    // the figure is and that it is as of CoStar's last research.
+    {
+      id: "place-rent",
+      type: "symbol",
+      source: "places",
+      minzoom: 13.6,
+      filter: ["all", ["!", ["has", "point_count"]], ["!", ["get", "passed"]]],
+      layout: {
+        "text-field": [
+          "case",
+          ["==", ["get", "rent_from"], null],
+          "on record",
+          [
+            "concat",
+            "from $",
+            ["number-format", ["get", "rent_from"], { "max-fraction-digits": 0 }],
+          ],
+        ],
+        "text-font": ["Noto Sans Bold"],
+        "text-size": 12,
+        "text-anchor": "top",
+        "text-offset": [0, 1.2],
+        "icon-image": IMG.chip,
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [4, 8, 4, 8],
+        "symbol-sort-key": ["case", ["get", "fits_brief"], 0, 1],
+      },
+      paint: { "text-color": p["on-chip"] },
+    },
     {
       id: L.cluster,
       type: "circle",
@@ -266,6 +316,25 @@ function placeLayers(p: Palette, look: Look, vector: boolean): Layer[] {
   );
   return out;
 }
+
+// Building heights come from the tiles (render_height, with 7 m where the map has none). They
+// are drawn taller than life at city zoom so the whole city reads as 3D, easing to true height
+// close in. `plus` lifts a layer above the roof line.
+const BLDG_H = ["max", ["coalesce", ["get", "render_height"], 7], 7];
+const BLDG_BASE = ["coalesce", ["get", "render_min_height"], 0];
+const tall = (h: unknown, plus = 0) => [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  12,
+  ["+", ["*", 3, h], plus * 3],
+  14,
+  ["+", ["*", 1.9, h], plus * 2],
+  16,
+  ["+", ["*", 1.15, h], plus],
+];
+// Images the style names; CityMap draws them from the palette when MapLibre asks for them.
+export const IMG = { facade: "sb-facade", chip: "sb-chip" } as const;
 
 const ROAD_WIDTH = (k: number) => [
   "interpolate",
@@ -366,9 +435,24 @@ function baseLayers(p: Palette, look: Look): Layer[] {
         "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1, 16, 5],
       },
     },
-    ...road("road-minor", ["minor", "service", "tertiary"], 0.6, 12),
-    ...road("road-major", ["primary", "secondary", "trunk"], 0.95, 9),
-    ...road("road-motorway", ["motorway"], 1.35, 7),
+    {
+      id: "road-glow",
+      type: "line",
+      ...src,
+      "source-layer": "transportation",
+      minzoom: 9,
+      filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary"]]],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": p["road-glow"],
+        "line-width": ROAD_WIDTH(3.4),
+        "line-blur": 8,
+        "line-opacity": 0.55,
+      },
+    },
+    ...road("road-minor", ["minor", "service", "tertiary"], 0.55, 12),
+    ...road("road-major", ["primary", "secondary", "trunk"], 1.05, 9),
+    ...road("road-motorway", ["motorway"], 1.7, 7),
     look === "paper"
       ? {
           id: L.buildingFlat,
@@ -386,16 +470,31 @@ function baseLayers(p: Palette, look: Look): Layer[] {
           minzoom: 12,
           paint: {
             "fill-extrusion-color": p.bldg,
-            "fill-extrusion-height": ["coalesce", ["get", "render_height"], 6],
-            "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-            "fill-extrusion-opacity": 0.82,
+            "fill-extrusion-height": tall(BLDG_H),
+            "fill-extrusion-base": tall(BLDG_BASE),
+            "fill-extrusion-opacity": 0.9,
             "fill-extrusion-vertical-gradient": true,
           },
         },
-    // A thin, paler slab on each roof: it gives every building a lit top edge.
     ...(look === "paper"
       ? []
       : [
+          // Close in, the walls carry floor bands and windows (a small pattern drawn from the
+          // tokens), laid over the plain walls.
+          {
+            id: "bldg-facade",
+            type: "fill-extrusion",
+            ...src,
+            "source-layer": "building",
+            minzoom: 14.4,
+            paint: {
+              "fill-extrusion-pattern": IMG.facade,
+              "fill-extrusion-height": tall(BLDG_H),
+              "fill-extrusion-base": tall(BLDG_BASE),
+              "fill-extrusion-opacity": 0.9,
+            },
+          },
+          // A thin, paler slab on each roof: it gives every building a lit top edge.
           {
             id: "bldg-roof",
             type: "fill-extrusion",
@@ -404,9 +503,9 @@ function baseLayers(p: Palette, look: Look): Layer[] {
             minzoom: 13,
             paint: {
               "fill-extrusion-color": p.roof,
-              "fill-extrusion-base": ["coalesce", ["get", "render_height"], 6],
-              "fill-extrusion-height": ["+", ["coalesce", ["get", "render_height"], 6], 0.8],
-              "fill-extrusion-opacity": 0.7,
+              "fill-extrusion-base": tall(BLDG_H),
+              "fill-extrusion-height": tall(BLDG_H, 0.9),
+              "fill-extrusion-opacity": 0.9,
               "fill-extrusion-vertical-gradient": false,
             },
           },
@@ -494,6 +593,68 @@ export function rasterStyle(p: Palette, data: PlaceData): Record<string, unknown
 
 export function camera(look: Look, narrow: boolean) {
   return look === "glass"
-    ? { center: narrow ? MIDTOWN : HOUSTON, zoom: narrow ? 12.85 : 13.15, pitch: 60, bearing: -24 }
+    ? { center: narrow ? MIDTOWN : HOUSTON, zoom: narrow ? 13.02 : 13.1, pitch: 57, bearing: -20 }
     : { center: HOUSTON, zoom: narrow ? 10.6 : 11.6, pitch: 0, bearing: 0 };
+}
+
+type Rgba = [number, number, number, number];
+
+// Any CSS colour to RGBA bytes, by letting a canvas paint it. Null where there is no canvas.
+function rgba(colour: string): Rgba | null {
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = colour;
+  ctx.fillRect(0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  return [d[0]!, d[1]!, d[2]!, d[3]!];
+}
+
+export interface StyleImage {
+  image: { width: number; height: number; data: Uint8ClampedArray };
+  options?: {
+    pixelRatio?: number;
+    stretchX?: [number, number][];
+    stretchY?: [number, number][];
+    content?: [number, number, number, number];
+  };
+}
+
+// The two small images the style names, painted from the palette: the wall pattern (one floor
+// band with two windows, repeated up and along every wall) and the rent chip's plate.
+export function styleImage(id: string, p: Palette): StyleImage | null {
+  if (id === IMG.facade) {
+    const wall = rgba(p.bldg);
+    const win = rgba(p.win);
+    const band = rgba(p["road-case"]);
+    if (!wall || !win || !band) return null;
+    const size = 32;
+    const data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const row = y % 16;
+        const col = x % 16;
+        const px = row === 15 ? band : row >= 4 && row <= 10 && col >= 4 && col <= 11 ? win : wall;
+        data.set(px, (y * size + x) * 4);
+      }
+    }
+    return { image: { width: size, height: size, data } };
+  }
+  if (id === IMG.chip) {
+    const plate = rgba(p.chip);
+    const edge = rgba(p["col-off"]);
+    if (!plate || !edge) return null;
+    const size = 12;
+    const data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const rim = x === 0 || y === 0 || x === size - 1 || y === size - 1;
+        data.set(rim ? edge : plate, (y * size + x) * 4);
+      }
+    }
+    return {
+      image: { width: size, height: size, data },
+      options: { stretchX: [[3, 9]], stretchY: [[3, 9]], content: [3, 3, 9, 9], pixelRatio: 1 },
+    };
+  }
+  return null;
 }

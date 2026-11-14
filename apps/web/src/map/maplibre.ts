@@ -28,17 +28,34 @@ export interface CameraMove {
   duration?: number;
   padding?: { top: number; right: number; bottom: number; left: number };
   essential?: boolean;
+  easing?: (t: number) => number;
 }
 export interface GeoJsonSource {
   setData(data: unknown): void;
   getClusterExpansionZoom(clusterId: number): Promise<number>;
 }
 export interface MapApi {
-  on(event: "load" | "idle" | "moveend" | "error", fn: (e?: unknown) => void): void;
+  on(
+    event: "load" | "idle" | "moveend" | "error" | "styledata" | "styleimagemissing",
+    fn: (e?: unknown) => void,
+  ): void;
   on(event: "click", fn: (e: MapClick) => void): void;
   on(event: "mousemove", fn: (e: MapClick) => void): void;
   once(event: "idle" | "moveend" | "load" | "styledata", fn: () => void): void;
   remove(): void;
+  hasImage(id: string): boolean;
+  removeImage(id: string): void;
+  addImage(
+    id: string,
+    image: { width: number; height: number; data: Uint8ClampedArray },
+    options?: {
+      pixelRatio?: number;
+      stretchX?: [number, number][];
+      stretchY?: [number, number][];
+      content?: [number, number, number, number];
+    },
+  ): void;
+  stop(): void;
   resize(): void;
   setStyle(style: unknown): void;
   getLayer(id: string): unknown;
@@ -81,5 +98,9 @@ export function loadMapLibre(): Promise<MapLibre> {
     ml.setWorkerUrl(worker.default);
     return ml as unknown as MapLibre;
   })();
+  // A failed load (a dropped connection, say) must not stick: the next call tries again.
+  loading.catch(() => {
+    loading = null;
+  });
   return loading;
 }

@@ -8,7 +8,11 @@ const n = (x: number) => x.toLocaleString("en-US");
 export const S = {
   city: "Houston",
   eyebrow: "The city",
-  countNoun: (count: number) => `${count === 1 ? "place" : "places"} CoStar has researched`,
+  // Fixture places are team-made samples, so the count never credits them to CoStar.
+  countNoun: (count: number, source: "live" | "fixture") =>
+    source === "fixture"
+      ? `sample ${count === 1 ? "place" : "places"}, made by the team`
+      : `${count === 1 ? "place" : "places"} CoStar has researched`,
   fitLine: (fit: number, total: number) => `${n(fit)} of ${n(total)} fit your brief`,
   noBrief: "Set a brief to narrow them down",
   asOf: AS_OF,
@@ -22,7 +26,8 @@ export const S = {
   legendOther: "On record",
   legendScan: "3D scan",
   legendHeight: "Taller: more plans",
-  mapLabel: "Map of the places CoStar has researched. The same places are in the list below.",
+  legendChip: "Chip: lowest asking rent, as of last research",
+  mapLabel: "Map of the places. The same places are in the list below.",
   // the brief
   criteria: "Your brief",
   criteriaCoStar: "On CoStar's record",
@@ -45,12 +50,15 @@ export const S = {
   clear: "Clear the brief",
   // the ledger
   ledger: "Places on record",
+  ledgerSample: "Sample places",
   ledgerEmpty: "Nothing on record fits this brief. Loosen one line.",
   kind: (k: "apartment" | "house") => (k === "house" ? "Rental home" : "Apartment community"),
+  kindShort: (k: "apartment" | "house") => (k === "house" ? "Home" : "Apartments"),
   rentFrom: (rent: number | null) => (rent == null ? "No asking price on record" : `$${n(rent)}`),
   rentLead: "from",
   rentTail: "a month",
   plans: (count: number) => `${count} floor ${count === 1 ? "plan" : "plans"}`,
+  plansShort: (count: number) => `${count} ${count === 1 ? "plan" : "plans"}`,
   units: (count: number | null) =>
     count == null ? "units not on record" : `${count} ${count === 1 ? "unit" : "units"} reported`,
   scanTag: "3D scan",

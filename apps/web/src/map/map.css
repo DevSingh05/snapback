@@ -157,7 +157,7 @@
   line-height: 1.2;
   font-weight: 700;
   letter-spacing: -0.01em;
-  max-width: 11ch;
+  max-width: 15ch;
   padding-bottom: 2px;
 }
 .hud-wait {
@@ -212,6 +212,12 @@
 .legend .lg-scan::before {
   height: 5px;
   background: var(--map-col-cap);
+  box-shadow: 0 0 0 1px var(--map-col-off);
+}
+.legend .lg-chip::before {
+  width: 16px;
+  height: 9px;
+  background: var(--map-chip);
   box-shadow: 0 0 0 1px var(--map-col-off);
 }
 .legend .lg-height::before {
@@ -1021,8 +1027,14 @@
   .tog,
   .seg-opt,
   .own input,
-  .city .own-add {
+  .city .own-add,
+  .city .crit-clear,
+  .city .btn-quiet,
+  .hud-brand {
     min-height: 44px;
+  }
+  .hud-brand {
+    align-items: center;
   }
   .city .own-drop {
     width: 44px;

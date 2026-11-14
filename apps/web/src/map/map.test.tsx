@@ -117,7 +117,8 @@ describe("the map page", () => {
     render(<MapPage MapView={NoMap} />);
     const count = await screen.findByTestId("count");
     expect(count).toHaveTextContent("64");
-    expect(count).toHaveTextContent("places CoStar has researched");
+    expect(count).toHaveTextContent("sample places, made by the team");
+    expect(count).not.toHaveTextContent("CoStar has researched");
     expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("FIXTURE");
     expect(screen.getAllByText(AS_OF).length).toBeGreaterThan(0);
     const attribution = screen.getByTestId("attribution");

@@ -80,6 +80,8 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
   const places = useMemo(() => feed?.features ?? [], [feed]);
   const selected = places.find((f) => f.properties.pid === selectedPid) ?? null;
   const set = criteriaCount(criteria) > 0;
+  const ledgerName = feed?.source === "live" ? S.ledger : S.ledgerSample;
+  const flatMap = look === "paper" || mapStatus === "raster" || mapStatus === "failed";
 
   const pick = useCallback(
     (pid: string) => {
@@ -153,7 +155,8 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
           <li className="lg-fit">{S.legendFit}</li>
           <li className="lg-other">{S.legendOther}</li>
           <li className="lg-scan">{S.legendScan}</li>
-          <li className="lg-height">{S.legendHeight}</li>
+          {flatMap ? null : <li className="lg-height">{S.legendHeight}</li>}
+          <li className="lg-chip">{S.legendChip}</li>
         </ul>
 
         <div className="col-left">
@@ -170,7 +173,9 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
             {load.state === "ready" ? (
               <h1 className="hud-count" data-testid="count">
                 <span className="hud-n">{load.feed.n_places.toLocaleString("en-US")}</span>
-                <span className="hud-noun">{S.countNoun(load.feed.n_places)}</span>
+                <span className="hud-noun">
+                  {S.countNoun(load.feed.n_places, load.feed.source)}
+                </span>
               </h1>
             ) : load.state === "loading" ? (
               <p className="hud-wait">{S.loading}</p>
@@ -233,9 +238,9 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
         ) : null}
       </div>
 
-      <section className="ledger-wrap" aria-label={S.ledger}>
+      <section className="ledger-wrap" aria-label={ledgerName}>
         <header className="ledger-head">
-          <h2>{S.ledger}</h2>
+          <h2>{ledgerName}</h2>
           <p className="mono">Every figure {S.asOf}</p>
         </header>
         {feed ? (
