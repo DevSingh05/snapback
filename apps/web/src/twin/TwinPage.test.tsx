@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import type { LocateResult } from "../contracts";
-import { TwinView } from "./TwinPage";
+import { TwinView, demoFromSearch } from "./TwinPage";
 
 describe("TwinView without a Matterport key", () => {
   it("shows the placeholder and a FIXTURE chip, and still mounts the trace slot", () => {
@@ -118,5 +118,48 @@ describe("TwinView photo landing", () => {
     unmount();
     render(<TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={live} liveLocate />);
     expect(screen.getAllByTestId("source-chip")[1]).toHaveTextContent("LIVE");
+  });
+});
+
+describe("TwinView aerial proof", () => {
+  it("shows one tile when the photo is in the claimed building", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(screen.queryByTestId("aerial-distance")).toBeNull();
+    expect(screen.queryByText("The listing says here.")).toBeNull();
+  });
+
+  it("shows both buildings and the distance when a photo is located elsewhere", () => {
+    const elsewhere = {
+      ...(hold.locate as unknown as LocateResult),
+      photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "fx-model-b" }],
+    } as LocateResult;
+    render(
+      <TwinView
+        caseId="fx-7Q2M"
+        sdkKey={undefined}
+        modelId={undefined}
+        locate={elsewhere}
+        liveLocate
+      />,
+    );
+    expect(screen.getByText("The listing says here.")).toBeInTheDocument();
+    expect(screen.getByText("This photo was taken here.")).toBeInTheDocument();
+    expect(screen.getByTestId("aerial-distance")).toHaveTextContent("0.4 miles away");
+  });
+});
+
+describe("TwinView demo=copied", () => {
+  it("parses the demo flag from the query string", () => {
+    expect(demoFromSearch("?demo=copied")).toBe("copied");
+    expect(demoFromSearch("?demo=other")).toBeUndefined();
+    expect(demoFromSearch("")).toBeUndefined();
+  });
+
+  it("shows the two-building view from fixtures, labelled FIXTURE throughout", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} demo="copied" />);
+    expect(screen.getByText("The listing says here.")).toBeInTheDocument();
+    expect(screen.getByTestId("aerial-distance")).toHaveTextContent("0.4 miles away");
+    for (const chip of screen.getAllByTestId("source-chip"))
+      expect(chip).toHaveTextContent("FIXTURE");
   });
 });

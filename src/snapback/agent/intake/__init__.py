@@ -18,7 +18,13 @@ from collections.abc import Callable, Iterable
 
 from pydantic import BaseModel, Field
 
-from snapback.agent.intake.fields import ContactClaims, extract_contacts, extract_rent
+from snapback.agent.intake.fields import (
+    ContactClaims,
+    extract_beds,
+    extract_contacts,
+    extract_rent,
+    extract_unit,
+)
 from snapback.agent.intake.injection import find_injections
 from snapback.agent.intake.ocr import OcrUnavailable, read_image
 from snapback.agent.rules import apply_rules
@@ -37,6 +43,8 @@ class Listing(BaseModel):
 
     text: str = ""
     listed_rent: int | None = None
+    unit: str | None = None  # "204", "4B": the unit the listing names
+    beds: int | None = None  # 0 for a studio
     rule_hits: list[RuleHit] = Field(default_factory=list)
     contacts: ContactClaims = Field(default_factory=ContactClaims)
     scope: ListingScope = ListingScope.RENTAL
@@ -87,6 +95,8 @@ def read_listing(
     return Listing(
         text=full_text,
         listed_rent=extract_rent(full_text),
+        unit=extract_unit(full_text),
+        beds=extract_beds(full_text),
         rule_hits=apply_rules(full_text),
         contacts=extract_contacts(full_text),
         scope=detect_scope(full_text),
