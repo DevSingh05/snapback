@@ -229,3 +229,105 @@ def test_on_without_a_model_file_is_off(monkeypatch, tmp_path):
     monkeypatch.setenv("RECAPTURE_MODEL", "on")
     detector = RecaptureDetector.from_file(tmp_path / "missing.json")
     assert detector.check("r1", genuine_photo(1)).model_version == "off"
+
+
+# --- second review (#112) ---------------------------------------------------------------------
+
+
+def test_real_and_synthetic_auroc_match_a_recomputation(tmp_path):
+    from snapback.vision.recapture import auroc
+
+    # Lane D's attacks (synthetic, easy here) plus "real" attacks that look exactly like genuine
+    # photos (hard): the two AUROCs must differ, so a mixed number cannot pass for either.
+    rows = bank(tmp_path, range(0, 24), generator_seed=5)
+    rows += [
+        TrainingRow(genuine_photo(seed + 500), RecaptureLabel.SCREEN, f"g{seed}", synthetic=False)
+        for seed in range(0, 24)
+    ]
+    rows = [
+        TrainingRow(
+            r.image,
+            r.label,
+            r.source,
+            synthetic=r.synthetic and r.label is not RecaptureLabel.GENUINE,
+        )
+        for r in rows
+    ]
+    model, report = train(rows, version="v0", seed=0)
+    assert abs(report.dev_auroc_real - report.dev_auroc_synthetic) > 0.1
+    kept = [
+        r
+        for r in rows
+        if r.label
+        in (
+            RecaptureLabel.GENUINE,
+            RecaptureLabel.SCREEN,
+            RecaptureLabel.PRINT,
+            RecaptureLabel.PASTE,
+        )
+    ]
+    dev = [r for r, (_, is_dev) in zip(kept, report.row_split, strict=True) if is_dev]
+    genuine = [model.score(r.image) for r in dev if r.label is RecaptureLabel.GENUINE]
+    real = [
+        model.score(r.image)
+        for r in dev
+        if r.label is not RecaptureLabel.GENUINE and not r.synthetic
+    ]
+    synthetic = [
+        model.score(r.image) for r in dev if r.label is not RecaptureLabel.GENUINE and r.synthetic
+    ]
+    assert report.dev_auroc_real == pytest.approx(auroc(genuine, real))
+    assert report.dev_auroc_synthetic == pytest.approx(auroc(genuine, synthetic))
+    assert (report.n_dev_attack_real, report.n_dev_attack_synthetic) == (len(real), len(synthetic))
+
+
+def test_command_prints_synthetic_apart_with_both_n(tmp_path, capsys):
+    import csv
+
+    from snapback.vision.recapture.train import main as train_main
+
+    src = tmp_path / "genuine"
+    src.mkdir()
+    rows = []
+    for seed in range(16):
+        genuine_photo(seed).save(src / f"g{seed}.jpg", quality=90)
+        rows.append(
+            {
+                "path": f"genuine/g{seed}.jpg",
+                "label": "genuine",
+                "source": f"g{seed}",
+                "synthetic": 0,
+            }
+        )
+    with (tmp_path / "team.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    from snapback.redteam.generator import write_manifest
+
+    cases = generate(sorted(src.iterdir()), tmp_path / "rt", 1)
+    write_manifest(cases, tmp_path / "rt" / "manifest.csv")
+    code = train_main(
+        [
+            "--manifest",
+            str(tmp_path / "team.csv"),
+            "--manifest",
+            str(tmp_path / "rt" / "manifest.csv"),
+            "--out",
+            str(tmp_path / "v0.json"),
+        ]
+    )
+    printed = capsys.readouterr().out
+    assert code == 0
+    assert "SYNTHETIC attacks" in printed and "real attacks" in printed
+    assert printed.count("n=") >= 4  # train, dev genuine, real attacks, synthetic attacks
+    meta = json.loads((tmp_path / "v0.json").read_text())["meta"]
+    assert "dev_auroc" not in meta and "dev_auroc_synthetic" in meta  # no mixed number saved
+
+
+def test_train_skips_a_photo_too_small_to_measure():
+    rows = [TrainingRow(genuine_photo(s), RecaptureLabel.GENUINE, f"g{s}") for s in range(8)]
+    rows.append(TrainingRow(Image.new("RGB", (10, 10)), RecaptureLabel.GENUINE, "tiny"))
+    _, report = train(rows, version="v0")
+    assert "tiny" not in {source for source, _ in report.row_split}
+    assert len(report.row_split) == 8

@@ -144,8 +144,10 @@ def train(
         dev_attack_false_accept_real=_rate(dev_attack[~dev_synthetic] <= model.threshold),
         dev_attack_false_accept_synthetic=_rate(dev_attack[dev_synthetic] <= model.threshold),
     )
+    # Real and synthetic numbers only, each with n; the mixed AUROC is never saved.
+    mixed = {"dev_auroc", "dev_attack_false_accept", "row_split"}
     model.meta = {
-        k: v for k, v in report.__dict__.items() if not k.endswith("_sources") and k != "row_split"
+        k: v for k, v in report.__dict__.items() if not k.endswith("_sources") and k not in mixed
     }
     return model, report
 

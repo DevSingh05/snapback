@@ -10,7 +10,7 @@ Each person, each phone, in each room we can stand in (dorm rooms, lounges, the 
 | Class     | How                                                                                                                                                      | Target per person for v0 |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | `genuine` | A fresh photo of a fixed feature (window frame, door, built-in) with a 4-character code written on paper held in the frame. Vary distance, light, angle. | 40                       |
-| `screen`  | A photo of a laptop or phone screen showing one of our own genuine photos or a walkthrough frame. Vary screens, angles, glare, brightness.               | 15                       |
+| `screen`  | A photo of a laptop or phone screen showing one of our own genuine photos. Vary screens, angles, glare, brightness.               | 15                       |
 | `print`   | A photo of a printout of one of our own photos (if a printer is available).                                                                              | 10                       |
 | `paste`   | Lane D's generator makes these from genuine photos (`python -m snapback.redteam`). Do not hand-make them.                                                | 0                        |
 
