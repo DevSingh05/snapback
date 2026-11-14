@@ -7,6 +7,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card            the Card
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
+    GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /healthz                         liveness and the data source
     POST /verdict                         decide() on evidence the caller already has
 
@@ -37,6 +38,7 @@ from snapback.api.cases import (
     RecordedCase,
     SessionCase,
 )
+from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
@@ -328,6 +330,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=409, detail="This case is not waiting for an approval."
             ) from None
         return case.status(with_challenge=True)
+
+    @app.get("/eval/results.csv")
+    def get_eval_results(
+        token: str | None = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """The eval harness's results as CSV, for the Lab panel. Read-only (issue #69).
+
+        Needs a secret of some case on this server: a read token as `?token=`, or either
+        secret in `Authorization: Bearer` or `X-Case-Token`. The write token is refused in
+        the address, as on the trace. The secret is checked before the file is looked for.
+        """
+        in_header = _bearer(authorization, x_case_token)
+        if in_header is not None:
+            if not store.knows(in_header, read_only=False):
+                raise HTTPException(status_code=403, detail="That token is not from this server.")
+        elif token is not None:
+            if not store.knows(token, read_only=True):
+                raise HTTPException(
+                    status_code=403, detail="Only a case's read token is accepted in the address."
+                )
+        else:
+            raise HTTPException(status_code=401, detail="This needs a case's read token.")
+
+        try:
+            results = read_results(settings.snapback_eval_results)
+        except NotTheAgreedCsv:
+            raise HTTPException(
+                status_code=500, detail="The results file is not the agreed eval results CSV."
+            ) from None
+        if results is None:
+            raise HTTPException(status_code=404, detail="No eval results yet. Run `make eval`.")
+        return Response(
+            content=results, media_type="text/csv", headers={"Cache-Control": "no-store"}
+        )
 
     return app
 

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     snapback_public_base_url: str = "http://localhost:5173"
     # Sponsor data, caches and uploads. Git-ignored, and purged after the event.
     snapback_data_dir: Path = Path("data")
+    # The eval harness's results, written by `make eval`: aggregate numbers only. Served
+    # read-only at GET /eval/results.csv for the Lab panel.
+    snapback_eval_results: Path = Path("eval/results.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
