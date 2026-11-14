@@ -65,7 +65,10 @@ These exist for reasons that will not change this weekend. Do not work around th
   `v` or `d`, e.g. `v/14-dinov2-index`), open a PR with `Closes #<task issue>`. Keep PRs small enough to review in five minutes.
 - **One issue per PR.** `Closes #<n>` for a task issue, `Refs #<n>` for a lane or inbox issue
   (`Closes` would close it). Never force-push, never push to someone else's branch.
-- **Plain commits.** No `Co-Authored-By` lines and no AI attribution in commits or PR text.
+- **Plain commits (hard rule, CI enforced).** No `Co-Authored-By` lines, no "Generated with Claude"
+  footer and no AI attribution of any kind in commit messages or PR titles and bodies. The repo's
+  `.claude/settings.json` turns Claude Code's attribution off; do not override it. `make hygiene`
+  fails on any such commit, and a PR with one is not merged until it is reworded and re-pushed.
 - **Stay in your lane's paths** (see the table in `README.md` and `.github/CODEOWNERS`). You may
   ask for a merge when `make check` is green and the PR touches only your lane's paths. Only the XO
   (on Vidyut's behalf) merges to `main`; agents never push or merge to `main`.
