@@ -14,16 +14,15 @@ import { RealStill, StageViews } from "../walk/StageViews";
 import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
 import { seeingLine, waysOut } from "../walk/seeing";
+import { WalkPlayer } from "../walk/player";
 import { WalkMap } from "../walk/WalkMap";
 import { useWalkLive } from "../walk/useWalkLive";
 import { photoAt, walkLook } from "../walk/walkLook";
 import { fetchTour, type TourResult, type TourTarget } from "./api";
 import { RoomStop, landingOfStop } from "./RoomStop";
 import { useAdPhoto } from "./useAdPhoto";
-import { stopMove } from "./walkMove";
 import "./tour.css";
 
-export const AUTOPLAY_MS = 6000;
 const LANDED_OPACITY = 0.6;
 
 // Synthetic stand-in for an ad photo (team-made, not sponsor imagery). An image cannot read page
@@ -64,7 +63,6 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
   const [sdkFailed, setSdkFailed] = useState(false);
   const [sweeps, setSweeps] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
-  const [autoplay, setAutoplay] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -108,43 +106,12 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
     Boolean(caseId) && canGoLive(caseId ?? undefined),
   );
 
-  // Move the 3D view to the stop (or to where its ad photo was taken). Never a stand-in sweep:
-  // a stop not in the model says so instead of flying somewhere else.
+  // The walk player (walk/player) owns the camera: it moves the 3D view to each stop, never to a
+  // stand-in sweep, and says so when a stop is not in the model.
   const [showPhoto, setShowPhoto] = useState(true);
   useEffect(() => setShowPhoto(true), [stop.key]);
-  useEffect(() => {
-    const move = stopMove(stop, reduced);
-    if (!sdk || !move || sweeps.length === 0 || wrongModel) return;
-    if (!sweeps.includes(move.sweepId)) {
-      setStatus("This stop is not in the loaded 3D model");
-      return;
-    }
-    let current = true;
-    sdk.Sweep.moveTo(move.sweepId, move.options)
-      .then(() => current && setStatus(`At: ${stop.title}`))
-      .catch(
-        (e: unknown) =>
-          current && setStatus(e instanceof Error ? e.message : "Could not move the 3D view"),
-      );
-    return () => {
-      current = false;
-    };
-  }, [sdk, sweeps, stop, reduced, wrongModel]);
-
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, last)), [last]);
   const back = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
-
-  // Autoplay: one step every AUTOPLAY_MS; any interaction pauses it; it stops at the end.
-  useEffect(() => {
-    if (!autoplay) return;
-    if (index >= last) {
-      setAutoplay(false);
-      return;
-    }
-    const t = setTimeout(next, AUTOPLAY_MS);
-    return () => clearTimeout(t);
-  }, [autoplay, index, last, next]);
-  const pause = () => setAutoplay(false);
 
   const landing = landingOfStop(stop);
   // The ad's real photo when this browser can read it; else the labelled placeholder.
@@ -211,9 +178,6 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
       className="tour-page"
       data-rail={look.events.length > 0 ? "on" : "off"}
       data-two-homes={look.mismatch ? "true" : undefined}
-      onPointerDownCapture={pause}
-      onKeyDownCapture={pause}
-      onWheelCapture={pause}
     >
       <nav className="tour-ways" aria-label="Leave the walk">
         <a className="tour-way tour-way-back" href={waysOut(plan, caseId).back.href}>
@@ -324,6 +288,18 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
               }
             />
           )}
+          <WalkPlayer
+            stops={plan.stops}
+            index={Math.min(index, last)}
+            onIndex={setIndex}
+            reduced={reduced}
+            sdk={wrongModel ? null : sdk}
+            sweeps={sweeps}
+            loading={live && !sdk && !sdkFailed}
+            onStatus={setStatus}
+            onPhoto={setShowPhoto}
+            endAction={{ label: "Tour prep: what to ask", href: plan.links.tour_prep }}
+          />
           {wrongModel && (
             <p className="tour-wrong-model" data-testid="wrong-model" role="status">
               The 3D view here is not this home&apos;s scan
@@ -402,17 +378,6 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             </button>
             <button type="button" onClick={next} disabled={index >= last}>
               Next
-            </button>
-            <button
-              type="button"
-              aria-pressed={autoplay}
-              onClick={(e) => {
-                e.stopPropagation();
-                setAutoplay((a) => !a);
-              }}
-              disabled={index >= last}
-            >
-              Autoplay {autoplay ? "on" : "off"}
             </button>
           </div>
         </aside>

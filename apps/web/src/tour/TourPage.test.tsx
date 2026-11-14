@@ -25,7 +25,7 @@ vi.mock("../twin/useReducedMotion", () => ({ usePrefersReducedMotion: () => redu
 
 import { TwinView } from "../twin/TwinPage";
 import { FIXTURE_TOUR } from "./fixtureTour";
-import { AUTOPLAY_MS, TourView } from "./TourPage";
+import { TourView } from "./TourPage";
 
 beforeEach(() => {
   fakeSdk.Sweep.moveTo.mockClear();
@@ -79,26 +79,24 @@ describe("TourView in fixture mode (no SDK)", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
-  it("autoplays about every 6 s, pauses on any interaction, and stops at the end", () => {
+  it("plays by itself like a video, pauses on any interaction with the page, and stops at the end", () => {
     vi.useFakeTimers();
     render(<TourView plan={FIXTURE_TOUR} />);
-    fireEvent.click(screen.getByRole("button", { name: /Autoplay off/ }));
-    expect(AUTOPLAY_MS).toBe(6000);
-    act(() => void vi.advanceTimersByTime(5900));
+    act(() => void vi.advanceTimersByTime(5000));
     expect(title()).toBe("Arrive outside");
-    act(() => void vi.advanceTimersByTime(200));
+    act(() => void vi.advanceTimersByTime(1000));
     expect(title()).toBe("Front door");
-    // Any interaction on the page pauses it.
+    // Any interaction with the rest of the page pauses it.
     fireEvent.pointerDown(screen.getByRole("heading", { level: 1 }));
-    expect(screen.getByRole("button", { name: /Autoplay off/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     act(() => void vi.advanceTimersByTime(20000));
     expect(title()).toBe("Front door");
-    // Resume and run to the end: it switches itself off on the last step.
-    fireEvent.click(screen.getByRole("button", { name: /Autoplay off/ }));
-    for (let i = 0; i < FIXTURE_TOUR.stops.length; i++)
-      act(() => void vi.advanceTimersByTime(AUTOPLAY_MS));
+    // Play runs to the end: it stops on the last step, with the one next action.
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    act(() => void vi.advanceTimersByTime(60000));
     expect(title()).toBe("Now see it in person");
-    expect(screen.getByRole("button", { name: /Autoplay off/ })).toBeDisabled();
+    expect(screen.getByTestId("wp-end")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play again" })).toBeInTheDocument();
   });
 });
 
