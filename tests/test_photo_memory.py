@@ -5,11 +5,13 @@ Every image here is drawn by the test itself from a seed, so no photo file is co
 
 import io
 import sqlite3
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw, ImageOps
 
 from snapback.contracts import MemoryHitKind
 from snapback.vision.memory import (
@@ -253,3 +255,130 @@ def test_embedding_catches_what_the_hashes_miss(tmp_path, clock):
     assert result.hit is MemoryHitKind.SAME_CASE_LISTING
     assert result.method == "embedding"
     assert result.matched_listing_photo_id == "fx-p1"
+
+
+# --- review fixes (#61): screenshots, uneven crops, mirrors, threads, size ----------------------
+
+
+def phone_screenshot(photo: Image.Image) -> Image.Image:
+    """A listing app screenshot: status bar, header, the photo full width at about a third of
+    the screen, then price and description text and a tab bar."""
+    width, height = 1170, 2532
+    shot = Image.new("RGB", (width, height), (248, 248, 248))
+    draw = ImageDraw.Draw(shot)
+    draw.rectangle((0, 0, width, 140), fill=(30, 30, 30))
+    for x in (60, 900, 980, 1060):
+        draw.rectangle((x, 50, x + 50, 90), fill=(230, 230, 230))
+    draw.rectangle((40, 190, 700, 260), fill=(20, 20, 20))
+    scaled = photo.resize((width, round(width * photo.height / photo.width)))
+    top = 320
+    shot.paste(scaled, (0, top))
+    y = top + scaled.height + 60
+    for line in range(8):
+        draw.rectangle((40, y, 40 + 300 + 90 * (line % 7), y + 36), fill=(60, 60, 60))
+        y += 70
+    draw.rectangle((0, height - 180, width, height), fill=(255, 255, 255))
+    for x in range(80, width, 260):
+        draw.rectangle((x, height - 130, x + 70, height - 60), fill=(120, 120, 120))
+    return jpeg(shot, quality=80)
+
+
+def crop_box(image: Image.Image, share_w: float, share_h: float, px: float, py: float):
+    width, height = image.size
+    w, h = int(width * share_w), int(height * share_h)
+    left, top = int((width - w) * px), int((height - h) * py)
+    return image.crop((left, top, left + w, top + h))
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        pytest.param(phone_screenshot, id="phone-screenshot"),
+        pytest.param(lambda img: crop_box(img, 0.9, 0.6, 0.5, 0.5), id="crop-90x60"),
+        pytest.param(lambda img: crop_box(img, 0.6, 0.9, 0.25, 0.5), id="crop-60x90"),
+        pytest.param(lambda img: crop_box(img, 0.5, 0.5, 0.5, 0.5), id="crop-50-centre"),
+        pytest.param(lambda img: crop_box(img, 0.5, 0.5, 0.0, 1.0), id="crop-50-corner"),
+        pytest.param(ImageOps.mirror, id="mirror"),
+        pytest.param(
+            lambda img: jpeg(ImageOps.mirror(center_crop(img, 0.8)), 50), id="mirror-crop"
+        ),
+    ],
+)
+def test_reply_attacks_hit_same_case_listing(memory, attack):
+    for seed in (1, 2, 3):
+        memory.record("fx-case-a", f"fx-p{seed}", room(seed), PhotoRole.LISTING)
+    reply = attack(room(2))
+    result = memory.check("fx-case-a", "fx-reply", reply, PhotoRole.REPLY)
+    assert result.hit is MemoryHitKind.SAME_CASE_LISTING
+    assert result.matched_listing_photo_id == "fx-p2"
+
+
+def test_unrelated_rooms_never_hit_with_the_new_variants(memory):
+    for seed in range(100, 110):
+        memory.record("fx-case-a", f"fx-p{seed}", room(seed), PhotoRole.LISTING)
+    for seed in range(200, 215):
+        for reply in (room(seed), phone_screenshot(room(seed)), ImageOps.mirror(room(seed))):
+            result = memory.check("fx-case-a", f"fx-r{seed}", reply, PhotoRole.REPLY)
+            assert result.hit is MemoryHitKind.NONE
+
+
+def test_checks_from_two_threads(tmp_path, clock):
+    """FastAPI runs sync routes in a thread pool, so one PhotoMemory serves several threads."""
+    memory = PhotoMemory(tmp_path / "memory.sqlite", clock=clock)
+    memory.record("fx-case-a", "fx-p1", room(1), PhotoRole.LISTING)
+
+    def work(n: int):
+        return memory.check(f"fx-case-{n}", f"fx-q{n}", room(1), PhotoRole.LISTING)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(work, range(2, 8)))
+    assert all(r.hit is MemoryHitKind.OTHER_CHECK for r in results)
+    rows = sqlite3.connect(tmp_path / "memory.sqlite").execute("select count(*) from photos")
+    assert rows.fetchone()[0] == 7
+
+
+def test_check_purges_expired_rows_from_disk(memory, clock, tmp_path):
+    memory.record("fx-case-a", "fx-p1", room(1), PhotoRole.LISTING)
+    clock.now = T0 + timedelta(days=8)
+    memory.check("fx-case-b", "fx-q1", room(2), PhotoRole.LISTING)
+    db = sqlite3.connect(tmp_path / "memory.sqlite")
+    assert db.execute("select count(*) from photos").fetchone()[0] == 1
+    assert (
+        db.execute(
+            "select count(*) from hashes h left join photos p on p.id = h.photo where p.id is null"
+        ).fetchone()[0]
+        == 0
+    )
+
+
+def test_a_12_megapixel_photo_is_fast(memory):
+    big = room(5, size=(4032, 3024))
+    started = time.perf_counter()
+    memory.record("fx-case-a", "fx-big", big, PhotoRole.LISTING)
+    assert time.perf_counter() - started < 1.0
+    small = jpeg(room(5).resize((1008, 756)), 60)
+    assert memory.check("fx-case-a", "fx-r", small, PhotoRole.REPLY).hit is (
+        MemoryHitKind.SAME_CASE_LISTING
+    )
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        pytest.param(phone_screenshot, id="phone-screenshot"),
+        pytest.param(lambda img: crop_box(img, 0.6, 0.9, 0.2, 0.5), id="crop-60x90-off-grid"),
+        pytest.param(
+            lambda img: jpeg(crop_box(img, 0.75, 0.75, 0.3, 0.7), 60), id="crop-75-off-grid"
+        ),
+    ],
+)
+def test_hard_copies_are_mostly_caught_by_hashes_alone(tmp_path, clock, attack):
+    """Hashes alone catch most of these (measured 17 of 20 or better on these synthetic rooms at
+    the frozen thresholds); the embedding lookup is the layer for the rest. Ten rooms here."""
+    memory = PhotoMemory(tmp_path / "m.sqlite", clock=clock)
+    caught = 0
+    for seed in range(1, 11):
+        memory.record(f"fx-case-{seed}", "fx-p1", room(seed), PhotoRole.LISTING)
+        result = memory.check(f"fx-case-{seed}", "fx-reply", attack(room(seed)), PhotoRole.REPLY)
+        caught += result.hit is MemoryHitKind.SAME_CASE_LISTING
+    assert caught >= 8

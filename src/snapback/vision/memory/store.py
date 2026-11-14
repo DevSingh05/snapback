@@ -17,7 +17,9 @@ import hashlib
 import hmac
 import secrets
 import sqlite3
-from collections.abc import Callable
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -28,7 +30,13 @@ import numpy as np
 from PIL import Image
 
 from snapback.contracts import MemoryHitKind, MemoryResult
-from snapback.vision.memory.hashes import HashPair, hamming, variants
+from snapback.vision.memory.hashes import (
+    Fingerprint,
+    HashPair,
+    best_distance,
+    fingerprint,
+    prepare,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_DB = REPO_ROOT / "data" / "memory" / "photo_memory.sqlite"
@@ -36,7 +44,7 @@ TTL = timedelta(days=7)
 
 # Frozen with the thresholds version. A hash match needs both hashes close, because a false
 # SAME_CASE_LISTING turns into "Don't pay". The eval harness (V6) measures these.
-THRESHOLDS_VERSION = "memory-2026-11-14a"
+THRESHOLDS_VERSION = "memory-2026-11-14b"
 PHASH_MAX = 10
 DHASH_MAX = 14
 COSINE_MIN = 0.92
@@ -59,12 +67,13 @@ def _now() -> datetime:
 
 @dataclass(frozen=True)
 class _Fingerprint:
-    hashes: list[HashPair]
+    hashes: Fingerprint
     embedding: np.ndarray | None
 
-    @property
-    def full(self) -> HashPair:
-        return self.hashes[0]
+
+# Stored hashes that stand for the whole photo, which a crop of a framed copy is compared with
+# (with the stored photo's own trimmed regions, "trimmed0", "trimmed1", ...).
+_WHOLE = frozenset({"full"})
 
 
 @dataclass(frozen=True)
@@ -119,9 +128,27 @@ class PhotoMemory:
         self._embedder = embedder
         self._ttl = ttl
         self._key = self._load_key()
-        self._db = sqlite3.connect(self.path)
-        self._db.execute("pragma foreign_keys = on")
-        self._db.executescript(_SCHEMA)
+        # One connection per call, so any thread may use this object (FastAPI runs sync routes
+        # in a thread pool). The lock makes each check one read-then-write step in this process;
+        # `begin immediate` does the same across processes.
+        self._lock = threading.Lock()
+        with self._transaction() as db:
+            db.executescript(_SCHEMA)
+
+    @contextmanager
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
+        with self._lock:
+            db = sqlite3.connect(self.path, timeout=30)
+            try:
+                db.execute("pragma foreign_keys = on")
+                db.execute("begin immediate")
+                yield db
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+            finally:
+                db.close()
 
     # --- public -----------------------------------------------------------------------------
 
@@ -132,8 +159,16 @@ class PhotoMemory:
         listing photos first; every photo is then checked against other checks."""
         now = self._time()
         fingerprint = self._fingerprint(image)
-        stored = self._unexpired(case_id, now)
+        with self._transaction() as db:
+            self._delete_expired(db, now)
+            stored = self._unexpired(db, case_id, now)
+            result = self._lookup(fingerprint, stored, photo_id, role)
+            self._store(db, case_id, photo_id, role, fingerprint, now)
+        return result or MemoryResult(photo_id=photo_id, hit=MemoryHitKind.NONE, method="phash")
 
+    def _lookup(
+        self, fingerprint: "_Fingerprint", stored: list["_Stored"], photo_id: str, role: PhotoRole
+    ) -> MemoryResult | None:
         result = None
         if role is PhotoRole.REPLY:
             own = [s for s in stored if s.same_case and s.role is PhotoRole.LISTING]
@@ -162,31 +197,32 @@ class PhotoMemory:
                     first_seen_on=first[0].seen_at.date(),
                 )
 
-        self._store(case_id, photo_id, role, fingerprint, now)
-        return result or MemoryResult(photo_id=photo_id, hit=MemoryHitKind.NONE, method="phash")
+        return result
 
     def record(self, case_id: str, photo_id: str, image: Image.Image, role: PhotoRole) -> None:
         """Remember a photo without looking it up."""
-        self._store(case_id, photo_id, role, self._fingerprint(image), self._time())
+        now = self._time()
+        fingerprint = self._fingerprint(image)
+        with self._transaction() as db:
+            self._delete_expired(db, now)
+            self._store(db, case_id, photo_id, role, fingerprint, now)
 
     def delete_case(self, case_id: str) -> None:
-        with self._db:
-            self._db.execute("delete from photos where case_key = ?", (self._case_key(case_id),))
+        with self._transaction() as db:
+            db.execute("delete from photos where case_key = ?", (self._case_key(case_id),))
 
     def purge_expired(self) -> int:
-        cutoff = (self._time() - self._ttl).isoformat()
-        with self._db:
-            cursor = self._db.execute("delete from photos where seen_at < ?", (cutoff,))
-        return cursor.rowcount
+        with self._transaction() as db:
+            return self._delete_expired(db, self._time())
 
     def purge(self) -> None:
         """Delete everything, file and key included (`make purge`, after judging)."""
-        self._db.close()
-        for path in (self.path, self._key_path):
-            path.unlink(missing_ok=True)
+        with self._lock:
+            for path in (self.path, self._key_path):
+                path.unlink(missing_ok=True)
 
     def close(self) -> None:
-        self._db.close()
+        """Nothing to close: every call opens and closes its own connection."""
 
     # --- internals --------------------------------------------------------------------------
 
@@ -211,16 +247,22 @@ class PhotoMemory:
             raise ValueError(f"the memory clock must carry a timezone, got {now!r}")
         return now.astimezone(UTC)
 
+    def _delete_expired(self, db: sqlite3.Connection, now: datetime) -> int:
+        cutoff = (now - self._ttl).isoformat()
+        return db.execute("delete from photos where seen_at < ?", (cutoff,)).rowcount
+
     def _fingerprint(self, image: Image.Image) -> _Fingerprint:
+        image = prepare(image)
         embedding = None
         if self._embedder is not None:
             vector = np.asarray(self._embedder.embed(image), dtype=np.float32).flatten()
             norm = float(np.linalg.norm(vector))
             embedding = vector / norm if norm else vector
-        return _Fingerprint(variants(image), embedding)
+        return _Fingerprint(fingerprint(image), embedding)
 
     def _store(
         self,
+        db: sqlite3.Connection,
         case_id: str,
         photo_id: str,
         role: PhotoRole,
@@ -228,30 +270,29 @@ class PhotoMemory:
         now: datetime,
     ) -> None:
         blob = None if fingerprint.embedding is None else fingerprint.embedding.tobytes()
-        with self._db:
-            cursor = self._db.execute(
-                "insert into photos (case_key, photo_id, role, seen_at, embedding)"
-                " values (?, ?, ?, ?, ?)",
-                (self._case_key(case_id), photo_id, role.value, now.isoformat(), blob),
-            )
-            self._db.executemany(
-                "insert into hashes (photo, variant, phash, dhash) values (?, ?, ?, ?)",
-                [
-                    (cursor.lastrowid, pair.variant, f"{pair.phash:016x}", f"{pair.dhash:016x}")
-                    for pair in fingerprint.hashes
-                ],
-            )
+        cursor = db.execute(
+            "insert into photos (case_key, photo_id, role, seen_at, embedding)"
+            " values (?, ?, ?, ?, ?)",
+            (self._case_key(case_id), photo_id, role.value, now.isoformat(), blob),
+        )
+        db.executemany(
+            "insert into hashes (photo, variant, phash, dhash) values (?, ?, ?, ?)",
+            [
+                (cursor.lastrowid, pair.variant, f"{pair.phash:016x}", f"{pair.dhash:016x}")
+                for pair in fingerprint.hashes.all()
+            ],
+        )
 
-    def _unexpired(self, case_id: str, now: datetime) -> list[_Stored]:
+    def _unexpired(self, db: sqlite3.Connection, case_id: str, now: datetime) -> list[_Stored]:
         cutoff = (now - self._ttl).isoformat()
         key = self._case_key(case_id)
-        photos = self._db.execute(
+        photos = db.execute(
             "select id, case_key, photo_id, role, seen_at, embedding from photos"
             " where seen_at >= ? order by id",
             (cutoff,),
         ).fetchall()
         hashes: dict[int, list[HashPair]] = {}
-        for photo, variant, ph, dh in self._db.execute(
+        for photo, variant, ph, dh in db.execute(
             "select h.photo, h.variant, h.phash, h.dhash from hashes h"
             " join photos p on p.id = h.photo where p.seen_at >= ? order by h.rowid",
             (cutoff,),
@@ -273,20 +314,25 @@ class PhotoMemory:
     def _match(self, fingerprint: _Fingerprint, stored: _Stored) -> _Match | None:
         """Closest agreement between the two photos, or None if nothing is close enough.
 
-        The new photo's own hashes are compared with every stored crop (a cropped copy), and
-        every crop of the new photo with the stored photo's own hashes (a framed copy).
+        The new photo's probes (itself, mirrored, trimmed) are compared with every stored hash
+        (a crop, screenshot or mirror of the stored photo), and every crop of the new photo with
+        the stored photo as a whole (the stored photo shown inside a bigger frame).
         """
         if not stored.hashes:
             return None
-        pairs = [(fingerprint.full, crop) for crop in stored.hashes]
-        pairs += [(crop, stored.hashes[0]) for crop in fingerprint.hashes[1:]]
-        best = None
-        for a, b in pairs:
-            p, d = hamming(a.phash, b.phash), hamming(a.dhash, b.dhash)
-            if p <= PHASH_MAX and d <= DHASH_MAX and (best is None or p < best):
-                best = p
-        if best is not None:
-            return _Match("phash", float(best))
+        whole = [
+            pair
+            for pair in stored.hashes
+            if pair.variant in _WHOLE
+            or (pair.variant.startswith("trimmed") and "-" not in pair.variant)
+        ]
+        found = [
+            best_distance(fingerprint.hashes.probes, stored.hashes, PHASH_MAX, DHASH_MAX),
+            best_distance(fingerprint.hashes.crops[1:], whole, PHASH_MAX, DHASH_MAX),
+        ]
+        distances = [d for d in found if d is not None]
+        if distances:
+            return _Match("phash", float(min(distances)))
 
         a, b = fingerprint.embedding, stored.embedding
         if a is not None and b is not None and a.shape == b.shape:
