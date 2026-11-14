@@ -13,6 +13,8 @@ interface Props {
   stacked?: boolean;
   /** A small still for the agent rail: fewer lines, no captions. */
   mini?: boolean;
+  /** Draws the points in again. Offered only when motion is allowed. */
+  onReplay?: () => void;
 }
 
 const PANE_W = 440;
@@ -67,6 +69,7 @@ export function MatchLines({
   reduced,
   stacked = false,
   mini = false,
+  onReplay,
 }: Props) {
   const all = photo.points?.sampled ?? [];
   const pairs = mini ? all.slice(0, MINI_LINES) : all;
@@ -208,6 +211,11 @@ export function MatchLines({
           <span className="ml-count mono" data-testid="match-count">
             {caption}
           </span>
+          {onReplay && !reduced && (
+            <button type="button" className="ml-replay" onClick={onReplay}>
+              Replay
+            </button>
+          )}
         </figcaption>
       )}
     </figure>

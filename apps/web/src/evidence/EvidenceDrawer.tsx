@@ -37,7 +37,20 @@ interface TableProps {
 
 // The match on one dark table: the two pictures with their points, and under them the meter
 // whose count rises as the lines draw in. Remounted per photo, so the draw-in replays.
-function MatchTable({ photo, bars, adSrc, scanSrc, reduced, stacked }: TableProps) {
+function MatchTable(props: TableProps) {
+  const [run, setRun] = useState(0);
+  return <MatchRun key={run} {...props} onReplay={() => setRun((r) => r + 1)} />;
+}
+
+function MatchRun({
+  photo,
+  bars,
+  adSrc,
+  scanSrc,
+  reduced,
+  stacked,
+  onReplay,
+}: TableProps & { onReplay: () => void }) {
   const drawn = photo.points?.sampled.length ?? 0;
   const count = useCountUp(photo.inliers ?? 0, drawMs(drawn), reduced);
   return (
@@ -53,6 +66,7 @@ function MatchTable({ photo, bars, adSrc, scanSrc, reduced, stacked }: TableProp
         scanSrc={scanSrc}
         reduced={reduced}
         stacked={stacked}
+        onReplay={onReplay}
       />
       <PointsMeter photo={photo} bars={bars} count={count} />
     </div>

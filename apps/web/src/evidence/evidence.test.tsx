@@ -167,6 +167,19 @@ describe("The meter: count, bar and one plain sentence", () => {
   });
 });
 
+describe("Replay", () => {
+  it("offers to draw the points in again, and not under reduced motion", () => {
+    const { unmount } = render(
+      <EvidenceDrawer file={file} alias="P3" onClose={() => {}} reduced={false} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+    expect(screen.getAllByTestId("match-pair")).toHaveLength(48);
+    unmount();
+    render(<EvidenceDrawer file={file} alias="P3" onClose={() => {}} reduced />);
+    expect(screen.queryByRole("button", { name: "Replay" })).toBeNull();
+  });
+});
+
 describe("Spread and rivals as pictures", () => {
   it("shades the drawn pairs in three teal strengths, a third each", () => {
     const tiers = pairTiers(photo("P1").points!.sampled);

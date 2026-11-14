@@ -261,6 +261,14 @@
   margin-left: auto;
   font-size: 0.75rem;
 }
+.ml-replay {
+  align-self: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  background: var(--meter-track);
+  color: var(--on-match-stage);
+  font-size: 0.8rem;
+}
 .ml-mini .ml-line {
   stroke-width: 3;
 }
@@ -865,6 +873,9 @@
       transform: translateY(327px);
     }
   }
+  .ml-pair {
+    transition: opacity 0.15s linear;
+  }
   .mt[data-motion="full"] .pm-sentence {
     animation: pm-say 0.45s var(--ease-out) var(--draw-ms, 0ms) backwards;
   }
@@ -894,5 +905,17 @@
       color: var(--muted);
       box-shadow: none;
     }
+  }
+}
+
+@media (hover: hover) {
+  .ml:not(.ml-mini) .ml-lines:hover .ml-pair {
+    opacity: 0.22;
+  }
+  .ml:not(.ml-mini) .ml-lines .ml-pair:hover {
+    opacity: 1;
+  }
+  .ml-replay:hover {
+    background: var(--meter-short);
   }
 }
