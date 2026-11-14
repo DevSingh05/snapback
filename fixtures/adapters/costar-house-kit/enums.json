@@ -1,0 +1,6 @@
+{
+  "ForRentStatus": {"1": "ForRent", "5": "Rented"},
+  "ForSaleStatus": {"1": "ForSale", "5": "Sold"},
+  "ListingStatus": {"1": "Active", "3": "OffMarket", "4": "Terminate"},
+  "ListingUpdateType": {"1": "NewlyActive", "8": "NewlySold"}
+}
