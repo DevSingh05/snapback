@@ -129,8 +129,8 @@ function TwinViewInner({
     () =>
       sdkStatus === "connecting"
         ? { kind: "loading" }
-        : landingFromLocate(locate, photoId, roomLabels),
-    [sdkStatus, locate, photoId, roomLabels],
+        : landingFromLocate(locate, photoId, roomLabels, poseIsLive ? "z" : "y"),
+    [sdkStatus, locate, photoId, roomLabels, poseIsLive],
   );
 
   const land = useCallback(
@@ -138,7 +138,7 @@ function TwinViewInner({
       const mine = ++run.current;
       setPhotoId(id);
       setOpacity(0);
-      const target = landingFromLocate(locate, id, roomLabels);
+      const target = landingFromLocate(locate, id, roomLabels, poseIsLive ? "z" : "y");
       if (target.kind !== "match") {
         setPhase("landed");
         setStatus("");
@@ -160,11 +160,14 @@ function TwinViewInner({
       });
       let moved: Promise<unknown> = Promise.resolve();
       if (sdk) {
+        const pose = locate.poses[id]!;
         const call = poseToSdkCall({
           sweep_id: target.sweepId,
           position: target.position,
-          rotation_quat: locate.poses[id]!.rotation_quat,
+          rotation_quat: pose.rotation_quat,
           fov_deg: target.fovDeg,
+          yaw_deg: pose.yaw_deg,
+          pitch_deg: pose.pitch_deg,
         });
         if (reduced)
           call.options = { ...call.options, transition: "transition.instant", transitionTime: 0 };
@@ -193,7 +196,7 @@ function TwinViewInner({
       setPhase("landed");
       setOpacity(LANDED_OPACITY);
     },
-    [locate, roomLabels, reduced, sdk, sdkStatus, sweeps],
+    [locate, roomLabels, reduced, sdk, sdkStatus, sweeps, poseIsLive],
   );
 
   // Run the landing once on the first pose we can use: at once without a 3D view, or when the

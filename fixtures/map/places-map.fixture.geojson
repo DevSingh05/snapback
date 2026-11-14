@@ -1,0 +1,201 @@
+{
+  "type": "FeatureCollection",
+  "source": "fixture",
+  "as_of": "as of CoStar's last research",
+  "n_places": 10,
+  "n_fit": 6,
+  "n_unlocated": 0,
+  "notes": "Team-made stand-ins: made-up points near downtown Houston, no real place, address, office or name. Props per feature: pid (our id), kind (apartment|house), has_scan (a 3D scan on record), n_plans (priced floor plans; 1 for a house), rent_from (lowest asking price a month, whole dollars, null if none), units_reported (units reported available as of CoStar's last research; null for a house or when not on record), fits_brief (bool; true for all when no brief), source (live|fixture), as_of. No address, office or name key, ever.",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "fx-map-01",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3698, 29.7604]
+      },
+      "properties": {
+        "pid": "fx-map-01",
+        "kind": "apartment",
+        "has_scan": true,
+        "n_plans": 3,
+        "rent_from": 1450,
+        "units_reported": 4,
+        "fits_brief": true,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-02",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3601, 29.7512]
+      },
+      "properties": {
+        "pid": "fx-map-02",
+        "kind": "apartment",
+        "has_scan": false,
+        "n_plans": 2,
+        "rent_from": 1180,
+        "units_reported": 0,
+        "fits_brief": true,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-03",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3894, 29.7431]
+      },
+      "properties": {
+        "pid": "fx-map-03",
+        "kind": "apartment",
+        "has_scan": true,
+        "n_plans": 5,
+        "rent_from": 1725,
+        "units_reported": 7,
+        "fits_brief": false,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-04",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3522, 29.7703]
+      },
+      "properties": {
+        "pid": "fx-map-04",
+        "kind": "apartment",
+        "has_scan": true,
+        "n_plans": 4,
+        "rent_from": 1310,
+        "units_reported": 2,
+        "fits_brief": true,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-05",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3421, 29.7355]
+      },
+      "properties": {
+        "pid": "fx-map-05",
+        "kind": "apartment",
+        "has_scan": false,
+        "n_plans": 1,
+        "rent_from": 990,
+        "units_reported": 0,
+        "fits_brief": false,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-06",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3811, 29.7798]
+      },
+      "properties": {
+        "pid": "fx-map-06",
+        "kind": "apartment",
+        "has_scan": true,
+        "n_plans": 6,
+        "rent_from": 2050,
+        "units_reported": 3,
+        "fits_brief": false,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-07",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3705, 29.7222]
+      },
+      "properties": {
+        "pid": "fx-map-07",
+        "kind": "house",
+        "has_scan": true,
+        "n_plans": 1,
+        "rent_from": 2200,
+        "units_reported": null,
+        "fits_brief": false,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-08",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3398, 29.7889]
+      },
+      "properties": {
+        "pid": "fx-map-08",
+        "kind": "house",
+        "has_scan": false,
+        "n_plans": 1,
+        "rent_from": 1850,
+        "units_reported": null,
+        "fits_brief": true,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-09",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3302, 29.7469]
+      },
+      "properties": {
+        "pid": "fx-map-09",
+        "kind": "apartment",
+        "has_scan": false,
+        "n_plans": 3,
+        "rent_from": 1560,
+        "units_reported": 1,
+        "fits_brief": true,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fx-map-10",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-95.3955, 29.7644]
+      },
+      "properties": {
+        "pid": "fx-map-10",
+        "kind": "apartment",
+        "has_scan": true,
+        "n_plans": 2,
+        "rent_from": 1395,
+        "units_reported": 5,
+        "fits_brief": true,
+        "source": "fixture",
+        "as_of": "as of CoStar's last research"
+      }
+    }
+  ]
+}

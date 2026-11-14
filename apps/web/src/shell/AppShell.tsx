@@ -1,6 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Wordmark } from "../components/HouseGlyph";
 import { loadPrefs, savePrefs, TABS, type Prefs, type Section } from "./prefs";
 import { applyTheme, defaultTheme, initialChoice, saveTheme, type ThemeChoice } from "./theme";
 import "./shell.css";
@@ -17,7 +16,7 @@ interface Props {
 
 /** What each page is for, in one line. One purpose per page. */
 export const PURPOSE: Record<string, string> = {
-  home: "Your cases, and checking a new ad.",
+  home: "Ask anything: check an ad, find a place, or open any view.",
   listings: "Browse the researched places.",
   map: "Find a home by where it is.",
   finder: "The agent that learns what you want and helps you find a home.",
@@ -47,6 +46,18 @@ export function AppShell({ section, context, children }: Props) {
   useEffect(() => applyTheme(theme), [theme]);
   const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs());
   const [open, setOpen] = useState(false);
+  // Phones: one row (mark and Menu); the tabs and tools open below it.
+  const [menu, setMenu] = useState(false);
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  const menuPanel = useRef<HTMLDivElement>(null);
+  // Opening moves focus to the first tab in the panel.
+  useEffect(() => {
+    if (menu) menuPanel.current?.querySelector<HTMLElement>("a, button")?.focus();
+  }, [menu]);
+  const closeMenu = (refocus: boolean) => {
+    setMenu(false);
+    if (refocus) menuBtn.current?.focus();
+  };
 
   const pick = (t: ThemeChoice) => {
     setPicked(t);
@@ -62,54 +73,83 @@ export function AppShell({ section, context, children }: Props) {
     <div className="app" data-section={section ?? "none"}>
       <header className="app-bar">
         <a className="app-mark" href="/home" aria-label="SNAPBACK home">
-          <Wordmark />
+          <span className="wordmark app-wordmark">SNAPBACK</span>
         </a>
-        <nav className="app-tabs" aria-label="Main">
-          {shown.map((t) => (
-            <a
-              key={t.id}
-              className="app-tab"
-              href={t.href}
-              aria-current={section === t.id && !context ? "page" : undefined}
-              data-in={section === t.id ? "true" : undefined}
-            >
-              {t.label}
-            </a>
-          ))}
-          {context && (
-            <a className="app-tab app-tab-context" href={context.href} aria-current="page">
-              {context.label}
-            </a>
-          )}
-        </nav>
-        <div className="app-tools">
-          {SITE_URL && (
-            <a className="app-site" href={withTheme(SITE_URL, theme)}>
-              About SNAPBACK
-            </a>
-          )}
-          <div className="app-theme" role="group" aria-label="Light, dark or your device's setting">
-            {(["light", "dark", "system"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="app-theme-opt"
-                aria-pressed={theme === t}
-                onClick={() => pick(t)}
+        <button
+          ref={menuBtn}
+          type="button"
+          className="app-menu-btn"
+          aria-expanded={menu}
+          aria-controls="app-menu"
+          onClick={() => setMenu((m) => !m)}
+        >
+          {menu ? "Close" : "Menu"}
+        </button>
+        <div
+          id="app-menu"
+          ref={menuPanel}
+          className="app-menu"
+          data-open={menu || undefined}
+          onKeyDown={(e) => {
+            if (menu && e.key === "Escape") closeMenu(true);
+          }}
+          onBlur={(e) => {
+            const next = e.relatedTarget as Node | null;
+            if (!menu || !next) return;
+            if (!e.currentTarget.contains(next) && next !== menuBtn.current) closeMenu(false);
+          }}
+        >
+          <nav className="app-tabs" aria-label="Main">
+            {shown.map((t) => (
+              <a
+                key={t.id}
+                className="app-tab"
+                href={t.href}
+                aria-current={section === t.id && !context ? "page" : undefined}
+                data-in={section === t.id ? "true" : undefined}
               >
-                {t === "light" ? "Light" : t === "dark" ? "Dark" : "Auto"}
-              </button>
+                {t.label}
+              </a>
             ))}
+            {context && (
+              <a className="app-tab app-tab-context" href={context.href} aria-current="page">
+                {context.label}
+              </a>
+            )}
+          </nav>
+          <div className="app-tools">
+            {SITE_URL && (
+              <a className="app-site" href={withTheme(SITE_URL, theme)}>
+                About SNAPBACK
+              </a>
+            )}
+            <div
+              className="app-theme"
+              role="group"
+              aria-label="Light, dark or your device's setting"
+            >
+              {(["light", "dark", "system"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="app-theme-opt"
+                  aria-pressed={theme === t}
+                  onClick={() => pick(t)}
+                >
+                  {t === "light" ? "Light" : t === "dark" ? "Dark" : "Auto"}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="app-custom-open"
+              aria-expanded={open}
+              aria-controls="app-custom"
+              onClick={() => setOpen((o) => !o)}
+            >
+              Customize
+            </button>
           </div>
-          <button
-            type="button"
-            className="app-custom-open"
-            aria-expanded={open}
-            aria-controls="app-custom"
-            onClick={() => setOpen((o) => !o)}
-          >
-            Customize
-          </button>
         </div>
         {open && (
           <section
@@ -168,11 +208,12 @@ export function AppShell({ section, context, children }: Props) {
           </section>
         )}
       </header>
-      {(context ? PURPOSE[context.label] : section ? PURPOSE[section] : null) && (
-        <p className="app-purpose" data-testid="page-purpose">
-          {context ? PURPOSE[context.label] : PURPOSE[section!]}
-        </p>
-      )}
+      {section !== "home" &&
+        (context ? PURPOSE[context.label] : section ? PURPOSE[section] : null) && (
+          <p className="app-purpose" data-testid="page-purpose">
+            {context ? PURPOSE[context.label] : PURPOSE[section!]}
+          </p>
+        )}
       {children}
     </div>
   );

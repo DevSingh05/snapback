@@ -127,6 +127,10 @@ class TourPhoto(BaseModel):
     position: tuple[float, float, float] | None = None
     rotation_quat: tuple[float, float, float, float] | None = None
     fov_deg: float | None = None
+    # The matched camera direction in the 3D viewer's frame (Pose.yaw_deg / pitch_deg): what the
+    # walk player turns the camera to before fading the photo over the view.
+    yaw_deg: float | None = None
+    pitch_deg: float | None = None
 
 
 class WalkCoverage(BaseModel):
@@ -933,6 +937,8 @@ def map_locate(
                 position=tuple(pose.position) if pose else None,
                 rotation_quat=tuple(pose.rotation_quat) if pose else None,
                 fov_deg=pose.fov_deg if pose else None,
+                yaw_deg=pose.yaw_deg if pose else None,
+                pitch_deg=pose.pitch_deg if pose else None,
             )
         )
         where[photo.photo_id] = stop.key

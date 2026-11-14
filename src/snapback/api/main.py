@@ -104,6 +104,16 @@ from snapback.office.models import (
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
 from snapback.pack import TourPrepPack, build_tour_prep
+from snapback.places_map import (
+    PlaceSheet,
+    PlacesIndex,
+    PlacesMap,
+    SheetAerial,
+    captured_line,
+    fixture_tile_jpeg,
+    place_sheet,
+    source_of,
+)
 from snapback.preferences import merge as merge_preferences
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
@@ -823,6 +833,88 @@ def create_app(
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    places_index = PlacesIndex(lookups)
+
+    @app.post("/places/map")
+    def post_places_map(request: Request, brief: RenterBrief | None = None) -> PlacesMap:
+        """The map's pins: one GeoJSON feature per researched place, with `fits_brief` set from
+        the optional brief. Public and read only; no address, office or name in any feature."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            return places_index.feed(brief)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+
+    def place_tile(property_id: str, direction: str):
+        """The tile for a place through the shared vexcel cache (7 days under data/vexcel/)."""
+        return aerial_side(
+            source_of(lookups),
+            property_id,
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+        )
+
+    @app.get("/places/{property_id}")
+    def get_place_sheet(property_id: str, request: Request) -> PlaceSheet:
+        """The map's sheet for one place: plans, prices and units reported (as of CoStar's last
+        research), the company on record, the scan badge and the aerial. Public and read only,
+        built by code from the record (no case data). 404 for a place with no priced plan."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            sheet = place_sheet(property_id, lookups)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if sheet is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        tile = place_tile(property_id, "north")
+        live = tile is not None and tile.source == DataSource.LIVE
+        if live or sheet.source is DataSource.FIXTURE:
+            sheet.aerial = SheetAerial(
+                source=DataSource.LIVE if live else DataSource.FIXTURE,
+                captured_on=tile.captured_on if tile is not None else None,
+                line=captured_line(
+                    tile.captured_on if tile is not None else None,
+                    DataSource.LIVE if live else DataSource.FIXTURE,
+                ),
+                image_path=f"/places/{property_id}/aerial.jpg",
+            )
+        return sheet
+
+    @app.get("/places/{property_id}/aerial.jpg")
+    def get_place_aerial(
+        property_id: str, request: Request, direction: AerialDirection = "north"
+    ) -> Response:
+        """The place's aerial: a live Vexcel tile from the shared 7-day cache, or, for a FIXTURE
+        place, a plain stand-in labelled as one. 404 when there is none. Rate limited."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        if place_sheet(property_id, lookups) is None:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        headers = {"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"}
+        tile = place_tile(property_id, direction)
+        if tile is not None and tile.source == DataSource.LIVE:
+            tile_path = Path(tile.path).resolve()
+            data_root = resolve_data_dir(settings.snapback_data_dir).resolve()
+            if tile_path.is_relative_to(data_root):
+                try:
+                    return Response(
+                        content=tile_path.read_bytes(), media_type="image/jpeg", headers=headers
+                    )
+                except FileNotFoundError:
+                    pass
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        if source_of(lookups) is DataSource.FIXTURE:
+            return Response(
+                content=fixture_tile_jpeg(property_id), media_type="image/jpeg", headers=headers
+            )
+        raise HTTPException(status_code=404, detail=NO_TILE)
 
     @app.get("/events/stream")
     def get_events(

@@ -87,6 +87,29 @@ describe("the app shell", () => {
     expect(savedTheme()).toBe("system");
   });
 
+  it("the phone Menu moves focus in, closes on Escape back to Menu, and on focus leaving", () => {
+    render(
+      <>
+        <AppShell section="home">page</AppShell>
+        <button type="button">outside</button>
+      </>,
+    );
+    const menu = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(menu);
+    expect(menu).toHaveAttribute("aria-expanded", "true");
+    const panel = document.getElementById("app-menu")!;
+    expect(panel).toHaveAttribute("data-open");
+    expect(panel.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(panel).not.toHaveAttribute("data-open");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
+    // Focus leaving the panel for somewhere else closes it.
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const first = panel.querySelector("a")!;
+    fireEvent.focusOut(first, { relatedTarget: screen.getByRole("button", { name: "outside" }) });
+    expect(panel).not.toHaveAttribute("data-open");
+  });
+
   it("Customize hides a tab and picks the one that opens first, and remembers both", () => {
     render(<AppShell section="home">home</AppShell>);
     fireEvent.click(screen.getByRole("button", { name: "Customize" }));

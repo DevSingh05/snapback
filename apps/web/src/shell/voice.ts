@@ -164,6 +164,12 @@ export type MicState = "idle" | "recording" | "writing";
  * hands-free ends by itself after a pause (talk mode). stop() ends and sends what was heard;
  * cancel() drops it. onWords gets the final words; onSilence runs when nothing was heard.
  */
+/** Moves the mic to `next` both now (the ref) and on the next render (the state). */
+function enter(phase: { current: MicState }, show: (next: MicState) => void, next: MicState) {
+  phase.current = next;
+  show(next);
+}
+
 export function useVoiceInput({
   server,
   onWords,
@@ -179,7 +185,11 @@ export function useVoiceInput({
   const engine: VoiceEngine | null =
     server && !serverOff && recordable ? "eleven" : Recog ? "browser" : null;
 
-  const [state, setState] = useState<MicState>("idle");
+  const [state, setShown] = useState<MicState>("idle");
+  // The phase as of now, not as of the last render. Talk mode re-opens the mic from a callback
+  // (the spoken reply ending) that can run before React has rendered the end of the last turn,
+  // and `start` must not mistake that turn for one still in flight.
+  const phase = useRef<MicState>("idle");
   const [level, setLevel] = useState(0);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -233,7 +243,7 @@ export function useVoiceInput({
     };
     r.onend = () => {
       live.current = null;
-      setState("idle");
+      enter(phase, setShown, "idle");
       setInterim("");
       setLevel(0);
       if (dropped) return;
@@ -249,7 +259,7 @@ export function useVoiceInput({
     };
     try {
       r.start();
-      setState("recording");
+      enter(phase, setShown, "recording");
     } catch {
       live.current = null;
       setError("Voice could not start. Try again.");
@@ -258,13 +268,13 @@ export function useVoiceInput({
 
   const startEleven = useCallback(async (handsFree: boolean) => {
     let stream: MediaStream;
-    setState("recording");
+    enter(phase, setShown, "recording");
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true },
       });
     } catch (err) {
-      setState("idle");
+      enter(phase, setShown, "idle");
       const name = err instanceof Error ? err.name : "";
       setError(MIC_ERRORS[name] ?? "The microphone could not start.");
       return;
@@ -335,24 +345,24 @@ export function useVoiceInput({
       close();
       live.current = null;
       if (dropped) {
-        setState("idle");
+        enter(phase, setShown, "idle");
         return;
       }
       const seconds = (performance.now() - began) / 1000;
       const clip = new Blob(chunks, { type: rec.mimeType || chunks[0]?.type || "audio/webm" });
       if (clip.size === 0) {
-        setState("idle");
+        enter(phase, setShown, "idle");
         cbs.current.onSilence?.();
         return;
       }
-      setState("writing");
+      enter(phase, setShown, "writing");
       try {
         const words = await transcribe(clip, Math.min(seconds, MAX_CLIP_SECONDS));
-        setState("idle");
+        enter(phase, setShown, "idle");
         if (words) cbs.current.onWords(words);
         else cbs.current.onSilence?.();
       } catch (err) {
-        setState("idle");
+        enter(phase, setShown, "idle");
         if (err instanceof VoiceOff) {
           setServerOff(true);
           setNote(
@@ -381,14 +391,14 @@ export function useVoiceInput({
 
   const start = useCallback(
     (handsFree = false) => {
-      if (live.current || state !== "idle" || !engine) return;
+      if (live.current || phase.current !== "idle" || !engine) return;
       setError(null);
       setNote(null);
       setInterim("");
       if (engine === "eleven") void startEleven(handsFree);
       else startBrowser();
     },
-    [engine, startBrowser, startEleven, state],
+    [engine, startBrowser, startEleven],
   );
   const stop = useCallback(() => live.current?.stop(), []);
   const cancel = useCallback(() => live.current?.cancel(), []);

@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { TourPlan, TourStop } from "../contracts";
-import type { LandingState } from "../twin/landing";
-import { quatToYawPitch } from "../twin/pose";
+import { floorOf, viewAngles, type LandingState, type UpAxis } from "../twin/landing";
 
 // Structure only: every colour, size and border is a class in tour.css, so a design pass can
 // restyle without touching this logic.
@@ -26,10 +25,12 @@ export function emptyFrameText(stop: TourStop, plan: TourPlan): string | null {
 }
 
 /** The landing state of a stop's first placed photo, for PhotoLanding. */
-export function landingOfStop(stop: TourStop): LandingState | null {
+export function landingOfStop(stop: TourStop, up: UpAxis = "y"): LandingState | null {
   const photo = stop.photos[0];
-  if (!photo || !photo.position || !photo.rotation_quat) return null;
-  const { yaw, pitch } = quatToYawPitch(photo.rotation_quat);
+  if (!photo || !photo.position) return null;
+  const angles = viewAngles(photo);
+  if (!angles) return null;
+  const { yaw, pitch } = angles;
   return {
     kind: "match",
     photoId: photo.photo_id,
@@ -39,6 +40,7 @@ export function landingOfStop(stop: TourStop): LandingState | null {
     pitch,
     fovDeg: photo.fov_deg ?? null,
     position: photo.position,
+    floor: floorOf(photo.position, up),
   };
 }
 
