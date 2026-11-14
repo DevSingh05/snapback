@@ -20,6 +20,7 @@ from pathlib import Path
 
 from snapback.agent.intake import Listing, read_listing
 from snapback.agent.modules import FixtureModules
+from snapback.agent.place_fixture import FixturePlaceSearcher
 from snapback.agent.runner import PolicyChooser, run_case
 from snapback.agent.session import CaseSession
 from snapback.agent.trace import Trace
@@ -60,13 +61,18 @@ def load_demo_case(case_id: str) -> DemoCase:
     )
 
 
-def demo_modules(case: DemoCase, listing: Listing) -> FixtureModules:
+def demo_place_searcher(case: DemoCase) -> FixturePlaceSearcher | None:
+    """The case's scripted, synthetic place retries, if it has any (see place_fixture.py)."""
+    return FixturePlaceSearcher.for_folder(case.folder)
+
+
+def demo_modules(case: DemoCase, listing: Listing, *, with_retry: bool = False) -> FixtureModules:
     """The case's stand-ins for the twin, the record and the challenge.
 
     What the listing itself says (its asks, its rent, its unit, its contacts) is read by the
     same code as any other listing, and replaces nothing here.
     """
-    return FixtureModules(
+    modules = FixtureModules(
         evidence_file="module_evidence.json",
         fixtures_dir=case.folder,
         record_file="property_record.json",
@@ -78,6 +84,13 @@ def demo_modules(case: DemoCase, listing: Listing) -> FixtureModules:
         beds=listing.beds,
         for_sale=case.for_sale,
     )
+    searcher = demo_place_searcher(case) if with_retry else None
+    if searcher is not None:
+        # Opt-in: the scripted unplaced photos join the base result so there is something to retry.
+        modules.evidence = modules.evidence.model_copy(
+            update={"locate": searcher.with_extra_photos(modules.evidence.locate)}
+        )
+    return modules
 
 
 def staged(card: Card, demo_case_id: str | None = None) -> Card:
@@ -89,13 +102,24 @@ def staged(card: Card, demo_case_id: str | None = None) -> Card:
 
 
 def run_demo_case(
-    case_id: str, *, lang: str = strings.DEFAULT_LANG, checked_at: datetime | None = None
+    case_id: str,
+    *,
+    lang: str = strings.DEFAULT_LANG,
+    checked_at: datetime | None = None,
+    with_retry: bool = False,
 ) -> tuple[Verdict, Card]:
     """Run one staged case from its listing to its card, approving the challenge as drafted."""
     case = load_demo_case(case_id)
     listing = read_listing(case.listing_text)
     full_id = f"fx-demo-{case_id}"
-    session = CaseSession(full_id, demo_modules(case, listing), Trace(full_id, DataSource.FIXTURE))
+    session = CaseSession(
+        full_id,
+        demo_modules(case, listing, with_retry=with_retry),
+        Trace(full_id, DataSource.FIXTURE),
+    )
+    searcher = demo_place_searcher(case) if with_retry else None
+    if searcher is not None:
+        session.place_searcher, session.place_scans = searcher, searcher.scans
     verdict = run_case(session, PolicyChooser(), lambda draft: "send")
     assert verdict is not None  # an approver was given, so the run cannot pause
     return verdict, staged(build_card(session.evidence, checked_at=checked_at, lang=lang), case_id)
