@@ -773,3 +773,45 @@ class _AskModules(FixtureModules):
 
     def license_by_number(self, case_id, number):
         return self._joined.license_by_number(case_id, number)
+
+
+# --- a state list that did not answer is a lookup that did not happen ---------------------------
+
+
+def failing_client(kind):
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if kind == "timeout":
+            raise httpx.ReadTimeout("slow", request=request)
+        if kind == "bad_json":
+            return httpx.Response(200, content=b"not json")
+        return httpx.Response(503)
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+@pytest.mark.parametrize("kind", ["timeout", "503", "bad_json"])
+def test_a_state_list_that_does_not_answer_is_not_reported_as_looked_up(kind):
+    from snapback.adapters import trec
+
+    assert trec.check_license_number("900123", NAMED_AD, client=failing_client(kind)) is None
+
+    class Down(RealCheck):
+        def __init__(self):
+            self.client = failing_client(kind)
+
+    modules = _AskModules(joined_modules(NAMED_AD, Down()))
+    case = final(modules, SECRET_ANSWER, PolicyChooser())
+    said = seen_trace(case)
+    assert strings.text("plan.ask.looked_up") not in said
+    assert strings.text("plan.ask.not_looked_up") in said
+    assert case.evidence.license == CLAIM
+    assert license_line(case).text == strings.text("license.not_checked_claimed")
+
+
+def test_a_non_number_or_all_zeros_looks_nothing_up():
+    from snapback.adapters import trec
+
+    for bad in ("12ab", "٠١٢٣٤٥٦", "0000000", ""):
+        assert trec.check_license_number(bad, NAMED_AD, client=failing_client("503")) is None

@@ -521,23 +521,32 @@ def check_license(
 
 def check_license_number(
     number: str, ad_text: str, *, client: httpx.Client | None = None
-) -> LicenseResult:
+) -> LicenseResult | None:
     """The same D10 check, for a license number the renter typed when the agent asked (A24).
 
     The number is taken directly, so it is looked up whatever the length of the ad (the ad's
     own words are read only for the name the poster claims, as `check_license` does). The
     rules are the ad's rules: a number with no active row is NOT_FOUND, one active under
     another name is NOT_CHECKED. The result says the number came from the renter, so the card
-    words it as "the number you gave", and it never goes in a report pack."""
+    words it as "the number you gave", and it never goes in a report pack.
+
+    None when nothing was looked up: not a number, or the state did not answer (a timeout, an
+    error status, bad JSON). A lookup that did not happen must not read as one that did."""
     digits = number.strip()
     if not digits.isascii() or not digits.isdigit():
-        return LicenseResult(status=LicenseStatus.NOT_CHECKED, number_from="renter")
+        return None
     digits = digits.lstrip("0")
-    claim = detect_claim(ad_text)
     if not digits:
-        return _result(_NOT_CHECKED, claim, "renter")
+        return None  # all zeros: not a number, nothing to look up
+    claim = detect_claim(ad_text)
     deadline = _monotonic() + TIMEOUT_S
-    return _result(_lookup_number(digits, claim, client or _client(), deadline), claim, "renter")
+    rows = _get_rows(
+        f"upper(license_number) like '{_soql(digits)}%'", client or _client(), deadline
+    )
+    if rows is None:
+        return None
+    answer = answer_for_number(digits, rows, claim) if len(rows) <= MAX_ROWS else _NOT_CHECKED
+    return _result(answer, claim, "renter")
 
 
 def _result(
