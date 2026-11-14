@@ -2,13 +2,36 @@
 
 > Draft for the HackPrinceton Fall 2026 Devpost page. Every number carries its n and whether it
 > is LIVE (the CoStar kit) or FIXTURE (synthetic, team-made). Sources: the README, the PRs on
-> `main` and the team board. Not yet on `main`, so not claimed here: MCP (#241), the one box
-> (#243) and the Stories page.
+> `main` and the team board. Features not yet on `main` are listed under "In progress" only.
+> Quotes are word for word from the sources named beside them.
 
 ## Tagline
 
 **Trust the home, not the ad.** Paste a rental ad you found online. SNAPBACK checks it against
 the home's own record before you pay anyone.
+
+CoStar protects the listings on its own sites; SNAPBACK protects the renter from the ad that
+copies one, wherever it shows up, and sends them back to the real listing on Apartments.com.
+
+## Scam prevention first
+
+Rental scams don't happen on the listing sites. They happen on the copy: a real home's photos,
+reposted somewhere else, with a stranger's phone number and a request for money.
+
+- **The listing sites can't see the copy.** CoStar's own scam page warns renters that "Scammers
+  may impersonate Apartments.com or Apartment Finder to make it seem like we participate in the
+  lease transaction or transfer of funds", and that "we do not participate in any rental
+  transactions and cannot refund your money if you are scammed" (apartmenthomeliving.com, "Avoid
+  scams and fraud", © 2026 CoStar Group). A listing site can't see ads posted elsewhere; the
+  renter is the one holding the copy.
+- **It is common.** The FTC (Dec 22 2025) counted nearly 65,000 rental-scam reports and about
+  $65 million lost. About half of people reporting in the 12 months ending June 2025 said it
+  began with a fake Facebook ad.
+- **It is costly.** The FBI's Boston office (Aug 11 2026) reported that 12,368 people lost
+  $275,110,419 to real estate scams in 2025.
+
+SNAPBACK meets the renter where the copy is: they paste it, upload it or text it, and the home's
+own record answers before any money moves. CoStar could ship this beside its listings.
 
 ## Inspiration
 
@@ -17,10 +40,7 @@ landlord and gave her a door code. She paid $2,200 for rent and a deposit and mo
 later the real owner, a rental company, told her the poster did not own the house (ABC13 Houston,
 Feb 15 2025).
 
-She did nothing careless. The photos were of a real house, and she even got inside. The FTC
-counted nearly 65,000 rental-scam reports from January 2020 to June 2025, and about half of the
-reports in the 12 months ending June 2025 began with a fake ad on Facebook
-([FTC Data Spotlight, Dec 2025](https://www.ftc.gov/news-events/data-visualizations/data-spotlight/2025/12/rental-scams-hit-home-65-million-reported-losses)).
+She did nothing careless. The photos were of a real house, and she even got inside.
 
 These scams work because real photos pass. The person and the offer are what's fake, and the
 home's own record can show that. So we built a renter's agent that checks the ad against the
@@ -131,14 +151,23 @@ or sends anything for you.
   manages it, and whether it is for sale.
 - Saying "not checked" honestly builds more trust than a confident guess.
 
+## In progress
+
+Built, not yet on `main`, so not claimed above:
+
+- **The real listing:** a panel that shows the home's real listing, a hand-off link back to it on
+  Apartments.com, and an alert when an ad looks copied from it (#250).
+- **New rules,** and a **batch run** over many ads at once.
+- **MCP** (#241), **the one box** (#243) and the **Stories** page.
+- **Voice in iMessage:** merged in the sidecar (#245); the live round trip from a phone is next.
+
 ## What's next
 
 - **University partnerships for international students.** They rent from abroad, sight unseen,
   and often to a deadline. Pre-arrival housing guides could carry "check any listing before you
   send a deposit".
-- **Platforms:** run the check when a listing is posted on Facebook Marketplace, Zillow or
-  Craigslist. Today it works on any listing a renter can paste or forward.
-- **Voice:** send a voice memo in iMessage and get the answer back as text plus a voice reply.
+- **Platforms:** CoStar could ship this beside its listings, and other platforms could run the
+  check when an ad is posted. Today it works on any listing a renter can paste or forward.
 - **More cities, more languages** (English and Spanish today), and measured accuracy on real ad
   photos at scale.
 
@@ -162,7 +191,9 @@ Actions.
   addresses or prices, as CoStar allowed for the event.
 - **Photon (+ Best Voice Agent):** the iMessage sidecar is live on Photon's Spectrum SDK: text an
   ad and get the card back. Watch alerts text a linked Finder search at most 3 times a day, and
-  "stop" ends them. Voice memos in and spoken replies out are in progress.
+  "stop" ends them. Voice memos in and spoken replies out are built (#245): a memo is written down
+  by our speech-to-text and checked like a typed ad, and the answer comes back as text plus a voice
+  memo. The live round trip from a phone is next.
 - **Arlequin:** the investigator view finds rental-scam rings across many ads, with evidence for
   every link, on a SYNTHETIC/FIXTURE corpus (numbers above).
 - **GoDaddy domain:** TBD.
