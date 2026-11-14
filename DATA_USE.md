@@ -48,8 +48,8 @@ there is tracked).
   above. The owner is the iMessage sidecar's renter id (`imsg-` plus a keyed hash of the thread,
   never a phone number), or `browser:<client cookie>` for a check started on the web. A case that
   cannot be registered is not started, so no check exists that its renter could not delete.
-  One limit: a running API keeps a case it has already loaded in memory, so a deleted case can
-  still be read from that process until it restarts (or until the API evicts it on delete).
+  A running API drops a deleted case too: on every request for a case it checks the case is still
+  registered, so once it is deleted every route answers 404, with no restart.
 - **`make purge`** (`uv run python -m snapback.safety purge`): deletes everything under `data/`.
   It refuses any folder not named `data`, and a relative `SNAPBACK_DATA_DIR` is taken from the
   repo root, so it works from any directory. A missing folder is an error, not "0 removed". Run it
