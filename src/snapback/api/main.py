@@ -77,10 +77,13 @@ PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 # What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
 # Nothing else is accepted, so a raw phone number or a name can never be stored as one.
 RENTER_ID = re.compile(r"imsg-[0-9a-f]{24}")
-# What a browser is known by: the client cookie this API issued.
-COOKIE_ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
+# What a browser is known by: the client cookie this API issued. That is 16 random bytes in
+# URL-safe base64, which is always 22 characters. Only that exact shape is accepted back, so
+# a client cannot have a phone number or a name stored as its id by sending one as a cookie.
+COOKIE_BYTES = 16
+COOKIE_ID = re.compile(r"[A-Za-z0-9_-]{22}")
 # Everything a case may be registered under.
-OWNER = re.compile(r"imsg-[0-9a-f]{24}|browser:[A-Za-z0-9_-]{8,64}")
+OWNER = re.compile(r"imsg-[0-9a-f]{24}|browser:[A-Za-z0-9_-]{22}")
 _DEFAULT = object()
 
 
@@ -330,7 +333,7 @@ def create_app(
             cookie = request.cookies.get(CLIENT_COOKIE)
             if cookie is not None and not COOKIE_ID.fullmatch(cookie):
                 cookie = None  # not one we issued; a fresh one is set below
-            new_cookie = None if renter_id or cookie else secrets.token_urlsafe(16)
+            new_cookie = None if renter_id or cookie else secrets.token_urlsafe(COOKIE_BYTES)
             client = f"renter:{renter_id}" if renter_id else f"browser:{cookie or new_cookie}"
             # Who the case is registered under, for delete: the sidecar's own renter id as
             # it sent it, or the browser's client cookie.

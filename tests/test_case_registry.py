@@ -100,6 +100,44 @@ def test_a_cookie_this_api_did_not_issue_is_replaced_not_stored(tmp_path):
     assert owner == f"browser:{made.cookies['snapback_client']}"
 
 
+@pytest.mark.parametrize(
+    "sent",
+    [
+        "555-010-0142",  # a phone number is made of the same characters a cookie is
+        "5550100142",
+        "1-555-010-0142",
+        "fxrenter-at-home",  # a name, a handle
+        "A" * 21,  # one short of what we issue
+        "A" * 23,  # one over
+        "A" * 64,
+    ],
+)
+def test_only_the_exact_shape_this_api_issues_is_kept_as_a_browser_s_id(tmp_path, sent):
+    # The cookie is 16 random bytes in URL-safe base64: 22 characters, always. Anything else
+    # was not issued here, so it is replaced and never stored. A client cannot get a phone
+    # number or a name written down as its id by sending one as the cookie.
+    registry = Recording()
+    client = client_for(tmp_path, registry)
+    client.cookies.set("snapback_client", sent)
+    made = client.post("/cases", data={"text": "x"})
+    assert made.status_code == 201
+    issued = made.cookies["snapback_client"]
+    assert issued != sent and len(issued) == 22
+    assert registry.calls[0][1] == f"browser:{issued}"
+    assert sent not in registry.calls[0][1]
+
+
+def test_every_cookie_this_api_issues_passes_its_own_check():
+    import secrets
+
+    from snapback.api.main import COOKIE_ID, OWNER
+
+    for _ in range(500):
+        issued = secrets.token_urlsafe(16)
+        assert COOKIE_ID.fullmatch(issued), issued
+        assert OWNER.fullmatch(f"browser:{issued}")
+
+
 def test_a_case_that_could_not_be_registered_is_not_started(tmp_path):
     # A check nobody can later delete must not exist.
     registry = Recording(fail=True)
