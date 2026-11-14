@@ -1,11 +1,11 @@
 {
-  "case_id": "fx-demo-b",
-  "model_id": "fx-model-a",
-  "floor_plan": "2 bed / 2 bath",
+  "case_id": "fx-demo-replay-zelle-deposit-real-house-video-tour",
+  "model_id": "fx-model-house",
+  "floor_plan": null,
   "spots": [
     {
       "spot_id": "fx-spot-window-n",
-      "model_id": "fx-model-a",
+      "model_id": "fx-model-house",
       "label": "the north window frame in the living room",
       "pose": {
         "sweep_id": "fx-sweep-04",
@@ -17,7 +17,7 @@
     },
     {
       "spot_id": "fx-spot-door-b",
-      "model_id": "fx-model-a",
+      "model_id": "fx-model-house",
       "label": "the bedroom 2 door and its frame",
       "pose": {
         "sweep_id": "fx-sweep-09",
@@ -29,7 +29,7 @@
     },
     {
       "spot_id": "fx-spot-counter-e",
-      "model_id": "fx-model-a",
+      "model_id": "fx-model-house",
       "label": "the east end of the kitchen counter",
       "pose": {
         "sweep_id": "fx-sweep-02",
@@ -41,7 +41,7 @@
     },
     {
       "spot_id": "fx-spot-closet",
-      "model_id": "fx-model-a",
+      "model_id": "fx-model-house",
       "label": "the hall closet door",
       "pose": {
         "sweep_id": "fx-sweep-06",
@@ -53,7 +53,7 @@
     },
     {
       "spot_id": "fx-spot-door-a",
-      "model_id": "fx-model-a",
+      "model_id": "fx-model-house",
       "label": "the front door from inside",
       "pose": {
         "sweep_id": "fx-sweep-01",
@@ -65,7 +65,7 @@
     },
     {
       "spot_id": "fx-spot-sink",
-      "model_id": "fx-model-a",
+      "model_id": "fx-model-house",
       "label": "the kitchen sink",
       "pose": {
         "sweep_id": "fx-sweep-07",
