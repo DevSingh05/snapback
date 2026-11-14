@@ -770,9 +770,10 @@ def _quoted_rule(rule: PublishedRule, lang: str, key: str) -> str:
 def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     """The owner of record, beside what the poster says about owning the home (A19, #125).
 
-    A company is named. A person never is: the card says "a private owner" and whether the
-    name the poster gave matches, yes or no. Nothing here is a red flag, and a match is a
-    supporting line: the owner roll is public, so anyone can type the owner's name.
+    A company we know is named; any other company is "a company owner". A person never is:
+    the card says "a private owner" and whether the name the poster gave matches, yes or no.
+    Nothing here is a red flag, and a match is a supporting line: the owner roll is public,
+    so anyone can type the owner's name.
     """
     owner = modules.owner
     if owner is None:
@@ -788,9 +789,12 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             return [_line(lang, label, CardTone.NOT_SHOWN, "owner.person_mismatch")]
         return [_line(lang, label, CardTone.NOT_CHECKED, "owner.person_no_name")]
 
-    company = _one_line(owner.company, MAX_COMPANY_CHARS)
+    company = _one_line(owner.company, MAX_COMPANY_CHARS) if owner.company_known else ""
     if not company:
-        return []
+        # A company we do not know is never named (round 5 on #160): "a company owner".
+        not_poster = _owner_is_not_the_poster(modules)
+        key = "owner.company_unnamed_not_poster" if not_poster else "owner.company_unnamed"
+        return [_line(lang, label, CardTone.NOT_SHOWN, key)]
     if owner.poster_matches is OwnerMatch.YES:
         tone, key = CardTone.OK, "owner.company_matches"
     elif _owner_is_not_the_poster(modules):

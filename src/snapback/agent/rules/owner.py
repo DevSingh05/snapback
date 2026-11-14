@@ -103,11 +103,20 @@ def check_owner(
             update={"company": None, "poster_says_owner": says_owner, "published_rule": None}
         )
 
-    if not " ".join((owner.company or "").split()):
-        # A company owner with no name to show: nothing was compared, so no line and no rule.
+    if not owner.company_known or not " ".join((owner.company or "").split()):
+        # A company we do not know: its name is never kept or shown ("a company owner").
+        # "I am the owner" with no company named is a no: a company owns the home. A company
+        # the poster names was compared with the roll by lane D, where the name is (round 6
+        # on #160); its answer is kept.
+        if claims.company:
+            matches = owner.poster_matches
+        else:
+            matches = OwnerMatch.NO if says_owner else OwnerMatch.NOT_CHECKED
         return owner.model_copy(
             update={
-                "poster_matches": OwnerMatch.NOT_CHECKED,
+                "company": None,
+                "company_known": False,
+                "poster_matches": matches,
                 "poster_says_owner": says_owner,
                 "published_rule": None,
             }

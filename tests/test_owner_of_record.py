@@ -36,7 +36,11 @@ MATCHES = {
     "manager_on_record": "Fixture Living LLC",
     "office_phone_match": "yes",
 }
-COMPANY = OwnerResult(kind=OwnerKind.COMPANY, company="Fixture Homes LLC")
+# A company we know (a row in the published-rule table, or an office on record in the kit):
+# lane D sends its name only then (conductor ruling, round 5 on #160).
+COMPANY = OwnerResult(kind=OwnerKind.COMPANY, company="Fixture Homes LLC", company_known=True)
+# Any other company: lane D sends no name, and the card says "a company owner".
+UNNAMED = OwnerResult(kind=OwnerKind.COMPANY)
 PERSON = OwnerResult(kind=OwnerKind.PERSON)
 FX_RULES = (
     PublishedRuleRow(
@@ -171,6 +175,7 @@ def test_a_person_owner_shows_yes_or_no_and_never_a_name():
     assert set(OwnerResult.model_fields) == {
         "kind",
         "company",
+        "company_known",  # a yes or no about the company, never a name
         "poster_matches",
         "poster_says_owner",
         "published_rule",
@@ -207,12 +212,93 @@ def test_a_company_field_on_a_person_owner_is_never_shown():
     assert "Fx Person" not in said
 
 
-@pytest.mark.parametrize("company", [None, "", "   "])
-def test_a_company_owner_with_no_name_is_not_checked_and_does_not_hold(company):
-    nameless = OwnerResult(kind=OwnerKind.COMPANY, company=company)
-    found = check_owner(SAYS_OWNER, nameless, rules=FX_RULES)
-    assert found.poster_matches is OwnerMatch.NOT_CHECKED
-    assert found.published_rule is None
+@pytest.mark.parametrize(
+    "unnamed",
+    [
+        UNNAMED,
+        OwnerResult(kind=OwnerKind.COMPANY, company=""),
+        OwnerResult(kind=OwnerKind.COMPANY, company="   ", company_known=True),
+        # a name that is not known is never shown, even if a producer sends one
+        OwnerResult(kind=OwnerKind.COMPANY, company="Fxhidden Holdings LLC"),
+    ],
+)
+def test_an_unknown_company_is_a_company_owner_with_no_name_and_still_holds(unnamed):
+    found = check_owner(SAYS_OWNER, unnamed, rules=FX_RULES)
+    # "I am the owner", and a company owns it: a no, so the HOLD still works
+    assert (found.poster_matches, found.company, found.published_rule) == (
+        OwnerMatch.NO,
+        None,
+        None,
+    )
+    modules = passing(found)
+    verdict = decide(to_evidence(modules))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.owner_not_poster") in verdict.reasons
+    assert owner_line(modules) == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. Owner of record: a company owner, not the poster.",
+    )
+    assert owner_line(modules, "es") == (
+        CardTone.NOT_SHOWN,
+        "Sin confirmar. Propietario registrado: una empresa, no quien publica.",
+    )
+    # without the claim: the same line without "not the poster", and nothing holds the case
+    quiet = passing(check_owner(ContactClaims(), unnamed, rules=FX_RULES))
+    assert owner_line(quiet) == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. Owner of record: a company owner.",
+    )
+    assert state(quiet) is VerdictState.VERIFIED
+    for lang in ("en", "es"):
+        said = build_card(modules, checked_at=CHECKED_AT, lang=lang).model_dump_json()
+        assert "Fxhidden" not in said and "Fixture Homes" not in said
+
+
+def test_the_card_never_prints_a_company_name_that_is_not_known():
+    # the card's own gate, apart from check_owner: a name a producer sends unknown is not shown
+    sent = OwnerResult(kind=OwnerKind.COMPANY, company="Fxhidden Holdings LLC")
+    for lang in ("en", "es"):
+        card = build_card(passing(sent), checked_at=CHECKED_AT, lang=lang).model_dump_json()
+        assert "Fxhidden" not in card
+    assert owner_line(passing(sent)) == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. Owner of record: a company owner.",
+    )
+
+
+def test_an_unknown_company_the_poster_names_wrongly_still_holds():
+    # round 6: lane D compares the poster's company with the roll inside its adapter (the roll
+    # name never leaves it) and sends NO; lane A keeps that NO, so the case still holds
+    sent = UNNAMED.model_copy(update={"poster_matches": OwnerMatch.NO})
+    found = check_owner(ContactClaims(company="Other Fxco", says_owner=True), sent)
+    assert (found.poster_matches, found.company) == (OwnerMatch.NO, None)
+    modules = passing(found)
+    assert decide(to_evidence(modules)).state is VerdictState.HOLD
+    assert owner_line(modules) == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. Owner of record: a company owner, not the poster.",
+    )
+    assert owner_line(modules, "es") == (
+        CardTone.NOT_SHOWN,
+        "Sin confirmar. Propietario registrado: una empresa, no quien publica.",
+    )
+
+
+def test_an_unknown_company_the_poster_names_rightly_is_not_held():
+    sent = UNNAMED.model_copy(update={"poster_matches": OwnerMatch.YES})
+    found = check_owner(ContactClaims(company="Fxample Homes", says_owner=True), sent)
+    assert found.poster_matches is OwnerMatch.YES
+    assert state(passing(found)) is VerdictState.VERIFIED
+
+
+def test_a_known_company_shows_its_name_and_still_holds_a_poster_who_says_they_own_it():
+    found = check_owner(SAYS_OWNER, COMPANY, rules=FX_RULES)
+    modules = passing(found)
+    assert decide(to_evidence(modules)).state is VerdictState.HOLD
+    tone, text = owner_line(modules)
+    assert tone is CardTone.NOT_SHOWN
+    assert text.startswith("Not confirmed. Owner of record: Fixture Homes LLC, not the poster.")
+    assert "fixturehomes.example" in text  # its row in the published-rule table is quoted
 
 
 def test_a_person_owner_loses_any_company_even_with_no_claims_to_compare():
@@ -293,7 +379,9 @@ def test_an_owner_with_a_row_in_the_table_has_its_rule_quoted_with_source_and_da
 
 
 def test_an_owner_without_a_row_gets_no_rule_and_none_is_guessed():
-    other = OwnerResult(kind=OwnerKind.COMPANY, company="Other Fixture Rentals LLC")
+    other = OwnerResult(
+        kind=OwnerKind.COMPANY, company="Other Fixture Rentals LLC", company_known=True
+    )
     found = check_owner(SAYS_OWNER, other, rules=FX_RULES)
     assert found.published_rule is None
     assert "says:" not in owner_line(passing(found))[1]
@@ -394,6 +482,8 @@ def test_the_owner_reason_sits_with_who_after_the_licence():
         (ContactClaims(), COMPANY),
         (ContactClaims(company="Fixture Homes", says_owner=True), COMPANY),
         (SAYS_OWNER, PERSON),
+        (SAYS_OWNER, UNNAMED),
+        (ContactClaims(), UNNAMED),
         (SAYS_OWNER, PERSON.model_copy(update={"poster_matches": OwnerMatch.YES})),
         (SAYS_OWNER, PERSON.model_copy(update={"poster_matches": OwnerMatch.NO})),
         (ContactClaims(), PERSON.model_copy(update={"poster_matches": OwnerMatch.NO})),
@@ -661,3 +751,50 @@ def test_an_owner_lookup_that_breaks_leaves_no_line_and_stops_nothing(tmp_path):
     card = card_from(tmp_path, Lookups(fail=True))
     labels = [line["label"] for row in card["rows"] for line in row["lines"]]
     assert "Owner of record" not in labels and "ownership" in card["not_checked"]
+
+
+def test_an_unknown_company_s_name_is_nowhere_in_the_api_trace_or_report(tmp_path):
+    """Lane D's real lookup over a lookup file whose company is not one we know."""
+    from snapback.adapters import hcad
+
+    subset = tmp_path / "owner_subset.jsonl"
+    subset.write_text(
+        json.dumps({"salt_fingerprint": hcad._salt_fingerprint("fx-salt")})
+        + "\n"
+        + json.dumps(
+            {"key": hcad._key("100 Fixture Lane"), "kind": "company", "company": "FXHIDDEN LLC"}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class RealOwner(Lookups):
+        def owner(self, listing_text: str) -> OwnerResult | None:
+            return hcad.owner(listing_text, subset, "fx-salt")
+
+    settings = Settings(_env_file=None, snapback_data_dir=tmp_path)
+    client = TestClient(create_app(settings, RealOwner()))
+    made = client.post(
+        "/cases", data={"text": "3 bed house at 100 Fixture Lane. I am the owner. $1,900."}
+    ).json()
+    auth = {"Authorization": f"Bearer {made['token']}"}
+    if made["status"] == "waiting_for_approval":
+        client.post(
+            f"/cases/{made['case_id']}/challenge/approve", json={"decision": "send"}, headers=auth
+        )
+    case = made["case_id"]
+    card = client.get(f"/cases/{case}/card").json()
+    said = {line["label"]: line["text"] for row in card["rows"] for line in row["lines"]}
+    assert (
+        said["Owner of record"]
+        == "Not confirmed. Owner of record: a company owner, not the poster."
+    )
+    assert card["state"] == "hold"
+    shown = [
+        json.dumps(card),
+        client.get(f"/cases/{case}", headers=auth).text,
+        client.get(f"/cases/{case}/card?lang=es").text,
+        client.get(f"/cases/{case}/report", headers=auth).text,
+        client.get(f"/cases/{case}/trace", headers=auth).text,
+    ]
+    assert not [text for text in shown if "fxhidden" in text.lower()]
