@@ -20,6 +20,7 @@ after move-in. Everything is labelled SYNTHETIC; there is no real address, numbe
 import argparse
 import json
 import random
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -76,22 +77,35 @@ MANAGER_TEMPLATE = (
     "Tour with our leasing office. Deposit due at lease signing."
 )
 
-# Payment-first wording. The first three are the shapes the existing money rules know; the
-# rest say the same thing in other words, which a keyword or regex search does not catch.
-ASK_PLAIN = [
-    "The security deposit and first month's rent are due before move-in.",
-    "You will pay the deposit before moving in, then I post the keys to you.",
-    "Zelle the deposit to hold the unit, I cannot show it until it arrives.",
-]
-ASK_REWORDED = [
-    "Kindly remit the holding amount ahead of receiving the keys.",
-    "A reservation sum must reach me before the keys are released; the unit is yours.",
-    "Send the reservation payment first and I will mail the keys and the lease to you.",
-    "To secure it, transfer the first month up front; viewing happens after the keys arrive.",
-    "Upfront reservation funds are needed prior to key handover.",
-    "Forward the booking amount today and the apartment is reserved in your name.",
-    "Your booking amount has to be paid in advance of collecting the keys.",
-]
+# Payment-first wording, one "voice" per ring (an operator keeps its own template and rewords
+# it). Some lines are shapes the existing money rules know ("due before move-in", "Zelle the
+# deposit"); the rest say the same thing in other words, which a keyword search does not catch.
+VOICES = {
+    "A": [
+        "The security deposit and first month's rent are due before move-in.",
+        "You will pay the deposit before moving in, then I post the keys to you.",
+        "Kindly remit the holding amount ahead of receiving the keys.",
+        "Zelle the deposit to hold the unit, I cannot show it until it arrives.",
+    ],
+    "B": [
+        "A reservation sum must reach me before the keys are released; the unit is yours.",
+        "Send the reservation payment first and I will mail the keys and the lease to you.",
+        "The deposit has to be paid before you collect the keys, no exceptions.",
+        "Pay the booking fee ahead of the key handover.",
+    ],
+    "C": [
+        "To secure it, transfer the first month up front; viewing happens after the keys arrive.",
+        "Upfront reservation funds are needed prior to key handover.",
+        "Kindly forward the reservation funds before the viewing.",
+        "Reservation funds go first, the keys follow by post.",
+    ],
+    "D": [
+        "Forward the booking amount today and the apartment is reserved in your name.",
+        "Your booking amount has to be paid in advance of collecting the keys.",
+        "Wire the first month's rent and the home is held for you.",
+        "Booking amount first, keys afterwards.",
+    ],
+}
 PRETEXT = [
     "I am out of town for work, so I can't show it myself.",
     "The owner is out of town and the unit is under new management.",
@@ -136,9 +150,27 @@ def _honest_text(rng: random.Random, beds: int, hood: str) -> str:
     return f"{opener} {rng.choice(HONEST_TERMS)}"
 
 
+_SWAPS = [
+    (r"\bbefore\b", ["ahead of", "prior to"]),
+    (r"\bdeposit\b", ["holding amount", "reservation sum"]),
+    (r"\bpay\b", ["remit", "forward"]),
+    (r"\bsend\b", ["forward", "remit"]),
+    (r"\bthe keys\b", ["the key set", "the keys and the lease"]),
+]
+
+
+def _reword(rng: random.Random, sentence: str) -> str:
+    """Swap a few words for equivalent ones: the operator rewords a template ad by ad."""
+    for pattern, options in _SWAPS:
+        if rng.random() < 0.5:
+            sentence = re.sub(pattern, rng.choice(options), sentence, count=1, flags=re.I)
+    return sentence
+
+
 def _ring_text(
     rng: random.Random, beds: int, hood: str, ask: str, *, pretext: bool, base: str | None
 ) -> str:
+    ask = _reword(rng, ask) if ask else ask
     body = base or rng.choice(HONEST_OPEN).format(**_fill(rng, beds, hood))
     parts = [body, ask]
     if pretext:
@@ -230,7 +262,7 @@ def generate(seed: int = DEFAULT_SEED) -> tuple[dict[str, object], dict[str, obj
         beds = rng.randint(1, 3)
         hood = rng.choice(HOODS)
         photos = [_recrop(rng, p) for p in rng.choice(pool)]
-        ask = rng.choice(ASK_PLAIN if rng.random() < 0.4 else ASK_REWORDED)
+        ask = rng.choice(VOICES["A"])
         day = date(2026, 2, 3) + timedelta(days=int(i * 76 / 21) + rng.randint(0, 2))
         idx = add(
             day,
@@ -248,8 +280,7 @@ def generate(seed: int = DEFAULT_SEED) -> tuple[dict[str, object], dict[str, obj
     b_phones = [phones.new() for _ in range(6)]
     for i, src_idx in enumerate(sources):
         src = rows[src_idx]
-        reworded_ask = rng.random() < 0.75
-        ask = rng.choice(ASK_REWORDED) if reworded_ask else rng.choice(ASK_PLAIN)
+        ask = rng.choice(VOICES["B"])
         if i in (3, 9):  # two copies keep quiet about money: only the evidence links them
             ask = ""
         day = max(
@@ -271,7 +302,6 @@ def generate(seed: int = DEFAULT_SEED) -> tuple[dict[str, object], dict[str, obj
 
     # ---- ring C: reworded text, chained numbers, fresh photos ------------------------------
     c_phones = [phones.new() for _ in range(5)]
-    c_voice = rng.sample(ASK_REWORDED, 4)
     for i in range(12):
         beds = rng.randint(1, 3)
         hood = rng.choice(HOODS)
@@ -279,7 +309,7 @@ def generate(seed: int = DEFAULT_SEED) -> tuple[dict[str, object], dict[str, obj
             date(2026, 4, 6) + timedelta(days=i * 5 + rng.randint(0, 3)),
             beds,
             hood,
-            _ring_text(rng, beds, hood, rng.choice(c_voice), pretext=True, base=None),
+            _ring_text(rng, beds, hood, VOICES["C"][i % 4], pretext=True, base=None),
             _rent(rng, beds, low=True),
             c_phones[i // 3 + (1 if i % 3 == 2 and i // 3 < 4 else 0)],
             [_hash(rng) for _ in range(rng.randint(4, 6))],
@@ -299,7 +329,7 @@ def generate(seed: int = DEFAULT_SEED) -> tuple[dict[str, object], dict[str, obj
                 rng,
                 beds,
                 hood,
-                rng.choice(ASK_REWORDED + ASK_PLAIN[:1]),
+                rng.choice(VOICES["D"]),
                 pretext=rng.random() < 0.6,
                 base=None,
             ),
