@@ -104,3 +104,28 @@ describe("the drawn rooms: real fixtures per room kind", () => {
     }
   });
 });
+
+describe("every CSS variable the walk, evidence, drawing and landing styles use is defined", () => {
+  it("names a token from tokens.css, a local custom property, or carries a fallback", () => {
+    const src = join(__dirname, "..");
+    const tokens = readFileSync(join(src, "styles", "tokens.css"), "utf8");
+    const defined = new Set([...tokens.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+    const files = [
+      "tour/tour.css",
+      "walk/walk.css",
+      "evidence/evidence.css",
+      "draw/draw.css",
+      "landing/landing.css",
+    ];
+    for (const file of files) {
+      const css = readFileSync(join(src, file), "utf8");
+      const local = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+      // Set from inline styles in the components.
+      for (const v of ["--fill", "--mark", "--rs-x", "--rs-y"]) local.add(v);
+      const missing = [...css.matchAll(/var\((--[a-z0-9-]+)(\s*,)?/g)]
+        .filter((m) => !m[2] && !defined.has(m[1]) && !local.has(m[1]))
+        .map((m) => m[1]);
+      expect(missing, file).toEqual([]);
+    }
+  });
+});

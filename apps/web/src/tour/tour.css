@@ -52,7 +52,7 @@
   align-items: center;
   gap: 12px;
   background: var(--v-slate);
-  color: var(--on-v-slate);
+  color: var(--on-v);
   font-weight: 700;
 }
 .tour-mismatch-mark {
@@ -294,7 +294,7 @@
   margin: 0;
   padding: 12px clamp(16px, 2.4vw, 28px);
   background: var(--v-slate);
-  color: var(--on-v-slate);
+  color: var(--on-v);
   font-weight: 700;
 }
 .tour-mode-line {

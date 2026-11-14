@@ -290,8 +290,8 @@
   font-size: 0.92rem;
 }
 .vt-opt[aria-pressed="true"] {
-  background: var(--band);
-  color: var(--band-ink);
+  background: var(--act);
+  color: var(--on-act);
 }
 .vt-opt:disabled {
   color: var(--muted);

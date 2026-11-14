@@ -22,10 +22,12 @@ export interface WalkLook {
   mismatch: Mismatch | null;
 }
 
-// Section 7 copy guards: "the home in these photos", never an address, and no claim that the
-// home can be rented. Lane A's card line replaces this text when X1-card lands.
-export const OFFICE_LINE =
-  "The home in these photos is listed by its office on CoStar's record. We can't tell you whether it can be rented, or at this price.";
+// Section 7 copy guards: never an address, and no claim that the home can be rented. The plan's
+// own mode line (written by code in tour.py) is used when it is set; this is the fallback.
+export const OFFICE_LINE = "We can't tell you if it is offered, or at this price.";
+
+/** The line under the two aerials: the plan's own words when it has them. */
+export const officeLineOf = (plan: TourPlan): string => plan.mode_line || OFFICE_LINE;
 export const MISMATCH_BANNER =
   "You are in the home in the ad's photos. It is not the home the ad names.";
 
@@ -56,7 +58,9 @@ export function walkLook(plan: TourPlan, search: string, live?: WalkLive | null)
       images: live?.images ?? {},
       events: live?.events ?? [],
       // The office line and name come from the card (X1-card, lane A); not wired yet.
-      mismatch: elsewhere ? { officeLine: OFFICE_LINE, officeName: null, banner: null } : null,
+      mismatch: elsewhere
+        ? { officeLine: officeLineOf(plan), officeName: null, banner: null }
+        : null,
     };
   const caseB = elsewhere || new URLSearchParams(search).get("demo") === "b";
   return caseB
@@ -65,7 +69,7 @@ export function walkLook(plan: TourPlan, search: string, live?: WalkLive | null)
         images: {},
         events: RAIL_STUB_B,
         mismatch: {
-          officeLine: OFFICE_LINE,
+          officeLine: officeLineOf(plan),
           officeName: "Fixture Leasing Office",
           banner: elsewhere ? null : MISMATCH_BANNER,
         },

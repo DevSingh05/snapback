@@ -267,6 +267,16 @@ describe("walkLook: what the walk reads", () => {
     expect(elsewhere.mismatch?.banner).toBeNull();
     expect(elsewhere.mismatch?.officeLine).toBe(OFFICE_LINE);
   });
+
+  it("the office line is the plan's own mode line when set, else the exact fallback", () => {
+    expect(OFFICE_LINE).toBe("We can't tell you if it is offered, or at this price.");
+    const line = "The home in these photos is listed by its office on CoStar's record.";
+    for (const source of ["fixture", "live"] as const) {
+      const base = { ...FIXTURE_TOUR, source, mode: "elsewhere" as const };
+      expect(walkLook({ ...base, mode_line: line }, "").mismatch?.officeLine).toBe(line);
+      expect(walkLook({ ...base, mode_line: null }, "").mismatch?.officeLine).toBe(OFFICE_LINE);
+    }
+  });
 });
 
 const IMG = "data:image/png;base64,AA==";
@@ -363,9 +373,12 @@ describe("MismatchAerials: the section 7 copy guards", () => {
     expect(screen.getByTestId("aerial-pictured")).toHaveTextContent(PICTURED_LABEL);
     expect(el).toHaveTextContent(MISMATCH_TITLE);
     expect(screen.getByTestId("office-line")).toHaveTextContent("Fixture Leasing Office");
-    expect(screen.getByTestId("aerial-named")).toHaveTextContent(
-      "Vexcel aerial, captured 2025-03-02",
-    );
+    // A drawn tile is never captioned as an aerial photo, even when a date is known.
+    for (const which of ["named", "pictured"])
+      expect(screen.getByTestId(`aerial-${which}-caption`)).toHaveTextContent(
+        "Drawn stand-in, not an aerial photo",
+      );
+    expect(el).not.toHaveTextContent("Vexcel aerial, captured");
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     expect(screen.getAllByText("Drawn stand-in (fixture)")).toHaveLength(2);
   });
@@ -390,5 +403,23 @@ describe("MismatchAerials: the section 7 copy guards", () => {
     );
     expect(screen.getAllByRole("img")).toHaveLength(2);
     expect(screen.queryByText("Drawn stand-in (fixture)")).toBeNull();
+    // Each pane carries only its own date: none is borrowed from the other.
+    expect(screen.getByTestId("aerial-named-caption")).toHaveTextContent("Vexcel aerial");
+    expect(screen.getByTestId("aerial-named-caption")).not.toHaveTextContent("captured");
+  });
+
+  it("captions a real tile with its own capture date", () => {
+    render(
+      <MismatchAerials
+        named={{ src: "data:image/png;base64,AA==", capturedOn: "2025-03-02" }}
+        pictured={{ src: "data:image/png;base64,AA==" }}
+        source="live"
+        officeLine={OFFICE_LINE}
+      />,
+    );
+    expect(screen.getByTestId("aerial-named-caption")).toHaveTextContent(
+      "Vexcel aerial, captured 2025-03-02",
+    );
+    expect(screen.getByTestId("aerial-pictured-caption")).not.toHaveTextContent("captured");
   });
 });

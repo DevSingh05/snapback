@@ -275,7 +275,6 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
               }}
               pictured={{
                 src: aerial.status === "ready" ? aerial.matched?.imageUrl : null,
-                capturedOn: plan.aerial?.captured_on,
               }}
               source={plan.source}
               officeLine={look.mismatch.officeLine}

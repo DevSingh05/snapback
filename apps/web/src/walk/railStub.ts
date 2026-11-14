@@ -59,7 +59,7 @@ export const RAIL_STUB_B: TraceEvent[] = build("fx-demo-b", [
     "model",
     ["wider_index", "deeper_claimed", "stop"],
   ],
-  ["unsure", null, "Another building matched far more strongly, so this photo was not placed."],
+  ["unsure", null, "P1 was placed in another building, where it matched far more strongly."],
   ["file", "/evidence/photos.json", ""],
   ["agent", "walk", "The walk opens in the building where the photo was taken."],
   ["file", "/evidence/walk.json", ""],

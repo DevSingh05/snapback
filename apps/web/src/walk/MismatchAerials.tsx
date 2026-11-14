@@ -54,8 +54,12 @@ function Pane({
           </>
         )}
       </div>
-      <p className="ma-date mono">
-        {pane.capturedOn ? `Vexcel aerial, captured ${pane.capturedOn}` : "Vexcel aerial"}
+      <p className="ma-date mono" data-testid={`aerial-${which}-caption`}>
+        {pane.src
+          ? pane.capturedOn
+            ? `Vexcel aerial, captured ${pane.capturedOn}`
+            : "Vexcel aerial"
+          : "Drawn stand-in, not an aerial photo"}
       </p>
     </figure>
   );
