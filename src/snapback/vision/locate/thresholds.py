@@ -19,6 +19,7 @@ class Thresholds:
     elsewhere_min_inliers: int
     elsewhere_min_spread: float
     ambiguity_ratio: float
+    claimed_min_spread: float
     default_hfov_deg: float
     spots_top_n: int
     spots_overlap_deg: float
@@ -31,6 +32,8 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
     verify_cfg = data["verify"]
     if verify_cfg["elsewhere_min_inliers"] < verify_cfg["min_inliers"]:
         raise ValueError("elsewhere_min_inliers must not be below min_inliers")
+    if not 0.0 <= verify_cfg["claimed_min_spread"] <= verify_cfg["elsewhere_min_spread"]:
+        raise ValueError("claimed_min_spread must be between 0 and elsewhere_min_spread")
     if verify_cfg["ambiguity_ratio"] <= 1.0:
         raise ValueError("ambiguity_ratio must be greater than 1.0")
     return Thresholds(
@@ -43,6 +46,7 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
         elsewhere_min_inliers=data["verify"]["elsewhere_min_inliers"],
         elsewhere_min_spread=data["verify"]["elsewhere_min_spread"],
         ambiguity_ratio=data["verify"]["ambiguity_ratio"],
+        claimed_min_spread=data["verify"]["claimed_min_spread"],
         default_hfov_deg=data["pose"]["default_hfov_deg"],
         spots_top_n=data["spots"]["top_n"],
         spots_overlap_deg=data["spots"]["overlap_deg"],
