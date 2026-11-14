@@ -63,7 +63,7 @@ describe("TourView in fixture mode (no SDK)", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
     expect(title()).toBe("Kitchen");
     expect(screen.getByRole("button", { name: "Kitchen" })).toHaveAttribute("aria-current", "step");
-    expect(screen.getByText(/Your ad photo photo-1 was placed in this room/)).toBeInTheDocument();
+    expect(screen.getByText("The photo you sent, taken here.")).toBeInTheDocument();
     expect(screen.getByText(/automatic labels/)).toBeInTheDocument();
   });
 
@@ -176,5 +176,13 @@ describe("links to the tour", () => {
       "href",
       "/tour/fx-prop-1?case=fx-7Q2M",
     );
+  });
+});
+
+describe("link to where the photos were taken", () => {
+  it("the twin page offers it only when a photo was verified in another building", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} demo="copied" />);
+    const link = screen.getByTestId("where-photos-link");
+    expect(link.getAttribute("href")).toMatch(/^\/tour\/.+\?case=fx-7Q2M&where=photos$/);
   });
 });

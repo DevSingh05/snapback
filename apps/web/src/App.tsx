@@ -63,6 +63,10 @@ export default function App() {
             propertyId: route.propertyId,
             planKey: new URLSearchParams(window.location.search).get("plan_key"),
             caseId: new URLSearchParams(window.location.search).get("case"),
+            mode:
+              new URLSearchParams(window.location.search).get("where") === "photos"
+                ? "elsewhere"
+                : "claimed",
           }}
         />
       ) : route.name === "trace" ? (
