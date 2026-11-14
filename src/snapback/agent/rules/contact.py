@@ -120,7 +120,9 @@ def check_phone(phones: Sequence[str], record: PropertyRecord | None, salt: str)
     listed = {phone_hash(number, salt) for number in phones[:MAX_PHONES]} - {None}
     if not on_record or not listed:
         return PhoneMatch.NOT_CHECKED
-    return PhoneMatch.YES if on_record in listed else PhoneMatch.NO
+    # Every number in the ad must be the office's: one matching number among others is not
+    # the office itself advertising (review round 1, H).
+    return PhoneMatch.YES if listed == {on_record} else PhoneMatch.NO
 
 
 # --- company -------------------------------------------------------------------------------

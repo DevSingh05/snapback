@@ -31,7 +31,11 @@ from snapback.verdict import REASON_ORDER, build_card, decide, to_evidence
 
 CONTRACTS = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 CHECKED_AT = datetime.fromisoformat("2026-11-13T21:42:00-05:00")
-MATCHES = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+MATCHES = {
+    "status": "matches_record",
+    "manager_on_record": "Fixture Living LLC",
+    "office_phone_match": "yes",
+}
 COMPANY = OwnerResult(kind=OwnerKind.COMPANY, company="Fixture Homes LLC")
 PERSON = OwnerResult(kind=OwnerKind.PERSON)
 FX_RULES = (
@@ -141,6 +145,8 @@ def test_a_near_miss_spelling_of_the_company_is_not_checked_and_never_held():
     # "LLC", "Inc" and punctuation are ignored, and a shorter form that starts the same matches.
     assert company_match("Fixture Homes, L.L.C.", "FIXTURE HOMES LLC") is OwnerMatch.YES
     assert company_match("Fixture", "Fixture Homes LLC") is OwnerMatch.YES
+    assert company_match("FixtureHomes", "Fixture Homes LLC") is OwnerMatch.YES
+    assert company_match("Fixture Homes", "FixtureHomes, Inc.") is OwnerMatch.YES
     assert company_match("Fixure Homes", "Fixture Homes LLC") is OwnerMatch.NOT_CHECKED
     assert company_match("Other Fixture Rentals", "Fixture Homes LLC") is OwnerMatch.NO
     assert company_match(None, "Fixture Homes LLC") is OwnerMatch.NOT_CHECKED
@@ -150,6 +156,7 @@ def test_a_company_owner_is_named_for_a_poster_who_claims_nothing():
     # An agent or a manager posting a company's home: the card says who owns it, and holds
     # nothing on that account.
     found = check_owner(ContactClaims(), COMPANY, rules=())
+    assert found.poster_matches is OwnerMatch.NOT_CHECKED
     assert owner_line(passing(found)) == (
         CardTone.NOT_SHOWN,
         "Not confirmed. Owner of record: Fixture Homes LLC.",
@@ -198,6 +205,21 @@ def test_a_company_field_on_a_person_owner_is_never_shown():
     assert found.company is None
     said = build_card(passing(found), checked_at=CHECKED_AT).model_dump_json()
     assert "Fx Person" not in said
+
+
+@pytest.mark.parametrize("company", [None, "", "   "])
+def test_a_company_owner_with_no_name_is_not_checked_and_does_not_hold(company):
+    nameless = OwnerResult(kind=OwnerKind.COMPANY, company=company)
+    found = check_owner(SAYS_OWNER, nameless, rules=FX_RULES)
+    assert found.poster_matches is OwnerMatch.NOT_CHECKED
+    assert found.published_rule is None
+
+
+def test_a_person_owner_loses_any_company_even_with_no_claims_to_compare():
+    from snapback.agent.modules import FixtureModules
+
+    odd = OwnerResult(kind=OwnerKind.PERSON, company="Fx Person")
+    assert FixtureModules(owner=odd).owner("c").company is None
 
 
 def test_a_person_owner_who_does_not_match_holds_a_poster_who_says_they_own_it():
@@ -408,6 +430,8 @@ def test_every_owner_line_follows_the_wording_rules_in_both_languages(claims, ow
         "Renting out my home while I work abroad.",
         "Owner here. Available now.",
         "I own this property.",
+        "I'm the property owner.",
+        "I am  the owner of this house.",
     ],
 )
 def test_a_poster_who_says_they_own_it_is_heard(text):
@@ -427,6 +451,21 @@ def test_a_poster_who_says_they_own_it_is_heard(text):
         "Managed by Fixture Living LLC.",
         "Feels like home. Make it your home today.",
         "Owner financing available on the sale.",
+        "For Rent By Owner Realty",
+        "Managed by Owner Direct Properties",
+        "Sold by owner last year",
+        "The owner here pays all utilities",
+        "Pet owner here?",
+        "I'm the leasing agent. The owner here is Invitation Homes",
+        "We are the owners' agents",
+        "homeowners association",
+        "This is not my house",
+        "like it's my home",
+        "Sold by owner in 2019.",
+        "It was for rent by owner last year.",
+        "Previous owner here, new management now.",
+        "FORMER OWNER HERE",
+        "Former owner of the house",
     ],
 )
 def test_other_mentions_of_an_owner_are_not_a_claim(text):

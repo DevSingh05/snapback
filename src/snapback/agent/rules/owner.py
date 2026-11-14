@@ -60,7 +60,9 @@ def company_match(said: str | None, on_record: str | None) -> OwnerMatch:
     same = same_company(said, on_record)
     if same is None:
         return OwnerMatch.NOT_CHECKED
-    if same:
+    ours, theirs = _joined(said or ""), _joined(on_record or "")
+    # "FixtureHomes" and "Fixture Homes" are one name written two ways.
+    if same or (ours and ours == theirs):
         return OwnerMatch.YES
     return OwnerMatch.NOT_CHECKED if _near_miss(said or "", on_record or "") else OwnerMatch.NO
 
@@ -99,6 +101,16 @@ def check_owner(
         # kept here: a `company` on a person owner is dropped, and no table is consulted.
         return owner.model_copy(
             update={"company": None, "poster_says_owner": says_owner, "published_rule": None}
+        )
+
+    if not " ".join((owner.company or "").split()):
+        # A company owner with no name to show: nothing was compared, so no line and no rule.
+        return owner.model_copy(
+            update={
+                "poster_matches": OwnerMatch.NOT_CHECKED,
+                "poster_says_owner": says_owner,
+                "published_rule": None,
+            }
         )
 
     matches = company_match(claims.company, owner.company)

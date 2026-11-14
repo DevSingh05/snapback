@@ -51,6 +51,7 @@ from snapback.api.cases import (
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
+from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.contracts import (
     AerialProofResponse,
@@ -61,6 +62,7 @@ from snapback.contracts import (
     Evidence,
     LocateStatus,
     ReplyResponse,
+    ReportResponse,
     Verdict,
 )
 from snapback.safety.paths import resolve_data_dir
@@ -507,6 +509,41 @@ def create_app(
             content=content,
             media_type="image/jpeg",
             headers={"Cache-Control": "private, max-age=600"},
+        )
+
+    @app.get("/cases/{case_id}/report")
+    def get_report(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> ReportResponse:
+        """The "Report this copy" pack (A20): what a listing agent takes to the platform.
+
+        The home's own record, the reasons the check gave, which photos were matched, and
+        where to click on Facebook Marketplace, Zillow and Craigslist. Listing facts only: no
+        score, no hash, no image bytes, nothing about the renter, no word about a person.
+        Report steps are given only on proof or a record that shows the home for sale.
+
+        Needs the case's read token in a header. A token in the address is refused with 401
+        even beside a good header: addresses are what servers log. 404 for an unknown case.
+        """
+        case = find(case_id)
+        if "token" in request.query_params:
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "Send the case's read token in the Authorization header, not in the address."
+                ),
+            )
+        check_read(case, _bearer(authorization, x_case_token), None)
+        return build_report(
+            case.evidence,
+            case.card(settings.snapback_public_base_url, lang),
+            case_id=case_id,
+            lang=lang,
+            aerial=case.property_id is not None,
         )
 
     @app.get("/cases/{case_id}/trace")

@@ -42,7 +42,9 @@ def from_the_string_table(text: str) -> bool:
 
 
 def test_there_are_three_cases_each_with_every_file():
-    assert demo_case_ids() == ["a", "b", "c"]
+    # the staged pack is exactly a, b, c; sourced replays (D8, #71) sit beside it as replay-*,
+    # as the pack's README says, and must be just as complete
+    assert [c for c in demo_case_ids() if not c.startswith("replay-")] == ["a", "b", "c"]
     for case_id in demo_case_ids():
         folder = DEMO_DIR / case_id
         for name in ("case.json", "listing.txt", "module_evidence.json", "property_record.json"):
@@ -158,7 +160,7 @@ def test_cases_a_and_b_are_the_same_listing():
 
 def test_case_c_is_held_because_the_house_is_for_sale():
     verdict, card = run_demo_case("c")
-    # For sale is a red flag, not proof, so this is never "don't pay". It outranks "could not
+    # For sale is a warning, not proof, so this is never "don't pay". It outranks "could not
     # place" (conductor ruling, Sat 02:00): there is no 3D scan of the house to place photos in.
     assert verdict.state is VerdictState.HOLD
     assert verdict.reasons == [
@@ -167,9 +169,12 @@ def test_case_c_is_held_because_the_house_is_for_sale():
     ]
     place = lines(card, CardRowKind.PLACE)
     assert place["Real"] == (CardTone.NOT_CHECKED, strings.text("place.not_indexed"))
+    # Red team H5: what the record says, who to ask, and never "not for rent".
     assert place["For sale"] == (
-        CardTone.RED_FLAG,
-        "This home is listed for sale on Homes.com, not for rent. Red flag.",
+        CardTone.HOLD,
+        "Listed for sale on Homes.com by Fixture Realty Group since 2026-10-02. Homes for "
+        "sale are sometimes also offered for lease, so confirm with that brokerage before "
+        "you pay.",
     )
     assert lines(card, CardRowKind.PERSON)["Here now"][0] is CardTone.NOT_CHECKED
 
@@ -353,4 +358,4 @@ def test_photos_of_a_building_with_no_scan_are_not_reported_as_no_photos():
 
 def test_the_demo_folder_holds_only_the_pack():
     names = {path.name for path in Path(DEMO_DIR).iterdir()}
-    assert names == {"README.md", "a", "b", "c"}
+    assert {n for n in names if not n.startswith("replay-")} == {"README.md", "a", "b", "c"}

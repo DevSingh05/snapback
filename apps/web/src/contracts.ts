@@ -29,6 +29,7 @@ export interface ForSaleMatch {
   site: string;
   listed_on?: string | null; // ISO date
   changed_on?: string | null;
+  offices?: string[]; // listing offices on record: brokerage companies, never a person
 }
 
 export interface FloorPlanRent {
@@ -56,47 +57,6 @@ export interface AuthorityResult {
   poster_said?: string | null;
   office_phone_match: PhoneMatch;
   link_domain: LinkDomain;
-}
-
-// D10 (#128): the poster's claimed real estate license, looked up in the Texas list. Never a
-// person's name and never a license number.
-export type LicenseStatus = "licensed" | "not_found" | "not_checked";
-
-export interface LicenseResult {
-  status: LicenseStatus;
-  claimed_role?: string | null; // agent, broker, locator or company; never shown as typed
-  sponsor_broker?: string | null; // a company name only
-  state?: string;
-}
-
-// D12 (#130) + A19 (#125): the owner of record of the home, and how the poster compares. A
-// company is named; a person never is.
-export type OwnerKind = "company" | "person";
-export type OwnerMatch = "yes" | "no" | "not_checked";
-
-export interface PublishedRule {
-  company: string; // the company, as it names itself
-  rule: string; // its own words, quoted
-  source_url: string;
-  checked_on: string; // the day it was read at the source, YYYY-MM-DD
-}
-
-export interface OwnerResult {
-  kind: OwnerKind;
-  company?: string | null; // company owners only; never a person's name
-  poster_matches: OwnerMatch;
-  poster_says_owner: boolean;
-  published_rule?: PublishedRule | null; // the owner's own rule, when one is verified
-}
-
-// Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
-// Used when the card API has not already put these lines in `rows`.
-export interface CardProofs {
-  price?: PriceResult | null;
-  authority?: AuthorityResult | null;
-  license?: LicenseResult | null; // D10; null or missing means not looked up
-  owner?: OwnerResult | null; // D12 + A19; null or missing means no owner data
-  unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
 }
 
 export interface Card {
@@ -138,18 +98,43 @@ export interface Pose {
   fov_deg?: number | null;
 }
 
+// Mirrors LocateStatus (contracts.py).
+export type LocateStatus =
+  "located_in_claimed" | "located_elsewhere" | "not_located" | "not_indexed";
+
+// Mirrors PhotoLocation.
 export interface LocatedPhoto {
   photo_id: string;
-  status: string;
+  status: LocateStatus;
   model_id?: string | null;
   pano_id?: string | null;
   inliers?: number | null;
+  inlier_ratio?: number | null;
+  // The twin the photo was placed in, claimed or not; for located_elsewhere these name the OTHER building.
+  matched_model_id?: string | null;
+  matched_property_id?: string | null;
+  room_label?: string | null; // Matterport's room classification, e.g. "Kitchen"
+}
+
+// Mirrors FloorPlanCandidate.
+export interface FloorPlanCandidate {
+  property_id: string;
+  model_id: string;
+  floor_plan?: string | null;
+  photos_located: number;
+  total_inliers: number;
 }
 
 export interface LocateResult {
   case_id: string;
   photos: LocatedPhoto[];
-  poses: Record<string, Pose>;
+  claimed_property_id?: string | null;
+  identified_by_scan?: boolean;
+  identified_photos?: number;
+  chosen?: FloorPlanCandidate | null;
+  alternatives?: FloorPlanCandidate[];
+  poses: Record<string, Pose>; // photo_id -> pose, located photos only
+  thresholds_version: string;
 }
 
 // Mirrors PropertyRecord and AerialTile in src/snapback/contracts.py.

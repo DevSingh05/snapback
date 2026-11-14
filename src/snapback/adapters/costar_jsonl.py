@@ -42,8 +42,7 @@ MARKETS = {14: "Houston", 20: "Los Angeles"}
 # Candidate key paths per output field, first present wins. Dotted paths walk nested objects.
 FIELDS: dict[str, list[str]] = {
     "property_id": ["propertyId", "id"],
-    "floors": ["numberOfStories", "stories", "buildingStories", "floors"],
-    "year_built": ["yearBuilt", "builtYear"],
+    "floors": ["numStoriesAboveGrade"],  # real kit key, 3,327 records (#152)
     "lat": ["primaryAddress.latitude", "location.latitude", "latitude"],
     "lon": ["primaryAddress.longitude", "location.longitude", "longitude"],
     "market_name": ["primaryAddress.researchMarketName", "researchMarketName"],
@@ -69,15 +68,15 @@ LISTING_FIELDS: dict[str, list[str]] = {
     "rent_pricing": ["rentPricingType"],
 }
 MODEL_FIELDS: dict[str, list[str]] = {
-    "beds": ["beds", "bedrooms", "bedroomCount"],
-    "baths": ["baths", "bathrooms", "bathroomCount"],
+    "beds": ["numBeds"],  # real kit keys on models and units (#152)
+    "baths": ["numBaths"],
     "rent_min": ["minRent"],
     "rent_max": ["maxRent"],
     "rent_pricing": ["rentPricingType"],
 }
 UNIT_FIELDS: dict[str, list[str]] = {
     "unit": ["unitNumber", "unit", "name"],
-    "beds": ["beds", "bedrooms", "bedroomCount"],
+    "beds": ["numBeds"],
     "floor_plan": ["floorPlanName", "floorPlan", "modelName"],
 }
 ENUMS_FILE = "enums.json"
@@ -266,18 +265,34 @@ def _property_units(record: dict[str, Any]) -> list[UnitOnRecord]:
     for model in _get(record, "propertyApartment.models") or []:
         if not isinstance(model, dict):
             continue
-        beds = _as_float(_get_any(model, MODEL_FIELDS["beds"]))
+        model_beds = _as_float(_get_any(model, MODEL_FIELDS["beds"]))
         plan = _floor_plan(model)
         for u in model.get("units") or []:
             name = _first(u, UNIT_FIELDS["unit"]) if isinstance(u, dict) else None
             if name is None:
                 continue
+            # the unit's own beds first: 1,384 kit units differ from their model (#156 review)
+            own = _as_float(_get_any(u, UNIT_FIELDS["beds"]))
+            beds = own if own is not None else model_beds
             out.append(
                 UnitOnRecord(
                     unit=str(name), beds=int(beds) if beds is not None else None, floor_plan=plan
                 )
             )
     return out
+
+
+CONSTRUCTION_COMPLETE = 2  # constructionEvents[].eventType (#156 review)
+
+
+def _year_built(record: dict[str, Any]) -> int | None:
+    """The earliest ConstructionComplete year in `constructionEvents[]` (3,329 kit records)."""
+    years = [
+        _as_int(e.get("year"))
+        for e in record.get("constructionEvents") or []
+        if isinstance(e, dict) and e.get("eventType") == CONSTRUCTION_COMPLETE
+    ]
+    return min((y for y in years if y), default=None)
 
 
 def _units(listing: dict[str, Any]) -> list[UnitOnRecord]:
@@ -310,6 +325,8 @@ def _apply_listing(
 
     company = _first(listing, LISTING_FIELDS["manager_company"])
     fields["manager_company"] = str(company) if company is not None else None
+    if fields.get("year_built") is None:  # no construction event: the listing's year (1,746)
+        fields["year_built"] = _as_int(listing.get("yearBuilt"))
 
     listing_per_bed = _per_bed(_first(listing, LISTING_FIELDS["rent_pricing"]), enums)
     bands = _floor_plan_rents(models, listing_per_bed, enums)
@@ -353,7 +370,7 @@ def parse_record(
         "market": market,
         "property_type": PROPERTY_TYPES.get(ptype, f"type {ptype}") if ptype else None,
         "floors": _as_int(_first(record, FIELDS["floors"])),
-        "year_built": _as_int(_first(record, FIELDS["year_built"])),
+        "year_built": _year_built(record),
         "lat": _as_float(_get_any(record, FIELDS["lat"])),
         "lon": _as_float(_get_any(record, FIELDS["lon"])),
         "model_ids": _model_ids(record),
@@ -403,10 +420,22 @@ def coverage(kit_dir: Path) -> dict[str, Any]:
     if path is None:
         raise KitNotFoundError(f"{PROPERTY_FILE} is not under {kit_dir}")
     fields = {name: dict.fromkeys(paths, 0) for name, paths in FIELDS.items()}
-    records = with_models = 0
+    records = with_models = year_events = 0
+    model_fields = dict.fromkeys(["numBeds", "numBaths", "units"], 0)
+    unit_fields = dict.fromkeys(["unitNumber", "numBeds"], 0)
     for obj in _iter_jsonl(path):
         records += 1
         with_models += bool(_model_ids(obj))
+        year_events += _year_built(obj) is not None
+        for model in _get(obj, "propertyApartment.models") or []:
+            if not isinstance(model, dict):
+                continue
+            for key in model_fields:
+                model_fields[key] += model.get(key) is not None
+            for unit in model.get("units") or []:
+                if isinstance(unit, dict):
+                    for key in unit_fields:
+                        unit_fields[key] += unit.get(key) is not None
         for name, paths in FIELDS.items():
             for p in paths:
                 fields[name][p] += _present(_get(obj, p))
@@ -429,6 +458,9 @@ def coverage(kit_dir: Path) -> dict[str, Any]:
                     pricing[str(code)] = pricing.get(str(code), 0) + 1
     return {
         "rent_pricing_codes": pricing,
+        "year_built_events": year_events,
+        "model_fields": model_fields,  # propertyApartment.models[]
+        "unit_fields": unit_fields,  # propertyApartment.models[].units[]
         "records": records,
         "records_with_model_ids": with_models,
         "fields": fields,

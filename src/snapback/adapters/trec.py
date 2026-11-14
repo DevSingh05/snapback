@@ -5,34 +5,39 @@ names were read from the source (`$limit=1`), not guessed. Every lookup has one 
 the whole call (headers included), and any failure is NOT_CHECKED.
 
 NOT_FOUND turns into a red flag against a person, and flagging a real agent is the one outcome we
-cannot ship. So NOT_FOUND is rare by design (ruling on #134, 02:50). It needs ALL of:
-  (a) an explicit, well-formed claim: "I'm / My name is <First Last>, a licensed agent" (realtor,
-      broker or locator), or a "<First Last>, Realtor" signature with a separator;
-  (b) a name of exactly two tokens, neither a company word nor a particle;
-  (c) zero ACTIVE licensees with that last name, and zero active ones whose last name ends with
-      it (a compound surname such as "De La X").
-Anyone active sharing the last name, a looser claim, a longer name, more than 25 rows, or any
-failure is NOT_CHECKED. LICENSED needs an active licensee with that last name and a compatible
-first name (exact, initial, nickname, middle name); the sponsor is named only when exactly one
-person fits and the sponsor is a company.
+cannot ship. Four review rounds showed no name lookup can rule a person out (family name first,
+surnames in middle_name, O'/Mc spellings, maiden names). So, by the ruling on #134 (04:24), a
+NAME never gives NOT_FOUND: it gives LICENSED (supporting) or NOT_CHECKED.
 
-A brokerage the poster names ("listed by Fxample Realty") is looked up among Broker Company
-licenses: an active exact match is LICENSED, zero rows on the name's prefix is NOT_FOUND, and
-anything in between is NOT_CHECKED.
+  - LICENSED: an active licensee whose exact last name and a compatible first name (exact,
+    initial, nickname, middle name) match, or whose full name contains every part of the claimed
+    name, in any order. The sponsor is named only when the fitting rows have exactly one
+    distinct Broker Company sponsor. Anything looser is NOT_CHECKED.
+  - A TREC license number the ad itself gives (6 or 7 digits after "TREC", "license" or "lic.")
+    is looked up by `license_number`, leading zeros stripped (ads write 0123456, TREC stores
+    123456-SA). No row, or only clearly ended ones (inactive, expired, revoked...): NOT_FOUND.
+    An unknown status such as Military: NOT_CHECKED. Active, and the claimed last name (or
+    every claimed token) is in the row's name: LICENSED.
+    Active under any other name: NOT_CHECKED, final, with no fall-through to a name lookup
+    (ruling 04:42). A number counts only next to "TREC" or a real-estate role word,
+    never next to MLS, business, insurance or driver.
+    TREC stores "123456-SA", "234567-B" and "3456789-BB".
+  - A brokerage the poster names ("listed by Fxample Realty") is looked up among Broker Company
+    licenses: an active exact match is LICENSED, anything else NOT_CHECKED.
 
 Never kept anywhere (result, cache, trace, log): a license number or any person's name. The cache
-under `data/trec/` is keyed by a hash of the query and holds only the answer; NOT_FOUND answers
-expire after 24 h.
+under `data/trec/` is keyed by a hash of the name or company and holds only the answer; only
+LICENSED is cached (never NOT_CHECKED), and a license-number lookup is never cached.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,21 +47,25 @@ from snapback.contracts import LicenseResult, LicenseStatus
 from snapback.safety.paths import resolve_data_dir
 from snapback.settings import get_settings
 
+# httpx logs the full request URL at INFO, and the URL carries the last name being looked up
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 TREC_URL = "https://data.texas.gov/resource/s7ft-44qi.json"
 TIMEOUT_S = 5.0
 MAX_TEXT = 2_000  # the claim is in the poster's message, not in a 2 MB paste
 MAX_ROWS = 25
 MAX_BODY_BYTES = 2 * 1024 * 1024  # 26 rows are a few KB
 READ_SLICE_S = 2.0
-NOT_FOUND_TTL_S = 24 * 3600
 _monotonic = time.monotonic  # replaced in tests
-_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="trec")
 
 _SP = r"[ \t]+"  # spaces and tabs only: a name never runs across a line break
 _TOKEN = r"[A-Z][A-Za-z'\-]{1,30}"
 _FIRST = r"[A-Z](?:[A-Za-z'\-]{1,30}|\.)"  # a first name may be an initial: "F."
 _NAME = r"(" + _FIRST + r")" + _SP + r"(" + _TOKEN + r")"
-_ROLE = r"(?i:(?:licensed[ \t]+)?(?:real[ \t]+estate[ \t]+)?(agent|realtor|broker|locator))\b"
+_ROLE = (
+    r"(?i:(?:licensed[ \t]+)?(?:real[ \t]+estate[ \t]+)?(agent|realtor|broker|locator))\b"
+    r"(?!['\u2019]s\b)"  # "the agent's assistant" is not a claim
+)
 _ARTICLE = r"(?i:(?:a|an|the|your)[ \t]+)"
 # a role word only counts after a separator or an article ("Email Listing Agent" is not a claim)
 _SEP = (
@@ -98,6 +107,18 @@ _COMPANY = re.compile(
     r"([A-Z][\w&'\-]*(?:[ \t]+(?:[A-Z&][\w&'\-]*|of|and)){0,6})"
 )
 
+# "TREC license # 860257-SA", "Lic. 0123456": the digits only, never an MLS or unit "#"
+_LIC_NUMBER = re.compile(
+    r"(?i:\btrec\b|\blic(?:ense|ence)?\b)"
+    r"(?:[ \t#:.\-]|\b(?:trec|licen[sc]e|lic|number|num|no|is)\b)*?"  # only license-ish filler
+    r"\b([0-9]{6,7})\b(?![ \t]*(?:sq|sf|ft|square))",  # not "555012 sq ft"
+    re.IGNORECASE,
+)
+_NOT_TREC = re.compile(
+    r"(?i:driver|plate|vehicle|permit|marriage|insurance|business|\bmls\b|\bid\b)"
+)
+_ROLE_WORD = re.compile(r"(?i:\b(?:agent|broker|realtor|real[ \t]+estate|salesperson)\b)")
+
 # Words that start labels and slogans, never a person's name
 _STOPWORDS = {
     "REAL", "ESTATE", "APARTMENT", "APARTMENTS", "LICENSED", "YOUR", "OUR", "PLEASE",
@@ -116,6 +137,7 @@ _COMPANY_WORDS = {
 }  # fmt: skip
 _PARTICLES = {"DE", "LA", "DEL", "DELA", "DI", "DA", "DOS", "DAS", "VAN", "VON", "LE", "ST", "MAC"}
 _COMPANY_SUFFIXES = {"LLC", "INC", "LP", "LLP", "CO", "LTD", "PLLC", "CORP", "COMPANY"}
+_SUFFIXES = {"JR", "SR", "II", "III", "IV"}
 _ROLE_OF = {"realtor": "agent", "agent": "agent", "broker": "broker", "locator": "locator"}
 _NICKNAMES = [
     {"MICHAEL", "MIKE", "MICKEY"},
@@ -161,7 +183,7 @@ class Claim:
     first: str | None = None
     last: str | None = None
     company: str | None = None
-    strict: bool = False  # only a strict claim can end NOT_FOUND
+    strict: bool = False  # an explicit, well-formed claim (informational; no name gives NOT_FOUND)
 
 
 def _is_person(first: str, last: str) -> bool:
@@ -217,6 +239,24 @@ def detect_claim(text: str) -> Claim | None:
 def _active(status: str) -> bool:
     s = status.strip()
     return s == "Active" or s.endswith("- Active")
+
+
+_ENDED = (
+    "inactive",
+    "expired",
+    "revoked",
+    "deceased",
+    "closed",
+    "cancelled",
+    "canceled",
+    "suspended",
+)
+
+
+def _ended(status: str) -> bool:
+    """A status that clearly says the license is over (never one that might be active)."""
+    low = status.lower()
+    return not _active(status) and any(word in low for word in _ENDED)
 
 
 def _first_names(name: str) -> set[str]:
@@ -276,54 +316,110 @@ def _read_rows(where: str, client: httpx.Client, deadline: float) -> list[dict] 
 
 
 def _get_rows(where: str, client: httpx.Client, deadline: float) -> list[dict] | None:
-    """One query, on a worker thread, waited for only until the shared deadline: slow headers
-    are bounded too, since httpx timeouts apply per phase."""
+    """One query on its own daemon thread, waited for only until the shared deadline: slow
+    headers are bounded too, since httpx timeouts apply per phase. A stuck query is abandoned
+    (it ends on its own read timeout) and never holds a slot the next query needs."""
     remaining = deadline - _monotonic()
     if remaining <= 0:
         return None
-    future = _POOL.submit(_read_rows, where, client, deadline)
-    try:
-        return future.result(timeout=remaining)
-    except (FuturesTimeout, httpx.HTTPError, ValueError):
-        return None
+    box: list[list[dict] | None] = []
+
+    def work() -> None:
+        try:
+            box.append(_read_rows(where, client, deadline))
+        except (httpx.HTTPError, ValueError):
+            box.append(None)
+
+    worker = threading.Thread(target=work, name="trec", daemon=True)
+    worker.start()
+    worker.join(timeout=remaining)
+    return box[0] if box else None
 
 
 Answer = tuple[LicenseStatus, str | None]
 _NOT_CHECKED: Answer = (LicenseStatus.NOT_CHECKED, None)
 
 
+def _tokens(*names: str) -> set[str]:
+    """Upper-case words of a name, split on anything that is not a letter or digit (so
+    "O'Brien" gives O and BRIEN), without Jr/Sr/II/III/IV."""
+    words = (w for name in names for w in re.findall(r"[A-Z0-9]+", name.upper()))
+    return {w for w in words if w not in _SUFFIXES}
+
+
+def _licensed(fits: list[dict]) -> Answer:
+    sponsors = {
+        str(row["related_license_full_name"]).strip()
+        for row in fits
+        if row.get("related_license_type") == "Broker Company"
+        and row.get("related_license_full_name")
+    }
+    # name a sponsor only when the fitting rows agree on exactly one brokerage
+    return LicenseStatus.LICENSED, (next(iter(sponsors)) if len(sponsors) == 1 else None)
+
+
 def _lookup_person(claim: Claim, client: httpx.Client, deadline: float) -> Answer:
+    """LICENSED or NOT_CHECKED, never NOT_FOUND: no name lookup can rule a person out."""
     first, last = claim.first or "", claim.last or ""
     rows = _get_rows(f"upper(last_name)='{_soql(last)}'", client, deadline)
     if rows is None or len(rows) > MAX_ROWS:
         return _NOT_CHECKED  # failed, or too common a name to say
-    active = [row for row in rows if _active(str(row.get("status", "")))]
-    fits = [row for row in active if _compatible(first, row)]
+    fits = [r for r in rows if _active(str(r.get("status", ""))) and _compatible(first, r)]
     if fits:
-        people = {
-            (str(r.get("first_name", "")).upper(), str(r.get("middle_name", "")).upper())
-            for r in fits
-        }
-        if len(people) > 1:
-            return LicenseStatus.LICENSED, None  # several people fit: name no sponsor
-        sponsor = next(
-            (
-                str(row["related_license_full_name"]).strip()
-                for row in fits
-                if row.get("related_license_type") == "Broker Company"
-                and row.get("related_license_full_name")
-            ),
-            None,
-        )
-        return LicenseStatus.LICENSED, sponsor
-    if not claim.strict or active:
-        return _NOT_CHECKED  # someone active shares the name, or the claim is not explicit
-    compound = _get_rows(f"upper(last_name) like '% {_soql(last)}'", client, deadline)
-    if compound is None or len(compound) > MAX_ROWS:
+        return _licensed(fits)
+    # family name first, a surname kept in middle_name, "JR" inside last_name: every part of
+    # the claimed name must be a word of the licensee's full name, in any order
+    wanted = _tokens(first, last)
+    if not wanted:
         return _NOT_CHECKED
-    if any(_active(str(row.get("status", ""))) for row in compound):
-        return _NOT_CHECKED  # "De La X": a compound surname ending with the claimed one
-    return LicenseStatus.NOT_FOUND, None
+    where = " AND ".join(f"upper(full_name) like '%{_soql(t)}%'" for t in sorted(wanted))
+    rows = _get_rows(where, client, deadline)
+    if rows is None or len(rows) > MAX_ROWS:
+        return _NOT_CHECKED
+    fits = [
+        r
+        for r in rows
+        if _active(str(r.get("status", ""))) and wanted <= _tokens(str(r.get("full_name", "")))
+    ]
+    return _licensed(fits) if fits else _NOT_CHECKED
+
+
+def _lookup_number(
+    number: str, claim: Claim | None, client: httpx.Client, deadline: float
+) -> Answer:
+    """The ad gives a license number (zeros stripped). No row, or only ended ones: NOT_FOUND.
+    Active under another name: NOT_CHECKED, since a mismatch (maiden name, nickname, a typo)
+    accuses no one."""
+    rows = _get_rows(f"upper(license_number) like '{_soql(number)}%'", client, deadline)
+    if rows is None or len(rows) > MAX_ROWS:
+        return _NOT_CHECKED
+    mine = [
+        r
+        for r in rows
+        if str(r.get("license_number", "")).strip().upper().split("-")[0].strip().lstrip("0")
+        == number
+    ]
+    active = [r for r in mine if _active(str(r.get("status", "")))]
+    if not active:
+        # no row at all, or every row clearly ended; an unknown status ("Military") accuses no one
+        if not mine or all(_ended(str(r.get("status", ""))) for r in mine):
+            return LicenseStatus.NOT_FOUND, None
+        return _NOT_CHECKED
+    if claim is None:
+        return _NOT_CHECKED
+    last = _tokens(claim.last or "")
+    named = _tokens(claim.first or "", claim.last or "") or _tokens(
+        _company_key(claim.company or "")
+    )
+    fits = []
+    for r in active:
+        row = _tokens(
+            *(str(r.get(k, "")) for k in ("full_name", "first_name", "middle_name", "last_name"))
+        )
+        # one shared first name is not enough: the last name, or every claimed word, must match
+        if (last and last <= row) or (named and named <= row):
+            fits.append(r)
+    return _licensed(fits) if fits else _NOT_CHECKED
 
 
 def _lookup_company(company: str, client: httpx.Client, deadline: float) -> Answer:
@@ -336,12 +432,10 @@ def _lookup_company(company: str, client: httpx.Client, deadline: float) -> Answ
     )
     if rows is None or len(rows) > MAX_ROWS:
         return _NOT_CHECKED
-    if not rows:
-        return LicenseStatus.NOT_FOUND, None  # no brokerage starts with that name at all
     same = [row for row in rows if _company_key(str(row.get("full_name", ""))) == key]
     if any(_active(str(row.get("status", ""))) for row in same):
         return LicenseStatus.LICENSED, None
-    return _NOT_CHECKED  # near misses or inactive: not enough to accuse anyone
+    return _NOT_CHECKED  # never NOT_FOUND: a DBA or a team name is not a Broker Company row
 
 
 _shared_client: httpx.Client | None = None
@@ -362,8 +456,8 @@ def _read_cache(path: Path) -> Answer | None:
             return None
         saved = json.loads(path.read_text(encoding="utf-8"))
         status = LicenseStatus(saved["status"])
-        if status is LicenseStatus.NOT_FOUND and time.time() - saved["at"] > NOT_FOUND_TTL_S:
-            return None  # a NOT_FOUND is looked up again after 24 h
+        if status is not LicenseStatus.LICENSED:
+            return None  # only LICENSED is trusted from disk
         return status, saved.get("sponsor")
     except (OSError, ValueError, KeyError, TypeError):
         return None
@@ -373,7 +467,7 @@ def _write_cache(path: Path, answer: Answer) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            json.dumps({"status": answer[0].value, "sponsor": answer[1], "at": time.time()}),
+            json.dumps({"status": answer[0].value, "sponsor": answer[1]}),
             encoding="utf-8",
         )
     except OSError:
@@ -384,33 +478,55 @@ def check_license(
     text: str, *, client: httpx.Client | None = None, cache_dir: Path | None = None
 ) -> LicenseResult:
     claim = detect_claim(text)
+    deadline = _monotonic() + TIMEOUT_S
+    http = client
+    number = _license_number(text)
+    if number is not None:
+        if not number:
+            return _result(_NOT_CHECKED, claim)  # all zeros: not a license number
+        # the number decides; never cached; a mismatch is final, with no name lookup after it
+        return _result(_lookup_number(number, claim, http or _client(), deadline), claim)
     if claim is None:
         return LicenseResult(status=LicenseStatus.NOT_CHECKED)
     if claim.company is None and (not claim.first or not claim.last):
         return LicenseResult(status=LicenseStatus.NOT_CHECKED, claimed_role=claim.role)
 
     if claim.company:
-        query = f"company|{claim.company.upper()}"
+        query = f"v3|company|{claim.company.upper()}"
     else:
-        query = (
-            f"person|{int(claim.strict)}|{(claim.first or '').upper()}|{(claim.last or '').upper()}"
-        )
+        query = f"v3|person|{(claim.first or '').upper()}|{(claim.last or '').upper()}"
     cache_dir = cache_dir or resolve_data_dir(get_settings().snapback_data_dir) / "trec"
     cached = cache_dir / f"{hashlib.sha256(query.encode()).hexdigest()[:32]}.json"
     answer = _read_cache(cached)
     if answer is None:
-        deadline = _monotonic() + TIMEOUT_S
-        http = client or _client()
+        http = http or _client()
         if claim.company:
             answer = _lookup_company(claim.company, http, deadline)
         else:
             answer = _lookup_person(claim, http, deadline)
-        if answer[0] is not LicenseStatus.NOT_CHECKED:
-            _write_cache(cached, answer)
+        if answer[0] is LicenseStatus.LICENSED:
+            _write_cache(cached, answer)  # only a LICENSED answer is kept
+    return _result(answer, claim)
 
+
+def _result(answer: Answer, claim: Claim | None) -> LicenseResult:
     status, sponsor = answer
     return LicenseResult(
         status=status,
-        claimed_role=claim.role,
+        claimed_role=claim.role if claim else None,
         sponsor_broker=sponsor if status is LicenseStatus.LICENSED else None,
     )
+
+
+def _license_number(text: str) -> str | None:
+    """The first TREC license number the ad gives, leading zeros stripped ("" when it is all
+    zeros), or None. It counts only next to "TREC" or a real-estate role word, and not when
+    the words around it say MLS, business, insurance, a driver, a plate and the like."""
+    text = text[:MAX_TEXT]
+    for m in _LIC_NUMBER.finditer(text):
+        if _NOT_TREC.search(text[max(0, m.start() - 14) : m.start(1)]):
+            continue
+        near = text[max(0, m.start() - 40) : m.end() + 20]
+        if m.group(0).upper().startswith("TREC") or _ROLE_WORD.search(near):
+            return m.group(1).lstrip("0")
+    return None
