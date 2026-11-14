@@ -1,16 +1,75 @@
 """What may be uploaded to a case, checked on the server.
 
-Two layers. `UploadSizeGuard` refuses an upload from its Content-Length alone, before any of
-the body is read or parsed. `read_images` then checks each file: it must be declared as an
-image, must start like one, and must be under the per-file cap.
+Three layers:
+
+1. `UploadSizeGuard` refuses an upload from its Content-Length alone, before any of the body
+   is read.
+2. `parse_form` reads the body as it arrives and stops the moment one file passes the per-file
+   cap or there are too many files. An oversized file is never spooled to disk in full.
+3. `read_images` checks each file that did arrive: declared as an image, and starts like one.
 """
 
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, Request
+from starlette.datastructures import FormData, UploadFile
+from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 MB = 1024 * 1024
 FORM_OVERHEAD = MB  # room for the text fields and the multipart framing
+
+
+class FileTooLarge(MultiPartException):
+    """One uploaded file passed the per-file cap while it was still arriving."""
+
+
+class CappedMultiPartParser(MultiPartParser):
+    """Starlette's multipart parser, with a cap on each file enforced as the bytes come in."""
+
+    def __init__(self, headers, stream, *, max_files: int, max_file_bytes: int) -> None:
+        super().__init__(headers, stream, max_files=max_files, max_fields=20)
+        self._max_file_bytes = max_file_bytes
+        self._file_bytes = 0
+
+    def on_part_begin(self) -> None:
+        super().on_part_begin()
+        self._file_bytes = 0
+
+    def on_part_data(self, data: bytes, start: int, end: int) -> None:
+        if self._current_part.file is not None:
+            self._file_bytes += end - start
+            if self._file_bytes > self._max_file_bytes:
+                raise FileTooLarge("file too large")
+        super().on_part_data(data, start, end)
+
+
+async def parse_form(request: Request, max_photos: int, max_file_bytes: int) -> FormData:
+    """The request's form, read with the upload caps applied while it streams."""
+    content_type = request.headers.get("content-type", "")
+    if not content_type.startswith("multipart/form-data"):
+        # Text fields only. The size guard let up to a full upload through; a form with no
+        # files has no business being that large.
+        if int(request.headers.get("content-length", "0")) > FORM_OVERHEAD:
+            raise HTTPException(status_code=413, detail="The text is too long to accept.")
+        return await request.form()
+
+    parser = CappedMultiPartParser(
+        request.headers, request.stream(), max_files=max_photos, max_file_bytes=max_file_bytes
+    )
+    try:
+        return await parser.parse()
+    except FileTooLarge:
+        raise HTTPException(
+            status_code=413, detail=f"Each photo can be at most {max_file_bytes // MB} MB."
+        ) from None
+    except MultiPartException as error:
+        if error.message.startswith("Too many files"):
+            raise HTTPException(
+                status_code=413, detail=f"At most {max_photos} photos per check."
+            ) from None
+        if "exceeded maximum size" in error.message:
+            raise HTTPException(status_code=413, detail="The text is too long to accept.") from None
+        raise HTTPException(status_code=400, detail="The upload could not be read.") from None
 
 
 def _looks_like_an_image(head: bytes) -> bool:
