@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import { HouseGlyph, Wordmark } from "../components/HouseGlyph";
+import { KitArt, type KitArtKind } from "../components/KitArt";
 import { LabSection } from "../lab";
 import { loadBrief } from "../search/api";
 import { OfficeConfirm } from "../office/OfficeConfirm";
@@ -17,6 +18,15 @@ const ROW_LABEL = {
   price: "PRICE",
   claims: "WHAT THE AD CLAIMS",
 } as const;
+
+// The drawing beside each group of checks. The place check is the product's own move: the ad's
+// photo pinned where it was taken, so that one is the room with a pinned photo.
+const ROW_ART: Record<CardRowKind, KitArtKind> = {
+  place: "scan",
+  person: "person",
+  price: "price",
+  claims: "claims",
+};
 
 const STATE_TONE: Record<VerdictState, string> = {
   hold: "amber",
@@ -75,24 +85,29 @@ function EvidenceRow({
   first,
   label,
   row,
+  span,
   index,
 }: {
   line: CardLine;
   first: boolean;
   label: string;
   row: CardRowKind;
+  // How many lines this group has: its label and drawing sit beside all of them.
+  span: number;
   // Where this line sits in the whole card: the lines land one after another.
   index: number;
 }) {
   return (
     <tr className={first ? "row-first" : undefined} style={{ "--i": index } as CSSProperties}>
-      <th scope="row" className="cell-kind">
-        {first ? (
+      {first ? (
+        <th scope="rowgroup" rowSpan={span} className="cell-kind">
           <span className="kind" data-testid="row-label">
             {label}
           </span>
-        ) : null}
-      </th>
+          <KitArt kind={ROW_ART[row]} className="kind-art" detail="low" />
+          {row === "place" ? <span className="kind-standin mono">Drawn stand-in</span> : null}
+        </th>
+      ) : null}
       <td className="cell-what">{line.label}</td>
       <td className="cell-text">{line.text}</td>
       <td className="cell-tone">
@@ -123,7 +138,7 @@ export function CardView({
       </header>
 
       <section className={`hero hero-${stateTone}`} aria-labelledby="card-title">
-        <HouseGlyph className="hero-house" />
+        <KitArt kind="pinned" className="hero-house" />
         <span className="hero-mark" aria-hidden="true">
           {STATE_ICON[card.state]}
         </span>
@@ -173,6 +188,7 @@ export function CardView({
                     first={i === 0}
                     label={ROW_LABEL[row.kind]}
                     row={row.kind}
+                    span={row.lines.length}
                     index={(firstIndex[r] ?? 0) + i}
                   />
                 ))}

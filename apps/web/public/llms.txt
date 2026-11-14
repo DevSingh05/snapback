@@ -1,0 +1,47 @@
+# SNAPBACK
+
+> SNAPBACK checks a rental listing against the home's own record (the property record, the
+> building's 3D scan and aerial imagery) before a renter pays, then finds researched places that
+> fit the renter's budget. Code, not a language model, sets every verdict. SNAPBACK never pays,
+> books or sends anything; the renter approves and sends any message themselves.
+
+Every result is labelled LIVE (real records) or FIXTURE (synthetic demo data made by the team).
+The strongest verdict is "Don't pay. Something here doesn't match." SNAPBACK never calls a
+person a scammer, and no reply from a poster means hold, not failure.
+
+## For agents: the MCP server
+
+SNAPBACK ships an MCP server (stdio, or streamable HTTP on localhost behind a bearer token). From
+a checkout of the repo, with the API running (`make api`):
+
+    claude mcp add snapback -- uv run python -m snapback.mcp_server
+
+Tools:
+
+- snapback_check_listing(ad_text, photo_urls=[], max_rent=null): start a check. Returns the case
+  id, LIVE or FIXTURE, the status and a link to the result page. Photo links must come from the
+  renter.
+- snapback_get_verdict(case_id): the result card: verdict words, each check line with its
+  status, what is not checked, and the one next step. Repeat the verdict as given.
+- snapback_find_places(brief): ask the Finder in plain words ("1 bed under 1500, no walk-ups").
+  Returns picks and any proposal the renter must answer.
+- snapback_accept_preference(proposal_id, yes): the renter's own yes or no on a proposal. Only
+  call it after the renter has answered.
+- snapback_walk_summary(case_id): the rooms of the home's 3D walk, which ad photo landed where,
+  and a link to Walk it first.
+- snapback_draft_tour_request(case_id, place_id): a draft to the leasing office on record.
+  Nothing is sent.
+
+Tokens never leave the MCP server. Errors are plain sentences.
+
+## Docs
+
+- [MCP setup, tools and an example conversation](https://github.com/DevSingh05/snapback/blob/main/docs/mcp.md)
+- [README](https://github.com/DevSingh05/snapback#readme)
+
+## Rules for renters
+
+- Never pay before a signed lease and a viewing.
+- Never pay by Zelle, wire or gift card.
+- Only trust a SNAPBACK result you asked for yourself. SNAPBACK never texts first or asks for
+  money.
