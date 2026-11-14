@@ -606,8 +606,9 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     Never a person's name, never a licence number, never the poster's own words. A licence
     found is a supporting line: it does not answer "allowed to rent it", so it never lifts
     that line and never verifies a case. NOT_FOUND happens only for a licence number the ad
-    itself gives (D10), and it is a warning that holds the case; it is not proof, so it never
-    gives DONT_PAY. A claim we could not check says to ask for the number and look it up.
+    itself gives (D10): a red flag (the ad's number contradicts the ad) that holds the
+    case. It is not proof, so it never gives DONT_PAY.
+    A claim we could not check says to ask for the number and look it up.
     A lookup that did not happen, or an ad with no claim, says nothing.
     """
     found = modules.license
@@ -615,7 +616,7 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         return []  # never looked up for this case: no line, as with any module that is absent
     label = "label.license"
     if found.status is LicenseStatus.NOT_FOUND:
-        return [_line(lang, label, CardTone.HOLD, "license.not_found")]
+        return [_line(lang, label, CardTone.RED_FLAG, "license.not_found")]
     if found.status is LicenseStatus.LICENSED:
         sponsor = " ".join((found.sponsor_broker or "").split())[:MAX_SPONSOR_CHARS]
         if sponsor:

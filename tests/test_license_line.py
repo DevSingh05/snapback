@@ -81,7 +81,10 @@ def test_not_found_is_a_warning_that_holds_the_case_with_the_exact_line():
     assert strings.text("reason.license_not_found") == (
         "The license number in the ad is not an active Texas license."
     )
-    assert person(modules)["License"] == (CardTone.HOLD, NOT_FOUND_TEXT)
+    assert person(modules)["License"] == (CardTone.RED_FLAG, NOT_FOUND_TEXT)
+    # The word the renter sees beside the line, on the PERSON row, in both languages.
+    assert strings.tone_word("red_flag", "person") == "Doesn't match"
+    assert strings.tone_word("red_flag", "person", "es") == strings.text("tone.red_flag", "es")
     assert person(modules, "es")["Licencia"][1] == NOT_FOUND_ES
 
 
@@ -169,6 +172,11 @@ def test_a_phone_mismatch_with_a_not_found_licence_is_still_only_not_confirmed()
     verdict = decide(to_evidence(passing(authority=differs, license=NOT_FOUND)))
     assert verdict.state is VerdictState.HOLD
     assert verdict.reasons.count(strings.text("reason.phone_flag")) == 1
+    # the same with no office named on record
+    unnamed = {"status": "unknown", "office_phone_match": "no"}
+    base = person(passing(authority=unnamed))["Contact on record"]
+    assert base[0] is CardTone.NOT_SHOWN
+    assert person(passing(authority=unnamed, license=NOT_FOUND))["Contact on record"] == base
 
 
 # --- wording, order, Spanish ---------------------------------------------------------------
@@ -212,7 +220,8 @@ def test_every_licence_line_follows_the_wording_rules_in_both_languages(result):
             assert "—" not in text
     license_line = person(passing(license=result), "en").get("License")
     if license_line:
-        assert license_line[0] is not CardTone.RED_FLAG  # the licence line is never a red flag
+        # only NOT_FOUND is a red flag; a found or unchecked licence never is
+        assert (license_line[0] is CardTone.RED_FLAG) == (result == NOT_FOUND)
     assert set(strings.TABLES["es"]) == set(strings.TABLES["en"])
 
 
@@ -266,7 +275,7 @@ def test_the_lookup_result_reaches_the_card(tmp_path):
     card = card_from(tmp_path, lookups)
     assert lookups.asked == ["2 bed. I am a licensed agent."]
     said = {line["label"]: line for row in card["rows"] for line in row["lines"]}
-    assert said["License"]["tone"] == "hold" and said["License"]["text"] == NOT_FOUND_TEXT
+    assert said["License"]["tone"] == "red_flag" and said["License"]["text"] == NOT_FOUND_TEXT
     assert card["state"] == "hold"
 
 
