@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import { Wordmark } from "../components/HouseGlyph";
 import { loadPrefs, savePrefs, TABS, type Prefs, type Section } from "./prefs";
 import { applyTheme, defaultTheme, initialChoice, saveTheme, type ThemeChoice } from "./theme";
 import "./shell.css";
@@ -17,7 +16,7 @@ interface Props {
 
 /** What each page is for, in one line. One purpose per page. */
 export const PURPOSE: Record<string, string> = {
-  home: "Your cases, and checking a new ad.",
+  home: "Ask anything: check an ad, find a place, or open any view.",
   listings: "Browse the researched places.",
   map: "Find a home by where it is.",
   finder: "The agent that learns what you want and helps you find a home.",
@@ -62,7 +61,7 @@ export function AppShell({ section, context, children }: Props) {
     <div className="app" data-section={section ?? "none"}>
       <header className="app-bar">
         <a className="app-mark" href="/home" aria-label="SNAPBACK home">
-          <Wordmark />
+          <span className="wordmark app-wordmark">SNAPBACK</span>
         </a>
         <nav className="app-tabs" aria-label="Main">
           {shown.map((t) => (
@@ -168,11 +167,12 @@ export function AppShell({ section, context, children }: Props) {
           </section>
         )}
       </header>
-      {(context ? PURPOSE[context.label] : section ? PURPOSE[section] : null) && (
-        <p className="app-purpose" data-testid="page-purpose">
-          {context ? PURPOSE[context.label] : PURPOSE[section!]}
-        </p>
-      )}
+      {section !== "home" &&
+        (context ? PURPOSE[context.label] : section ? PURPOSE[section] : null) && (
+          <p className="app-purpose" data-testid="page-purpose">
+            {context ? PURPOSE[context.label] : PURPOSE[section!]}
+          </p>
+        )}
       {children}
     </div>
   );

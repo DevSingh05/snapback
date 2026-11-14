@@ -1,6 +1,6 @@
 /* The app frame: one bar on every page. Mark, tabs, light or dark. Sharp corners, tokens only. */
 .app {
-  --bar-h: 92px;
+  --bar-h: 64px;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -417,4 +417,19 @@
   color: var(--act);
   font-size: var(--fs-sm);
   font-weight: 700;
+}
+
+/* The mark in the bar: the name, set flat. No drawing in the frame. */
+.app-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  letter-spacing: 0.16em;
+}
+.app-wordmark::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--act);
 }

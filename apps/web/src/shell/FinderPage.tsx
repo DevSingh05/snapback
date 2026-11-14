@@ -161,7 +161,7 @@ function FinderHead({ children, actions }: { children?: ReactNode; actions?: Rea
 // ---------------------------------------------------------------------------------------------
 // Small pieces shared by both modes.
 
-function Icon({ name }: { name: "mic" | "send" | "speaker" | "stop" | "talk" | "close" }) {
+export function Icon({ name }: { name: "mic" | "send" | "speaker" | "stop" | "talk" | "close" }) {
   const paths: Record<typeof name, ReactNode> = {
     mic: (
       <>
@@ -203,7 +203,7 @@ function Icon({ name }: { name: "mic" | "send" | "speaker" | "stop" | "talk" | "
 }
 
 /** Live input level as seven bars. Each bar leans on the level a little differently. */
-function LevelMeter({ level }: { level: number }) {
+export function LevelMeter({ level }: { level: number }) {
   const shape = [0.45, 0.7, 0.9, 1, 0.85, 0.65, 0.4];
   return (
     <span className="fd-meter" aria-hidden="true" data-testid="voice-meter">
@@ -217,13 +217,13 @@ function LevelMeter({ level }: { level: number }) {
   );
 }
 
-type Voice = ReturnType<typeof useVoiceInput>;
+export type Voice = ReturnType<typeof useVoiceInput>;
 
 /**
  * One mic, like a dictation key: hold it and talk, let go to send; or tap once to start and tap
  * again to send. Keyboard: Enter or Space toggles.
  */
-function MicButton({
+export function MicButton({
   voice,
   disabled,
   onOpen,
