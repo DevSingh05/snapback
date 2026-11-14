@@ -15,7 +15,30 @@ export type LandingState =
       pitch: number;
       fovDeg: number | null;
       position: [number, number, number];
+      /** Plan-view coordinates in the viewer's frame (x, then the viewer's z): what the mini-map
+       *  draws, so its cone and dot agree with the 3D view. Absent on old states: (x, z). */
+      floor?: [number, number];
     };
+
+export type UpAxis = "y" | "z";
+
+/** Plan-view coordinates of a model position in the 3D viewer's frame. A y-up position keeps
+ *  (x, z); a z-up scan-cache position (x, y, height) is (x, -y) in the viewer's y-up frame. */
+export function floorOf(p: [number, number, number], up: UpAxis = "y"): [number, number] {
+  return up === "z" ? [p[0], -p[1]] : [p[0], p[2]];
+}
+
+/** The camera direction for every surface: the locator's viewer angles when sent (they account
+ *  for z-up scans), else read off the quaternion. */
+export function viewAngles(p: {
+  rotation_quat?: [number, number, number, number] | null;
+  yaw_deg?: number | null;
+  pitch_deg?: number | null;
+}): { yaw: number; pitch: number } | null {
+  if (typeof p.yaw_deg === "number" && typeof p.pitch_deg === "number")
+    return { yaw: p.yaw_deg, pitch: p.pitch_deg };
+  return p.rotation_quat ? quatToYawPitch(p.rotation_quat) : null;
+}
 
 /**
  * Fixture-only room names (photo id to label). A live photo carries its own `room_label`, which
@@ -52,6 +75,7 @@ export function landingFromLocate(
   locate: LocateResult,
   photoId: string,
   roomLabels: Record<string, string>,
+  up: UpAxis = "y",
 ): LandingState {
   const photo = locate.photos.find((p) => p.photo_id === photoId);
   if (!photo) return { kind: "not_found" };
@@ -61,7 +85,7 @@ export function landingFromLocate(
   const roomLabel = photo.room_label || roomLabels[photoId] || null;
   const pose = locate.poses[photoId];
   if (!pose) return { kind: "placed", photoId, roomLabel };
-  const { yaw, pitch } = quatToYawPitch(pose.rotation_quat);
+  const { yaw, pitch } = viewAngles(pose)!;
   return {
     kind: "match",
     photoId,
@@ -71,6 +95,7 @@ export function landingFromLocate(
     pitch,
     fovDeg: pose.fov_deg ?? null,
     position: pose.position,
+    floor: floorOf(pose.position, up),
   };
 }
 

@@ -145,7 +145,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
   }, [autoplay, index, last, next]);
   const pause = () => setAutoplay(false);
 
-  const landing = landingOfStop(stop);
+  const landing = landingOfStop(stop, plan.up_axis ?? "y");
   // The ad's real photo when this browser can read it; else the labelled placeholder.
   const realPhoto = useAdPhoto(caseId, stop.photos[0]?.alias);
   const photoNote = realPhoto
