@@ -488,7 +488,7 @@ def walk(
         groups.setdefault((s.label or "").strip(), []).append(s)
     rooms: list[tuple[str, list[TourSweep]]] = []
     for label in sorted(groups, key=lambda lab: min(order[s.sweep_id] for s in groups[lab])):
-        rooms.extend((label, c) for c in _clusters(groups[label], order))
+        rooms.extend((label, c) for c in _clusters(groups[label], order, up))
 
     reps = {id(g): _central(g, order, avoid=door_sweep.sweep_id, up=up) for _l, g in rooms}
     path = _nearest_first(door_sweep, [reps[id(g)] for _l, g in rooms], order, up)

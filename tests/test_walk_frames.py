@@ -134,3 +134,38 @@ def test_office_is_looked_up_by_id_even_with_more_than_50_cheaper_places():
     assert office_on_record(lookups, "pricey") == "Pricey Management"  # beyond a top-50 page
     assert office_on_record(lookups, "house-1") == "House Realty Inc"  # houses too
     assert office_on_record(lookups, "unknown") is None
+
+
+def test_one_label_split_by_10_m_in_y_is_two_rooms_in_a_z_up_scan():
+    sweeps = [
+        zup(0, 0.0, 0.0, "Entryway"),
+        zup(1, 5.0, 0.0, "Bathroom"),
+        zup(2, 5.0, 10.0, "Bathroom"),  # same x and height, 10 m away across the floor
+    ]
+    plan = build_tour(
+        property_id="p", kind="apartment", source=DataSource.LIVE, sweeps=sweeps, has_scan=True
+    )
+    assert plan.up_axis == "z"
+    assert [s.title for s in plan.stops if s.kind == "room"] == ["Bathroom 1", "Bathroom 2"]
+
+
+def test_count_line_in_a_walk_names_the_kind_even_for_a_primary_bedroom_label():
+    from snapback.contracts import AdNote
+    from snapback.tour import attach_claims
+
+    sweeps = [
+        zup(0, 0.0, 0.0, "Entryway"),
+        zup(1, 5.0, 0.0, "Primary Bedroom"),
+        zup(2, 5.0, 10.0, "Primary Bedroom"),
+    ]
+    plan = build_tour(
+        property_id="p", kind="apartment", source=DataSource.LIVE, sweeps=sweeps, has_scan=True
+    )
+    out = attach_claims(
+        plan, [AdNote(key="beds_differ", claim="beds", ad_value="3", record_value="2")]
+    )
+    lines = [c.text for s in out.stops for c in s.claims if "labelled" in c.text]
+    assert lines == [
+        "The ad says 3 bedrooms. This scan has 2 rooms labelled Bedroom. "
+        "Labels can be wrong, so count them in person."
+    ]
