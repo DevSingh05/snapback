@@ -27,7 +27,9 @@ from snapback.agent import (
     run_case,
 )
 from snapback.agent.intake import Listing
+from snapback.agent.join import JoinedModules, KitLookups, Lookups
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
+from snapback.agent.rules.contact import phone_salt
 from snapback.card import strings
 from snapback.contracts import (
     Card,
@@ -46,8 +48,8 @@ class NothingWaiting(Exception):
     """An approval arrived for a case that is not waiting for one."""
 
 
-class LiveModeNotWired(Exception):
-    """A case was asked for in live mode before the live modules exist."""
+class UnknownProperty(Exception):
+    """A check named a building we hold no record for."""
 
 
 class ChallengeView(BaseModel):
@@ -226,8 +228,10 @@ def _deepagents_runner() -> Callable[[CaseSession], object]:
 
 
 class CaseStore:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, lookups: Lookups | None = None) -> None:
         self._settings = settings
+        # Lane D's adapters: the record and the for-sale lookup (A10). The kit is read once.
+        self._lookups = lookups or KitLookups(settings.snapback_data_source)
         self._cases: dict[str, RecordedCase | SessionCase] = {}
         self._lock = threading.Lock()
         self._runner = (
@@ -254,24 +258,37 @@ class CaseStore:
             if candidate not in self._cases:
                 return candidate
 
-    def check_can_create(self) -> None:
-        if self._settings.snapback_data_source is not DataSource.FIXTURE:
-            raise LiveModeNotWired
+    def create(self, listing: Listing, property_id: str | None = None) -> SessionCase:
+        """Start a check. `property_id` is our id for the building the listing claims.
 
-    def create(self, listing: Listing) -> SessionCase:
-        self.check_can_create()
+        The record and the for-sale lookup come from lane D's adapters and feed the price,
+        unit and contact rules. The twin and the challenge are stand-ins until lanes V and D
+        land them, so the case is labelled FIXTURE as a whole whatever the record's source.
+
+        Raises `UnknownProperty` for an id we hold no record for, and `KitMissing` when the
+        record is asked for and the kit is not on this machine.
+        """
+        record = None
+        if property_id:
+            record = self._lookups.record(property_id)
+            if record is None:
+                raise UnknownProperty
+        for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+        # What the record says is as real as the record. A lookup with no record behind it
+        # is as real as the data it searched.
+        record_source = record.source if record else self._settings.snapback_data_source
+
         with self._lock:
             short_id = self._new_id()
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
-            # The fixture modules stand in for the twin, the record and the challenge. What
-            # the renter sent is real: its scope, its rule hits and its rent come from intake.
-            modules = FixtureModules(
-                listing_scope=listing.scope,
-                rules=listing.rule_hits if listing.text else None,
-                listed_rent=listing.listed_rent,
-                contacts=listing.contacts,
-                unit=listing.unit,
-                beds=listing.beds,
+            stand_in = FixtureModules(listing_scope=listing.scope)
+            modules = JoinedModules(
+                stand_in=stand_in,
+                listing=listing,
+                record=record,
+                for_sale=for_sale,
+                salt=phone_salt(self._settings),
+                record_source=record_source,
             )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
             if listing.truncated:

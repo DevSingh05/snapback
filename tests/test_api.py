@@ -487,8 +487,11 @@ def test_one_address_cannot_start_checks_without_end(tmp_path):
 
 
 def test_a_check_that_could_not_start_is_not_counted(tmp_path):
+    # Live mode with no kit on the machine: asking for a record cannot work, and costs nothing.
     live = make_client(tmp_path, snapback_data_source="live", snapback_daily_limit=2)
-    assert [live.post("/cases", data={"text": "x"}).status_code for _ in range(5)] == [503] * 5
+    asks = {"text": "x", "property_id": "any-id"}
+    assert [live.post("/cases", data=asks).status_code for _ in range(5)] == [503] * 5
+    assert live.post("/cases", data={"text": "x"}).status_code == 201
 
     fixture = make_client(tmp_path, snapback_daily_limit=2)
     bad_file = [("photos", ("run.exe", b"MZ\x90\x00", "application/x-msdownload"))]
@@ -682,12 +685,19 @@ def test_only_send_edit_or_cancel_are_accepted(client, decision):
     assert client.get(f"/cases/{case['case_id']}").json()["status"] == "waiting_for_approval"
 
 
-def test_live_mode_says_plainly_that_the_modules_are_not_wired(tmp_path):
+def test_live_mode_runs_a_check_and_does_not_call_its_stand_ins_live(tmp_path):
+    # A10: the record side is joined, so live mode starts a check. The twin and the challenge
+    # are still stand-ins, so the card is labelled FIXTURE, not LIVE.
     live = make_client(tmp_path, snapback_data_source="live")
     assert live.get("/healthz").json()["data_source"] == "live"
-    response = live.post("/cases", data={"text": "x"})
-    assert response.status_code == 503
-    # Fixture cases are not served as if they were live.
+    made = live.post("/cases", data={"text": "x"})
+    assert made.status_code == 201
+    assert made.json()["source"] == "fixture"
+    assert live.get(f"/cases/{made.json()['case_id']}/card").json()["source"] == "fixture"
+    # Without the kit there is no record to read, and that is said plainly.
+    asked = live.post("/cases", data={"text": "x", "property_id": "any-id"})
+    assert asked.status_code == 503 and "kit" in asked.json()["detail"].lower()
+    # The recorded fixture case is not served as if it were live.
     assert live.get("/cases/fx-7Q2M/card").status_code == 404
 
 
