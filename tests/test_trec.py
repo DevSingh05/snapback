@@ -30,22 +30,25 @@ def _row(
     }
 
 
+def _cond_ok(row: dict, cond: str) -> bool:
+    """One SoQL condition the adapter sends: `upper(f)='X'`, `upper(f) like 'P'` (any % pattern)
+    or `f='X'`. An unknown shape fails loudly, so the mock cannot hide a bad query."""
+    cond = cond.strip()
+    m = re.fullmatch(r"upper\((\w+)\)\s*=\s*'(.*)'", cond)
+    if m:
+        return str(row.get(m.group(1)) or "").upper() == m.group(2).replace("''", "'")
+    m = re.fullmatch(r"upper\((\w+)\)\s+like\s+'(.*)'", cond)
+    if m:
+        pattern = ".*".join(re.escape(p) for p in m.group(2).replace("''", "'").split("%"))
+        return re.fullmatch(pattern, str(row.get(m.group(1)) or "").upper(), re.S) is not None
+    m = re.fullmatch(r"(\w+)\s*=\s*'(.*)'", cond)
+    if m:
+        return str(row.get(m.group(1)) or "") == m.group(2)
+    raise AssertionError(f"the mock cannot evaluate: {cond}")
+
+
 def _matches_where(row: dict, where: str) -> bool:
-    """Apply the parts of the SoQL filter the adapter sends, so the mock cannot hide a bad query."""
-    last = re.search(r"upper\(last_name\)='([^']*)'", where)
-    if last and str(row.get("last_name", "")).upper() != last.group(1):
-        return False
-    first = re.search(r"upper\(first_name\)='([^']*)'", where)
-    if first and str(row.get("first_name", "")).upper() != first.group(1):
-        return False
-    ends = re.search(r"upper\(last_name\) like '% ([^']*)'", where)
-    if ends and not str(row.get("last_name", "")).upper().endswith(" " + ends.group(1)):
-        return False
-    kind = re.search(r"license_type='([^']*)'", where)
-    if kind and row.get("license_type") != kind.group(1):
-        return False
-    like = re.search(r"upper\(full_name\) like '([^']*)%'", where)
-    return not like or str(row.get("full_name", "")).upper().startswith(like.group(1))
+    return all(_cond_ok(row, cond) for cond in where.split(" AND "))
 
 
 def _client(rows=None, *, status=200, fail=False, seen=None) -> httpx.Client:
@@ -209,8 +212,9 @@ def test_a_named_brokerage_is_checked_as_a_company(tmp_path):
     result = _check(text, _client([company], seen=seen), tmp_path)
     assert result.status is LicenseStatus.LICENSED and result.claimed_role == "company"
     assert "Broker Company" in seen[0].url.params["$where"]
+    # a company is never NOT_FOUND, even when no brokerage starts with the name
     missing = _check("Managed by Fxnone Properties.", _client([]), tmp_path)
-    assert missing.status is LicenseStatus.NOT_FOUND
+    assert missing.status is LicenseStatus.NOT_CHECKED
 
 
 class _Trickle(httpx.SyncByteStream):
@@ -312,7 +316,12 @@ def test_compound_surnames_never_end_not_found(tmp_path):
 
 
 def test_a_role_word_needs_a_separator_or_an_article():
-    for text in ("Email Listing Agent for a tour", "Landlord Pays Broker Fee", "Rent Fast Locator"):
+    for text in (
+        "Email Listing Agent for a tour",
+        "Landlord Pays Broker Fee",
+        "Rent Fast Locator",
+        "Fxzed Fxquick Agent for a tour",  # a name then a role word, no separator or article
+    ):
         assert detect_claim(text) is None, text
 
 
@@ -356,3 +365,101 @@ def test_a_not_found_answer_expires_after_24_hours(tmp_path, monkeypatch):
     monkeypatch.setattr(time, "time", lambda: real() + 25 * 3600)
     _check(CLAIM, client, tmp_path)
     assert len(seen) > calls  # looked up again
+
+
+def _licensees():
+    return [
+        _row("Active", first="FXTOM", last="FXKING JR"),  # suffix kept inside last_name
+        _row("Active", first="FXMARIA", last="FXGARCIA FXLOPEZ"),  # two surnames, space
+        _row("Active", first="FXLEE", last="FXNGUYEN-FXTRAN"),  # hyphen
+        _row("Active", first="FXANA", last="FXRUIZ-FXVEGA"),
+    ]
+
+
+def test_a_surname_contained_in_an_active_last_name_is_never_not_found(tmp_path):
+    cases = {
+        "P1 suffix in last_name": "Fxtom Fxking, REALTOR\nFxbeta Realty LLC\nCell 555-0100",
+        "P3 first of two surnames": "I'M FXMARIA FXGARCIA, A LICENSED REALTOR. TEXT 555-0100",
+        "P4 hyphen against a space": "Hi, I'm Fxmaria Fxgarcia-Fxlopez, a licensed realtor.",
+        "P7 second part of a hyphen": "Soy agente con licencia.\n- Fxana Fxvega, Realtor",
+        "X1 hyphen part, intro": "Hi, I'm Fxlee Fxtran, a licensed realtor.",
+        "X2 suffix, intro": "My name is Fxtom Fxking, a licensed agent.",
+    }
+    for i, (label, text) in enumerate(cases.items()):
+        result = _check(text, _client(_licensees()), tmp_path / str(i))
+        assert result.status is LicenseStatus.NOT_CHECKED, label
+
+
+def test_every_part_of_a_surname_is_asked_with_contains(tmp_path):
+    seen: list = []
+    result = _check(
+        "Hi, I'm Fxname Fxperson, a licensed realtor.", _client([], seen=seen), tmp_path
+    )
+    wheres = [r.url.params["$where"] for r in seen]
+    assert result.status is LicenseStatus.NOT_FOUND
+    assert "upper(last_name) like '%FXPERSON%'" in wheres
+
+
+def test_a_hyphen_or_apostrophe_surname_is_never_strict(tmp_path):
+    for i, text in enumerate(
+        ("I'm Fxname Fxper-Fxson, a licensed realtor.", "I'm Fxname Fxo'Fxperson, a licensed agent.")
+    ):
+        assert _check(text, _client([]), tmp_path / str(i)).status is LicenseStatus.NOT_CHECKED
+
+
+def test_a_suffix_is_not_asked_and_over_25_contains_rows_is_not_checked(tmp_path):
+    from snapback.adapters.trec import _surname_parts
+
+    assert _surname_parts("Fxking Jr.") == ["FXKING"]
+    assert _surname_parts("Fxo'Fxper-Fxson III") == ["FXO", "FXPER", "FXSON"]
+    crowd = [_row("Inactive", first=f"FX{i:02d}", last=f"FXPERSON{i}") for i in range(26)]
+    assert _check(CLAIM, _client(crowd), tmp_path).status is LicenseStatus.NOT_CHECKED
+
+
+def test_a_company_is_never_not_found(tmp_path):
+    seen: list = []
+    zero = _check("Listed by Fxnone Properties.", _client([], seen=seen), tmp_path)
+    assert zero.status is LicenseStatus.NOT_CHECKED and len(seen) == 1
+    dba = [{"license_type": "Broker Company", "full_name": "FXOTHER REALTY GROUP LLC",
+            "status": "Active"}]  # fmt: skip
+    near = _check("Listed by Fxother Realty.", _client(dba), tmp_path / "b")
+    assert near.status is LicenseStatus.NOT_CHECKED
+
+
+def test_the_slogan_intro_with_a_strict_shape_makes_no_lookup(tmp_path):
+    seen: list = []
+    text = "I'm Very Excited, a licensed agent here to help."
+    result = _check(text, _client([], seen=seen), tmp_path)
+    assert result.status is LicenseStatus.NOT_CHECKED
+    assert seen == [] and detect_claim(text) is None or detect_claim(text).first is None
+
+
+def test_a_sponsor_is_named_only_for_exactly_one_company(tmp_path):
+    same = [_row("Active", sponsor="Fx One Realty"), _row("Active", sponsor="Fx One Realty")]
+    assert _check(CLAIM, _client(same), tmp_path).sponsor_broker == "Fx One Realty"
+    two = [_row("Active", sponsor="Fx One Realty"), _row("Active", sponsor="Fx Two Realty")]
+    assert _check(CLAIM, _client(two), tmp_path / "b").sponsor_broker is None
+    mixed_sponsors = [_row("Active", sponsor="Fx One Realty"), _row("Active", sponsor_type="X")]
+    assert _check(CLAIM, _client(mixed_sponsors), tmp_path / "c").sponsor_broker == "Fx One Realty"
+
+
+ROUND_2_SENTENCES = {
+    "A": "Great 2 bed near campus. Broker: Fxbeta Realty LLC. Call Fxjane",
+    "B": "I'm a licensed realtor with great rates. - Fxbeta Realty",
+    "C": "Fxjane Fxdoe | Fxbeta Realty, Realtor.",
+    "D": "I'm Fxmaria De La Fxcruz, a licensed realtor",
+    "E": "Fxana Fxgarcia Fxlopez, licensed agent.",
+    "F": "Listed by Fxbeta Realty\nSchedule A Tour Today",
+    "G": "Listed by Fxacme Realty.",
+    "H": "Showings: Email Listing Agent for a time.",
+    "I": "Landlord Pays Broker Fee.",
+}
+
+
+def test_round_2_sentences_never_give_not_found(tmp_path):
+    acme = {"license_type": "Broker Company", "full_name": "FXACME REALTY GROUP LLC",
+            "status": "Active"}  # fmt: skip
+    for key, text in ROUND_2_SENTENCES.items():
+        for variant, rows in (("empty", []), ("acme", [acme])):
+            result = _check(text, _client(rows), tmp_path / f"{key}{variant}")
+            assert result.status is not LicenseStatus.NOT_FOUND, key

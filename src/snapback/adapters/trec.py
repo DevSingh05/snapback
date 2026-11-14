@@ -9,16 +9,18 @@ cannot ship. So NOT_FOUND is rare by design (ruling on #134, 02:50). It needs AL
   (a) an explicit, well-formed claim: "I'm / My name is <First Last>, a licensed agent" (realtor,
       broker or locator), or a "<First Last>, Realtor" signature with a separator;
   (b) a name of exactly two tokens, neither a company word nor a particle;
-  (c) zero ACTIVE licensees with that last name, and zero active ones whose last name ends with
-      it (a compound surname such as "De La X").
-Anyone active sharing the last name, a looser claim, a longer name, more than 25 rows, or any
-failure is NOT_CHECKED. LICENSED needs an active licensee with that last name and a compatible
-first name (exact, initial, nickname, middle name); the sponsor is named only when exactly one
-person fits and the sponsor is a company.
+  (c) the surname, with Jr/Sr/II/III/IV removed, has no hyphen or apostrophe, and no ACTIVE
+      licensee has a last_name that CONTAINS it (`like '%PART%'`; TREC stores the first of two
+      surnames, parts of hyphenated names and "JR" inside last_name). A surname split on space,
+      hyphen and apostrophe gets the same check for each part (amended ruling on #134, 03:05).
+Anyone active containing the surname, a looser claim, a longer name, more than 25 rows, or any
+failure is NOT_CHECKED. LICENSED needs an active licensee with that exact last name and a
+compatible first name (exact, initial, nickname, middle name); the sponsor is named only when
+the fitting rows have exactly one distinct Broker Company sponsor.
 
 A brokerage the poster names ("listed by Fxample Realty") is looked up among Broker Company
-licenses: an active exact match is LICENSED, zero rows on the name's prefix is NOT_FOUND, and
-anything in between is NOT_CHECKED.
+licenses: an active exact match is LICENSED, anything else is NOT_CHECKED. A company never gets
+NOT_FOUND: a DBA or a team name is not a Broker Company row.
 
 Never kept anywhere (result, cache, trace, log): a license number or any person's name. The cache
 under `data/trec/` is keyed by a hash of the query and holds only the answer; NOT_FOUND answers
@@ -29,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -41,6 +44,9 @@ import httpx
 from snapback.contracts import LicenseResult, LicenseStatus
 from snapback.safety.paths import resolve_data_dir
 from snapback.settings import get_settings
+
+# httpx logs the full request URL at INFO, and the URL carries the last name being looked up
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 TREC_URL = "https://data.texas.gov/resource/s7ft-44qi.json"
 TIMEOUT_S = 5.0
@@ -116,6 +122,7 @@ _COMPANY_WORDS = {
 }  # fmt: skip
 _PARTICLES = {"DE", "LA", "DEL", "DELA", "DI", "DA", "DOS", "DAS", "VAN", "VON", "LE", "ST", "MAC"}
 _COMPANY_SUFFIXES = {"LLC", "INC", "LP", "LLP", "CO", "LTD", "PLLC", "CORP", "COMPANY"}
+_SUFFIXES = {"JR", "SR", "II", "III", "IV"}
 _ROLE_OF = {"realtor": "agent", "agent": "agent", "broker": "broker", "locator": "locator"}
 _NICKNAMES = [
     {"MICHAEL", "MIKE", "MICKEY"},
@@ -292,6 +299,12 @@ Answer = tuple[LicenseStatus, str | None]
 _NOT_CHECKED: Answer = (LicenseStatus.NOT_CHECKED, None)
 
 
+def _surname_parts(last: str) -> list[str]:
+    """The surname split on space, hyphen and apostrophe, without Jr/Sr/II/III/IV."""
+    parts = [p.rstrip(".") for p in re.split(r"[ \-']+", last.upper()) if p]
+    return [p for p in parts if p and p not in _SUFFIXES]
+
+
 def _lookup_person(claim: Claim, client: httpx.Client, deadline: float) -> Answer:
     first, last = claim.first or "", claim.last or ""
     rows = _get_rows(f"upper(last_name)='{_soql(last)}'", client, deadline)
@@ -300,29 +313,24 @@ def _lookup_person(claim: Claim, client: httpx.Client, deadline: float) -> Answe
     active = [row for row in rows if _active(str(row.get("status", "")))]
     fits = [row for row in active if _compatible(first, row)]
     if fits:
-        people = {
-            (str(r.get("first_name", "")).upper(), str(r.get("middle_name", "")).upper())
-            for r in fits
+        sponsors = {
+            str(row["related_license_full_name"]).strip()
+            for row in fits
+            if row.get("related_license_type") == "Broker Company"
+            and row.get("related_license_full_name")
         }
-        if len(people) > 1:
-            return LicenseStatus.LICENSED, None  # several people fit: name no sponsor
-        sponsor = next(
-            (
-                str(row["related_license_full_name"]).strip()
-                for row in fits
-                if row.get("related_license_type") == "Broker Company"
-                and row.get("related_license_full_name")
-            ),
-            None,
-        )
-        return LicenseStatus.LICENSED, sponsor
+        # name a sponsor only when the fitting rows agree on exactly one brokerage
+        return LicenseStatus.LICENSED, (next(iter(sponsors)) if len(sponsors) == 1 else None)
     if not claim.strict or active:
         return _NOT_CHECKED  # someone active shares the name, or the claim is not explicit
-    compound = _get_rows(f"upper(last_name) like '% {_soql(last)}'", client, deadline)
-    if compound is None or len(compound) > MAX_ROWS:
-        return _NOT_CHECKED
-    if any(_active(str(row.get("status", ""))) for row in compound):
-        return _NOT_CHECKED  # "De La X": a compound surname ending with the claimed one
+    if re.search(r"[\-']", last):
+        return _NOT_CHECKED  # TREC stores hyphenated names in too many shapes to rule one out
+    for part in _surname_parts(last):
+        contains = _get_rows(f"upper(last_name) like '%{_soql(part)}%'", client, deadline)
+        if contains is None or len(contains) > MAX_ROWS:
+            return _NOT_CHECKED
+        if any(_active(str(row.get("status", ""))) for row in contains):
+            return _NOT_CHECKED  # "FXKING JR", "FXGARCIA FXLOPEZ", "DE LA FXCRUZ" and the like
     return LicenseStatus.NOT_FOUND, None
 
 
@@ -336,12 +344,10 @@ def _lookup_company(company: str, client: httpx.Client, deadline: float) -> Answ
     )
     if rows is None or len(rows) > MAX_ROWS:
         return _NOT_CHECKED
-    if not rows:
-        return LicenseStatus.NOT_FOUND, None  # no brokerage starts with that name at all
     same = [row for row in rows if _company_key(str(row.get("full_name", ""))) == key]
     if any(_active(str(row.get("status", ""))) for row in same):
         return LicenseStatus.LICENSED, None
-    return _NOT_CHECKED  # near misses or inactive: not enough to accuse anyone
+    return _NOT_CHECKED  # never NOT_FOUND: a DBA or a team name is not a Broker Company row
 
 
 _shared_client: httpx.Client | None = None
