@@ -1,0 +1,29 @@
+{
+  "id": "ask",
+  "title": "A house for sale, posted by someone who says they are a licensed agent but gives no number",
+  "for_sale": {
+    "status": "active",
+    "site": "Homes.com",
+    "listed_on": "2026-10-02",
+    "changed_on": "2026-10-02",
+    "offices": ["Fixture Realty Group"]
+  },
+  "license": {
+    "status": "not_checked",
+    "claimed_role": "agent"
+  },
+  "renter_answer": "Sent me this: TREC # 0900123",
+  "trec_rows": {
+    "900123": {
+      "license_type": "Sales Agent",
+      "license_number": "0900123",
+      "full_name": "Sample, Fx",
+      "first_name": "FX",
+      "middle_name": "",
+      "last_name": "SAMPLE",
+      "status": "Active",
+      "related_license_type": "Broker Company",
+      "related_license_full_name": "Fixture Realty Group"
+    }
+  }
+}

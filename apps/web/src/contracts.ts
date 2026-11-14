@@ -38,6 +38,8 @@ export interface FloorPlanRent {
   rent_min?: number | null;
   rent_max?: number | null;
   per_bed: boolean;
+  baths?: number | null;
+  units_available?: number | null; // reported available at CoStar's last research
 }
 
 export interface PriceResult {
@@ -158,6 +160,11 @@ export interface PropertyRecord {
   rent_min?: number | null;
   rent_median?: number | null;
   rent_max?: number | null;
+  // Search must-haves; null or missing means the record does not say.
+  is_walkup?: boolean | null;
+  has_elevator?: boolean | null;
+  metering?: string | null; // "individual" or "master"
+  parking_ratio?: number | null;
 }
 
 export interface AerialTile {
@@ -181,4 +188,81 @@ export interface AerialProofResponse {
   claimed: AerialSideOut;
   matched: AerialSideOut | null;
   distance_m: number | null;
+}
+
+// Mirrors RenterBrief, PlaceMatch, SearchResponse, AlternativesResponse, TourDraftRequest and
+// TourDraft in src/snapback/contracts.py (POST /search, GET /cases/{id}/alternatives,
+// POST /cases/{id}/tour-draft). Every price and availability line ends "as of CoStar's last
+// research"; never render "available now".
+export const AS_OF = "as of CoStar's last research";
+
+export interface RenterBrief {
+  max_rent_month?: number | null; // whole-unit rent a month
+  beds_min?: number | null; // 0 is a studio
+  baths_min?: number | null;
+  needs_no_walkup?: boolean;
+  needs_parking?: boolean;
+  pets?: boolean;
+  move_in_by?: string | null; // ISO date
+  max_results?: number; // 1 to 50, default 10
+}
+
+export type BudgetFit = "within" | "starts_within" | "no_full_price" | "no_budget";
+
+export interface MustHaveLine {
+  key: string; // "walkup", "utilities", "parking", "pets"
+  text: string;
+  met?: boolean | null; // null: the record does not say, or the renter did not ask
+}
+
+export interface PlaceMatch {
+  property_id: string;
+  kind: "apartment" | "house";
+  floor_plan?: string | null;
+  plan_key?: string | null; // pick a plan by this, not by the label: many share one
+  beds?: number | null;
+  baths?: number | null;
+  rent_min?: number | null; // the asking price as reported
+  rent_max?: number | null;
+  budget_fit: BudgetFit;
+  price_text: string;
+  availability_text: string;
+  must_haves: MustHaveLine[];
+  musts_met: number;
+  has_3d_scan: boolean;
+  scan_text?: string | null; // "a 3D scan in this building"
+  office_on_record?: string | null; // company name only
+  source: DataSource;
+}
+
+export interface SearchResponse {
+  source: DataSource;
+  as_of: string;
+  n_considered: number;
+  n_matches: number;
+  matches: PlaceMatch[];
+}
+
+export interface AlternativesResponse {
+  case_id: string;
+  source: DataSource;
+  as_of: string;
+  matches: PlaceMatch[];
+}
+
+export interface TourDraftRequest {
+  property_id: string;
+  floor_plan?: string | null;
+  plan_key?: string | null;
+  brief?: RenterBrief | null;
+}
+
+// A draft for the renter to approve. Nothing is sent and no route sends it.
+export interface TourDraft {
+  property_id: string;
+  addressee: string; // the office on record, company name only
+  text: string;
+  status: "draft";
+  sent: false;
+  source: DataSource;
 }

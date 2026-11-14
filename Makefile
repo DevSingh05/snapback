@@ -27,7 +27,7 @@ hygiene: ## fail if sponsor data, secrets or large files are tracked
 check: hygiene lint test ## everything CI runs; must pass before a PR merges
 
 api: ## run the API on :8000
-	uv run uvicorn snapback.api.main:app --reload --port 8000
+	uv run uvicorn snapback.api.main:app --reload --port 8000 --no-proxy-headers
 
 web: ## run the web app on :5173 against the API on :8000 via the /api proxy (LIVE chips)
 	VITE_API_URL=/api npm run dev -w apps/web

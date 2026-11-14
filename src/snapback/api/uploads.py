@@ -113,19 +113,26 @@ def read_images(photos: list[UploadFile], max_photos: int, max_bytes: int) -> li
 class UploadSizeGuard:
     """Refuse `POST /cases` bodies that are too large, or of unknown length, unread."""
 
-    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+    def __init__(
+        self, app: ASGIApp, max_body_bytes: int, small_posts: dict[str, int] | None = None
+    ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
+        # Paths that take a small JSON body, with their own cap (POST /search).
+        self.small_posts = small_posts or {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and scope["method"] == "POST" and scope["path"] == "/cases":
+        post = scope["type"] == "http" and scope["method"] == "POST"
+        cap = self.small_posts.get(scope["path"]) if post else None
+        if post and (scope["path"] == "/cases" or cap is not None):
+            limit = self.max_body_bytes if cap is None else cap
             length = dict(scope["headers"]).get(b"content-length")
             refusal = None
             if length is None or not length.isdigit():
                 refusal = JSONResponse(
                     {"detail": "Send a Content-Length with the upload."}, status_code=411
                 )
-            elif int(length) > self.max_body_bytes:
+            elif int(length) > limit:
                 refusal = JSONResponse(
                     {"detail": "The upload is too large to accept."}, status_code=413
                 )

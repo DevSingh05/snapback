@@ -36,6 +36,7 @@ from snapback.contracts import (
     PhotoLocation,
     PriceResult,
     PropertyRecord,
+    RentalHouse,
     RuleHit,
     SpotCandidate,
     SpotRanking,
@@ -72,6 +73,9 @@ class Lookups(Protocol):
     def owner(self, listing_text: str) -> OwnerResult | None:
         """Who owns the home in the listing, by the county roll? None means no owner data."""
         ...
+
+    # Optional, so lookups written before A24 still fit: `license_number(number, listing_text)`
+    # looks up a license number the renter typed, by the same rules as `license`.
 
 
 def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
@@ -110,6 +114,7 @@ class KitLookups:
         self.source = source
         self._kit_dir = kit_dir
         self._records: dict[str, PropertyRecord] | None = None
+        self._rentals: list[RentalHouse] | None = None
         self._lock = threading.Lock()
 
     def records(self) -> dict[str, PropertyRecord]:
@@ -139,6 +144,19 @@ class KitLookups:
     def record(self, property_id: str) -> PropertyRecord | None:
         return self.records().get(property_id)
 
+    def rentals(self) -> list[RentalHouse]:
+        """The active house rentals in the kit (search supply), read once and kept."""
+        with self._lock:
+            if self._rentals is None:
+                try:
+                    from snapback.adapters import costar_residential
+
+                    self._rentals = costar_residential.rental_houses(self.source, self._kit_dir)
+                except Exception as error:  # a broken residential file must not hide buildings
+                    log.warning("house rentals not read (%s)", type(error).__name__)
+                    self._rentals = []
+            return self._rentals
+
     def for_sale(self, listing_text: str) -> ForSaleMatch | None:
         try:
             from snapback.adapters import costar_residential
@@ -165,10 +183,29 @@ class KitLookups:
             return None  # lane D's lookup (D10) is not here: nothing was looked up
         return trec.check_license(listing_text)
 
+    def license_number(self, number: str, listing_text: str) -> LicenseResult | None:
+        """D10 for a number the renter typed (A24 stretch): a live run only, like `license`."""
+        if self.source is not DataSource.LIVE:
+            return None
+        try:
+            from snapback.adapters import trec
+        except ImportError:
+            return None
+        return trec.check_license_number(number, listing_text)
+
     def owner(self, listing_text: str) -> OwnerResult | None:
-        # D12 (#130) plugs in here: the county owner roll, filtered to the kit's houses. Until
-        # it lands there is no owner data, and the card says ownership was not checked.
-        return None
+        # D12 (#130): the county owner roll (HCAD), filtered to the kit's Houston houses and kept
+        # under data/hcad/. No lookup file, or no street match, is None: ownership not checked.
+        # Lane A fills poster_says_owner and published_rule; a person's name never comes back.
+        # A company is named only when we know it: a row in the published-rule table, or an
+        # office on record in the kit for this home (ruling, round 5 on #160).
+        # The company the poster names is compared with the roll inside the adapter (round 6).
+        from snapback.adapters.hcad import lookup_owner
+        from snapback.agent.intake.fields import extract_contacts
+
+        match = self.for_sale(listing_text)
+        offices = getattr(match, "offices", None) or ()
+        return lookup_owner(listing_text, offices, extract_contacts(listing_text).company)
 
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""
@@ -258,6 +295,25 @@ class JoinedModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
+
+    def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
+        """D10 again, with the number the renter gave (A24 stretch): the number goes straight to
+        the lookup, with the ad's words for the name the poster claims, so the ad's length
+        cannot hide it. None when nothing was looked up (no lookup, or it broke). The number is
+        kept nowhere; the result holds only whether the state found it."""
+        lookup = getattr(self._lookups, "license_number", None)
+        if lookup is None:
+            return None
+        try:
+            found = lookup(number, self._listing.text)
+        except Exception as error:
+            log.warning(
+                "licence lookup failed (%s); treated as not looked up", type(error).__name__
+            )
+            return None
+        if found is None:
+            return None
+        return found.model_copy(update={"number_from": "renter"})
 
     def owner(self, case_id: str) -> OwnerResult | None:
         # Lane D says who owns the home. What the poster says about owning it is added here.

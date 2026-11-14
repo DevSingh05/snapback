@@ -39,7 +39,7 @@ def test_every_commercial_count_fills_on_the_fixture_kit():
     commercial = selfcheck(FIXTURE_KIT, TODAY)["commercial"]
     empty = [k for k, v in commercial.items() if v == 0]
     assert not empty, empty
-    assert commercial["records"] == 4
+    assert commercial["records"] == 5
 
 
 def test_every_residential_and_demo_count_fills_on_the_house_kit():

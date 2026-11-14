@@ -31,11 +31,11 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from snapback.adapters.vexcel import aerial_proof, aerial_side
@@ -52,23 +52,36 @@ from snapback.api.cases import (
     UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
-from snapback.api.limits import DailyLimit
+from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.contracts import (
     AerialProofResponse,
     AerialSideOut,
+    AlternativesResponse,
     Card,
     CreateCaseResponse,
     DataSource,
     Evidence,
     LocateStatus,
+    RenterBrief,
     ReplyResponse,
     ReportResponse,
+    SearchResponse,
+    TourDraft,
+    TourDraftRequest,
     Verdict,
 )
 from snapback.safety.paths import resolve_data_dir
+from snapback.search import (
+    AmbiguousPlace,
+    NoOfficeOnRecord,
+    alternatives_for,
+    draft_tour_request,
+    place_for,
+)
+from snapback.search import search as run_search
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -76,6 +89,8 @@ POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
 # Our ids for records: short, and nothing that could be a path or a sentence.
+SEARCH_MAX_BODY = 4096  # bytes: a RenterBrief is a few hundred
+SEARCH_PER_MINUTE = 30  # searches one address may make in a minute
 PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 # What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
 # Nothing else is accepted, so a raw phone number or a name can never be stored as one.
@@ -100,6 +115,12 @@ Language = Literal["en", "es"]
 class Approval(BaseModel):
     decision: Literal["send", "edit", "cancel"]
     text: str | None = None  # the renter's wording, with "edit"
+
+
+class Answer(BaseModel):
+    """The renter's answer to the license question. Blank means they have no number."""
+
+    text: str | None = Field(default=None, max_length=500)
 
 
 def _after(last_event_id: str | None) -> int:
@@ -167,6 +188,7 @@ def create_app(
     limit_reached = f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow."
 
     pictures = CardPictures()
+    search_limit = PerMinuteLimit(SEARCH_PER_MINUTE)
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -174,6 +196,7 @@ def create_app(
     app.add_middleware(
         UploadSizeGuard,
         max_body_bytes=settings.snapback_max_photos * max_photo_bytes + FORM_OVERHEAD,
+        small_posts={"/search": SEARCH_MAX_BODY},
     )
     app.add_middleware(
         CORSMiddleware,
@@ -586,6 +609,74 @@ def create_app(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    @app.post("/search")
+    def post_search(brief: RenterBrief, request: Request) -> SearchResponse:
+        """CoStar's researched places that fit a renter's brief, in code order.
+
+        The budget is compared with the asking price as reported, never a band. Every price and
+        availability line says "as of CoStar's last research". The response carries LIVE or
+        FIXTURE and the counts. No model is involved. A brief is a few hundred bytes (413 above
+        `SEARCH_MAX_BODY`); one address gets `SEARCH_PER_MINUTE` searches a minute (429)."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            return run_search(brief, lookups)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+
+    @app.get("/cases/{case_id}/alternatives")
+    def get_alternatives(
+        case_id: str,
+        request: Request,
+        n: Annotated[int, Query(ge=1, le=10)] = 3,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> AlternativesResponse:
+        """Up to `n` researched places near the checked ad's price and size, never its own
+        building. Needs the case's read token in a header; a token in the address is refused."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        try:
+            matches = alternatives_for(case, None, lookups, n)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        return AlternativesResponse(
+            case_id=case_id, source=settings.snapback_data_source, matches=matches
+        )
+
+    @app.post("/cases/{case_id}/tour-draft")
+    def post_tour_draft(
+        case_id: str,
+        body: TourDraftRequest,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> TourDraft:
+        """A tour-request draft addressed only to the leasing office on record, for the renter
+        to approve. Needs the case's write token in a header. It is never sent: the response is
+        a draft (`status: draft`, `sent: false`) and no route sends it. 404 for a place we do
+        not hold, 422 when it has no office on record."""
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        try:
+            place = place_for(body.property_id, body.floor_plan, lookups, body.brief, body.plan_key)
+        except AmbiguousPlace:
+            raise HTTPException(
+                status_code=422,
+                detail="Several floor plans share that label. Send the plan_key you picked.",
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if place is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        try:
+            return draft_tour_request(place, body.brief)
+        except NoOfficeOnRecord:
+            raise HTTPException(
+                status_code=422, detail="That place has no leasing office on record."
+            ) from None
+
     @app.post("/cases/{case_id}/challenge/approve")
     def approve_challenge(
         case_id: str,
@@ -605,6 +696,29 @@ def create_app(
         except NothingWaiting:
             raise HTTPException(
                 status_code=409, detail="This case is not waiting for an approval."
+            ) from None
+        return case.status(with_challenge=True)
+
+    @app.post("/cases/{case_id}/answer")
+    def post_answer(
+        case_id: str,
+        answer: Answer,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseStatus:
+        """The renter's answer when the agent asked for the license number (A24 stretch).
+
+        Needs the case's write secret, as the approval does. The text is read for a number by
+        code and goes no further; a blank answer or one with no number changes nothing.
+        409 unless the renter was asked.
+        """
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        try:
+            case.answer(answer.text)
+        except NothingWaiting:
+            raise HTTPException(
+                status_code=409, detail="This case is not waiting for an answer."
             ) from None
         return case.status(with_challenge=True)
 

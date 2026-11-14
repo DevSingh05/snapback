@@ -273,3 +273,31 @@ def test_build_command_with_every_model_skipped_says_so(tmp_path, capsys):
     assert code == 1
     assert "all 1 models were skipped" in capsys.readouterr().out
     assert not (tmp_path / "i").exists()
+
+
+def test_live_adapter_retries_a_dropped_connection(tmp_path, monkeypatch):
+    monkeypatch.setattr("snapback.adapters.matterport.time.sleep", lambda _: None)
+    calls = {"graph": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.matterport.com":
+            calls["graph"] += 1
+            if calls["graph"] == 1:
+                raise httpx.RemoteProtocolError("Server disconnected without sending a response.")
+            return httpx.Response(200, json=_graph(with_pose=True))
+        return httpx.Response(200, content=_face_bytes((1, 2, 3)))
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    assert LiveMatterport("k", "s", cache_dir=tmp_path, client=client).sweeps("m3")
+    assert calls["graph"] == 2
+
+
+def test_live_adapter_gives_up_after_repeated_drops_with_a_clear_error(tmp_path, monkeypatch):
+    monkeypatch.setattr("snapback.adapters.matterport.time.sleep", lambda _: None)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with pytest.raises(RuntimeError, match="network"):
+        LiveMatterport("k", "s", cache_dir=tmp_path, client=client).sweeps("m4")

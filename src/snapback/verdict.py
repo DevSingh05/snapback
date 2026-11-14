@@ -149,8 +149,18 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             _for_sale(modules) is ForSaleStatus.ACTIVE and not _the_ad_is_the_office_s(modules)
         ),
         recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
+        # A phone that is not the office's holds the case, unless an active licence checked by
+        # number is sponsored by the brokerage on record (Vidyut, Sat 07:35): that clears this
+        # one reason only. phone_confirmed stays False, so it can never verify a case.
         phone_flag=(
-            modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
+            modules.authority is not None
+            and modules.authority.office_phone_match is PhoneMatch.NO
+            and _licence_clears_contact(modules) is None
+        ),
+        phone_cleared_by_licence=(
+            modules.authority is not None
+            and modules.authority.office_phone_match is PhoneMatch.NO
+            and _licence_clears_contact(modules) is not None
         ),
         phone_confirmed=_the_ad_is_the_office_s(modules),
         brokerage_only=modules.authority is not None and modules.authority.brokerage_only,
@@ -158,7 +168,10 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
         unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
-        license_flag=_license(modules) is LicenseStatus.NOT_FOUND,
+        license_flag=_license(modules) is LicenseStatus.NOT_FOUND and not _renter_number(modules),
+        license_given_flag=(
+            _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
+        ),
         owner_flag=_owner_is_not_the_poster(modules),
     )
 
@@ -183,6 +196,7 @@ REASON_ORDER = (
     "reason.phone_flag",
     "reason.lookalike_link",
     "reason.license_not_found",
+    "reason.license_not_found_given",
     "reason.owner_not_poster",
     # Availability: is the home for rent at all?
     "reason.for_sale",
@@ -212,6 +226,11 @@ def _license(modules: ModuleEvidence) -> LicenseStatus | None:
     return modules.license.status if modules.license else None
 
 
+def _renter_number(modules: ModuleEvidence) -> bool:
+    """The licence number that was looked up is the one the renter typed (A24 stretch)."""
+    return modules.license is not None and modules.license.number_from == "renter"
+
+
 def _owner_is_not_the_poster(modules: ModuleEvidence) -> bool:
     """The poster says they own the home, and the owner of record is someone else (A19).
 
@@ -226,6 +245,38 @@ def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
     """The phone in the listing is the leasing office's on record."""
     authority = modules.authority
     return authority is not None and authority.office_phone_match is PhoneMatch.YES
+
+
+def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
+    """The brokerage on record, when an active licence clears the contact line (Vidyut, Sat 07:35).
+
+    All four must hold: the licence is active (LICENSED); it was checked by NUMBER (the ad's or
+    the renter's, never a name lookup); its sponsor is a company; and that company is the
+    brokerage or office on record (the authority's, or a listing office of an ACTIVE
+    for-sale match), by the same matcher as everywhere else. Then a phone that is not the
+    office's is information, not "Not confirmed". It never verifies a case: the phone is
+    still not the office's, the owner line and the for-sale hold are not touched.
+    Returns that brokerage's name from the record, or None.
+    """
+    # Imported here: snapback.agent imports this module while it loads.
+    from snapback.agent.rules.contact import same_company
+
+    found = modules.license
+    if (
+        found is None
+        or found.status is not LicenseStatus.LICENSED
+        or found.number_from not in ("ad", "renter")
+        or not found.sponsor_broker
+    ):
+        return None
+    on_record = []
+    if modules.authority is not None and modules.authority.manager_on_record:
+        on_record.append(modules.authority.manager_on_record)
+    if modules.for_sale is not None and modules.for_sale.status is ForSaleStatus.ACTIVE:
+        on_record.extend(modules.for_sale.offices)
+    return next(
+        (name for name in on_record if same_company(found.sponsor_broker, name) is True), None
+    )
 
 
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
@@ -298,6 +349,14 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # D10: a licence we could not confirm is no reason to call the number a red flag, so a
     # phone that is not the office's stays "not confirmed" whatever the licence list says.
     unconfirmed = ["reason.phone_flag"] if evidence.phone_flag else []
+    if evidence.phone_cleared_by_licence:
+        # The licence is a number anyone can copy from a real listing (review H1): the contact
+        # is still not shown to be the office, so a contact reason always remains.
+        unconfirmed = ["reason.phone_not_confirmed"]
+    if evidence.license_given_flag:
+        # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
+        # confirmed and HOLD, never a red flag, and never in a report pack.
+        unconfirmed = [*unconfirmed, "reason.license_not_found_given"]
     if evidence.owner_flag:
         # A19 (#125): the poster says they own it and the owner of record is someone else.
         # Not confirmed, like any name that does not match (ruling, Sat 01:20): owners rent
@@ -347,7 +406,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # H1: the name matches and the ad's contact was not shown to be the office. Said so the
     # hold has a reason. (A phone that is NOT the office's already has its own.)
     contact = []
-    if matches and not evidence.phone_confirmed and not evidence.phone_flag:
+    if (
+        matches
+        and not evidence.phone_confirmed
+        and not evidence.phone_flag
+        and not evidence.phone_cleared_by_licence
+    ):
         contact = [f"reason.phone_not_confirmed{by_brokerage}"]
     return verdict(
         VerdictState.HOLD,
@@ -601,7 +665,21 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     elif authority.office_phone_match is PhoneMatch.NO:
         # Not confirmed, never a red flag by itself (ruling, Sat 02:10, #121): agents and
         # locators often post with their own number.
-        if authority.manager_on_record:
+        cleared_by = _licence_clears_contact(modules)
+        if cleared_by is not None:
+            # Vidyut, Sat 07:35: an active licence checked by number, sponsored by the
+            # brokerage on record. Information only: the number is still not the office's.
+            brokerage = " ".join(cleared_by.split())[:MAX_BROKERAGE_CHARS]
+            lines.append(
+                _line(
+                    lang,
+                    "label.contact",
+                    CardTone.NOT_SHOWN,
+                    "contact.licensed_sponsor",
+                    brokerage=brokerage,
+                )
+            )
+        elif authority.manager_on_record:
             lines.append(
                 _line(
                     lang,
@@ -647,7 +725,11 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     if found is None:
         return []  # never looked up for this case: no line, as with any module that is absent
     label = "label.license"
+    renter = found.number_from == "renter"
     if found.status is LicenseStatus.NOT_FOUND:
+        if renter:
+            # a typed number may be a typo: Not confirmed (HOLD tone), never a red flag
+            return [_line(lang, label, CardTone.HOLD, "license.not_found_given")]
         return [_line(lang, label, CardTone.RED_FLAG, "license.not_found")]
     if found.status is LicenseStatus.LICENSED:
         sponsor = " ".join((found.sponsor_broker or "").split())[:MAX_SPONSOR_CHARS]
@@ -655,7 +737,8 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             return [_line(lang, label, CardTone.OK, "license.licensed_sponsored", broker=sponsor)]
         return [_line(lang, label, CardTone.OK, "license.licensed")]
     if found.claimed_role:
-        return [_line(lang, label, CardTone.NOT_CHECKED, "license.not_checked_claimed")]
+        key = "license.not_checked_given" if renter else "license.not_checked_claimed"
+        return [_line(lang, label, CardTone.NOT_CHECKED, key)]
     return []  # no claim, so nothing to say
 
 
@@ -687,9 +770,10 @@ def _quoted_rule(rule: PublishedRule, lang: str, key: str) -> str:
 def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     """The owner of record, beside what the poster says about owning the home (A19, #125).
 
-    A company is named. A person never is: the card says "a private owner" and whether the
-    name the poster gave matches, yes or no. Nothing here is a red flag, and a match is a
-    supporting line: the owner roll is public, so anyone can type the owner's name.
+    A company we know is named; any other company is "a company owner". A person never is:
+    the card says "a private owner" and whether the name the poster gave matches, yes or no.
+    Nothing here is a red flag, and a match is a supporting line: the owner roll is public,
+    so anyone can type the owner's name.
     """
     owner = modules.owner
     if owner is None:
@@ -705,9 +789,12 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             return [_line(lang, label, CardTone.NOT_SHOWN, "owner.person_mismatch")]
         return [_line(lang, label, CardTone.NOT_CHECKED, "owner.person_no_name")]
 
-    company = _one_line(owner.company, MAX_COMPANY_CHARS)
+    company = _one_line(owner.company, MAX_COMPANY_CHARS) if owner.company_known else ""
     if not company:
-        return []
+        # A company we do not know is never named (round 5 on #160): "a company owner".
+        not_poster = _owner_is_not_the_poster(modules)
+        key = "owner.company_unnamed_not_poster" if not_poster else "owner.company_unnamed"
+        return [_line(lang, label, CardTone.NOT_SHOWN, key)]
     if owner.poster_matches is OwnerMatch.YES:
         tone, key = CardTone.OK, "owner.company_matches"
     elif _owner_is_not_the_poster(modules):

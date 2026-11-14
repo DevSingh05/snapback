@@ -41,9 +41,10 @@ def run_case(
     Returns None when the case is paused for approval and `approver` is None. Record the
     answer with `case.approve(...)` and call this again to carry on. It also returns None
     while the poster's reply is awaited; give it to `case.reply(...)` and call this again.
+    Likewise while the renter is asked for the license number: `case.answer(...)`.
     """
     while not case.done:
-        if case.step is Step.REPLY:
+        if case.step in (Step.REPLY, Step.ASK):
             return None
         if case.step is Step.SPOT:
             case.draw_spot()

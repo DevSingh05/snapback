@@ -90,6 +90,7 @@ class CaseStatus(BaseModel):
     screenshots: int = 0
     injection_noticed: bool = False
     challenge: ChallengeView | None = None
+    question: str | None = None  # code-written; set only while status is waiting_for_answer
 
 
 def public_id(case_id: str) -> str:
@@ -166,6 +167,9 @@ class RecordedCase:
     def reply(self, photo: bytes) -> ReplyCheck:
         raise NothingWaiting(self.case_id)
 
+    def answer(self, text: str | None) -> None:
+        raise NothingWaiting(self.case_id)
+
     def presence(self) -> PresenceStatus:
         return presence_of(self._evidence).status
 
@@ -193,6 +197,11 @@ class SessionCase:
         self.property_id: str | None = None  # our id for the building the listing claims
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
+
+    @property
+    def listing(self) -> Listing:
+        """What intake read from the ad. Read-only for other routes (search alternatives)."""
+        return self._listing
 
     @property
     def done(self) -> bool:
@@ -231,6 +240,8 @@ class SessionCase:
             status = CaseProgress.WAITING_FOR_APPROVAL
         elif self.session.waiting_for_reply:
             status = CaseProgress.WAITING_FOR_REPLY
+        elif self.session.waiting_for_answer:
+            status = CaseProgress.WAITING_FOR_ANSWER
         else:
             status = CaseProgress.RUNNING
         draft = self.session.pending_challenge
@@ -250,6 +261,7 @@ class SessionCase:
                 if draft
                 else None
             ),
+            question=self.session.question,
         )
 
     def approve(self, decision: str, text: str | None) -> None:
@@ -274,6 +286,17 @@ class SessionCase:
             self.session.reply(outcome)
         self.advance()
         return check
+
+    def answer(self, text: str | None) -> None:
+        """The renter's answer to the license question (A24 stretch); the case carries on.
+
+        Raises `NothingWaiting` unless the renter was asked."""
+        with self._lock:
+            try:
+                self.session.answer(text)
+            except RuntimeError as error:
+                raise NothingWaiting(self.case_id) from error
+        self.advance()
 
     def presence(self) -> PresenceStatus:
         return presence_of(self.session.evidence).status
@@ -456,7 +479,12 @@ class CaseStore:
                 # case has no challenge yet (no stand-in), so there is nothing to reply to.
                 modules = ReplyModules(modules, self._photo_memory())
                 modules.remember_listing_photos(full_id, photos or [])
-            session = CaseSession(full_id, modules, Trace(full_id, source))
+            session = CaseSession(
+                full_id,
+                modules,
+                Trace(full_id, source),
+                ask_enabled=self._settings.snapback_ask_renter,
+            )
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:

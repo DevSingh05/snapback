@@ -104,7 +104,10 @@ def test_a_sponsor_name_is_folded_and_cut_to_a_sane_length():
     long = {"status": "licensed", "claimed_role": "agent", "sponsor_broker": "Fx  Realty\n" * 40}
     text = person(passing(license=long))["License"][1]
     assert "\n" not in text and "  " not in text
-    assert len(text) <= len("Licensed in Texas, sponsored by .") + 80
+    assert (
+        len(text)
+        <= len("An active Texas license exists under the name in the ad, sponsored by .") + 80
+    )
 
 
 def test_no_licence_is_never_dont_pay_whatever_else_is_true():
@@ -129,7 +132,8 @@ def test_a_licence_is_a_supporting_line_and_never_lifts_authority():
     assert state(without) is state(licensed) is VerdictState.HOLD
     assert person(licensed)["License"] == (
         CardTone.OK,
-        "Licensed in Texas, sponsored by Fixture Realty Group.",
+        "An active Texas license exists under the name in the ad, "
+        "sponsored by Fixture Realty Group.",
     )
     assert person(licensed)["Allowed to rent it"] == person(without)["Allowed to rent it"]
     assert to_evidence(licensed).license_flag is False
@@ -228,7 +232,13 @@ def test_every_licence_line_follows_the_wording_rules_in_both_languages(result):
 def test_nothing_about_the_licence_names_a_person_or_a_number():
     modules = passing(license=LICENSED)
     card = build_card(modules, checked_at=CHECKED_AT)
-    assert set(LicenseResult.model_fields) == {"status", "claimed_role", "sponsor_broker", "state"}
+    assert set(LicenseResult.model_fields) == {
+        "status",
+        "claimed_role",
+        "sponsor_broker",
+        "state",
+        "number_from",  # where the looked-up number came from ("ad", "renter"), never the number
+    }
     said = card.model_dump_json()
     assert "Fixture Realty Group" in said  # a company, which is allowed
     assert not any(ch.isdigit() for ch in person(modules)["License"][1])

@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import sample from "../../../../fixtures/contracts/results_sample.csv?raw";
+import pr181 from "./calibration_pr181.csv?raw";
 import { LabPanel, LabSection } from "./LabPanel";
 import {
   ResultsError,
@@ -209,5 +210,57 @@ describe("LabSection source label from the served file", () => {
     vi.stubGlobal("fetch", async () => new Response(body, { status: 200 }));
     render(<LabSection />);
     expect(await screen.findByTestId("source-chip")).toHaveTextContent("LIVE");
+  });
+});
+
+// calibration_pr181.csv is the aggregate-count CSV from PR #181 (renders of our scans).
+describe("calibration rows from renders (PR #181)", () => {
+  it("does not print a frozen line from the calibration tag above FIXTURE data", () => {
+    render(<LabPanel csv={pr181} source="fixture" />);
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    expect(screen.queryByText(/frozen/i)).toBeNull();
+    expect(screen.queryByText(/cal-20261114/)).toBeNull();
+  });
+
+  it("labels the series as renders and shows n per bin", () => {
+    render(<LabPanel csv={pr181} source="fixture" />);
+    const legend = screen.getByTestId("cal-legend");
+    expect(within(legend).getByText("Renders of our scans (not photos)")).toBeInTheDocument();
+    expect(within(legend).getByTestId("cal-legend-n")).toHaveTextContent(
+      "n per bin: 37, 4, 3, 6, 30",
+    );
+    expect(screen.queryAllByTestId("cal-point-n")).toHaveLength(0);
+  });
+
+  it("marks the calibration block as measured on renders, with n from the rows", () => {
+    render(<LabPanel csv={pr181} source="fixture" />);
+    expect(screen.getByTestId("cal-chip")).toHaveTextContent(
+      "Measured on renders of our scans, n=80",
+    );
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    expect(screen.queryByText(/Stated confidence/)).toBeNull();
+  });
+
+  it("retitles the heading and never frames a stated probability", () => {
+    render(<LabPanel csv={pr181} source="fixture" />);
+    expect(
+      screen.getByRole("heading", { name: "Locate score calibration (renders of our scans)" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/when we say 90%/)).toBeNull();
+  });
+
+  it("still shows a real frozen date from a non-calibration row", () => {
+    const csv = `${HEADER}
+rules_only,forged_false_accept,9,40,0.225,0.1232,0.375,2026-11-13
+place_real_renders,calibration_bin:0.90-1.00,30,30,1.0,0.8865,1.0,cal-20261114-0404
+`;
+    render(<LabPanel csv={csv} source="live" />);
+    expect(screen.getByText(/Held-out set frozen 2026-11-13\./)).toBeInTheDocument();
+  });
+
+  it("main's current sample is unchanged: no frozen line, bins keyed by condition name", () => {
+    render(<LabPanel csv={sample} source="fixture" />);
+    expect(screen.queryByText(/frozen/i)).toBeNull();
+    expect(screen.getAllByTestId("cal-series").length).toBeGreaterThan(0);
   });
 });

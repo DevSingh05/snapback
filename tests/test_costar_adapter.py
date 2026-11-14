@@ -86,7 +86,7 @@ def test_default_source_comes_from_settings(monkeypatch):
 
 def test_coverage_reports_counts_and_field_paths_only():
     report = coverage(costar_jsonl.FIXTURE_KIT)
-    assert report["records"] == 4
+    assert report["records"] == 5
     assert report["year_built_events"] == 2  # fx-prop-1 and -4; the year-0 record does not count
     text = json.dumps(report)
     assert "fx-" not in text and "Fixture" not in text  # no ids or values, safe to paste
