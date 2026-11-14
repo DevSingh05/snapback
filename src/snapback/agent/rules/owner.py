@@ -60,7 +60,9 @@ def company_match(said: str | None, on_record: str | None) -> OwnerMatch:
     same = same_company(said, on_record)
     if same is None:
         return OwnerMatch.NOT_CHECKED
-    if same:
+    ours, theirs = _joined(said or ""), _joined(on_record or "")
+    # "FixtureHomes" and "Fixture Homes" are one name written two ways.
+    if same or (ours and ours == theirs):
         return OwnerMatch.YES
     return OwnerMatch.NOT_CHECKED if _near_miss(said or "", on_record or "") else OwnerMatch.NO
 

@@ -145,6 +145,8 @@ def test_a_near_miss_spelling_of_the_company_is_not_checked_and_never_held():
     # "LLC", "Inc" and punctuation are ignored, and a shorter form that starts the same matches.
     assert company_match("Fixture Homes, L.L.C.", "FIXTURE HOMES LLC") is OwnerMatch.YES
     assert company_match("Fixture", "Fixture Homes LLC") is OwnerMatch.YES
+    assert company_match("FixtureHomes", "Fixture Homes LLC") is OwnerMatch.YES
+    assert company_match("Fixture Homes", "FixtureHomes, Inc.") is OwnerMatch.YES
     assert company_match("Fixure Homes", "Fixture Homes LLC") is OwnerMatch.NOT_CHECKED
     assert company_match("Other Fixture Rentals", "Fixture Homes LLC") is OwnerMatch.NO
     assert company_match(None, "Fixture Homes LLC") is OwnerMatch.NOT_CHECKED
@@ -154,6 +156,7 @@ def test_a_company_owner_is_named_for_a_poster_who_claims_nothing():
     # An agent or a manager posting a company's home: the card says who owns it, and holds
     # nothing on that account.
     found = check_owner(ContactClaims(), COMPANY, rules=())
+    assert found.poster_matches is OwnerMatch.NOT_CHECKED
     assert owner_line(passing(found)) == (
         CardTone.NOT_SHOWN,
         "Not confirmed. Owner of record: Fixture Homes LLC.",
