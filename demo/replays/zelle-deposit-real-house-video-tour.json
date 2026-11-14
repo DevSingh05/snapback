@@ -1,6 +1,6 @@
 {
   "slug": "zelle-deposit-real-house-video-tour",
-  "case_id": "7Q2M",
+  "case_id": "replay-zelle-deposit-real-house-video-tour",
   "title": "A $2,500 Zelle deposit for a real house that was never for rent",
   "pattern": "price",
   "fictional": false,
@@ -14,35 +14,35 @@
     {
       "id": "listing",
       "kind": "listing",
-      "reported_on": "2026-07-31",
+      "reported_on": "",
       "label": "Listing seen",
       "detail": "A real house is listed for rent online. The owner still lives there and never offered it for rent."
     },
     {
       "id": "chat",
       "kind": "chat",
-      "reported_on": "2026-07-31",
+      "reported_on": "",
       "label": "Asked to see it",
       "detail": "The poster says the occupants will not move out for weeks and sends a link to a professional video tour instead of a viewing."
     },
     {
       "id": "hold",
       "kind": "hold_request",
-      "reported_on": "2026-07-31",
+      "reported_on": "",
       "label": "Asked to pay to secure it",
       "detail": "The renter is asked for an application fee and a security deposit to secure the house."
     },
     {
       "id": "payment",
       "kind": "payment",
-      "reported_on": "2026-07-31",
+      "reported_on": "",
       "label": "Paid by Zelle",
-      "detail": "The renter sends a $75 fee and a $2,500 deposit by Zelle, without ever seeing inside."
+      "detail": "The renter pays a $75 application fee, then sends the $2,500 deposit by Zelle over several days, without ever seeing inside."
     },
     {
       "id": "discovery",
       "kind": "discovery",
-      "reported_on": "2026-07-31",
+      "reported_on": "",
       "label": "Found out",
       "detail": "The poster stops answering. The video tour had been copied from an older real estate listing."
     }
@@ -54,18 +54,29 @@
       {
         "step_id": "listing",
         "status": "matches",
-        "text": "The photos and the tour were taken in this house. Real photos do not mean the poster may rent it."
+        "text": "Taken in this building (3 of 3 photos)."
+      },
+      {
+        "step_id": "listing",
+        "status": "not_checked",
+        "text": "Not checked (our data has no rent for this building)."
       },
       {
         "step_id": "chat",
         "status": "not_confirmed",
-        "text": "The poster could not be confirmed as someone who may rent this house, and offers no viewing."
+        "text": "No reply yet. An honest landlord may need time."
+      },
+      {
+        "step_id": "chat",
+        "status": "not_confirmed",
+        "text": "NOT SHOWN. Being inside does not mean they may rent it."
       },
       {
         "step_id": "hold",
-        "status": "warning",
-        "text": "A Zelle deposit before a viewing. Red flag."
+        "status": "red_flag",
+        "text": "Zelle before a viewing. Red flag."
       }
     ]
-  }
+  },
+  "cant_catch": "SNAPBACK does not open the video tour link, so it cannot tell that the tour was copied from an older listing. Real photos of a real house do not show that the poster may rent it."
 }
