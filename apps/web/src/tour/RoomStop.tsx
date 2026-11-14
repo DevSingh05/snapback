@@ -43,11 +43,13 @@ interface Props {
   dwell: boolean;
   showingPhoto: boolean;
   onToggle: () => void;
+  /** Set while a placeholder stands in for the ad's own photo: says which, never silent. */
+  photoNote?: string | null;
   /** Where the agent rail mounts (the walk's real trace); empty until it exists. */
   rail?: ReactNode;
 }
 
-export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, rail }: Props) {
+export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, photoNote, rail }: Props) {
   const empty = emptyFrameText(stop, plan);
   const inside = stop.kind === "room" || stop.kind === "stop";
   const details = (
@@ -87,6 +89,11 @@ export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, rail }: Pr
             {showingPhoto ? "Show the scan" : "Show the photo"}
           </button>
         </div>
+      )}
+      {stop.photos.length > 0 && photoNote && (
+        <p className="tour-photo-note" data-testid="photo-fallback">
+          {photoNote}
+        </p>
       )}
       {empty && (
         <p className="tour-empty-frame" data-testid="empty-frame">

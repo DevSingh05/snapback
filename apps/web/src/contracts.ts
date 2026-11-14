@@ -322,6 +322,7 @@ export interface TourFact {
 
 export interface TourPhoto {
   photo_id: string;
+  alias?: string | null; // P1, P2...: the key of /cases/{id}/evidence/{alias}/photo.jpg
   sweep_id?: string | null;
   position?: [number, number, number] | null;
   rotation_quat?: [number, number, number, number] | null;
