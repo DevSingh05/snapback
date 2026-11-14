@@ -7,6 +7,7 @@ import random
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from snapback.vision.locate.cube import face_basis, look_rotation
 from snapback.vision.locate.geometry import (
@@ -63,3 +64,71 @@ def test_the_locator_puts_the_viewer_angles_on_the_pose_and_the_walk_carries_the
 
     assert {"yaw_deg", "pitch_deg"} <= set(Pose.model_fields)
     assert {"yaw_deg", "pitch_deg"} <= set(TourPhoto.model_fields)
+
+
+def test_the_locator_sets_the_viewer_angles_from_its_own_pose(tmp_path):
+    """#244 review: drop `yaw_deg`/`pitch_deg` in Locator._pose and this fails. The angles must be
+    the viewer angles of the very camera the pose's quaternion describes."""
+    from dataclasses import replace
+
+    from snapback.adapters.matterport import FixtureMatterport
+    from snapback.vision.embed import TinyEmbedder
+    from snapback.vision.locate.geometry import CV_TO_GL
+    from snapback.vision.locate.index import LocateIndex
+    from snapback.vision.locate.locate import Catalog, Locator, ModelInfo
+    from snapback.vision.locate.thresholds import load_thresholds
+    from snapback.vision.locate.verify import PatchMatcher
+
+    adapter = FixtureMatterport(tmp_path / "faces")
+    sweeps = {"fx-model-a": adapter.sweeps("fx-model-a")}
+    index = LocateIndex.build("fx", sweeps["fx-model-a"], TinyEmbedder())
+    t = replace(load_thresholds(), min_inliers=12, stop_at_inliers=60, elsewhere_min_inliers=16)
+    locator = Locator(
+        index, sweeps, Catalog([ModelInfo("fx-model-a", "fx-prop-1")]), PatchMatcher(), t
+    )
+    with Image.open(sweeps["fx-model-a"][2].faces[1]) as opened:
+        crop = opened.convert("RGB").crop((30, 20, 230, 190))
+    result = locator.locate("c", {"p": crop}, "fx-prop-1")
+    pose = result.poses["p"]
+    assert pose.yaw_deg is not None and pose.pitch_deg is not None
+    sweep = next(s for s in sweeps["fx-model-a"] if s.sweep_id == pose.sweep_id)
+    pano = matrix_from_quaternion(sweep.rotation_quat) if sweep.rotation_quat else np.eye(3)
+    camera_to_world_cv = (
+        matrix_from_quaternion(pose.rotation_quat) @ CV_TO_GL
+    )  # CV_TO_GL is its own inverse
+    yaw, pitch = viewer_yaw_pitch(pano, pano.T @ camera_to_world_cv)
+    assert (pose.yaw_deg, pose.pitch_deg) == pytest.approx((yaw, pitch), abs=0.05)
+
+
+def test_the_walk_carries_the_angles_to_each_photo_unchanged():
+    """#244 review: drop them in map_locate and this fails."""
+    from snapback.contracts import DataSource, LocateResult, LocateStatus, PhotoLocation, Pose
+    from snapback.tour import TourSweep, build_tour, map_locate
+
+    q = (0.0, 0.0, 0.0, 1.0)
+    sweeps = [
+        TourSweep("z0", (0.0, 0.0, 1.4), q, "Entryway"),
+        TourSweep("z1", (5.0, 0.0, 1.4), q, "Kitchen"),
+    ]
+    plan = build_tour(
+        property_id="p", kind="apartment", source=DataSource.LIVE, sweeps=sweeps, has_scan=True
+    )
+    pose = Pose(
+        sweep_id="z1",
+        position=(5.0, 0.0, 1.4),
+        rotation_quat=q,
+        fov_deg=62.0,
+        yaw_deg=-175.3,
+        pitch_deg=-13.2,
+    )
+    located = LocateResult(
+        case_id="c",
+        photos=[PhotoLocation(photo_id="p1", status=LocateStatus.LOCATED_IN_CLAIMED, pano_id="z1")],
+        poses={"p1": pose},
+        thresholds_version="t",
+    )
+    out, _ = map_locate(plan, located)
+    placed = [p for s in out.stops for p in s.photos]
+    assert len(placed) == 1
+    got = placed[0]
+    assert (got.sweep_id, got.yaw_deg, got.pitch_deg, got.fov_deg) == ("z1", -175.3, -13.2, 62.0)
