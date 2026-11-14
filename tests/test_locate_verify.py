@@ -355,10 +355,39 @@ def test_thresholds_reject_an_elsewhere_bar_below_the_placement_bar(tmp_path):
     from snapback.vision.locate.thresholds import THRESHOLDS_FILE
 
     copy = tmp_path / "t.toml"
-    copy.write_text(
-        THRESHOLDS_FILE.read_text().replace(
-            "elsewhere_min_inliers = 60", "elsewhere_min_inliers = 29"
-        )
+    import re
+
+    text, swapped = re.subn(
+        r"elsewhere_min_inliers = \d+", "elsewhere_min_inliers = 29", THRESHOLDS_FILE.read_text()
     )
+    assert swapped == 1  # the edit must land, whatever the current value is
+    copy.write_text(text)
     with pytest.raises(ValueError, match="elsewhere_min_inliers"):
         load_thresholds(copy)
+
+
+def test_thresholds_version_names_the_matcher(twins, locator):
+    sweeps, _, _ = twins
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    result = locator.locate("fx-case-v", {"p": photo}, "fx-prop-1")
+    assert result.thresholds_version.startswith("thresholds-")
+    assert result.thresholds_version.endswith("+patch")
+
+
+def test_seam_neighbours_add_the_faces_either_side_of_the_top_two_hits():
+    from snapback.vision.locate.index import Entry, Hit
+    from snapback.vision.locate.locate import seam_neighbours
+
+    hits = [
+        Hit(Entry("m1", "s1", 1, "c"), 0.9),
+        Hit(Entry("m2", "s4", 4, "face"), 0.8),
+        Hit(Entry("m3", "s9", 2, "c"), 0.7),  # third hit: no neighbours added
+    ]
+    added = {(h.entry.model_id, h.entry.sweep_id, h.entry.face) for h in seam_neighbours(hits)}
+    assert added == {("m1", "s1", 4), ("m1", "s1", 2), ("m2", "s4", 3), ("m2", "s4", 1)}
+    assert all(h.score < 0.7 for h in seam_neighbours(hits))  # tried after the real hits
+
+
+def test_elsewhere_bar_follows_the_ruling():
+    t = load_thresholds()
+    assert t.elsewhere_min_inliers == 50 and t.elsewhere_min_spread == 0.15
