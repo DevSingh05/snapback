@@ -1,8 +1,12 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 
 import { SourceChip } from "../components/SourceChip";
 import { FINDING_WORDS, getReplay, REPLAY_VERDICT_WORDS } from "./index";
+import { openCase, runReplayCase, type RunCase } from "./runCase";
+import { replayLang, shortDate, words, type Lang } from "./text";
 import type { Replay } from "./types";
+import { useReplays } from "./useReplays";
+import { dataMode } from "../api";
 import "./replay.css";
 
 // Dates arrive as YYYY-MM-DD; format in UTC so the day never shifts with the viewer's timezone.
@@ -31,8 +35,14 @@ function NotFound() {
   );
 }
 
-function FindingLine({ finding }: { finding?: Replay["snapback"]["findings"][number] }) {
-  if (!finding) return <p>Nothing flagged yet.</p>;
+function FindingLine({
+  finding,
+  lang,
+}: {
+  finding?: Replay["snapback"]["findings"][number];
+  lang: Lang;
+}) {
+  if (!finding) return <p>{words(lang).nothingFlagged}</p>;
   return (
     <p className={`finding finding-${finding.status}`} data-status={finding.status}>
       <strong>{FINDING_WORDS[finding.status]}.</strong> {finding.text}
@@ -40,7 +50,61 @@ function FindingLine({ finding }: { finding?: Replay["snapback"]["findings"][num
   );
 }
 
-export function ReplayView({ replay }: { replay: Replay }) {
+// A replay can have several findings for one step; every one is shown, in file order.
+function FindingLines({ list, lang }: { list: Replay["snapback"]["findings"]; lang: Lang }) {
+  if (list.length === 0) return <FindingLine lang={lang} />;
+  return (
+    <>
+      {list.map((f) => (
+        <FindingLine key={`${f.step_id}-${f.text}`} finding={f} lang={lang} />
+      ))}
+    </>
+  );
+}
+
+// "Run this case" starts the replay's staged case on the API and opens its real card.
+function RunButton({ replay, run, lang }: { replay: Replay; run: RunCase; lang: Lang }) {
+  const t = words(lang);
+  const [state, setState] = useState<"idle" | "busy" | "failed">("idle");
+  const offline = dataMode() === "fixture";
+  const go = async () => {
+    setState("busy");
+    try {
+      openCase(await run(replay.case_id));
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <div className="replay-run">
+      <button
+        type="button"
+        className="replay-run-btn"
+        onClick={go}
+        disabled={offline || state === "busy"}
+      >
+        {state === "busy" ? t.running : t.run}
+      </button>
+      {offline ? <p className="muted">{t.runNeedsApi}</p> : null}
+      {state === "failed" ? (
+        <p role="alert" className="replay-error">
+          {t.runFailed}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function ReplayView({
+  replay,
+  lang = replayLang(),
+  runCase = runReplayCase,
+}: {
+  replay: Replay;
+  lang?: Lang;
+  runCase?: RunCase;
+}) {
+  const t = words(lang);
   const { steps, snapback } = replay;
   // The stop is the first payment step; stop_before, when given, must agree.
   const stopIndex = steps.findIndex((s) => s.kind === "payment");
@@ -50,7 +114,9 @@ export function ReplayView({ replay }: { replay: Replay }) {
       : snapback.stop_before && snapback.stop_before !== steps[stopIndex]?.id
         ? "This replay's stop_before does not name its first payment step."
         : null;
-  const findings = new Map(snapback.findings.map((f) => [f.step_id, f]));
+  const findings = new Map<string, Replay["snapback"]["findings"]>();
+  for (const f of snapback.findings)
+    findings.set(f.step_id, [...(findings.get(f.step_id) ?? []), f]);
 
   return (
     <article className="replay-page">
@@ -59,18 +125,16 @@ export function ReplayView({ replay }: { replay: Replay }) {
           <span className="wordmark">SNAPBACK</span>
           <SourceChip source="fixture" />
         </div>
-        <p className="replay-label">
-          {replay.fictional ? "Fictional example" : "Re-created from a public report"}
-        </p>
+        <p className="replay-label">{replay.fictional ? t.fictional : t.reportedLabel}</p>
         <h1>{replay.title}</h1>
         {replay.source && !replay.fictional ? (
           <p className="replay-source">
-            Source:{" "}
+            {t.source}:{" "}
             <a href={replay.source.url} rel="noopener noreferrer" target="_blank">
               {replay.source.name}
             </a>
             {", "}
-            <span data-testid="source-date">{reportedDate(replay.source.published_on)}</span>
+            <span data-testid="source-date">{shortDate(replay.source.published_on, lang)}</span>
           </p>
         ) : null}
         {replay.fictional ? (
@@ -88,8 +152,8 @@ export function ReplayView({ replay }: { replay: Replay }) {
       ) : (
         <>
           <div className="replay-legend" aria-hidden="true">
-            <span>What was reported</span>
-            <span>What SNAPBACK would have shown</span>
+            <span>{t.happened}</span>
+            <span>{t.withSnapback}</span>
           </div>
 
           <ol className="timeline" data-testid="timeline">
@@ -115,15 +179,19 @@ export function ReplayView({ replay }: { replay: Replay }) {
                   data-testid={`step-${step.id}`}
                 >
                   <div className="tl-real">
-                    <time dateTime={step.reported_on}>{reportedDate(step.reported_on)}</time>
+                    <span className="tl-label">{t.happened}</span>
+                    {step.reported_on ? (
+                      <time dateTime={step.reported_on}>{reportedDate(step.reported_on)}</time>
+                    ) : null}
                     <h2>{step.label}</h2>
                     <p>{step.detail}</p>
                   </div>
                   <div className="tl-snap">
+                    <span className="tl-label">{t.withSnapback}</span>
                     {i >= stopIndex && stopIndex >= 0 ? (
-                      <p className="muted">Not sent. Stopped before this.</p>
+                      <p className="muted">{t.notSent}</p>
                     ) : (
-                      <FindingLine finding={findings.get(step.id)} />
+                      <FindingLines list={findings.get(step.id) ?? []} lang={lang} />
                     )}
                   </div>
                 </li>
@@ -133,14 +201,40 @@ export function ReplayView({ replay }: { replay: Replay }) {
         </>
       )}
 
+      {replay.cant_catch ? (
+        <section className="replay-cant" aria-label={t.cantCatch}>
+          <h2>{t.cantCatch}</h2>
+          <p>{replay.cant_catch}</p>
+        </section>
+      ) : null}
+
+      {replay.fictional ? null : <RunButton replay={replay} run={runCase} lang={lang} />}
+
       <footer className="replay-foot">
+        {replay.source && !replay.fictional ? (
+          <p data-testid="replay-footer">
+            {t.footer(replay.source.name, shortDate(replay.source.published_on, lang))}{" "}
+            <a href={replay.source.url} rel="noopener noreferrer" target="_blank">
+              {t.source}
+            </a>
+          </p>
+        ) : null}
         <p>SNAPBACK never texts first and never asks for money.</p>
       </footer>
     </article>
   );
 }
 
-export function ReplayPage({ slug, replay }: { slug: string; replay?: Replay }) {
-  const found = replay ?? getReplay(slug);
-  return found ? <ReplayView replay={found} /> : <NotFound />;
+export function ReplayPage({
+  slug,
+  replay,
+  runCase,
+}: {
+  slug: string;
+  replay?: Replay;
+  runCase?: RunCase;
+}) {
+  const all = useReplays();
+  const found = replay ?? getReplay(slug, all);
+  return found ? <ReplayView replay={found} runCase={runCase} /> : <NotFound />;
 }

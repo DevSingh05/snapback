@@ -194,6 +194,7 @@ class SessionCase:
         self._listing = listing
         self._runner = runner
         self.staged = False  # made from a staged demo case (fixtures/demo)
+        self.demo_case_id: str | None = None  # which one, so a replay can name its source
         self.property_id: str | None = None  # our id for the building the listing claims
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
@@ -230,7 +231,7 @@ class SessionCase:
             lang=lang,
         )
         # A card made from a staged demo case says so on the card itself.
-        return staged(card) if self.staged else card
+        return staged(card, self.demo_case_id) if self.staged else card
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         """Where the case stands. The drafted challenge is left out unless asked for."""
@@ -406,9 +407,11 @@ class CaseStore:
         register: Callable[[str], None] | None = None,
         *,
         photos: list[bytes] | None = None,
+        demo_case: str | None = None,
     ) -> SessionCase:
         """Start a check. `property_id` is our id for the building the listing claims, and
-        `photos` are the listing photos as sent, in order.
+        `photos` are the listing photos as sent, in order. `demo_case` names one staged case
+        (a replay's) for this request alone; without it the server's DEMO_CASE setting applies.
 
         `register` is told the new case's id before anything runs. If it raises, there is no
         case: a check that could not be recorded for later deletion is not started.
@@ -430,7 +433,8 @@ class CaseStore:
             if record is None:
                 raise UnknownProperty
 
-        demo = load_demo_case(self._settings.demo_case) if self._settings.demo_case else None
+        demo_id = demo_case or self._settings.demo_case
+        demo = load_demo_case(demo_id) if demo_id else None
         if demo is not None and not listing.text:
             # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
             own = read_listing(demo.listing_text)
@@ -491,6 +495,7 @@ class CaseStore:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner, self._zone_of(record))
             case.staged = demo is not None
+            case.demo_case_id = demo.case_id if demo is not None else None
             case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()
