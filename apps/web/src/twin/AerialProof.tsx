@@ -111,7 +111,7 @@ function ProofView({ matched, claimed, mismatch, live = false, chip }: ViewProps
         <Tile
           side={matched}
           caption={mismatch ? "This photo was taken here." : undefined}
-          showFacts={live}
+          showFacts={live && mismatch}
         />
       </div>
       {away ? (

@@ -21,7 +21,10 @@ export function canGoLive(caseId: string | undefined): caseId is string {
 }
 
 // Our own route only; an image address from the API is never fetched if it points elsewhere.
-const OWN_IMAGE = /^\/cases\/[^/?#]+\/aerial\/(claimed|matched)\.jpg(\?[^#]*)?$/;
+const ownImage = (caseId: string): RegExp => {
+  const id = encodeURIComponent(caseId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^/cases/${id}/aerial/(claimed|matched)\\.jpg(\\?[^#]*)?$`);
+};
 
 /**
  * Fetches the aerial proof with the read token in a header, then each live tile's bytes the same
@@ -38,10 +41,11 @@ export function useLiveAerial(caseId: string | undefined, enabled: boolean): Liv
     const id = caseId;
     const ctl = new AbortController();
     const blobs: string[] = [];
+    const own = ownImage(id);
 
     async function image(side: AerialSideOut | null): Promise<string | undefined> {
       const path = side?.image_url;
-      if (!side?.tile || side.tile.source !== "live" || !path || !OWN_IMAGE.test(path)) {
+      if (!side?.tile || side.tile.source !== "live" || !path || !own.test(path)) {
         return undefined;
       }
       try {

@@ -261,7 +261,7 @@ function TwinViewInner({
             <p className="twin-status">{status}</p>
           </div>
           <AerialProof
-            caseId={caseId}
+            caseId={demo ? undefined : caseId}
             matched={matchedAerial}
             claimed={claimedAerial}
             mismatch={mismatch}

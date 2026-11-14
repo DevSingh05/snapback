@@ -66,7 +66,10 @@ beforeEach(() => {
         const side = url.includes("/claimed.jpg") ? "claimed" : "matched";
         const status = imageStatus[side] ?? 200;
         return status === 200
-          ? new Response(new Blob(["jpg"], { type: "image/jpeg" }), { status })
+          ? new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+              status,
+              headers: { "Content-Type": "image/jpeg" },
+            })
           : new Response("{}", { status });
       }
       return new Response(JSON.stringify(json), { status: 200 });
@@ -144,7 +147,22 @@ describe("AerialProof live", () => {
     render(view());
     await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
     expect(screen.queryByTestId("aerial-distance")).toBeNull();
+    expect(screen.queryByText(/Acme/)).toBeNull();
   });
+
+  it.each(["https://evil.example/a.jpg", ".evil.example/a.jpg", "/cases/OTHER/aerial/claimed.jpg"])(
+    "never fetches an image address outside this case's own route (%s)",
+    async (bad) => {
+      json = body({ claimed: { ...body().claimed, image_url: bad }, matched: null });
+      render(view());
+      await waitFor(() =>
+        expect(screen.getByText("No aerial image for this building yet")).toBeInTheDocument(),
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.url).toBe(`/api/cases/${CASE}/aerial`);
+      expect(screen.queryByRole("img")).toBeNull();
+    },
+  );
 
   it("shows company names and facts from the API, no person name field", async () => {
     render(view());
