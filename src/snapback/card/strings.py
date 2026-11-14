@@ -30,6 +30,9 @@ EN: dict[str, str] = {
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
     "label.link": "Link",
+    "label.license": "License",
+    "label.owner": "Owner of record",
+    "label.owner_rule": "Owner's rule",
     "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
@@ -39,11 +42,32 @@ EN: dict[str, str] = {
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
+    "place.not_indexed_yet": "Not checked (this building's scan is not indexed yet).",
     "place.no_photos": "Not checked (no listing photos were sent).",
     "place.seen_before_dated": "A listing photo also appeared in another check on {date}.",
     "place.seen_before": "A listing photo also appeared in another check.",
     # For sale is a red flag, never proof: it holds a case and cannot set DON'T PAY by itself.
-    "place.for_sale": "This home is listed for sale on {site}, not for rent. Red flag.",
+    # A warning, never a red flag, and never "not for rent" (red team H5, Sat 03:25). We do
+    # not know whether a home is leased; the record says it is for sale, and so do we. The
+    # line is what the record says ({record}, one of the four below) and then who to ask.
+    "place.for_sale_record": "Listed for sale on {site} by {brokerage} since {date}.",
+    "place.for_sale_record_no_date": "Listed for sale on {site} by {brokerage}.",
+    "place.for_sale_record_no_brokerage": "Listed for sale on {site} since {date}.",
+    "place.for_sale_record_bare": "Listed for sale on {site}.",
+    "place.for_sale": (
+        "{record} Homes for sale are sometimes also offered for lease, so confirm with that "
+        "brokerage before you pay."
+    ),
+    "place.for_sale_ask_listing": (
+        "{record} Homes for sale are sometimes also offered for lease, so confirm with the "
+        "listing brokerage before you pay."
+    ),
+    # The ad's phone is the office's on record: the brokerage itself is offering the home.
+    # Information only; it holds nothing (ruling, Sat 03:36).
+    "place.for_sale_office": (
+        "Not confirmed. {record} The contact in this listing is the office on record, so ask "
+        "them whether it is also offered for lease."
+    ),
     # Lease status is something we do not know and never claim (ruling, Sat 01:20). This is
     # an information line: it carries no flag and holds no case by itself.
     "place.recently_rented": (
@@ -66,6 +90,18 @@ EN: dict[str, str] = {
     "here_now.proven_bare": "Someone with access to a unit here proved it just now.",
     "here_now.waiting": "No reply yet. An honest landlord may need time.",
     "here_now.retry": "The reply photo could not be accepted. Ask for a new photo at a new spot.",
+    # A reply came, could not be accepted, and nothing more will be asked (A14).
+    "here_now.no_retry_left": (
+        "We could not confirm they are there. Call the office on record yourself."
+    ),
+    # A14: a reply came. What it showed, and what nothing has checked yet.
+    "here_now.code_only": (
+        "Not confirmed. The reply shows the code we asked for, but nothing has checked "
+        "that it was taken at the spot."
+    ),
+    "here_now.code_missing": (
+        "The reply did not show the code we asked for. Ask for a new photo at a new spot."
+    ),
     "here_now.not_requested": "Not checked (no one has been asked to prove they are inside yet).",
     "here_now.forged_copy": "The reply is a copy of listing photo {n}. Red flag.",
     "here_now.forged_copy_unknown": "The reply is a copy of one of the listing photos. Red flag.",
@@ -88,17 +124,82 @@ EN: dict[str, str] = {
     "contact.phone_match": (
         "The phone matches the leasing office on record. Call it yourself to confirm."
     ),
-    # The poster's own contact not matching the record is a real red flag (ruling, Sat 01:20).
+    # H1: the name matches the record and there was no phone to compare with the office's.
+    "contact.phone_unchecked": (
+        "Not checked (no phone number in the listing could be compared with the leasing "
+        "office on record)."
+    ),
+    # A15: a home for sale with no property record. Whatever the ad says, there is no phone
+    # on record for the brokerage to compare it with.
+    "contact.no_brokerage_phone": "Not checked (we hold no phone for the listing brokerage).",
+    # Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
+    # number. The line is Not confirmed, and it says who to call.
     "contact.phone_mismatch": (
-        "The phone in the listing is not the leasing office on record. "
-        "Call {manager} yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own, so check it with the office."
     ),
     "contact.phone_mismatch_unnamed": (
-        "The phone in the listing is not the leasing office on record. "
-        "Call the office on record yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own. Call the office on record yourself to confirm."
+    ),
+    # Vidyut, Sat 07:35: an active licence checked by number, sponsored by the brokerage on
+    # record. Information, not a confirmation: the number is still not the office's.
+    "contact.licensed_sponsor": (
+        "Not the office's number. The license number given is active, under the name in the "
+        "ad, and sponsored by {brokerage}, the brokerage on record. A license number can be "
+        "copied from a real listing, so call {brokerage} on a number you look up yourself to "
+        "confirm this agent."
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    "license.licensed": "Licensed in Texas.",
+    "license.licensed_sponsored": (
+        "An active Texas license exists under the name in the ad, sponsored by {broker}."
+    ),
+    # D10 (#128): NOT_FOUND only from a license number the ad itself gives. A name never gives it.
+    "license.not_found": (
+        "The license number in the ad is not an active Texas license. "
+        "Look it up yourself at trec.texas.gov."
+    ),
+    "license.not_checked_claimed": (
+        "Says they're licensed. Ask for their Texas license number and look it up at "
+        "trec.texas.gov."
+    ),
+    # A24 stretch: the number was typed by the renter, so these say "the number you gave" and
+    # a dead number is "Not confirmed" (typo risk), never "Doesn't match" (ruling, Sat 07:14).
+    "license.not_found_given": (
+        "The license number you gave is not an active Texas license. Check it was typed "
+        "right, then look it up yourself at trec.texas.gov."
+    ),
+    "license.not_checked_given": (
+        "Says they're licensed. The number you gave did not confirm it. Look it up yourself "
+        "at trec.texas.gov."
+    ),
+    "owner.company_not_poster": "Not confirmed. Owner of record: {company}, not the poster.",
+    "owner.company": "Not confirmed. Owner of record: {company}.",
+    "owner.company_unnamed_not_poster": (
+        "Not confirmed. Owner of record: a company owner, not the poster."
+    ),
+    "owner.company_unnamed": "Not confirmed. Owner of record: a company owner.",
+    "owner.company_matches": "The company they named is the owner of record: {company}.",
+    "owner.person_matches": "The owner of record is a private owner, and the name given matches.",
+    "owner.person_mismatch": (
+        "Not confirmed. The owner of record is a private owner, and the name given doesn't "
+        "match. Owners can rent through family or a trust; check with the owner of record or "
+        "the county records yourself."
+    ),
+    "owner.person_no_claim": (
+        "Not checked (a private owner is on record, and the poster does not say they are the "
+        "owner)."
+    ),
+    "owner.person_no_name": (
+        "Not checked (a private owner is on record, and the poster gave no name to compare)."
+    ),
+    # The owner's own published rule, quoted, with where it is from and the day we read it.
+    "owner.rule": '{company} says: "{rule}" ({source}, read {date}).',
+    "owner.rule_beside_payment": (
+        '{company}, the owner of record, says: "{rule}" ({source}, read {date}).'
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -158,6 +259,30 @@ EN: dict[str, str] = {
         "Only trust a SNAPBACK result you asked for yourself. "
         "SNAPBACK never texts first or asks for money."
     ),
+    # --- the "Report this copy" pack (A20, #126) --------------------------------------------
+    # For a listing agent whose listing was copied. Facts and where to click. No line here is
+    # about a person, and like every string in this table none uses the word the card bans:
+    # Facebook's own menu label for the reason is described, not quoted.
+    "report.pair.elsewhere": "Listing photo {n} was taken in a different property.",
+    "report.platform.facebook": "Facebook Marketplace",
+    "report.platform.zillow": "Zillow",
+    "report.platform.craigslist": "Craigslist",
+    "report.steps.facebook.1": "Open the copied listing on Facebook Marketplace.",
+    "report.steps.facebook.2": (
+        'Open the menu (three dots) and choose "Report listing". Pick the reason for a fake '
+        "or misleading listing."
+    ),
+    "report.steps.facebook.3": "Paste the lines from this page where it asks for details.",
+    "report.steps.zillow.1": "Open the copied listing on Zillow.",
+    "report.steps.zillow.2": (
+        'Choose "Report listing", then "Listing seems to be fraudulent or illegal".'
+    ),
+    "report.steps.zillow.3": "Paste the lines from this page where it asks for details.",
+    "report.steps.craigslist.1": "Open the copied post on Craigslist.",
+    "report.steps.craigslist.2": 'Use the "prohibited" flag at the top of the post.',
+    "report.steps.craigslist.3": (
+        "For a fuller report, use the Craigslist contact form and paste the lines from this page."
+    ),
     # On every card made from a staged demo case (fixtures/demo), first in the footer.
     "footer.staged": (
         "Staged example. The SNAPBACK team wrote this listing to show the checks. "
@@ -189,14 +314,57 @@ EN: dict[str, str] = {
         "Waiting for the renter to approve the message. Nothing is sent until then."
     ),
     "trace.hitl.send": "The renter approved the challenge text.",
+    "trace.reply.waiting": (
+        "The message is with the renter to pass on. Waiting for the poster's reply photo."
+    ),
+    "trace.tool.reply": "Checked the reply photo for the code and against the listing photos.",
     "trace.hitl.edit": "The renter edited the challenge text and approved it.",
     "trace.hitl.cancel": "The renter chose not to send a challenge.",
+    # --- the evidence-driven plan (A24): which check runs next -------------------------------
+    "plan.pick.record": "The home's own record gives the rent band and who is on record. Read it.",
+    # With a listing active, who is on record is the brokerage step's finding (A15).
+    "plan.pick.record_rent": "The home's own record gives the rent band. Read it.",
+    "plan.pick.brokerage": "The home is listed for sale right now. Check the listing office.",
+    "plan.pick.license": "The ad names a license. Look it up with the state.",
+    "plan.pick.owner": "An owner is on public record. Compare it with who is posting.",
+    "plan.pick.ask": (
+        "The ad says they're licensed but gives no number. Ask the renter for the license number."
+    ),
+    "plan.ask.question": (
+        "The ad says they're a licensed agent but gives no license number. Can you ask them "
+        "for it, or paste it here?"
+    ),
+    "plan.ask.looked_up": "Looked up the license number you gave with the state.",
+    "plan.ask.no_number": "No license number came back. The license stays not checked.",
+    "plan.ask.not_looked_up": (
+        "Could not look up the license number you gave. The license stays not checked."
+    ),
+    "plan.skip.ask_off": "asking the renter is not available",
+    "plan.skip.ask_none": "the ad does not claim a license without giving its number",
+    "plan.pick.report": "Every check that could run has run. Gather what they found for a report.",
+    "plan.skip.record": "no property record to read",
+    "plan.skip.brokerage": "the home is not listed for sale right now",
+    "plan.skip.license_off": "license lookup not available",
+    "plan.skip.license_none": "the ad names no license to look up",
+    "plan.skip.owner_off": "owner lookup not available",
+    "plan.skip.owner_none": "no owner on record to read",
+    "plan.skipped": "Skipped {option}: {reason}.",
+    "plan.only_option": "Only one option was open.",
     "trace.retry.accept_both": "Both spots matched with the code read and no recapture flag.",
     "trace.retry.accept": (
         "{matched} of {total} spots matched with the code read and no recapture flag."
     ),
     "trace.retry.forged": "The reply failed the check, so there is nothing to retry.",
     "trace.retry.again": "The reply could not be accepted, so we ask again at a new spot.",
+    "trace.retry.late": "The reply came too late to count, so we ask once more at a new spot.",
+    "trace.reply.late": (
+        "The reply came after the time limit. It was compared with the listing photos and "
+        "not counted."
+    ),
+    "trace.retry.code_only": (
+        "The reply shows the code. Whether it was taken at the spot cannot be checked yet, "
+        "so it stays not confirmed."
+    ),
     "trace.retry.stop": (
         "The reply could not be accepted and no retry is left, so the result stays on hold."
     ),
@@ -219,16 +387,34 @@ EN: dict[str, str] = {
     "reason.price_flag": "The rent is far below comparable units.",
     "reason.payment_flag": "Payment was requested before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
-    "reason.for_sale": "This home is listed for sale, not for rent.",
+    "reason.for_sale": (
+        "This home is listed for sale. Confirm with the listing brokerage that it is also "
+        "offered for lease."
+    ),
+    "reason.phone_not_confirmed": (
+        "The contact in the listing was not shown to be the leasing office on record."
+    ),
+    "reason.phone_not_confirmed_brokerage": (
+        "We hold no phone for the listing brokerage, so the contact in the listing could not "
+        "be compared."
+    ),
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
+    "reason.license_not_found": "The license number in the ad is not an active Texas license.",
+    "reason.license_not_found_given": "The license number you gave is not an active Texas license.",
+    "reason.owner_not_poster": (
+        "The poster says they are the owner, and the owner of record is someone else."
+    ),
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
     "reason.not_located": "The photos could not be located in this property's 3D twin.",
     "reason.located": "The photos were located in this property.",
-    "reason.authority_matches": "The poster matches the contact on the property record.",
+    "reason.authority_matches": ("The ad names the manager on record. Anyone can type that name."),
+    "reason.authority_matches_brokerage": (
+        "The ad names the listing brokerage on record. Anyone can type that name."
+    ),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
@@ -279,6 +465,9 @@ ES: dict[str, str] = {
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
     "label.link": "Enlace",
+    "label.license": "Licencia",
+    "label.owner": "Propietario registrado",
+    "label.owner_rule": "Regla del propietario",
     "label.unit": "Unidad en el registro",
     "place.located_plan": (
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
@@ -289,10 +478,28 @@ ES: dict[str, str] = {
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
     ),
     "place.not_indexed": "No comprobado (no tenemos un escaneo 3D de este edificio).",
+    "place.not_indexed_yet": (
+        "No comprobado (el escaneo de este edificio todavía no está indexado)."
+    ),
     "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
-    "place.for_sale": "Esta vivienda está en venta en {site}, no en alquiler. Señal de alerta.",
+    "place.for_sale_record": "En venta en {site} por {brokerage} desde el {date}.",
+    "place.for_sale_record_no_date": "En venta en {site} por {brokerage}.",
+    "place.for_sale_record_no_brokerage": "En venta en {site} desde el {date}.",
+    "place.for_sale_record_bare": "En venta en {site}.",
+    "place.for_sale": (
+        "{record} Las viviendas en venta a veces también se ofrecen en alquiler, así que "
+        "confírmelo con esa agencia antes de pagar."
+    ),
+    "place.for_sale_ask_listing": (
+        "{record} Las viviendas en venta a veces también se ofrecen en alquiler, así que "
+        "confírmelo con la agencia que la anuncia antes de pagar."
+    ),
+    "place.for_sale_office": (
+        "Sin confirmar. {record} El contacto de este anuncio es la oficina que figura en el "
+        "registro, así que pregúnteles si también se ofrece en alquiler."
+    ),
     "place.recently_rented": (
         "Sin confirmar. El registro muestra que se alquiló hace poco. "
         "Pregunte al administrador que figura en el registro si sigue disponible."
@@ -312,6 +519,17 @@ ES: dict[str, str] = {
     "here_now.proven_bare": "Alguien con acceso a una unidad aquí lo demostró ahora mismo.",
     "here_now.waiting": "Aún sin respuesta. Un arrendador honesto puede necesitar tiempo.",
     "here_now.retry": "No se pudo aceptar la foto de respuesta. Pida una foto nueva en otro punto.",
+    "here_now.no_retry_left": (
+        "No pudimos confirmar que están allí. Llame usted mismo a la oficina que figura en "
+        "el registro."
+    ),
+    "here_now.code_only": (
+        "Sin confirmar. La respuesta muestra el código que pedimos, pero nada ha comprobado "
+        "que se tomó en el punto indicado."
+    ),
+    "here_now.code_missing": (
+        "La respuesta no mostró el código que pedimos. Pida una foto nueva en otro punto."
+    ),
     "here_now.not_requested": (
         "No comprobado (aún no se ha pedido a nadie que demuestre que está dentro)."
     ),
@@ -341,16 +559,80 @@ ES: dict[str, str] = {
         "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
         "Llame usted mismo para confirmarlo."
     ),
+    "contact.phone_unchecked": (
+        "No comprobado (ningún teléfono del anuncio se pudo comparar con el de la oficina de "
+        "alquiler que figura en el registro)."
+    ),
+    "contact.no_brokerage_phone": (
+        "No comprobado (no tenemos un teléfono de la agencia que anuncia la vivienda)."
+    ),
     "contact.phone_mismatch": (
-        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a {manager}. Señal de alerta."
+        "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
+        "registro. Los agentes suelen usar el suyo, así que confírmelo con la oficina."
     ),
     "contact.phone_mismatch_unnamed": (
-        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a la oficina que figura en el registro. Señal de alerta."
+        "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
+        "registro. Los agentes suelen usar el suyo. Llame usted mismo a la oficina que figura "
+        "en el registro para confirmarlo."
+    ),
+    "contact.licensed_sponsor": (
+        "No es el número de la oficina. El número de licencia que se dio está activo, a nombre "
+        "de quien firma el anuncio, y patrocinado por {brokerage}, la agencia que figura en el "
+        "registro. Un número de licencia se puede copiar de un anuncio real, así que llame a "
+        "{brokerage} a un número que usted mismo busque para confirmar a este agente."
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "license.licensed": "Con licencia en Texas.",
+    "license.licensed_sponsored": (
+        "Existe una licencia activa de Texas a nombre de quien firma el anuncio, patrocinada "
+        "por {broker}."
+    ),
+    "license.not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas. "
+        "Búsquelo usted mismo en trec.texas.gov."
+    ),
+    "license.not_checked_claimed": (
+        "Dice tener licencia. Pídale su número de licencia de Texas y búsquelo en trec.texas.gov."
+    ),
+    "license.not_found_given": (
+        "El número de licencia que usted dio no es una licencia activa de Texas. Revise que "
+        "esté bien escrito y búsquelo usted mismo en trec.texas.gov."
+    ),
+    "license.not_checked_given": (
+        "Dice tener licencia. El número que usted dio no lo confirmó. Búsquelo usted mismo "
+        "en trec.texas.gov."
+    ),
+    "owner.company_not_poster": (
+        "Sin confirmar. Propietario registrado: {company}, no quien publica."
+    ),
+    "owner.company": "Sin confirmar. Propietario registrado: {company}.",
+    "owner.company_unnamed_not_poster": (
+        "Sin confirmar. Propietario registrado: una empresa, no quien publica."
+    ),
+    "owner.company_unnamed": "Sin confirmar. Propietario registrado: una empresa.",
+    "owner.company_matches": "La empresa que nombró es la propietaria registrada: {company}.",
+    "owner.person_matches": (
+        "El propietario registrado es un particular, y el nombre dado coincide."
+    ),
+    "owner.person_mismatch": (
+        "Sin confirmar. El propietario registrado es un particular, y el nombre dado no "
+        "coincide. Los propietarios pueden alquilar a través de familiares o de un "
+        "fideicomiso; consulte usted mismo con el propietario registrado o en los registros "
+        "del condado."
+    ),
+    "owner.person_no_claim": (
+        "No comprobado (hay un propietario particular registrado, y quien publica no dice "
+        "ser el propietario)."
+    ),
+    "owner.person_no_name": (
+        "No comprobado (hay un propietario particular registrado, y quien publica no dio un "
+        "nombre para comparar)."
+    ),
+    "owner.rule": '{company} dice: "{rule}" ({source}, leído el {date}).',
+    "owner.rule_beside_payment": (
+        '{company}, el propietario registrado, dice: "{rule}" ({source}, leído el {date}).'
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
@@ -427,6 +709,28 @@ ES: dict[str, str] = {
         "Confíe solo en un resultado de SNAPBACK que usted mismo pidió. SNAPBACK nunca "
         "escribe primero ni pide dinero."
     ),
+    # The platforms' menus are quoted as they appear in English.
+    "report.pair.elsewhere": "La foto {n} del anuncio se tomó en otra propiedad.",
+    "report.platform.facebook": "Facebook Marketplace",
+    "report.platform.zillow": "Zillow",
+    "report.platform.craigslist": "Craigslist",
+    "report.steps.facebook.1": "Abra el anuncio copiado en Facebook Marketplace.",
+    "report.steps.facebook.2": (
+        'Abra el menú (tres puntos) y elija "Report listing". Elija el motivo para un '
+        "anuncio falso o engañoso."
+    ),
+    "report.steps.facebook.3": "Pegue las líneas de esta página donde le pidan detalles.",
+    "report.steps.zillow.1": "Abra el anuncio copiado en Zillow.",
+    "report.steps.zillow.2": (
+        'Elija "Report listing" y luego "Listing seems to be fraudulent or illegal".'
+    ),
+    "report.steps.zillow.3": "Pegue las líneas de esta página donde le pidan detalles.",
+    "report.steps.craigslist.1": "Abra la publicación copiada en Craigslist.",
+    "report.steps.craigslist.2": ('Use la marca "prohibited" que está arriba en la publicación.'),
+    "report.steps.craigslist.3": (
+        "Para un informe más completo, use el formulario de contacto de Craigslist y pegue "
+        "las líneas de esta página."
+    ),
     "footer.staged": (
         "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
         "revisiones. No es un anunciante real."
@@ -460,8 +764,47 @@ ES: dict[str, str] = {
         "Esperando a que el inquilino apruebe el mensaje. No se envía nada hasta entonces."
     ),
     "trace.hitl.send": "El inquilino aprobó el texto del reto.",
+    "trace.reply.waiting": (
+        "El mensaje está con el inquilino para que lo pase. Esperando la foto de respuesta "
+        "del anunciante."
+    ),
+    "trace.tool.reply": (
+        "Se revisó la foto de respuesta: el código y su parecido con las fotos del anuncio."
+    ),
     "trace.hitl.edit": "El inquilino editó el texto del reto y lo aprobó.",
     "trace.hitl.cancel": "El inquilino decidió no enviar un reto.",
+    "plan.pick.record": (
+        "El registro propio de la vivienda da el rango de renta y quién figura. Leerlo."
+    ),
+    "plan.pick.record_rent": "El registro propio de la vivienda da el rango de renta. Leerlo.",
+    "plan.pick.brokerage": "La vivienda está en venta ahora. Revisar la oficina que la anuncia.",
+    "plan.pick.license": "El anuncio menciona una licencia. Buscarla en el estado.",
+    "plan.pick.owner": "Hay un propietario en el registro público. Compararlo con quien publica.",
+    "plan.pick.ask": (
+        "El anuncio dice que tienen licencia pero no da el número. Pedirle el número al inquilino."
+    ),
+    "plan.ask.question": (
+        "El anuncio dice que es agente con licencia pero no da el número de licencia. "
+        "¿Puede pedírselo, o pegarlo aquí?"
+    ),
+    "plan.ask.looked_up": "Se buscó en el estado el número de licencia que usted dio.",
+    "plan.ask.no_number": "No llegó ningún número de licencia. La licencia sigue sin comprobarse.",
+    "plan.ask.not_looked_up": (
+        "No se pudo buscar el número de licencia que usted dio. La licencia sigue sin comprobarse."
+    ),
+    "plan.skip.ask_off": "preguntar al inquilino no está disponible",
+    "plan.skip.ask_none": "el anuncio no dice tener licencia sin dar su número",
+    "plan.pick.report": (
+        "Se hicieron todas las comprobaciones posibles. Reunir lo encontrado para un informe."
+    ),
+    "plan.skip.record": "no hay registro de la propiedad que leer",
+    "plan.skip.brokerage": "la vivienda no está en venta ahora",
+    "plan.skip.license_off": "la búsqueda de licencias no está disponible",
+    "plan.skip.license_none": "el anuncio no menciona ninguna licencia que buscar",
+    "plan.skip.owner_off": "la búsqueda de propietarios no está disponible",
+    "plan.skip.owner_none": "no hay propietario en el registro que leer",
+    "plan.skipped": "Omitido {option}: {reason}.",
+    "plan.only_option": "Solo había una opción abierta.",
     "trace.retry.accept_both": (
         "Los dos puntos coincidieron, con el código leído y sin aviso de recaptura."
     ),
@@ -469,7 +812,18 @@ ES: dict[str, str] = {
         "{matched} de {total} puntos coincidieron, con el código leído y sin aviso de recaptura."
     ),
     "trace.retry.forged": "La respuesta no pasó la revisión, así que no hay nada que reintentar.",
+    "trace.retry.code_only": (
+        "La respuesta muestra el código. Todavía no se puede comprobar si se tomó en el punto "
+        "indicado, así que queda sin confirmar."
+    ),
     "trace.retry.again": "No se pudo aceptar la respuesta, así que pedimos otra en un punto nuevo.",
+    "trace.retry.late": (
+        "La respuesta llegó demasiado tarde para contar, así que pedimos una más en un punto nuevo."
+    ),
+    "trace.reply.late": (
+        "La respuesta llegó después del límite de tiempo. Se comparó con las fotos del "
+        "anuncio y no se contó."
+    ),
     "trace.retry.stop": (
         "No se pudo aceptar la respuesta y no quedan reintentos, así que el resultado queda "
         "en espera."
@@ -496,11 +850,31 @@ ES: dict[str, str] = {
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
     "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
-    "reason.for_sale": "Esta vivienda está en venta, no en alquiler.",
+    "reason.for_sale": (
+        "Esta vivienda está en venta. Confirme con la agencia que la anuncia que también se "
+        "ofrece en alquiler."
+    ),
+    "reason.phone_not_confirmed": (
+        "No se demostró que el contacto del anuncio sea la oficina de alquiler que figura en "
+        "el registro."
+    ),
+    "reason.phone_not_confirmed_brokerage": (
+        "No tenemos un teléfono de la agencia que anuncia la vivienda, así que no se pudo "
+        "comparar el contacto del anuncio."
+    ),
     "reason.phone_flag": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
+    "reason.license_not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas."
+    ),
+    "reason.license_not_found_given": (
+        "El número de licencia que usted dio no es una licencia activa de Texas."
+    ),
+    "reason.owner_not_poster": (
+        "Quien publica dice ser el propietario, y el propietario registrado es otro."
+    ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
@@ -509,7 +883,11 @@ ES: dict[str, str] = {
     "reason.not_located": "Las fotos no se pudieron ubicar en el gemelo 3D de esta propiedad.",
     "reason.located": "Las fotos se ubicaron en esta propiedad.",
     "reason.authority_matches": (
-        "Quien publicó el anuncio coincide con el contacto del registro de la propiedad."
+        "El anuncio nombra al administrador del registro. Cualquiera puede escribir ese nombre."
+    ),
+    "reason.authority_matches_brokerage": (
+        "El anuncio nombra a la agencia que figura en el registro. Cualquiera puede escribir "
+        "ese nombre."
     ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",

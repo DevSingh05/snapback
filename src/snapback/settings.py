@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,8 +26,38 @@ class Settings(BaseSettings):
     # The eval harness's results, written by `make eval`: aggregate numbers only. Served
     # read-only at GET /eval/results.csv for the Lab panel.
     snapback_eval_results: Path = Path("eval/results.csv")
+    # Locate accuracy on the kit's own photos, written by `make eval-locate-real` (A8):
+    # totals only. Served read-only at GET /eval/locate_real.csv.
+    snapback_eval_locate_real: Path = Path("eval/locate_real.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
+    # What happens after the renter approves the challenge (A14). "stand_in" answers at once
+    # from the fixture. "reply" waits for the poster's real reply photo, sent to
+    # POST /cases/{id}/reply, and checks it.
+    snapback_challenge: Literal["stand_in", "reply"] = "stand_in"
+    # A24 stretch: may the agent ask the renter for a license number the ad did not give?
+    # Off by default: a case that asks waits for POST /cases/{id}/answer, and no screen sends it.
+    snapback_ask_renter: bool = False
+    # A22: the live locator. Index folder under data/index, and the time one case may spend
+    # placing its photos (a photo not done in time reads "not located", never "elsewhere").
+    snapback_locate_index: str = "demo"
+    snapback_locate_budget_s: float = 25.0
+    # The zone a card's times are shown in: the building's, not the server's. Houston is
+    # America/Chicago.
+    snapback_card_timezone: str = "America/Chicago"
+
+    @field_validator("snapback_card_timezone")
+    @classmethod
+    def _a_known_time_zone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError(
+                f"SNAPBACK_CARD_TIMEZONE is not a known time zone: {value!r}. "
+                "Use a name like America/Chicago."
+            ) from None
+        return value
+
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
     # Checks one renter (or one browser) may start per day, and a ceiling per network address

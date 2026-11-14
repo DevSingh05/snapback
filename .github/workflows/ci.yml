@@ -5,9 +5,11 @@ on:
   push:
     branches: [main]
 
+# PR branches: a new push cancels the older run. Main: every merge gets its own group (by commit),
+# so a later merge never cancels or drops the run for an earlier one.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'latest' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   hygiene:
@@ -30,6 +32,10 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+      # V6 eval gate (#62): fixture case bank only, headless, no network. Writes to the runner's
+      # temp dir so the tracked eval/results.csv is never changed by CI. Exit 1 = gate failed.
+      - name: Eval gate (python -m snapback.eval)
+        run: uv run python -m snapback.eval --baseline eval/baseline.csv --out "$RUNNER_TEMP/results.csv"
 
   node:
     runs-on: ubuntu-latest

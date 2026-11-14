@@ -116,6 +116,21 @@ export interface CalibrationPoint extends ResultRow {
 
 const BIN = /^calibration_bin:(\d(?:\.\d+)?)-(\d(?:\.\d+)?)$/;
 
+export const isCalibrationRow = (r: ResultRow): boolean => r.metric.startsWith("calibration_bin:");
+
+// Calibration rows carry their own tag (cal-YYYYMMDD-HHMM), which is not the date the
+// held-out set was frozen, so it never feeds the "Held-out set frozen" line.
+export function heldOutFrozenAt(rows: ResultRow[]): string | undefined {
+  return rows.find((r) => !isCalibrationRow(r) && r.frozen_at && r.frozen_at !== "FIXTURE")
+    ?.frozen_at;
+}
+
+export const CALIBRATION_LABEL: Record<string, string> = {
+  place_real_renders: "Renders of our scans (not photos)",
+};
+
+export const calibrationLabel = (c: string): string => CALIBRATION_LABEL[c] ?? c;
+
 export function calibrationPoints(rows: ResultRow[]): CalibrationPoint[] {
   return rows
     .flatMap((r) => {

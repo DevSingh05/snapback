@@ -2,10 +2,12 @@
 
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 
+from snapback.agent.join import KitLookups
 from snapback.api.main import app, create_app
 from snapback.card import strings
 from snapback.card.render import render_card_png
@@ -14,14 +16,23 @@ from snapback.contracts import (
     CreateCaseRequest,
     CreateCaseResponse,
     DataSource,
+    ModuleEvidence,
     TraceEvent,
     TraceKind,
     VerdictState,
 )
 from snapback.settings import Settings
+from snapback.verdict import build_card
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 FIXTURE_CARD = Card.model_validate_json((FIXTURES / "card_hold.json").read_text())
+# The recorded case as the API serves it: the same evidence at the same moment, on the
+# building's clock (Houston), not the clock it was saved on.
+HOUSTON_CARD = build_card(
+    ModuleEvidence.model_validate_json((FIXTURES / "module_evidence_hold.json").read_text()),
+    checked_at=FIXTURE_CARD.checked_at.astimezone(ZoneInfo("America/Chicago")),
+    verify_base_url=Settings(_env_file=None).snapback_public_base_url,
+)
 FIXTURE_TRACE = [
     TraceEvent.model_validate(json.loads(line))
     for line in (FIXTURES / "trace_events.jsonl").read_text().strip().splitlines()
@@ -31,9 +42,14 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"synthetic png body" * 4
 HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00" + b"synthetic heic body" * 4
 
 
-def make_client(tmp_path, **overrides) -> TestClient:
+def make_client(tmp_path, lookups=None, **overrides) -> TestClient:
     settings = Settings(_env_file=None, snapback_data_dir=tmp_path, **overrides)
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, lookups=lookups))
+
+
+def no_kit(tmp_path) -> KitLookups:
+    """Lane D's adapters pointed at an empty folder, so no test reads a real kit."""
+    return KitLookups(DataSource.LIVE, kit_dir=tmp_path / "no-kit")
 
 
 @pytest.fixture
@@ -61,14 +77,18 @@ def stream_trace(
     client: TestClient, case_id: str, last_event_id: str | None = None, token: str | None = None
 ):
     headers = {"Last-Event-ID": last_event_id} if last_event_id is not None else {}
-    params = {"token": token} if token else {}
-    with client.stream(
-        "GET", f"/cases/{case_id}/trace", headers=headers, params=params
-    ) as response:
+    if token:
+        headers["Authorization"] = f"Bearer {token}"  # a header, never the address
+    with client.stream("GET", f"/cases/{case_id}/trace", headers=headers) as response:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
         assert response.headers["cache-control"] == "no-cache"
         return read_sse(response)
+
+
+def renter(name: str) -> str:
+    """A renter id shaped like the sidecar's: "imsg-" and 24 hex characters."""
+    return "imsg-" + name.encode().hex().ljust(24, "0")[:24]
 
 
 def create(client: TestClient, **form) -> dict:
@@ -116,7 +136,11 @@ def test_verdict_endpoint_round_trips_the_contract():
 def test_card_route_returns_card_contract(client, case_id):
     response = client.get(f"/cases/{case_id}/card")
     assert response.status_code == 200
-    assert Card.model_validate(response.json()) == FIXTURE_CARD
+    served = Card.model_validate(response.json())
+    assert served == HOUSTON_CARD
+    # The same case as it was saved, apart from the clock its times are read on.
+    assert (served.state, served.checked_at) == (FIXTURE_CARD.state, FIXTURE_CARD.checked_at)
+    assert [row.kind for row in served.rows] == [row.kind for row in FIXTURE_CARD.rows]
 
 
 def test_trace_route_streams_fixture_events_in_order(client):
@@ -136,12 +160,12 @@ def test_trace_resumes_from_last_event_id(client):
 
 def test_create_case_rejects_more_than_daily_limit(client):
     for _ in range(3):
-        create(client, renter_id="renter-a")
-    refused = client.post("/cases", data={"text": "x", "renter_id": "renter-a"})
+        create(client, renter_id=renter("a"))
+    refused = client.post("/cases", data={"text": "x", "renter_id": renter("a")})
     assert refused.status_code == 429
     assert "3" in refused.json()["detail"]
     # Someone else's limit is their own.
-    create(client, renter_id="renter-b")
+    create(client, renter_id=renter("b"))
 
 
 # --- create: what the upload page sends and reads ------------------------------------------
@@ -290,15 +314,15 @@ def finish(client: TestClient, case: dict) -> Card:
 
 
 def test_rules_run_on_the_text_the_renter_posted(client):
-    quiet = finish(client, create(client, text="Two bed near the park.", renter_id="a"))
-    asked = finish(client, create(client, text=ZELLE_ASK, renter_id="b"))
+    quiet = finish(client, create(client, text="Two bed near the park.", renter_id=renter("a")))
+    asked = finish(client, create(client, text=ZELLE_ASK, renter_id=renter("b")))
     assert quiet.rows[2].lines[0].text == "No risky payment ask found in the text you sent."
     assert "Zelle before a viewing. Red flag." in [line.text for line in asked.rows[2].lines]
 
 
 def test_text_written_for_an_ai_system_is_noticed_and_changes_nothing(client):
-    plain = create(client, text=ZELLE_ASK, renter_id="a")
-    injected = create(client, text=f"{ZELLE_ASK} {INJECTED}", renter_id="b")
+    plain = create(client, text=ZELLE_ASK, renter_id=renter("a"))
+    injected = create(client, text=f"{ZELLE_ASK} {INJECTED}", renter_id=renter("b"))
     assert plain["injection_noticed"] is False
     assert injected["injection_noticed"] is True
 
@@ -338,7 +362,7 @@ def test_a_screenshot_is_read_as_part_of_the_listing(client):
 
 
 def test_case_ids_are_short_and_differ(client):
-    ids = {create(client, renter_id=f"renter-{n}")["case_id"] for n in range(5)}
+    ids = {create(client, renter_id=renter(str(n)))["case_id"] for n in range(5)}
     assert len(ids) == 5
     assert all(len(case_id) == 4 and case_id.isalnum() for case_id in ids)
 
@@ -392,14 +416,74 @@ def test_the_read_only_secret_cannot_approve(client):
 
 
 def test_the_write_secret_is_refused_in_a_query_string(client):
-    # Servers log the path and query of every request. The secret that approves a challenge
-    # must never be put there, so reads from the query take the read-only secret and no other.
+    # Servers log the path and query of every request. No secret is ever put there: not the
+    # one that approves a challenge, and not the read-only one either (locked, Sat 02:27).
     case = create(client)
     approve(client, case)
     url = f"/cases/{case['case_id']}"
-    assert client.get(f"{url}/trace", params={"token": case["token"]}).status_code == 403
-    assert client.get(url, params={"token": case["token"]}).status_code == 403
-    assert client.get(f"{url}/trace", params={"token": case["read_token"]}).status_code == 200
+    assert client.get(f"{url}/trace", params={"token": case["token"]}).status_code == 401
+    assert client.get(url, params={"token": case["token"]}).status_code == 401
+    assert client.get(f"{url}/trace", params={"token": case["read_token"]}).status_code == 401
+
+
+@pytest.mark.parametrize(
+    "route", ["", "/report", "/trace", "/aerial", "/aerial/claimed.jpg", "/aerial/matched.jpg"]
+)
+def test_no_case_route_takes_a_token_in_the_address(client, route):
+    # Every route that reads a case with a secret: a token in the address is refused, the
+    # right one included, and even beside a good header. Nothing of the case comes back.
+    case = create(client)
+    approve(client, case)
+    url = f"/cases/{case['case_id']}{route}"
+    good_header = {"Authorization": f"Bearer {case['read_token']}"}
+    for secret in (case["read_token"], case["token"], "nope", ""):
+        for headers in ({}, good_header):
+            refused = client.get(url, params={"token": secret}, headers=headers)
+            assert refused.status_code == 401, (route, secret, headers)
+            assert "header" in refused.json()["detail"].lower()
+            assert case["read_token"] not in refused.text and case["token"] not in refused.text
+    # The same route with the header alone is not refused for lack of a secret.
+    assert client.get(url, headers=good_header).status_code != 401
+
+
+def test_nothing_in_the_api_can_read_a_secret_from_the_address():
+    # The read check takes a header and nothing else, and no route declares a `token`
+    # parameter, so a later route cannot quietly start reading the query again.
+    import inspect
+
+    from snapback.api import main
+
+    source = inspect.getsource(main)
+    assert "in_query" not in source
+    assert "token: str | None = None" not in source
+    assert 'query_params.get("token")' not in source
+
+
+def test_the_case_status_takes_no_token_in_the_address_not_even_the_right_one(client):
+    # Locked ruling, Sat 02:27: the read token goes in a header only. An address is what
+    # servers and proxies log, so a token found in one is refused, valid or not.
+    case = create(client)
+    url = f"/cases/{case['case_id']}"
+    for secret in (case["read_token"], case["token"], "nope"):
+        refused = client.get(url, params={"token": secret})
+        assert refused.status_code == 401
+        assert "header" in refused.json()["detail"].lower()
+        assert case["challenge_text"] not in refused.text and secret not in refused.text
+    # Even beside a good header: the address must not carry one at all.
+    both = client.get(
+        url,
+        params={"token": case["read_token"]},
+        headers={"Authorization": f"Bearer {case['read_token']}"},
+    )
+    assert both.status_code == 401
+    # An empty one is still one.
+    assert client.get(f"{url}?token=").status_code == 401
+    # With no token anywhere the public summary is still there, and still says nothing.
+    summary = client.get(url)
+    assert summary.status_code == 200 and summary.json()["challenge_text"] is None
+    # And a header still works.
+    with_header = client.get(url, headers={"Authorization": f"Bearer {case['read_token']}"})
+    assert with_header.json()["challenge_text"] == case["challenge_text"]
 
 
 def test_the_secret_can_also_travel_in_its_own_header(client):
@@ -434,11 +518,14 @@ def test_the_challenge_text_needs_a_case_secret(client):
     # Whoever may write may also read, as long as the secret travels in a header.
     with_write = client.get(url, headers={"Authorization": f"Bearer {case['token']}"}).json()
     with_read = client.get(url, headers={"X-Case-Token": case["read_token"]}).json()
-    with_query = client.get(url, params={"token": case["read_token"]}).json()
-    for body in (with_write, with_read, with_query):
+    for body in (with_write, with_read):
         assert body["challenge_text"] == case["challenge_text"]
     assert client.get(url, headers={"Authorization": "Bearer nope"}).status_code == 403
-    assert client.get(url, params={"token": other["read_token"]}).status_code == 403
+    other_header = {"Authorization": f"Bearer {other['read_token']}"}
+    assert client.get(url, headers=other_header).status_code == 403
+    # Never from the address (locked ruling, Sat 02:27), whoever's token it is.
+    assert client.get(url, params={"token": case["read_token"]}).status_code == 401
+    assert client.get(url, params={"token": other["read_token"]}).status_code == 401
 
 
 def test_the_trace_stream_needs_the_case_secret(client):
@@ -446,15 +533,18 @@ def test_the_trace_stream_needs_the_case_secret(client):
     approve(client, case)
     url = f"/cases/{case['case_id']}/trace"
     assert client.get(url).status_code == 401
-    assert client.get(url, params={"token": "nope"}).status_code == 403
-    assert client.get(url, params={"token": other["read_token"]}).status_code == 403
+    assert client.get(url, headers={"Authorization": "Bearer nope"}).status_code == 403
+    other_case = {"Authorization": f"Bearer {other['read_token']}"}
+    assert client.get(url, headers=other_case).status_code == 403
+    # Never from the address: the web reads the stream with a header (locked, Sat 02:27).
+    assert client.get(url, params={"token": case["read_token"]}).status_code == 401
 
-    # A browser's EventSource cannot set headers, so the read-only secret may ride in the query.
-    by_query = stream_trace(client, case["case_id"], token=case["read_token"])
+    # Either secret opens it, in either header, and both see the same stream.
+    with_read = stream_trace(client, case["case_id"], token=case["read_token"])
     with client.stream("GET", url, headers={"X-Case-Token": case["token"]}) as response:
-        by_header = read_sse(response)
-    assert by_query == by_header
-    assert json.loads(by_query[-1]["data"])["kind"] == "verdict"
+        with_write = read_sse(response)
+    assert with_read == with_write
+    assert json.loads(with_read[-1]["data"])["kind"] == "verdict"
 
 
 def test_the_recorded_fixture_trace_stays_open_to_read(client):
@@ -476,6 +566,29 @@ def test_each_browser_has_its_own_daily_allowance(tmp_path):
     assert "snapback_client" in first.cookies
 
 
+@pytest.mark.parametrize(
+    ("base_url", "secure"),
+    [
+        ("http://localhost:5173", False),  # local development has no TLS to send it over
+        ("https://snapback.example", True),
+        ("HTTPS://snapback.example", True),
+    ],
+)
+def test_the_client_cookie_is_marked_secure_when_the_site_is_served_over_https(
+    tmp_path, base_url, secure
+):
+    settings = Settings(
+        _env_file=None, snapback_data_dir=tmp_path, snapback_public_base_url=base_url
+    )
+    made = TestClient(create_app(settings)).post("/cases", data={"text": "x"})
+    assert made.status_code == 201
+    cookie = made.headers["set-cookie"]
+    assert cookie.startswith("snapback_client=")
+    flags = [part.strip().lower() for part in cookie.split(";")[1:]]
+    assert ("secure" in flags) is secure
+    assert "httponly" in flags and "samesite=lax" in flags
+
+
 def test_one_address_cannot_start_checks_without_end(tmp_path):
     api = create_app(
         Settings(_env_file=None, snapback_data_dir=tmp_path, snapback_daily_limit_per_address=4)
@@ -487,8 +600,13 @@ def test_one_address_cannot_start_checks_without_end(tmp_path):
 
 
 def test_a_check_that_could_not_start_is_not_counted(tmp_path):
-    live = make_client(tmp_path, snapback_data_source="live", snapback_daily_limit=2)
-    assert [live.post("/cases", data={"text": "x"}).status_code for _ in range(5)] == [503] * 5
+    # Live mode with no kit on the machine: asking for a record cannot work, and costs nothing.
+    live = make_client(
+        tmp_path, no_kit(tmp_path), snapback_data_source="live", snapback_daily_limit=2
+    )
+    asks = {"text": "x", "property_id": "any-id"}
+    assert [live.post("/cases", data=asks).status_code for _ in range(5)] == [503] * 5
+    assert live.post("/cases", data={"text": "x"}).status_code == 201
 
     fixture = make_client(tmp_path, snapback_daily_limit=2)
     bad_file = [("photos", ("run.exe", b"MZ\x90\x00", "application/x-msdownload"))]
@@ -625,7 +743,7 @@ def test_card_png_route_returns_a_png_of_the_card(client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
-    assert response.content == render_card_png(FIXTURE_CARD)
+    assert response.content == render_card_png(HOUSTON_CARD)
 
 
 def test_card_and_png_can_be_asked_for_in_spanish(client):
@@ -682,12 +800,26 @@ def test_only_send_edit_or_cancel_are_accepted(client, decision):
     assert client.get(f"/cases/{case['case_id']}").json()["status"] == "waiting_for_approval"
 
 
-def test_live_mode_says_plainly_that_the_modules_are_not_wired(tmp_path):
-    live = make_client(tmp_path, snapback_data_source="live")
+def test_live_mode_runs_a_check_with_no_stand_in_in_it(tmp_path):
+    # A10: the record side is joined, so live mode starts a check. The twin and the challenge
+    # are still stand-ins, which are fixture data, so a live case gets neither: nothing is
+    # placed, nobody is asked to prove presence, and the card cannot read VERIFIED.
+    live = make_client(tmp_path, no_kit(tmp_path), snapback_data_source="live")
     assert live.get("/healthz").json()["data_source"] == "live"
-    response = live.post("/cases", data={"text": "x"})
-    assert response.status_code == 503
-    # Fixture cases are not served as if they were live.
+    made = live.post("/cases", data={"text": "x"})
+    assert made.status_code == 201
+    assert (made.json()["source"], made.json()["status"]) == ("live", "done")
+    assert made.json()["challenge_text"] is None
+
+    card = live.get(f"/cases/{made.json()['case_id']}/card").json()
+    assert card["source"] == "live" and card["state"] == "unverified"
+    tones = {line["label"]: line["tone"] for row in card["rows"] for line in row["lines"]}
+    assert tones["Real"] == "not_checked" and tones["Here now"] == "not_checked"
+
+    # Without the kit there is no record to read, and that is said plainly.
+    asked = live.post("/cases", data={"text": "x", "property_id": "any-id"})
+    assert asked.status_code == 503 and "kit" in asked.json()["detail"].lower()
+    # The recorded fixture case is not served as if it were live.
     assert live.get("/cases/fx-7Q2M/card").status_code == 404
 
 
@@ -705,3 +837,12 @@ def test_the_route_list_is_what_the_other_lanes_were_told():
         ("GET", "/healthz"),
     ]:
         assert expected in paths
+
+
+def test_every_trace_step_carries_who_chose_it(client):
+    case = create(client)
+    approve(client, case)
+    stream = stream_trace(client, case["case_id"], token=case["read_token"])
+    wire = [json.loads(e["data"]) for e in stream]
+    assert wire and all(event["chosen_by"] in ("model", "policy") for event in wire)
+    assert any(event["choice"] == "next_check" for event in wire)

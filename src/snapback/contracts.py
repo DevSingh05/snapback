@@ -6,8 +6,9 @@ Change this file only through a pull request reviewed by the integrator lane.
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DataSource(StrEnum):
@@ -22,7 +23,9 @@ class LocateStatus(StrEnum):
 
     LOCATED_IN_CLAIMED = "located_in_claimed"  # geometrically verified inside the claimed property
     LOCATED_ELSEWHERE = "located_elsewhere"  # verified inside a different indexed property
-    NOT_LOCATED = "not_located"  # the claimed property is indexed and the photo matches nowhere
+    NOT_LOCATED = (
+        "not_located"  # claimed home indexed, photo matches nowhere; or no claim and no single home
+    )
     NOT_INDEXED = "not_indexed"  # the claimed property has no twin in our index
 
 
@@ -35,6 +38,11 @@ class PhotoLocation(BaseModel):
     pano_id: str | None = None
     inliers: int | None = None
     inlier_ratio: float | None = None
+    # Which twin the photo was placed in (claimed or not), for located_in_claimed and
+    # located_elsewhere; for located_elsewhere these name the OTHER building (V2, #41).
+    matched_model_id: str | None = None
+    matched_property_id: str | None = None
+    room_label: str | None = None  # Matterport's room classification, e.g. "Kitchen"
 
 
 class AuthorityStatus(StrEnum):
@@ -70,8 +78,18 @@ class Evidence(BaseModel):
     for_sale_flag: bool = False  # the home is listed for sale, not for rent
     recently_rented_flag: bool = False  # the record shows it was rented out recently
     phone_flag: bool = False  # the phone in the listing is not the leasing office on record
+    # A23 (H1): the phone in the listing IS the leasing office's on record. VERIFIED needs it.
+    phone_confirmed: bool = False
+    # the phone is not the office's, but an active licence by number is sponsored by the
+    # brokerage on record (Sat 07:35): no red-flag-like phone reason, but still not confirmed
+    phone_cleared_by_licence: bool = False
+    # A15: who is on record is a listing brokerage, not a manager with an office phone.
+    brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
+    license_flag: bool = False  # the ad prints a license number that is not an active license
+    license_given_flag: bool = False  # the number the renter typed is not an active license
+    owner_flag: bool = False  # says they are the owner; the owner of record is someone else
 
 
 class VerdictState(StrEnum):
@@ -123,6 +141,10 @@ class LocateResult(BaseModel):
     case_id: str
     photos: list[PhotoLocation]
     claimed_property_id: str | None = None
+    # True when the ad named no home and the scan identified it: claimed_property_id is then
+    # the home the photos were placed in.
+    identified_by_scan: bool = False
+    identified_photos: int = 0  # photos that placed in that home on the strict bar
     chosen: FloorPlanCandidate | None = None
     alternatives: list[FloorPlanCandidate] = Field(default_factory=list)
     poses: dict[str, Pose] = Field(default_factory=dict)  # photo_id -> pose, located photos only
@@ -264,6 +286,9 @@ class AuthorityResult(BaseModel):
     # A7 (#67). Yes/no only: no phone number, hash or web address is ever kept here.
     office_phone_match: PhoneMatch = PhoneMatch.NOT_CHECKED
     link_domain: LinkDomain = LinkDomain.NOT_CHECKED
+    # A15: the comparison was with the listing brokerages alone. The home has no property
+    # record, so there is no manager, office phone or website on record to compare with.
+    brokerage_only: bool = False
 
 
 class ForSaleStatus(StrEnum):
@@ -279,6 +304,72 @@ class ForSaleMatch(BaseModel):
     site: str = "Homes.com"  # where it is listed; shown on the card
     listed_on: date | None = None
     changed_on: date | None = None  # when it reached its current status
+    # Listing offices on record (brokerage company names, Homes.com `offices[].name`). These
+    # count as legitimate marketers. Companies only: an agent's personal name is never kept.
+    offices: list[str] = Field(default_factory=list)
+
+
+class LicenseStatus(StrEnum):
+    LICENSED = "licensed"  # an active TREC license under the claimed name
+    NOT_FOUND = "not_found"  # the license number in the ad is not an active Texas license
+    NOT_CHECKED = "not_checked"  # no claim, no name, an owner's own home, or the lookup failed
+
+
+class LicenseResult(BaseModel):
+    """D10 (lane D, #128): the poster's real estate license claim, looked up in TREC.
+
+    Never keeps the license number or any person's name (the poster's, or an individual
+    sponsoring broker's)."""
+
+    status: LicenseStatus
+    claimed_role: str | None = None  # "agent", "broker" or "locator", from the poster's words
+    sponsor_broker: str | None = None  # LICENSED only, and only when the sponsor is a company
+    state: str = "TX"
+    # Where the number that was looked up came from: "ad" (the listing printed it), "renter"
+    # (the renter typed it when asked, A24 stretch), or None (no number was looked up, so with
+    # a claim and no number we may ask). Never the number. A renter's typed number is the
+    # renter's own thread: it never reaches the report pack and never reads as a fact about the ad.
+    number_from: Literal["ad", "renter"] | None = None
+
+
+class OwnerKind(StrEnum):
+    COMPANY = "company"  # a company or institution: LLC, REIT, iBuyer, brokerage, trust company
+    PERSON = "person"  # an individual. The card says "a private owner"; the name stays in lane D
+
+
+class OwnerMatch(StrEnum):
+    YES = "yes"
+    NO = "no"
+    NOT_CHECKED = "not_checked"
+
+
+class PublishedRule(BaseModel):
+    """A rule a company publishes about where it takes applications and money, quoted (A19).
+
+    From lane A's table of verified rows. It travels with the case, so a recorded case is
+    redrawn with the rule it had."""
+
+    company: str  # the company, as it names itself
+    rule: str  # its own words, quoted
+    source_url: str  # where it is published
+    checked_on: date  # the day one of us read it there
+
+
+class OwnerResult(BaseModel):
+    """The owner of record of the home the listing claims (D12, #130), and how the poster
+    compares (A19, #125). Never a person's name, anywhere."""
+
+    kind: OwnerKind
+    company: str | None = None  # COMPANY only. A company name, never a person's
+    # COMPANY only: the name is one we already know (a row in the published-rule table, or an
+    # office on record in the kit). `company` is set only then; any other company is shown
+    # as "a company owner", with no name (conductor ruling, round 5 on #160).
+    company_known: bool = False
+    # Does what the poster calls themselves match the owner of record? Yes or no, nothing
+    # more. For a person owner lane D compares inside its adapter and sends only this.
+    poster_matches: OwnerMatch = OwnerMatch.NOT_CHECKED
+    poster_says_owner: bool = False  # lane A: the poster's own words say they are the owner
+    published_rule: PublishedRule | None = None  # lane A: the owner's own rule, if verified
 
 
 class ModuleEvidence(BaseModel):
@@ -294,9 +385,15 @@ class ModuleEvidence(BaseModel):
     price: PriceResult | None = None
     authority: AuthorityResult | None = None
     for_sale: ForSaleMatch | None = None  # D7; None means not looked up
+    license: LicenseResult | None = None  # D10; None means not looked up
+    # D12 + A19; None means no owner data (LA, an unknown address, or not looked up)
+    owner: OwnerResult | None = None
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
+    # A14: a reply came, could not be accepted, and no further photo will be asked for. The
+    # card then says "we could not confirm", not "ask for a new photo". It changes no state.
+    no_retry_left: bool = False
 
 
 # ---------------------------------------------------------------------------------------------
@@ -359,6 +456,7 @@ class ChoiceKind(StrEnum):
     WHICH_SPOT = "which_spot"
     RETRY_OR_STOP = "retry_or_stop"
     ASK_HUMAN = "ask_human"
+    NEXT_CHECK = "next_check"  # A24: which evidence-gated check to run next (order only)
 
 
 class TraceKind(StrEnum):
@@ -382,6 +480,10 @@ class TraceEvent(BaseModel):
     pick: str | None = None
     reason: str  # one plain sentence; may be model-written, never sets a state
     source: DataSource
+    # A24: who made this step happen. "model" only when a language model picked from the
+    # code-written options; everything else (the code policy, a fallback, a tool code ran,
+    # a random draw, the renter's own answer) is "policy".
+    chosen_by: Literal["model", "policy"] = "policy"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -417,6 +519,8 @@ class FloorPlanRent(BaseModel):
     rent_min: int | None = None  # whole dollars per month
     rent_max: int | None = None
     per_bed: bool = False  # priced per bed: never compare with a whole-unit rent
+    baths: float | None = None  # search (council 4): bathrooms on the floor plan
+    units_available: int | None = None  # units CoStar reported available at its last research
 
 
 class UnitOnRecord(BaseModel):
@@ -451,6 +555,11 @@ class PropertyRecord(BaseModel):
     website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
     floor_plan_rents: list[FloorPlanRent] = Field(default_factory=list)
     units: list[UnitOnRecord] = Field(default_factory=list)
+    # Search (council 4): building facts for must-haves. None means the record does not say.
+    is_walkup: bool | None = None
+    has_elevator: bool | None = None  # True only when an elevator is on record
+    metering: str | None = None  # "individual" or "master"
+    parking_ratio: float | None = None  # spaces per unit, as reported
 
 
 class AerialTile(BaseModel):
@@ -461,6 +570,83 @@ class AerialTile(BaseModel):
     direction: str  # "north", "east", "south", "west" or "nadir"
     captured_on: date | None = None
     path: str  # local file under data/ (or fixtures/ for the synthetic tile)
+
+
+class AerialSideOut(BaseModel):
+    """One building in the aerial proof (D9, approved on #41)."""
+
+    tile: AerialTile | None = None  # None: no tile (no coverage, rate limited, out of time)
+    record: PropertyRecord | None = None  # building facts and company names only
+    image_url: str | None = None  # our own route; never a Vexcel URL, the key stays server side
+
+
+class AerialProofResponse(BaseModel):
+    """`GET /cases/{case_id}/aerial`: the claimed building and the one the photos matched."""
+
+    case_id: str
+    source: DataSource
+    claimed: AerialSideOut
+    matched: AerialSideOut | None = None  # a photo located_elsewhere; None otherwise
+    distance_m: float | None = None  # None when either record lacks lat/lon
+
+
+# ---------------------------------------------------------------------------------------------
+# The "Report this copy" pack (A20): what a listing agent takes to the platform.
+# ---------------------------------------------------------------------------------------------
+
+
+class ReportPlatform(StrEnum):
+    FACEBOOK = "facebook"
+    ZILLOW = "zillow"
+    CRAIGSLIST = "craigslist"
+
+
+class ReportStatusStrip(BaseModel):
+    """What the home's own record says. The same facts the card already carries in `for_sale`."""
+
+    status: ForSaleStatus
+    site: str  # where the record is listed, e.g. Homes.com
+    listed_on: date | None = None
+    changed_on: date | None = None
+    brokerage: str | None = None  # the listing office on record. A company, never a person
+
+
+class ReportPhotoPair(BaseModel):
+    """One listing photo something was found about. Pictures are references to OUR routes."""
+
+    listing_photo: int  # which listing photo, counting from 1
+    finding: str  # the fixed sentence for what was found about it
+    listing_image_url: str | None = None  # our route for the photo as posted, when one exists
+    match_image_url: str | None = None  # our route for the matching view, when one exists
+
+
+class ReportSteps(BaseModel):
+    platform: ReportPlatform
+    name: str  # "Facebook Marketplace", "Zillow", "Craigslist"
+    steps: list[str]  # what to click, in order, in the pack's language
+
+
+class ReportResponse(BaseModel):
+    """`GET /cases/{case_id}/report`: one pack for reporting a copied listing to a platform.
+
+    Listing facts only. No score, count or threshold; no hash or model id; no image bytes;
+    nothing about the renter; no word about any person."""
+
+    case_id: str  # short public id
+    source: DataSource
+    lang: str
+    checked_at: datetime
+    state: VerdictState
+    # True only on proof (DONT_PAY) or a record that shows the home for sale. Not on a hold
+    # for something that is merely not confirmed: the poster may be a real agent.
+    reportable: bool
+    status_strip: ReportStatusStrip | None = None
+    proof_lines: list[str]  # decide()'s own reasons, in order. Never model text
+    photo_pairs: list[ReportPhotoPair] = Field(default_factory=list)
+    twin_url: str | None = None  # our /case/{id}/twin page, where each photo was placed
+    aerial_url: str | None = None  # our /cases/{id}/aerial route, when the case names a building
+    platforms: list[ReportSteps] = Field(default_factory=list)
+    not_checked: list[str]  # the card's standing list: what this does not show
 
 
 # ---------------------------------------------------------------------------------------------
@@ -474,6 +660,8 @@ class CaseProgress(StrEnum):
     # A14: the challenge was sent and the poster's reply photo has not come, or another is
     # asked for. The card reads HOLD meanwhile: no reply is never a failure.
     WAITING_FOR_REPLY = "waiting_for_reply"
+    # A24 stretch: the agent asked the renter for the license number the ad did not give.
+    WAITING_FOR_ANSWER = "waiting_for_answer"
     DONE = "done"
 
 
@@ -494,7 +682,8 @@ class CreateCaseResponse(BaseModel):
     case_id: str  # short public id, for display and for reading the case
     source: DataSource
     token: str  # write secret for this case; send it on every write, in a header only
-    # Read-only secret: opens the trace and the challenge text, and may ride in `?token=`.
+    # Read-only secret: opens the trace, the challenge text, the report and the aerial proof.
+    # Header only, like the write secret; never in the address (locked, Sat 02:27).
     read_token: str | None = None
     status: CaseProgress
     state: VerdictState | None = None  # set once the case is done
@@ -512,9 +701,13 @@ class CreateCaseResponse(BaseModel):
 class ReplyCheck(StrEnum):
     """What checking one reply photo found. Each is a fact about the photo, not about a person."""
 
-    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"  # one of the listing's own photos: forged
-    CODE_NOT_READ = "code_not_read"  # the code is not on the paper in the photo: forged
-    LATE = "late"  # it came after the deadline, so it was not checked
+    # One of the listing's own photos: forged, whenever it arrives. The only proof here.
+    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"
+    # The code could not be read on the photo (wrong, missing or unreadable). Not confirmed,
+    # ask again up to the retry cap, then HOLD. Never forged: it is not proof.
+    CODE_NOT_READ = "code_not_read"
+    # It came after the deadline and is not a copy, so it was not counted. Asked again once.
+    LATE = "late"
     # The code is there and the photo is not a copy, but nothing has checked that it was taken
     # at the spot (that needs locate, V2). Not confirmed, never proven.
     CODE_READ_SPOT_NOT_CHECKED = "code_read_spot_not_checked"
@@ -529,9 +722,162 @@ class ReplyResponse(BaseModel):
 
     case_id: str  # short public id
     source: DataSource
-    status: CaseProgress  # waiting_for_reply while another photo is wanted, else done
+    # While another photo is wanted this is waiting_for_approval: the next message is in
+    # `challenge_text` for the renter to approve. It is waiting_for_reply once that is sent,
+    # and done when nothing more will be asked.
+    status: CaseProgress
     check: ReplyCheck
     presence: PresenceStatus
     state: VerdictState | None = None  # set once the case is done
     # The next message for the renter to forward, when another photo is asked for.
     challenge_text: str | None = None
+
+
+# ---------------------------------------------------------------------------------------------
+# Search (council 4 core): a renter's brief in, CoStar's researched places out.
+# ---------------------------------------------------------------------------------------------
+
+AS_OF = "as of CoStar's last research"
+
+
+class RenterBrief(BaseModel):
+    """What the renter asked for. Every field is optional; code filters on what is given."""
+
+    max_rent_month: int | None = Field(default=None, ge=0, le=1_000_000)  # whole unit, a month
+    beds_min: int | None = Field(default=None, ge=0, le=20)  # 0 is a studio
+    baths_min: float | None = Field(default=None, ge=0, le=20)
+    needs_no_walkup: bool = False
+    needs_parking: bool = False
+    pets: bool = False
+    move_in_by: date | None = None
+    max_results: int = Field(default=10, ge=1, le=50)
+
+
+class RentalHouse(BaseModel):
+    """One active house rental from the Homes.com records in the kit (search supply)."""
+
+    property_id: str
+    source: DataSource
+    beds: int | None = None
+    baths: float | None = None
+    rent_min: int | None = None  # as listed, whole dollars a month
+    rent_max: int | None = None
+    pets_ok: bool | None = None  # None: the record does not say
+    parking_spaces: int | None = None
+    available_on: date | None = None
+    office: str | None = None  # the listing office, company name only
+    has_scan: bool = False
+
+
+class BudgetFit(StrEnum):
+    WITHIN = "within"  # the whole reported price range is at or under the budget
+    STARTS_WITHIN = "starts_within"  # the low end fits, the high end does not
+    NO_FULL_PRICE = "no_full_price"  # one end of the price is missing: not counted as within
+    NO_BUDGET = "no_budget"  # the brief gave no budget
+
+
+class MustHaveLine(BaseModel):
+    key: str  # "walkup", "parking", "pets", "utilities"
+    text: str
+    met: bool | None = None  # None: the record does not say
+
+
+class PlaceMatch(BaseModel):
+    property_id: str
+    kind: Literal["apartment", "house"]
+    floor_plan: str | None = None  # "2 bed / 2 bath" for an apartment, None for a house
+    # Stable id of this plan within its building (label, price ends, units): many plans share a
+    # label, so a pick is made by this key, never by the label alone.
+    plan_key: str | None = None
+    beds: int | None = None
+    baths: float | None = None
+    rent_min: int | None = None  # the asking price as reported, for code to compare
+    rent_max: int | None = None
+    budget_fit: BudgetFit
+    price_text: str
+    availability_text: str
+    must_haves: list[MustHaveLine] = Field(default_factory=list)
+    musts_met: int = 0
+    has_3d_scan: bool = False
+    scan_text: str | None = None  # "a 3D scan in this building"
+    office_on_record: str | None = None  # company name only
+    # True only for a place that got the record-side deep check (the model picks up to three
+    # per search); every other place is "researched" only. The line is built by code from the
+    # record, so it is the same for the same place whoever chose it.
+    checked: bool = False
+    check_line: str | None = None
+    source: DataSource
+
+
+class SearchDecision(BaseModel):
+    """One choice the search agent made, in the trace's own shape. `chosen_by` is "model" only
+    when a language model picked from the options code wrote; a menu of one is always "policy"."""
+
+    kind: Literal["deep_check", "tradeoff", "tour_gate"]
+    options: list[str]
+    pick: str
+    reason: str
+    chosen_by: Literal["model", "policy"]
+
+
+class CasePreferences(BaseModel):
+    """What the agent remembers about one renter's session. Code-defined keys only: a rejected
+    walk-up, a parking need, a lower budget, places to stop showing. Never free text."""
+
+    no_walkup: bool = False
+    needs_parking: bool = False
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class PreferencesUpdate(BaseModel):
+    """`POST /cases/{id}/preferences`: the renter rejected something. Each field is optional."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    no_walkup: bool | None = None
+    needs_parking: bool | None = None
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_id: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class SearchResponse(BaseModel):
+    source: DataSource
+    as_of: str = AS_OF
+    n_considered: int  # priced places looked at before the brief's filters
+    n_matches: int  # places that passed, before max_results cut the list
+    matches: list[PlaceMatch]
+    # What the agent decided, in order, each stamped model or policy with a reason.
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None  # the one trade-off question to put to the renter
+    ask_first: bool = False  # ask it before drafting a tour request
+    remembered: list[str] = Field(default_factory=list)  # preference keys applied to this search
+
+
+class AlternativesResponse(BaseModel):
+    case_id: str
+    source: DataSource
+    as_of: str = AS_OF
+    matches: list[PlaceMatch]
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None
+    ask_first: bool = False
+    remembered: list[str] = Field(default_factory=list)
+
+
+class TourDraftRequest(BaseModel):
+    property_id: str = Field(min_length=1, max_length=64)
+    floor_plan: str | None = Field(default=None, max_length=64)
+    plan_key: str | None = Field(default=None, max_length=128)
+    brief: RenterBrief | None = None
+
+
+class TourDraft(BaseModel):
+    """A draft for the renter to approve. Nothing is sent; there is no send route."""
+
+    property_id: str
+    addressee: str  # the office on record, company name only
+    text: str
+    status: Literal["draft"] = "draft"
+    sent: Literal[False] = False
+    source: DataSource

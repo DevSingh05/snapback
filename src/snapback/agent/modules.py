@@ -10,17 +10,24 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from snapback.adapters import trec
 from snapback.agent.rules import check_price
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, Claims, check_authority
+from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
     ChallengeResult,
+    DataSource,
     FloorPlanCandidate,
     ForSaleMatch,
+    LicenseResult,
+    LicenseStatus,
     LocateResult,
     MemoryResult,
     ModuleEvidence,
+    OwnerKind,
+    OwnerResult,
     PriceResult,
     PropertyRecord,
     RecaptureResult,
@@ -46,6 +53,12 @@ class ChallengeOutcome:
     challenge: ChallengeResult
     recapture: list[RecaptureResult] = field(default_factory=list)
     memory: list[MemoryResult] = field(default_factory=list)
+    # A14: the message was handed over and the poster's reply has not come. The case waits
+    # (HOLD, never a failure) until `CaseSession.reply` is given the checked reply.
+    awaiting_reply: bool = False
+    # A14: the reply came after the deadline and is not a copy of a listing photo, so it was
+    # not counted. The session asks again once (decision 4, Sat 02:45).
+    late: bool = False
 
 
 class Modules(Protocol):
@@ -71,6 +84,18 @@ class Modules(Protocol):
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         """Is the home listed for sale, or just rented? None when it was not looked up."""
+        ...
+
+    def license(self, case_id: str) -> LicenseResult | None:
+        """The poster's claimed real estate licence, looked up. None when it was not."""
+        ...
+
+    def owner(self, case_id: str) -> OwnerResult | None:
+        """The owner of record and how the poster compares. None when there is no owner data."""
+        ...
+
+    def record_source(self, case_id: str) -> DataSource | None:
+        """Where price, authority and for_sale came from, if not from where the case did."""
         ...
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None: ...
@@ -101,6 +126,10 @@ class FixtureModules:
         beds: int | None = None,
         record_file: str = "property_record.json",
         for_sale: ForSaleMatch | None = None,
+        license: LicenseResult | None = None,
+        trec_rows: dict[str, dict] | None = None,
+        ad_text: str = "",
+        owner: OwnerResult | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
@@ -122,6 +151,14 @@ class FixtureModules:
         self._unit = unit
         self._beds = beds
         self._for_sale = for_sale
+        self._license = license
+        # A24 stretch: the stand-in for the state's list, one row (as the state returns it)
+        # per license number. A number it does not hold has no row, which is what the real
+        # list says (D10: NOT_FOUND). The answer comes from trec's own rule, with the name the
+        # ad claims: an active number under no claimed name is NOT_CHECKED, as it is live.
+        self._trec_rows = trec_rows or {}
+        self._ad_text = ad_text
+        self._owner = owner
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
             None
@@ -176,6 +213,37 @@ class FixtureModules:
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         return self._for_sale if self._for_sale is not None else self.evidence.for_sale
+
+    def license(self, case_id: str) -> LicenseResult | None:
+        return self._license if self._license is not None else self.evidence.license
+
+    def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
+        """The license lookup by a number the renter gave (A24 stretch)."""
+        row = self._trec_rows.get(number)
+        claim = trec.detect_claim(self._ad_text)
+        status, sponsor = trec.answer_for_number(number, [row] if row else [], claim)
+        return LicenseResult(
+            status=status,
+            claimed_role=claim.role if claim else None,
+            sponsor_broker=sponsor if status is LicenseStatus.LICENSED else None,
+            number_from="renter",
+        )
+
+    def owner(self, case_id: str) -> OwnerResult | None:
+        owner = self._owner if self._owner is not None else self.evidence.owner
+        if owner is None:
+            return owner
+        if self._contacts is None:
+            # No claims to compare, but a person's name still never travels onward.
+            return (
+                owner.model_copy(update={"company": None})
+                if owner.kind is OwnerKind.PERSON
+                else owner
+            )
+        return check_owner(self._contacts, owner)
+
+    def record_source(self, case_id: str) -> DataSource | None:
+        return None  # all of a fixture case is fixture
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None:
         if self._spots_available is None:

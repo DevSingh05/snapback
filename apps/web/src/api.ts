@@ -28,8 +28,8 @@ export function saveCaseToken(caseId: string, token: string): void {
   }
 }
 
-// The read-only secret (POST /cases `read_token`). Only this one may travel in a URL, for the
-// SSE trace, because EventSource cannot send headers. The write token above never does.
+// The read-only secret (POST /cases `read_token`). It opens the SSE trace, sent in an
+// Authorization header by fetch. It is never put in a URL, and the write token above never is.
 const READ_TOKEN_PREFIX = "snapback.case-read-token.";
 
 export function saveCaseReadToken(caseId: string, token: string): void {
@@ -69,6 +69,20 @@ export function apiFetch(
   const token = tokenFor ? loadCaseToken(tokenFor) : null;
   if (token) merged.set("Authorization", `Bearer ${token}`);
   return fetch(`${base}${path}`, { ...rest, headers: merged, credentials: "include" });
+}
+
+// GET with the case's read token in the Authorization header (never in a URL; ruling on #113).
+// Returns null when this browser holds no read token for the case, so callers fall back to fixtures.
+export function apiFetchRead(
+  path: string,
+  caseId: string,
+  init: RequestInit = {},
+): Promise<Response> | null {
+  const token = loadCaseReadToken(caseId);
+  if (!apiBase() || !token) return null;
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return apiFetch(path, { ...init, headers });
 }
 
 export async function fetchCard(caseId: string, signal?: AbortSignal): Promise<Card> {

@@ -36,6 +36,63 @@ _COMPANY = re.compile(
 )
 
 
+# The poster says they own the home: "I am the owner", "for rent by owner", "owner here",
+# "I own this property", "my house". Not "the owner's agent", "not the owner", "a pet owner".
+_HOME = r"(?:house|home|property|condo|townhouse|townhome|duplex)"
+# Words that turn "by owner" into a company name ("For Rent By Owner Realty").
+_OWNER_COMPANY = (
+    r"realty|direct|properties|property|group|homes|management|mgmt|real|rentals|services|"
+    r"associates|investments|holdings|company|inc|llc"
+)
+_SAYS_OWNER = re.compile(
+    r"\b(?i:"
+    r"(?:i\s{0,2}am|i['’]m|im|we\s{0,2}are|we['’]re)\s{1,3}(?:the\s{1,3})?"
+    r"(?:(?:home|property)\s?)?owners?\b(?!['’])"
+    # "For rent by owner", not something the owner pays for or does ("water paid by owner").
+    r"|(?<!sold )(?<!paid )(?<!paid for )(?<!covered )(?<!provided )(?<!supplied )"
+    r"(?<!maintained )(?<!handled )(?<!included )(?<!occupied )"
+    r"by\s{1,3}(?:the\s{1,3})?owner\b(?!['’])"
+    rf"(?!\s{{1,3}}(?:last\s{{1,3}}year|(?:{_OWNER_COMPANY})\b))"
+    r"|(?<!the )(?<!a )(?<!an )(?<!pet )(?<!its )"
+    r"(?<!previous )(?<!former )owner\s{1,3}(?:here|speaking)\b"
+    r"|i\s{1,3}own\s{1,3}(?:this|the)\s{1,3}" + _HOME + r"\b"
+    r"|(?<!not )(?<!like )(?<!it's )(?<!it’s )\bmy\s{1,3}(?:own\s{1,3})?" + _HOME + r"\b"
+    r")"
+)
+
+# The same claim in Spanish: "soy el dueño", "somos los propietarios", "se renta por dueño",
+# "trato directo con el dueño", "dueño directo", "es mi casa", "rento mi casa". "Dueno"
+# without the ñ is how it is often typed.
+#
+# Two of the forms are common words in other sentences, so they count only beside a word that
+# makes them about renting or selling the home:
+#   "por (el) dueño"  after renta / alquila / venta ..., with the home between them or not
+#                     ("se renta por dueño", "se renta casa por dueño"); not "pagadas por el
+#                     dueño", "pregunte por el dueño", "vendido por el dueño", nor "se renta
+#                     casa pagada por el dueño"
+#   "mi casa"         after es / rento / alquilo ...      not "cerca de mi casa", "desde mi
+#                     casa", "mi casa es su casa", "Mi Casa Apartments", "Detroit, MI Townhouse"
+_DUENO = r"(?:due[ñn][oa]s?|propietari[oa]s?)"
+_CASA_WORDS = r"casa|propiedad|vivienda|condominio|d[úu]plex|townhouse"
+_CASA = r"(?:" + _CASA_WORDS + r")"
+_RENTS_OR_SELLS = r"(?:renta|rento|alquila|alquilo|alquiler|vende|vendo|venta)"
+_OFFERS_MINE = r"(?:es|rento|alquilo|ofrezco|vendo|rentando|alquilando|renta|alquila|vende)"
+# What is offered may sit between the verb and "por": "se renta CASA por dueño".
+_OFFERED = r"(?:" + _CASA_WORDS + r"|departamento|depa|cuarto|habitaci[óo]n|terreno|local)"
+_SAYS_OWNER_ES = re.compile(
+    r"(?i:"
+    r"(?<!no )\b(?:soy|somos)\s{1,3}(?:(?:el|la|los|las)\s{1,3})?" + _DUENO + r"\b"
+    # Not a pet's owner: "dueño de un perro", "del perro", "de la gata", "de mascotas".
+    r"(?!\s{1,3}del?\s{1,3}(?:(?:la|las|los|un|una|mi|mis|dos|tres)\s{1,3})?(?:perr|gat|mascota))"
+    r"|\b" + _RENTS_OR_SELLS + r"\s{1,3}(?:(?:de\s{1,3})?" + _OFFERED + r"\s{1,3})?"
+    r"(?:direct[oa]\s{1,3})?por\s{1,3}"
+    r"(?:(?:el|la|su|los)\s{1,3})?" + _DUENO + r"\b(?!\s{1,3}(?:anterior|pasad))"
+    r"|\btrato\s{1,3}directo\s{1,3}con\s{1,3}(?:(?:el|la)\s{1,3})?" + _DUENO + r"\b"
+    r"|\b" + _DUENO + r"\s{1,3}direct[oa]\b"
+    r"|(?<!no )\b" + _OFFERS_MINE + r"\s{1,3}mi\s{1,3}(?:propia\s{1,3})?" + _CASA + r"\b"
+    r")"
+)
+
 # A link as written: with a scheme or "www.", or a bare name ending in a common ending. The
 # bare form does not start inside an email address or a longer name.
 _LINK = re.compile(r"(?:https?://|\bwww\.)([^\s/?#]{1,253})", re.IGNORECASE)
@@ -76,6 +133,7 @@ class ContactClaims(BaseModel):
     phones: list[str] = Field(default_factory=list)
     emails: list[str] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)  # where each link goes, not the full link
+    says_owner: bool = False  # their own words say they own the home (A19)
 
 
 def extract_rent(text: str) -> int | None:
@@ -128,4 +186,7 @@ def extract_contacts(text: str) -> ContactClaims:
         phones=[match.group(0).strip() for match in _PHONE.finditer(text)],
         emails=[match.group(0).rstrip(".") for match in _EMAIL.finditer(text)],
         links=_links(text),
+        says_owner=(
+            _SAYS_OWNER.search(text) is not None or _SAYS_OWNER_ES.search(text) is not None
+        ),
     )

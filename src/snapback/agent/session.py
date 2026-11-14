@@ -18,8 +18,10 @@ import random
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from typing import Literal
 
-from snapback.agent.modules import Modules
+from snapback.agent.modules import ChallengeOutcome, Modules
+from snapback.agent.planner import ASK_FIELDS, Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -36,6 +38,7 @@ from snapback.contracts import (
 from snapback.verdict import decide, presence_of, to_evidence
 
 MAX_RETRIES = 2
+MAX_LATE_ASKS = 1  # a reply that came too late (and is not a copy) is asked for again once
 TOP_SPOTS = 5
 
 TWIN_RULES_CHALLENGE = "twin+rules+challenge"
@@ -55,9 +58,12 @@ DECISIONS = (SEND, EDIT, CANCEL)
 
 class Step(StrEnum):
     CHECKS = "checks"
+    PLAN = "plan"  # A24: which evidence-gated check runs next (order only)
+    ASK = "ask"  # A24 stretch: the renter was asked for the license number; waiting for them
     FLOOR_PLAN = "floor_plan"
     SPOT = "spot"
     APPROVAL = "approval"
+    REPLY = "reply"  # the challenge was sent; waiting for the poster's reply photo (A14)
     RETRY = "retry"
     DONE = "done"
 
@@ -101,8 +107,10 @@ class CaseSession:
         *,
         rng: random.Random | None = None,
         lang: str = strings.DEFAULT_LANG,
+        ask_enabled: bool = False,
     ) -> None:
         self.case_id = case_id
+        self.ask_enabled = ask_enabled  # may the agent ask the renter for the license number?
         self.modules = modules
         self.trace = trace
         self.lang = lang
@@ -112,6 +120,9 @@ class CaseSession:
         self.step = Step.CHECKS
         self.evidence = ModuleEvidence(case_id=case_id, source=trace.source)
         self.retries = 0
+        self.late_replies = 0  # replies that came after the deadline and were not copies
+        self._late = False  # the reply being weighed now is one of those
+        self._replied = False  # a real reply was checked at least once (A14)
         self.verdict: Verdict | None = None
         self.pending_challenge: ChallengeDraft | None = None
 
@@ -122,6 +133,9 @@ class CaseSession:
         self._decision: tuple[str, str | None] | None = None
         self._said_waiting = False
         self._skipped_spot: str | None = None
+        self._plan: Plan | None = None
+        self._after_plan: Step | None = None  # where the case goes when the plan is done
+        self.question: str | None = None  # the code-written question the renter is asked
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -132,6 +146,16 @@ class CaseSession:
     @property
     def waiting_for_approval(self) -> bool:
         return self.step is Step.APPROVAL and self._decision is None
+
+    @property
+    def waiting_for_reply(self) -> bool:
+        """The challenge was sent and the poster's reply photo has not been checked yet."""
+        return self.step is Step.REPLY
+
+    @property
+    def waiting_for_answer(self) -> bool:
+        """The renter was asked for the license number and has not answered yet."""
+        return self.step is Step.ASK
 
     @property
     def recorded_decision(self) -> str | None:
@@ -145,6 +169,8 @@ class CaseSession:
         """The choice that is open now, or None when the next step is not a choice to make."""
         if self.step is Step.CHECKS:
             return self._checks_offer()
+        if self.step is Step.PLAN:
+            return self._plan_offer()
         if self.step is Step.FLOOR_PLAN:
             return self._floor_plan_offer()
         if self.step is Step.RETRY:
@@ -191,9 +217,7 @@ class CaseSession:
 
         update: dict[str, object] = {
             "rules": self.modules.rules(self.case_id),
-            "price": self.modules.price(self.case_id),
-            "authority": self.modules.authority(self.case_id),
-            "for_sale": self.modules.for_sale(self.case_id),
+            "record_source": self.modules.record_source(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:
             self.trace.emit(
@@ -219,13 +243,86 @@ class CaseSession:
         self.evidence = self.evidence.model_copy(update=update)
 
         if pick == RULES_ONLY:
-            self._finish()
+            self._after_plan = None
         elif self._candidates:
-            self.step = Step.FLOOR_PLAN
+            self._after_plan = Step.FLOOR_PLAN
         elif self._model_id:
-            self.step = Step.SPOT  # photos were placed but no floor plans were ranked
+            self._after_plan = Step.SPOT  # photos were placed but no floor plans were ranked
         else:
-            self._finish()  # nothing to challenge against
+            self._after_plan = None  # nothing to challenge against
+        self._begin_plan()
+
+    # --- choice 1b: which check next (A24) -------------------------------------------------
+
+    def _begin_plan(self) -> None:
+        self._plan = Plan(self.modules, self.case_id, ask_enabled=self.ask_enabled)
+        self.evidence = self.evidence.model_copy(update=self._plan.unclaimed_evidence())
+        for skipped in self._plan.skipped():
+            self.trace.emit(
+                TraceKind.STATUS,
+                self._say(
+                    "plan.skipped", option=skipped.kind.value, reason=self._say(skipped.reason)
+                ),
+                pick=skipped.kind.value,
+            )
+        self.step = Step.PLAN
+        self._advance_plan()
+
+    def _advance_plan(self) -> None:
+        """Leave the plan when no option can run any more."""
+        assert self._plan is not None
+        if self._plan.open_options():
+            return
+        if self._after_plan is None:
+            self._finish()
+        else:
+            self.step = self._after_plan
+
+    def _plan_offer(self) -> Offer:
+        assert self._plan is not None
+        kinds = self._plan.open_options()
+        labels = tuple(kind.value for kind in kinds)
+        return Offer(
+            kind=ChoiceKind.NEXT_CHECK,
+            options=labels,
+            aliases=labels,
+            facts=self._plan.facts(),
+            default=labels[0],
+            default_reason=self._say(self._plan.pick_key(kinds[0])),
+        )
+
+    def _apply_plan(self, pick: str) -> None:
+        assert self._plan is not None
+        if PlanKind(pick) is PlanKind.ASK:
+            # The question is a code string. The case now waits for the renter, like REPLY.
+            self.question = self._say("plan.ask.question")
+            self.trace.emit(TraceKind.STATUS, self.question)
+            self.step = Step.ASK
+            return
+        update = self._plan.run(PlanKind(pick))
+        self.evidence = self.evidence.model_copy(update=update)
+        self._advance_plan()
+
+    def answer(self, text: str | None) -> None:
+        """Take the renter's answer to the license question (blank or no number: no change).
+
+        Only the checks `UNLOCKS` names for the field re-run. The raw text is read for a
+        number by code and goes nowhere else: not to a model, not to the trace.
+        """
+        if self.step is not Step.ASK or self._plan is None:
+            raise RuntimeError("no question is waiting for an answer")
+        update = self._plan.answer(ASK_FIELDS[0], text)
+        self.question = None
+        if self._plan.looked_up:
+            self.trace.emit(TraceKind.TOOL, self._say("plan.ask.looked_up"), pick="license")
+        elif self._plan.number_given:
+            # a number came but no lookup answered (none is wired, it broke, or it timed out)
+            self.trace.emit(TraceKind.STATUS, self._say("plan.ask.not_looked_up"))
+        else:
+            self.trace.emit(TraceKind.STATUS, self._say("plan.ask.no_number"))
+        self.evidence = self.evidence.model_copy(update=update)
+        self.step = Step.PLAN
+        self._advance_plan()
 
     # --- choice 2: which floor plan --------------------------------------------------------
 
@@ -378,6 +475,15 @@ class CaseSession:
         outcome = self.modules.challenge(
             self.case_id, self._spot, draft.code, draft.text, self.retries
         )
+        self._take(outcome)
+        if outcome.awaiting_reply:
+            # Nothing to judge yet. The case waits here: no reply is HOLD, never a failure.
+            self.trace.emit(TraceKind.STATUS, self._say("trace.reply.waiting"))
+            self.step = Step.REPLY
+        else:
+            self.step = Step.RETRY
+
+    def _take(self, outcome: ChallengeOutcome) -> None:
         self.evidence = self.evidence.model_copy(
             update={
                 "challenge": outcome.challenge,
@@ -385,6 +491,29 @@ class CaseSession:
                 "memory": outcome.memory,
             }
         )
+
+    def reply(self, outcome: ChallengeOutcome) -> None:
+        """Take the poster's reply, already checked. The retry-or-stop choice comes next.
+
+        A reply that came too late to count and is not a copy (`outcome.late`) is not judged;
+        the choice that follows asks again once (decision 4, Sat 02:45). A copy is proof
+        whenever it arrives. Only an outcome that is still `awaiting_reply` leaves the case
+        waiting, and no check returns one today.
+        """
+        if self.step is not Step.REPLY:
+            raise RuntimeError("no reply is awaited now")
+        self._take(outcome)
+        if outcome.awaiting_reply:
+            return
+        self._replied = True
+        self._late = outcome.late
+        if outcome.late:
+            # Too late to count and not a copy (a copy is proof whenever it comes). Nothing
+            # on it was judged; whether to ask again is the next choice.
+            self.late_replies += 1
+            self.trace.emit(TraceKind.STATUS, self._say("trace.reply.late"))
+        else:
+            self.trace.emit(TraceKind.TOOL, self._say("trace.tool.reply"), pick="reply")
         self.step = Step.RETRY
 
     # --- choice 5: retry or stop -----------------------------------------------------------
@@ -397,17 +526,44 @@ class CaseSession:
         forged = presence.status is PresenceStatus.FORGED
         proven = presence.status is PresenceStatus.PROVEN
 
+        # Decision 4 (Sat 02:45): a reply that came too late and is not a copy is asked for
+        # again once. A second late one is not: the case holds, and nobody is accused.
+        late = self._late and not forged
+        late_asks_used_up = late and self.late_replies > MAX_LATE_ASKS
+
         # Proof of a forgery is never retried away, and the cap is enforced here, not asked for.
-        can_retry = not forged and self.retries < MAX_RETRIES and bool(self._spots()[0])
+        can_retry = (
+            not forged
+            and not late_asks_used_up
+            and self.retries < MAX_RETRIES
+            and bool(self._spots()[0])
+        )
         options = (ACCEPT, RETRY, STOP) if can_retry else (ACCEPT, STOP)
+
+        # A14: the reply showed the code, and nothing has checked that it was taken at the
+        # spot (that needs locate). Asking again cannot change that, so the case stops here,
+        # not confirmed.
+        last = spots[-1] if spots else None
+        code_only = (
+            not forged
+            and not proven
+            and last is not None
+            and last.replied_at is not None
+            and last.code_read is True
+            and last.located is None
+        )
 
         if forged:
             default, reason = ACCEPT, self._say("trace.retry.forged")
+        elif code_only:
+            default, reason = STOP, self._say("trace.retry.code_only")
         elif proven and matched == len(spots) == 2:
             default, reason = ACCEPT, self._say("trace.retry.accept_both")
         elif proven:
             default = ACCEPT
             reason = self._say("trace.retry.accept", matched=matched, total=len(spots))
+        elif late and can_retry:
+            default, reason = RETRY, self._say("trace.retry.late")
         elif can_retry:
             default, reason = RETRY, self._say("trace.retry.again")
         else:
@@ -423,6 +579,7 @@ class CaseSession:
                 "code_read_on_every_reply": bool(spots) and all(s.code_read for s in spots),
                 "recapture_flag": any(result.blocks_pass for result in self.evidence.recapture),
                 "reply_copies_a_listing_photo": presence.copies_listing_photo,
+                "reply_came_too_late_to_count": late,
                 "retries_used": self.retries,
                 "retries_left": MAX_RETRIES - self.retries,
             },
@@ -433,13 +590,20 @@ class CaseSession:
     def _apply_retry(self, pick: str) -> None:
         if pick == RETRY:
             self.retries += 1
+            self._late = False
             self.step = Step.SPOT
         else:
             self._finish()
 
     # --- making a choice -------------------------------------------------------------------
 
-    def choose(self, pick: object, reason: object = None) -> str:
+    def choose(
+        self,
+        pick: object,
+        reason: object = None,
+        *,
+        by: Literal["model", "policy"] = "policy",
+    ) -> str:
         """Take a pick for the open choice. Returns the label that was applied.
 
         A pick that is not on the list is not an error to raise: the default is applied and the
@@ -450,24 +614,35 @@ class CaseSession:
             raise RuntimeError(f"no choice is open at step {self.step.value!r}")
 
         label = offer.resolve(pick)
-        if label is None:
+        if len(offer.options) == 1:
+            # Nothing was chosen: a menu of one. Say so, and never credit a model for it.
+            label, reason, by = offer.options[0], self._say("plan.only_option"), "policy"
+        elif label is None:
             self.trace.emit(TraceKind.ERROR, self._say("trace.error.bad_pick"))
-            label, reason = offer.default, offer.default_reason
+            label, reason, by = offer.default, offer.default_reason, "policy"
         self.trace.emit(
             TraceKind.CHOICE,
             clean_reason(reason, offer.default_reason),
             choice=offer.kind,
             options=offer.options,
             pick=label,
+            chosen_by=by,
         )
 
         if offer.kind is ChoiceKind.WHICH_CHECKS:
             self._apply_checks(label)
+        elif offer.kind is ChoiceKind.NEXT_CHECK:
+            self._apply_plan(label)
         elif offer.kind is ChoiceKind.WHICH_FLOOR_PLAN:
             self._apply_floor_plan(label)
         else:
             self._apply_retry(label)
         return label
+
+    def settle(self) -> None:
+        """Apply every open choice that has a single option. No chooser is asked about these."""
+        while (offer := self.offer()) is not None and len(offer.options) == 1:
+            self.choose(offer.default, offer.default_reason)
 
     def choose_default(self, *, failed: bool = False) -> str:
         """Apply the code policy's pick, noting in the trace if a model failed to answer."""
@@ -482,6 +657,10 @@ class CaseSession:
 
     def _finish(self) -> None:
         """Decide on the evidence gathered. This is the only way a case gets a state."""
+        if self._replied and presence_of(self.evidence).status is PresenceStatus.WAITING:
+            # A reply came, it could not be accepted, and nothing more will be asked. The
+            # card must stop telling the renter to ask for a photo. This changes no state.
+            self.evidence = self.evidence.model_copy(update={"no_retry_left": True})
         self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
         reasons: list[str] = []
         for reason in self.verdict.reasons:

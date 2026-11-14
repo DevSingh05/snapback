@@ -413,6 +413,12 @@ button {
   gap: 8px;
   font-weight: 700;
 }
+.trace-by {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
 .trace-time {
   color: var(--muted);
   font-weight: 400;
@@ -770,4 +776,25 @@ button {
 }
 .replay-link a:hover {
   color: var(--ink);
+}
+.aerial-facts {
+  margin: 0;
+  color: var(--muted);
+}
+.aerial-skeleton {
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  border-radius: 0;
+  background: var(--line);
+  animation: aerial-pulse 1.4s ease-in-out infinite;
+}
+@keyframes aerial-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aerial-skeleton {
+    animation: none;
+  }
 }

@@ -7,7 +7,13 @@ import { TracePanel } from "../trace";
 import { AerialProof, type AerialSide } from "./AerialProof";
 import { PhotoLanding, type FlyFrom, type LandingPhase } from "./PhotoLanding";
 import { TraceStrip } from "./TraceStrip";
-import { FIXTURE_ROOM_LABELS, chooseLocate, landingFromLocate, type LandingState } from "./landing";
+import {
+  FIXTURE_ROOM_LABELS,
+  chooseLocate,
+  hasDifferentHome,
+  landingFromLocate,
+  type LandingState,
+} from "./landing";
 import { poseToSdkCall } from "./pose";
 import { COPIED_LOCATE, FIXTURE_CLAIMED, FIXTURE_MATCHED } from "./proofFixtures";
 import { connectShowcase, embedUrl, flyToPose, watchSweeps, type ShowcaseSdk } from "./showcase";
@@ -55,7 +61,7 @@ function TwinViewInner({
   const fixtureBase = demo === "copied" ? COPIED_LOCATE : fixtureLocate;
   const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
   // A photo placed in a different building than the claimed one: show both buildings.
-  const mismatch = locate.photos.some((p) => p.status === "located_elsewhere");
+  const mismatch = hasDifferentHome(locate);
   const poseIsLive = locate !== fixtureBase;
   // Fixture room names belong to the fixture pose only; a live result without labels shows none.
   const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
@@ -260,7 +266,12 @@ function TwinViewInner({
             </label>
             <p className="twin-status">{status}</p>
           </div>
-          <AerialProof matched={matchedAerial} claimed={claimedAerial} mismatch={mismatch} />
+          <AerialProof
+            caseId={demo ? undefined : caseId}
+            matched={matchedAerial}
+            claimed={claimedAerial}
+            mismatch={mismatch}
+          />
         </aside>
       </div>
       <TraceStrip>

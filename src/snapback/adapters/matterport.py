@@ -48,6 +48,12 @@ query($id: ID!) { model(id: $id) { locations {
   id position { x y z }
   panos { rotation { x y z w } skybox(resolution: "high") { children } }
 } } }"""
+# Each sweep's room and Matterport's classifications of it (issue #68: rooms carry no custom
+# labels, but most are classified).
+_QUERY_ROOMS = """
+query($id: ID!) { model(id: $id) { locations {
+  id room { classifications { label confidence } }
+} } }"""
 # The field set the kit probe has confirmed on our keys. Used if the pose fields are refused.
 _QUERY_BARE = """
 query($id: ID!) { model(id: $id) { locations {
@@ -80,6 +86,10 @@ class Sweep:
 
 class Matterport(Protocol):
     def sweeps(self, model_id: str) -> list[Sweep]: ...
+
+    def room_labels(self, model_id: str) -> dict[str, str | None]:
+        """Sweep id -> Matterport's most confident room classification ("Kitchen"), or None."""
+        ...
 
 
 def get_matterport(
@@ -161,9 +171,9 @@ def synthetic_face(seed: int, size: int = 256) -> Image.Image:
         a, b, c = rng.uniform(-1, 1, 3)
         channels.append(120 + 60 * np.sin(3 * a * x + 2 * b * y + c))
     pixels = np.stack(channels, axis=-1)
-    for _ in range(10):
+    for _ in range(30):  # enough fixed structure for a crop to keep a few dozen corners
         x0, y0 = rng.integers(0, size - 24, 2)
-        w, h = rng.integers(16, size // 3, 2)
+        w, h = rng.integers(12, size // 4, 2)
         pixels[y0 : y0 + h, x0 : x0 + w] = rng.uniform(0, 255, 3)
     return Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), "RGB")
 
@@ -206,8 +216,25 @@ class FixtureMatterport:
         _write_manifest(folder, sweeps)
         return sweeps
 
+    def room_labels(self, model_id: str) -> dict[str, str | None]:
+        return {}
+
 
 # --- live backend ------------------------------------------------------------------------------
+
+
+MAX_RETRY_SLEEP_S = 30.0
+
+
+def _retry_delay(header: str | None, attempt: int) -> float:
+    """Seconds to wait before retrying a 429: the server's Retry-After in seconds when it is a
+    number, else exponential backoff; never longer than MAX_RETRY_SLEEP_S (an HTTP-date or a
+    value like 3600 must not stall a case)."""
+    try:
+        delay = float(header) if header is not None else float(2**attempt)
+    except ValueError:
+        delay = float(2**attempt)
+    return min(max(delay, 0.0), MAX_RETRY_SLEEP_S)
 
 
 class LiveMatterport:
@@ -262,6 +289,22 @@ class LiveMatterport:
         _write_manifest(folder, sweeps)
         return sweeps
 
+    def room_labels(self, model_id: str) -> dict[str, str | None]:
+        cache = self.cache_dir / _safe(model_id) / "rooms.json"
+        if cache.is_file():
+            return json.loads(cache.read_text())
+        payload = self._post({"query": _QUERY_ROOMS, "variables": {"id": model_id}}).json()
+        if payload.get("errors"):
+            return {}
+        labels: dict[str, str | None] = {}
+        for location in ((payload.get("data") or {}).get("model") or {}).get("locations") or []:
+            kinds = ((location.get("room") or {}).get("classifications")) or []
+            best = max(kinds, key=lambda k: k.get("confidence") or 0, default=None)
+            labels[_safe(str(location.get("id")))] = (best or {}).get("label")
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(labels))
+        return labels
+
     def _locations(self, model_id: str) -> tuple[list[dict], bool]:
         for query, with_pose in ((_QUERY_WITH_POSE, True), (_QUERY_BARE, False)):
             payload = self._post({"query": query, "variables": {"id": model_id}}).json()
@@ -281,10 +324,20 @@ class LiveMatterport:
 
     def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
         for attempt in range(self.RETRIES + 1):
-            response = self._client.request(method, url, **kwargs)
+            try:
+                response = self._client.request(method, url, **kwargs)
+            except httpx.TransportError as error:
+                # A dropped or refused connection: back off and try again, like a 429.
+                if attempt == self.RETRIES:
+                    # The error type only: its message may echo a signed URL.
+                    raise RuntimeError(
+                        f"Matterport request failed: network ({type(error).__name__})"
+                    ) from None
+                time.sleep(2**attempt)
+                continue
             if response.status_code != 429 or attempt == self.RETRIES:
                 break
-            time.sleep(float(response.headers.get("retry-after", 2**attempt)))
+            time.sleep(_retry_delay(response.headers.get("retry-after"), attempt))
         if response.status_code >= 400:
             # Status only: the URL may carry a signature, and the body may echo the request.
             raise RuntimeError(f"Matterport request failed: HTTP {response.status_code}")

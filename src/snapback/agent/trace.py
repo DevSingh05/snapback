@@ -7,6 +7,7 @@
 import threading
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
+from typing import Literal
 
 from snapback.contracts import ChoiceKind, DataSource, TraceEvent, TraceKind
 
@@ -15,7 +16,19 @@ MAX_REASON = 200
 # A reason may be written by a model, and the trace is shown on screen. These words are the
 # ones the product never uses about a listing or a person; a reason containing one is dropped
 # in favour of the code-written fallback.
-_BANNED_IN_REASONS = ("scam", "fraud", "safe", "verified", "legit")
+_BANNED_IN_REASONS = (
+    "scam",
+    "fraud",
+    "safe",
+    "verified",
+    "legit",
+    "available now",
+    "neighborhood",
+    "neighbourhood",
+    "school",
+    "family",
+    "families",
+)
 
 
 def clean_reason(text: object, fallback: str) -> str:
@@ -54,6 +67,7 @@ class Trace:
         choice: ChoiceKind | None = None,
         options: Iterable[str] = (),
         pick: str | None = None,
+        chosen_by: Literal["model", "policy"] = "policy",
     ) -> TraceEvent:
         with self._lock:
             event = TraceEvent(
@@ -66,6 +80,7 @@ class Trace:
                 pick=pick,
                 reason=reason,
                 source=self.source,
+                chosen_by=chosen_by,
             )
             self.events.append(event)
         for listener in self._listeners:

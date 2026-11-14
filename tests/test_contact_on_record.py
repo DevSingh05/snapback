@@ -89,7 +89,9 @@ def test_the_new_fixtures_parse_and_old_records_still_do():
     ("phones", "expected"),
     [
         ([OFFICE], PhoneMatch.YES),
-        ([OTHER, OFFICE], PhoneMatch.YES),
+        ([OTHER, OFFICE], PhoneMatch.NO),
+        ([OFFICE, OTHER], PhoneMatch.NO),
+        ([OFFICE, "(555) 010-0142"], PhoneMatch.YES),
         ([OTHER], PhoneMatch.NO),
         ([], PhoneMatch.NOT_CHECKED),
     ],
@@ -115,18 +117,63 @@ def test_a_phone_that_is_not_the_office_holds_the_case_even_if_the_name_matches(
     assert to_evidence(modules).phone_flag is True
     assert state(modules) is VerdictState.HOLD
 
-    # Ruling, Sat 01:20: the poster's own contact not matching the record is a real red flag.
+    # Ruling, Sat 02:10 (#121): a number that is not the office's reads Not confirmed. A
+    # licensed locator or listing agent posting with their own number is normal and legal.
     tone, text = card_lines(modules, CardRowKind.PERSON)["Contact on record"]
-    assert tone is CardTone.RED_FLAG
+    assert tone is CardTone.NOT_SHOWN
+    # The one "Call {manager} yourself" on this row is on the "Allowed to rent it" line, so
+    # this line does not say "call" a second time.
     assert text == (
-        "The phone in the listing is not the leasing office on record. "
-        "Call Fixture Living LLC yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own, so check it with the office."
     )
+    assert "Fixture Living LLC" in card_lines(modules, CardRowKind.PERSON)["Allowed to rent it"][1]
+
+    # With no manager on record nothing else on the row says who to call, so this line does.
     unnamed = check_authority(ContactClaims(phones=[OTHER]), record(manager_company=None), SALT)
-    _, said = card_lines(evidence(authority=unnamed.model_dump(mode="json")), CardRowKind.PERSON)[
-        "Contact on record"
-    ]
-    assert said.endswith("Call the office on record yourself. Red flag.")
+    tone, said = card_lines(
+        evidence(authority=unnamed.model_dump(mode="json")), CardRowKind.PERSON
+    )["Contact on record"]
+    assert tone is CardTone.NOT_SHOWN
+    assert said == (
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own. Call the office on record yourself to confirm."
+    )
+
+
+def test_a_phone_mismatch_alone_holds_the_case_and_puts_no_red_flag_anywhere_on_the_card():
+    # Everything else is in order: presence proven, the company named is the manager on
+    # record, nothing flagged. Only the phone differs.
+    claims = ContactClaims(company="Fixture Living LLC", phones=[OTHER])
+    authority = check_authority(claims, record(), SALT)
+    assert authority.office_phone_match is PhoneMatch.NO
+    modules = evidence(authority=authority.model_dump(mode="json"), rules=[], price=None)
+
+    verdict = decide(to_evidence(modules))
+    # It still holds: the card cannot say "Checks passed" while the contact is unconfirmed.
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.phone_flag") in verdict.reasons
+
+    card = build_card(modules, checked_at=CHECKED_AT)
+    tones = [item.tone for row in card.rows for item in row.lines]
+    assert CardTone.RED_FLAG not in tones
+    assert not any("Red flag" in item.text for row in card.rows for item in row.lines)
+    # And with the office's own number the same case passes, so the phone is what holds it.
+    passing = check_authority(
+        ContactClaims(company="Fixture Living LLC", phones=[OFFICE]), record(), SALT
+    )
+    assert passing.office_phone_match is PhoneMatch.YES
+    assert state(evidence(authority=passing.model_dump(mode="json"), rules=[], price=None)) is (
+        VerdictState.VERIFIED
+    )
+
+
+def test_a_lookalike_link_is_still_a_red_flag_beside_an_unconfirmed_phone():
+    claims = ContactClaims(phones=[OTHER], links=["fixtureliving-apply.example"])
+    authority = check_authority(claims, record(), SALT)
+    person = card_lines(evidence(authority=authority.model_dump(mode="json")), CardRowKind.PERSON)
+    assert person["Contact on record"][0] is CardTone.NOT_SHOWN
+    assert person["Link"][0] is CardTone.RED_FLAG
 
 
 def test_a_matching_phone_is_a_supporting_line_and_never_authority():
@@ -289,27 +336,72 @@ def test_links_are_read_from_the_listing_text():
 # --- for sale ------------------------------------------------------------------------------
 
 
-def test_a_home_listed_for_sale_is_a_red_flag_on_the_place_row_and_holds_the_case():
+def test_a_home_listed_for_sale_is_a_warning_on_the_place_row_and_holds_the_case():
     modules = evidence(for_sale={"status": "active"})
     assert to_evidence(modules).for_sale_flag is True
     assert state(modules) is VerdictState.HOLD
+    # Red team H5 (Sat 03:25): a warning, not a red flag, and never "not for rent". Homes
+    # for sale are sometimes also offered for lease, and lease status is not ours to claim.
     tone, text = card_lines(modules, CardRowKind.PLACE)["For sale"]
-    assert tone is CardTone.RED_FLAG
-    assert text == "This home is listed for sale on Homes.com, not for rent. Red flag."
+    assert tone is CardTone.HOLD
+    assert text == (
+        "Listed for sale on Homes.com. Homes for sale are sometimes also offered for lease, "
+        "so confirm with the listing brokerage before you pay."
+    )
 
 
-def test_for_sale_alone_is_never_dont_pay_whatever_else_is_true():
-    # DON'T PAY needs proof: a forged reply or a photo taken elsewhere. This is neither.
+def test_for_sale_holds_a_case_even_when_no_photo_could_be_placed():
+    # Conductor ruling, Sat 02:00: for sale outranks "could not place". A home that is for
+    # sale usually has no 3D scan, and "we could not check" is the wrong headline for it.
     nothing_placed = ModuleEvidence(case_id="fx-1", source="fixture", for_sale={"status": "active"})
     verdict = decide(to_evidence(nothing_placed))
-    assert verdict.state is VerdictState.UNVERIFIED
-    assert strings.text("reason.for_sale") in verdict.reasons
+    assert verdict.state is VerdictState.HOLD
+    assert verdict.reasons[0] == strings.text("reason.for_sale")
+    assert strings.text("reason.not_indexed") in verdict.reasons  # and why nothing was placed
+
+    unplaced = evidence(
+        for_sale={"status": "active"},
+        locate={
+            "case_id": "fx-7Q2M",
+            "photos": [{"photo_id": "l1", "status": "not_located"}],
+            "thresholds_version": "none",
+        },
+    )
+    assert state(unplaced) is VerdictState.HOLD
+
+
+def test_for_sale_is_never_dont_pay_and_nothing_else_outranks_could_not_place():
+    # DON'T PAY needs proof: a forged reply or a photo taken elsewhere. For sale is neither.
     assert state(evidence(for_sale={"status": "active"}, challenge=None)) is VerdictState.HOLD
+    nothing = {"case_id": "fx-1", "source": "fixture"}
+    for other in (
+        {"for_sale": {"status": "recently_rented"}},
+        {"authority": {"status": "unknown", "office_phone_match": "no"}},
+        {"authority": {"status": "unknown", "link_domain": "lookalike"}},
+        {"price": {"status": "not_checked", "unit": "not_on_record"}},
+    ):
+        verdict = decide(to_evidence(ModuleEvidence.model_validate(nothing | other)))
+        assert verdict.state is VerdictState.UNVERIFIED, other
+    # A photo taken in another building still outranks everything.
+    elsewhere = evidence(
+        for_sale={"status": "active"},
+        locate={
+            "case_id": "fx-7Q2M",
+            "photos": [{"photo_id": "l1", "status": "located_elsewhere"}],
+            "thresholds_version": "none",
+        },
+    )
+    assert state(elsewhere) is VerdictState.DONT_PAY
 
 
 def verified_but_for(**sections) -> ModuleEvidence:
-    """A case that would be VERIFIED: presence proven, the company matches, nothing flagged."""
-    matches = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    """A case that would be VERIFIED: presence proven, the company and the office phone
+    match (red team H1: a name alone never verifies), nothing flagged."""
+    matches = {
+        "status": "matches_record",
+        "manager_on_record": "Fixture Living LLC",
+        "office_phone_match": "yes",
+    }
     return evidence(authority=matches, rules=[], price=None, **sections)
 
 
@@ -333,8 +425,92 @@ def test_recently_rented_is_information_and_holds_nothing_by_itself():
     assert "Red flag" not in text
 
 
-def test_for_sale_still_holds_a_case_that_would_otherwise_pass():
-    assert state(verified_but_for(for_sale={"status": "active"})) is VerdictState.HOLD
+def test_for_sale_holds_a_case_unless_the_ad_s_contact_is_the_office_on_record():
+    # A named manager, presence proven, and the record shows the home for sale: held, and
+    # the for-sale reason is given.
+    by_name = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    held = evidence(authority=by_name, rules=[], price=None, for_sale={"status": "active"})
+    verdict = decide(to_evidence(held))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.for_sale") in verdict.reasons
+    # Ruling, Sat 03:36: when the ad's phone is the office's on record, the brokerage itself
+    # is offering the home. For sale is then information and holds nothing.
+    by_the_office = verified_but_for(for_sale={"status": "active"})
+    assert to_evidence(by_the_office).for_sale_flag is False
+    assert state(by_the_office) is VerdictState.VERIFIED
+
+
+def test_one_matching_number_among_several_is_not_the_office_calling():
+    # Review round 1, H: [OFFICE, OTHER] must not read as "the contact is the office".
+    claims = ContactClaims(phones=[OFFICE, OTHER], company="Fixture Living LLC")
+    authority = check_authority(claims, record(), SALT)
+    assert authority.office_phone_match is PhoneMatch.NO
+    mixed = evidence(
+        authority=authority.model_dump(mode="json"),
+        rules=[],
+        price=None,
+        for_sale={"status": "active"},
+    )
+    verdict = decide(to_evidence(mixed))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.for_sale") in verdict.reasons
+    assert strings.text("reason.phone_flag") in verdict.reasons
+
+
+def test_with_no_property_record_the_brokerages_on_record_are_still_compared():
+    # A15 (#132): a home that is for sale usually has no property record at all. The
+    # for-sale lookup still names the listing brokerages, and those are on record.
+    offices = ["Fixture Realty Group", "Sample Homes Brokerage"]
+    named = check_authority(ContactClaims(company="Fixture Realty Group LLC"), None, SALT, offices)
+    assert named.status is AuthorityStatus.MATCHES_RECORD
+    assert named.manager_on_record == "Fixture Realty Group"  # who to call: a company on record
+    assert named.poster_said == "Fixture Realty Group LLC"
+    # There is no office phone and no website to compare with, so those stay unchecked.
+    assert (named.office_phone_match, named.link_domain) == (
+        PhoneMatch.NOT_CHECKED,
+        LinkDomain.NOT_CHECKED,
+    )
+    second = check_authority(ContactClaims(company="Sample Homes"), None, SALT, offices)
+    assert second.manager_on_record == "Sample Homes Brokerage"
+
+    other = check_authority(ContactClaims(company="Somebody Else Realty"), None, SALT, offices)
+    assert other.status is AuthorityStatus.MISMATCH and other.manager_on_record is None
+
+    silent = check_authority(ContactClaims(), None, SALT, offices)
+    assert (silent.status, silent.manager_on_record) == (AuthorityStatus.UNKNOWN, None)
+    # Each of those was a comparison with brokerages alone, and says so.
+    assert named.brokerage_only and other.brokerage_only and silent.brokerage_only
+    # With nothing on record at all, nothing is claimed and nothing was compared, as before.
+    nothing = check_authority(ContactClaims(company="Fixture Realty Group"), None, SALT)
+    assert (nothing.status, nothing.manager_on_record) == (AuthorityStatus.UNKNOWN, None)
+    assert nothing.brokerage_only is False
+    # And a home with a record is never "brokerages alone", whoever else is on record.
+    with_record = check_authority(
+        ContactClaims(company="Fixture Realty Group"), record(), SALT, offices
+    )
+    assert with_record.brokerage_only is False
+    blank = check_authority(ContactClaims(company="Fixture Realty Group"), None, SALT, ["", " "])
+    assert blank.status is AuthorityStatus.UNKNOWN
+
+
+def test_a_phone_in_the_listing_never_matches_when_there_is_no_office_on_record():
+    # No record means no office phone on record. A number in the ad is compared with nothing,
+    # so a brokerage named in a for-sale home's ad can never pass on its own (red team H1).
+    offices = ["Fixture Realty Group"]
+    claims = ContactClaims(company="Fixture Realty Group", phones=[OFFICE])
+    found = check_authority(claims, None, SALT, offices)
+    assert found.status is AuthorityStatus.MATCHES_RECORD
+    assert found.office_phone_match is PhoneMatch.NOT_CHECKED
+    modules = evidence(authority=found.model_dump(mode="json"), rules=[], price=None)
+    assert to_evidence(modules).phone_confirmed is False
+    assert state(modules) is VerdictState.HOLD
+
+
+def test_the_manager_is_named_before_a_brokerage_when_both_are_on_record():
+    offices = ["Fixture Realty Group"]
+    result = check_authority(ContactClaims(company="Fixture Realty Group"), record(), SALT, offices)
+    assert result.status is AuthorityStatus.MATCHES_RECORD
+    assert result.manager_on_record == "Fixture Living LLC"
 
 
 def test_naming_a_listing_brokerage_on_record_matches_as_naming_the_manager_does():
@@ -634,9 +810,9 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
         assert strings.text(f"reason.{key}") in verdict.reasons
 
     lines = {item.label: item for row in card.rows for item in row.lines}
-    assert lines["For sale"].tone is CardTone.RED_FLAG
+    assert lines["For sale"].tone is CardTone.HOLD  # a warning, not a red flag (H5)
     assert lines["Link"].tone is CardTone.RED_FLAG
-    assert lines["Contact on record"].tone is CardTone.RED_FLAG
+    assert lines["Contact on record"].tone is CardTone.NOT_SHOWN
     assert lines["Unit on record"].tone is CardTone.HOLD
     assert lines["Rent vs record"].tone is CardTone.HOLD
 
@@ -654,3 +830,12 @@ def test_the_shared_fixture_record_has_nothing_to_compare_so_nothing_changes(tmp
     with_claims = FixtureModules(contacts=listing.contacts)
     assert with_claims.authority("fx-1") == plain.authority("fx-1")
     assert plain.for_sale("fx-1") is None
+
+
+def test_authority_matches_says_anyone_can_type_the_name():
+    assert strings.text("reason.authority_matches") == (
+        "The ad names the manager on record. Anyone can type that name."
+    )
+    assert strings.text("reason.authority_matches", "es") == (
+        "El anuncio nombra al administrador del registro. Cualquiera puede escribir ese nombre."
+    )
