@@ -35,6 +35,12 @@ def _matches_where(row: dict, where: str) -> bool:
     last = re.search(r"upper\(last_name\)='([^']*)'", where)
     if last and str(row.get("last_name", "")).upper() != last.group(1):
         return False
+    first = re.search(r"upper\(first_name\)='([^']*)'", where)
+    if first and str(row.get("first_name", "")).upper() != first.group(1):
+        return False
+    ends = re.search(r"upper\(last_name\) like '% ([^']*)'", where)
+    if ends and not str(row.get("last_name", "")).upper().endswith(" " + ends.group(1)):
+        return False
     kind = re.search(r"license_type='([^']*)'", where)
     if kind and row.get("license_type") != kind.group(1):
         return False
@@ -164,14 +170,17 @@ def test_an_initial_or_a_middle_name_counts(tmp_path):
     assert initial.status is LicenseStatus.LICENSED  # goes by the middle name
 
 
-def test_same_last_name_but_no_compatible_first_name_is_not_found(tmp_path):
+def test_an_active_namesake_with_another_first_name_is_not_checked(tmp_path):
+    # ruling 02:50: anyone active sharing the last name means we cannot say "not found"
     rows = [_row("Active", first="ZORA"), _row("Active", first="QUINN")]
-    assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_FOUND
+    assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_CHECKED
 
 
-def test_only_inactive_compatible_matches_is_not_found(tmp_path):
-    rows = [_row("Expired more than 6 months"), _row("Active", first="ZORA")]
+def test_only_inactive_matches_and_no_active_namesake_is_not_found(tmp_path):
+    rows = [_row("Expired more than 6 months"), _row("Inactive", first="ZORA")]
     assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_FOUND
+    with_active = [_row("Expired more than 6 months"), _row("Active", first="ZORA")]
+    assert _check(CLAIM, _client(with_active), tmp_path / "b").status is LicenseStatus.NOT_CHECKED
 
 
 def test_more_than_25_rows_is_not_checked(tmp_path):
@@ -179,10 +188,14 @@ def test_more_than_25_rows_is_not_checked(tmp_path):
     assert _check(CLAIM, _client(rows), tmp_path).status is LicenseStatus.NOT_CHECKED
 
 
-def test_an_initial_that_fits_two_different_people_is_not_checked(tmp_path):
-    text = "I'm F. Fxperson, a licensed realtor."
-    rows = [_row("Active", first="FRANK"), _row("Inactive", first="FIONA")]
-    assert _check(text, _client(rows), tmp_path).status is LicenseStatus.NOT_CHECKED
+def test_several_compatible_people_are_licensed_with_no_sponsor_named(tmp_path):
+    text = "I'm Chris Fxperson, a licensed realtor."
+    rows = [
+        _row("Active", first="CHRISTOPHER", sponsor="Fx One Realty"),
+        _row("Active", first="CHRISTINA", sponsor="Fx Two Realty"),
+    ]
+    result = _check(text, _client(rows), tmp_path)
+    assert result.status is LicenseStatus.LICENSED and result.sponsor_broker is None
 
 
 def test_a_named_brokerage_is_checked_as_a_company(tmp_path):
@@ -248,9 +261,12 @@ def test_a_signature_wins_over_a_bare_im(tmp_path):
 
 
 def test_an_owner_who_claims_a_license_is_checked(tmp_path):
-    text = "I'm the owner and also a licensed broker. - Fxname Fxperson"
-    assert detect_claim(text).role == "broker"
-    assert _check(text, _client([]), tmp_path).status is LicenseStatus.NOT_FOUND
+    loose = "I'm the owner and also a licensed broker. - Fxname Fxperson"
+    assert detect_claim(loose).role == "broker"
+    # a loose claim is looked up but can never be NOT_FOUND
+    assert _check(loose, _client([]), tmp_path).status is LicenseStatus.NOT_CHECKED
+    strict = "I'm Fxname Fxperson, a licensed broker, and also the owner."
+    assert _check(strict, _client([]), tmp_path / "b").status is LicenseStatus.NOT_FOUND
 
 
 def test_a_read_only_cache_still_returns_the_answer(tmp_path, monkeypatch):
@@ -262,3 +278,81 @@ def test_a_read_only_cache_still_returns_the_answer(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "write_text", refuse)
     result = _check(CLAIM, _client([_row("Active")]), tmp_path)
     assert result.status is LicenseStatus.LICENSED
+
+
+def test_a_brokerage_name_is_never_read_as_a_person(tmp_path):
+    seen: list = []
+    for text in (
+        "Broker: Fxbeta Realty LLC",
+        "Call us today. - Fxbeta Realty",
+        "Fxjane Fxdoe | Fxbeta Realty, Realtor",
+    ):
+        _check(text, _client([], seen=seen), tmp_path)
+    assert not any(
+        "REALTY" in r.url.params.get("$where", "") and "last_name" in r.url.params.get("$where", "")
+        for r in seen
+    )
+
+
+def test_compound_surnames_never_end_not_found(tmp_path):
+    assert (
+        _check("My name is Fxana De La Fxcruz, a licensed agent.", _client([]), tmp_path).status
+        is LicenseStatus.NOT_CHECKED
+    )
+    assert (
+        _check(
+            "My name is Fxana Fxgarcia Fxlopez, a licensed agent.", _client([]), tmp_path / "b"
+        ).status
+        is LicenseStatus.NOT_CHECKED
+    )
+    # "Fxcruz" claimed, but an active "DE LA FXCRUZ" exists: the like-query catches it
+    rows = [_row("Active", first="FXANA", last="DE LA FXCRUZ")]
+    strict = "I'm Fxana Fxcruz, a licensed agent."
+    assert _check(strict, _client(rows), tmp_path / "c").status is LicenseStatus.NOT_CHECKED
+
+
+def test_a_role_word_needs_a_separator_or_an_article():
+    for text in ("Email Listing Agent for a tour", "Landlord Pays Broker Fee", "Rent Fast Locator"):
+        assert detect_claim(text) is None, text
+
+
+def test_no_signature_and_a_slogan_intro_is_not_checked(tmp_path):
+    text = "I'm Very Excited to help, licensed agent"
+    assert _check(text, _client([]), tmp_path).status is LicenseStatus.NOT_CHECKED
+
+
+def test_the_signature_wins_over_an_im_name(tmp_path):
+    seen: list = []
+    text = "I'm Fxsunny Fxday here to help! I am a licensed agent. - Fxname Fxperson"
+    _check(text, _client([], seen=seen), tmp_path)
+    assert (
+        "FXPERSON" in seen[0].url.params["$where"] and "FXDAY" not in seen[0].url.params["$where"]
+    )
+
+
+def test_slow_headers_are_bounded_by_the_deadline(tmp_path, monkeypatch):
+    from snapback.adapters import trec
+
+    monkeypatch.setattr(trec, "TIMEOUT_S", 0.3)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        time.sleep(1.5)  # nothing at all for 1.5 s
+        return httpx.Response(200, json=[])
+
+    start = time.perf_counter()
+    result = _check(CLAIM, httpx.Client(transport=httpx.MockTransport(handler)), tmp_path)
+    assert result.status is LicenseStatus.NOT_CHECKED
+    assert time.perf_counter() - start < 1.0
+
+
+def test_a_not_found_answer_expires_after_24_hours(tmp_path, monkeypatch):
+    seen: list = []
+    client = _client([], seen=seen)
+    assert _check(CLAIM, client, tmp_path).status is LicenseStatus.NOT_FOUND
+    calls = len(seen)
+    _check(CLAIM, client, tmp_path)
+    assert len(seen) == calls  # cached
+    real = time.time
+    monkeypatch.setattr(time, "time", lambda: real() + 25 * 3600)
+    _check(CLAIM, client, tmp_path)
+    assert len(seen) > calls  # looked up again
