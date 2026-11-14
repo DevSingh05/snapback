@@ -288,6 +288,11 @@ EN: dict[str, str] = {
         "Staged example. The SNAPBACK team wrote this listing to show the checks. "
         "It is not a real poster."
     ),
+    # On a card made from a replay demo case (fixtures/demo/replay-*), instead of footer.staged.
+    "footer.replay": (
+        "Replay of a reported case ({source}, {date}). "
+        "The listing and house are re-created; no real names."
+    ),
     # --- the challenge message the renter relays, and the agent's own trace lines ----------
     "challenge.text": (
         "Before you pay, ask them to send a photo of {spot} with the code {code} written on paper."
@@ -734,6 +739,10 @@ ES: dict[str, str] = {
     "footer.staged": (
         "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
         "revisiones. No es un anunciante real."
+    ),
+    "footer.replay": (
+        "Repetición de un caso denunciado ({source}, {date}). "
+        "El anuncio y la casa están recreados; no hay nombres reales."
     ),
     "challenge.text": (
         "Antes de pagar, pídales que envíen una foto de {spot} con el código {code} escrito "
