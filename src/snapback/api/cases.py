@@ -101,7 +101,7 @@ class RecordedCase:
     def card(self, verify_base_url: str) -> Card:
         return self._card
 
-    def status(self) -> CaseStatus:
+    def status(self, with_challenge: bool = False) -> CaseStatus:
         return CaseStatus(
             case_id=self.case_id,
             source=self._card.source,
@@ -152,7 +152,8 @@ class SessionCase:
             lang=self.session.lang,
         )
 
-    def status(self) -> CaseStatus:
+    def status(self, with_challenge: bool = False) -> CaseStatus:
+        """Where the case stands. The drafted challenge is left out unless asked for."""
         if self.session.done:
             status = CaseProgress.DONE
         elif self.session.waiting_for_approval:
@@ -160,7 +161,7 @@ class SessionCase:
         else:
             status = CaseProgress.RUNNING
         draft = self.session.pending_challenge
-        if status is not CaseProgress.WAITING_FOR_APPROVAL:
+        if status is not CaseProgress.WAITING_FOR_APPROVAL or not with_challenge:
             draft = None
         return CaseStatus(
             case_id=self.case_id,
