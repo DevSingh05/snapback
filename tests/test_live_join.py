@@ -434,7 +434,7 @@ def test_a_live_text_only_case_on_a_home_that_is_for_sale_is_held(tmp_path):
         for_sale=ForSaleMatch(status="active"),
     )
     assert card["state"] == "hold" and card["source"] == "live"
-    assert said_on(card)["For sale"]["tone"] == "red_flag"
+    assert said_on(card)["For sale"]["tone"] == "hold"
 
 
 def test_a_scan_that_exists_but_is_not_indexed_is_said_differently_from_no_scan(tmp_path):
@@ -459,7 +459,7 @@ def test_a_live_case_still_runs_the_record_rules_and_the_whole_card_is_live(tmp_
     form = {"text": f"Unit 999, 2 bed, $900 a month. Call {OTHER}. See fixtureliving.co"}
     card = live_card(tmp_path, record, form, for_sale=ForSaleMatch(status="active"))
     said = said_on(card)
-    assert said["For sale"]["tone"] == "red_flag"
+    assert said["For sale"]["tone"] == "hold"
     assert said["Contact on record"]["tone"] == "not_shown"
     assert said["Link"]["tone"] == "red_flag"
     assert said["Unit on record"]["tone"] == "hold"

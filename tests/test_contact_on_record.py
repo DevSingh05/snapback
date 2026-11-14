@@ -89,7 +89,9 @@ def test_the_new_fixtures_parse_and_old_records_still_do():
     ("phones", "expected"),
     [
         ([OFFICE], PhoneMatch.YES),
-        ([OTHER, OFFICE], PhoneMatch.YES),
+        ([OTHER, OFFICE], PhoneMatch.NO),
+        ([OFFICE, OTHER], PhoneMatch.NO),
+        ([OFFICE, "(555) 010-0142"], PhoneMatch.YES),
         ([OTHER], PhoneMatch.NO),
         ([], PhoneMatch.NOT_CHECKED),
     ],
@@ -156,8 +158,11 @@ def test_a_phone_mismatch_alone_holds_the_case_and_puts_no_red_flag_anywhere_on_
     tones = [item.tone for row in card.rows for item in row.lines]
     assert CardTone.RED_FLAG not in tones
     assert not any("Red flag" in item.text for row in card.rows for item in row.lines)
-    # And without the mismatch the same case passes, so the phone is what holds it.
-    passing = check_authority(ContactClaims(company="Fixture Living LLC"), record(), SALT)
+    # And with the office's own number the same case passes, so the phone is what holds it.
+    passing = check_authority(
+        ContactClaims(company="Fixture Living LLC", phones=[OFFICE]), record(), SALT
+    )
+    assert passing.office_phone_match is PhoneMatch.YES
     assert state(evidence(authority=passing.model_dump(mode="json"), rules=[], price=None)) is (
         VerdictState.VERIFIED
     )
@@ -331,13 +336,18 @@ def test_links_are_read_from_the_listing_text():
 # --- for sale ------------------------------------------------------------------------------
 
 
-def test_a_home_listed_for_sale_is_a_red_flag_on_the_place_row_and_holds_the_case():
+def test_a_home_listed_for_sale_is_a_warning_on_the_place_row_and_holds_the_case():
     modules = evidence(for_sale={"status": "active"})
     assert to_evidence(modules).for_sale_flag is True
     assert state(modules) is VerdictState.HOLD
+    # Red team H5 (Sat 03:25): a warning, not a red flag, and never "not for rent". Homes
+    # for sale are sometimes also offered for lease, and lease status is not ours to claim.
     tone, text = card_lines(modules, CardRowKind.PLACE)["For sale"]
-    assert tone is CardTone.RED_FLAG
-    assert text == "This home is listed for sale on Homes.com, not for rent. Red flag."
+    assert tone is CardTone.HOLD
+    assert text == (
+        "Listed for sale on Homes.com. Homes for sale are sometimes also offered for lease, "
+        "so confirm with the listing brokerage before you pay."
+    )
 
 
 def test_for_sale_holds_a_case_even_when_no_photo_could_be_placed():
@@ -385,8 +395,13 @@ def test_for_sale_is_never_dont_pay_and_nothing_else_outranks_could_not_place():
 
 
 def verified_but_for(**sections) -> ModuleEvidence:
-    """A case that would be VERIFIED: presence proven, the company matches, nothing flagged."""
-    matches = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    """A case that would be VERIFIED: presence proven, the company and the office phone
+    match (red team H1: a name alone never verifies), nothing flagged."""
+    matches = {
+        "status": "matches_record",
+        "manager_on_record": "Fixture Living LLC",
+        "office_phone_match": "yes",
+    }
     return evidence(authority=matches, rules=[], price=None, **sections)
 
 
@@ -410,8 +425,36 @@ def test_recently_rented_is_information_and_holds_nothing_by_itself():
     assert "Red flag" not in text
 
 
-def test_for_sale_still_holds_a_case_that_would_otherwise_pass():
-    assert state(verified_but_for(for_sale={"status": "active"})) is VerdictState.HOLD
+def test_for_sale_holds_a_case_unless_the_ad_s_contact_is_the_office_on_record():
+    # A named manager, presence proven, and the record shows the home for sale: held, and
+    # the for-sale reason is given.
+    by_name = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    held = evidence(authority=by_name, rules=[], price=None, for_sale={"status": "active"})
+    verdict = decide(to_evidence(held))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.for_sale") in verdict.reasons
+    # Ruling, Sat 03:36: when the ad's phone is the office's on record, the brokerage itself
+    # is offering the home. For sale is then information and holds nothing.
+    by_the_office = verified_but_for(for_sale={"status": "active"})
+    assert to_evidence(by_the_office).for_sale_flag is False
+    assert state(by_the_office) is VerdictState.VERIFIED
+
+
+def test_one_matching_number_among_several_is_not_the_office_calling():
+    # Review round 1, H: [OFFICE, OTHER] must not read as "the contact is the office".
+    claims = ContactClaims(phones=[OFFICE, OTHER], company="Fixture Living LLC")
+    authority = check_authority(claims, record(), SALT)
+    assert authority.office_phone_match is PhoneMatch.NO
+    mixed = evidence(
+        authority=authority.model_dump(mode="json"),
+        rules=[],
+        price=None,
+        for_sale={"status": "active"},
+    )
+    verdict = decide(to_evidence(mixed))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.for_sale") in verdict.reasons
+    assert strings.text("reason.phone_flag") in verdict.reasons
 
 
 def test_naming_a_listing_brokerage_on_record_matches_as_naming_the_manager_does():
@@ -711,7 +754,7 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
         assert strings.text(f"reason.{key}") in verdict.reasons
 
     lines = {item.label: item for row in card.rows for item in row.lines}
-    assert lines["For sale"].tone is CardTone.RED_FLAG
+    assert lines["For sale"].tone is CardTone.HOLD  # a warning, not a red flag (H5)
     assert lines["Link"].tone is CardTone.RED_FLAG
     assert lines["Contact on record"].tone is CardTone.NOT_SHOWN
     assert lines["Unit on record"].tone is CardTone.HOLD
@@ -731,3 +774,12 @@ def test_the_shared_fixture_record_has_nothing_to_compare_so_nothing_changes(tmp
     with_claims = FixtureModules(contacts=listing.contacts)
     assert with_claims.authority("fx-1") == plain.authority("fx-1")
     assert plain.for_sale("fx-1") is None
+
+
+def test_authority_matches_says_anyone_can_type_the_name():
+    assert strings.text("reason.authority_matches") == (
+        "The ad names the manager on record. Anyone can type that name."
+    )
+    assert strings.text("reason.authority_matches", "es") == (
+        "El anuncio nombra al administrador del registro. Cualquiera puede escribir ese nombre."
+    )

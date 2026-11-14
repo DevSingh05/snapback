@@ -31,6 +31,8 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
     verify_cfg = data["verify"]
     if verify_cfg["elsewhere_min_inliers"] < verify_cfg["min_inliers"]:
         raise ValueError("elsewhere_min_inliers must not be below min_inliers")
+    if verify_cfg["ambiguity_ratio"] <= 1.0:
+        raise ValueError("ambiguity_ratio must be greater than 1.0")
     return Thresholds(
         top_k=data["retrieve"]["top_k"],
         top_k_claimed=data["retrieve"]["top_k_claimed"],
