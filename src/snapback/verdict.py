@@ -24,13 +24,17 @@ from snapback.contracts import (
     CardRow,
     CardRowKind,
     CardTone,
+    ContactStatus,
     Evidence,
+    ForSaleStatus,
+    LinkStatus,
     LocateStatus,
     MemoryHitKind,
     ModuleEvidence,
     PresenceStatus,
     PriceStatus,
     RuleCategory,
+    UnitStatus,
     Verdict,
     VerdictState,
 )
@@ -53,6 +57,8 @@ _RULE_LABELS = {
     RuleCategory.PRESSURE: "label.pressure",
 }
 _RULE_LABEL_ORDER = ("label.payment_ask", "label.data_ask", "label.pressure")
+
+_UNIT_DOES_NOT_FIT = frozenset({UnitStatus.NOT_ON_RECORD, UnitStatus.BEDS_MISMATCH})
 
 
 @dataclass(frozen=True)
@@ -117,7 +123,20 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules
         ),
         rule_flag=any(hit.red_flag for hit in modules.rules),
+        for_sale_flag=_for_sale(modules) is ForSaleStatus.ACTIVE,
+        recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
+        phone_flag=(
+            modules.authority is not None and modules.authority.phone is ContactStatus.MISMATCH
+        ),
+        lookalike_link_flag=(
+            modules.authority is not None and modules.authority.link is LinkStatus.LOOKALIKE
+        ),
+        unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
     )
+
+
+def _for_sale(modules: ModuleEvidence) -> ForSaleStatus:
+    return modules.for_sale.status if modules.for_sale else ForSaleStatus.NONE
 
 
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
@@ -126,12 +145,15 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     The order of the checks is the policy:
     1. Only proof gives DONT_PAY: a forged reply, or a photo taken in another property. A record
        mismatch is not proof (owners live elsewhere, agents act for them), with or without a
-       red flag beside it.
-    2. No photo placed in the claimed property gives UNVERIFIED.
+       red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
+       leasing office's and a unit that does not fit the record are not proof either.
+    2. No photo placed in the claimed property gives UNVERIFIED. What the record flagged is
+       still listed among the reasons.
     3. Presence proven, authority matching the record and no red flag of any kind gives
        VERIFIED.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
-       (price, payment, fee, data ask, pressure, link, overpayment).
+       (price, payment, fee, data ask, pressure, link, overpayment, for sale, recently
+       rented, phone, lookalike link, unit).
     """
     statuses = {photo.status for photo in evidence.photos}
 
@@ -149,10 +171,24 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     if LocateStatus.LOCATED_ELSEWHERE in statuses:
         return verdict(VerdictState.DONT_PAY, say("reason.photo_elsewhere"))
 
+    # What the record says against the listing. None of it is proof, so none of it sets
+    # DONT_PAY, but it is said whatever the state turns out to be.
+    on_record = [
+        say(key)
+        for key, raised in (
+            ("reason.for_sale", evidence.for_sale_flag),
+            ("reason.recently_rented", evidence.recently_rented_flag),
+            ("reason.phone_flag", evidence.phone_flag),
+            ("reason.lookalike_link", evidence.lookalike_link_flag),
+            ("reason.unit_flag", evidence.unit_flag),
+        )
+        if raised
+    ]
+
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
         if statuses <= {LocateStatus.NOT_INDEXED}:
-            return verdict(VerdictState.UNVERIFIED, say("reason.not_indexed"))
-        return verdict(VerdictState.UNVERIFIED, say("reason.not_located"))
+            return verdict(VerdictState.UNVERIFIED, say("reason.not_indexed"), *on_record)
+        return verdict(VerdictState.UNVERIFIED, say("reason.not_located"), *on_record)
 
     red_flags = []
     if evidence.price_flag:
@@ -161,6 +197,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         red_flags.append(say("reason.payment_flag"))
     elif evidence.rule_flag:
         red_flags.append(say("reason.rule_flag"))
+    red_flags.extend(on_record)
 
     if (
         evidence.presence is PresenceStatus.PROVEN
@@ -268,8 +305,23 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
 
     return CardRow(
-        kind=CardRowKind.PLACE, lines=[main, *_seen_before_lines(modules, lang, replies=False)]
+        kind=CardRowKind.PLACE,
+        lines=[
+            main,
+            *_for_sale_lines(modules, lang),
+            *_seen_before_lines(modules, lang, replies=False),
+        ],
     )
+
+
+def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    status = _for_sale(modules)
+    if status is ForSaleStatus.ACTIVE:
+        site = modules.for_sale.site if modules.for_sale else ""
+        return [_line(lang, "label.for_sale", CardTone.RED_FLAG, "place.for_sale", site=site)]
+    if status is ForSaleStatus.RECENTLY_RENTED:
+        return [_line(lang, "label.recently_rented", CardTone.HOLD, "place.recently_rented")]
+    return []
 
 
 def _aware(moment: datetime, what: str) -> datetime:
@@ -335,12 +387,34 @@ def _allowed_line(modules: ModuleEvidence, lang: str) -> CardLine:
     return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.not_shown")
 
 
+def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """The phone yes/no and a lookalike link. Never the number, never the record's address."""
+    authority = modules.authority
+    if authority is None:
+        return []
+    lines = []
+    if authority.phone is not ContactStatus.NOT_CHECKED:
+        matches = authority.phone is ContactStatus.MATCHES_RECORD
+        key = "contact.phone_match" if matches else "contact.phone_mismatch"
+        tone = CardTone.OK if matches else CardTone.HOLD
+        if authority.manager_on_record:
+            lines.append(
+                _line(lang, "label.contact", tone, key, manager=authority.manager_on_record)
+            )
+        else:
+            lines.append(_line(lang, "label.contact", tone, f"{key}_unnamed"))
+    if authority.link is LinkStatus.LOOKALIKE:
+        lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
+    return lines
+
+
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
     return CardRow(
         kind=CardRowKind.PERSON,
         lines=[
             _here_now_line(modules, lang, zone),
             _allowed_line(modules, lang),
+            *_contact_lines(modules, lang),
             *_seen_before_lines(modules, lang, replies=True),
         ],
     )
@@ -370,6 +444,8 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     # Only how the asked rent compares. The record's own figures are sponsor data and stay off
     # the card.
     status = modules.price.status if modules.price else PriceStatus.NOT_CHECKED
+    if modules.price is not None and modules.price.per_bed:
+        return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.per_bed")
     if status is PriceStatus.WITHIN_RANGE:
         return _line(lang, "label.rent_vs_record", CardTone.OK, "rent.within_range")
     if status is PriceStatus.BELOW_RANGE:
@@ -377,9 +453,21 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
 
 
+def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    # The line never repeats the unit number: it is the renter's own text, and the card is
+    # passed around.
+    unit = modules.price.unit if modules.price else UnitStatus.NOT_CHECKED
+    if unit is UnitStatus.NOT_ON_RECORD:
+        return [_line(lang, "label.unit", CardTone.HOLD, "unit.not_on_record")]
+    if unit is UnitStatus.BEDS_MISMATCH:
+        return [_line(lang, "label.unit", CardTone.HOLD, "unit.beds_mismatch")]
+    return []
+
+
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     return CardRow(
-        kind=CardRowKind.PRICE, lines=[*_rule_lines(modules, lang), _rent_line(modules, lang)]
+        kind=CardRowKind.PRICE,
+        lines=[*_rule_lines(modules, lang), _rent_line(modules, lang), *_unit_lines(modules, lang)],
     )
 
 

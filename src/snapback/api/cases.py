@@ -259,6 +259,9 @@ class CaseStore:
                 listing_scope=listing.scope,
                 rules=listing.rule_hits if listing.text else None,
                 listed_rent=listing.listed_rent,
+                contacts=listing.contacts,
+                unit=listing.unit,
+                beds=listing.beds,
             )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
             if listing.truncated:

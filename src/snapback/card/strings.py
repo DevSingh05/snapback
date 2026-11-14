@@ -26,6 +26,11 @@ EN: dict[str, str] = {
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
     "label.seen_before": "Seen before",
+    "label.for_sale": "For sale",
+    "label.recently_rented": "Recently rented",
+    "label.contact": "Contact on record",
+    "label.link": "Link",
+    "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
         "Taken in this building, in the {floor_plan} floor plan ({located} of {total} photos)."
@@ -37,6 +42,12 @@ EN: dict[str, str] = {
     "place.no_photos": "Not checked (no listing photos were sent).",
     "place.seen_before_dated": "A listing photo also appeared in another check on {date}.",
     "place.seen_before": "A listing photo also appeared in another check.",
+    # For sale is a red flag, never proof: it holds a case and cannot set DON'T PAY by itself.
+    "place.for_sale": "This home is listed for sale on {site}, not for rent. Red flag.",
+    "place.recently_rented": (
+        "The record shows this home was rented out recently. "
+        "Ask the manager on record if it is still available."
+    ),
     # --- PERSON: is someone there now, and may they rent it? -------------------------------
     "here_now.proven_plan": (
         "Someone with access to a {floor_plan} unit here sent these just now "
@@ -65,6 +76,26 @@ EN: dict[str, str] = {
     ),
     "allowed.mismatch": (
         "The name they gave does not match the manager on record for this building. Red flag."
+    ),
+    # Contact on record. The phone number itself and the record's web address are never shown.
+    "contact.phone_match": (
+        "The phone number in the listing is the leasing office on record. "
+        "Call the manager on record yourself: {manager}."
+    ),
+    "contact.phone_match_unnamed": (
+        "The phone number in the listing is the leasing office on record. "
+        "Call the manager on record yourself."
+    ),
+    "contact.phone_mismatch": (
+        "The phone number in the listing is not the leasing office on record. "
+        "Call the manager on record yourself: {manager}."
+    ),
+    "contact.phone_mismatch_unnamed": (
+        "The phone number in the listing is not the leasing office on record. "
+        "Call the manager on record yourself."
+    ),
+    "contact.lookalike_link": (
+        "A link in the listing imitates this building's website but is not it. Red flag."
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -98,6 +129,14 @@ EN: dict[str, str] = {
     "rent.not_checked": "Not checked (our data has no rent for this building).",
     "rent.within_range": "In line with the rents on record for this building.",
     "rent.below_range": "Below the rents on record for this building. Ask why; discounts happen.",
+    "rent.per_bed": "Not checked (this building prices by the bed, so the rent was not compared).",
+    "unit.not_on_record": (
+        "The record for this building lists no unit with that number. Ask the manager on record."
+    ),
+    "unit.beds_mismatch": (
+        "The bedroom count in the listing does not match the record for this building. "
+        "Ask the manager on record."
+    ),
     # --- what no card ever checks, and the two lines under every card ----------------------
     "not_checked.id": "ID",
     "not_checked.lease": "lease",
@@ -167,6 +206,11 @@ EN: dict[str, str] = {
     "reason.price_flag": "The rent is far below comparable units.",
     "reason.payment_flag": "Payment was requested before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
+    "reason.for_sale": "This home is listed for sale, not for rent.",
+    "reason.recently_rented": "The record shows this home was rented out recently.",
+    "reason.phone_flag": "The phone number in the listing is not the leasing office on record.",
+    "reason.lookalike_link": "A link in the listing imitates the building's website.",
+    "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
