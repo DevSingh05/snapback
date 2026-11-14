@@ -618,8 +618,8 @@ def build_model(api_key: str | None = None, name: str | None = None) -> Any:
 
 def build_agent(session: FinderSession, prefs: PrefDesk, search: SearchDesk) -> Any:
     from deepagents import FilesystemPermission, create_deep_agent
-    from langchain_core.tools import tool
     from langchain.agents.middleware import TodoListMiddleware
+    from langchain_core.tools import tool
     from langgraph.checkpoint.memory import InMemorySaver
 
     pp, kp = f"/finder/{session.id}/prefs.md", f"/finder/{session.id}/picks.md"
