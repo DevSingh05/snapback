@@ -38,7 +38,9 @@ def test_live_mode_without_kit_fails_with_a_clear_message(tmp_path):
 
 def test_fixture_matches_the_shared_property_record_contract():
     expected = PropertyRecord.model_validate(json.loads(CONTRACT.read_text(encoding="utf-8")))
-    assert load_records(DataSource.FIXTURE)["fx-prop-1"] == expected
+    d7 = {"site_phone_hash", "website_host", "floor_plan_rents", "units"}  # D7 fields, tested below
+    got = load_records(DataSource.FIXTURE)["fx-prop-1"]
+    assert got.model_dump(exclude=d7) == expected.model_dump(exclude=d7)
 
 
 def test_only_matterport_attachment_types_count_and_ids_are_deduplicated():
@@ -80,7 +82,7 @@ def test_default_source_comes_from_settings(monkeypatch):
 
 def test_coverage_reports_counts_and_field_paths_only():
     report = coverage(costar_jsonl.FIXTURE_KIT)
-    assert report["records"] == 3
-    assert report["fields"]["year_built"]["yearBuilt"] == 2  # the enum-0 record does not count
+    assert report["records"] == 4
+    assert report["fields"]["year_built"]["yearBuilt"] == 3  # the enum-0 record does not count
     text = json.dumps(report)
     assert "fx-" not in text and "Fixture" not in text  # no ids or values, safe to paste

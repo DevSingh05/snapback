@@ -239,8 +239,12 @@ def generate(
 
 
 def write_manifest(rows: list[CaseRow], path: Path) -> Path:
-    """CSV the V6 harness reads. `synthetic` is written as 1, as learning-v2 L1a asks."""
+    """CSV the V6 harness reads. `synthetic` is written as 1, as learning-v2 L1a asks.
+
+    Image paths are written relative to the manifest's own folder, with forward slashes, so a
+    reader resolves them against the manifest wherever it runs (V4 #112, FIX item 4)."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    base = path.parent.resolve()
     fields = list(CaseRow.model_fields)
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields)
@@ -249,5 +253,11 @@ def write_manifest(rows: list[CaseRow], path: Path) -> Path:
             data = row.model_dump(mode="json")
             data["synthetic"] = int(row.synthetic)
             data["expect_injection"] = int(row.expect_injection)
+            image = Path(row.path).resolve()
+            data["path"] = (
+                image.relative_to(base).as_posix()
+                if image.is_relative_to(base)
+                else image.as_posix()
+            )
             writer.writerow(data)
     return path

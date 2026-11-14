@@ -39,6 +39,7 @@ EN: dict[str, str] = {
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
+    "place.not_indexed_yet": "Not checked (this building's scan is not indexed yet).",
     "place.no_photos": "Not checked (no listing photos were sent).",
     "place.seen_before_dated": "A listing photo also appeared in another check on {date}.",
     "place.seen_before": "A listing photo also appeared in another check.",
@@ -88,14 +89,15 @@ EN: dict[str, str] = {
     "contact.phone_match": (
         "The phone matches the leasing office on record. Call it yourself to confirm."
     ),
-    # The poster's own contact not matching the record is a real red flag (ruling, Sat 01:20).
+    # Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
+    # number. The line is Not confirmed, and it says who to call.
     "contact.phone_mismatch": (
-        "The phone in the listing is not the leasing office on record. "
-        "Call {manager} yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own, so check it with the office."
     ),
     "contact.phone_mismatch_unnamed": (
-        "The phone in the listing is not the leasing office on record. "
-        "Call the office on record yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own. Call the office on record yourself to confirm."
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
@@ -157,6 +159,11 @@ EN: dict[str, str] = {
     "footer.only_trust": (
         "Only trust a SNAPBACK result you asked for yourself. "
         "SNAPBACK never texts first or asks for money."
+    ),
+    # On every card made from a staged demo case (fixtures/demo), first in the footer.
+    "footer.staged": (
+        "Staged example. The SNAPBACK team wrote this listing to show the checks. "
+        "It is not a real poster."
     ),
     # --- the challenge message the renter relays, and the agent's own trace lines ----------
     "challenge.text": (
@@ -284,6 +291,9 @@ ES: dict[str, str] = {
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
     ),
     "place.not_indexed": "No comprobado (no tenemos un escaneo 3D de este edificio).",
+    "place.not_indexed_yet": (
+        "No comprobado (el escaneo de este edificio todavía no está indexado)."
+    ),
     "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
@@ -337,12 +347,13 @@ ES: dict[str, str] = {
         "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_mismatch": (
-        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a {manager}. Señal de alerta."
+        "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
+        "registro. Los agentes suelen usar el suyo, así que confírmelo con la oficina."
     ),
     "contact.phone_mismatch_unnamed": (
-        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a la oficina que figura en el registro. Señal de alerta."
+        "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
+        "registro. Los agentes suelen usar el suyo. Llame usted mismo a la oficina que figura "
+        "en el registro para confirmarlo."
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
@@ -421,6 +432,10 @@ ES: dict[str, str] = {
     "footer.only_trust": (
         "Confíe solo en un resultado de SNAPBACK que usted mismo pidió. SNAPBACK nunca "
         "escribe primero ni pide dinero."
+    ),
+    "footer.staged": (
+        "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
+        "revisiones. No es un anunciante real."
     ),
     "challenge.text": (
         "Antes de pagar, pídales que envíen una foto de {spot} con el código {code} escrito "

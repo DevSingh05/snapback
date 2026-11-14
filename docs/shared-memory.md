@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 01:10. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 02:47. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
 
 ## Decisions (locked)
 
@@ -21,11 +21,26 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - Sat 00:35 Token ruling: `GET /eval/results.csv` is public (aggregate only, no case data). (conductor, #69/#70)
 - Sat 00:35 Card words are locked; use the locked wording everywhere (CardPage.tsx included, #76). (conductor)
 - Sat 00:50 Schedule LOCKED: sleep 01:30-07:30 (agents keep working their queues); feedback round about 10:00 (we go and talk to people), build all day, second feedback round in the evening; demo video made in parallel during the day. **New features stop Sun 01:00**; after that only rest, polish, bug fixes, demo prep. Hard deadline Sun 08:00. (Vidyut, #41)
-- Sat 00:38 Ruling: a recapture flag is a model score, not proof: it stays WAITING and asks for a new photo, never FORGED. FORGED only for a wrong or missing code, or a confirmed copy of a listing photo. (conductor, #37)
+- Sat 00:38 Ruling: a recapture flag is a model score, not proof: it stays WAITING and asks for a new photo, never FORGED. FORGED only for a wrong or missing code, or a confirmed copy of a listing photo. (conductor, #37) **The code part is revised by the 02:45 ruling below.**
 - Sat 00:40 Ruling: home actively listed for sale = red flag + HOLD, never DON'T PAY. DON'T PAY only on proof (presence FORGED or a photo taken elsewhere). (conductor, #67)
 - Sat 00:44 Ruling: eval results are public and read-only (`GET /eval/results.csv`, no token, aggregate only). (conductor, #70)
 - Sat 01:03 Ruling: the `unverified` headline is the locked "Could not place these photos" (strings.py), in every surface incl. iMessage (#83). (conductor)
 - Sat 01:03 Ruling: Dev does A10 live modules join (CoStar record #80 + D7 lookup #95 into the price, unit and contact rules) BEFORE the A8 harness; then A11 register_case, A12 card.png cache + zone label, A13 end-to-end API test of DEMO_CASE a/b/c. (conductor, #8)
+- Sat 01:08 Ruling: a poster phone that matches the leasing office on record is a supporting yes/no line only ("call that number yourself"); it never sets authority to MATCHES_RECORD on its own. A phone-only match never verifies. (conductor)
+- Sat 01:20 **Realtor reframe (LOCKED):** (1) premise: scammers copy real listings, swap in their own contact, and ask for a deposit before you tour or sign; SNAPBACK checks the listing against the building's own records and tells you who to call (never "pay to view"); (2) PERSON: property manager, leasing office or listing agent/brokerage on record all count; a name mismatch alone is Not confirmed + "call the office on record yourself", never a red flag; (3) never claim lease status; "recently rented" is an informational prompt, no flag; (4) the pitch and demo lead with real sourced cases; (5) second realtor check Sat 10-11:00. (Vidyut, #41)
+- Sat 01:28 Overnight: master-planner drafts 2-3 reframe directions, master-council judges (budget about $2.50), conductor decides; result for Vidyut at 07:30. (Vidyut)
+- Sat 01:31 Ruling: A9 (#91) stays a staged poster on real records, labelled "Staged example" on screen and in the README; D8 replays land next to it as `fixtures/demo/replay-*`, never replacing it. (conductor, #73)
+- Sat 01:31 Ruling: A14 approved, the poster's reply for real (#109): reply route + "waiting for a reply" state, joining D3 challenge and V5 photo memory. A right code that is not a copy stays Not confirmed until V2. Contract merged (#110). (conductor, #8)
+- Sat 01:34 Ruling: V2 contract approved: optional `PhotoLocation.matched_model_id`, `matched_property_id`, `room_label`; set for located_in_claimed and located_elsewhere (elsewhere names the OTHER building). (conductor, #41)
+- Sat 01:42 Ruling: D9 aerial route contract approved: `GET /cases/{id}/aerial` -> `AerialProofResponse` (claimed + matched side, tile, record, image_url on our route; Vexcel key server side), 20 s bound, 7-day cache covered by `make purge`; `record` trimmed to company names and building facts (no phone hash, no site host); read token on both routes. Rishit builds builder + routes in ONE PR, Dev reviews api/. (conductor, #41)
+- Sat 02:00 Ruling: an ACTIVE for-sale match gives HOLD (for-sale reason first) even when no photo was placed; it outranks "Could not place". DON'T PAY still only on proof. When the record has model ids but no index, Real reads "Not checked (this building's scan is not indexed yet)"; "no 3D scan" only when there are no model ids. Lane A task #119, PR #120. (conductor, #101)
+- Sat 02:10 Ruling: a poster phone that is not the leasing office's = Not confirmed + "call the office yourself", a HOLD reason, never red-flag tone; back to red flag only when the poster is also not licensed (D10 #128). Task #121. (conductor)
+- Sat 02:18 **Direction A LOCKED: "Not for rent: the home's own record".** Council 5 of 5, chair concurs (`plan/council/2026-11-14-0206-snapback-reframe`). Houses first; the photos identify the home (they land in its own scan), the record gives the verdict (for sale by another brokerage); the listing agent is a second user ("Report this copy"). Built on B's floor: F1 #121, F2 #124 + #128, F3 copy (T), reason order #127, all merged before the 10:00 realtor round. C = one pitch line + README section. Video closes on staged case b (Don't pay). Vidyut confirms at 07:30; reversible to B until the 12:00 gate. (council + conductor)
+- Sat 02:22 Ruling: HCAD owner of record (#130) cleared. HCAD calls the bulk file "Public Data"; no licence limit found. Download it only into the gitignored `data/` on a kit machine, filter once to kit Houston addresses, never commit rows. The card names an owner only as a company or institution (LLC, iBuyer, REIT, brokerage) or says "a private owner"; never a person's name, never a mailing address. (conductor)
+- Sat 02:25 Ruling: D10 license (#128) contract approved with 3 amendments. NOT_FOUND only when no active licensee shares the last name with a compatible first name (nicknames, initials); ambiguous or more than 25 rows = NOT_CHECKED; companies checked as Broker Company; NOT_FOUND = Doesn't match + a HOLD reason, never DON'T PAY alone; LICENSED is supporting only. Flagging a real agent is the worst realtor failure. (conductor, #41)
+- Sat 02:27 Ruling: the read token goes in the header only, on every case route including images. Lane T fetches images with the header and shows a blob URL. No `?token=` anywhere. (conductor, #113)
+- Sat 02:29 Ruling: a poster who says they are the owner and also claims a license gets checked. LICENSED is fine; NOT_FOUND gives "Doesn't match" like any other claim. The owner exemption applies only when no license is claimed. (conductor, #134)
+- Sat 02:45 **Ruling (revises the 22:30 chair ruling and the code part of 00:38):** a wrong, missing or unreadable challenge code is NOT proof. It gives "Not confirmed, ask again" (up to `MAX_RETRIES`), then HOLD; never FORGED, never DON'T PAY. A late reply that is not a copy asks again once (no dead end). A reply that is a copy of a listing photo is FORGED whenever it arrives. DON'T PAY proof is only: a photo located elsewhere, a reply that is a copy of a listing photo (photo memory), or a confirmed recapture of one. Reason: the code reader misses handwriting and an honest landlord can mis-write a code; a realtor reads a code slip as an accusation. (conductor on #117; Vidyut can reverse)
 - No "SAFE", "VERIFIED" or "SCAM" state anywhere. Card words come from code, never from a model. Say "could not verify", never "scam", about a person. (spec v3)
 
 ## Who is doing what
@@ -33,12 +48,12 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
 `epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                                                          |
-| ------- | ----------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Dev     | DevSingh05  | A. agent and backend                 | A1-A6 merged, eval route #70, contracts #88 #92 merged. Open: #87 A7 rules (in review), #91 A9 demo cases (stacked on #87), #96 A8 harness (not run; needs V2 + kit). Next: A10 live join, then A11-A13 (#8) |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | T7 hero #86, T11 replay #89 merged. Open: #90 T8 card rows, #94 T9 two-building aerial proof (in review); design r6 artifact                                                                                 |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | V1 #63 merged. Open: #61 V5 (264900f), #62 V6 (4c88e6d) in review. Overnight queue (#10): V8 #68 probes, V2 pose #28 (02:00: 5 photos on 1 building), locate JSON, V9 #74                                    |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | Claude Pro. D1 #80, D2 #81, D6 #85 merged. Open: D3 #82, D4 #83, D5 #84 (FIX posted), D7 #95 (queued). Blocked: kit download, Vexcel docs (morning)                                                          |
+| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------- | ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dev     | DevSingh05  | A. agent and backend                 | #135 A21 merged 02:43, #133 A17 (F1) 02:35. #117 A14 FIX r1 02:43 @6675c3d (M1 L3; decisions 1 and 4 ruled, incl. the 02:45 code ruling). #137 A18 license line @6051f19 queued after #134 (contract note approved on #41 02:44). A21 follow-up: verdict.py:186-187 docstring, fold into next PR. Next: #125 A19 owner rule, #126 A20 report pack, then #132 A15 (listing brokerage counts as a marketer), A13 #104. #96 A8 waits on V2                                                                  |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | Lane T is the conductor's (listed on #9, 02:18): F3 copy (FTC wording, "Taken here" = this floor plan, replay opens every demo); house case as the T7 opener if the 12:00 gate passes; "Report this copy" print page on #126; "Not for rent" share card. Still open: T7 live wiring (`landing.ts:43`), T9 live on D9, T10 #79                                                                                                                                                                            |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | #111 V2 FIX first (critical path; nudged on #10 02:30; no push at 02:45, last commit 01:41; the conductor takes the H fix at 03:00 if still none). Last activity: #62 push 0ea6476 + ready comment 02:19. #62 V6 FIX r3 02:36 (H1 M1 L1, after #111). Then #112 V4 FIX (answer Rishit's id question there), then V9 #74 grown to 3 kit houses (for sale, recently sold, decoy; 3 photos each with pose). 07:30 probe: one house image through V2, yes/no on #74. 12:00 hard gate on #74. Then #114, #118 |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | Claude Pro. #100 D2b merged 02:22 (follow-up: bounded gzip decode, demo risk). #113 D9 merged 02:38; follow-up PR after #134 (KitMissing -> `{}` at main.py:350 + route test, OSError tile route test; list on #113). #134 D10 r2 @fa92e64 (items 1-6 done 02:36, 25 tests) in review. Queued: #116. Then #129 D11 ForRent join, #130 D12 HCAD (cleared 02:22, privacy rules on the issue), D8 #71                                                                                                       |
 
 ## Data facts (REPORTED until our probe confirms)
 
@@ -64,11 +79,14 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 - **Fri 22:45**: if the data gate failed, switch to PRETEXT+.
 - **Sat 02:00 locate and learn gate**: 15 of 20 held-out real photos located; recapture v0 trained (150 genuine, 150 attacks); Photon round trip with a photo; card from a live record.
 - **Sat about 10:00 feedback round 1**; evening feedback round 2.
+- **Sat 07:30 V9 probe** (Jeffrey, #74): can one kit-house image or a render from a house scan go through V2? Yes or no on #74. Vidyut confirms direction A at 07:30.
+- **Sat 12:00 hard gate** (#74): 3 kit-house photos located with pose, including the decoy landing as "different home". Pass: the house case opens the demo and the report pack ships. Fail: B's apartment opener stays, the house case is one beat; owner and license lines still ship.
 - **Sun 01:00 new features stop** (replaces the old Sun 02:00 freeze); after that polish, bug fixes, demo prep only.
 - **Sun 08:00 hard deadline.** Older interim gates (Sat 08:00 recapture v1, Sat 18:00 storyboard, Sat 20:00 recapture v2) still stand as targets.
 
 ## Open questions
 
+- Sat 01:55 Human list for 07:30 (lane V): browser check of kit photo URLs (403 to scripts, #68); V4 team photos (#30, about 40 genuine / 15 screen / 10 print each); V3 60 s walkthrough video plus one photo of a room we can stand in (#29)
 - Fri 21:15 CoStar q1: may kit data go to Claude? (CoStar, via Discord)
 - Fri 21:15 CoStar: may we cache Matterport faces and embeddings locally for the weekend? (CoStar)
 - Fri 21:15 Does the kit have listing photos, owner of record, rent or leasing contact? (our probe first)
@@ -76,12 +94,14 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Live facts
 
-- Nothing deployed yet (NOT re-checked at 01:10). main = afdf692 (Sat 01:04).
-- Merged 00:34-01:04: #59 A6 card, #70 eval route, #80 D1 CoStar adapter, #81 D2 Vexcel tile, #85 D6 red team, #86 T7 hero, #88 A7 contract stub, #89 T11 replay, #92 Card.for_sale.
-- Open PRs at 01:04: #61 #62 (Jeffrey, in review), #82 #83 #84 (Rishit, FIX posted), #87 #91 #96 (Dev, #87 in review), #90 #94 (lane T, in review), #95 (D7, queued).
+- Nothing deployed yet (NOT re-checked at 02:47). main = ab8a158 (#135 A21); 98ae396 (#113) CI success, ab8a158 CI in progress at 02:45; prettier format:check clean on ab8a158. Merged 02:35-02:43: #133 A17, #113 D9, #135 A21 (36 since midnight). Merged 02:25-02:35: #107, #118 secure_delete, #131 D6 manifest paths, #115 DATA_USE. Merged 02:04-02:22: #101, #106, #95, #123, #120, #100.
+- Published (private, Vidyut's account): realtor second-look page https://claude.ai/code/artifact/753dbcf2-8571-4a45-9915-bfce03ecaada (new; Vidyut decides whether to send; the first realtor page is unchanged); team page v8 (direction A) https://claude.ai/code/artifact/02692146-1751-437c-a78e-276c9f94c586; worlds design r9 https://claude.ai/code/artifact/a96c4cf3-27b3-4c6d-a2fc-b4f0ea616aee (r10 house framing in progress).
+- TREC licensee data (Socrata `data.texas.gov/resource/s7ft-44qi.json`) is live with no key: 327,540 rows (conductor, 02:18). Use lightly and cache demo answers locally.
+- Merged 01:04-01:45: #61 V5, #82 D3, #83 D4, #84 D5, #87 A7 rules, #90 T8, #91 A9, #94 T9, #98 A10 contract, #99 V1 follow-ups, #105 CODEOWNERS, #108 T housekeeping, #110 A14 contract.
+- Open FIX at 02:47: #111@e339dc7 (V2, H, no push since the 02:02 FIX), #112@890152d (V4), #117@6675c3d (A14, M1 L3), #62@0ea6476 (V6 r3, H1 M1 L1). In review: #134 D10 r2 @fa92e64, #136 T9 live aerial @b0fd82f (conductor lane T). Queued: #137 A18 (after #134), #114, #116. Blocked: #96 on V2. Draft held for Vidyut: #122 T10. Reviews and merges: conductor only.
 - Contract fields on main (#88, #92), additive and optional: `PropertyRecord.site_phone_hash` (keyed hash, never digits; both lanes use the same phone hash helper), `website_host` (host only), `floor_plan_rents[]` (name, beds 0=studio, rent_min, rent_max, per_bed), `units[]` (unit, beds, floor_plan); `AuthorityResult.office_phone_match`, `link_domain` (yes/no only); `ForSaleMatch` (status active / recently_rented / none, site, listed_on, changed_on) on `ModuleEvidence.for_sale` and `Card.for_sale`. Pending in #87: `PriceResult.compared_beds`.
 - Fri 22:10 data gate GO: 3/3 Houston multifamily Matterport models load on Vidyut's key (issue #5); apartment-listing has min/max rent per floor plan and the management company.
-- API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace/status; may go in `?token=`). `/c/:id` card stays public.
+- API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace, status, aerial, images; header only since the 02:27 ruling, no `?token=`). `/c/:id` card stays public.
 
 ## Gotchas
 
@@ -100,3 +120,8 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 - Sat 00:58 New user-facing strings need Spanish too: a test holds the English and Spanish tables to the same keys (#59, #87).
 - Sat 01:00 `.github/` is owned by Vidyut and the XO; lane PRs must not touch `ci.yml` (pushing it needs the `workflow` token scope anyway).
 - Per-bed rents (`per_bed`) are never compared with a whole-unit rent.
+- Sat 01:45 V2 gate numbers (#28) are on RENDERS of the scans at unseen viewpoints, not phone photos. Say "renders" in any claim until real photos are run (A8).
+- Sat 01:31 #91 and #101 both touch `CaseStore.create`; A13 waits until both merge (both now merged).
+- Sat 02:02 Twin matching: never let index order break a tie between the claimed building and another one; check the claimed twin first and hold "elsewhere" to a stricter bar (#111). A tie must never produce DON'T PAY.
+- Sat 02:03 ML splits: split train and test by building (or capture session), never by photo, or the score leaks (#112).
+- Sat 01:59 A recorded case with no secret (fixture `7Q2M`) must go straight to `check_read`; an early "no token -> 401" locks it out for good (#113).

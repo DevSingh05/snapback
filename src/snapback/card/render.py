@@ -30,6 +30,9 @@ from snapback.card import strings
 from snapback.contracts import Card, CardTone, DataSource, VerdictState
 
 WIDTH = 1080
+# Raise this whenever the drawing changes. It is part of each picture's cache key and ETag,
+# so a picture drawn by an older renderer is never served or kept as "unchanged".
+RENDER_VERSION = "2"
 MARGIN = 56
 CONTENT = WIDTH - 2 * MARGIN
 ICON = 48
@@ -288,6 +291,9 @@ def render_card(card: Card) -> RenderedCard:
             pen.text((TEXT_LEFT, y - 2), label, fill=INK, font=_font(34))
             tone_x = TEXT_LEFT + pen.textlength(label, font=_font(34)) + 20
             word = strings.tone_word(item.tone.value, row.kind.value, lang)
+            if item.source is not None and item.source is not card.source:
+                # A line from a real record on a card that also holds stand-ins.
+                word = f"{word}  ·  {say(f'card.source.{item.source.value}')}"
             tone_word = drawable(word.upper())
             pen.text((tone_x, y + 8), tone_word, fill=colour, font=_font(22))
             y = _paragraph(pen, item.text, 28, INK, TEXT_LEFT, y + 46, WIDTH - MARGIN - TEXT_LEFT)

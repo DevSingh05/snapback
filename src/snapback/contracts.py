@@ -284,6 +284,9 @@ class ForSaleMatch(BaseModel):
     site: str = "Homes.com"  # where it is listed; shown on the card
     listed_on: date | None = None
     changed_on: date | None = None  # when it reached its current status
+    # Listing offices on record (brokerage company names, Homes.com `offices[].name`). These
+    # count as legitimate marketers. Companies only: an agent's personal name is never kept.
+    offices: list[str] = Field(default_factory=list)
 
 
 class ModuleEvidence(BaseModel):
@@ -466,6 +469,24 @@ class AerialTile(BaseModel):
     direction: str  # "north", "east", "south", "west" or "nadir"
     captured_on: date | None = None
     path: str  # local file under data/ (or fixtures/ for the synthetic tile)
+
+
+class AerialSideOut(BaseModel):
+    """One building in the aerial proof (D9, approved on #41)."""
+
+    tile: AerialTile | None = None  # None: no tile (no coverage, rate limited, out of time)
+    record: PropertyRecord | None = None  # building facts and company names only
+    image_url: str | None = None  # our own route; never a Vexcel URL, the key stays server side
+
+
+class AerialProofResponse(BaseModel):
+    """`GET /cases/{case_id}/aerial`: the claimed building and the one the photos matched."""
+
+    case_id: str
+    source: DataSource
+    claimed: AerialSideOut
+    matched: AerialSideOut | None = None  # a photo located_elsewhere; None otherwise
+    distance_m: float | None = None  # None when either record lacks lat/lon
 
 
 # ---------------------------------------------------------------------------------------------
