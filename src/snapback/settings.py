@@ -101,6 +101,11 @@ class Settings(BaseSettings):
     # fixture run uses a fixed synthetic salt and a live run makes one per process.
     snapback_phone_salt: SecretStr | None = None
 
+    # Show CoStar's record figures (rent bands, units available, links) in a LIVE case. Off by
+    # default: set it only in the local demo .env, never on a public host. A fixture case always
+    # shows them (synthetic). Never in card.png, the report pack, the MCP output or the iMessage.
+    snapback_show_record_figures: bool = False
+
     anthropic_api_key: SecretStr | None = None
 
     # Voice for the Finder (ElevenLabs text to speech and Scribe speech to text). Unset, the voice

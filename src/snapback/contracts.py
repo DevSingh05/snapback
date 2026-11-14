@@ -672,6 +672,49 @@ class AerialProofResponse(BaseModel):
 # ---------------------------------------------------------------------------------------------
 
 
+class RealListingPlan(BaseModel):
+    """One floor plan on the record, as the real-listing panel shows it. The rent band and the
+    unit count are record figures: they are None unless `RealListing.figures_shown`."""
+
+    name: str | None = None  # "2 bed / 2 bath"
+    beds: int | None = None  # 0 is a studio
+    baths: float | None = None
+    rent_min: int | None = None  # whole dollars a month, as of CoStar's last research
+    rent_max: int | None = None
+    units_available: int | None = None  # units reported available at that research
+    availability_host: str | None = None  # host only: where the plan's availability page sits
+
+
+class RealListing(BaseModel):
+    """The ad's building as CoStar's record has it (GET /cases/{id}/real-listing).
+
+    Never a phone number or a street address. `which` says whose record this is: the building
+    the photos were placed in when that was not the claimed one, else the claimed one. In a LIVE
+    case the record figures show only when SNAPBACK_SHOW_RECORD_FIGURES is on (local demo)."""
+
+    case_id: str
+    source: DataSource
+    property_id: str
+    which: Literal["claimed", "matched"]
+    building_name: str | None = None  # only with figures_shown
+    manager_company: str | None = None  # company name only
+    website_host: str | None = None  # host only
+    plans: list[RealListingPlan] = Field(default_factory=list)  # narrowed to the ad's beds
+    photos_in_scan: int = 0  # ad photos placed in this building's scan
+    photos_total: int = 0
+    ad_rent: int | None = None  # what the ad asked, whole dollars a month
+    ad_asks_irreversible: bool = False  # a payment that cannot be taken back, before a viewing
+    phone_is_office: PhoneMatch = PhoneMatch.NOT_CHECKED  # only ever yes / no, never digits
+    figures_shown: bool = False
+    as_of: str = ""  # "as of CoStar's last research", in the asked language
+    # Words, built by code from card/strings.py (real.*), in the asked language.
+    headline: str = ""  # what the ad says against what the record says
+    provenance: str | None = None  # "N of M of the ad's photos are in CoStar's own scan..."
+    phone_line: str | None = None
+    cta_label: str | None = None  # "See the real listing"
+    cta_url: str | None = None  # the availability link, else https://<website_host>; with figures
+
+
 class ReportPlatform(StrEnum):
     FACEBOOK = "facebook"
     ZILLOW = "zillow"

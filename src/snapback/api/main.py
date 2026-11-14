@@ -80,6 +80,7 @@ from snapback.contracts import (
     EvidenceFile,
     LocateStatus,
     PreferencesUpdate,
+    RealListing,
     RenterBrief,
     ReplyResponse,
     ReportResponse,
@@ -105,6 +106,7 @@ from snapback.office.models import (
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
 from snapback.pack import TourPrepPack, build_tour_prep
 from snapback.preferences import merge as merge_preferences
+from snapback.real_listing import real_listing
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
@@ -646,6 +648,47 @@ def create_app(
         return proof.model_copy(
             update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
         )
+
+    @app.get("/cases/{case_id}/real-listing")
+    def get_real_listing(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> RealListing:
+        """The ad's building as CoStar's record has it, beside what the ad says. The building
+        the photos were placed in wins when it is not the claimed one. Record figures show for a
+        LIVE case only when SNAPBACK_SHOW_RECORD_FIGURES is on. Needs the case's read token in a
+        header; a token in the address is refused. Never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers["Cache-Control"] = "no-store"
+        modules = case.evidence
+        try:
+            claimed = lookups.record(case.property_id) if case.property_id else None
+            matched_id = matched_id_of(case)
+            matched = lookups.record(matched_id) if matched_id else None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        listing = getattr(case, "listing", None)
+        beds = getattr(listing, "beds", None)
+        if beds is None and modules.price is not None:
+            beds = modules.price.compared_beds
+        panel = real_listing(
+            modules,
+            claimed,
+            matched,
+            settings,
+            ad_beds=beds,
+            ad_unit=getattr(listing, "unit", None),
+            lang=lang,
+        )
+        if panel is None:
+            raise HTTPException(status_code=404, detail=strings.text("real.no_record", lang))
+        return panel.model_copy(update={"case_id": case_id})
 
     @app.get("/cases/{case_id}/aerial/{side}.jpg")
     def get_aerial_image(

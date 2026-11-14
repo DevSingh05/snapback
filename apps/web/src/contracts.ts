@@ -40,6 +40,7 @@ export interface FloorPlanRent {
   per_bed: boolean;
   baths?: number | null;
   units_available?: number | null; // reported available at CoStar's last research
+  availability_url?: string | null; // LIVE local only; the route never sends it without the flag
 }
 
 export interface PriceResult {
@@ -224,6 +225,43 @@ export interface AerialProofResponse {
   claimed: AerialSideOut;
   matched: AerialSideOut | null;
   distance_m: number | null;
+}
+
+// Mirrors RealListingPlan and RealListing in src/snapback/contracts.py
+// (GET /cases/{id}/real-listing; read token in a header, never in the address; no-store).
+// Record figures (rents, units, links, building name) are null unless figures_shown. Words are
+// built by code in the asked language (?lang=en|es). No phone digits and no street address.
+export interface RealListingPlan {
+  name?: string | null;
+  beds?: number | null; // 0 is a studio
+  baths?: number | null;
+  rent_min?: number | null; // whole dollars a month
+  rent_max?: number | null;
+  units_available?: number | null;
+  availability_host?: string | null; // host only
+}
+
+export interface RealListing {
+  case_id: string;
+  source: DataSource; // show the LIVE or FIXTURE chip from this
+  property_id: string;
+  which: "claimed" | "matched"; // matched: the building the photos were placed in
+  building_name?: string | null; // only with figures_shown
+  manager_company?: string | null;
+  website_host?: string | null;
+  plans: RealListingPlan[]; // narrowed to the ad's bedrooms; never a per-bed plan
+  photos_in_scan: number;
+  photos_total: number;
+  ad_rent?: number | null;
+  ad_asks_irreversible: boolean;
+  phone_is_office: "yes" | "no" | "not_checked";
+  figures_shown: boolean;
+  as_of: string; // "as of CoStar's last research"
+  headline: string; // the ad against the record, one paragraph
+  provenance?: string | null; // "N of M of the ad's photos are in CoStar's own scan..."
+  phone_line?: string | null;
+  cta_label?: string | null; // "See the real listing"
+  cta_url?: string | null; // availability link, else https://<website_host>; only with figures
 }
 
 // Mirrors RenterBrief, PlaceMatch, SearchResponse, AlternativesResponse, TourDraftRequest and

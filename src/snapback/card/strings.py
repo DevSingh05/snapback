@@ -1339,6 +1339,96 @@ ES.update(
     }
 )
 
+EN.update(
+    {
+        "real.as_of": "as of CoStar's last research",
+        "real.plan_studio": "studio",
+        "real.plan_beds": "{beds}-bed",
+        "real.plan_unnamed": "matching floor plan",
+        "real.ad_rent": "The ad asks {ad_rent} a month.",
+        "real.ad_no_rent": "The ad's rent could not be read.",
+        "real.ad_irreversible": (
+            "It asks for a payment that cannot be taken back, before a viewing."
+        ),
+        "real.range": "{low} to {high}",
+        "real.record_one": (
+            "Its Apartments.com listing on CoStar's record says {band} a month for a {plan}."
+        ),
+        "real.record_many": (
+            "Its Apartments.com listing on CoStar's record says {band} a month across "
+            "{n} matching floor plans."
+        ),
+        "real.record_hidden": (
+            "CoStar's record has this building's Apartments.com listing; its rent figures "
+            "are not shown here."
+        ),
+        "real.record_no_rent": "CoStar's record has no rent for a matching floor plan.",
+        "real.managed_by": "Managed by {company}.",
+        "real.website": "Its own website: {host}.",
+        "real.provenance_scan": (
+            "{n} of {m} of the ad's photos are in CoStar's own scan of this building."
+        ),
+        "real.provenance_elsewhere": (
+            "{n} of {m} of the ad's photos are in CoStar's scan of a different building "
+            "than the one the ad names."
+        ),
+        "real.provenance_none": (
+            "None of the ad's {m} photos could be placed in CoStar's scan of this building."
+        ),
+        "real.phone_office": "The ad's number is the office's on record.",
+        "real.phone_not_office": "The ad's number is not the office's on record.",
+        "real.cta": "See the real listing",
+        "real.no_record": "CoStar has no record of the building this ad names.",
+    }
+)
+
+ES.update(
+    {
+        "real.as_of": "según la última investigación de CoStar",
+        "real.plan_studio": "estudio",
+        "real.plan_beds": "de {beds} dormitorios",
+        "real.plan_unnamed": "plano que coincide",
+        "real.ad_rent": "El anuncio pide {ad_rent} al mes.",
+        "real.ad_no_rent": "No se pudo leer el alquiler del anuncio.",
+        "real.ad_irreversible": (
+            "Pide un pago que no se puede recuperar, antes de cualquier visita."
+        ),
+        "real.range": "{low} a {high}",
+        "real.record_one": (
+            "Su anuncio en Apartments.com, en el registro de CoStar, dice {band} al mes "
+            "por un plano {plan}."
+        ),
+        "real.record_many": (
+            "Su anuncio en Apartments.com, en el registro de CoStar, dice {band} al mes "
+            "en {n} planos que coinciden."
+        ),
+        "real.record_hidden": (
+            "El registro de CoStar tiene el anuncio de este edificio en Apartments.com; "
+            "aquí no se muestran sus cifras de alquiler."
+        ),
+        "real.record_no_rent": (
+            "El registro de CoStar no tiene alquiler para un plano que coincida."
+        ),
+        "real.managed_by": "Administrado por {company}.",
+        "real.website": "Su sitio web: {host}.",
+        "real.provenance_scan": (
+            "{n} de {m} fotos del anuncio están en el escaneo propio de CoStar de este edificio."
+        ),
+        "real.provenance_elsewhere": (
+            "{n} de {m} fotos del anuncio están en el escaneo de CoStar de un edificio "
+            "distinto al que nombra el anuncio."
+        ),
+        "real.provenance_none": (
+            "Ninguna de las {m} fotos del anuncio se pudo ubicar en el escaneo de CoStar "
+            "de este edificio."
+        ),
+        "real.phone_office": "El número del anuncio es el de la oficina en el registro.",
+        "real.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
+        "real.cta": "Ver el anuncio real",
+        "real.no_record": "CoStar no tiene registro del edificio que nombra este anuncio.",
+    }
+)
+
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
 
 
