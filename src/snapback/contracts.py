@@ -235,20 +235,21 @@ class PriceResult(BaseModel):
     # A7 (#67): the unit on the record, and the per-bed guard.
     unit: UnitStatus = UnitStatus.NOT_CHECKED
     per_bed: bool = False  # the record prices by the bed, so the rent was not compared
+    compared_beds: int | None = None  # the rent was compared with floor plans of this size
 
 
-class ContactStatus(StrEnum):
+class PhoneMatch(StrEnum):
     """Is the phone number in the listing the leasing office on the record? (A7)"""
 
-    MATCHES_RECORD = "matches_record"
-    MISMATCH = "mismatch"  # both sides have a number and none of them match
+    YES = "yes"
+    NO = "no"  # both sides have a number and they differ
     NOT_CHECKED = "not_checked"  # the listing or the record has no number
 
 
-class LinkStatus(StrEnum):
+class LinkDomain(StrEnum):
     """How a link in the listing compares with the building's own website. (A7)"""
 
-    RECORD_SITE = "record_site"  # the building's own site, or a page under it
+    MATCHES = "matches"  # the building's own site, or a page under it
     LOOKALIKE = "lookalike"  # close to it but not it: a typo, punycode, extra words
     OTHER = "other"  # some other site; says nothing either way
     NOT_CHECKED = "not_checked"  # the listing has no link, or the record has no website
@@ -260,9 +261,9 @@ class AuthorityResult(BaseModel):
     status: AuthorityStatus
     manager_on_record: str | None = None  # company name, or None when the record has none
     poster_said: str | None = None  # what the renter typed the poster claimed
-    # A7 (#67). Yes/no only: no phone number, digest or web address is ever kept here.
-    phone: ContactStatus = ContactStatus.NOT_CHECKED
-    link: LinkStatus = LinkStatus.NOT_CHECKED
+    # A7 (#67). Yes/no only: no phone number, hash or web address is ever kept here.
+    office_phone_match: PhoneMatch = PhoneMatch.NOT_CHECKED
+    link_domain: LinkDomain = LinkDomain.NOT_CHECKED
 
 
 class ForSaleStatus(StrEnum):
@@ -434,10 +435,10 @@ class PropertyRecord(BaseModel):
     rent_median: int | None = None
     rent_max: int | None = None
     # D7 fields, stubbed by A7 (#67). All optional; an empty list means the record has none.
-    # Phones are never stored as digits: each entry is
-    # snapback.agent.rules.contact.phone_digest(number, salt), a keyed hash.
-    leasing_phone_digests: list[str] = Field(default_factory=list)
-    website: str | None = None  # the building's own site, host only: "oakcourt.example"
+    # The leasing office's phone is never stored as digits. This is
+    # snapback.agent.rules.contact.phone_hash(number, phone_salt()), a keyed hash.
+    site_phone_hash: str | None = None
+    website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
     floor_plan_rents: list[FloorPlanRent] = Field(default_factory=list)
     units: list[UnitOnRecord] = Field(default_factory=list)
 

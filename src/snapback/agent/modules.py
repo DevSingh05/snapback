@@ -169,7 +169,7 @@ class FixtureModules:
         # The listing's own claims are compared only when the record has something to compare
         # them with. The shared fixture record has none, so it keeps the fixture's answer.
         record = self.record
-        comparable = record.manager_company or record.leasing_phone_digests or record.website
+        comparable = record.manager_company or record.site_phone_hash or record.website_host
         if self._contacts is None or not comparable:
             return self.evidence.authority
         return check_authority(self._contacts, record, FIXTURE_PHONE_SALT)

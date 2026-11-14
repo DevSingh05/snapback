@@ -129,6 +129,12 @@ EN: dict[str, str] = {
     "rent.not_checked": "Not checked (our data has no rent for this building).",
     "rent.within_range": "In line with the rents on record for this building.",
     "rent.below_range": "Below the rents on record for this building. Ask why; discounts happen.",
+    # "NN% under this building's lowest N bed": the comparison with the listing's own size.
+    "rent.below_floor_plan": (
+        "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
+    ),
+    "rent.plan.studio": "studio",
+    "rent.plan.beds": "{beds} bed",
     "rent.per_bed": "Not checked (this building prices by the bed, so the rent was not compared).",
     "unit.not_on_record": (
         "The record for this building lists no unit with that number. Ask the manager on record."

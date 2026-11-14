@@ -13,8 +13,8 @@
   "rent_min": 1200,
   "rent_median": 1500,
   "rent_max": 1900,
-  "leasing_phone_digests": ["fx-digest-filled-in-by-the-test"],
-  "website": "fixtureliving.example",
+  "site_phone_hash": "fx-hash-filled-in-by-the-test",
+  "website_host": "fixtureliving.example",
   "floor_plan_rents": [
     { "name": "1 bed / 1 bath", "beds": 1, "rent_min": 1200, "rent_max": 1400, "per_bed": false },
     { "name": "2 bed / 2 bath", "beds": 2, "rent_min": 1600, "rent_max": 1900, "per_bed": false },

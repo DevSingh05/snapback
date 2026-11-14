@@ -14,17 +14,17 @@ from snapback.agent.rules.contact import (
     check_authority,
     check_link,
     host_of,
-    phone_digest,
+    phone_hash,
 )
 from snapback.card import strings
 from snapback.contracts import (
     AuthorityStatus,
     CardRowKind,
     CardTone,
-    ContactStatus,
     ForSaleMatch,
-    LinkStatus,
+    LinkDomain,
     ModuleEvidence,
+    PhoneMatch,
     PriceStatus,
     PropertyRecord,
     UnitStatus,
@@ -44,7 +44,7 @@ CHECKED_AT = datetime.fromisoformat("2026-11-13T21:42:00-05:00")
 
 def record(**changes) -> PropertyRecord:
     raw = json.loads((CONTRACTS / "property_record_contact.json").read_text())
-    raw["leasing_phone_digests"] = [phone_digest(OFFICE, SALT)]
+    raw["site_phone_hash"] = phone_hash(OFFICE, SALT)
     return PropertyRecord.model_validate(raw | changes)
 
 
@@ -74,51 +74,36 @@ def everything_on(modules: ModuleEvidence) -> str:
 
 
 def test_the_new_fixtures_parse_and_old_records_still_do():
-    assert record().website == SITE
+    assert record().website_host == SITE
     assert ForSaleMatch.model_validate_json((CONTRACTS / "for_sale_match.json").read_text())
     old = PropertyRecord.model_validate_json((CONTRACTS / "property_record.json").read_text())
-    assert (old.leasing_phone_digests, old.website, old.floor_plan_rents, old.units) == (
-        [], None, [], [],
+    assert (old.site_phone_hash, old.website_host, old.floor_plan_rents, old.units) == (
+        None, None, [], [],
     )  # fmt: skip
 
 
 # --- phone: a keyed hash, compared, never shown --------------------------------------------
 
 
-def test_a_phone_digest_ignores_how_the_number_is_written():
-    same = ["(555) 010-0142", "555-010-0142", "555.010.0142", "+1 555 010 0142", "15550100142"]
-    assert len({phone_digest(number, SALT) for number in same}) == 1
-    assert phone_digest(OFFICE, SALT) != phone_digest(OTHER, SALT)
-    assert phone_digest(OFFICE, SALT) != phone_digest(OFFICE, "another-salt")
-
-
-def test_a_phone_digest_holds_no_digits_of_the_number():
-    digest = phone_digest(OFFICE, SALT)
-    assert len(digest) == 64
-    assert "5550100142" not in digest and "0142" not in digest[:8]
-    assert phone_digest("call me", SALT) is None
-    assert phone_digest("555-0142", SALT) is None  # too short to be a full number
-
-
 @pytest.mark.parametrize(
     ("phones", "expected"),
     [
-        ([OFFICE], ContactStatus.MATCHES_RECORD),
-        ([OTHER, OFFICE], ContactStatus.MATCHES_RECORD),
-        ([OTHER], ContactStatus.MISMATCH),
-        ([], ContactStatus.NOT_CHECKED),
+        ([OFFICE], PhoneMatch.YES),
+        ([OTHER, OFFICE], PhoneMatch.YES),
+        ([OTHER], PhoneMatch.NO),
+        ([], PhoneMatch.NOT_CHECKED),
     ],
 )
 def test_the_listing_phone_is_compared_with_the_leasing_office(phones, expected):
     result = check_authority(ContactClaims(phones=phones), record(), SALT)
-    assert result.phone is expected
+    assert result.office_phone_match is expected
 
 
 def test_no_phone_on_the_record_means_not_checked():
-    result = check_authority(ContactClaims(phones=[OTHER]), record(leasing_phone_digests=[]), SALT)
-    assert result.phone is ContactStatus.NOT_CHECKED
-    assert check_authority(ContactClaims(phones=[OTHER]), None, SALT).phone is (
-        ContactStatus.NOT_CHECKED
+    result = check_authority(ContactClaims(phones=[OTHER]), record(site_phone_hash=None), SALT)
+    assert result.office_phone_match is PhoneMatch.NOT_CHECKED
+    assert check_authority(ContactClaims(phones=[OTHER]), None, SALT).office_phone_match is (
+        PhoneMatch.NOT_CHECKED
     )
 
 
@@ -152,12 +137,12 @@ def test_a_matching_phone_says_so_and_still_does_not_lift_allowed_to_rent_it():
     assert person["Allowed to rent it"][1].startswith("Not confirmed.")
 
 
-def test_no_phone_number_or_digest_or_web_address_reaches_card_verdict_or_evidence():
+def test_no_phone_number_or_hash_or_web_address_reaches_card_verdict_or_evidence():
     claims = ContactClaims(phones=[OTHER], links=["fixtureliving-apply.example"])
     authority = check_authority(claims, record(), SALT)
     modules = evidence(authority=authority.model_dump(mode="json"))
     out = everything_on(modules)
-    for secret in ("0142", "0177", phone_digest(OFFICE, SALT), phone_digest(OTHER, SALT), SITE):
+    for secret in ("0142", "0177", phone_hash(OFFICE, SALT), phone_hash(OTHER, SALT), SITE):
         assert secret not in out
     assert "fixtureliving-apply" not in out
 
@@ -205,7 +190,7 @@ def test_without_a_record_or_a_manager_nothing_is_claimed():
     ],
 )
 def test_the_buildings_own_site_is_recognised(link):
-    assert check_link([host_of(link)], SITE) is LinkStatus.RECORD_SITE
+    assert check_link([host_of(link)], SITE) is LinkDomain.MATCHES
 
 
 @pytest.mark.parametrize(
@@ -225,7 +210,7 @@ def test_the_buildings_own_site_is_recognised(link):
     ],
 )
 def test_a_lookalike_of_the_buildings_site_is_caught(link):
-    assert check_link([host_of(link)], SITE) is LinkStatus.LOOKALIKE
+    assert check_link([host_of(link)], SITE) is LinkDomain.LOOKALIKE
 
 
 @pytest.mark.parametrize(
@@ -233,21 +218,21 @@ def test_a_lookalike_of_the_buildings_site_is_caught(link):
     ["zillow.com", "www.apartments.com", "docs.google.com", "sunriseproperty.example", "fix.co"],
 )
 def test_an_unrelated_site_is_not_called_a_lookalike(link):
-    assert check_link([host_of(link)], SITE) is LinkStatus.OTHER
+    assert check_link([host_of(link)], SITE) is LinkDomain.OTHER
 
 
 def test_a_lookalike_outweighs_the_real_site_and_no_link_or_no_website_is_not_checked():
-    assert check_link(["fixtureliving.example", "fixtureliving.co"], SITE) is LinkStatus.LOOKALIKE
-    assert check_link([], SITE) is LinkStatus.NOT_CHECKED
-    assert check_link(["fixtureliving.co"], None) is LinkStatus.NOT_CHECKED
+    assert check_link(["fixtureliving.example", "fixtureliving.co"], SITE) is LinkDomain.LOOKALIKE
+    assert check_link([], SITE) is LinkDomain.NOT_CHECKED
+    assert check_link(["fixtureliving.co"], None) is LinkDomain.NOT_CHECKED
     # A record that points at a big shared site gives nothing to imitate.
-    assert check_link(["apartments-com.example"], "apartments.com") is LinkStatus.OTHER
+    assert check_link(["apartments-com.example"], "apartments.com") is LinkDomain.OTHER
 
 
 def test_a_lookalike_link_is_a_red_flag_on_the_person_row_and_holds_the_case():
     claims = ContactClaims(company="Fixture Living LLC", links=["fixtureliving-apply.example"])
     authority = check_authority(claims, record(), SALT)
-    assert authority.link is LinkStatus.LOOKALIKE
+    assert authority.link_domain is LinkDomain.LOOKALIKE
     modules = evidence(authority=authority.model_dump(mode="json"))
     assert state(modules) is VerdictState.HOLD
     tone, text = card_lines(modules, CardRowKind.PERSON)["Link"]
@@ -354,9 +339,10 @@ def test_a_unit_that_does_not_fit_the_record_holds_the_case(unit_status):
     modules = evidence(price=price)
     assert to_evidence(modules).unit_flag is True
     assert state(modules) is VerdictState.HOLD
-    tone, text = card_lines(modules, CardRowKind.PRICE)["Unit on record"]
+    tone, text = card_lines(modules, CardRowKind.PLACE)["Unit on record"]
     assert tone is CardTone.HOLD
     assert "999" not in text and "204" not in text  # the card never repeats a unit number
+    assert "Unit on record" not in card_lines(modules, CardRowKind.PRICE)
 
 
 # --- rent against the floor plan's own band ------------------------------------------------
@@ -374,6 +360,36 @@ def test_a_unit_that_does_not_fit_the_record_holds_the_case(unit_status):
 )
 def test_rent_is_compared_with_the_band_for_that_floor_plan(rent, beds, unit, expected):
     assert check_price(rent, record(), beds=beds, unit=unit).status is expected
+
+
+def test_a_low_rent_is_put_as_a_percent_under_the_lowest_plan_of_that_size():
+    # 1,100 against a two-bed band that starts at 1,600 is 31% under.
+    result = check_price(1100, record(), beds=2)
+    assert (result.status, result.compared_beds) == (PriceStatus.BELOW_RANGE, 2)
+    tone, text = card_lines(evidence(price=result.model_dump(mode="json")), CardRowKind.PRICE)[
+        "Rent vs record"
+    ]
+    assert tone is CardTone.HOLD
+    assert text == ("31% under this building's lowest 2 bed on record. Ask why; discounts happen.")
+    assert "1600" not in text and "1,600" not in text  # the record's own rent stays off
+
+    studio = record(
+        floor_plan_rents=[{"name": "Studio", "beds": 0, "rent_min": 1000, "rent_max": 1100}]
+    )
+    low = check_price(600, studio, beds=0)
+    _, said = card_lines(evidence(price=low.model_dump(mode="json")), CardRowKind.PRICE)[
+        "Rent vs record"
+    ]
+    assert said.startswith("40% under this building's lowest studio on record.")
+
+
+def test_without_a_size_to_compare_the_plain_wording_is_used():
+    result = check_price(800, record())  # no beds, no unit: compared with every plan
+    assert (result.status, result.compared_beds) == (PriceStatus.BELOW_RANGE, None)
+    _, text = card_lines(evidence(price=result.model_dump(mode="json")), CardRowKind.PRICE)[
+        "Rent vs record"
+    ]
+    assert text == strings.text("rent.below_range")
 
 
 def test_a_floor_plan_priced_by_the_bed_is_never_compared_with_a_whole_unit_rent():
@@ -499,7 +515,7 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
 
     said = " ".join([card.model_dump_json(), verdict.model_dump_json()])
     said += " ".join(event.model_dump_json() for event in case.trace.events)
-    for secret in ("0177", "0142", "999", SITE, "fixtureliving-apply", phone_digest(OFFICE, SALT)):
+    for secret in ("0177", "0142", "999", SITE, "fixtureliving-apply", phone_hash(OFFICE, SALT)):
         assert secret not in said
 
 

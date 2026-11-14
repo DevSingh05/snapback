@@ -24,13 +24,13 @@ from snapback.contracts import (
     CardRow,
     CardRowKind,
     CardTone,
-    ContactStatus,
     Evidence,
     ForSaleStatus,
-    LinkStatus,
+    LinkDomain,
     LocateStatus,
     MemoryHitKind,
     ModuleEvidence,
+    PhoneMatch,
     PresenceStatus,
     PriceStatus,
     RuleCategory,
@@ -126,10 +126,10 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
         for_sale_flag=_for_sale(modules) is ForSaleStatus.ACTIVE,
         recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
         phone_flag=(
-            modules.authority is not None and modules.authority.phone is ContactStatus.MISMATCH
+            modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
         ),
         lookalike_link_flag=(
-            modules.authority is not None and modules.authority.link is LinkStatus.LOOKALIKE
+            modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
         unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
     )
@@ -309,6 +309,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         lines=[
             main,
             *_for_sale_lines(modules, lang),
+            *_unit_lines(modules, lang),
             *_seen_before_lines(modules, lang, replies=False),
         ],
     )
@@ -393,8 +394,8 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     if authority is None:
         return []
     lines = []
-    if authority.phone is not ContactStatus.NOT_CHECKED:
-        matches = authority.phone is ContactStatus.MATCHES_RECORD
+    if authority.office_phone_match is not PhoneMatch.NOT_CHECKED:
+        matches = authority.office_phone_match is PhoneMatch.YES
         key = "contact.phone_match" if matches else "contact.phone_mismatch"
         tone = CardTone.OK if matches else CardTone.HOLD
         if authority.manager_on_record:
@@ -403,7 +404,7 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             )
         else:
             lines.append(_line(lang, "label.contact", tone, f"{key}_unnamed"))
-    if authority.link is LinkStatus.LOOKALIKE:
+    if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
     return lines
 
@@ -449,6 +450,23 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     if status is PriceStatus.WITHIN_RANGE:
         return _line(lang, "label.rent_vs_record", CardTone.OK, "rent.within_range")
     if status is PriceStatus.BELOW_RANGE:
+        price = modules.price
+        if price and price.compared_beds is not None and price.record_min and price.listed_rent:
+            # Against floor plans of the listing's own size, say how far under. The percent is
+            # ours; the record's rents themselves stay off the card.
+            beds = price.compared_beds
+            plan = strings.text("rent.plan.beds", lang, beds=beds)
+            if beds == 0:
+                plan = strings.text("rent.plan.studio", lang)
+            percent = round(100 * (price.record_min - price.listed_rent) / price.record_min)
+            return _line(
+                lang,
+                "label.rent_vs_record",
+                CardTone.HOLD,
+                "rent.below_floor_plan",
+                percent=percent,
+                plan=plan,
+            )
         return _line(lang, "label.rent_vs_record", CardTone.HOLD, "rent.below_range")
     return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
 
@@ -467,7 +485,7 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     return CardRow(
         kind=CardRowKind.PRICE,
-        lines=[*_rule_lines(modules, lang), _rent_line(modules, lang), *_unit_lines(modules, lang)],
+        lines=[*_rule_lines(modules, lang), _rent_line(modules, lang)],
     )
 
 

@@ -415,6 +415,7 @@ def check_price(
         low = min(p.rent_min if p.rent_min is not None else p.rent_max for p in whole)
         high = max(p.rent_max if p.rent_max is not None else p.rent_min for p in whole)
         below = listed_rent < BELOW_RANGE_RATIO * low
+        sizes = {plan.beds for plan in whole}
         return PriceResult(
             status=PriceStatus.BELOW_RANGE if below else PriceStatus.WITHIN_RANGE,
             listed_rent=listed_rent,
@@ -422,6 +423,8 @@ def check_price(
             record_max=high,
             n_floor_plans=len(whole),
             unit=unit_status,
+            # Named on the card only when every plan compared has the same bedroom count.
+            compared_beds=sizes.pop() if len(sizes) == 1 else None,
         )
 
     reference = record.rent_min if record.rent_min is not None else record.rent_median

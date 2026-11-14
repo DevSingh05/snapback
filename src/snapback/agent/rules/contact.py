@@ -10,9 +10,9 @@ Three comparisons, each a yes/no and nothing more:
 None of them proves anything about a person. A match never lifts "Allowed to rent it"
 (anyone can type a public name or number), and a mismatch holds a case, it does not fail one.
 
-What never leaves this module: a phone number, a digest of one, or the record's web address.
-The record keeps phones only as keyed hashes (`phone_digest`), the listing's numbers are
-hashed the same way to compare, and the result that travels on is a status.
+What never leaves this module: a phone number, a hash of one, or the record's web address.
+The record keeps the office phone only as a keyed hash (`phone_hash`), the listing's numbers
+are hashed the same way to compare, and the result that travels on is a status.
 """
 
 import hashlib
@@ -26,9 +26,9 @@ from typing import Protocol
 from snapback.contracts import (
     AuthorityResult,
     AuthorityStatus,
-    ContactStatus,
     DataSource,
-    LinkStatus,
+    LinkDomain,
+    PhoneMatch,
     PropertyRecord,
 )
 from snapback.settings import Settings, get_settings
@@ -85,7 +85,12 @@ class Claims(Protocol):
 
 
 def phone_salt(settings: Settings | None = None) -> str:
-    """The salt both lanes hash phones with. Lane D calls this when it reads the record."""
+    """The salt both lanes hash phones with. Lane D calls this when it reads the record.
+
+    With no SNAPBACK_PHONE_SALT set, a live run gets a salt that lasts as long as the process,
+    so the record must be hashed in the process that runs the check. To keep hashes on disk,
+    a human sets SNAPBACK_PHONE_SALT.
+    """
     settings = settings or get_settings()
     if settings.snapback_phone_salt is not None:
         return settings.snapback_phone_salt.get_secret_value()
@@ -94,11 +99,11 @@ def phone_salt(settings: Settings | None = None) -> str:
     return _PROCESS_SALT
 
 
-def phone_digest(number: str, salt: str) -> str | None:
+def phone_hash(number: str, salt: str) -> str | None:
     """A keyed hash of a ten-digit phone number, or None if `number` is not one.
 
-    HMAC-SHA256 over the digits, so the same number written two ways gives one digest and
-    the digest cannot be turned back into the number without the salt.
+    HMAC-SHA256 over the digits (a leading 1 is dropped), so the same number written two ways
+    gives one hash, and the hash cannot be turned back into the number without the salt.
     """
     digits = "".join(ch for ch in number[:64] if ch in "0123456789")
     if len(digits) == 11 and digits.startswith("1"):
@@ -108,12 +113,12 @@ def phone_digest(number: str, salt: str) -> str | None:
     return hmac.new(salt.encode(), digits.encode(), hashlib.sha256).hexdigest()
 
 
-def check_phone(phones: Sequence[str], record: PropertyRecord | None, salt: str) -> ContactStatus:
-    on_record = set(record.leasing_phone_digests) if record is not None else set()
-    listed = {phone_digest(number, salt) for number in phones[:MAX_PHONES]} - {None}
+def check_phone(phones: Sequence[str], record: PropertyRecord | None, salt: str) -> PhoneMatch:
+    on_record = record.site_phone_hash if record is not None else None
+    listed = {phone_hash(number, salt) for number in phones[:MAX_PHONES]} - {None}
     if not on_record or not listed:
-        return ContactStatus.NOT_CHECKED
-    return ContactStatus.MATCHES_RECORD if listed & on_record else ContactStatus.MISMATCH
+        return PhoneMatch.NOT_CHECKED
+    return PhoneMatch.YES if on_record in listed else PhoneMatch.NO
 
 
 # --- company -------------------------------------------------------------------------------
@@ -210,18 +215,18 @@ def _distance(a: str, b: str) -> int:
     return one_back[-1]
 
 
-def _compare(host: str, record_host: str) -> LinkStatus:
+def _compare(host: str, record_host: str) -> LinkDomain:
     name_before_at, _, where = host.rpartition("@")
     if where == record_host or where.endswith(f".{record_host}"):
-        return LinkStatus.RECORD_SITE
+        return LinkDomain.MATCHES
 
     name = _skeleton(_site_name(record_host))
     if _registrable(record_host) in SHARED_HOSTS or len(name) < MIN_SITE_NAME:
-        return LinkStatus.OTHER
+        return LinkDomain.OTHER
     if name_before_at and name in _skeleton(name_before_at):
-        return LinkStatus.LOOKALIKE
+        return LinkDomain.LOOKALIKE
     if _registrable(where) in SHARED_HOSTS:
-        return LinkStatus.OTHER
+        return LinkDomain.OTHER
 
     allowed = 1 if len(name) < 8 else 2
     for label in _labels(where):
@@ -229,25 +234,25 @@ def _compare(host: str, record_host: str) -> LinkStatus:
         whole = _skeleton(shown)
         # The same name with another ending, or with extra words around it.
         if name in whole:
-            return LinkStatus.LOOKALIKE
+            return LinkDomain.LOOKALIKE
         # A typo, a swapped pair, a look-alike letter: in the whole label or one word of it.
         for part in (whole, *(_skeleton(word) for word in shown.split("-"))):
             if abs(len(part) - len(name)) <= allowed and _distance(part, name) <= allowed:
-                return LinkStatus.LOOKALIKE
-    return LinkStatus.OTHER
+                return LinkDomain.LOOKALIKE
+    return LinkDomain.OTHER
 
 
-def check_link(links: Sequence[str], website: str | None) -> LinkStatus:
+def check_link(links: Sequence[str], website: str | None) -> LinkDomain:
     """The listing's links against the building's own site. A lookalike outweighs the rest."""
     record_host = host_of(website) if website else None
     hosts = [host for host in (host_of(link) for link in links[:MAX_LINKS]) if host]
     if not record_host or "@" in record_host or not hosts:
-        return LinkStatus.NOT_CHECKED
+        return LinkDomain.NOT_CHECKED
     found = {_compare(host, record_host) for host in hosts}
-    for status in (LinkStatus.LOOKALIKE, LinkStatus.RECORD_SITE):
+    for status in (LinkDomain.LOOKALIKE, LinkDomain.MATCHES):
         if status in found:
             return status
-    return LinkStatus.OTHER
+    return LinkDomain.OTHER
 
 
 # --- all three -----------------------------------------------------------------------------
@@ -267,7 +272,7 @@ def check_authority(claims: Claims, record: PropertyRecord | None, salt: str) ->
     company = same_company(claims.company, record.manager_company)
     if company is False:
         status = AuthorityStatus.MISMATCH
-    elif company or phone is ContactStatus.MATCHES_RECORD:
+    elif company or phone is PhoneMatch.YES:
         status = AuthorityStatus.MATCHES_RECORD
     else:
         status = AuthorityStatus.UNKNOWN
@@ -276,6 +281,6 @@ def check_authority(claims: Claims, record: PropertyRecord | None, salt: str) ->
         status=status,
         manager_on_record=record.manager_company,
         poster_said=claims.company,
-        phone=phone,
-        link=check_link(claims.links, record.website),
+        office_phone_match=phone,
+        link_domain=check_link(claims.links, record.website_host),
     )
