@@ -42,7 +42,9 @@ def from_the_string_table(text: str) -> bool:
 
 
 def test_there_are_three_cases_each_with_every_file():
-    assert demo_case_ids() == ["a", "b", "c"]
+    # the staged pack is exactly a, b, c; sourced replays (D8, #71) sit beside it as replay-*,
+    # as the pack's README says, and must be just as complete
+    assert [c for c in demo_case_ids() if not c.startswith("replay-")] == ["a", "b", "c"]
     for case_id in demo_case_ids():
         folder = DEMO_DIR / case_id
         for name in ("case.json", "listing.txt", "module_evidence.json", "property_record.json"):
@@ -356,4 +358,4 @@ def test_photos_of_a_building_with_no_scan_are_not_reported_as_no_photos():
 
 def test_the_demo_folder_holds_only_the_pack():
     names = {path.name for path in Path(DEMO_DIR).iterdir()}
-    assert names == {"README.md", "a", "b", "c"}
+    assert {n for n in names if not n.startswith("replay-")} == {"README.md", "a", "b", "c"}
