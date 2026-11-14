@@ -31,6 +31,7 @@ from snapback.agent import (
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
 from snapback.agent.join import JoinedModules, KitLookups, Lookups
+from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
@@ -301,10 +302,21 @@ def _deepagents_runner() -> Callable[[CaseSession], object]:
 
 
 class CaseStore:
-    def __init__(self, settings: Settings, lookups: Lookups | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        lookups: Lookups | None = None,
+        live_locate: LiveLocate | None = None,
+    ) -> None:
         self._settings = settings
         # Lane D's adapters: the record and the for-sale lookup (A10). The kit is read once.
         self._lookups = lookups or KitLookups(settings.snapback_data_source)
+        self._live_locate = live_locate or LiveLocate(
+            data_dir=settings.snapback_data_dir,
+            records=lambda: self._lookups.records().values(),
+            index_name=settings.snapback_locate_index,
+            budget_s=settings.snapback_locate_budget_s,
+        )
         self._cases: dict[str, RecordedCase | SessionCase] = {}
         self._lock = threading.Lock()
         self._memory: PhotoMemory | None = None
@@ -426,6 +438,10 @@ class CaseStore:
                     for_sale=for_sale,
                     salt=phone_salt(self._settings),
                     record_source=record.source if record else source,
+                    live_locate=self._live_locate if live else None,
+                    photo_bytes=photos,
+                    lookups=self._lookups,
+                    case_id=full_id,
                 )
             if self._settings.snapback_challenge == "reply" and not live:
                 # The poster's real reply is awaited and checked (A14). The listing photos
