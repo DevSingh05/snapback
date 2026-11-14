@@ -33,9 +33,12 @@ def run_case(
     """Run `case` until it has a verdict, or until it needs the renter and nobody can answer.
 
     Returns None when the case is paused for approval and `approver` is None. Record the
-    answer with `case.approve(...)` and call this again to carry on.
+    answer with `case.approve(...)` and call this again to carry on. It also returns None
+    while the poster's reply is awaited; give it to `case.reply(...)` and call this again.
     """
     while not case.done:
+        if case.step is Step.REPLY:
+            return None
         if case.step is Step.SPOT:
             case.draw_spot()
         elif case.step is Step.APPROVAL:

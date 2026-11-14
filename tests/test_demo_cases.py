@@ -124,8 +124,8 @@ def test_case_a_is_dont_pay_on_the_copied_reply_and_shows_every_other_finding():
         strings.text("here_now.forged_copy", n=2),
     )
     assert person["Allowed to rent it"][0] is CardTone.NOT_SHOWN
-    # The poster's own contact not matching the record is a red flag (ruling, Sat 01:20).
-    assert person["Contact on record"][0] is CardTone.RED_FLAG
+    # A number that is not the office's reads Not confirmed (ruling, Sat 02:10, #121).
+    assert person["Contact on record"][0] is CardTone.NOT_SHOWN
     assert person["Link"][0] is CardTone.RED_FLAG
     assert price["Rent vs record"] == (
         CardTone.HOLD,
@@ -156,13 +156,14 @@ def test_cases_a_and_b_are_the_same_listing():
 # --- (c) a house for sale, posted as a rental ----------------------------------------------
 
 
-def test_case_c_cannot_be_placed_and_says_the_house_is_for_sale():
+def test_case_c_is_held_because_the_house_is_for_sale():
     verdict, card = run_demo_case("c")
-    # For sale is a red flag, not proof, and there is no 3D scan to place the photos in.
-    assert verdict.state is VerdictState.UNVERIFIED
+    # For sale is a red flag, not proof, so this is never "don't pay". It outranks "could not
+    # place" (conductor ruling, Sat 02:00): there is no 3D scan of the house to place photos in.
+    assert verdict.state is VerdictState.HOLD
     assert verdict.reasons == [
-        strings.text("reason.not_indexed"),
         strings.text("reason.for_sale"),
+        strings.text("reason.not_indexed"),
     ]
     place = lines(card, CardRowKind.PLACE)
     assert place["Real"] == (CardTone.NOT_CHECKED, strings.text("place.not_indexed"))
@@ -274,7 +275,7 @@ def test_with_the_flag_a_post_with_no_text_runs_the_staged_listing(tmp_path):
 def test_with_the_flag_the_for_sale_house_finishes_without_a_challenge(tmp_path):
     client = client_for(tmp_path, "c")
     case = client.post("/cases", data={}).json()
-    assert case["status"] == "done" and case["state"] == "unverified"
+    assert case["status"] == "done" and case["state"] == "hold"
     card = client.get(f"/cases/{case['case_id']}/card").json()
     assert "For sale" in [line["label"] for line in card["rows"][0]["lines"]]
 
@@ -292,6 +293,44 @@ def test_with_the_flag_text_the_presenter_pastes_is_what_gets_read(tmp_path):
     said = json.dumps(card)
     assert "Zelle before a viewing. Red flag." in said  # the pasted text was read
     assert card["state"] == "dont_pay"  # and the staged photo evidence still decides
+
+
+def test_the_flag_in_live_mode_gives_only_the_listing_and_says_so_at_start(tmp_path, caplog):
+    # XO review of #101: easy to set both and expect the staged cards on demo day.
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        made = Settings(
+            _env_file=None,
+            snapback_data_dir=tmp_path,
+            demo_case="a",
+            snapback_data_source="live",
+        )
+        client = TestClient(create_app(made))
+    warned = " ".join(record.getMessage() for record in caplog.records)
+    assert "DEMO_CASE=a" in warned and "Not checked" in warned
+
+    case = client.post("/cases", data={}).json()
+    assert (case["status"], case["source"]) == ("done", "live")
+    card = client.get(f"/cases/{case['case_id']}/card").json()
+    assert card["state"] == "unverified"  # not the staged "don't pay": no stand-in is used
+    tones = {line["label"]: line["tone"] for row in card["rows"] for line in row["lines"]}
+    assert tones["Real"] == "not_checked" and tones["Here now"] == "not_checked"
+    assert card["footer"][0].startswith("Staged example.")  # the listing is still staged
+
+
+def test_the_flag_in_fixture_mode_logs_no_warning(tmp_path, caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        client_for(tmp_path, "a")
+    assert not [record for record in caplog.records if "DEMO_CASE" in record.getMessage()]
+
+
+def test_the_readme_says_what_the_flag_does_in_each_mode():
+    readme = (DEMO_DIR / "README.md").read_text()
+    assert "SNAPBACK_DATA_SOURCE=fixture" in readme and "SNAPBACK_DATA_SOURCE=live" in readme
+    assert "supplies only the listing text" in readme
 
 
 def test_without_the_flag_nothing_changes(tmp_path):

@@ -50,6 +50,9 @@ class Listing(BaseModel):
     scope: ListingScope = ListingScope.RENTAL
     photos: int = 0
     screenshots: int = 0
+    # Which of the images given were counted as photos, by position. The bytes are not kept
+    # here; whoever holds them uses this to know which ones are listing photos.
+    photo_indexes: list[int] = Field(default_factory=list)
     injection_spans: list[str] = Field(default_factory=list)
     ocr_available: bool = True
     # There was more text than is read (`MAX_TEXT_CHARS`). What came after it was not checked.
@@ -67,7 +70,8 @@ def read_listing(
     photos = screenshots = 0
     ocr_available = True
 
-    for image in images:
+    photo_indexes: list[int] = []
+    for position, image in enumerate(images):
         try:
             seen = ocr(image).strip()
         except OcrUnavailable:
@@ -81,6 +85,7 @@ def read_listing(
             parts.append(seen)
         else:
             photos += 1
+            photo_indexes.append(position)
 
     # Cut and folded before any pattern runs: the text is written by the person being checked.
     sent = "\n".join(parts)
@@ -102,6 +107,7 @@ def read_listing(
         scope=detect_scope(full_text),
         photos=photos,
         screenshots=screenshots,
+        photo_indexes=photo_indexes,
         injection_spans=injections,
         ocr_available=ocr_available,
         truncated=truncated,

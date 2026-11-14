@@ -75,6 +75,8 @@ def describe(case: CaseSession) -> str:
         return json.dumps({"next": "call draw_spot"})
     if case.step is Step.APPROVAL:
         return json.dumps({"next": "call send_challenge, then wait for the renter"})
+    if case.step is Step.REPLY:
+        return json.dumps({"waiting": "the poster has not replied yet; nothing to do now"})
     return json.dumps({"finished": True})
 
 
@@ -150,6 +152,8 @@ def run_case_with_agent(
     To carry on after a pause, record the answer with `case.approve(...)` and call this again
     with the same agent and thread id.
     """
+    if case.step is Step.REPLY:
+        return None  # the poster has not replied; there is nothing for a model to choose
     config = {
         "configurable": {"thread_id": thread_id or case.case_id},
         "recursion_limit": RECURSION_LIMIT,

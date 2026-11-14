@@ -2,12 +2,14 @@
 
 Routes the web app and the iMessage sidecar call:
 
-    POST /cases                           start a check (form: link, text, renter_id, photos)
+    POST /cases                           start a check (form: link, text, renter_id,
+                                          property_id, photos)
     GET  /cases/{case_id}                 where the case stands
     GET  /cases/{case_id}/card            the Card (?lang=en|es)
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
+    POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /healthz                         liveness and the data source
     POST /verdict                         decide() on evidence the caller already has
@@ -20,8 +22,10 @@ challenge and is the only one accepted as `?token=`, because servers log address
 """
 
 import asyncio
+import re
 import secrets
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -31,26 +35,55 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
-from snapback.agent.intake import read_listing
+from snapback.adapters.vexcel import aerial_proof, aerial_side
+from snapback.agent.intake import OcrUnavailable, read_listing
+from snapback.agent.join import KitLookups, KitMissing, Lookups
+from snapback.agent.reply import UnreadablePhoto
+from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
-    LiveModeNotWired,
     NothingWaiting,
     RecordedCase,
     SessionCase,
+    UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
+from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
-from snapback.card.render import render_card_png
-from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
+from snapback.contracts import (
+    AerialProofResponse,
+    AerialSideOut,
+    Card,
+    CreateCaseResponse,
+    DataSource,
+    Evidence,
+    LocateStatus,
+    ReplyResponse,
+    Verdict,
+)
+from snapback.safety.paths import resolve_data_dir
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
+# Our ids for records: short, and nothing that could be a path or a sentence.
+PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
+# What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
+# Nothing else is accepted, so a raw phone number or a name can never be stored as one.
+RENTER_ID = re.compile(r"imsg-[0-9a-f]{24}")
+# What a browser is known by: the client cookie this API issued.
+COOKIE_ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
+# Everything a case may be registered under.
+OWNER = re.compile(r"imsg-[0-9a-f]{24}|browser:[A-Za-z0-9_-]{8,64}")
+_DEFAULT = object()
+
+
+class NotRegistered(Exception):
+    """The case could not be recorded with its renter, so it must not be started."""
 
 
 Language = Literal["en", "es"]
@@ -67,6 +100,10 @@ def _after(last_event_id: str | None) -> int:
         return int(last_event_id) if last_event_id is not None else -1
     except ValueError:
         return -1
+
+
+NO_TILE = "No aerial tile for this building."
+AerialDirection = Literal["north", "east", "south", "west", "nadir"]
 
 
 def _bearer(authorization: str | None, case_token: str | None) -> str | None:
@@ -100,15 +137,28 @@ async def _trace_stream(
                 quiet = 0.0
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    lookups: Lookups | None = None,
+    *,
+    registry: CaseRegistry | None | object = _DEFAULT,
+) -> FastAPI:
+    """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
+    started each case; the default is lane D's safety store."""
     settings = settings or get_settings()
-    store = CaseStore(settings)
+    # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
+    lookups = lookups or KitLookups(settings.snapback_data_source)
+    store = CaseStore(settings, lookups)
+    if registry is _DEFAULT:
+        registry = SafetyRegistry(settings.snapback_data_dir)
     # One allowance per renter or per browser, and a ceiling per network address so that
     # clearing cookies is not a way around it.
     per_client = DailyLimit(settings.snapback_daily_limit)
     per_address = DailyLimit(settings.snapback_daily_limit_per_address)
     max_photo_bytes = settings.snapback_max_photo_mb * MB
     limit_reached = f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow."
+
+    pictures = CardPictures()
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -130,6 +180,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def find(case_id: str) -> RecordedCase | SessionCase:
         case = store.get(case_id)
         if case is None:
+            raise HTTPException(status_code=404, detail="No case with that id.")
+        # A case the renter deleted (lane D's delete, run from anywhere) is no longer
+        # registered. Forget it here too, so it is not served from memory until a restart.
+        owner = getattr(case, "owner", None)
+        deleted = (
+            registry is not None
+            and owner is not None
+            and case.session.case_id not in registry.cases_of(owner)
+        )
+        if deleted:
+            store.discard(case_id)
             raise HTTPException(status_code=404, detail="No case with that id.")
         return case
 
@@ -181,12 +242,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
-    def start_case(text: str, link: str, photos: list[UploadFile]) -> SessionCase:
+    def start_case(
+        text: str, link: str, photos: list[UploadFile], property_id: str | None, owner: str
+    ) -> SessionCase:
+        if property_id is not None and not PROPERTY_ID.fullmatch(property_id):
+            raise HTTPException(status_code=422, detail="That is not one of our building ids.")
+
+        def register(case_id: str) -> None:
+            # So lane D's delete finds every case this renter started (A11).
+            if registry is None:
+                return
+            try:
+                registry.register_case(case_id, owner)
+            except Exception:
+                raise NotRegistered from None
+
         images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
         listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
-        return store.create(read_listing(listing_text, images))
+        try:
+            listing = read_listing(listing_text, images)
+            listing_photos = [images[index] for index in listing.photo_indexes]
+            case = store.create(listing, property_id, register, photos=listing_photos)
+            case.owner = owner if registry is not None else None
+            return case
+        except NotRegistered:
+            raise HTTPException(
+                status_code=503,
+                detail="The check could not be recorded, so it was not started. Try again.",
+            ) from None
+        except UnknownProperty:
+            raise HTTPException(
+                status_code=422, detail="We hold no record for that building id."
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
 
     @app.post(
         "/cases",
@@ -201,6 +292,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 "link": {"type": "string"},
                                 "text": {"type": "string"},
                                 "renter_id": {"type": "string"},
+                                "property_id": {"type": "string"},
                                 "photos": {
                                     "type": "array",
                                     "items": {"type": "string", "format": "binary"},
@@ -217,31 +309,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         The form is `CreateCaseRequest` in contracts.py plus `photos` as files, which may be
         listing photos or screenshots of the listing. The link is read as part of the
-        listing's text and is never fetched.
+        listing's text and is never fetched. `property_id` is our id for the building the
+        listing claims; with it the check runs on that building's record (422 if we hold
+        none, 503 if the kit is not on this server).
         """
-        try:
-            store.check_can_create()
-        except LiveModeNotWired:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Live mode needs the locate, record and challenge modules, which are "
-                    "not wired yet. Run with SNAPBACK_DATA_SOURCE=fixture."
-                ),
-            ) from None
-
         form = await parse_form(request, settings.snapback_max_photos, max_photo_bytes)
         try:
             text, link, renter_id = (
                 str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
+            property_id = str(form.get("property_id") or "").strip() or None
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
+            if renter_id and not RENTER_ID.fullmatch(renter_id):
+                raise HTTPException(status_code=422, detail="That is not a renter id.")
 
             # Who is asking. The sidecar names its renter; a browser is known by a cookie.
             address = request.client.host if request.client else "unknown"
             cookie = request.cookies.get(CLIENT_COOKIE)
+            if cookie is not None and not COOKIE_ID.fullmatch(cookie):
+                cookie = None  # not one we issued; a fresh one is set below
             new_cookie = None if renter_id or cookie else secrets.token_urlsafe(16)
             client = f"renter:{renter_id}" if renter_id else f"browser:{cookie or new_cookie}"
+            # Who the case is registered under, for delete: the sidecar's own renter id as
+            # it sent it, or the browser's client cookie.
+            owner = renter_id or client
+            if not OWNER.fullmatch(owner):  # cannot happen with the checks above
+                raise HTTPException(status_code=422, detail="That is not a renter id.")
 
             # A place is taken before the check starts, in one step, so two requests arriving
             # together cannot both take the last one. It is given back if nothing starts.
@@ -251,7 +344,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 per_client.release(client)
                 raise HTTPException(status_code=429, detail=limit_reached)
             try:
-                case = await run_in_threadpool(start_case, text, link, photos)
+                case = await run_in_threadpool(start_case, text, link, photos, property_id, owner)
             except BaseException:
                 per_client.release(client)
                 per_address.release(address)
@@ -295,10 +388,126 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return find(case_id).card(settings.snapback_public_base_url, lang)
 
     @app.get("/cases/{case_id}/card.png")
-    def get_card_png(case_id: str, lang: Language = "en") -> Response:
-        """The same card drawn as a PNG, with the verify link as a QR code."""
+    def get_card_png(
+        case_id: str,
+        lang: Language = "en",
+        if_none_match: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """The same card drawn as a PNG, with the verify link as a QR code.
+
+        Each distinct card is drawn once and kept. The reply carries an `ETag`; send it back
+        as `If-None-Match` and an unchanged picture comes back as 304 with no body.
+        """
         card = find(case_id).card(settings.snapback_public_base_url, lang)
-        return Response(content=render_card_png(card), media_type="image/png")
+        tag = f'"{pictures.etag(card)}"'
+        headers = {"ETag": tag, "Cache-Control": "no-cache"}
+        if if_none_match is not None and tag in if_none_match:
+            return Response(status_code=304, headers=headers)
+        return Response(content=pictures.png(card), media_type="image/png", headers=headers)
+
+    # --- D9 aerial proof (lane D builder in adapters/vexcel.py; contract approved on #41) ---
+
+    def kit_records_for_aerial() -> dict | None:
+        """The shared lookups' parsed kit, when they offer one (a test stand-in may not)."""
+        records = getattr(lookups, "records", None)
+        if not callable(records):
+            return None
+        try:
+            return records()
+        except KitMissing:
+            return {}  # live mode without the kit: no buildings, so no tiles, never a 500
+
+    def matched_id_of(case: RecordedCase | SessionCase) -> str | None:
+        """The building a photo was located in when it was not the claimed one (V2)."""
+        locate = case.evidence.locate
+        for photo in locate.photos if locate is not None else []:
+            if photo.status == LocateStatus.LOCATED_ELSEWHERE:
+                found = getattr(photo, "matched_property_id", None)
+                if found:
+                    return found
+        return None
+
+    def aerial_for(case: RecordedCase | SessionCase, case_id: str, direction: str):
+        """The two buildings for this case. The claimed one is the case's property id (A10); the
+        matched one is a photo located in another building (V2). Either may be missing."""
+        return aerial_proof(
+            case_id,
+            case.evidence.source,
+            case.property_id,
+            matched_id_of(case),
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+            image_url=lambda side: f"/cases/{case_id}/aerial/{side}.jpg?direction={direction}",
+        )
+
+    @app.get("/cases/{case_id}/aerial")
+    def get_aerial(
+        case_id: str,
+        direction: AerialDirection = "north",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> AerialProofResponse:
+        """The claimed building and the one the photos matched, from the air, with the distance.
+
+        Cases are private: this needs the case's read token in a header. Each tile is bounded at
+        20 s and cached for 7 days under data/vexcel/ (`make purge` deletes it)."""
+        case = find(case_id)
+        # check_read answers 401 for a case that has a secret and got none; the recorded fixture
+        # case has no secret, so it is readable without one, as for the trace.
+        check_read(case, _bearer(authorization, x_case_token), None)
+        proof = aerial_for(case, case_id, direction)
+
+        # The image is served by our own route; the client never sees where it sits on disk.
+        # A trimmed copy, so the builder's own object is never changed.
+        def trimmed(side: AerialSideOut | None) -> AerialSideOut | None:
+            if side is None or side.tile is None:
+                return side
+            name = Path(side.tile.path).name
+            return side.model_copy(update={"tile": side.tile.model_copy(update={"path": name})})
+
+        return proof.model_copy(
+            update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
+        )
+
+    @app.get("/cases/{case_id}/aerial/{side}.jpg")
+    def get_aerial_image(
+        case_id: str,
+        side: Literal["claimed", "matched"],
+        direction: AerialDirection = "north",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """One live tile's bytes. The token goes in a header only (ruling on #113): lane T fetches
+        the image with the header and shows it through a blob URL. Only the side asked for is
+        fetched."""
+        case = find(case_id)
+        check_read(case, _bearer(authorization, x_case_token), None)
+        property_id = case.property_id if side == "claimed" else matched_id_of(case)
+        if property_id is None:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        tile = aerial_side(
+            case.evidence.source,
+            property_id,
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+        )
+        if tile is None or tile.source != DataSource.LIVE:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        tile_path = Path(tile.path).resolve()
+        data_root = resolve_data_dir(settings.snapback_data_dir).resolve()
+        if not tile_path.is_relative_to(data_root):
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        try:
+            content = tile_path.read_bytes()
+        except FileNotFoundError:  # purged between the JSON call and this one
+            raise HTTPException(status_code=404, detail=NO_TILE) from None
+        return Response(
+            content=content,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=600"},
+        )
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(
@@ -345,6 +554,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=409, detail="This case is not waiting for an approval."
             ) from None
         return case.status(with_challenge=True)
+
+    @app.post("/cases/{case_id}/reply")
+    async def post_reply(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> ReplyResponse:
+        """The photo the poster sent back, checked (A14). One image, in the form field `photo`.
+
+        Needs the case's write secret in a header, as the approval does. The photo is checked
+        on this machine: is it a copy of one of the listing's own photos, and is the code on
+        it? A copy is forged, whenever it arrives. A code that cannot be read is not proof:
+        another photo is asked for, up to the cap. A right code is not yet "proven": whether
+        it was taken at the spot needs locate, so it stays not confirmed. A reply that comes
+        too late and is not a copy is asked for again once. 409 unless a reply is awaited.
+        """
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        form = await parse_form(request, 1, max_photo_bytes)
+        try:
+            files = [item for item in form.getlist("photo") if isinstance(item, UploadFile)]
+            if len(files) != 1:
+                raise HTTPException(status_code=422, detail="Send one image as `photo`.")
+            [photo] = read_images(files, 1, max_photo_bytes)
+            try:
+                check = await run_in_threadpool(case.reply, photo)
+            except NothingWaiting:
+                raise HTTPException(
+                    status_code=409, detail="This case is not waiting for a reply."
+                ) from None
+            except UnreadablePhoto:
+                raise HTTPException(
+                    status_code=415, detail="That file is not a picture we can open."
+                ) from None
+            except OcrUnavailable:
+                raise HTTPException(
+                    status_code=503,
+                    detail="The reader for the code is not installed on this server.",
+                ) from None
+        finally:
+            await form.close()
+
+        status = case.status(with_challenge=True)
+        return ReplyResponse(
+            case_id=status.case_id,
+            source=status.source,
+            status=status.status,
+            check=check,
+            presence=case.presence(),
+            state=status.state,
+            challenge_text=status.challenge_text,
+        )
 
     @app.get("/eval/results.csv")
     def get_eval_results() -> Response:
