@@ -5,8 +5,10 @@
  * fake app and CI never needs an account. The SDK is loaded only when a project is configured.
  *
  * Hard rules, on top of handler.ts:
- * - SNAPBACK never texts first. The only send is `space.send`, on the space an inbound message
- *   came from, after that message. Outbound messages (our own echoes) are skipped.
+ * - SNAPBACK texts first ONLY in a thread that linked a Finder watch with "watch <code>"
+ *   (Vidyut's ruling R-M1, M10): at most 3 a day, and a stop word ends it for good (watch.ts). Every other send is `space.send`, on
+ *   the space an inbound message came from, after that message: every other thread stays
+ *   reply-only. Outbound messages (our own echoes) are skipped.
  * - Only allowlisted threads get anything back, and nothing is checked for any other thread.
  * - Nothing about a renter is logged: no thread id, no handle, no words. A thread that is not
  *   on the allowlist is logged by its keyed hash only, which is what the allowlist can hold.
@@ -20,6 +22,7 @@ import {
   type InboundMessage,
   type SidecarConfig,
 } from "./handler";
+import { answerCommand, type WatchBook } from "./watch";
 
 export type PhotonContent =
   | { type: "text"; text: string }
@@ -45,6 +48,8 @@ export type PhotonConfig = SidecarConfig & {
   quietMs?: number;
   /** A photo larger than this is not downloaded (SNAPBACK_MAX_PHOTO_MB). */
   maxPhotoBytes?: number;
+  /** Watch alerts (M10). Without it, "watch" and "stop" are read as any other text. */
+  watches?: WatchBook;
 };
 
 type Log = (line: string) => void;
@@ -141,6 +146,19 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
         `[sidecar] ignored a thread not on the allowlist (${renterId(space.id, config.renterSalt)})`,
       );
       continue;
+    }
+    if (config.watches) {
+      const answer = answerCommand(message.content, space, config.watches, config.webUrl, log);
+      if (answer !== null) {
+        // "watch <code>" and a stop word are answered at once, in the same thread, and never
+        // checked; a swipe-reply "stop" counts too
+        try {
+          await space.send(answer);
+        } catch {
+          log("[sidecar] a reply could not be sent");
+        }
+        continue;
+      }
     }
     const item = pending.get(space.id) ?? { space, texts: [], images: [] };
     // Stop the wait while this message is read, so a slow download cannot let the check go

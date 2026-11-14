@@ -25,7 +25,7 @@ vi.mock("../twin/useReducedMotion", () => ({ usePrefersReducedMotion: () => redu
 
 import { TwinView } from "../twin/TwinPage";
 import { FIXTURE_TOUR } from "./fixtureTour";
-import { AUTOPLAY_MS, TourView } from "./TourPage";
+import { TourView } from "./TourPage";
 
 beforeEach(() => {
   fakeSdk.Sweep.moveTo.mockClear();
@@ -57,6 +57,24 @@ describe("TourView in fixture mode (no SDK)", () => {
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
   });
 
+  it("reads top to bottom for a first visit, and the rail follows the stop on screen", async () => {
+    render(<TourView plan={FIXTURE_TOUR} />);
+    expect(screen.getByTestId("tour-intro")).toHaveTextContent(
+      `Walk it first.Press play to walk all ${FIXTURE_TOUR.stops.length} stops in 37 seconds, or pick Explore to look around yourself.`,
+    );
+    expect(screen.getByTestId("tour-next")).toHaveAttribute("href", FIXTURE_TOUR.links.tour_prep);
+    expect(screen.getByText(`Step 1 of ${FIXTURE_TOUR.stops.length}`)).toBeInTheDocument();
+    const lit = () =>
+      screen.getAllByTestId("rail-line").find((l) => l.getAttribute("aria-current") === "step")!;
+    expect(lit()).toHaveAttribute("data-agent", "record");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
+    expect(lit()).toHaveAttribute("data-agent", "place");
+    expect(screen.getByTestId("rail-here")).toHaveTextContent("Ad photo P2: 96 matching points.");
+    // The stop's name shows on the view and in the chapter row; the panel does not print it again.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveClass("sr-only");
+    expect(screen.getByTestId("walk-map")).not.toHaveTextContent("Kitchen");
+  });
+
   it("shows every fact with its source and the progress rail jumps to a room", async () => {
     render(<TourView plan={FIXTURE_TOUR} />);
     expect(screen.getByText(/Built in 1998/).parentElement).toHaveTextContent("CoStar record");
@@ -79,26 +97,24 @@ describe("TourView in fixture mode (no SDK)", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
-  it("autoplays about every 6 s, pauses on any interaction, and stops at the end", () => {
+  it("plays by itself like a video, pauses on any interaction with the page, and stops at the end", () => {
     vi.useFakeTimers();
     render(<TourView plan={FIXTURE_TOUR} />);
-    fireEvent.click(screen.getByRole("button", { name: /Autoplay off/ }));
-    expect(AUTOPLAY_MS).toBe(6000);
-    act(() => void vi.advanceTimersByTime(5900));
+    act(() => void vi.advanceTimersByTime(2000));
     expect(title()).toBe("Arrive outside");
-    act(() => void vi.advanceTimersByTime(200));
+    act(() => void vi.advanceTimersByTime(1000));
     expect(title()).toBe("Front door");
-    // Any interaction on the page pauses it.
+    // Any interaction with the rest of the page pauses it.
     fireEvent.pointerDown(screen.getByRole("heading", { level: 1 }));
-    expect(screen.getByRole("button", { name: /Autoplay off/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     act(() => void vi.advanceTimersByTime(20000));
     expect(title()).toBe("Front door");
-    // Resume and run to the end: it switches itself off on the last step.
-    fireEvent.click(screen.getByRole("button", { name: /Autoplay off/ }));
-    for (let i = 0; i < FIXTURE_TOUR.stops.length; i++)
-      act(() => void vi.advanceTimersByTime(AUTOPLAY_MS));
+    // Play runs to the end: it stops on the last step, with the one next action.
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    act(() => void vi.advanceTimersByTime(60000));
     expect(title()).toBe("Now see it in person");
-    expect(screen.getByRole("button", { name: /Autoplay off/ })).toBeDisabled();
+    expect(screen.getByTestId("wp-end")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play again" })).toBeInTheDocument();
   });
 });
 
@@ -149,9 +165,15 @@ describe("TourView with a mocked Showcase SDK", () => {
   it("shows the placeholder and says so when the loaded model holds none of the plan's sweeps", async () => {
     sweepIds.current = ["real-1", "real-2", "real-3", "real-4"];
     render(<TourView plan={FIXTURE_TOUR} sdkKey="k" modelId="m" />);
-    expect(await screen.findByTestId("wrong-model")).toHaveTextContent(
-      "The 3D view here is not this home's scan",
+    // No warning box over the walk: the drawing stays the walk, and the scan is offered whole.
+    expect(await screen.findByTestId("scan-offer")).toHaveTextContent(
+      "See a real 3D scan of this building",
     );
+    expect(screen.queryByTestId("wrong-model")).toBeNull();
+    expect(screen.queryByTitle("A real 3D scan")).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Open the scan" }));
+    expect(screen.getByTitle("A real 3D scan")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Close the scan" }));
     expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
     expect(screen.getByTitle("Matterport 3D view")).not.toBeVisible();
     // Never another home's sweeps in its place: no numbered stops, no flights.

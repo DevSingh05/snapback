@@ -8,3 +8,4 @@ data
 mp_out
 package-lock.json
 uv.lock
+fixtures/forensics

@@ -177,6 +177,7 @@ class PlaceDesk:
         est_seconds: Mapping[str, float] | None = None,
         covers_unshown: Mapping[str, bool] | None = None,
         retry_can_find_elsewhere: bool = True,
+        points: Mapping[str, EvidencePoints] | None = None,
     ) -> None:
         self.base = located
         self.searcher = searcher
@@ -203,7 +204,11 @@ class PlaceDesk:
             seen = dict.fromkeys(p.model_id for p in located.photos if p.model_id)
             self.scans = {f"S{i}": m for i, m in enumerate(seen, start=1)}
         self._scan_alias = {m: a for a, m in self.scans.items()}
-        self.rows = {p.photo_id: _Row(p) for p in located.photos}
+        # the base search's matched pairs (E2b): a photo no retry touches keeps them
+        base_points = dict(points or {})
+        self.rows = {
+            p.photo_id: _Row(p, points=base_points.get(p.photo_id)) for p in located.photos
+        }
         for row in self.rows.values():
             row.steps.append(
                 PlaceStep(option="base", chosen_by="policy", result=_result(row.location))
@@ -461,39 +466,15 @@ class PlaceDesk:
         )
 
     def evidence_file(self, case_id: str, source: DataSource) -> EvidenceFile:
-        t = self.thresholds
-        photos: list[EvidencePhoto] = []
-        for p in self.base.photos:
-            row = self.rows[p.photo_id]
-            loc = row.location
-            photos.append(
-                EvidencePhoto(
-                    alias=self.alias_of[p.photo_id],
-                    status=loc.status,
-                    inliers=loc.inliers,
-                    inlier_ratio=loc.inlier_ratio,
-                    spread=loc.spread,
-                    rival_ratio=loc.rival_ratio,
-                    bar_failed=loc.bar_failed,
-                    room_label=loc.room_label,
-                    scan_alias=self._scan_alias.get(loc.model_id or ""),
-                    searches=row.steps,
-                    points=row.points,
-                )
-            )
-        return EvidenceFile(
-            case_id=case_id,
-            source=source,
-            thresholds_version=self.base.thresholds_version or t.version,
-            bars={
-                "min_inliers": t.min_inliers,
-                "min_inlier_ratio": t.min_inlier_ratio,
-                "claimed_min_spread": t.claimed_min_spread,
-                "elsewhere_min_inliers": t.elsewhere_min_inliers,
-                "elsewhere_min_spread": t.elsewhere_min_spread,
-                "ambiguity_ratio": t.ambiguity_ratio,
-            },
-            photos=photos,
+        return write_evidence_file(
+            case_id,
+            source,
+            self.located(),
+            thresholds=self.thresholds,
+            points={pid: row.points for pid, row in self.rows.items() if row.points is not None},
+            steps={pid: row.steps for pid, row in self.rows.items()},
+            scans=self.scans,
+            thresholds_version=self.base.thresholds_version,
         )
 
     def bar_of(self, alias: str) -> int | float:
@@ -518,3 +499,57 @@ def _result(loc: PhotoLocation) -> Literal["placed", "not_placed", "elsewhere", 
     if loc.status is LocateStatus.LOCATED_ELSEWHERE:
         return "elsewhere"
     return "not_placed"
+
+
+def write_evidence_file(
+    case_id: str,
+    source: DataSource,
+    located: LocateResult,
+    *,
+    thresholds: Thresholds | None = None,
+    points: Mapping[str, EvidencePoints] | None = None,
+    steps: Mapping[str, list[PlaceStep]] | None = None,
+    scans: Mapping[str, str] | None = None,
+    thresholds_version: str | None = None,
+) -> EvidenceFile:
+    """The evidence file the code writes for the "How we know" drawer: every photo's
+    measurements, the bars they were held to, and its matched pairs (`points`, at most 48,
+    normalised to 0..1, E2b). Used with or without a retry desk. Aliases only (P1, S1)."""
+    t = thresholds or load_thresholds()
+    points = points or {}
+    steps = steps or {}
+    if scans:
+        scan_alias = {m: a for a, m in scans.items()}
+    else:
+        seen = dict.fromkeys(p.model_id for p in located.photos if p.model_id)
+        scan_alias = {m: f"S{i}" for i, m in enumerate(seen, start=1)}
+    photos = [
+        EvidencePhoto(
+            alias=f"P{number}",
+            status=loc.status,
+            inliers=loc.inliers,
+            inlier_ratio=loc.inlier_ratio,
+            spread=loc.spread,
+            rival_ratio=loc.rival_ratio,
+            bar_failed=loc.bar_failed,
+            room_label=loc.room_label,
+            scan_alias=scan_alias.get(loc.model_id or ""),
+            searches=list(steps.get(loc.photo_id, [])),
+            points=points.get(loc.photo_id),
+        )
+        for number, loc in enumerate(located.photos, start=1)
+    ]
+    return EvidenceFile(
+        case_id=case_id,
+        source=source,
+        thresholds_version=thresholds_version or located.thresholds_version or t.version,
+        bars={
+            "min_inliers": t.min_inliers,
+            "min_inlier_ratio": t.min_inlier_ratio,
+            "claimed_min_spread": t.claimed_min_spread,
+            "elsewhere_min_inliers": t.elsewhere_min_inliers,
+            "elsewhere_min_spread": t.elsewhere_min_spread,
+            "ambiguity_ratio": t.ambiguity_ratio,
+        },
+        photos=photos,
+    )

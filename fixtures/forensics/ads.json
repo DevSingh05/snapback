@@ -1,0 +1,5538 @@
+{
+ "ads": [
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 1,
+   "phone": "555-6835",
+   "photos": [
+    "ph-d789bebf2cff4534",
+    "ph-eda3669230209c54",
+    "ph-239ca45dc4f3b8b5",
+    "ph-65bb1353e8b8e0c4",
+    "ph-fb3dbc43f5b6403d",
+    "ph-9d142f3acf95f4a1"
+   ],
+   "posted_at": "2026-01-05",
+   "rent": 1755,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Westering. You will love a small balcony and off-street parking. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 2,
+   "phone": "555-2782",
+   "photos": [
+    "ph-78e09362726d6900",
+    "ph-1051d1e6e3ee1ad8",
+    "ph-5dbbcb869f890b15",
+    "ph-8d1b23c1e2d09787",
+    "ph-9cc1498dc938f73f",
+    "ph-2b19daeb56dbcd70",
+    "ph-19dbb546ce9e5a3d"
+   ],
+   "posted_at": "2026-01-07",
+   "rent": 1660,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Alder Flats. You will love a quiet courtyard and in-unit laundry. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 3,
+   "phone": "555-9707",
+   "photos": [
+    "ph-c427ab59568f5fc5",
+    "ph-d85baf8682289fdc",
+    "ph-61b65f294e40e9af",
+    "ph-4cdc8f595bd7a720",
+    "ph-91224d5353d8fa4e"
+   ],
+   "posted_at": "2026-01-07",
+   "rent": 1050,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Oakbend, off-street parking. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Kestrel Row",
+   "id": 4,
+   "phone": "555-4908",
+   "photos": [
+    "ph-36bb5e422d6db353",
+    "ph-625266cca491397d",
+    "ph-858ce9fb22e66f1e",
+    "ph-0b68fbea321304f0",
+    "ph-6b2d538b1e9af1b8"
+   ],
+   "posted_at": "2026-01-08",
+   "rent": 1750,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Kestrel Row. You will love a quiet courtyard and in-unit laundry. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 5,
+   "phone": "555-2509",
+   "photos": [
+    "ph-4c8610bd4b584a6b",
+    "ph-13e395d99df2f801",
+    "ph-0ea9dac2c78795b5",
+    "ph-eef777dd5c7a7984",
+    "ph-566976033f334f7e",
+    "ph-bd66b07038764af3",
+    "ph-28abe56235b8ccf4"
+   ],
+   "posted_at": "2026-01-09",
+   "rent": 975,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love a bright kitchen and high ceilings. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Westering",
+   "id": 6,
+   "phone": "555-2897",
+   "photos": [
+    "ph-46bafe98f5e4a366",
+    "ph-44e092bcc0159892",
+    "ph-e4b2e7913533edcd",
+    "ph-bc36f5f0b0017726"
+   ],
+   "posted_at": "2026-01-10",
+   "rent": 1315,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Westering. You will love new windows and a bright kitchen. Come see it first; the application fee is paid through our online portal.",
+   "title": "2 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 7,
+   "phone": "555-9259",
+   "photos": [
+    "ph-c4629ede51cccf3d",
+    "ph-4e9b3e4ccaffb77c",
+    "ph-b834954678998a34",
+    "ph-065eda1091b41897",
+    "ph-0a77062ed51fb533",
+    "ph-2f4ffe8dd73eae7c",
+    "ph-ef37f4d205ec6a59"
+   ],
+   "posted_at": "2026-01-10",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "1 bed apartment near the Millrace market: in-unit laundry, lots of closet space, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 8,
+   "phone": "555-2529",
+   "photos": [
+    "ph-129d10e8637bc793",
+    "ph-ec96c5e6678e0706",
+    "ph-e73b12bde3d80683",
+    "ph-2ab772a5029ca8d5"
+   ],
+   "posted_at": "2026-01-12",
+   "rent": 1655,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Fenwick Street, Alder Flats. Features high ceilings and hardwood floors. Come see it first; the application fee is paid through our online portal.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 9,
+   "phone": "555-5540",
+   "photos": [
+    "ph-b79ed11f2ebec93f",
+    "ph-3f74cfa4f242e079",
+    "ph-4173d023ab9dd9d0",
+    "ph-07564dfe909fcd17"
+   ],
+   "posted_at": "2026-01-12",
+   "rent": 1335,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Quarry Hill. You will love lots of closet space and a renovated bath. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 10,
+   "phone": "555-4198",
+   "photos": [
+    "ph-72afa6256d2bc080",
+    "ph-b293250c40b30803",
+    "ph-7ec79b6a2ea49542",
+    "ph-94cf35d77ebd866f",
+    "ph-ee5271a8f7a60fbc",
+    "ph-87a1add56cda93f7"
+   ],
+   "posted_at": "2026-01-13",
+   "rent": 1040,
+   "synthetic": true,
+   "text": "1 bed apartment near the Saltmarsh market: hardwood floors, a small balcony, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 11,
+   "phone": "555-2591",
+   "photos": [
+    "ph-9f73c917a3e4a1c1",
+    "ph-46d3ea282a965f5f",
+    "ph-c9720bf53a0bcbe8",
+    "ph-7c3d45b6561fc1c8",
+    "ph-3a2b6e5fec10eb8c"
+   ],
+   "posted_at": "2026-01-14",
+   "rent": 975,
+   "synthetic": true,
+   "text": "1 bed apartment near the Ashgrove market: a small balcony, a renovated bath, and a short walk to the bus. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 12,
+   "phone": "555-1394",
+   "photos": [
+    "ph-95d30e02d986084a",
+    "ph-571c0fd719342190",
+    "ph-0ca0f406ce6547bb",
+    "ph-afd555f5626d0a6d",
+    "ph-c2fa4aac73cfb977",
+    "ph-6a1fea54eccee418"
+   ],
+   "posted_at": "2026-01-15",
+   "rent": 1025,
+   "synthetic": true,
+   "text": "1 bed apartment near the Alder Flats market: a quiet courtyard, lots of closet space, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 13,
+   "phone": "555-2160",
+   "photos": [
+    "ph-3a2d0fb1e0e23d9f",
+    "ph-ec9d30c07c2e2b66",
+    "ph-253776a6eb0fd921",
+    "ph-7acad40e9dd5a41d",
+    "ph-e2384a212524f38b",
+    "ph-600b64a3b1f1e5ae",
+    "ph-5b16e028b4441eeb"
+   ],
+   "posted_at": "2026-01-17",
+   "rent": 1000,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Ashgrove. You will love new windows and a quiet courtyard. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 14,
+   "phone": "555-4528",
+   "photos": [
+    "ph-7124b0112ac012e7",
+    "ph-cbdc9a063fa868ee",
+    "ph-dadd65e9899189b8",
+    "ph-116d584d9f6a2234"
+   ],
+   "posted_at": "2026-01-17",
+   "rent": 1750,
+   "synthetic": true,
+   "text": "3 bed apartment near the Quarry Hill market: a quiet courtyard, hardwood floors, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 15,
+   "phone": "555-6009",
+   "photos": [
+    "ph-4ae282bab8adf87f",
+    "ph-93e606e88e5eedc9",
+    "ph-6ed9ba4b16b0c26d",
+    "ph-5d421bad32d77da3",
+    "ph-f3ecee114baa9251",
+    "ph-b43ce2ef5fac6dd4",
+    "ph-b98d81820b95da31"
+   ],
+   "posted_at": "2026-01-19",
+   "rent": 1745,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Harrow Street, Millrace. Features new windows and hardwood floors. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 16,
+   "phone": "555-5875",
+   "photos": [
+    "ph-f2704c8088ecd6e7",
+    "ph-cc48925f02c6053e",
+    "ph-74fb92f28a540e65",
+    "ph-4c5b06ad3ae814a1",
+    "ph-6910e2e0826ecc4d",
+    "ph-d6e1fc50757b1aca",
+    "ph-4aa06bdc80a7942b"
+   ],
+   "posted_at": "2026-01-19",
+   "rent": 1700,
+   "synthetic": true,
+   "text": "3 bed apartment near the Pelham Green market: lots of closet space, a renovated bath, and a short walk to the bus. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 4,
+   "hood": "Alder Flats",
+   "id": 17,
+   "phone": "555-6625",
+   "photos": [
+    "ph-37dd1e05eaff7dde",
+    "ph-772549c80e3e9c4e",
+    "ph-fc6059165958391e",
+    "ph-884d2e31e59147ee",
+    "ph-210ac3db9a2a2f35",
+    "ph-217eb5f64e2593a1",
+    "ph-ef4c5243fb387069"
+   ],
+   "posted_at": "2026-01-20",
+   "rent": 2020,
+   "synthetic": true,
+   "text": "4 bed apartment near the Alder Flats market: a renovated bath, lots of closet space, and a short walk to the bus. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "4 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 18,
+   "phone": "555-9799",
+   "photos": [
+    "ph-9b643938160f2721",
+    "ph-d2026c2fe4c66411",
+    "ph-543ef01bb07cdd88",
+    "ph-a9a431ef572310c4",
+    "ph-16ef5a4c82e03388"
+   ],
+   "posted_at": "2026-01-20",
+   "rent": 1115,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Millrace, a small balcony. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 19,
+   "phone": "555-2345",
+   "photos": [
+    "ph-0d27be67bd622b78",
+    "ph-6571f375fb576fe9",
+    "ph-d0d5ffdbda688fdb",
+    "ph-aafc08cabbdb4a17",
+    "ph-173a908d82de5e08"
+   ],
+   "posted_at": "2026-01-22",
+   "rent": 1340,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Oakbend, new windows. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 20,
+   "phone": "555-1341",
+   "photos": [
+    "ph-e0e0bf94d64c9fc9",
+    "ph-5f7584dfb8e2a177",
+    "ph-539f6da19824005c",
+    "ph-24fa1ecb73b09be6"
+   ],
+   "posted_at": "2026-01-25",
+   "rent": 1350,
+   "synthetic": true,
+   "text": "2 bed apartment near the Millrace market: a bright kitchen, hardwood floors, and a short walk to the bus. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 21,
+   "phone": "555-6699",
+   "photos": [
+    "ph-a491d875c9ee9e1f",
+    "ph-c2fd40c5f510fdbf",
+    "ph-2a052589a9dfb4c4",
+    "ph-d5ad33b79dab887a",
+    "ph-8f6de4a5d58b0781",
+    "ph-a21db43d75c8fb41"
+   ],
+   "posted_at": "2026-01-25",
+   "rent": 1985,
+   "synthetic": true,
+   "text": "4 bed apartment near the Saltmarsh market: in-unit laundry, new windows, and a short walk to the bus. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 22,
+   "phone": "555-3416",
+   "photos": [
+    "ph-92a70aed4a49f5b1",
+    "ph-7b3b806abab8e079",
+    "ph-34c20702479c49a0",
+    "ph-12c4007011af9d17",
+    "ph-4ca957cb365f36f8",
+    "ph-716e526da74d25f8",
+    "ph-bbefd4fce9196853"
+   ],
+   "posted_at": "2026-01-25",
+   "rent": 1100,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Saltmarsh with new windows and high ceilings. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 23,
+   "phone": "555-9199",
+   "photos": [
+    "ph-482d3425df609caf",
+    "ph-1fa42a71c471829e",
+    "ph-3fd672c20f279297",
+    "ph-161f251e4e5490e7",
+    "ph-ec746b5070540192",
+    "ph-7259f3741fec4e15",
+    "ph-cc4fafb6192e517f"
+   ],
+   "posted_at": "2026-01-26",
+   "rent": 2090,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Harrow Street, Millrace. Features off-street parking and a quiet courtyard. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 24,
+   "phone": "555-4288",
+   "photos": [
+    "ph-ef479cfde0880e3d",
+    "ph-69fb6c9cd0904011",
+    "ph-2ac7cbd30b7b66b3",
+    "ph-d4a4b26d060b8ed3",
+    "ph-273e905299956c59",
+    "ph-57f210be61dc583a"
+   ],
+   "posted_at": "2026-01-27",
+   "rent": 1985,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Oakbend with hardwood floors and new windows. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 25,
+   "phone": "555-6245",
+   "photos": [
+    "ph-6fa638c5274705bd",
+    "ph-ace7c7bd6c23f4a3",
+    "ph-ef54c2374eccd2b4",
+    "ph-760532c70547ac13",
+    "ph-12d3a772dd3ef458"
+   ],
+   "posted_at": "2026-01-28",
+   "rent": 1750,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Westering. You will love high ceilings and a renovated bath. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 26,
+   "phone": "555-6250",
+   "photos": [
+    "ph-dbed19a85dd162e9",
+    "ph-54f194d2aa7fef21",
+    "ph-0b201ec9980900e0",
+    "ph-8fc25cf351c8fdb2"
+   ],
+   "posted_at": "2026-01-30",
+   "rent": 2085,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Sparrow Street, Tern Point. Features off-street parking and a small balcony. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 27,
+   "phone": "555-5988",
+   "photos": [
+    "ph-9fbb17f25758ecf8",
+    "ph-9fcfdf9dc71a68ca",
+    "ph-3c9de2a75ccdbc97",
+    "ph-f9fa975e77dd87b5",
+    "ph-f27bb463c0ef6ee1",
+    "ph-9715b126e3f78250",
+    "ph-e9704cf090ce779f"
+   ],
+   "posted_at": "2026-01-30",
+   "rent": 1735,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Alder Flats. You will love a small balcony and new windows. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 28,
+   "phone": "555-8929",
+   "photos": [
+    "ph-90e2d2daa0bf8b40",
+    "ph-7de072645e65fc76",
+    "ph-4ca3c0bca8ce05e0",
+    "ph-5190dc10fd617357",
+    "ph-e7fe7ec211555449",
+    "ph-c9a9748005ef45d8"
+   ],
+   "posted_at": "2026-01-31",
+   "rent": 2090,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Oakbend. You will love a small balcony and new windows. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 29,
+   "phone": "555-4241",
+   "photos": [
+    "ph-9e750c22f9507269",
+    "ph-3ffecff65d946b37",
+    "ph-cb909f81cf97fb07",
+    "ph-dd20c48b39cc6362",
+    "ph-6a86b577280da70c",
+    "ph-1fc215e3deabd2dc",
+    "ph-382533a0e724be7f"
+   ],
+   "posted_at": "2026-02-01",
+   "rent": 1650,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Marlow Street, Tern Point. Features hardwood floors and a small balcony. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 2,
+   "hood": "Westering",
+   "id": 30,
+   "phone": "555-9884",
+   "photos": [
+    "ph-2218cda484f08419",
+    "ph-6f1a6546eef6a903",
+    "ph-eca0989f08960d6f",
+    "ph-133572cbe3f09abc",
+    "ph-669d7c8e317ef7c5"
+   ],
+   "posted_at": "2026-02-01",
+   "rent": 1385,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Westering. You will love new windows and off-street parking. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Westering"
+  },
+  {
+   "beds": 2,
+   "hood": "Westering",
+   "id": 31,
+   "phone": "555-4954",
+   "photos": [
+    "ph-b37b0f25520e2b1d",
+    "ph-feb1304117758607",
+    "ph-49a8679f936986f1",
+    "ph-e00030431f6014de",
+    "ph-9860ec06d7394155",
+    "ph-5b926693e1d804a3",
+    "ph-145befa6db60f06f"
+   ],
+   "posted_at": "2026-02-02",
+   "rent": 1430,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Westering with a renovated bath and lots of closet space. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Westering"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 32,
+   "phone": "555-1059",
+   "photos": [
+    "ph-86f4739c28a3408d",
+    "ph-3d4494b8e573388d",
+    "ph-32d93eb382ef7b21",
+    "ph-f2d13540851ee5df",
+    "ph-07991dffae8bc6b0",
+    "ph-22e86e1e464cfd90"
+   ],
+   "posted_at": "2026-02-03",
+   "rent": 2055,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Tilbury Street, Oakbend. Features high ceilings and lots of closet space. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Pelham Green",
+   "id": 33,
+   "phone": "555-5754",
+   "photos": [
+    "ph-3fae51fdb3dd199d",
+    "ph-18c23458e24ba6da",
+    "ph-50532383df9f56f1",
+    "ph-0b30a9f84cc6f649"
+   ],
+   "posted_at": "2026-02-03",
+   "rent": 1385,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Pelham Green. You will love in-unit laundry and a bright kitchen. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "2 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Saltmarsh",
+   "id": 34,
+   "phone": "555-5719",
+   "photos": [
+    "ph-4a7dc138e30a5ff1",
+    "ph-93bcc94fe81da220",
+    "ph-7862f34edc536ea0",
+    "ph-94555e585ae4613d",
+    "ph-de83f576a5208332",
+    "ph-b12bcac5e5b2a2b6"
+   ],
+   "posted_at": "2026-02-03",
+   "rent": 1690,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Tilbury Street, Saltmarsh. Features a renovated bath and a small balcony. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "3 BR in Saltmarsh"
+  },
+  {
+   "beds": 4,
+   "hood": "Westering",
+   "id": 35,
+   "phone": "555-2816",
+   "photos": [
+    "ph-03e85ee219e4fc02",
+    "ph-04373fbfb66b1237",
+    "ph-d691ec8e2bae7c63",
+    "ph-fc4e2bb913546eec",
+    "ph-d2a37a504461e3f9",
+    "ph-66d7679586ef6438"
+   ],
+   "posted_at": "2026-02-04",
+   "rent": 2080,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Westering. You will love in-unit laundry and new windows. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 36,
+   "phone": "555-7971",
+   "photos": [
+    "ph-63cac3a24373a5f0",
+    "ph-f143964c7994e4fb",
+    "ph-3db663c5e1017d36",
+    "ph-26f4cc06a04139d1"
+   ],
+   "posted_at": "2026-02-04",
+   "rent": 1095,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Pelham Green with lots of closet space and off-street parking. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 37,
+   "phone": "555-2650",
+   "photos": [
+    "ph-ca061b5b77c153fe",
+    "ph-546fb07ad0211133",
+    "ph-fef65f27c0c639fa",
+    "ph-10ba175071ea9910",
+    "ph-19b1d85b78808e18"
+   ],
+   "posted_at": "2026-02-04",
+   "rent": 675,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Millrace with high ceilings and hardwood floors. Zelle the deposit to hold the unit, I cannot show it until it arrives. Blessings, the Owner's Office.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Kestrel Row",
+   "id": 38,
+   "phone": "555-5577",
+   "photos": [
+    "ph-fdc6b35c7326b106",
+    "ph-12ac372debfd8ef3",
+    "ph-e18e9c66a4265af9",
+    "ph-0751b2940e60969a",
+    "ph-5db3cdc14b334ae5",
+    "ph-719b9cb41b6954a6"
+   ],
+   "posted_at": "2026-02-05",
+   "rent": 2090,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Fenwick Street, Kestrel Row. Features a renovated bath and in-unit laundry. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 39,
+   "phone": "555-5288",
+   "photos": [
+    "ph-f0abf283c6c36ce4",
+    "ph-11293bfd62f6977a",
+    "ph-7896f69018a94d88",
+    "ph-1c4b1341762cadc0",
+    "ph-68e22d9c000df6eb"
+   ],
+   "posted_at": "2026-02-05",
+   "rent": 1035,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Harrow Street, Tern Point. Features lots of closet space and new windows. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 40,
+   "phone": "555-4481",
+   "photos": [
+    "ph-5d429c197b0bf699",
+    "ph-2354d66c1951faf9",
+    "ph-c26d28ef9e5e7bae",
+    "ph-67ebba8cddf1d4e7"
+   ],
+   "posted_at": "2026-02-05",
+   "rent": 1025,
+   "synthetic": true,
+   "text": "1 bed apartment near the Pelham Green market: hardwood floors, in-unit laundry, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 41,
+   "phone": "555-9290",
+   "photos": [
+    "ph-76845e8f1de7962c",
+    "ph-e9d4b926c312fc79",
+    "ph-3e088c52435895fd",
+    "ph-657dad555da35288",
+    "ph-7c655b4173717277",
+    "ph-29c1485fe7c5b86b"
+   ],
+   "posted_at": "2026-02-05",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Westering with in-unit laundry and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 42,
+   "phone": "555-1762",
+   "photos": [
+    "ph-062278d4d57c64ba",
+    "ph-88f3fe09a5e8e9e7",
+    "ph-4bf8433a5bb915c8",
+    "ph-0853b6dccdc1d63b",
+    "ph-01d194930f7f423b",
+    "ph-75cd8e38da419bd2",
+    "ph-92d164c6840287db"
+   ],
+   "posted_at": "2026-02-05",
+   "rent": 1020,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love off-street parking and a renovated bath. Come see it first; the application fee is paid through our online portal.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 43,
+   "phone": "555-6799",
+   "photos": [
+    "ph-0d68352e8cf7b970",
+    "ph-760c474237e0d8f1",
+    "ph-16a088f61a5c979f",
+    "ph-8a88224bcbcf32f9",
+    "ph-2a68b70c4a879e39",
+    "ph-07b552d449c0373e"
+   ],
+   "posted_at": "2026-02-07",
+   "rent": 1435,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Alder Flats. You will love a quiet courtyard and a bright kitchen. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 2,
+   "hood": "Tern Point",
+   "id": 44,
+   "phone": "555-2380",
+   "photos": [
+    "ph-9348058815739b0a",
+    "ph-77ae0b994ca24316",
+    "ph-f248292b90141f90",
+    "ph-73c71894e907dec9",
+    "ph-c64ca82954ed901d",
+    "ph-6552032d7a1bfc07",
+    "ph-9b4c9e12da74751f"
+   ],
+   "posted_at": "2026-02-07",
+   "rent": 1445,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Tern Point with new windows and a renovated bath. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "2 BR in Tern Point"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 45,
+   "phone": "555-1117",
+   "photos": [
+    "ph-2c9d7f36f1a92dea",
+    "ph-8eb8c47ffeb85e80",
+    "ph-a62a0da5fa03381a",
+    "ph-b4d4362f8c34c88f",
+    "ph-e2ec705baabab249"
+   ],
+   "posted_at": "2026-02-08",
+   "rent": 890,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Tilbury Street, Saltmarsh. Features a renovated bath and new windows. Zelle the deposit to hold the unit, I cannot show it until it arrives. Blessings, the Owner's Office.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Tern Point",
+   "id": 46,
+   "phone": "555-7215",
+   "photos": [
+    "ph-29dbc1504723fa96",
+    "ph-e88ef55881bbdf6d",
+    "ph-7e2642be2ab0d201",
+    "ph-b5bc265706fd1b61"
+   ],
+   "posted_at": "2026-02-09",
+   "rent": 1435,
+   "synthetic": true,
+   "text": "2 bed apartment near the Tern Point market: high ceilings, a renovated bath, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "2 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 47,
+   "phone": "555-5502",
+   "photos": [
+    "ph-addcca27221d80ef",
+    "ph-678796ac7ae52607",
+    "ph-9e392efbd05e7fd3",
+    "ph-65d8ac3ca3006445",
+    "ph-737872853eb5d0e7",
+    "ph-51ec6c21a140b35f"
+   ],
+   "posted_at": "2026-02-09",
+   "rent": 1015,
+   "synthetic": true,
+   "text": "1 bed apartment near the Alder Flats market: in-unit laundry, a renovated bath, and a short walk to the bus. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 48,
+   "phone": "555-5098",
+   "photos": [
+    "ph-d4a4ee9014cb2b45",
+    "ph-78cf0453cd67fa66",
+    "ph-f224592ae0c812c2",
+    "ph-a7137935b7d8c200",
+    "ph-13a7b6f14cb614a6",
+    "ph-75b7a8bc39a0b05c"
+   ],
+   "posted_at": "2026-02-09",
+   "rent": 1990,
+   "synthetic": true,
+   "text": "4 bed apartment near the Pelham Green market: a bright kitchen, a small balcony, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 49,
+   "phone": "555-4279",
+   "photos": [
+    "ph-e306b0acd541be2e",
+    "ph-5a8f281009e9c606",
+    "ph-ee07ccaafc29f8a6",
+    "ph-d09cd50c8d2d69e9",
+    "ph-a6b8089977fae736"
+   ],
+   "posted_at": "2026-02-09",
+   "rent": 975,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Linden Street, Kestrel Row. Features a small balcony and new windows. Come see it first; the application fee is paid through our online portal.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 50,
+   "phone": "555-1803",
+   "photos": [
+    "ph-d2af21cf62541b19",
+    "ph-e20fb3299aa7929b",
+    "ph-518361caa0d5ef3c",
+    "ph-32890ad5e9475fa6",
+    "ph-86397d10c870f337"
+   ],
+   "posted_at": "2026-02-10",
+   "rent": 1690,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Alder Flats, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 51,
+   "phone": "555-9799",
+   "photos": [
+    "ph-69af8773b799640c",
+    "ph-13a6576326a03b95",
+    "ph-af219191c44db6c1",
+    "ph-87dd893ce0a8c3bc",
+    "ph-bf6cf30921b60a0e"
+   ],
+   "posted_at": "2026-02-10",
+   "rent": 1630,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Oakbend, a small balcony. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Saltmarsh",
+   "id": 52,
+   "phone": "555-2650",
+   "photos": [
+    "ph-2c9d7f36f1892dea",
+    "ph-8eb8c47ffeb85e84",
+    "ph-a62a0d857e43381a",
+    "ph-b4d43f2e8cb4c88f",
+    "ph-62ec705baabab24d"
+   ],
+   "posted_at": "2026-02-10",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Linden Street, Saltmarsh. Features a quiet courtyard and new windows. Kindly remit the holding amount ahead of receiving the keys.",
+   "title": "3 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 53,
+   "phone": "555-9707",
+   "photos": [
+    "ph-f41c4615ab3d3c8f",
+    "ph-6141d6feaba3030d",
+    "ph-865ed6c148440696",
+    "ph-33548b721096bf9f",
+    "ph-f721b570aaf18276"
+   ],
+   "posted_at": "2026-02-11",
+   "rent": 1325,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Alder Flats, high ceilings. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 54,
+   "phone": "555-3463",
+   "photos": [
+    "ph-814e2f437a359d18",
+    "ph-5b4f0c046cb732a4",
+    "ph-9aa3a89a6403bd4e",
+    "ph-d96622adf51872c0",
+    "ph-552534e9268e3fcb",
+    "ph-5a7cbec29d7456c2",
+    "ph-c344d6329b0770d6"
+   ],
+   "posted_at": "2026-02-12",
+   "rent": 1645,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Millrace. You will love new windows and in-unit laundry. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 55,
+   "phone": "555-4785",
+   "photos": [
+    "ph-71a50077d059319a",
+    "ph-4395e23d6a742acd",
+    "ph-ddea9154adea0862",
+    "ph-c672222302cfb39d",
+    "ph-939a34ee1d57550a",
+    "ph-c4f3c0ed39d02096",
+    "ph-92535f14dab6ffa4"
+   ],
+   "posted_at": "2026-02-12",
+   "rent": 1720,
+   "synthetic": true,
+   "text": "3 bed apartment near the Tern Point market: a quiet courtyard, a bright kitchen, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 56,
+   "phone": "555-2345",
+   "photos": [
+    "ph-03f02fffaffdacd8",
+    "ph-bb4a9d8fb2934952",
+    "ph-9862f0e6c0a7c8bd",
+    "ph-efa22cc88d27bfde",
+    "ph-c90e1cec99725be9"
+   ],
+   "posted_at": "2026-02-13",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Kestrel Row, off-street parking. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 57,
+   "phone": "555-2650",
+   "photos": [
+    "ph-3e9dff36f1892dea",
+    "ph-8eb8c47fffb85ea4",
+    "ph-a62a09a5fe03381a",
+    "ph-b4d4374f8cb4489f",
+    "ph-e2ec705baabab249"
+   ],
+   "posted_at": "2026-02-13",
+   "rent": 655,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Alder Flats with a bright kitchen and in-unit laundry. You will pay the reservation sum before moving in, then I post the key set to you.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 58,
+   "phone": "555-9174",
+   "photos": [
+    "ph-b0efc9a182f31281",
+    "ph-e5993cf14b8ae988",
+    "ph-175b35ebae619908",
+    "ph-e161c71e117f9904",
+    "ph-d4a19d31018e82df",
+    "ph-eaca73ed770c9b0c",
+    "ph-54d23f1b068f9a89"
+   ],
+   "posted_at": "2026-02-14",
+   "rent": 980,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love new windows and a renovated bath. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 59,
+   "phone": "555-8325",
+   "photos": [
+    "ph-59da8d715e043368",
+    "ph-94edec5404b13faa",
+    "ph-93f775deefc8f2be",
+    "ph-1ec62a2306d29e23",
+    "ph-b8ccecadbefd07b3"
+   ],
+   "posted_at": "2026-02-14",
+   "rent": 1445,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Saltmarsh. You will love a renovated bath and a small balcony. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Pelham Green",
+   "id": 60,
+   "phone": "555-4643",
+   "photos": [
+    "ph-70b51366e58556cb",
+    "ph-8c6010844d5f103c",
+    "ph-eddc166b9d0460cd",
+    "ph-13ae6436d4cef5eb",
+    "ph-294d2bb0592a4ff1",
+    "ph-ef0f057ba7ff6163",
+    "ph-f100110483b560e8"
+   ],
+   "posted_at": "2026-02-14",
+   "rent": 1365,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Tilbury Street, Pelham Green. Features lots of closet space and new windows. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "2 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 61,
+   "phone": "555-2211",
+   "photos": [
+    "ph-bb4b8efd1c18d908",
+    "ph-dd21398ad596f187",
+    "ph-30f1d1c0f98d9d41",
+    "ph-5ab67311628e91a2",
+    "ph-e3cdc11c29e0d2a5"
+   ],
+   "posted_at": "2026-02-15",
+   "rent": 1005,
+   "synthetic": true,
+   "text": "1 bed apartment near the Quarry Hill market: a small balcony, hardwood floors, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 62,
+   "phone": "555-5355",
+   "photos": [
+    "ph-4b8742e3d9d7ca7c",
+    "ph-203c55ea1d4172d4",
+    "ph-eb8ee80c6a0dafdc",
+    "ph-b352aec55b688192"
+   ],
+   "posted_at": "2026-02-16",
+   "rent": 1010,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Cobble Street, Kestrel Row. Features a renovated bath and a small balcony. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 63,
+   "phone": "555-6187",
+   "photos": [
+    "ph-0457ad8264cfbf5d",
+    "ph-f767ec60902a307d",
+    "ph-93c395940ab64c8e",
+    "ph-52fe1f09c6f1e402",
+    "ph-bbf947e37392f16d"
+   ],
+   "posted_at": "2026-02-16",
+   "rent": 1385,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Oakbend, hardwood floors. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 64,
+   "phone": "555-3702",
+   "photos": [
+    "ph-ebde20e843ff4228",
+    "ph-a6d20fe6768bcd50",
+    "ph-2fbe045bb1972987",
+    "ph-a0b21c3bc42a4535",
+    "ph-f70d6535443a5d24",
+    "ph-f33ee7042fcd54f8",
+    "ph-ead7cbebc4230e09"
+   ],
+   "posted_at": "2026-02-18",
+   "rent": 1390,
+   "synthetic": true,
+   "text": "2 bed apartment near the Saltmarsh market: new windows, a bright kitchen, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Westering",
+   "id": 65,
+   "phone": "555-9522",
+   "photos": [
+    "ph-cc37e0a34f9a6494",
+    "ph-b32f7d968c37f477",
+    "ph-03a9fafe8f5f8c8e",
+    "ph-7ce51dac4d7c2ac3",
+    "ph-eea4a9200f41eb65",
+    "ph-03662eea89b9daf6",
+    "ph-53afbde62bac3f25"
+   ],
+   "posted_at": "2026-02-18",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Westering. You will love new windows and a bright kitchen. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Westering"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 66,
+   "phone": "555-2650",
+   "photos": [
+    "ph-6a06195b77c352fc",
+    "ph-546db0fad0215133",
+    "ph-7ef65f67c0c639ba",
+    "ph-10ba075271ea9910",
+    "ph-1993d85f78808e18"
+   ],
+   "posted_at": "2026-02-18",
+   "rent": 1055,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Quarry Hill with new windows and lots of closet space. You will remit the holding amount before moving in, then I post the keys to you. The owner is out of town and the unit is under new management. Blessings, the Owner's Office.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 67,
+   "phone": "555-5087",
+   "photos": [
+    "ph-8c6d39277f3a167c",
+    "ph-5f8be4697f81058e",
+    "ph-74bb27fe3ae64d81",
+    "ph-7fa8a0719a69ea90",
+    "ph-ac41c900aac59461",
+    "ph-8efd7a5eb8d14482",
+    "ph-642eda1a301ed092"
+   ],
+   "posted_at": "2026-02-21",
+   "rent": 970,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Saltmarsh with a small balcony and in-unit laundry. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 68,
+   "phone": "555-2345",
+   "photos": [
+    "ph-59e4557ce4a28e19",
+    "ph-f70fc7373f88779b",
+    "ph-a52acc9a4f7a774b",
+    "ph-8de4ebc9d9aaace6",
+    "ph-2f9f5e78581afae5"
+   ],
+   "posted_at": "2026-02-21",
+   "rent": 1430,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 69,
+   "phone": "555-3786",
+   "photos": [
+    "ph-f7ca4468450a51fc",
+    "ph-c84ae4a8a538693c",
+    "ph-6e9b1b01efcfae35",
+    "ph-dc9bbb82397477a8",
+    "ph-92fa5441b40761b8",
+    "ph-db3e4131bf0b0944"
+   ],
+   "posted_at": "2026-02-22",
+   "rent": 1760,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Pelham Green with in-unit laundry and a bright kitchen. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Westering",
+   "id": 70,
+   "phone": "555-9896",
+   "photos": [
+    "ph-0f1634fda9ae6bca",
+    "ph-08511c8b1da930a6",
+    "ph-bebbe1b912dacba9",
+    "ph-79be4bb95bd90521",
+    "ph-2313fac0f0370005",
+    "ph-b09a67147c7f2da0",
+    "ph-f79218543331d468"
+   ],
+   "posted_at": "2026-02-22",
+   "rent": 1015,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Juniper Street, Westering. Features a renovated bath and high ceilings. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 71,
+   "phone": "555-9707",
+   "photos": [
+    "ph-fb76c03ac15047ec",
+    "ph-7e76548d27e88431",
+    "ph-c3b6083114b8c6c1",
+    "ph-fbaeefa4de79179e",
+    "ph-a1b3dfb637b30596"
+   ],
+   "posted_at": "2026-02-22",
+   "rent": 995,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Alder Flats, a small balcony. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 72,
+   "phone": "555-9707",
+   "photos": [
+    "ph-6314265e0be7cf4c",
+    "ph-77131a1b2f9d8f96",
+    "ph-1feb2c0cb0964f5f",
+    "ph-a9d510ff4cd316b4",
+    "ph-28a2cd56ebddb6c6"
+   ],
+   "posted_at": "2026-02-23",
+   "rent": 1435,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Alder Flats, high ceilings. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 73,
+   "phone": "555-2650",
+   "photos": [
+    "ph-40f5fb5b9bfd736b",
+    "ph-e1a5564e1e56839a",
+    "ph-b7fa365007d88c29",
+    "ph-0b5471179fb65eb3",
+    "ph-e1cde0ffe3bb84d2"
+   ],
+   "posted_at": "2026-02-23",
+   "rent": 605,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Oakbend. You will love a bright kitchen and a renovated bath. You will forward the holding amount before moving in, then I post the keys and the lease to you.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 74,
+   "phone": "555-3558",
+   "photos": [
+    "ph-59eda1e17f0489ec",
+    "ph-9f0eb87cef8fb7a5",
+    "ph-2a7b8c488804cc1e",
+    "ph-5c88e120c71e9b09",
+    "ph-ed22d89c2aaecc03"
+   ],
+   "posted_at": "2026-02-25",
+   "rent": 1360,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Cobble Street, Kestrel Row. Features a small balcony and a quiet courtyard. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 75,
+   "phone": "555-8290",
+   "photos": [
+    "ph-053b8af30862b936",
+    "ph-989d32e77a76315f",
+    "ph-cea1a6fbdc9e1a73",
+    "ph-d38ec5377fd4206c"
+   ],
+   "posted_at": "2026-02-25",
+   "rent": 1655,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Quarry Hill. You will love a small balcony and lots of closet space. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 76,
+   "phone": "555-7981",
+   "photos": [
+    "ph-8774fe0efa3a20e9",
+    "ph-3fc7ef5b2ddecc79",
+    "ph-cdd4326ae519c510",
+    "ph-27db92f6eb01462f"
+   ],
+   "posted_at": "2026-02-25",
+   "rent": 995,
+   "synthetic": true,
+   "text": "1 bed apartment near the Pelham Green market: off-street parking, a quiet courtyard, and a short walk to the bus. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 77,
+   "phone": "555-9394",
+   "photos": [
+    "ph-c42fafac3e30672b",
+    "ph-84b7e589702b093d",
+    "ph-411821ed5ed0389d",
+    "ph-9b88abff34105497",
+    "ph-7eb39a3190ffbede",
+    "ph-991e6d29746e323d",
+    "ph-f0fa407eaca68b41"
+   ],
+   "posted_at": "2026-02-26",
+   "rent": 1660,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Westering. You will love a renovated bath and in-unit laundry. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 78,
+   "phone": "555-9927",
+   "photos": [
+    "ph-c7b4b831453e5998",
+    "ph-2ba8945fd2feef13",
+    "ph-b231fa7f4581ce58",
+    "ph-2a1f45ec60372cf9",
+    "ph-ec6eba3dc515b66f",
+    "ph-ef4486c87c2bedaa",
+    "ph-3b23aaa9f6d64751"
+   ],
+   "posted_at": "2026-02-26",
+   "rent": 2010,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Oakbend with a renovated bath and in-unit laundry. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 79,
+   "phone": "555-4874",
+   "photos": [
+    "ph-2f26eb107966b6bc",
+    "ph-e8908d365ee079e0",
+    "ph-31de403efc397370",
+    "ph-3f129d833b7c5ee1",
+    "ph-816b23d5381cf188",
+    "ph-678626f8a6e95733",
+    "ph-15c743298b561ce3"
+   ],
+   "posted_at": "2026-02-26",
+   "rent": 1015,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Juniper Street, Millrace. Features in-unit laundry and off-street parking. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 80,
+   "phone": "555-9789",
+   "photos": [
+    "ph-40f7fb5f9bfd736b",
+    "ph-e5a5764e1e56839a",
+    "ph-b3fa265007588c28",
+    "ph-0b5671179fb65e33",
+    "ph-e1cde8ffe3bb84d2"
+   ],
+   "posted_at": "2026-02-26",
+   "rent": 815,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Millrace with a renovated bath and lots of closet space. Zelle the deposit to hold the unit, I cannot show it until it arrives.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 81,
+   "phone": "555-9265",
+   "photos": [
+    "ph-7a473f1f60142af2",
+    "ph-01efb35efc83d0e3",
+    "ph-8b494fe2687aaf21",
+    "ph-3a7b9c6829d96cca",
+    "ph-66ed6880bb1d48aa",
+    "ph-6853cba7cc122836"
+   ],
+   "posted_at": "2026-02-28",
+   "rent": 2035,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Sparrow Street, Saltmarsh. Features a quiet courtyard and lots of closet space. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 82,
+   "phone": "555-4558",
+   "photos": [
+    "ph-9907dc2e4ffdf0c7",
+    "ph-e67b7a9c9cfe0039",
+    "ph-927c3a65b691c6b5",
+    "ph-6a4a97221ae86ff5"
+   ],
+   "posted_at": "2026-03-01",
+   "rent": 2005,
+   "synthetic": true,
+   "text": "4 bed apartment near the Millrace market: a renovated bath, off-street parking, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Ashgrove",
+   "id": 83,
+   "phone": "555-3917",
+   "photos": [
+    "ph-e843704f16c2bb0f",
+    "ph-b8a0600a964d1406",
+    "ph-c9f56f19fa0bcdd8",
+    "ph-a25ec0c6eb003b78"
+   ],
+   "posted_at": "2026-03-01",
+   "rent": 2050,
+   "synthetic": true,
+   "text": "4 bed apartment near the Ashgrove market: high ceilings, a small balcony, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "4 BR in Ashgrove"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 84,
+   "phone": "555-9126",
+   "photos": [
+    "ph-5ed24243b5878985",
+    "ph-7570706b75761d95",
+    "ph-cddd752baadbed58",
+    "ph-4a9a8d403f4f8e38",
+    "ph-bb9a1f65ec126bb4"
+   ],
+   "posted_at": "2026-03-01",
+   "rent": 1015,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Linden Street, Millrace. Features lots of closet space and off-street parking. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 85,
+   "phone": "555-9531",
+   "photos": [
+    "ph-40f7eb5f9bfd736b",
+    "ph-e5a5564f0e52839a",
+    "ph-b3fa265007d88c28",
+    "ph-0b5671179fb65e33",
+    "ph-e1cde0ffe3bb84d2"
+   ],
+   "posted_at": "2026-03-02",
+   "rent": 610,
+   "synthetic": true,
+   "text": "1 bed apartment near the Ashgrove market: hardwood floors, a renovated bath, and a short walk to the bus. Zelle the deposit to hold the unit, I cannot show it until it arrives.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 86,
+   "phone": "555-8234",
+   "photos": [
+    "ph-e129551863cfc76c",
+    "ph-1ab076541cfd425e",
+    "ph-abed2b1c8a12ceaf",
+    "ph-50627ed28fccb580",
+    "ph-69ce816a6bdbb30d",
+    "ph-13369b456f48fdaf",
+    "ph-455542ee6c64f0b1"
+   ],
+   "posted_at": "2026-03-03",
+   "rent": 1340,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Ashgrove. You will love hardwood floors and a bright kitchen. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Westering",
+   "id": 87,
+   "phone": "555-9789",
+   "photos": [
+    "ph-40f7fb5f9bfd736b",
+    "ph-e5a5564e1e568b9a",
+    "ph-b3fa265007d8cc2c",
+    "ph-1b5671179fb61e33",
+    "ph-e1cde0ffe3bb84d2"
+   ],
+   "posted_at": "2026-03-04",
+   "rent": 825,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Westering with high ceilings and a renovated bath. Kindly remit the holding amount ahead of receiving the keys and the lease. I am out of town for work, so I can't show it myself. Warm regards from the Owner's Office.",
+   "title": "2 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 88,
+   "phone": "555-5602",
+   "photos": [
+    "ph-adfb869d4a46ad41",
+    "ph-30dc127c537fa77e",
+    "ph-2b12be092b7371e9",
+    "ph-1cc8f5a2833a05ff"
+   ],
+   "posted_at": "2026-03-05",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "1 bed apartment near the Alder Flats market: new windows, lots of closet space, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Westering",
+   "id": 89,
+   "phone": "555-4120",
+   "photos": [
+    "ph-16d25cfa198bcbd5",
+    "ph-186712b0258fb472",
+    "ph-caa6adde6191f4b0",
+    "ph-2060bd591aa97eca",
+    "ph-354805d27ac7282a",
+    "ph-0ff5fa3b26645af8",
+    "ph-eee6b05ee9493c81"
+   ],
+   "posted_at": "2026-03-05",
+   "rent": 2010,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Westering with a renovated bath and off-street parking. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "4 BR in Westering"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 90,
+   "phone": "555-2977",
+   "photos": [
+    "ph-f3274a6931c0d337",
+    "ph-c584f25afe52d30d",
+    "ph-180e57416f5e0f1d",
+    "ph-886d782b7c481960",
+    "ph-7cb0745b31f27949",
+    "ph-9301f5d073a29e06",
+    "ph-b6813e9dff4acdd0"
+   ],
+   "posted_at": "2026-03-06",
+   "rent": 2010,
+   "synthetic": true,
+   "text": "4 bed apartment near the Saltmarsh market: in-unit laundry, lots of closet space, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 91,
+   "phone": "555-1803",
+   "photos": [
+    "ph-40d0419320d6d4ba",
+    "ph-e64dcf73ac77fe97",
+    "ph-7cf4a5925e0bb083",
+    "ph-97090b3683e363d8",
+    "ph-055a43d910377e02"
+   ],
+   "posted_at": "2026-03-06",
+   "rent": 1000,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Alder Flats, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 92,
+   "phone": "555-7466",
+   "photos": [
+    "ph-c6ab6e614a82a326",
+    "ph-bbd8dd1cf6e518fe",
+    "ph-a3e85d5e1ff96923",
+    "ph-fbd432d32f3e6de4",
+    "ph-f88566bc904e99fd",
+    "ph-5b73f675e80a4727",
+    "ph-2d6c5974d2c10792"
+   ],
+   "posted_at": "2026-03-07",
+   "rent": 1675,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Oakbend. You will love in-unit laundry and lots of closet space. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 93,
+   "phone": "555-9531",
+   "photos": [
+    "ph-930e66ee336aace7",
+    "ph-891c259e68f9c989",
+    "ph-888b542e78192762",
+    "ph-dc5609fcc6737eb8",
+    "ph-282edc12a2967227"
+   ],
+   "posted_at": "2026-03-09",
+   "rent": 630,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Pelham Green. You will love a small balcony and off-street parking. Kindly remit the holding amount ahead of receiving the keys and the lease. Blessings, the Owner's Office.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 94,
+   "phone": "555-9670",
+   "photos": [
+    "ph-2b4cb5c6c00e43a5",
+    "ph-0deb920094d93479",
+    "ph-e57c3daf5f7f745d",
+    "ph-5eec7513dfc47666"
+   ],
+   "posted_at": "2026-03-10",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Juniper Street, Ashgrove. Features new windows and hardwood floors. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 95,
+   "phone": "555-2535",
+   "photos": [
+    "ph-c4e3794fe6039652",
+    "ph-51db46b4a66bd21d",
+    "ph-4c36c2500d2f25cb",
+    "ph-3c5413df981a6802",
+    "ph-54b3f2ef1916b135",
+    "ph-844de8920ec30ef9"
+   ],
+   "posted_at": "2026-03-10",
+   "rent": 1635,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Linden Street, Ashgrove. Features a bright kitchen and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 96,
+   "phone": "555-9531",
+   "photos": [
+    "ph-40f7fb5f9bbd736b",
+    "ph-eda5564e1e56839a",
+    "ph-b3fa265007d88c28",
+    "ph-0f5671179fb75e33",
+    "ph-e1cd60ffe1bb84d2"
+   ],
+   "posted_at": "2026-03-12",
+   "rent": 885,
+   "synthetic": true,
+   "text": "2 bed apartment near the Alder Flats market: in-unit laundry, new windows, and a short walk to the bus. Kindly remit the holding amount ahead of receiving the keys. I am overseas on a posting and cannot meet in person.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 97,
+   "phone": "555-5332",
+   "photos": [
+    "ph-e129551863cfc76c",
+    "ph-1a9076141cfd425e",
+    "ph-abed2b1c8a12ceaf",
+    "ph-50627ed28fccb480",
+    "ph-69ce816a6bdbb10d",
+    "ph-13369b456f48fdaf",
+    "ph-455d42ee6c64f0b1"
+   ],
+   "posted_at": "2026-03-12",
+   "rent": 1090,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Ashgrove with high ceilings and new windows. forward the booking fee ahead of the key handover. Blessings, the Owner's Office.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 98,
+   "phone": "555-1800",
+   "photos": [
+    "ph-54405b0ae75fa1d0",
+    "ph-ed2ce555436caca2",
+    "ph-aacbf40d42b4d9d1",
+    "ph-5f5632392d549875"
+   ],
+   "posted_at": "2026-03-14",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Juniper Street, Millrace. Features new windows and a quiet courtyard. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 3,
+   "hood": "Kestrel Row",
+   "id": 99,
+   "phone": "555-1803",
+   "photos": [
+    "ph-d235c31c9d5a1ad3",
+    "ph-dbf46eac1e57c032",
+    "ph-8dd423c7d3611205",
+    "ph-81cbf474877c5c35",
+    "ph-5de234507f110381"
+   ],
+   "posted_at": "2026-03-14",
+   "rent": 1670,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Kestrel Row, a quiet courtyard. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 100,
+   "phone": "555-1803",
+   "photos": [
+    "ph-bc363b8c78b3fc56",
+    "ph-27bfc543c178c862",
+    "ph-466b95fbf48e0e48",
+    "ph-0a426e88f24f8389",
+    "ph-5b57a37faa241efd"
+   ],
+   "posted_at": "2026-03-14",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Alder Flats, new windows. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 101,
+   "phone": "555-4010",
+   "photos": [
+    "ph-676d5d399a16565f",
+    "ph-7ee722b112f99a03",
+    "ph-4196786cbe7f0dd0",
+    "ph-695abe4c3d11976e",
+    "ph-72091e7487c882bf",
+    "ph-e35b47aaeb1354d3",
+    "ph-4c5ef4b3c01ebc69"
+   ],
+   "posted_at": "2026-03-15",
+   "rent": 2105,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Tern Point. You will love off-street parking and a small balcony. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 102,
+   "phone": "555-8528",
+   "photos": [
+    "ph-4b316bc250c7d5f6",
+    "ph-01c7d92b781ca791",
+    "ph-f3a983ff95c6f3c5",
+    "ph-5958d40edd3c088e"
+   ],
+   "posted_at": "2026-03-15",
+   "rent": 1105,
+   "synthetic": true,
+   "text": "1 bed apartment near the Ashgrove market: a bright kitchen, off-street parking, and a short walk to the bus. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 103,
+   "phone": "555-5694",
+   "photos": [
+    "ph-91e4a045cf322f26",
+    "ph-ed64424697fc45d9",
+    "ph-9fa8d4dd71b4952c",
+    "ph-df3e54782f4fa962",
+    "ph-d1cfbb606fec2cb2",
+    "ph-1f7b1378aaa74623"
+   ],
+   "posted_at": "2026-03-16",
+   "rent": 1360,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Linden Street, Alder Flats. Features in-unit laundry and new windows. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 104,
+   "phone": "555-9531",
+   "photos": [
+    "ph-44f7fb5f8bfd536b",
+    "ph-e5a5164e1e568398",
+    "ph-b3fa265007d88c28",
+    "ph-0b5671179fb65e33",
+    "ph-e5cde0ffa3bb86d2"
+   ],
+   "posted_at": "2026-03-16",
+   "rent": 850,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Ashgrove. You will love lots of closet space and off-street parking. Kindly remit the holding amount ahead of receiving the keys. Warm regards from the Owner's Office.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 105,
+   "phone": "555-7867",
+   "photos": [
+    "ph-04d85323de50de49",
+    "ph-8ed1ce3fc652f614",
+    "ph-5724f33576c91515",
+    "ph-ce5bf87053976e8a",
+    "ph-cb71a5ac0f41190b"
+   ],
+   "posted_at": "2026-03-17",
+   "rent": 1315,
+   "synthetic": true,
+   "text": "2 bed apartment near the Saltmarsh market: a renovated bath, a bright kitchen, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 106,
+   "phone": "555-3087",
+   "photos": [
+    "ph-0eefd2b4f2d93c66",
+    "ph-e56c95aa5c44a6d3",
+    "ph-b297546299b46b82",
+    "ph-ba42e684c34b9838",
+    "ph-bcf86b25e1d6c9db",
+    "ph-90d2b01e2078c7ae",
+    "ph-e7db39cd396c3bea"
+   ],
+   "posted_at": "2026-03-17",
+   "rent": 1355,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Cobble Street, Kestrel Row. Features a quiet courtyard and new windows. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 107,
+   "phone": "555-5423",
+   "photos": [
+    "ph-ceaddfb40626dfa8",
+    "ph-9f6a270e9ad1f61c",
+    "ph-e62dcd8dee6b421c",
+    "ph-f8bc4e9977940194",
+    "ph-ab3bd35b1fec0eef"
+   ],
+   "posted_at": "2026-03-18",
+   "rent": 2065,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Pelham Green with a quiet courtyard and off-street parking. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 108,
+   "phone": "555-4522",
+   "photos": [
+    "ph-4fe3bc349de06310",
+    "ph-66954ea27434de03",
+    "ph-68a9bc6de73a237e",
+    "ph-f8b3c87b7f402923"
+   ],
+   "posted_at": "2026-03-18",
+   "rent": 2000,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Sparrow Street, Millrace. Features a quiet courtyard and a bright kitchen. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 109,
+   "phone": "555-9294",
+   "photos": [
+    "ph-a20d356dbce42670",
+    "ph-31d0e71353150d91",
+    "ph-094b4459adfaf85a",
+    "ph-6afdc809d03f45a7",
+    "ph-b48ad93d65dd4b74",
+    "ph-5c3df89f7bac783d",
+    "ph-91b615cc0f8f4976"
+   ],
+   "posted_at": "2026-03-19",
+   "rent": 1035,
+   "synthetic": true,
+   "text": "1 bed apartment near the Quarry Hill market: new windows, off-street parking, and a short walk to the bus. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 4,
+   "hood": "Kestrel Row",
+   "id": 110,
+   "phone": "555-1939",
+   "photos": [
+    "ph-aeee0542d52a9d7e",
+    "ph-39a1ff9763f265e8",
+    "ph-d30126d2793e9f68",
+    "ph-3bd00647deb8bd32"
+   ],
+   "posted_at": "2026-03-19",
+   "rent": 2095,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Kestrel Row. You will love a small balcony and high ceilings. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "4 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 111,
+   "phone": "555-4141",
+   "photos": [
+    "ph-44e3794f66039652",
+    "ph-51db46b4a66bd21d",
+    "ph-4c36c2d00d2f65cb",
+    "ph-3c54139f181a6802",
+    "ph-54b3b2ef0916b135",
+    "ph-844de0920ec30ef9"
+   ],
+   "posted_at": "2026-03-19",
+   "rent": 1385,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Juniper Street, Ashgrove. Features new windows and hardwood floors. Blessings, the Owner's Office.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 112,
+   "phone": "555-9071",
+   "photos": [
+    "ph-2c9d7736f1892dea",
+    "ph-8eb8c47ffeb85e8c",
+    "ph-a62a05a5ff03381a",
+    "ph-b4d4f66f8cb4c88f",
+    "ph-eaee705baabab249"
+   ],
+   "posted_at": "2026-03-20",
+   "rent": 805,
+   "synthetic": true,
+   "text": "2 bed apartment near the Quarry Hill market: new windows, lots of closet space, and a short walk to the bus. Kindly remit the holding amount ahead of receiving the keys. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 113,
+   "phone": "555-8907",
+   "photos": [
+    "ph-9261724964c08d17",
+    "ph-e42f200a2b52c762",
+    "ph-6c71576c75827d01",
+    "ph-6a558f7ecfe4e33c",
+    "ph-2c30f9c71a433dc2",
+    "ph-341fd4c8e0e8eda1",
+    "ph-d1d37bfbf9938298"
+   ],
+   "posted_at": "2026-03-22",
+   "rent": 2035,
+   "synthetic": true,
+   "text": "4 bed apartment near the Pelham Green market: off-street parking, high ceilings, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 114,
+   "phone": "555-3653",
+   "photos": [
+    "ph-bf6ad558086c969d",
+    "ph-eaa3964d42ca0d81",
+    "ph-826140d9445f4922",
+    "ph-afe52f75c4c176ee",
+    "ph-195d0ccbe40b9be0"
+   ],
+   "posted_at": "2026-03-23",
+   "rent": 1695,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Marlow Street, Ashgrove. Features off-street parking and a quiet courtyard. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 115,
+   "phone": "555-3462",
+   "photos": [
+    "ph-ca2f63d40bbb2168",
+    "ph-3a62de3b34f50d4d",
+    "ph-9c88cda95827c3a5",
+    "ph-6b8f76825dc292ab",
+    "ph-9e9c98e070de5def",
+    "ph-396beb778d032b6b",
+    "ph-832c2a62d00cabdf"
+   ],
+   "posted_at": "2026-03-23",
+   "rent": 1395,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Quarry Hill. You will love a quiet courtyard and in-unit laundry. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 116,
+   "phone": "555-1889",
+   "photos": [
+    "ph-9400fb9fe15d4da2",
+    "ph-2180fd30168dc14c",
+    "ph-12775fe548c9e053",
+    "ph-03f279e87a799f33",
+    "ph-8fe3ecabf1854b38"
+   ],
+   "posted_at": "2026-03-24",
+   "rent": 2065,
+   "synthetic": true,
+   "text": "4 bed apartment near the Tern Point market: lots of closet space, a quiet courtyard, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 117,
+   "phone": "555-9071",
+   "photos": [
+    "ph-98b322cb301a25e8",
+    "ph-fbf0064e63c56fb0",
+    "ph-41a1a281ef2362ae",
+    "ph-b2417b995e2d60a7",
+    "ph-ebb89d7e0a4128fe"
+   ],
+   "posted_at": "2026-03-24",
+   "rent": 1085,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Ashgrove. You will love in-unit laundry and a quiet courtyard. Zelle the deposit to hold the unit, I cannot show it until it arrives. I am out of town for work, so I can't show it myself. Warm regards from the Owner's Office.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 118,
+   "phone": "555-6777",
+   "photos": [
+    "ph-d801e50f1ca5e11a",
+    "ph-f660ef1ffbbac81c",
+    "ph-ece8a1ff3e9cc2d0",
+    "ph-d51d73ef2ceec52d",
+    "ph-b391591965355f16"
+   ],
+   "posted_at": "2026-03-25",
+   "rent": 1325,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Saltmarsh with a renovated bath and lots of closet space. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 4,
+   "hood": "Westering",
+   "id": 119,
+   "phone": "555-9564",
+   "photos": [
+    "ph-9ac79be1290afc4b",
+    "ph-e2b4c71a7daf3b43",
+    "ph-3e884c2d8f03c285",
+    "ph-62ef5a41d55ff2cd"
+   ],
+   "posted_at": "2026-03-26",
+   "rent": 2100,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Harrow Street, Westering. Features in-unit laundry and a bright kitchen. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "4 BR in Westering"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 120,
+   "phone": "555-5988",
+   "photos": [
+    "ph-9fbb17f25758ecf8",
+    "ph-9fcfdf9dc71a68ca",
+    "ph-3c9de2a75ccdbc97",
+    "ph-f9fa975e77dd87b5",
+    "ph-f27bb463c0ef6ee1",
+    "ph-9715b126e3f78250",
+    "ph-e9704cf090ce779f"
+   ],
+   "posted_at": "2026-03-27",
+   "rent": 1710,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Alder Flats. You will love a small balcony and new windows. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 121,
+   "phone": "555-5848",
+   "photos": [
+    "ph-2c9d7f36f1892dea",
+    "ph-8eb8c47ffeb85e84",
+    "ph-a32a0da5fe03381a",
+    "ph-b4d4372facb4c88f",
+    "ph-e2ec705baabab25b"
+   ],
+   "posted_at": "2026-03-27",
+   "rent": 675,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Pelham Green with lots of closet space and hardwood floors. Kindly remit the holding amount ahead of receiving the keys and the lease. I am out of town for work, so I can't show it myself.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 122,
+   "phone": "555-4597",
+   "photos": [
+    "ph-9fbb17f25718ecf8",
+    "ph-9fcfdf9dc71a68da",
+    "ph-3c9de2a75ccdbcd7",
+    "ph-f9fa975e77dd87b5",
+    "ph-f27bb463c06f6ee1",
+    "ph-9715b126e3f78250",
+    "ph-f9704cf092ce779f"
+   ],
+   "posted_at": "2026-03-28",
+   "rent": 1485,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Alder Flats with off-street parking and high ceilings. A reservation sum must reach me before the keys are released; the unit is yours. Warm regards from the Owner's Office.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 123,
+   "phone": "555-4138",
+   "photos": [
+    "ph-d8cace83b3930973",
+    "ph-48cf13bb33bc6e16",
+    "ph-222460665f6db65e",
+    "ph-a7711e56c804dc46"
+   ],
+   "posted_at": "2026-03-29",
+   "rent": 1760,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Tern Point with a renovated bath and high ceilings. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 124,
+   "phone": "555-3091",
+   "photos": [
+    "ph-85f1d4f6ecd4adc7",
+    "ph-e16ffefa66396fcd",
+    "ph-6a16ffb51b443735",
+    "ph-7c048f94a2339eed"
+   ],
+   "posted_at": "2026-03-29",
+   "rent": 1015,
+   "synthetic": true,
+   "text": "1 bed apartment near the Kestrel Row market: a quiet courtyard, in-unit laundry, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 125,
+   "phone": "555-5848",
+   "photos": [
+    "ph-98b122eb301a25e0",
+    "ph-fbf0060661c56fb1",
+    "ph-51a1a291af0262ae",
+    "ph-a2417b9d5e2d70a7",
+    "ph-eba09d7a0a4168fe"
+   ],
+   "posted_at": "2026-03-30",
+   "rent": 1065,
+   "synthetic": true,
+   "text": "3 bed apartment near the Ashgrove market: high ceilings, new windows, and a short walk to the bus. You will pay the deposit prior to moving in, then I post the keys and the lease to you. Warm regards from the Owner's Office.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Tern Point",
+   "id": 126,
+   "phone": "555-5443",
+   "photos": [
+    "ph-6e890cf3fa252790",
+    "ph-6fda1d54f2b590f1",
+    "ph-c7fe1b5d0da99cf6",
+    "ph-ab186a886e47074b",
+    "ph-b37a4e1fd55d3243",
+    "ph-295afb666122a522",
+    "ph-191d2f8ff0e26535"
+   ],
+   "posted_at": "2026-03-31",
+   "rent": 1395,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Tern Point with a quiet courtyard and new windows. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "2 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 127,
+   "phone": "555-2931",
+   "photos": [
+    "ph-f0e009732c7dc21b",
+    "ph-b54a39cc2bc13915",
+    "ph-27a2ad8f2aba39a1",
+    "ph-47a3102d3f533ea5",
+    "ph-fa55c68151fb865a"
+   ],
+   "posted_at": "2026-03-31",
+   "rent": 1705,
+   "synthetic": true,
+   "text": "3 bed apartment near the Oakbend market: off-street parking, high ceilings, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 128,
+   "phone": "555-6187",
+   "photos": [
+    "ph-d6d2b660c3f183c1",
+    "ph-00fcd9639c8855d3",
+    "ph-a8bdc0c7e89a9c2c",
+    "ph-b7959d042dfb3f7b",
+    "ph-e06fe9b087115ae0"
+   ],
+   "posted_at": "2026-03-31",
+   "rent": 1370,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, high ceilings. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 129,
+   "phone": "555-9360",
+   "photos": [
+    "ph-d7ae6a9b9c784374",
+    "ph-77484a5c6cca7a6b",
+    "ph-5b52cf18295cf8ae",
+    "ph-88f563dbf6e4fdd2",
+    "ph-832eba7b6a487264",
+    "ph-ecee62ebd3c6baf7"
+   ],
+   "posted_at": "2026-04-02",
+   "rent": 1300,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Ashgrove. You will love in-unit laundry and a small balcony. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 130,
+   "phone": "555-5768",
+   "photos": [
+    "ph-c4d8d68f431d663b",
+    "ph-14dad23c3c29ac9c",
+    "ph-8e5efb2812dc3fb2",
+    "ph-b9944f209de8c2d1",
+    "ph-13c6fb748de9e79d",
+    "ph-585174e37020a4d0"
+   ],
+   "posted_at": "2026-04-02",
+   "rent": 1995,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Oakbend with a renovated bath and a bright kitchen. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Saltmarsh",
+   "id": 131,
+   "phone": "555-4597",
+   "photos": [
+    "ph-4a7dc138c30a5ff1",
+    "ph-93bcc94fc81d2220",
+    "ph-7a62f34edc536ea8",
+    "ph-94555e585be4611d",
+    "ph-df83f576a5248332",
+    "ph-b12bcac5e5b2a2b4"
+   ],
+   "posted_at": "2026-04-02",
+   "rent": 1440,
+   "synthetic": true,
+   "text": "3 bed apartment near the Saltmarsh market: a renovated bath, off-street parking, and a short walk to the bus. A reservation sum must reach me before the key set are released; the unit is yours. Blessings, the Owner's Office.",
+   "title": "3 BR in Saltmarsh"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 132,
+   "phone": "555-5848",
+   "photos": [
+    "ph-930666ee33faace7",
+    "ph-881c259e68f9c989",
+    "ph-888b542e58192762",
+    "ph-dc5649fc46777ab8",
+    "ph-282edc12a3167227"
+   ],
+   "posted_at": "2026-04-03",
+   "rent": 1030,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Pelham Green with hardwood floors and off-street parking. Zelle the reservation sum to hold the unit, I cannot show it until it arrives. Warm regards from the Owner's Office.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 4,
+   "hood": "Quarry Hill",
+   "id": 133,
+   "phone": "555-4433",
+   "photos": [
+    "ph-0e92dcfdf2d35322",
+    "ph-89356eee72b76443",
+    "ph-439242cad0f30d53",
+    "ph-204748da16cf26a4",
+    "ph-da2399a17d1f946f",
+    "ph-e7d5e8969b5457c2"
+   ],
+   "posted_at": "2026-04-04",
+   "rent": 2100,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Sparrow Street, Quarry Hill. Features lots of closet space and a quiet courtyard. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 134,
+   "phone": "555-6710",
+   "photos": [
+    "ph-814e2f437a359d1a",
+    "ph-5b4f0c046cb732a4",
+    "ph-9aaba89a6403bd4e",
+    "ph-d96622adf51872c0",
+    "ph-152534e9268e3f8b",
+    "ph-7a7cbec21d7456c2",
+    "ph-c344d6329b0778d6"
+   ],
+   "posted_at": "2026-04-04",
+   "rent": 1395,
+   "synthetic": true,
+   "text": "3 bed apartment near the Millrace market: a quiet courtyard, lots of closet space, and a short walk to the bus. A reservation sum must reach me before the keys and the lease are released; the unit is yours. I am overseas on a posting and cannot meet in person. Warm regards from the Owner's Office.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 135,
+   "phone": "555-9139",
+   "photos": [
+    "ph-29e3730a3d9e663f",
+    "ph-7d5a39af59249112",
+    "ph-62bebae6ef67c8e8",
+    "ph-6a695571e8466a7e",
+    "ph-29da123e241d0b27",
+    "ph-dabb088b9af6f0f2"
+   ],
+   "posted_at": "2026-04-05",
+   "rent": 1330,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Juniper Street, Ashgrove. Features hardwood floors and a bright kitchen. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 3,
+   "hood": "Kestrel Row",
+   "id": 136,
+   "phone": "555-2364",
+   "photos": [
+    "ph-a448643381f60be0",
+    "ph-f305da931a60caf9",
+    "ph-381adecafa6d92ae",
+    "ph-f7ada47acfcbc295"
+   ],
+   "posted_at": "2026-04-06",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Kestrel Row. You will love in-unit laundry and a renovated bath. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "3 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Kestrel Row",
+   "id": 137,
+   "phone": "555-1139",
+   "photos": [
+    "ph-178f0248a61ddf2f",
+    "ph-30ae54a6667d56e2",
+    "ph-5fb4c544418b71e8",
+    "ph-458fb292783123ae",
+    "ph-e8ea6e3bdc6c4a62"
+   ],
+   "posted_at": "2026-04-07",
+   "rent": 1680,
+   "synthetic": true,
+   "text": "3 bed apartment near the Kestrel Row market: high ceilings, in-unit laundry, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "3 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 138,
+   "phone": "555-3611",
+   "photos": [
+    "ph-40f7fb5f8bfd736b",
+    "ph-e5a55e4e1e56839a",
+    "ph-f3fa265007d8cc28",
+    "ph-0b5671179fb65e33",
+    "ph-e1cde0fde3bb84d2"
+   ],
+   "posted_at": "2026-04-07",
+   "rent": 690,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Kestrel Row with a bright kitchen and hardwood floors. Zelle the deposit to hold the unit, I cannot show it until it arrives.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 139,
+   "phone": "555-6300",
+   "photos": [
+    "ph-508519083f027978",
+    "ph-e70811a52e670d57",
+    "ph-63f270e00cfac604",
+    "ph-a198a01d17cf61de"
+   ],
+   "posted_at": "2026-04-07",
+   "rent": 890,
+   "synthetic": true,
+   "text": "2 bed apartment near the Kestrel Row market: a bright kitchen, off-street parking, and a short walk to the bus. To secure it, transfer the first month up front; viewing happens after the key set arrive. The owner is out of town and the unit is under new management. Warm regards from the Owner's Office.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 4,
+   "hood": "Westering",
+   "id": 140,
+   "phone": "555-8317",
+   "photos": [
+    "ph-62a1dbb84cf2f34c",
+    "ph-33773464de19021e",
+    "ph-25de233706620d73",
+    "ph-e27b9670ea8fc9ae",
+    "ph-c40b4476e5f5702b"
+   ],
+   "posted_at": "2026-04-08",
+   "rent": 1985,
+   "synthetic": true,
+   "text": "4 bed apartment near the Westering market: in-unit laundry, a quiet courtyard, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Westering"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 141,
+   "phone": "555-6710",
+   "photos": [
+    "ph-59eca9e17f0489ec",
+    "ph-9f0eba7cef8fb7a5",
+    "ph-6a7b8c488804cc1e",
+    "ph-5488e520c71e9b09",
+    "ph-ed26d8942aaecc03"
+   ],
+   "posted_at": "2026-04-08",
+   "rent": 1110,
+   "synthetic": true,
+   "text": "2 bed apartment near the Kestrel Row market: a renovated bath, new windows, and a short walk to the bus. Blessings, the Owner's Office.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 142,
+   "phone": "555-1182",
+   "photos": [
+    "ph-8a7b0fadd93a5d8f",
+    "ph-d38fafc4f09e5851",
+    "ph-192425adad30fc17",
+    "ph-af59d2df98847eb4"
+   ],
+   "posted_at": "2026-04-09",
+   "rent": 1055,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Saltmarsh with a renovated bath and lots of closet space. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 143,
+   "phone": "555-9799",
+   "photos": [
+    "ph-7050af95cec3aff5",
+    "ph-ab26bd596f34b512",
+    "ph-850e1f3486827c36",
+    "ph-381e798815291be6",
+    "ph-fc99494afc707879"
+   ],
+   "posted_at": "2026-04-09",
+   "rent": 1075,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Oakbend, in-unit laundry. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 4,
+   "hood": "Westering",
+   "id": 144,
+   "phone": "555-4378",
+   "photos": [
+    "ph-dab0b8e4f43efdb4",
+    "ph-561a98305642f9f1",
+    "ph-6e443e6b5d66a267",
+    "ph-678b05cbef39f991"
+   ],
+   "posted_at": "2026-04-10",
+   "rent": 2100,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Marlow Street, Westering. Features off-street parking and in-unit laundry. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "4 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 145,
+   "phone": "555-5848",
+   "photos": [
+    "ph-930766ee33faace7",
+    "ph-881c251e68f9c9cb",
+    "ph-c88bd42e78592762",
+    "ph-dc5649fcc6737eb0",
+    "ph-2a2edc52a3967267"
+   ],
+   "posted_at": "2026-04-10",
+   "rent": 675,
+   "synthetic": true,
+   "text": "1 bed apartment near the Quarry Hill market: hardwood floors, in-unit laundry, and a short walk to the bus. Zelle the deposit to hold the unit, I cannot show it until it arrives. I am overseas on a posting and cannot meet in person.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 2,
+   "hood": "Tern Point",
+   "id": 146,
+   "phone": "555-8658",
+   "photos": [
+    "ph-9e08bf82feba3146",
+    "ph-32f6884a56e7117a",
+    "ph-06c1f8905c5b3cc9",
+    "ph-3966df2cbdf5a068"
+   ],
+   "posted_at": "2026-04-11",
+   "rent": 1355,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Tern Point with high ceilings and hardwood floors. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "2 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 147,
+   "phone": "555-1493",
+   "photos": [
+    "ph-42e2e210999d625c",
+    "ph-39bf03ecfb8ca190",
+    "ph-d40d058d03c31b6c",
+    "ph-867369889c85ad26",
+    "ph-493781bc23b0a7da",
+    "ph-d8a2bbed76d1b7cb"
+   ],
+   "posted_at": "2026-04-11",
+   "rent": 1715,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Westering with in-unit laundry and hardwood floors. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 148,
+   "phone": "555-6432",
+   "photos": [
+    "ph-41040cd4b5da3ae4",
+    "ph-eaef23b0d08021e9",
+    "ph-89ccb13e57275bb9",
+    "ph-327c87ead0927a57",
+    "ph-699bad6673c5ad18"
+   ],
+   "posted_at": "2026-04-12",
+   "rent": 1670,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Juniper Street, Quarry Hill. Features a quiet courtyard and hardwood floors. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 149,
+   "phone": "555-9324",
+   "photos": [
+    "ph-4b5934d2404dbef1",
+    "ph-3131f41ee414e1f4",
+    "ph-edfd62fff2c88e7e",
+    "ph-62e0056e03716109",
+    "ph-3cc8c6b5d7dac03a",
+    "ph-71788a390c351a2e",
+    "ph-dcf441ee73988fa3"
+   ],
+   "posted_at": "2026-04-12",
+   "rent": 1035,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love off-street parking and hardwood floors. Come see it first; the application fee is paid through our online portal.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 150,
+   "phone": "555-5215",
+   "photos": [
+    "ph-2c167f945f187440",
+    "ph-e7de596cc40ce692",
+    "ph-1c0be182030599f4",
+    "ph-f85fd4dd67be578b",
+    "ph-2d09a040dfca7946",
+    "ph-70584c29a86c1395"
+   ],
+   "posted_at": "2026-04-13",
+   "rent": 1425,
+   "synthetic": true,
+   "text": "2 bed apartment near the Alder Flats market: a small balcony, off-street parking, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Kestrel Row",
+   "id": 151,
+   "phone": "555-1678",
+   "photos": [
+    "ph-ed903e10d565c566",
+    "ph-c2d878f686b5f13c",
+    "ph-894d20081bc303dd",
+    "ph-78f47b070acef756",
+    "ph-ed5aab291ff0662a",
+    "ph-0be8b83508fece8a"
+   ],
+   "posted_at": "2026-04-13",
+   "rent": 2010,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Juniper Street, Kestrel Row. Features off-street parking and a small balcony. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "4 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 152,
+   "phone": "555-6300",
+   "photos": [
+    "ph-919bc5065b1094b8",
+    "ph-cfb77e7017fedce3",
+    "ph-03012fe5e6ce2952",
+    "ph-d13eff9c5443146b",
+    "ph-38a939f1f3fc0032"
+   ],
+   "posted_at": "2026-04-13",
+   "rent": 840,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Kestrel Row with a bright kitchen and high ceilings. Upfront reservation funds are needed prior to key handover. I am out of town for work, so I can't show it myself. Warm regards from the Owner's Office.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 153,
+   "phone": "555-9799",
+   "photos": [
+    "ph-1b8e287f9e8dd4ab",
+    "ph-57e9b43e6de0edd8",
+    "ph-6a14aa94e863c2c9",
+    "ph-3edb5cb1dc95145a",
+    "ph-72b49edfab1d021a"
+   ],
+   "posted_at": "2026-04-14",
+   "rent": 1115,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Kestrel Row, a bright kitchen. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 154,
+   "phone": "555-2211",
+   "photos": [
+    "ph-bb4b8efd1c18d908",
+    "ph-dd21398ad596f187",
+    "ph-30f1d1c0f98d9d41",
+    "ph-5ab67311628e91a2",
+    "ph-e3cdc11c29e0d2a5"
+   ],
+   "posted_at": "2026-04-14",
+   "rent": 980,
+   "synthetic": true,
+   "text": "1 bed apartment near the Quarry Hill market: a small balcony, hardwood floors, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 155,
+   "phone": "555-1117",
+   "photos": [
+    "ph-932666ce31faace7",
+    "ph-881c659ee8f9c989",
+    "ph-c88b542e78192722",
+    "ph-dc5649fcce737ebc",
+    "ph-282efc12a3967227"
+   ],
+   "posted_at": "2026-04-14",
+   "rent": 615,
+   "synthetic": true,
+   "text": "1 bed apartment near the Kestrel Row market: a small balcony, a bright kitchen, and a short walk to the bus. You will pay the holding amount ahead of moving in, then I post the keys and the lease to you. Blessings, the Owner's Office.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 156,
+   "phone": "555-3118",
+   "photos": [
+    "ph-5d9f1e5cdcf649e8",
+    "ph-cc68a8baadb79707",
+    "ph-705cb90a3295cfdb",
+    "ph-e9a9eec8f55839d4",
+    "ph-a5e11703490e2151"
+   ],
+   "posted_at": "2026-04-15",
+   "rent": 1000,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Harrow Street, Alder Flats. Features high ceilings and a renovated bath. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 157,
+   "phone": "555-6378",
+   "photos": [
+    "ph-4605d5a5968211bb",
+    "ph-88b7721461a635d9",
+    "ph-51aa913a08bb0b39",
+    "ph-fa6a3a2d5f43ff2b"
+   ],
+   "posted_at": "2026-04-15",
+   "rent": 1015,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Harrow Street, Tern Point. Features in-unit laundry and a quiet courtyard. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 4,
+   "hood": "Westering",
+   "id": 158,
+   "phone": "555-5558",
+   "photos": [
+    "ph-72870f766180a25d",
+    "ph-74f070121c508289",
+    "ph-14a0b1e4c0e75057",
+    "ph-4becbc8df0bc33b1",
+    "ph-b31e6a91dc2ab6ce",
+    "ph-86834ac1d50af3ba"
+   ],
+   "posted_at": "2026-04-15",
+   "rent": 2055,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Westering with in-unit laundry and high ceilings. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Westering"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 159,
+   "phone": "555-3790",
+   "photos": [
+    "ph-4fe3bc349de06314",
+    "ph-66954ea27434de03",
+    "ph-68a9b46de77a237e",
+    "ph-f9b3c87b6f402923"
+   ],
+   "posted_at": "2026-04-15",
+   "rent": 1750,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Millrace with off-street parking and in-unit laundry. Pay the booking fee ahead of the key handover. Blessings, the Owner's Office.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 160,
+   "phone": "555-9014",
+   "photos": [
+    "ph-28d390149717fae5",
+    "ph-da37820755ba0290",
+    "ph-ec7317d6484c9093",
+    "ph-a777b61944d87167",
+    "ph-2ab8998a3338a3df",
+    "ph-af59498847c2d2de"
+   ],
+   "posted_at": "2026-04-16",
+   "rent": 1065,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Tern Point with new windows and a small balcony. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 161,
+   "phone": "555-1319",
+   "photos": [
+    "ph-3ac6ffa198ecde70",
+    "ph-859a1c78cc835a40",
+    "ph-53a8ad75d8ded416",
+    "ph-06d348a0d75fdb8f",
+    "ph-6ce738655a646b32",
+    "ph-4bb7acd3a4e2719b"
+   ],
+   "posted_at": "2026-04-16",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Oakbend. You will love a quiet courtyard and high ceilings. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 162,
+   "phone": "555-7591",
+   "photos": [
+    "ph-413c6a1f57251c44",
+    "ph-0229cbc1153d6176",
+    "ph-d4e17935c2759176",
+    "ph-7a2c5be5858c916b",
+    "ph-c47835cab3d0c91f"
+   ],
+   "posted_at": "2026-04-16",
+   "rent": 1100,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Marlow Street, Millrace. Features new windows and a renovated bath. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 163,
+   "phone": "555-4785",
+   "photos": [
+    "ph-71a50077d059319a",
+    "ph-4395e23d6a742acd",
+    "ph-ddea9154adea0862",
+    "ph-c672222302cfb39d",
+    "ph-939a34ee1d57550a",
+    "ph-c4f3c0ed39d02096",
+    "ph-92535f14dab6ffa4"
+   ],
+   "posted_at": "2026-04-16",
+   "rent": 1695,
+   "synthetic": true,
+   "text": "3 bed apartment near the Tern Point market: a quiet courtyard, a bright kitchen, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 4,
+   "hood": "Quarry Hill",
+   "id": 164,
+   "phone": "555-2494",
+   "photos": [
+    "ph-e9e762bba8a4864c",
+    "ph-659a112bf39ec9c2",
+    "ph-93bcc95064414434",
+    "ph-42bc185d6f268e16",
+    "ph-5d44197869c5f06a",
+    "ph-bbf258e5946cc5dd",
+    "ph-237bad948b3b8f5a"
+   ],
+   "posted_at": "2026-04-17",
+   "rent": 2015,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Quarry Hill. You will love high ceilings and a bright kitchen. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "4 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 165,
+   "phone": "555-7564",
+   "photos": [
+    "ph-ca7f45a1cda6e141",
+    "ph-4543ce065ec5da0c",
+    "ph-fe33e528852734ae",
+    "ph-eb26473b9179dc39"
+   ],
+   "posted_at": "2026-04-17",
+   "rent": 1680,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Ashgrove with a small balcony and lots of closet space. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 166,
+   "phone": "555-6329",
+   "photos": [
+    "ph-5a9d775980d380cb",
+    "ph-55520ea148d2384f",
+    "ph-d307e0d3370107e0",
+    "ph-302b1a82c39c194d"
+   ],
+   "posted_at": "2026-04-18",
+   "rent": 1665,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Oakbend with high ceilings and in-unit laundry. Come see it first; the application fee is paid through our online portal.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 167,
+   "phone": "555-3611",
+   "photos": [
+    "ph-88b322cb301a26e8",
+    "ph-fbf0064e61c56fb1",
+    "ph-11a1a281ef2262ae",
+    "ph-b2417b995e2d60a7",
+    "ph-eba0997e0a4168fe"
+   ],
+   "posted_at": "2026-04-18",
+   "rent": 1010,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Cobble Street, Westering. Features high ceilings and a bright kitchen. Zelle the reservation sum to hold the unit, I cannot show it until it arrives. Blessings, the Owner's Office.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 168,
+   "phone": "555-4966",
+   "photos": [
+    "ph-fd1e05be1898462e",
+    "ph-5be4409bb7e92dab",
+    "ph-e48480917dcf6569",
+    "ph-5a28c54c39d93d44",
+    "ph-85cd51d5278589cc",
+    "ph-52f8f8729cdf8a99"
+   ],
+   "posted_at": "2026-04-19",
+   "rent": 850,
+   "synthetic": true,
+   "text": "2 bed apartment near the Alder Flats market: lots of closet space, a small balcony, and a short walk to the bus. Kindly forward the reservation funds prior to the viewing. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 169,
+   "phone": "555-2779",
+   "photos": [
+    "ph-3ab831f440c9aa3f",
+    "ph-65a2ac4ec6b49f9d",
+    "ph-2382d4d325803037",
+    "ph-1866a49b520a3987",
+    "ph-fe6ff39ff2f52d9a",
+    "ph-d763f999c44da487",
+    "ph-5bbe9c20e127fc8e"
+   ],
+   "posted_at": "2026-04-20",
+   "rent": 2100,
+   "synthetic": true,
+   "text": "4 bed apartment near the Tern Point market: a renovated bath, a small balcony, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 170,
+   "phone": "555-7220",
+   "photos": [
+    "ph-999b44750ebf3c0a",
+    "ph-92d22bc9fd227e97",
+    "ph-7afd0e95814489db",
+    "ph-32ead05ed45378e7",
+    "ph-30a8162b671d6066",
+    "ph-8430472e26632910"
+   ],
+   "posted_at": "2026-04-20",
+   "rent": 1000,
+   "synthetic": true,
+   "text": "1 bed apartment near the Tern Point market: a small balcony, in-unit laundry, and a short walk to the bus. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 171,
+   "phone": "555-6187",
+   "photos": [
+    "ph-9661965674a845d1",
+    "ph-5e2a292cb9418494",
+    "ph-bc6415f94fe02caa",
+    "ph-fc6f6c9f72da1464",
+    "ph-31e1e63f2479eb41"
+   ],
+   "posted_at": "2026-04-20",
+   "rent": 1100,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Alder Flats, a bright kitchen. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 172,
+   "phone": "555-1800",
+   "photos": [
+    "ph-54405b0ae75fa1d0",
+    "ph-ed2ce555436caca2",
+    "ph-aacbf40d42b4d9d1",
+    "ph-5f5632392d549875"
+   ],
+   "posted_at": "2026-04-21",
+   "rent": 1055,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Juniper Street, Millrace. Features new windows and a quiet courtyard. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 173,
+   "phone": "555-4597",
+   "photos": [
+    "ph-28d390149797fae5",
+    "ph-da37820755ba0290",
+    "ph-ec731fd6484c9493",
+    "ph-a777b61944dc7167",
+    "ph-2ab8998a3338a3dd",
+    "ph-af59498847c2d2de"
+   ],
+   "posted_at": "2026-04-21",
+   "rent": 815,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Tern Point with off-street parking and lots of closet space. The deposit has to be paid before you collect the keys, no exceptions.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 4,
+   "hood": "Alder Flats",
+   "id": 174,
+   "phone": "555-1829",
+   "photos": [
+    "ph-64d481191feafc1a",
+    "ph-c21be2507534f0ba",
+    "ph-bca7916eac63a869",
+    "ph-51ee1edf245aab76"
+   ],
+   "posted_at": "2026-04-22",
+   "rent": 2055,
+   "synthetic": true,
+   "text": "4 bed apartment near the Alder Flats market: a bright kitchen, a quiet courtyard, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Kestrel Row",
+   "id": 175,
+   "phone": "555-1117",
+   "photos": [
+    "ph-2c9d7f36f1892dea",
+    "ph-8eb8c67ffeb85e94",
+    "ph-a62a0da5fe03381a",
+    "ph-b4d5376f8cb4c88f",
+    "ph-e2ec705baabab249"
+   ],
+   "posted_at": "2026-04-22",
+   "rent": 1025,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Kestrel Row. You will love a quiet courtyard and new windows. Zelle the deposit to hold the unit, I cannot show it until it arrives.",
+   "title": "3 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 176,
+   "phone": "555-4966",
+   "photos": [
+    "ph-7ba0a9e3ce80001a",
+    "ph-b9bda4a9f068ba86",
+    "ph-9d80b825bc9d98c5",
+    "ph-ccafc93d16c00aa3"
+   ],
+   "posted_at": "2026-04-22",
+   "rent": 645,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Ashgrove. You will love a quiet courtyard and a small balcony. Reservation funds go first, the keys follow by post. I am out of town for work, so I can't show it myself. Warm regards from the Owner's Office.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Westering",
+   "id": 177,
+   "phone": "555-9464",
+   "photos": [
+    "ph-88cbbfe247f64d8b",
+    "ph-120d9ce5b38f8f01",
+    "ph-f1795389432a5360",
+    "ph-bd6beaa6456f136d",
+    "ph-e1ca5d8e56fd21ab",
+    "ph-65d95bd5560e32ec",
+    "ph-69d8c10fc8d75a92"
+   ],
+   "posted_at": "2026-04-23",
+   "rent": 1415,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Westering. You will love off-street parking and a bright kitchen. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 178,
+   "phone": "555-9707",
+   "photos": [
+    "ph-18566d1e2f3026ce",
+    "ph-7b4a02c4afb352a0",
+    "ph-5c8fc6493b6894b8",
+    "ph-116c3301da85cac1",
+    "ph-d5aada1bc07cf655"
+   ],
+   "posted_at": "2026-04-23",
+   "rent": 1020,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Alder Flats, in-unit laundry. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Alder Flats",
+   "id": 179,
+   "phone": "555-1803",
+   "photos": [
+    "ph-bc363b8c78b3fc56",
+    "ph-27bfc543c178c862",
+    "ph-466b95fbf48e0e48",
+    "ph-0a426e88f24f8389",
+    "ph-5b57a37faa241efd"
+   ],
+   "posted_at": "2026-04-23",
+   "rent": 1715,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Alder Flats, new windows. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 180,
+   "phone": "555-4292",
+   "photos": [
+    "ph-061a7d7a71afab94",
+    "ph-fca79922b0134b9d",
+    "ph-6bad092396604595",
+    "ph-1c164ad42248db54",
+    "ph-a17f2ea6c2aab00d",
+    "ph-0efff6912a7c16fa"
+   ],
+   "posted_at": "2026-04-24",
+   "rent": 1985,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Pelham Green. You will love in-unit laundry and hardwood floors. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 181,
+   "phone": "555-5531",
+   "photos": [
+    "ph-8d889b5f8fa0b327",
+    "ph-e850434c1497ecb6",
+    "ph-08d8721c04b2315c",
+    "ph-c534d84ab0bb3237",
+    "ph-8212a2240203e88f",
+    "ph-24d2148a83309eee",
+    "ph-0a8991493d33ddcf"
+   ],
+   "posted_at": "2026-04-24",
+   "rent": 1355,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Linden Street, Ashgrove. Features new windows and a small balcony. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 182,
+   "phone": "555-1959",
+   "photos": [
+    "ph-52e68ad92ef654e1",
+    "ph-ff8b6c381d58dc22",
+    "ph-37f0bf0ada4ff054",
+    "ph-6984442ae284fd26",
+    "ph-f05c9c8ac1baea32"
+   ],
+   "posted_at": "2026-04-24",
+   "rent": 2065,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Tern Point with in-unit laundry and off-street parking. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 183,
+   "phone": "555-4262",
+   "photos": [
+    "ph-a46a46624d29744c",
+    "ph-4a1811609cf85932",
+    "ph-b8429547c25307cc",
+    "ph-f2ca08d4ed58b2ba",
+    "ph-b8f1eceab5f53528"
+   ],
+   "posted_at": "2026-04-25",
+   "rent": 1650,
+   "synthetic": true,
+   "text": "3 bed apartment near the Quarry Hill market: a bright kitchen, a quiet courtyard, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 184,
+   "phone": "555-1914",
+   "photos": [
+    "ph-4dd5c6c7ed61422f",
+    "ph-66672fc20de926cd",
+    "ph-925a3c4d608720a7",
+    "ph-9c4f44645c8e5ae0",
+    "ph-b1e6bf555a7b925f"
+   ],
+   "posted_at": "2026-04-25",
+   "rent": 1065,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love lots of closet space and off-street parking. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 185,
+   "phone": "555-7714",
+   "photos": [
+    "ph-d51494191169bdb3",
+    "ph-7c4f17131aae7aae",
+    "ph-e3a1eff02fdb145a",
+    "ph-0024417da1038934",
+    "ph-5699ada8194837e5"
+   ],
+   "posted_at": "2026-04-25",
+   "rent": 2020,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Millrace. You will love new windows and high ceilings. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 186,
+   "phone": "555-4444",
+   "photos": [
+    "ph-eac9b7835f0abcf8",
+    "ph-4fa59246e02125d6",
+    "ph-9aaef4512f4dabf9",
+    "ph-24de96c667e48ccb"
+   ],
+   "posted_at": "2026-04-25",
+   "rent": 2030,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Millrace with a small balcony and off-street parking. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 187,
+   "phone": "555-5332",
+   "photos": [
+    "ph-9661965676a845d0",
+    "ph-5e2a292cb9418494",
+    "ph-bc6455f94fe02caa",
+    "ph-fc6f6c9f72da0464",
+    "ph-31e1e63f2479eb41"
+   ],
+   "posted_at": "2026-04-25",
+   "rent": 850,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Tilbury Street, Alder Flats. Features in-unit laundry and high ceilings. forward the reservation payment first and I will mail the keys and the lease and the lease to you.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 2,
+   "hood": "Westering",
+   "id": 188,
+   "phone": "555-4483",
+   "photos": [
+    "ph-a543e7c5b42d2a10",
+    "ph-6d6d8a7064640212",
+    "ph-6030c9f17e3b3df0",
+    "ph-6cd60feeca33223a",
+    "ph-c93fa73221fb16ed",
+    "ph-03670371f68f60c9"
+   ],
+   "posted_at": "2026-04-26",
+   "rent": 1425,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Tilbury Street, Westering. Features high ceilings and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 189,
+   "phone": "555-2668",
+   "photos": [
+    "ph-eb6eb3e49b87d8ce",
+    "ph-a25faba0d65228b7",
+    "ph-de5ca14b577b8257",
+    "ph-ba77ec0fd52edebc"
+   ],
+   "posted_at": "2026-04-27",
+   "rent": 1115,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Saltmarsh with hardwood floors and lots of closet space. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 190,
+   "phone": "555-9403",
+   "photos": [
+    "ph-7d7f1335ee95b6ed",
+    "ph-6ab14cb567b9a476",
+    "ph-b5ce0637abbb408d",
+    "ph-f9cd9c81809ed236",
+    "ph-7774f936a0a227e2",
+    "ph-4744db6dfdf140df"
+   ],
+   "posted_at": "2026-04-27",
+   "rent": 2085,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Oakbend with in-unit laundry and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Westering",
+   "id": 191,
+   "phone": "555-4966",
+   "photos": [
+    "ph-bd4bdc43a45744cf",
+    "ph-649a2ea3625bc0de",
+    "ph-4146b36d558cf535",
+    "ph-c4efe68a814ba7d0",
+    "ph-1edc1a842805071e"
+   ],
+   "posted_at": "2026-04-27",
+   "rent": 670,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Sparrow Street, Westering. Features a renovated bath and hardwood floors. To secure it, transfer the first month up front; viewing happens after the keys and the lease arrive. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "1 BR in Westering"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 192,
+   "phone": "555-3237",
+   "photos": [
+    "ph-28a11940218cb275",
+    "ph-f202d012d16ba86c",
+    "ph-a0239bf4f614a547",
+    "ph-035b0752d1d7f59f",
+    "ph-db68e8adc45a742e"
+   ],
+   "posted_at": "2026-04-28",
+   "rent": 1310,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Millrace. You will love a small balcony and new windows. Come see it first; the application fee is paid through our online portal.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 193,
+   "phone": "555-8151",
+   "photos": [
+    "ph-a080b988d95b83fe",
+    "ph-29ec834575d4655a",
+    "ph-c38ea4cd44131769",
+    "ph-b6e6655df6adc2ee",
+    "ph-04c02c6127cc4876",
+    "ph-86f122b79b1efa74",
+    "ph-1b7488502135d827"
+   ],
+   "posted_at": "2026-04-28",
+   "rent": 1000,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Pelham Green with hardwood floors and new windows. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 194,
+   "phone": "555-2537",
+   "photos": [
+    "ph-97279278da47232d",
+    "ph-f2b5e9b67e779f20",
+    "ph-e073d545e6debea8",
+    "ph-b5b93f82ea43909d",
+    "ph-a85e832f53c7b880"
+   ],
+   "posted_at": "2026-04-29",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Pelham Green with hardwood floors and a renovated bath. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 195,
+   "phone": "555-1734",
+   "photos": [
+    "ph-8c7b2e6bb0377e21",
+    "ph-e577160cf135ed9d",
+    "ph-c5f9470841947559",
+    "ph-904ac1539241a8e6",
+    "ph-d0da223fbededa17",
+    "ph-10ebd8c0754122e2",
+    "ph-bb01d369e8bd4ad6"
+   ],
+   "posted_at": "2026-04-29",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "3 bed apartment near the Westering market: off-street parking, lots of closet space, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 196,
+   "phone": "555-6511",
+   "photos": [
+    "ph-1e6f5409faf524ab",
+    "ph-4436e69db0b181cb",
+    "ph-17f27d2a838f1ee4",
+    "ph-d398ddb117b5c3aa",
+    "ph-975190fcaba5065f",
+    "ph-11d2477bd09da022",
+    "ph-45134352da7723af"
+   ],
+   "posted_at": "2026-04-30",
+   "rent": 1715,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Pelham Green. You will love hardwood floors and lots of closet space. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 197,
+   "phone": "555-4324",
+   "photos": [
+    "ph-da14b8ee159eab0f",
+    "ph-281e06a305962064",
+    "ph-dc081cb6b9666f83",
+    "ph-28fdedd24a8cc1d8",
+    "ph-227af761e9a05f87"
+   ],
+   "posted_at": "2026-04-30",
+   "rent": 1390,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Quarry Hill. You will love a bright kitchen and off-street parking. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 198,
+   "phone": "555-8504",
+   "photos": [
+    "ph-010e0e31f9fd40ad",
+    "ph-a2c6d8bea28b2942",
+    "ph-96f4dfbb07873eaa",
+    "ph-82fc0217d74b8248",
+    "ph-4e3629d9991d7201",
+    "ph-ff5fa395efc8865c"
+   ],
+   "posted_at": "2026-05-01",
+   "rent": 1050,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Pelham Green with new windows and off-street parking. Upfront reservation funds are needed prior to key handover. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 4,
+   "hood": "Kestrel Row",
+   "id": 199,
+   "phone": "555-6758",
+   "photos": [
+    "ph-3eeac6988b0d9503",
+    "ph-ce82e2c684721f6c",
+    "ph-7167b8325782e9df",
+    "ph-cfbab584bd6d4844",
+    "ph-57ace238b97532c9"
+   ],
+   "posted_at": "2026-05-02",
+   "rent": 1995,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Kestrel Row. You will love a quiet courtyard and high ceilings. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "4 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 200,
+   "phone": "555-6280",
+   "photos": [
+    "ph-7c7d400dc40da74e",
+    "ph-a3c5c17b6c4faa1d",
+    "ph-4082bda4218ad99f",
+    "ph-ef6ac0d5c73a217d",
+    "ph-0e5903eb3ec65cd4",
+    "ph-424dacb0e888a768"
+   ],
+   "posted_at": "2026-05-02",
+   "rent": 1050,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Tern Point. You will love a bright kitchen and a quiet courtyard. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 201,
+   "phone": "555-6187",
+   "photos": [
+    "ph-9a81d78482254a39",
+    "ph-791cf00f925f4cf3",
+    "ph-8d1536cac72b5192",
+    "ph-714b5a49cb112a14",
+    "ph-fd33e55f74270745"
+   ],
+   "posted_at": "2026-05-03",
+   "rent": 1100,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Kestrel Row, new windows. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 4,
+   "hood": "Ashgrove",
+   "id": 202,
+   "phone": "555-5178",
+   "photos": [
+    "ph-f9ec50b20f5c5518",
+    "ph-0ab7d2ddf07f2fd5",
+    "ph-c141ee102f2b11d0",
+    "ph-c07704f159abd6a6",
+    "ph-5fa02777e409165a"
+   ],
+   "posted_at": "2026-05-04",
+   "rent": 1990,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Ashgrove. You will love a small balcony and off-street parking. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Ashgrove"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 203,
+   "phone": "555-6187",
+   "photos": [
+    "ph-1b6e6daa8ba7bdc4",
+    "ph-2f789e1cb7d33d88",
+    "ph-2f8e2932c3ec891a",
+    "ph-6e23fade73a494d7",
+    "ph-d7f60749202ebe80"
+   ],
+   "posted_at": "2026-05-04",
+   "rent": 1710,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Millrace, lots of closet space. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 204,
+   "phone": "555-5122",
+   "photos": [
+    "ph-64092a8fe63a2c47",
+    "ph-5de0e3f4d7c06418",
+    "ph-db2c178859bfbf7e",
+    "ph-090761d07ad9c3e8",
+    "ph-d79d21ce4a9e9337"
+   ],
+   "posted_at": "2026-05-05",
+   "rent": 1985,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Harrow Street, Tern Point. Features in-unit laundry and a quiet courtyard. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 205,
+   "phone": "555-4899",
+   "photos": [
+    "ph-0f7ab498f66f41c1",
+    "ph-f7cb3fc96c092e3b",
+    "ph-dbf43e2a1a3f924f",
+    "ph-437db518a0f3c46f",
+    "ph-1c959667bd3f9fc0",
+    "ph-5029f030f2baa286",
+    "ph-40326e27d4fa9bc4"
+   ],
+   "posted_at": "2026-05-05",
+   "rent": 1090,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Quarry Hill with a bright kitchen and a small balcony. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 206,
+   "phone": "555-9879",
+   "photos": [
+    "ph-da14b8ee159eab0f",
+    "ph-289e06a305962064",
+    "ph-dc081cb6b9666f83",
+    "ph-28fdedd04a8cc1d8",
+    "ph-22727761e9a05f87"
+   ],
+   "posted_at": "2026-05-05",
+   "rent": 1140,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Linden Street, Quarry Hill. Features a bright kitchen and off-street parking. The reservation sum has to be paid prior to you collect the keys and the lease, no exceptions.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 4,
+   "hood": "Quarry Hill",
+   "id": 207,
+   "phone": "555-8893",
+   "photos": [
+    "ph-c02ff27ec86fdc18",
+    "ph-b6edfc7dbabc0632",
+    "ph-531161b2f3b0a1a5",
+    "ph-e1afaae744753a0f"
+   ],
+   "posted_at": "2026-05-06",
+   "rent": 2075,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Fenwick Street, Quarry Hill. Features a quiet courtyard and a renovated bath. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 208,
+   "phone": "555-1199",
+   "photos": [
+    "ph-3465a1d1ebf2135d",
+    "ph-09c9c7b5a17f4e25",
+    "ph-6b5c367cf4d11d95",
+    "ph-5fd3baa0af02c960"
+   ],
+   "posted_at": "2026-05-06",
+   "rent": 1685,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Fenwick Street, Tern Point. Features new windows and in-unit laundry. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 209,
+   "phone": "555-9707",
+   "photos": [
+    "ph-44594bc6511bab93",
+    "ph-5372340ebc65b8dd",
+    "ph-a97fc941a443ea67",
+    "ph-99767e6245e9222a",
+    "ph-703fd57c6ed87458"
+   ],
+   "posted_at": "2026-05-06",
+   "rent": 1780,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Oakbend, hardwood floors. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 210,
+   "phone": "555-3462",
+   "photos": [
+    "ph-ca2f63d40bbb2168",
+    "ph-3a62de3b34f50d4d",
+    "ph-9c88cda95827c3a5",
+    "ph-6b8f76825dc292ab",
+    "ph-9e9c98e070de5def",
+    "ph-396beb778d032b6b",
+    "ph-832c2a62d00cabdf"
+   ],
+   "posted_at": "2026-05-06",
+   "rent": 1370,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Quarry Hill. You will love a quiet courtyard and in-unit laundry. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 211,
+   "phone": "555-8361",
+   "photos": [
+    "ph-24f8d2ea6be5c2ff",
+    "ph-f2741f07cd53473e",
+    "ph-8996697de9bd991e",
+    "ph-73c3a66ab4fd7355",
+    "ph-a269534532438dec",
+    "ph-25c7b479a0a74345",
+    "ph-24bfcac83b7485e1"
+   ],
+   "posted_at": "2026-05-07",
+   "rent": 1735,
+   "synthetic": true,
+   "text": "3 bed apartment near the Pelham Green market: high ceilings, off-street parking, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Kestrel Row",
+   "id": 212,
+   "phone": "555-5332",
+   "photos": [
+    "ph-9a81d78482254a31",
+    "ph-791cf01f925f4cf3",
+    "ph-8d1536cac70f5192",
+    "ph-714b5a49cb112814",
+    "ph-fd33e55f74270745"
+   ],
+   "posted_at": "2026-05-08",
+   "rent": 850,
+   "synthetic": true,
+   "text": "1 bed apartment near the Kestrel Row market: a quiet courtyard, a renovated bath, and a short walk to the bus. Send the reservation payment first and I will mail the keys and the lease and the lease to you. I am out of town for work, so I can't show it myself.",
+   "title": "1 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 213,
+   "phone": "555-8504",
+   "photos": [
+    "ph-02d1ef870a897235",
+    "ph-c7b944ccfed4680f",
+    "ph-9a904da54009a3d9",
+    "ph-c0946ed93d19ce2e"
+   ],
+   "posted_at": "2026-05-08",
+   "rent": 630,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Marlow Street, Oakbend. Features hardwood floors and a bright kitchen. Kindly forward the reservation funds before the viewing. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 214,
+   "phone": "555-3790",
+   "photos": [
+    "ph-1b6e6daa8ba7bdc4",
+    "ph-2f789a1cb7d33d88",
+    "ph-2f8a2132c3ec891a",
+    "ph-6e23fade73a494d7",
+    "ph-d7f60749202ebe80"
+   ],
+   "posted_at": "2026-05-09",
+   "rent": 1460,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Millrace. You will love high ceilings and hardwood floors. forward the reservation payment first and I will mail the keys and the lease to you. Blessings, the Owner's Office.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 215,
+   "phone": "555-5387",
+   "photos": [
+    "ph-3c2dbaff79f5b60e",
+    "ph-7c1cd7a808c2b3dd",
+    "ph-9a185aad122bc146",
+    "ph-b01151d0b604193c",
+    "ph-77b2ddf9e9014d8c"
+   ],
+   "posted_at": "2026-05-10",
+   "rent": 1395,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Juniper Street, Kestrel Row. Features in-unit laundry and a bright kitchen. Come see it first; the application fee is paid through our online portal.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 216,
+   "phone": "555-2208",
+   "photos": [
+    "ph-7e19973b779f682b",
+    "ph-cc5fc1c3a05a64d4",
+    "ph-1a47b3fc6f6e7c67",
+    "ph-2f0fea54098bc375",
+    "ph-e238290586e66903"
+   ],
+   "posted_at": "2026-05-11",
+   "rent": 1345,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Millrace. You will love a renovated bath and new windows. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 217,
+   "phone": "555-3375",
+   "photos": [
+    "ph-c983d89ebc596bfd",
+    "ph-c09b714a0553cef7",
+    "ph-ba7aa0cd92171c6c",
+    "ph-8981e0f7f5ba6661",
+    "ph-cf2108cef150a510"
+   ],
+   "posted_at": "2026-05-12",
+   "rent": 1115,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Quarry Hill. You will love a small balcony and high ceilings. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 218,
+   "phone": "555-1803",
+   "photos": [
+    "ph-faa9714db3d7f35a",
+    "ph-4849aa6408ad3516",
+    "ph-aadd58e5a22bd19a",
+    "ph-d239c66af8fd323b",
+    "ph-22461ee91ab3fdd9"
+   ],
+   "posted_at": "2026-05-12",
+   "rent": 1700,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Oakbend, a bright kitchen. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 219,
+   "phone": "555-7798",
+   "photos": [
+    "ph-1d0f3afe40b853c7",
+    "ph-29d58e4f28fb4154",
+    "ph-c5b80c1c161afe3a",
+    "ph-69c373729f835f50"
+   ],
+   "posted_at": "2026-05-13",
+   "rent": 1765,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Cobble Street, Oakbend. Features a renovated bath and a quiet courtyard. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 220,
+   "phone": "555-8504",
+   "photos": [
+    "ph-54ee23a2adacb2b2",
+    "ph-bd4c1b2ea76749fa",
+    "ph-e248af8a2f0eaf21",
+    "ph-cf69fd5b634e62da",
+    "ph-9722bba60ef18836"
+   ],
+   "posted_at": "2026-05-13",
+   "rent": 665,
+   "synthetic": true,
+   "text": "1 bed apartment near the Pelham Green market: off-street parking, a bright kitchen, and a short walk to the bus. Reservation funds go first, the key set follow by post. The owner is out of town and the unit is under new management. Blessings, the Owner's Office.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 221,
+   "phone": "555-4326",
+   "photos": [
+    "ph-9c0005b2f84a0909",
+    "ph-7a71826561e60e72",
+    "ph-8833779be9487568",
+    "ph-3a6adef60f853f15"
+   ],
+   "posted_at": "2026-05-14",
+   "rent": 1340,
+   "synthetic": true,
+   "text": "2 bed apartment near the Saltmarsh market: in-unit laundry, a quiet courtyard, and a short walk to the bus. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 222,
+   "phone": "555-9341",
+   "photos": [
+    "ph-59f53aed66854eb1",
+    "ph-9290df8e42a736b3",
+    "ph-6caed906788f5fc7",
+    "ph-d6412571028f5831",
+    "ph-d4169ebeceb8adea"
+   ],
+   "posted_at": "2026-05-14",
+   "rent": 1745,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Millrace. You will love lots of closet space and high ceilings. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 223,
+   "phone": "555-9707",
+   "photos": [
+    "ph-3bf7a3741afabd23",
+    "ph-0c8a3b347107789a",
+    "ph-e31f5746553db4e1",
+    "ph-cf40a04574ae4acf",
+    "ph-1f829b020cac4333"
+   ],
+   "posted_at": "2026-05-14",
+   "rent": 1405,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, a bright kitchen. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 224,
+   "phone": "555-8785",
+   "photos": [
+    "ph-3dea28545f1ab1cd",
+    "ph-68a0e7fb6fae0f87",
+    "ph-f0fb8773ff926c77",
+    "ph-25e252c3af24f0eb"
+   ],
+   "posted_at": "2026-05-16",
+   "rent": 1310,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Oakbend with a bright kitchen and hardwood floors. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 225,
+   "phone": "555-3814",
+   "photos": [
+    "ph-ff8d2f484af74d82",
+    "ph-9c912f5260e39241",
+    "ph-67b61eb29fde1aab",
+    "ph-72bf62212b8ed54d"
+   ],
+   "posted_at": "2026-05-17",
+   "rent": 805,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Ashgrove. You will love a quiet courtyard and a renovated bath. To secure it, transfer the first month up front; viewing happens after the keys and the lease arrive. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 4,
+   "hood": "Tern Point",
+   "id": 226,
+   "phone": "555-4010",
+   "photos": [
+    "ph-676d5d399a16565f",
+    "ph-7ee722b112f99a03",
+    "ph-4196786cbe7f0dd0",
+    "ph-695abe4c3d11976e",
+    "ph-72091e7487c882bf",
+    "ph-e35b47aaeb1354d3",
+    "ph-4c5ef4b3c01ebc69"
+   ],
+   "posted_at": "2026-05-19",
+   "rent": 2080,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Tern Point. You will love off-street parking and a small balcony. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 227,
+   "phone": "555-2919",
+   "photos": [
+    "ph-b62996d2621c3c60",
+    "ph-22b03cc70f70941b",
+    "ph-4b8b2655a8c95cfa",
+    "ph-93597d72504f89f4",
+    "ph-73c85896b5bfd820"
+   ],
+   "posted_at": "2026-05-19",
+   "rent": 1010,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Tern Point with high ceilings and a quiet courtyard. Booking amount first, keys afterwards. I am overseas on a posting and cannot meet in person. Blessings, the Owner's Office.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 228,
+   "phone": "555-5377",
+   "photos": [
+    "ph-d6f7ccbdc3eb69b5",
+    "ph-7851012c04266f15",
+    "ph-7f64130137237057",
+    "ph-066da3b9cab20886",
+    "ph-3dbb8a94dab3985d"
+   ],
+   "posted_at": "2026-05-20",
+   "rent": 1330,
+   "synthetic": true,
+   "text": "2 bed apartment near the Oakbend market: a quiet courtyard, lots of closet space, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 229,
+   "phone": "555-6187",
+   "photos": [
+    "ph-a58ef94b7a2135f5",
+    "ph-f9df2dfb6667160b",
+    "ph-c022c1985120faac",
+    "ph-cf358ef3310de47a",
+    "ph-956b7567e3b4f584"
+   ],
+   "posted_at": "2026-05-20",
+   "rent": 1770,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 3-bedroom in Millrace, new windows. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 230,
+   "phone": "555-2345",
+   "photos": [
+    "ph-58a0d813e6ea69a6",
+    "ph-a6f67d2b762bb3e4",
+    "ph-c9cbb6bcc1870ffb",
+    "ph-f29611916f518648",
+    "ph-79dc7e09d8c24cab"
+   ],
+   "posted_at": "2026-05-20",
+   "rent": 1340,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Alder Flats, a quiet courtyard. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Quarry Hill",
+   "id": 231,
+   "phone": "555-7684",
+   "photos": [
+    "ph-9f03d0d936569932",
+    "ph-5317f9edf8ad0b53",
+    "ph-bcb21f6cf655a477",
+    "ph-1e4e3e7f3052735c",
+    "ph-1d0e01a3870e02bf",
+    "ph-5907a70c6b099589",
+    "ph-328ea6b7c4122f6b"
+   ],
+   "posted_at": "2026-05-21",
+   "rent": 2065,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Quarry Hill. You will love hardwood floors and a quiet courtyard. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "4 BR in Quarry Hill"
+  },
+  {
+   "beds": 4,
+   "hood": "Millrace",
+   "id": 232,
+   "phone": "555-1457",
+   "photos": [
+    "ph-d13692c4892a0f41",
+    "ph-29d589ac8e4b590e",
+    "ph-5c974c7745b5a49e",
+    "ph-91fdcf965cf013be",
+    "ph-5bd3a52a92174f91",
+    "ph-0ec00ef139962a8f"
+   ],
+   "posted_at": "2026-05-21",
+   "rent": 2065,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Millrace with a renovated bath and in-unit laundry. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "4 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 233,
+   "phone": "555-6386",
+   "photos": [
+    "ph-33590aa3ceaea9d0",
+    "ph-fd76b70a64c7c5c2",
+    "ph-6a4fff4ad352ad9c",
+    "ph-fca263ab68e22040",
+    "ph-9ba1fe8264fdbd37",
+    "ph-8f94b2858a9de3b6"
+   ],
+   "posted_at": "2026-05-21",
+   "rent": 1970,
+   "synthetic": true,
+   "text": "4 bed apartment near the Saltmarsh market: new windows, a small balcony, and a short walk to the bus. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 234,
+   "phone": "555-3790",
+   "photos": [
+    "ph-3dea28545f1ab1cd",
+    "ph-68a0a7fb6fae8f87",
+    "ph-f0fb8773ff926c77",
+    "ph-65e252c3af24f0eb"
+   ],
+   "posted_at": "2026-05-21",
+   "rent": 1060,
+   "synthetic": true,
+   "text": "2 bed apartment near the Oakbend market: a quiet courtyard, a bright kitchen, and a short walk to the bus. The deposit has to be paid prior to you collect the keys, no exceptions.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 235,
+   "phone": "555-3769",
+   "photos": [
+    "ph-4404090337cf2c5c",
+    "ph-a01bc26da12fa604",
+    "ph-e73d409a318379ec",
+    "ph-dc681d45bb2279e2",
+    "ph-c4261b79a347e377"
+   ],
+   "posted_at": "2026-05-22",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Oakbend. You will love a renovated bath and lots of closet space. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 4,
+   "hood": "Quarry Hill",
+   "id": 236,
+   "phone": "555-7712",
+   "photos": [
+    "ph-7f169cf1c9017e7f",
+    "ph-d8b2f1b3dad88261",
+    "ph-b3863a07a0090d6e",
+    "ph-9b437debcb4345d8",
+    "ph-24ef8438d9dc3585",
+    "ph-92f97019e095e0e5"
+   ],
+   "posted_at": "2026-05-23",
+   "rent": 1970,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Quarry Hill with in-unit laundry and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Quarry Hill"
+  },
+  {
+   "beds": 4,
+   "hood": "Oakbend",
+   "id": 237,
+   "phone": "555-3303",
+   "photos": [
+    "ph-2e44fb977bb7f741",
+    "ph-f58f939800cc147b",
+    "ph-3baa7e891820944b",
+    "ph-bea23a858c6df409",
+    "ph-9acbc3cd62f0eb62",
+    "ph-edb3efbcf86fdf99",
+    "ph-67aa2cfb32a6aa2c"
+   ],
+   "posted_at": "2026-05-23",
+   "rent": 2035,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Oakbend. You will love a quiet courtyard and hardwood floors. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "4 BR in Oakbend"
+  },
+  {
+   "beds": 4,
+   "hood": "Alder Flats",
+   "id": 238,
+   "phone": "555-5485",
+   "photos": [
+    "ph-75bf0bebbbe75bf7",
+    "ph-b3036269a52d5726",
+    "ph-044ab0d072f76bba",
+    "ph-d8f7e3e5e26edf7d",
+    "ph-5298006aa98bf51e",
+    "ph-fdeef69b4184ae0c",
+    "ph-7a310968397ef566"
+   ],
+   "posted_at": "2026-05-23",
+   "rent": 2095,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Alder Flats with lots of closet space and hardwood floors. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 239,
+   "phone": "555-1345",
+   "photos": [
+    "ph-881c979e62dac3b3",
+    "ph-56e77f995b254fba",
+    "ph-b627db42afa04d73",
+    "ph-cdc6e5ff62c97dbd",
+    "ph-26fba15f064e5fcf"
+   ],
+   "posted_at": "2026-05-23",
+   "rent": 1740,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Pelham Green. You will love a renovated bath and lots of closet space. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 240,
+   "phone": "555-3814",
+   "photos": [
+    "ph-9b8a0c16be75f32e",
+    "ph-4c4502cba2e7f0c3",
+    "ph-fe46782cef59565b",
+    "ph-589bf30b556f05bf"
+   ],
+   "posted_at": "2026-05-23",
+   "rent": 615,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love off-street parking and high ceilings. Upfront reservation funds are needed prior to key handover. I am overseas on a posting and cannot meet in person. Warm regards from the Owner's Office.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Westering",
+   "id": 241,
+   "phone": "555-1808",
+   "photos": [
+    "ph-41e96660b75edac9",
+    "ph-a5baa0c08baed394",
+    "ph-64508529998687e3",
+    "ph-9babe8042e3782bd",
+    "ph-5c7dec2b422ef129",
+    "ph-cce8ed71392090f4"
+   ],
+   "posted_at": "2026-05-24",
+   "rent": 1070,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Westering. You will love off-street parking and a small balcony. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "1 BR in Westering"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 242,
+   "phone": "555-8907",
+   "photos": [
+    "ph-9261724964c08d17",
+    "ph-e42f200a2b52c762",
+    "ph-6c71576c75827d01",
+    "ph-6a558f7ecfe4e33c",
+    "ph-2c30f9c71a433dc2",
+    "ph-341fd4c8e0e8eda1",
+    "ph-d1d37bfbf9938298"
+   ],
+   "posted_at": "2026-05-24",
+   "rent": 2010,
+   "synthetic": true,
+   "text": "4 bed apartment near the Pelham Green market: off-street parking, high ceilings, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 243,
+   "phone": "555-4721",
+   "photos": [
+    "ph-6ebf095541fecc4f",
+    "ph-6285a6a298032f35",
+    "ph-c1843240ed6a4685",
+    "ph-70aec4a318bedad7",
+    "ph-d042fb3eee7ea13e"
+   ],
+   "posted_at": "2026-05-24",
+   "rent": 880,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Alder Flats with a renovated bath and a bright kitchen. Forward the booking amount today and the apartment is reserved in your name. I am overseas on a posting and cannot meet in person. Warm regards from the Owner's Office.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Ashgrove",
+   "id": 244,
+   "phone": "555-3873",
+   "photos": [
+    "ph-7ca19ad075038e59",
+    "ph-bba5af2e682b9ad1",
+    "ph-ffaf719e71e95004",
+    "ph-0a042225450a7b82",
+    "ph-1705e64fa3f958c8",
+    "ph-b949cf7b30e8a68f"
+   ],
+   "posted_at": "2026-05-25",
+   "rent": 1735,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Ashgrove. You will love in-unit laundry and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Pelham Green",
+   "id": 245,
+   "phone": "555-3944",
+   "photos": [
+    "ph-629c33caf9c80ec9",
+    "ph-eefe3ff5ef1354c4",
+    "ph-1e9ee44fd627c45b",
+    "ph-28ecd0ea8bd1cdd8",
+    "ph-8326cd0b34a90988"
+   ],
+   "posted_at": "2026-05-25",
+   "rent": 1440,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Pelham Green. You will love a renovated bath and new windows. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Pelham Green"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 246,
+   "phone": "555-5695",
+   "photos": [
+    "ph-8d59de16e3abdcd1",
+    "ph-13c27d17c970cb2e",
+    "ph-6db9c0a97baa22eb",
+    "ph-017cb7de6738cefb",
+    "ph-c228b78908b0a915",
+    "ph-60933fc8b14951b3",
+    "ph-f0f083ecc96cff20"
+   ],
+   "posted_at": "2026-05-25",
+   "rent": 2000,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Pelham Green with new windows and hardwood floors. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 247,
+   "phone": "555-4872",
+   "photos": [
+    "ph-bd7674ddf8a49403",
+    "ph-06c9e87a275f9bbd",
+    "ph-6bb1a8cfd94b9a1b",
+    "ph-9d1fd1a7d51e51d4",
+    "ph-c5382758a74e66d4",
+    "ph-61030b858a4391ec",
+    "ph-b230d6db65a66d66"
+   ],
+   "posted_at": "2026-05-26",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Oakbend. You will love lots of closet space and in-unit laundry. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Alder Flats",
+   "id": 248,
+   "phone": "555-1075",
+   "photos": [
+    "ph-b42996d2621c7c60",
+    "ph-22b03c450f30949b",
+    "ph-4b8b26d5a8c95cfa",
+    "ph-9351fd72504789f4",
+    "ph-7bc05817b4bfdc20"
+   ],
+   "posted_at": "2026-05-26",
+   "rent": 815,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Alder Flats with high ceilings and hardwood floors. Wire the first month's rent and the home is held for you. The owner is out of town and the unit is under new management. Warm regards from the Owner's Office.",
+   "title": "2 BR in Alder Flats"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 249,
+   "phone": "555-3814",
+   "photos": [
+    "ph-5cf2de792f4c6d5a",
+    "ph-0acd7a8a9d194328",
+    "ph-917e9d1589be17c1",
+    "ph-4703e64ff34af3a4"
+   ],
+   "posted_at": "2026-05-27",
+   "rent": 610,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Tern Point. You will love high ceilings and a quiet courtyard. Kindly forward the reservation funds prior to the viewing. I am out of town for work, so I can't show it myself.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 250,
+   "phone": "555-4741",
+   "photos": [
+    "ph-979ce6f1cb184cdf",
+    "ph-bb69f67fa49b705d",
+    "ph-34928eac251169d7",
+    "ph-86788357baf5d1bb"
+   ],
+   "posted_at": "2026-05-28",
+   "rent": 1080,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Saltmarsh. You will love new windows and a quiet courtyard. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Quarry Hill",
+   "id": 251,
+   "phone": "555-2129",
+   "photos": [
+    "ph-b0595c4c68bd6a6c",
+    "ph-12abe4e1d068f5c2",
+    "ph-54bc8654fb0a4771",
+    "ph-ad97d3b82bf1011e",
+    "ph-f588fea310e489ae",
+    "ph-870676e2106c50f7"
+   ],
+   "posted_at": "2026-05-29",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "1 bed apartment near the Quarry Hill market: a bright kitchen, hardwood floors, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Kestrel Row",
+   "id": 252,
+   "phone": "555-3476",
+   "photos": [
+    "ph-1aac76d5607bfd81",
+    "ph-5128196957da5d2e",
+    "ph-83dc0b38c0c07fc2",
+    "ph-aa8a75182528cc7e"
+   ],
+   "posted_at": "2026-05-30",
+   "rent": 1630,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Kestrel Row. You will love high ceilings and a bright kitchen. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "3 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Tern Point",
+   "id": 253,
+   "phone": "555-8679",
+   "photos": [
+    "ph-a4f50a4c8ce1a077",
+    "ph-ce8b219dcdbfcda5",
+    "ph-316da7ba4153a8a2",
+    "ph-3e8d3ce7615baf3f",
+    "ph-e088a81de5198cfa"
+   ],
+   "posted_at": "2026-05-31",
+   "rent": 850,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Tern Point. You will love off-street parking and new windows. Reservation funds go first, the keys and the lease follow by post. I am overseas on a posting and cannot meet in person.",
+   "title": "2 BR in Tern Point"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 254,
+   "phone": "555-2362",
+   "photos": [
+    "ph-6ebf09d540fecc4f",
+    "ph-6285a6a298036f35",
+    "ph-c1843440ed6a4685",
+    "ph-70aee4a31cbedad7",
+    "ph-d042fbbe6e7ea13e"
+   ],
+   "posted_at": "2026-05-31",
+   "rent": 625,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Millrace. You will love a quiet courtyard and lots of closet space. Wire the first month's rent and the home is held for you. Warm regards from the Owner's Office.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Ashgrove",
+   "id": 255,
+   "phone": "555-8799",
+   "photos": [
+    "ph-8aa34fa4a9812fff",
+    "ph-f3cf664b686d9814",
+    "ph-a5252d5486e304d0",
+    "ph-8b55171a89f0d6f2",
+    "ph-b42129e9c560d47d"
+   ],
+   "posted_at": "2026-06-01",
+   "rent": 2095,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Ashgrove with lots of closet space and a quiet courtyard. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Ashgrove"
+  },
+  {
+   "beds": 4,
+   "hood": "Quarry Hill",
+   "id": 256,
+   "phone": "555-3429",
+   "photos": [
+    "ph-3cba2af370773cac",
+    "ph-f890d653dbcc653c",
+    "ph-d86f0b319b192078",
+    "ph-164abe958573c9c9"
+   ],
+   "posted_at": "2026-06-01",
+   "rent": 1970,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Quarry Hill with new windows and a quiet courtyard. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "4 BR in Quarry Hill"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 257,
+   "phone": "555-3962",
+   "photos": [
+    "ph-f536a5f14eb4d1de",
+    "ph-3961da26320160d7",
+    "ph-723f3b47f5599ff0",
+    "ph-b78bfc47d25b40f8",
+    "ph-a703748f08e0c95d",
+    "ph-76ccb4c90c42ee25"
+   ],
+   "posted_at": "2026-06-03",
+   "rent": 1365,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Harrow Street, Ashgrove. Features new windows and high ceilings. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 258,
+   "phone": "555-8715",
+   "photos": [
+    "ph-a706cb41896cd1d4",
+    "ph-24f164f9ae92aecd",
+    "ph-0b085f8e75df3fca",
+    "ph-7554040b83a37229"
+   ],
+   "posted_at": "2026-06-03",
+   "rent": 1115,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Tern Point. You will love a bright kitchen and new windows. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Oakbend",
+   "id": 259,
+   "phone": "555-7341",
+   "photos": [
+    "ph-07d880a6119e4dcd",
+    "ph-aaa9c0d545f1128c",
+    "ph-eafbf98361f2c26a",
+    "ph-36d3b5ead61eb1ca",
+    "ph-d121475dd359251f",
+    "ph-8dc1ca2e10be95a3"
+   ],
+   "posted_at": "2026-06-03",
+   "rent": 1735,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Linden Street, Oakbend. Features a bright kitchen and high ceilings. Come see it first; the application fee is paid through our online portal.",
+   "title": "3 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 260,
+   "phone": "555-9799",
+   "photos": [
+    "ph-2b370c51b59ffb23",
+    "ph-c328b0dc68ca78d1",
+    "ph-4d42ab31fd124beb",
+    "ph-a053993c37ee484d",
+    "ph-aadf8e10c847922f"
+   ],
+   "posted_at": "2026-06-03",
+   "rent": 1315,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 261,
+   "phone": "555-7474",
+   "photos": [
+    "ph-765e8abcafbf1bdf",
+    "ph-935794dde0ea52ef",
+    "ph-f7a0370ab3b22948",
+    "ph-633cc8a464ad8f91"
+   ],
+   "posted_at": "2026-06-04",
+   "rent": 1305,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Oakbend with a bright kitchen and a small balcony. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 262,
+   "phone": "555-4309",
+   "photos": [
+    "ph-7b7dbe338bfcadab",
+    "ph-150db521163102bc",
+    "ph-13d617ea633ee3c1",
+    "ph-15ac0cb4ce5484a2",
+    "ph-91871a02952cb6c5"
+   ],
+   "posted_at": "2026-06-04",
+   "rent": 1420,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Marlow Street, Oakbend. Features high ceilings and in-unit laundry. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 263,
+   "phone": "555-9707",
+   "photos": [
+    "ph-a8763854ab6acc14",
+    "ph-5bf936459a51892f",
+    "ph-15e7283963e2e797",
+    "ph-4949ba8c6d28af50",
+    "ph-418c0a621d8c881e"
+   ],
+   "posted_at": "2026-06-04",
+   "rent": 1110,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Oakbend, high ceilings. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 264,
+   "phone": "555-3601",
+   "photos": [
+    "ph-b62996d2621c3c60",
+    "ph-22b03c4f0f70949b",
+    "ph-4b8b2655a8c95cfa",
+    "ph-93517572504789f4",
+    "ph-73c05896b4bfd822"
+   ],
+   "posted_at": "2026-06-04",
+   "rent": 845,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Oakbend with in-unit laundry and off-street parking. Booking amount first, keys afterwards.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 265,
+   "phone": "555-3913",
+   "photos": [
+    "ph-fd8ed9a92002a078",
+    "ph-a01c25cfbce6c432",
+    "ph-45169e516585352c",
+    "ph-85517625afa7d5fb"
+   ],
+   "posted_at": "2026-06-06",
+   "rent": 1060,
+   "synthetic": true,
+   "text": "1 bed apartment near the Saltmarsh market: a renovated bath, in-unit laundry, and a short walk to the bus. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Oakbend",
+   "id": 266,
+   "phone": "555-8057",
+   "photos": [
+    "ph-cb46419d228a0a27",
+    "ph-6dc7958b2546ae52",
+    "ph-2459301d2f216f22",
+    "ph-51469694be00d589"
+   ],
+   "posted_at": "2026-06-06",
+   "rent": 1020,
+   "synthetic": true,
+   "text": "Well kept 1-bedroom in Oakbend. You will love a bright kitchen and in-unit laundry. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Millrace",
+   "id": 267,
+   "phone": "555-9799",
+   "photos": [
+    "ph-847dcebc54a31c0a",
+    "ph-8ef5adf064e49461",
+    "ph-f73281c72b06fb83",
+    "ph-a6b3bfb11423bd4e",
+    "ph-208b1c0a842e107e"
+   ],
+   "posted_at": "2026-06-06",
+   "rent": 985,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Millrace, in-unit laundry. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Ashgrove",
+   "id": 268,
+   "phone": "555-9879",
+   "photos": [
+    "ph-8aa34fa4a9812fff",
+    "ph-f3cf664b68ed9894",
+    "ph-a5212d5486e304d0",
+    "ph-8b55171a89f0d6f2",
+    "ph-b42129e9c560d47d"
+   ],
+   "posted_at": "2026-06-06",
+   "rent": 1845,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Ashgrove with lots of closet space and off-street parking. A reservation sum must reach me prior to the keys are released; the unit is yours. Blessings, the Owner's Office.",
+   "title": "4 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Oakbend",
+   "id": 269,
+   "phone": "555-7759",
+   "photos": [
+    "ph-6ebf09d540fecc4f",
+    "ph-6285a6a298036f35",
+    "ph-d18432402d6a4685",
+    "ph-70aee4a31cbedad7",
+    "ph-d042fb3e6e7eb13e"
+   ],
+   "posted_at": "2026-06-07",
+   "rent": 855,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Oakbend with a bright kitchen and hardwood floors. Booking amount first, keys afterwards. I am out of town for work, so I can't show it myself. Warm regards from the Owner's Office.",
+   "title": "2 BR in Oakbend"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 270,
+   "phone": "555-7142",
+   "photos": [
+    "ph-7224be39ee2c6bda",
+    "ph-f96c89d86f7cf5a6",
+    "ph-a5a8ce96c03b2971",
+    "ph-84fe4156e5154f9e",
+    "ph-5a58315df49c84e1",
+    "ph-54c884aa034ee695"
+   ],
+   "posted_at": "2026-06-08",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Alder Flats with a small balcony and a bright kitchen. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 271,
+   "phone": "555-4218",
+   "photos": [
+    "ph-04fd229a7b64081d",
+    "ph-273e4c20c55c34da",
+    "ph-e83b35e26d172cdc",
+    "ph-3fdf2ec28327d192"
+   ],
+   "posted_at": "2026-06-09",
+   "rent": 1695,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Pelham Green with off-street parking and hardwood floors. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Tern Point",
+   "id": 272,
+   "phone": "555-8756",
+   "photos": [
+    "ph-03636c7f03bc6e75",
+    "ph-d7dcf6f6545f6b0c",
+    "ph-6acf4c95418545a7",
+    "ph-07e88efe2d46f81e"
+   ],
+   "posted_at": "2026-06-10",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Marlow Street, Tern Point. Features high ceilings and a bright kitchen. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "1 BR in Tern Point"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 273,
+   "phone": "555-2135",
+   "photos": [
+    "ph-fb89f0bf563597d3",
+    "ph-e15b5c889d17688e",
+    "ph-e35721ce05d5cc53",
+    "ph-1cdfa62b5707c2d6",
+    "ph-ad942a97166c98f7"
+   ],
+   "posted_at": "2026-06-11",
+   "rent": 1335,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Quarry Hill. You will love new windows and a quiet courtyard. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 274,
+   "phone": "555-4607",
+   "photos": [
+    "ph-b62996d262043ce0",
+    "ph-22b83c470f708499",
+    "ph-4b8b2655a8cd5cfa",
+    "ph-9350fd72504789f4",
+    "ph-73c05897b4bdd820"
+   ],
+   "posted_at": "2026-06-11",
+   "rent": 1085,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Fenwick Street, Quarry Hill. Features hardwood floors and a small balcony. Forward the booking amount today and the apartment is reserved in your name.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 2,
+   "hood": "Ashgrove",
+   "id": 275,
+   "phone": "555-3335",
+   "photos": [
+    "ph-daa9545db3fb61e8",
+    "ph-0042c8c7f574f43c",
+    "ph-696cb021890b8da0",
+    "ph-c16f3b3d45a21e32",
+    "ph-c69d4641dea74c6f",
+    "ph-c9d8393e98d3a454",
+    "ph-0680f0ee007d88a7"
+   ],
+   "posted_at": "2026-06-12",
+   "rent": 1400,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Ashgrove with high ceilings and a small balcony. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Ashgrove"
+  },
+  {
+   "beds": 2,
+   "hood": "Quarry Hill",
+   "id": 276,
+   "phone": "555-4324",
+   "photos": [
+    "ph-da14b8ee159eab0f",
+    "ph-281e06a305962064",
+    "ph-dc081cb6b9666f83",
+    "ph-28fdedd24a8cc1d8",
+    "ph-227af761e9a05f87"
+   ],
+   "posted_at": "2026-06-12",
+   "rent": 1365,
+   "synthetic": true,
+   "text": "Well kept 2-bedroom in Quarry Hill. You will love a bright kitchen and off-street parking. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "2 BR in Quarry Hill"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 277,
+   "phone": "555-5340",
+   "photos": [
+    "ph-ab22c3ceaf1ee1ed",
+    "ph-a81c6ab98e562335",
+    "ph-9c79f956cbc6dcdb",
+    "ph-70486a175c58e738",
+    "ph-06a9fa952924eee9"
+   ],
+   "posted_at": "2026-06-13",
+   "rent": 1340,
+   "synthetic": true,
+   "text": "2 bed apartment near the Millrace market: a bright kitchen, a renovated bath, and a short walk to the bus. Come see it first; the application fee is paid through our online portal.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Tern Point",
+   "id": 278,
+   "phone": "555-9659",
+   "photos": [
+    "ph-f3245217741518cc",
+    "ph-f777e15f40ba338d",
+    "ph-d8d98991fe19f4e9",
+    "ph-586ab43087c388a5",
+    "ph-2c74d2894d339262",
+    "ph-26275c46e732b8d6"
+   ],
+   "posted_at": "2026-06-14",
+   "rent": 1385,
+   "synthetic": true,
+   "text": "Welcome to this 2-bedroom home in Tern Point with new windows and in-unit laundry. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "2 BR in Tern Point"
+  },
+  {
+   "beds": 4,
+   "hood": "Pelham Green",
+   "id": 279,
+   "phone": "555-2846",
+   "photos": [
+    "ph-d182e07585922f91",
+    "ph-10b9fcc72bb83ec8",
+    "ph-797731ee59189a09",
+    "ph-ab2fe5b2b6ae3e52"
+   ],
+   "posted_at": "2026-06-15",
+   "rent": 2015,
+   "synthetic": true,
+   "text": "4 bed apartment near the Pelham Green market: a small balcony, a quiet courtyard, and a short walk to the bus. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "4 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 280,
+   "phone": "555-7727",
+   "photos": [
+    "ph-6ebf09d540fecc4f",
+    "ph-6285a6a290036f35",
+    "ph-69843240ed6a4685",
+    "ph-70aef4a31cbedad7",
+    "ph-d842fb3e667fa13e"
+   ],
+   "posted_at": "2026-06-15",
+   "rent": 630,
+   "synthetic": true,
+   "text": "Welcome to this 1-bedroom home in Alder Flats with in-unit laundry and new windows. Wire the first month's rent and the home is held for you. I am out of town for work, so I can't show it myself. Blessings, the Owner's Office.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 281,
+   "phone": "555-6955",
+   "photos": [
+    "ph-a3b74a7bf6ae9ab0",
+    "ph-ae06c30855846842",
+    "ph-d0a49b97ecb60c98",
+    "ph-d1857a9a23de885e",
+    "ph-700efca2ce8a1eb0"
+   ],
+   "posted_at": "2026-06-16",
+   "rent": 1985,
+   "synthetic": true,
+   "text": "Sunny 4-bedroom on Fenwick Street, Saltmarsh. Features high ceilings and a bright kitchen. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 1,
+   "hood": "Pelham Green",
+   "id": 282,
+   "phone": "555-2393",
+   "photos": [
+    "ph-3ae6093bbbaf60da",
+    "ph-34c07162e4d59531",
+    "ph-419583039ede65f9",
+    "ph-3e3ee1d3e024f5d6",
+    "ph-038c638283f76e8f"
+   ],
+   "posted_at": "2026-06-17",
+   "rent": 970,
+   "synthetic": true,
+   "text": "1 bed apartment near the Pelham Green market: new windows, off-street parking, and a short walk to the bus. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "1 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Ashgrove",
+   "id": 283,
+   "phone": "555-9306",
+   "photos": [
+    "ph-e43f77df3e0bde92",
+    "ph-c0a3fbd197aa55f6",
+    "ph-d63075c7464043d6",
+    "ph-c3230261a1b43f97",
+    "ph-1d014f3340679547",
+    "ph-e2e81cf8242de350",
+    "ph-2f9d64148159b42f"
+   ],
+   "posted_at": "2026-06-17",
+   "rent": 1090,
+   "synthetic": true,
+   "text": "Sunny 1-bedroom on Juniper Street, Ashgrove. Features a small balcony and a quiet courtyard. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Ashgrove"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 284,
+   "phone": "555-7447",
+   "photos": [
+    "ph-a14efa9014dbfb60",
+    "ph-b05ba1d35d407b17",
+    "ph-0ab9f4516334e752",
+    "ph-e03ad5f8c978d732",
+    "ph-57ab717073fd1dff",
+    "ph-709f6397630c91b9",
+    "ph-0e9375aab884fc1a"
+   ],
+   "posted_at": "2026-06-18",
+   "rent": 2070,
+   "synthetic": true,
+   "text": "Welcome to this 4-bedroom home in Saltmarsh with high ceilings and a quiet courtyard. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 3,
+   "hood": "Millrace",
+   "id": 285,
+   "phone": "555-5538",
+   "photos": [
+    "ph-75443cda00bfc1d0",
+    "ph-8f8a17a408c1a989",
+    "ph-56269325777986e6",
+    "ph-575dc6b595eef1ab"
+   ],
+   "posted_at": "2026-06-18",
+   "rent": 1640,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Millrace with a small balcony and a renovated bath. Apply on our website. The security deposit is due once approved, after a walk-through.",
+   "title": "3 BR in Millrace"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 286,
+   "phone": "555-2345",
+   "photos": [
+    "ph-b772fa8afe6b6413",
+    "ph-c4ff66e204637970",
+    "ph-aa39eed78c65d726",
+    "ph-318752cadcb4a637",
+    "ph-46387df9c3ca20a7"
+   ],
+   "posted_at": "2026-06-18",
+   "rent": 1350,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 287,
+   "phone": "555-4141",
+   "photos": [
+    "ph-ab22c3ceaf1ee1ed",
+    "ph-a81c6eb98e56233d",
+    "ph-9c79f956cbc6d4db",
+    "ph-70406a175c58e738",
+    "ph-26a9fa952924eee9"
+   ],
+   "posted_at": "2026-06-18",
+   "rent": 1090,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Harrow Street, Millrace. Features new windows and in-unit laundry. A reservation sum must reach me ahead of the keys are released; the unit is yours. The owner is out of town and the unit is under new management. Warm regards from the Owner's Office.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Saltmarsh",
+   "id": 288,
+   "phone": "555-4019",
+   "photos": [
+    "ph-eccf3a235e85cf28",
+    "ph-965e29d3c2d2ee83",
+    "ph-92655bb637c54aa7",
+    "ph-6752c827832db52a"
+   ],
+   "posted_at": "2026-06-20",
+   "rent": 2100,
+   "synthetic": true,
+   "text": "4 bed apartment near the Saltmarsh market: a bright kitchen, high ceilings, and a short walk to the bus. Showings are by appointment. Deposit of one month is due at lease signing, after you tour.",
+   "title": "4 BR in Saltmarsh"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 289,
+   "phone": "555-3870",
+   "photos": [
+    "ph-2ef7e547608292ed",
+    "ph-41ef8ad198aa34f4",
+    "ph-b945d7063c67ae52",
+    "ph-c9b7a90f1cf178eb",
+    "ph-07ce485f673d13a2"
+   ],
+   "posted_at": "2026-06-21",
+   "rent": 1670,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Westering with high ceilings and lots of closet space. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 290,
+   "phone": "555-8807",
+   "photos": [
+    "ph-945203abd36e5eda",
+    "ph-e8d12d180ea885bc",
+    "ph-4af0ab04d940a010",
+    "ph-49c1cd8d53d4f52f"
+   ],
+   "posted_at": "2026-06-21",
+   "rent": 1045,
+   "synthetic": true,
+   "text": "1 bed apartment near the Saltmarsh market: a small balcony, in-unit laundry, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Millrace",
+   "id": 291,
+   "phone": "555-8949",
+   "photos": [
+    "ph-4eec46a33c835fba",
+    "ph-6314dfbbc8dfa686",
+    "ph-227818f331faae5c",
+    "ph-ebdc37581a8c9c84"
+   ],
+   "posted_at": "2026-06-23",
+   "rent": 1330,
+   "synthetic": true,
+   "text": "Sunny 2-bedroom on Juniper Street, Millrace. Features a renovated bath and new windows. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "2 BR in Millrace"
+  },
+  {
+   "beds": 4,
+   "hood": "Kestrel Row",
+   "id": 292,
+   "phone": "555-8127",
+   "photos": [
+    "ph-f2f76f19b20c9874",
+    "ph-83aed8bf763e1956",
+    "ph-34119ce3a0607c03",
+    "ph-f7d6563dd85256fa",
+    "ph-12b7c1695eac2953",
+    "ph-1d2ff8034cc08190",
+    "ph-796710728eecd318"
+   ],
+   "posted_at": "2026-06-24",
+   "rent": 1990,
+   "synthetic": true,
+   "text": "Well kept 4-bedroom in Kestrel Row. You will love in-unit laundry and lots of closet space. Come see it first; the application fee is paid through our online portal.",
+   "title": "4 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Westering",
+   "id": 293,
+   "phone": "555-2512",
+   "photos": [
+    "ph-94e8dac65dbf5dd3",
+    "ph-d6bc581273a72226",
+    "ph-065fe23a50cefd37",
+    "ph-7ad36a3b6136564c",
+    "ph-d295c700ba224505",
+    "ph-de28b4bb5b0ae9a6",
+    "ph-10b60f7ff21a7fd0"
+   ],
+   "posted_at": "2026-06-25",
+   "rent": 1680,
+   "synthetic": true,
+   "text": "Sunny 3-bedroom on Juniper Street, Westering. Features a small balcony and high ceilings. Pets negotiable. Water included. Lease terms are twelve months.",
+   "title": "3 BR in Westering"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 294,
+   "phone": "555-6187",
+   "photos": [
+    "ph-04a88e183857e361",
+    "ph-899c65da7bfb2266",
+    "ph-bf1ff4d52ff067fb",
+    "ph-0e3645c1bfbecf90",
+    "ph-c88c33a3e479290e"
+   ],
+   "posted_at": "2026-06-25",
+   "rent": 1315,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, a small balcony. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 1,
+   "hood": "Alder Flats",
+   "id": 295,
+   "phone": "555-6187",
+   "photos": [
+    "ph-aa3ba663da231bd9",
+    "ph-b92b072dda179cd6",
+    "ph-fdd5a214a920d984",
+    "ph-d924059d251d40a6",
+    "ph-c514a14ce37a164f"
+   ],
+   "posted_at": "2026-06-26",
+   "rent": 985,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 1-bedroom in Alder Flats, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "1 BR in Alder Flats"
+  },
+  {
+   "beds": 3,
+   "hood": "Tern Point",
+   "id": 296,
+   "phone": "555-1508",
+   "photos": [
+    "ph-26c34ac8ff86ada7",
+    "ph-47d90339bb2f0f8f",
+    "ph-89be8cd54428a20b",
+    "ph-ef77925de79ff38c"
+   ],
+   "posted_at": "2026-06-27",
+   "rent": 1720,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Tern Point. You will love in-unit laundry and off-street parking. Tenants may pay monthly rent by Zelle or check once they have moved in.",
+   "title": "3 BR in Tern Point"
+  },
+  {
+   "beds": 3,
+   "hood": "Quarry Hill",
+   "id": 297,
+   "phone": "555-9901",
+   "photos": [
+    "ph-2e468f7f22cb4d75",
+    "ph-04126b31410d7cdb",
+    "ph-3a6e6ad8dd31135c",
+    "ph-147338221eaf9cf0",
+    "ph-c3e96723ebc66618",
+    "ph-42639441102bf73c",
+    "ph-127023b5a54a8d9c"
+   ],
+   "posted_at": "2026-06-28",
+   "rent": 1750,
+   "synthetic": true,
+   "text": "Welcome to this 3-bedroom home in Quarry Hill with a renovated bath and a quiet courtyard. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "3 BR in Quarry Hill"
+  },
+  {
+   "beds": 2,
+   "hood": "Saltmarsh",
+   "id": 298,
+   "phone": "555-9648",
+   "photos": [
+    "ph-b39f8dfdbba15710",
+    "ph-cb45f882a4947bcc",
+    "ph-5fd497c2c8d6ef42",
+    "ph-d96604b2abb604bb",
+    "ph-b4303372100b1d91",
+    "ph-cba280009af393f0",
+    "ph-f2a6a8ac4ab75e61"
+   ],
+   "posted_at": "2026-06-28",
+   "rent": 1335,
+   "synthetic": true,
+   "text": "2 bed apartment near the Saltmarsh market: off-street parking, a quiet courtyard, and a short walk to the bus. First month's rent is collected on move-in day. Tour any weekday.",
+   "title": "2 BR in Saltmarsh"
+  },
+  {
+   "beds": 2,
+   "hood": "Kestrel Row",
+   "id": 299,
+   "phone": "555-2345",
+   "photos": [
+    "ph-b772fa8afe6b6413",
+    "ph-c4ff66e204637970",
+    "ph-aa39eed78c65d726",
+    "ph-318752cadcb4a637",
+    "ph-46387df9c3ca20a7"
+   ],
+   "posted_at": "2026-06-29",
+   "rent": 1325,
+   "synthetic": true,
+   "text": "Managed by Harbor Row Property Group. 2-bedroom in Kestrel Row, a renovated bath. Tour with our leasing office. Deposit due at lease signing.",
+   "title": "2 BR in Kestrel Row"
+  },
+  {
+   "beds": 3,
+   "hood": "Pelham Green",
+   "id": 300,
+   "phone": "555-1345",
+   "photos": [
+    "ph-881c979e62dac3b3",
+    "ph-56e77f995b254fba",
+    "ph-b627db42afa04d73",
+    "ph-cdc6e5ff62c97dbd",
+    "ph-26fba15f064e5fcf"
+   ],
+   "posted_at": "2026-06-29",
+   "rent": 1715,
+   "synthetic": true,
+   "text": "Well kept 3-bedroom in Pelham Green. You will love a renovated bath and lots of closet space. Rent covers water and trash. Deposit is collected at the signing table.",
+   "title": "3 BR in Pelham Green"
+  },
+  {
+   "beds": 1,
+   "hood": "Saltmarsh",
+   "id": 301,
+   "phone": "555-8807",
+   "photos": [
+    "ph-945203abd36e5eda",
+    "ph-e8d12d180ea885bc",
+    "ph-4af0ab04d940a010",
+    "ph-49c1cd8d53d4f52f"
+   ],
+   "posted_at": "2026-06-29",
+   "rent": 1020,
+   "synthetic": true,
+   "text": "1 bed apartment near the Saltmarsh market: a small balcony, in-unit laundry, and a short walk to the bus. We never ask for money before you have seen the unit. No wire, no gift cards.",
+   "title": "1 BR in Saltmarsh"
+  }
+ ],
+ "label": "SYNTHETIC: generated rental ads for the forensics demo. Not real people, places or numbers.",
+ "seed": 20261114
+}

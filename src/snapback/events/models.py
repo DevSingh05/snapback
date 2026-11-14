@@ -30,6 +30,10 @@ class EventKind(StrEnum):
     INDEX_WARMED = "index_warmed"
     CASE_CREATED = "case_created"
     AERIAL_CACHED = "aerial_cached"
+    # M9: what the renter did in the finder. Attributes of the place only, never which place.
+    PLACE_PICKED = "place_picked"
+    PLACE_PASSED = "place_passed"
+    BRIEF_CHANGED = "brief_changed"
 
 
 # What each payload key may hold. A key is never free text: it is one of a few words, a
@@ -66,6 +70,11 @@ VALUE_RULES = {
     "views": _is_count,
     "data_source": _one_of("fixture", "live"),
     "direction": _one_of("north", "east", "south", "west", "nadir"),
+    "place_kind": _one_of("apartment", "house"),
+    "walkup": _is_bool,
+    "parking": _is_bool,
+    "brief_field": _one_of("budget", "beds", "parking", "no_walkup", "pets"),
+    "rent_max": _is_count,
 }
 
 # The keys a payload may carry, per kind. Anything else is refused, not dropped: a caller
@@ -78,6 +87,13 @@ PAYLOAD_KEYS: dict[EventKind, frozenset[str]] = {
     EventKind.INDEX_WARMED: frozenset({"twins", "views"}),
     EventKind.CASE_CREATED: frozenset({"data_source"}),
     EventKind.AERIAL_CACHED: frozenset({"direction"}),
+    EventKind.PLACE_PICKED: frozenset(
+        {"session", "place_kind", "has_scan", "rent_from", "walkup", "parking"}
+    ),
+    EventKind.PLACE_PASSED: frozenset(
+        {"session", "place_kind", "has_scan", "rent_from", "walkup", "parking"}
+    ),
+    EventKind.BRIEF_CHANGED: frozenset({"session", "brief_field", "rent_max"}),
 }
 
 # A change to a record can only ever be scripted: the kit does not change under us.

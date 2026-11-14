@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar purge eval eval-baseline prefetch-weights eval-locate-real
+.PHONY: setup lint format test hygiene check api web sidecar mcp purge eval eval-baseline prefetch-weights eval-locate-real
 
 setup: ## install python and node dependencies
 	uv sync
@@ -34,6 +34,9 @@ web: ## run the web app on :5173 against the API on :8000 via the /api proxy (LI
 
 sidecar: ## run the intake sidecar stub
 	npm run dev -w apps/sidecar
+
+mcp: ## SNAPBACK's MCP server on stdio, for Claude Desktop / Claude Code (needs `make api`)
+	uv run python -m snapback.mcp_server
 
 purge: ## delete everything under data/ (sponsor caches, memory DB); sponsor terms: by Sun 16:00
 	uv run python -m snapback.safety purge

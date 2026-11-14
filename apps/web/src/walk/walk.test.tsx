@@ -1,13 +1,16 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { TourStop, TraceEvent, TraceKind } from "../contracts";
 import { EVIDENCE_FIXTURE_A } from "../evidence/fixture";
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { parseTraceEvent } from "../trace/parse";
-import { AgentRail } from "./AgentRail";
+import { AgentRail, FOLLOW_PAUSE_MS } from "./AgentRail";
 import { MISMATCH_TITLE, MismatchAerials, NAMED_LABEL, PICTURED_LABEL } from "./MismatchAerials";
-import { railCounts, railFiles, railItems } from "./rail";
+import { plainLine, railCounts, railFiles, railItems, stepForStop, stopLine } from "./rail";
 import { RAIL_STUB_A, RAIL_STUB_B } from "./railStub";
 import { DRAWING_LABEL, REAL_LABEL, RealStill, StageViews } from "./StageViews";
 import { StageCaption, StopStage } from "./StopStage";
@@ -85,12 +88,17 @@ describe("AgentRail: one line per event kind", () => {
       />,
     );
     const stamp = (seq: number) => within(lineOf(seq)).getByTestId("rail-stamp");
-    expect(stamp(0)).toHaveTextContent("picked by model");
+    expect(stamp(0)).toHaveTextContent("Picked by the model");
     expect(stamp(0)).toHaveAttribute("data-by", "model");
     expect(lineOf(0)).toHaveTextContent("Search scan S2 on its own.");
     expect(lineOf(0)).toHaveTextContent("from 3 options");
-    expect(stamp(1)).toHaveTextContent("picked by rules");
-    expect(stamp(2)).toHaveTextContent("random draw");
+    expect(within(lineOf(0)).getAllByTestId("pick-option")).toHaveLength(3);
+    expect(within(lineOf(0)).getByText(/Look closer at scan S2/)).toHaveAttribute(
+      "data-picked",
+      "true",
+    );
+    expect(stamp(1)).toHaveTextContent("Picked by our rules");
+    expect(stamp(2)).toHaveTextContent("Random draw");
   });
 
   it("unsure: the code's fixed sentence, marked Not sure", () => {
@@ -142,6 +150,9 @@ describe("AgentRail: only what the stream delivered", () => {
     );
     expect(lines).toHaveLength(parsed.length);
     expect(screen.getByTestId("rail-summary")).toHaveTextContent(
+      `${parsed.length} steps our agents took, in order.`,
+    );
+    expect(screen.getByTestId("rail-counts")).toHaveTextContent(
       `${parsed.length} steps, 1 picked by model`,
     );
   });
@@ -151,15 +162,22 @@ describe("AgentRail: only what the stream delivered", () => {
     expect(screen.getByTestId("rail-empty")).toBeInTheDocument();
     expect(screen.queryAllByTestId("rail-line")).toHaveLength(0);
     expect(screen.queryAllByTestId("rail-agent")).toHaveLength(0);
-    expect(screen.getByTestId("rail-summary")).toHaveTextContent("0 steps, 0 picked by model");
+    expect(screen.getByTestId("rail-summary")).toHaveTextContent(
+      "Steps appear here as our agents work.",
+    );
+    expect(screen.queryByTestId("rail-counts")).not.toBeInTheDocument();
   });
 
   it("lists only files that a file event carried", () => {
     render(<AgentRail events={RAIL_STUB_A} source="fixture" reduced={false} />);
-    const toggle = screen.getByRole("button", { name: "Files (4)" });
+    const tab = screen.getByRole("tab", { name: "Files 4" });
     expect(railFiles(RAIL_STUB_A)).toHaveLength(4);
-    fireEvent.click(toggle);
+    fireEvent.click(tab);
+    expect(tab).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByTestId("files-file")).toHaveLength(4);
+    // The files take the steps' place in the same box, inside the rail.
+    expect(screen.getByTestId("rail-scroll")).toContainElement(screen.getByTestId("rail-files"));
+    expect(screen.queryAllByTestId("rail-line")).toHaveLength(0);
   });
 
   it("shows the matched points for a pick that names a photo, read from the evidence file", () => {
@@ -174,8 +192,8 @@ describe("AgentRail: only what the stream delivered", () => {
       />,
     );
     const proofs = screen.getAllByTestId("rail-proof");
-    expect(proofs[0]).toHaveTextContent("P3: 88 matched points, bar 30");
-    expect(proofs[1]).toHaveTextContent("P4: 24 matched points, bar 30");
+    expect(proofs[0]).toHaveTextContent("P3: 88 matching points, 30 needed");
+    expect(proofs[1]).toHaveTextContent("P4: 24 matching points, 30 needed");
     fireEvent.click(proofs[0]!);
     expect(onOpen).toHaveBeenCalledWith("P3");
   });
@@ -184,7 +202,7 @@ describe("AgentRail: only what the stream delivered", () => {
     render(<AgentRail events={RAIL_STUB_B} source="fixture" reduced />);
     const rail = screen.getByTestId("agent-rail");
     expect(rail).toHaveAttribute("data-motion", "reduced");
-    const sheet = within(rail).getByRole("button", { expanded: false, name: /steps/ });
+    const sheet = within(rail).getByRole("button", { expanded: false, name: /How we checked/ });
     fireEvent.click(sheet);
     expect(rail).toHaveAttribute("data-open", "true");
   });
@@ -197,6 +215,246 @@ describe("AgentRail: only what the stream delivered", () => {
 
 const stopOf = (key: string): TourStop => FIXTURE_TOUR.stops.find((s) => s.key === key)!;
 
+describe("the rail follows the walk", () => {
+  const items = railItems(RAIL_STUB_A);
+  const seqOf = (kind: string, pick: string) =>
+    RAIL_STUB_A.find((e) => (e.kind as string) === kind && e.pick === pick)!.seq;
+  const kitchenPhoto = photoAt(stopOf("room-3"), EVIDENCE_FIXTURE_A);
+  const follow = (key: string, reduced = true) => (
+    <AgentRail
+      events={RAIL_STUB_A}
+      source="fixture"
+      evidence={EVIDENCE_FIXTURE_A}
+      reduced={reduced}
+      stop={stopOf(key)}
+      photo={photoAt(stopOf(key), EVIDENCE_FIXTURE_A)}
+    />
+  );
+  const lit = () => screen.getAllByTestId("rail-line").filter((l) => l.dataset.lit === "true");
+
+  afterEach(() => vi.useRealTimers());
+
+  it("maps each stop to the agent step behind it: record, place for a photo stop, walk", () => {
+    expect(stepForStop(items, stopOf("arrive"))).toBe(seqOf("agent", "record"));
+    // The kitchen's photo was placed by the base search, so the base search step is its step.
+    expect(kitchenPhoto?.searches.at(-1)).toMatchObject({ option: "base", result: "placed" });
+    expect(stepForStop(items, stopOf("room-3"), kitchenPhoto)).toBe(seqOf("tool", "locate_photos"));
+    // A photo the agent's own pick placed lights that pick.
+    const p3 = EVIDENCE_FIXTURE_A.photos.find((p) => p.alias === "P3")!;
+    expect(stepForStop(items, stopOf("room-3"), p3)).toBe(seqOf("choice", "focus_scan:S2"));
+    // A room the walk agent named lights that step; any other room, the walk agent's first step.
+    expect(stepForStop(items, stopOf("room-4"))).toBe(seqOf("choice", "Bathroom"));
+    expect(stepForStop(items, stopOf("room-2"))).toBe(seqOf("agent", "walk"));
+    expect(stepForStop(items, stopOf("outro"))).toBe(RAIL_STUB_A.at(-1)!.seq);
+    expect(stepForStop([], stopOf("arrive"))).toBeNull();
+  });
+
+  it("says what the step means at this stop in the evidence file's own numbers", () => {
+    const n = kitchenPhoto!.inliers;
+    const bar = EVIDENCE_FIXTURE_A.bars.min_inliers;
+    expect(stopLine(stopOf("room-3"), kitchenPhoto, EVIDENCE_FIXTURE_A.bars)).toBe(
+      `Ad photo ${kitchenPhoto!.alias}: ${n} matching points. We need ${bar} to be sure, so we say it's this room.`,
+    );
+    expect(stopLine(stopOf("room-2"), null, {})).toBe("The ad showed no photo of this room.");
+    expect(stopLine(stopOf("arrive"), null, {})).toBeNull();
+    expect(stopLine(stopOf("room-3"), null, {})).toBeNull();
+    expect(plainLine(RAIL_STUB_A.find((e) => e.pick === "focus_scan:S2")!)).toBe(
+      "Picked: Look closer at scan S2",
+    );
+  });
+
+  it("lights and opens only the step for this stop; every other step is one line", () => {
+    const { rerender } = render(follow("arrive"));
+    expect(screen.getByRole("heading", { name: "How SNAPBACK checked this ad" })).toBeVisible();
+    expect(screen.getByTestId("rail-summary")).toHaveTextContent(
+      `${RAIL_STUB_A.length} steps our agents took, in order. The step behind this stop is lit.`,
+    );
+    expect(lit()).toHaveLength(1);
+    expect(lit()[0]).toHaveAttribute("data-seq", String(seqOf("agent", "record")));
+    expect(lit()[0]).toHaveAttribute("aria-current", "step");
+    const open = () => screen.getAllByTestId("rail-line").filter((l) => l.dataset.state === "open");
+    expect(open()).toHaveLength(1);
+    expect(
+      screen.getAllByTestId("rail-agent").find((a) => a.getAttribute("aria-current")),
+    ).toHaveTextContent("record");
+
+    rerender(follow("room-3"));
+    expect(lit()[0]).toHaveAttribute("data-seq", String(seqOf("tool", "locate_photos")));
+    expect(open()).toHaveLength(1);
+    expect(screen.getByTestId("rail-here")).toHaveTextContent(
+      "At this stopAd photo P2: 96 matching points. We need 30 to be sure, so we say it's this room.",
+    );
+    expect(within(lit()[0]!).getByTestId("rail-proof")).toHaveTextContent("P2: 96 matching points");
+    expect(
+      screen.getAllByTestId("rail-agent").find((a) => a.getAttribute("aria-current")),
+    ).toHaveTextContent("place");
+    expect(screen.getByTestId("rail-now")).toHaveTextContent(
+      `Step 4 of ${RAIL_STUB_A.length}: Base search of 4 photos.`,
+    );
+
+    // The step's own reason already says it, so the sentence is not shown twice.
+    rerender(follow("room-4"));
+    expect(lit()[0]).toHaveAttribute("data-seq", String(seqOf("choice", "Bathroom")));
+    expect(screen.queryByTestId("rail-here")).not.toBeInTheDocument();
+  });
+
+  it("opens a folded step on a tap and folds it again", () => {
+    render(follow("arrive"));
+    const row = screen.getByRole("button", { name: "Step 5: Picked: Look closer at scan S2" });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(lineOf(seqOf("choice", "focus_scan:S2"))).toHaveTextContent("Picked by the model");
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("a scroll in the rail holds the follow for about 8 s; Follow the walk resumes it", () => {
+    vi.useFakeTimers();
+    render(follow("arrive"));
+    const rail = screen.getByTestId("agent-rail");
+    expect(rail).toHaveAttribute("data-follow", "on");
+    expect(screen.queryByTestId("rail-follow")).not.toBeInTheDocument();
+    fireEvent.wheel(rail.querySelector(".ar-scroll")!);
+    expect(rail).toHaveAttribute("data-follow", "paused");
+    fireEvent.click(screen.getByRole("button", { name: "Follow the walk" }));
+    expect(rail).toHaveAttribute("data-follow", "on");
+
+    fireEvent.wheel(rail.querySelector(".ar-scroll")!);
+    act(() => void vi.advanceTimersByTime(FOLLOW_PAUSE_MS - 1));
+    expect(rail).toHaveAttribute("data-follow", "paused");
+    act(() => void vi.advanceTimersByTime(1));
+    expect(rail).toHaveAttribute("data-follow", "on");
+    expect(screen.queryByTestId("rail-follow")).not.toBeInTheDocument();
+  });
+
+  it("scrolls the lit step into its box, with the step before it in view, unless held", () => {
+    const { rerender } = render(follow("arrive"));
+    const box = screen.getByTestId("agent-rail").querySelector<HTMLElement>(".ar-scroll")!;
+    const tops = (el: HTMLElement) => Number(el.dataset.seq ?? 0) * 50;
+    const spy = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return tops(this);
+    });
+    rerender(follow("room-3"));
+    expect(box.scrollTop).toBe(tops(lineOf(seqOf("tool", "locate_photos") - 1)) - 8);
+    fireEvent.wheel(box);
+    box.scrollTop = 7;
+    rerender(follow("room-4"));
+    expect(box.scrollTop).toBe(7);
+    spy.mockRestore();
+  });
+});
+
+describe("the rail fits beside the player and scrolls in place", () => {
+  const css = (rel: string) =>
+    readFileSync(join(__dirname, rel), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rule = (src: string, selector: string, from = 0) => {
+    const at = src.indexOf(`${selector} {`, from);
+    expect(at, selector).toBeGreaterThanOrEqual(0);
+    return src.slice(at, src.indexOf("}", at));
+  };
+  const walkCss = css("walk.css");
+  const desktop = walkCss.indexOf("@media (min-width: 761px)");
+  const phone = walkCss.indexOf("@media (max-width: 760px)");
+  const follow = (key: string) => (
+    <AgentRail
+      events={RAIL_STUB_A}
+      source="fixture"
+      evidence={EVIDENCE_FIXTURE_A}
+      reduced
+      stop={stopOf(key)}
+      photo={photoAt(stopOf(key), EVIDENCE_FIXTURE_A)}
+    />
+  );
+  const tab = (name: string | RegExp) => screen.getByRole("tab", { name });
+  const shownSeqs = () => screen.getAllByTestId("rail-line").map((l) => l.dataset.agent);
+
+  it("the list scrolls in place: every step sits in one scroll box under a fixed head", () => {
+    render(follow("arrive"));
+    const rail = screen.getByTestId("agent-rail");
+    const box = screen.getByTestId("rail-scroll");
+    expect(screen.getAllByTestId("rail-line")).toHaveLength(RAIL_STUB_A.length);
+    for (const line of screen.getAllByTestId("rail-line")) expect(box).toContainElement(line);
+    // The title, explainer and tabs are outside the box, so they stay put while it scrolls.
+    expect(box).not.toContainElement(screen.getByRole("heading", { name: /How SNAPBACK/ }));
+    expect(box).not.toContainElement(screen.getByRole("tablist"));
+    expect(rail).toContainElement(tab("Files 4"));
+    const scroll = rule(walkCss, ".ar-scroll");
+    expect(scroll).toMatch(/overflow-y:\s*auto/);
+    expect(scroll).toMatch(/min-height:\s*0/);
+    expect(scroll).toMatch(/flex:\s*1/);
+    // Phone: the closed sheet opens to an inner scroll of about 60vh.
+    expect(rule(walkCss, ".ar-scroll", phone)).toMatch(/max-height:\s*60vh/);
+  });
+
+  it("the page height does not change when a step opens: the rail never sizes its row", () => {
+    render(follow("arrive"));
+    const box = screen.getByTestId("rail-scroll");
+    const row = screen.getByRole("button", { name: "Step 5: Picked: Look closer at scan S2" });
+    fireEvent.click(row);
+    // The opened step grows inside the scroll box only.
+    expect(box).toContainElement(row);
+    expect(within(box).getByText("Picked by the model")).toBeInTheDocument();
+    // Desktop: the rail's own height is 0 and it stretches to its grid row, clipping its content,
+    // so nothing inside it can push the page down.
+    const ar = rule(walkCss, ".ar", desktop);
+    expect(ar).toMatch(/height:\s*0;/);
+    expect(ar).toMatch(/min-height:\s*100%/);
+    expect(ar).toMatch(/overflow:\s*hidden/);
+  });
+
+  it("the rail bottom aligns with the player bottom at 1440x900: it shares only the stage row", () => {
+    const tour = css("../tour/tour.css");
+    const body = rule(tour, '.tour-page[data-rail="on"] .tour-body');
+    expect(body).toMatch(/grid-template-areas:\s*"stage rail"\s*"panel panel"/);
+    expect(rule(walkCss, ".ar")).toMatch(/grid-area:\s*rail/);
+  });
+
+  it("tabs filter the list to one agent's steps, with All first and chosen", () => {
+    render(<AgentRail events={RAIL_STUB_A} source="fixture" reduced />);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "All",
+      "record",
+      "place",
+      "walk",
+      "Files 4",
+    ]);
+    expect(tab("All")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(tab("place"));
+    expect(tab("place")).toHaveAttribute("aria-selected", "true");
+    expect(new Set(shownSeqs())).toEqual(new Set(["place"]));
+    fireEvent.click(tab("All"));
+    expect(screen.getAllByTestId("rail-line")).toHaveLength(RAIL_STUB_A.length);
+  });
+
+  it("switches the tab when the walk lights a step of another agent; a held follow stays", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(follow("room-3"));
+    fireEvent.click(tab("place"));
+    // A step keeps its number in the whole run.
+    expect(
+      screen.getByRole("button", { name: "Step 5: Picked: Look closer at scan S2" }),
+    ).toBeVisible();
+    // Picking a tab holds the follow like a scroll; Follow the walk lets it go.
+    fireEvent.click(screen.getByRole("button", { name: "Follow the walk" }));
+    rerender(follow("room-4"));
+    expect(tab("walk")).toHaveAttribute("aria-selected", "true");
+    expect(lit()).toHaveLength(1);
+
+    fireEvent.click(tab("record"));
+    rerender(follow("room-3"));
+    expect(tab("record")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Follow the walk" }));
+    expect(tab("place")).toHaveAttribute("aria-selected", "true");
+    expect(lit()).toHaveLength(1);
+    vi.useRealTimers();
+  });
+});
+
+const lit = () => screen.getAllByTestId("rail-line").filter((l) => l.dataset.lit === "true");
+
 describe("StopStage and StageCaption", () => {
   it("lands the placed ad photo in its room and says Taken here", () => {
     const kitchen = stopOf("room-3");
@@ -207,7 +465,7 @@ describe("StopStage and StageCaption", () => {
       </>,
     );
     expect(screen.getByTestId("stage-photo")).toHaveAttribute("data-fly", "true");
-    expect(screen.getByTestId("stage-caption")).toHaveTextContent("Taken here: Kitchen");
+    expect(screen.getByTestId("stage-caption")).toHaveTextContent("Taken here: ad photo P2");
     expect(screen.getByText("Drawn stand-in (fixture)")).toBeInTheDocument();
   });
 

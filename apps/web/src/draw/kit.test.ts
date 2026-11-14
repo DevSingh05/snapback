@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { O } from "../walk/roomParts";
 import { drawRoom, type RoomKind } from "../walk/rooms";
+import { HERE_SPOT } from "../walk/StopStage";
+import { personPrims } from "./Person";
 import { between, makeScene, project } from "./kit";
 
 const s = makeScene({ ox: 100, oy: 50 });
@@ -127,5 +130,55 @@ describe("every CSS variable the walk, evidence, drawing and landing styles use 
         .map((m) => m[1]);
       expect(missing, file).toEqual([]);
     }
+  });
+});
+
+describe("the person in a drawn room", () => {
+  const inside = (pts: [number, number][], [px, py]: [number, number]) => {
+    let hit = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i]!;
+      const [xj, yj] = pts[j]!;
+      if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) hit = !hit;
+    }
+    return hit;
+  };
+  const kinds: RoomKind[] = ["kitchen", "bathroom", "bedroom", "living", "entry", "plain"];
+
+  it("stands on open floor in every room: its feet clear every furniture footprint", () => {
+    for (const kind of kinds) {
+      const [sx, sy] = HERE_SPOT[kind];
+      const feet: [number, number][] = Array.from({ length: 8 }, (_, i) => {
+        const a = (i * Math.PI) / 4;
+        return project([sx + Math.cos(a) * 9, sy + Math.sin(a) * 9, 0], O);
+      });
+      feet.push(project([sx, sy, 0], O));
+      const footprints = drawRoom(kind)
+        .things.flatMap((p) => p.prims)
+        .filter((p) => p.k === "poly" && p.c === "dk-contact")
+        .map((p) =>
+          (p as { pts: string }).pts
+            .split(" ")
+            .map((xy) => xy.split(",").map(Number) as [number, number]),
+        );
+      expect(footprints.length, kind).toBeGreaterThan(0);
+      for (const pt of feet)
+        expect(
+          footprints.some((f) => inside(f, pt)),
+          `${kind} at ${sx},${sy}`,
+        ).toBe(false);
+    }
+  });
+
+  it("is one rigid figure: shadow first, then head, torso, legs, arms and camera, all in place", () => {
+    const prims = personPrims(O, 250, 130);
+    expect(prims[0]!.c).toContain("dk-contact");
+    expect(prims.filter((p) => p.k === "dot" && p.c === "dk-head")).toHaveLength(1);
+    expect(prims.filter((p) => p.c.includes("dk-teal"))).toHaveLength(3);
+    expect(prims.filter((p) => p.c.includes("dk-dark")).length).toBe(9); // two legs, the camera
+    expect(prims.filter((p) => p.k === "line")).toHaveLength(4);
+    // The head sits straight over the feet.
+    const head = prims.find((p) => p.k === "dot" && p.c === "dk-head") as { cx: number };
+    expect(head.cx).toBeCloseTo(project([250, 130, 0], O)[0], 0);
   });
 });

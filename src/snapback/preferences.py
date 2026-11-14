@@ -28,6 +28,8 @@ def merge(current: CasePreferences, update: PreferencesUpdate) -> CasePreference
         out.max_rent = (
             update.max_rent if out.max_rent is None else min(out.max_rent, update.max_rent)
         )
+    if update.prefer_scans is not None:
+        out.prefer_scans = update.prefer_scans
     pid = update.avoid_property_id
     if pid and pid not in out.avoid_property_ids and len(out.avoid_property_ids) < MAX_AVOIDED:
         out.avoid_property_ids.append(pid)
@@ -45,6 +47,8 @@ def keys_of(prefs: CasePreferences | None) -> list[str]:
         out.append("needs_parking")
     if prefs.max_rent is not None:
         out.append("max_rent")
+    if prefs.prefer_scans:
+        out.append("prefer_scans")
     if prefs.avoid_property_ids:
         out.append("avoid_property_id")
     return out
