@@ -46,6 +46,7 @@ from snapback.vision.locate.geometry import (
     camera_quaternion,
     matrix_from_quaternion,
     rotation_from_homography,
+    viewer_yaw_pitch,
 )
 from snapback.vision.locate.index import LocateIndex
 from snapback.vision.locate.thresholds import Thresholds, load_thresholds
@@ -578,12 +579,16 @@ class Locator:
             if placed.sweep.rotation_quat
             else np.eye(3)
         )
-        camera_to_world = pano @ face_basis(placed.face) @ photo_to_face
+        camera_to_pano = face_basis(placed.face) @ photo_to_face
+        camera_to_world = pano @ camera_to_pano
+        yaw, pitch = viewer_yaw_pitch(pano, camera_to_pano)
         return Pose(
             sweep_id=placed.sweep.sweep_id,
             position=placed.sweep.position or (0.0, 0.0, 0.0),
             rotation_quat=camera_quaternion(camera_to_world),
             fov_deg=round(hfov, 2),
+            yaw_deg=yaw,
+            pitch_deg=pitch,
         )
 
     # --- one case ----------------------------------------------------------------------------

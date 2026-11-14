@@ -32,7 +32,10 @@ export interface SdkMoveTo {
 }
 
 export function poseToSdkCall(pose: Pose): SdkMoveTo {
-  const { yaw, pitch } = quatToYawPitch(pose.rotation_quat);
+  // The locator's own viewer angles when present (they account for the scan's z-up frame).
+  const fromQuat = quatToYawPitch(pose.rotation_quat);
+  const yaw = typeof pose.yaw_deg === "number" ? pose.yaw_deg : fromQuat.yaw;
+  const pitch = typeof pose.pitch_deg === "number" ? pose.pitch_deg : fromQuat.pitch;
   return {
     sweepId: pose.sweep_id ?? "",
     options: {

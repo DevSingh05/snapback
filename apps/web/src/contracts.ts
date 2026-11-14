@@ -139,6 +139,10 @@ export interface Pose {
   position: [number, number, number];
   rotation_quat: [number, number, number, number]; // x, y, z, w
   fov_deg?: number | null;
+  // The matched camera direction in the 3D viewer's frame, degrees (yaw 0 looks down -Z and
+  // grows turning left; pitch positive looks up). Set by the locator; prefer these to the quat.
+  yaw_deg?: number | null;
+  pitch_deg?: number | null;
 }
 
 // Mirrors LocateStatus (contracts.py).
@@ -352,6 +356,8 @@ export interface TourPhoto {
   position?: [number, number, number] | null;
   rotation_quat?: [number, number, number, number] | null;
   fov_deg?: number | null;
+  yaw_deg?: number | null; // the matched camera direction in the 3D viewer's frame (Pose.yaw_deg)
+  pitch_deg?: number | null;
 }
 
 export interface TourStop {

@@ -135,6 +135,11 @@ class Pose(BaseModel):
     position: tuple[float, float, float]
     rotation_quat: tuple[float, float, float, float]  # x, y, z, w
     fov_deg: float | None = None
+    # Where the camera looks in the 3D viewer's own frame (y up; yaw 0 looks down -Z and turns
+    # left as it grows; pitch positive looks up), degrees. Set by the locator, which knows the
+    # pano's rotation; a viewer uses these instead of reading angles off `rotation_quat`.
+    yaw_deg: float | None = None
+    pitch_deg: float | None = None
 
 
 class FloorPlanCandidate(BaseModel):

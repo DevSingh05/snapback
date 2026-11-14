@@ -62,3 +62,31 @@ describe("stopMove", () => {
     expect(stopMove({ ...base, kind: "arrive", sweep_id: null }, false)).toBeNull();
   });
 });
+
+describe("the locator's viewer angles (z-up scans)", () => {
+  it("are used as sent when the photo carries them, over the quaternion", () => {
+    const stop: TourStop = {
+      ...base,
+      photos: [
+        {
+          photo_id: "l1",
+          sweep_id: "s9",
+          rotation_quat: [0.5, 0.5, 0.5, 0.5], // would read as a steep pitch
+          yaw_deg: -175.3,
+          pitch_deg: -13.2,
+        },
+      ],
+    };
+    const move = stopMove(stop, false)!;
+    expect(move.sweepId).toBe("s9");
+    expect(move.options.rotation).toEqual({ x: -13.2, y: YAW_SIGN * -175.3 });
+  });
+
+  it("fall back to the quaternion when the photo has none", () => {
+    const stop: TourStop = {
+      ...base,
+      photos: [{ photo_id: "l1", sweep_id: "s9", rotation_quat: [0, s, 0, s] }],
+    };
+    expect(stopMove(stop, false)!.options.rotation).toEqual(sdkRotation([0, s, 0, s]));
+  });
+});
