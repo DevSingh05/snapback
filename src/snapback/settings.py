@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     costar_kit_url: str | None = None
     costar_kit_zip: str | None = None
 
+    # Key for hashing phone numbers so they are compared without being kept (A7). Unset, a
+    # fixture run uses a fixed synthetic salt and a live run makes one per process.
+    snapback_phone_salt: SecretStr | None = None
+
     anthropic_api_key: SecretStr | None = None
 
 
