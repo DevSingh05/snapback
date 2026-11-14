@@ -82,7 +82,7 @@ SUFFIXES = {
     "west": "w",
 }
 UNIT_WORDS = {"apt", "apartment", "unit", "suite", "ste"}
-ZIP = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
+ZIP_TOKEN = re.compile(r"\b(\d{5})\b")
 
 
 def normalize_address(text: str) -> str:
@@ -189,27 +189,46 @@ def _offices(rec: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(names))
 
 
-def _matches(
-    rec: dict[str, Any], text: str, zip_in_text: str | None, lat: float | None, lon: float | None
-) -> bool:
+def _zip_after(text: str, street: str) -> str | None:
+    """The last 5-digit number after the street: a zip, never the house number in front of it."""
+    i = f" {text} ".find(f" {street} ")
+    tail = f" {text} "[i + len(street) + 2 :] if i >= 0 else ""
+    found = ZIP_TOKEN.findall(tail)
+    return found[-1] if found else None
+
+
+def _any_unit(text: str) -> str | None:
+    """The first unit the text names anywhere ('unit 7'), for a match made on coordinates."""
+    words = text.split()
+    for w, nxt in zip(words, words[1:], strict=False):
+        if w == "unit":
+            return nxt
+    return None
+
+
+def _same_unit(rec: dict[str, Any], asked: str | None) -> bool:
+    """A different unit in the same building is not that home; a missing unit on either side is."""
+    unit = _first(rec, RESIDENTIAL_FIELDS["unit"])
+    return unit is None or asked is None or normalize_address(str(unit)) == asked
+
+
+def _matches(rec: dict[str, Any], text: str, lat: float | None, lon: float | None) -> bool:
     street_raw = _first(rec, RESIDENTIAL_FIELDS["street"])
     street = normalize_address(street_raw) if isinstance(street_raw, str) else ""
     if street and f" {street} " in f" {text} ":
         record_zip = _first(rec, RESIDENTIAL_FIELDS["zip"])
+        zip_in_text = _zip_after(text, street)
         if zip_in_text and record_zip and str(record_zip)[:5] != zip_in_text:
             return False  # same street text, a different town
-        unit = _first(rec, RESIDENTIAL_FIELDS["unit"])
-        asked = _unit_after(text, street)
-        return not (
-            unit is not None and asked is not None and normalize_address(str(unit)) != asked
-        )
+        return _same_unit(rec, _unit_after(text, street))
     if lat is None or lon is None:
         return False
     rlat, rlon = _get_any(rec, RESIDENTIAL_FIELDS["lat"]), _get_any(rec, RESIDENTIAL_FIELDS["lon"])
     try:
-        return _metres(lat, lon, float(rlat), float(rlon)) <= NEAR_M
+        near = _metres(lat, lon, float(rlat), float(rlon)) <= NEAR_M
     except (TypeError, ValueError):
         return False
+    return near and _same_unit(rec, _any_unit(text))
 
 
 def for_sale_lookup(
@@ -232,13 +251,11 @@ def for_sale_lookup(
     today = today or date.today()
     enums = _load_enums(kit)
     text = normalize_address(listing_text)
-    zip_match = ZIP.search(listing_text)
-    zip_in_text = zip_match.group(1) if zip_match else None
 
     best: ForSaleMatch | None = None
     rank = {ForSaleStatus.ACTIVE: 2, ForSaleStatus.RECENTLY_RENTED: 1, ForSaleStatus.NONE: 0}
     for rec in _iter_jsonl(path):
-        if not _public(rec) or not _matches(rec, text, zip_in_text, lat, lon):
+        if not _public(rec) or not _matches(rec, text, lat, lon):
             continue
         status, listed_on, changed_on = _status(rec, enums, today)
         match = ForSaleMatch(

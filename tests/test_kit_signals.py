@@ -97,8 +97,8 @@ def test_coverage_counts_residential_paths_and_codes_without_values():
     from snapback.adapters.costar_residential import coverage_residential
 
     report = coverage(FIXTURE_KIT) | coverage_residential(FIXTURE_KIT)
-    assert report["residential_records"] == 6
-    assert report["residential_fields"]["street"]["property.address.fullStreetAddress"] == 6
+    assert report["residential_records"] == 7
+    assert report["residential_fields"]["street"]["property.address.fullStreetAddress"] == 7
     assert report["rent_pricing_codes"] == {"1": 2, "2": 1}
     text = json.dumps(report)
     assert "Fixture" not in text and "fx-" not in text and "2026" not in text
@@ -148,3 +148,25 @@ def test_no_is_a_unit_word_only_before_a_number():
     assert normalize_address("100 Fixture Lane No. 2") == "100 fixture ln unit 2"
     match = for_sale_lookup("100 Fixture Lane, no pets", DataSource.FIXTURE, today=TODAY)
     assert match.status is ForSaleStatus.ACTIVE  # 'pets' is not read as a different unit
+
+
+def test_a_five_digit_house_number_is_not_read_as_the_zip():
+    for text in ("12345 Fixture Lane, Fixture City 00001", "12345 Fixture Lane"):
+        match = for_sale_lookup(text, DataSource.FIXTURE, today=TODAY)
+        assert match.status is ForSaleStatus.ACTIVE, text
+    wrong_town = for_sale_lookup(
+        "12345 Fixture Lane, Elsewhere 00009", DataSource.FIXTURE, today=TODAY
+    )
+    assert wrong_town.status is ForSaleStatus.NONE
+
+
+def test_the_lat_lon_match_applies_the_unit_rule():
+    # fx-home-1 (unit 2) is about 22 m away; a different unit there is not that home
+    other = for_sale_lookup(
+        "Apt 7, nice place", DataSource.FIXTURE, today=TODAY, lat=10.0002, lon=10.0
+    )
+    assert other.status is ForSaleStatus.NONE
+    same = for_sale_lookup(
+        "Apt 2, nice place", DataSource.FIXTURE, today=TODAY, lat=10.0002, lon=10.0
+    )
+    assert same.status is ForSaleStatus.ACTIVE
