@@ -550,37 +550,6 @@
   align-items: center;
   gap: 4px 10px;
 }
-.ar-pick {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-}
-.ar-pick-what {
-  overflow-wrap: anywhere;
-}
-.ar-stamp {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  background: var(--sky);
-  color: var(--ink);
-}
-.ar-stamp[data-by="model"] {
-  background: var(--act);
-  color: var(--on-act);
-  transform: rotate(-2deg);
-}
-.ar-options {
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-.ar-reason-quoted {
-  padding-left: 10px;
-  border-left: 3px solid var(--act);
-}
 .ar-unsure {
   background: var(--unchecked-soft);
   color: var(--unchecked);
@@ -600,14 +569,14 @@
   align-self: stretch;
   width: 100%;
   padding: 6px;
-  background: var(--surface);
-  color: var(--ink);
+  background: var(--match-stage);
+  color: var(--on-match-stage);
   font-weight: 500;
   text-align: left;
 }
 .ar-proof-text {
   font-size: 0.72rem;
-  color: var(--muted);
+  color: var(--match-stage-muted);
 }
 .ar-rule {
   margin: 0;
@@ -630,7 +599,7 @@
 @media (hover: hover) {
   .ar-files-toggle:hover,
   button.ar-proof:hover {
-    background: var(--sky);
+    background: var(--match-stage-2);
   }
 }
 

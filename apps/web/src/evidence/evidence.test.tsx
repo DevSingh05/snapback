@@ -7,6 +7,8 @@ import { EvidenceDrawer, RENDER_NOTE } from "./EvidenceDrawer";
 import { EVIDENCE_FIXTURE_A, EVIDENCE_FIXTURE_B } from "./fixture";
 import { FilesTree } from "./FilesTree";
 import { MatchLines } from "./MatchLines";
+import { barLabel, coverage, pairTiers, pickOutcome, pointsSentence } from "./match";
+import { PickCard } from "./PickCard";
 import { chipState, failedLine, gauges, placeLine, searchLine } from "./read";
 import type { EvidencePhoto } from "./types";
 
@@ -120,7 +122,7 @@ describe("MatchLines", () => {
 
   it("staggers the draw-in when motion is allowed", () => {
     render(<MatchLines photo={photo("P1")} reduced={false} />);
-    expect(screen.getAllByTestId("match-pair")[2]!.style.animationDelay).toBe("36ms");
+    expect(screen.getAllByTestId("match-pair")[2]!.style.animationDelay).toBe("80ms");
   });
 
   it("stacks for phones and marks a photo that fell short", () => {
@@ -129,6 +131,98 @@ describe("MatchLines", () => {
     expect(fig).toHaveAttribute("data-layout", "stacked");
     expect(fig).toHaveAttribute("data-weak", "true");
     expect(screen.getByTestId("match-count")).toHaveTextContent("24 of 24 matched points drawn");
+  });
+});
+
+describe("The meter: count, bar and one plain sentence", () => {
+  it("says a just-short photo is not called this room, with both numbers from the file", () => {
+    render(<BarGauges photo={photo("P4")} bars={bars} thresholdsVersion="v" />);
+    expect(screen.getByTestId("points-sentence")).toHaveTextContent(
+      "24 matching points. We need 30 to be sure, so we don't say it's this room.",
+    );
+    expect(screen.getByTestId("bar-label")).toHaveTextContent("30 needed to say it's this room");
+    expect(screen.getByTestId("gauge-points")).toHaveTextContent("6 short");
+    expect(screen.getByTestId("gauge-points")).toHaveAttribute("data-crossed", "false");
+  });
+
+  it("says a placed photo is this room, and follows a changed bar", () => {
+    expect(pointsSentence(photo("P3"), bars)).toBe(
+      "88 matching points. We need 30 to be sure, so we say it's this room.",
+    );
+    expect(pointsSentence(photo("P3"), { ...bars, min_inliers: 100 })).toMatch(/We need 100/);
+    expect(pointsSentence({ ...photo("P3"), bar_failed: "spread" }, bars)).toMatch(
+      /past the 30 we need. Another check fell short/,
+    );
+    const other = EVIDENCE_FIXTURE_B.photos[0]!;
+    expect(pointsSentence(other, bars)).toMatch(/We need 50 to be sure it's a different building/);
+    expect(barLabel(other, bars)).toBe("50 needed to say it's a different building");
+    expect(pointsSentence({ ...photo("P3"), inliers: null }, bars)).toBeNull();
+  });
+
+  it("rises with the lines in the drawer, and is final at once under reduced motion", () => {
+    render(<EvidenceDrawer file={file} alias="P4" onClose={() => {}} reduced />);
+    const meter = screen.getByTestId("gauge-points");
+    expect(meter).toHaveAttribute("data-done", "true");
+    expect(meter.querySelector(".pm-num")).toHaveTextContent("24");
+  });
+});
+
+describe("Spread and rivals as pictures", () => {
+  it("shades the drawn pairs in three teal strengths, a third each", () => {
+    const tiers = pairTiers(photo("P1").points!.sampled);
+    expect(tiers).toHaveLength(48);
+    for (const t of ["strong", "mid", "faint"] as const)
+      expect(tiers.filter((x) => x === t)).toHaveLength(16);
+    expect(pairTiers([])).toEqual([]);
+  });
+
+  it("counts every drawn point into the coverage squares and boxes them", () => {
+    const cov = coverage(photo("P1").points!.sampled);
+    expect(cov.cells.reduce((a, b) => a + b, 0)).toBe(48);
+    expect(cov.box!.w).toBeGreaterThan(0.5);
+    expect(coverage([]).box).toBeNull();
+  });
+
+  it("draws this home beside the next best building", () => {
+    render(<BarGauges photo={photo("P4")} bars={bars} thresholdsVersion="v" />);
+    const rival = screen.getByTestId("gauge-rival");
+    expect(rival).toHaveTextContent("This home");
+    expect(rival).toHaveTextContent("Another building matched 1.8 times as strongly.");
+    expect(rival).toHaveTextContent("A match is blocked at 3 times.");
+    expect(screen.getByTestId("gauge-spread")).toHaveAttribute("data-pass", "false");
+  });
+});
+
+describe("PickCard", () => {
+  it("shows the options as chips, the picked one marked, why, and the outcome on file", () => {
+    render(
+      <PickCard
+        options={["focus_scan:S2", "wider_index", "deeper_claimed", "stop"]}
+        pick="focus_scan:S2"
+        by="model"
+        why="P3 was not placed by the base search."
+        result={pickOutcome(photo("P3"), "focus_scan:S2")}
+      />,
+    );
+    const chips = screen.getAllByTestId("pick-option");
+    expect(chips.map((c) => c.textContent)).toEqual([
+      "Look closer at scan S2 (picked)",
+      "Search more buildings",
+      "Search deeper in this home",
+      "Stop here",
+    ]);
+    expect(chips[0]).toHaveAttribute("data-picked", "true");
+    expect(screen.getByTestId("rail-stamp")).toHaveTextContent("Picked by the model");
+    expect(screen.getByTestId("pick-outcome")).toHaveTextContent("Placed");
+  });
+
+  it("never guesses an outcome the evidence file does not carry", () => {
+    expect(pickOutcome(photo("P3"), "wider_index")).toBeNull();
+    expect(pickOutcome(undefined, "stop")).toBeNull();
+    render(<PickCard options={[]} pick="stop" by="policy" />);
+    expect(screen.getByTestId("rail-stamp")).toHaveTextContent("Picked by our rules");
+    expect(screen.queryByTestId("pick-outcome")).toBeNull();
+    expect(screen.getAllByTestId("pick-option")).toHaveLength(1);
   });
 });
 
@@ -163,8 +257,13 @@ describe("EvidenceDrawer", () => {
     expect(screen.getByTestId("place-line")).toHaveTextContent("Taken here: Bedroom");
     expect(screen.getByText("Matterport's label, can be wrong")).toBeInTheDocument();
     const steps = screen.getByTestId("search-steps");
-    expect(steps).toHaveTextContent("1 base search (picked by rules, 1.3 s)");
-    expect(steps).toHaveTextContent("2 scan S2 on its own (picked by model, 2.1 s)");
+    const [first, second] = within(steps).getAllByRole("listitem");
+    expect(first).toHaveTextContent("First search of this home");
+    expect(first).toHaveTextContent("Picked by our rules");
+    expect(first).toHaveTextContent("Still not placed 1.3 s");
+    expect(second).toHaveTextContent("Look closer at scan S2");
+    expect(second).toHaveTextContent("Picked by the model");
+    expect(second).toHaveTextContent("Placed 2.1 s");
   });
 
   it("switches photos by tab, and a photo that fell short is not placed, not fake", () => {
@@ -207,11 +306,11 @@ describe("EvidenceDrawer", () => {
     );
     const real = within(screen.getByTestId("view-toggle")).getByRole("button", { name: "Real" });
     expect(real).toHaveAttribute("aria-pressed", "true");
-    expect(container.querySelectorAll("svg image")).toHaveLength(2);
+    expect(container.querySelectorAll(".ml-svg image")).toHaveLength(2);
     expect(screen.getAllByTestId("match-pair")).toHaveLength(48);
     expect(screen.queryByText(/stand-in drawing/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Drawing" }));
-    expect(container.querySelectorAll("svg image")).toHaveLength(0);
+    expect(container.querySelectorAll(".ml-svg image")).toHaveLength(0);
     expect(screen.getByTestId("view-note")).toHaveTextContent("Drawn stand-in");
     // A photo with no real image falls back to the drawing, labelled, with Real switched off.
     fireEvent.click(screen.getByRole("tab", { name: /P2/ }));
