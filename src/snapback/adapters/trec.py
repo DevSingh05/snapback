@@ -109,7 +109,8 @@ _COMPANY = re.compile(
 _LIC_NUMBER = re.compile(
     r"(?i:\btrec\b|\blic(?:ense|ence)?\b)"
     r"(?:[ \t#:.\-]|\b(?:trec|licen[sc]e|lic|number|num|no|is)\b)*?"  # only license-ish filler
-    r"\b(\d{6,7})\b(?![ \t]*(?:sq|sf|ft|square))"  # not "555012 sq ft"
+    r"\b(\d{6,7})\b(?![ \t]*(?:sq|sf|ft|square))",  # not "555012 sq ft"
+    re.IGNORECASE,
 )
 _NOT_TREC = re.compile(
     r"(?i:driver|plate|vehicle|permit|marriage|insurance|business|\bmls\b|\bid\b)"

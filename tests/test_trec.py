@@ -744,3 +744,11 @@ def test_a_number_in_other_words_after_trec_is_not_a_license_number():
         assert _license_number(text) is None, text
     assert _license_number("TREC lic. no. 0123456") == "123456"
     assert _license_number("Realtor, license: 1234567-B") == "1234567"
+
+
+def test_the_number_is_read_whatever_the_case_and_whatever_stands_between():
+    from snapback.adapters.trec import _license_number
+
+    for text in ("TREC License #0612345", "trec LICENSE # 612345", "TREC lic. No: 612345"):
+        assert _license_number(text) == "612345", text
+    assert _license_number("TREC License #0000000") == ""
