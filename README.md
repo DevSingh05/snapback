@@ -165,11 +165,11 @@ uv run python -m snapback.agent.demo   # prints all three cards
 DEMO_CASE=a make api                   # every new check runs on case a (a, b or c)
 ```
 
-| Case | The staged poster                                                       | The card                                             |
-| ---- | ----------------------------------------------------------------------- | ---------------------------------------------------- |
-| `a`  | Real building, wrong unit, low rent, lookalike link, copied reply photo | Don't pay: the reply is a copy of listing photo 2    |
-| `b`  | The same ad, with one photo taken in a different building               | Don't pay: a photo was taken in a different property |
-| `c`  | A house listed for sale, posted as a rental, with no scan               | Hold off: listed for sale, not for rent              |
+| Case | The staged poster                                                       | The card                                               |
+| ---- | ----------------------------------------------------------------------- | ------------------------------------------------------ |
+| `a`  | Real building, wrong unit, low rent, lookalike link, copied reply photo | Don't pay: the reply is a copy of listing photo 2      |
+| `b`  | The same ad, with one photo taken in a different building               | Don't pay: a photo was taken in a different property   |
+| `c`  | A house listed for sale, posted as a rental, with no scan               | Hold off: listed for sale; confirm with that brokerage |
 
 In live mode `DEMO_CASE` supplies only the listing text; see
 [fixtures/demo/README.md](fixtures/demo/README.md).
