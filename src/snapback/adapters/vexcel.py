@@ -351,6 +351,31 @@ def get_tile(
             http.close()
 
 
+def known_capture_date(
+    record: PropertyRecord,
+    *,
+    source: DataSource,
+    data_dir: Path | None = None,
+    direction: str = "north",
+) -> date | None:
+    """The aerial capture date for a building when it is already known, and never a fetch.
+
+    Fixture: the synthetic tile's date. Live: the date saved beside a tile already cached in
+    the last `CACHE_DAYS` days, else None. A damaged or missing meta file is "not known"."""
+    if source == DataSource.FIXTURE:
+        return _fixture(record, direction).captured_on
+    root = resolve_data_dir(data_dir or get_settings().snapback_data_dir) / "vexcel"
+    path = root / f"{_SAFE.sub('_', record.property_id)}-{_SAFE.sub('_', direction)}.jpg"
+    meta = path.with_suffix(".json")
+    try:
+        fresh = path.is_file() and time.time() - path.stat().st_mtime < CACHE_DAYS * 24 * 3600
+        if not fresh or not meta.is_file():
+            return None
+        return _capture_date(json.loads(meta.read_text()).get("captured_on"))
+    except (*_BAD_REPLY, OSError):
+        return None
+
+
 @dataclass(frozen=True)
 class TwoBuildingProof:
     """The claimed building and the building the photos matched, from the air, side by side."""
