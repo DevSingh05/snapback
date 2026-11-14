@@ -27,7 +27,7 @@
 
 .replay-head h1 {
   margin: 0 0 10px;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: clamp(1.8rem, 4vw, 3rem);
   line-height: 1.05;
 }
@@ -127,7 +127,7 @@
   gap: 8px;
   padding: 16px;
   background: var(--coral);
-  color: #fff;
+  color: var(--on-act);
   animation:
     tl-in 480ms ease-out both,
     stop-pulse 2.4s ease-in-out 600ms 3;
@@ -145,7 +145,7 @@
 }
 
 .stop-words {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 1.15rem;
   line-height: 1.2;
 }

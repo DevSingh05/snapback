@@ -587,3 +587,25 @@ def test_a_model_on_two_houses_belongs_to_neither(tmp_path):
     }
     catalog = catalog_from_records(records.values())
     assert catalog.property_of("fx-shared") is None  # so it can never read "elsewhere"
+
+
+# --- room labels on a live result (#74, #205) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("rooms", "expected"), [({"fx-sweep-02": "Bedroom"}, "Bedroom"), ({}, None)]
+)
+def test_a_live_result_carries_the_room_label_when_the_cache_has_it(world, rooms, expected):
+    data, sweeps, adapter = world
+    live = LiveLocate(
+        data_dir=data,
+        records=lambda: RECORDS,
+        sweeps_for=adapter.sweeps,
+        matcher_factory=PatchMatcher,
+        thresholds=THRESHOLDS,
+        rooms_for=lambda model_id: rooms if model_id == "fx-model-a" else {},
+    )
+    outcome = live.locate("LIVE-ROOM", [photo(sweeps, "fx-model-a", 2, 1)], "fx-prop-1")
+    placed = outcome.result.photos[0]
+    assert placed.status is LocateStatus.LOCATED_IN_CLAIMED and placed.pano_id == "fx-sweep-02"
+    assert placed.room_label == expected
