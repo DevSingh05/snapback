@@ -5,8 +5,10 @@ import { test } from "node:test";
 import { cardText, renterId } from "./handler";
 import {
   connectPhoton,
+  publicWebUrl,
   runPhoton,
   type PhotonApp,
+  type PhotonContent,
   type PhotonMessage,
   type PhotonSpace,
 } from "./photon";
@@ -187,4 +189,133 @@ test("a message that fails to read does not stop the loop", async () => {
     config(calls),
   );
   assert.equal(renter.sent.length, 1);
+});
+
+// --- review of #204 (XO, 15:12) ------------------------------------------------------------
+
+const image = (
+  opts: { size?: number; delayMs?: number; onRead?: () => void } = {},
+): PhotonContent => ({
+  type: "attachment",
+  mimeType: "image/jpeg",
+  ...(opts.size === undefined ? {} : { size: opts.size }),
+  read: async () => {
+    opts.onRead?.();
+    if (opts.delayMs) await new Promise((done) => setTimeout(done, opts.delayMs));
+    return Buffer.from("jpeg-bytes");
+  },
+});
+
+test("a caption and a photo in one send (a group) is one check with both", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  const grouped: PhotonMessage = {
+    direction: "inbound",
+    content: {
+      type: "group",
+      items: [
+        { content: { type: "text", text: "Is this real? fx-listing" } },
+        { content: image() },
+      ],
+    },
+  };
+  await runPhoton(app([[renter, grouped]]), config(calls));
+  const posts = calls.filter((c) => c.method === "POST");
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0]?.body?.get("text"), "Is this real? fx-listing");
+  assert.equal(posts[0]?.body?.getAll("photos").length, 1);
+  assert.equal(renter.sent.length, 1);
+});
+
+test("a swipe-reply is read for what it carries", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  const reply: PhotonMessage = {
+    direction: "inbound",
+    content: { type: "reply", content: { type: "text", text: "fx-listing again" } },
+  };
+  await runPhoton(app([[renter, reply]]), config(calls));
+  assert.equal(calls.filter((c) => c.method === "POST")[0]?.body?.get("text"), "fx-listing again");
+  assert.equal(renter.sent.length, 1);
+});
+
+test("a photo still downloading when the wait ends is not a second check", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  const slow: PhotonMessage = { direction: "inbound", content: image({ delayMs: 60 }) };
+  const items: [PhotonSpace, PhotonMessage][] = [
+    [renter, text("fx-listing")],
+    [renter, slow],
+  ];
+  const paced: PhotonApp = {
+    messages: (async function* () {
+      for (const item of items) {
+        yield item;
+        await new Promise((done) => setTimeout(done, 2)); // the photo arrives inside the wait
+      }
+    })(),
+  };
+  await runPhoton(paced, config(calls)); // quietMs 5, the download takes 60
+  const posts = calls.filter((c) => c.method === "POST");
+  assert.equal(posts.length, 1, "one ad, one check, one of the day's checks");
+  assert.equal(posts[0]?.body?.getAll("photos").length, 1);
+  assert.equal(renter.sent.length, 1);
+});
+
+test("at most 10 photos are read, and one over the size limit is not downloaded", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  let reads = 0;
+  const onRead = () => void reads++;
+  const big: PhotonMessage = {
+    direction: "inbound",
+    content: image({ size: 11 * 1024 * 1024, onRead }),
+  };
+  const many: [PhotonSpace, PhotonMessage][] = Array.from({ length: 12 }, () => [
+    renter,
+    { direction: "inbound", content: image({ onRead }) } as PhotonMessage,
+  ]);
+  await runPhoton(app([[renter, big], ...many]), {
+    ...config(calls),
+    maxPhotoBytes: 10 * 1024 * 1024,
+  });
+  assert.equal(reads, 10, "the big photo and the 11th and 12th are never downloaded");
+  assert.equal(calls.filter((c) => c.method === "POST")[0]?.body?.getAll("photos").length, 10);
+});
+
+test("a voice note or video is skipped with a line that says nothing about it", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  const out = logs();
+  const voice: PhotonMessage = { direction: "inbound", content: { type: "voice" } };
+  await runPhoton(app([[renter, voice]]), config(calls), out.log);
+  assert.equal(calls.length, 0);
+  const said = out.lines.join("\n");
+  assert.match(said, /skipped a message type the check cannot read \(voice\)/);
+  assert.ok(!said.includes(RENTER));
+});
+
+test("with Photon on, the reply link must be the public site, never localhost", () => {
+  for (const bad of [undefined, "", "http://localhost:5173", "http://127.0.0.1:5173/"]) {
+    assert.throws(() => publicWebUrl({ WEB_URL: bad }), /WEB_URL/);
+  }
+  assert.equal(publicWebUrl({ WEB_URL: "https://snapback.example" }), "https://snapback.example");
+});
+
+test("the SDK's own logger is turned down and telemetry is off", async () => {
+  const seen: Record<string, unknown>[] = [];
+  const load = async () => ({
+    Spectrum: async (options: Record<string, unknown>) => {
+      seen.push(options);
+      return app([]);
+    },
+    imessage: { config: () => ({}) },
+  });
+  await connectPhoton(
+    { SPECTRUM_PROJECT_ID: "fx-project", SPECTRUM_PROJECT_SECRET: SECRET },
+    load,
+    () => {},
+  );
+  assert.deepEqual(seen[0]?.options, { logLevel: "error" });
+  assert.equal(seen[0]?.telemetry, false);
 });

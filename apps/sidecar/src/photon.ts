@@ -23,8 +23,11 @@ import {
 
 export type PhotonContent =
   | { type: "text"; text: string }
-  | { type: "attachment"; mimeType: string; read: () => Promise<Uint8Array> }
+  | { type: "attachment"; mimeType: string; size?: number; read: () => Promise<Uint8Array> }
   | { type: "richlink"; url: string }
+  // more than one part in one send (a caption and a photo), and a swipe-reply
+  | { type: "group"; items: { content: PhotonContent }[] }
+  | { type: "reply"; content: PhotonContent }
   | { type: string };
 
 export type PhotonMessage = { direction: "inbound" | "outbound"; content: PhotonContent };
@@ -40,17 +43,42 @@ export type PhotonConfig = SidecarConfig & {
   /** A renter often sends the ad and its photos as separate messages: wait this long after
    * the last one, then check them together. */
   quietMs?: number;
+  /** A photo larger than this is not downloaded (SNAPBACK_MAX_PHOTO_MB). */
+  maxPhotoBytes?: number;
 };
 
 type Log = (line: string) => void;
 
 const QUIET_MS = 4000;
+const MAX_PHOTOS = 10;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i;
+
+/** The public site the reply links to. With Photon on, a renter's phone must be able to open
+ * it: unset or localhost refuses to start (review of #204). */
+export function publicWebUrl(env: Record<string, string | undefined>): string {
+  const url = (env.WEB_URL ?? "").trim();
+  if (!url || LOCAL.test(url)) {
+    throw new Error("Photon is on, so WEB_URL must be the public site the reply links to.");
+  }
+  return url;
+}
 
 type Pending = { space: PhotonSpace; texts: string[]; images: Blob[]; timer?: NodeJS.Timeout };
 
-/** Read one inbound message into the pending check for its space. False if nothing usable. */
-async function collect(pending: Pending, message: PhotonMessage): Promise<boolean> {
-  const content = message.content;
+type Limits = { maxPhotos: number; maxPhotoBytes: number; skipped: string[] };
+
+/** Read one message's content into the pending check for its space. False if nothing usable;
+ * the type of anything that cannot be read is noted in `limits.skipped` (no content). */
+async function collect(pending: Pending, content: PhotonContent, limits: Limits): Promise<boolean> {
+  if (content.type === "group" && "items" in content) {
+    let used = false;
+    for (const item of content.items) used = (await collect(pending, item.content, limits)) || used;
+    return used;
+  }
+  if (content.type === "reply" && "content" in content) {
+    return collect(pending, content.content, limits);
+  }
   if (content.type === "text" && "text" in content) {
     pending.texts.push(content.text);
     return true;
@@ -60,10 +88,17 @@ async function collect(pending: Pending, message: PhotonMessage): Promise<boolea
     return true;
   }
   if (content.type === "attachment" && "read" in content && content.mimeType.startsWith("image/")) {
+    // never download what will not be sent: past the photo limit, or over the size limit
+    if (pending.images.length >= limits.maxPhotos) return false;
+    if ((content.size ?? 0) > limits.maxPhotoBytes) {
+      limits.skipped.push("photo over the size limit");
+      return false;
+    }
     const bytes = await content.read();
     pending.images.push(new Blob([new Uint8Array(bytes)], { type: content.mimeType }));
     return true;
   }
+  limits.skipped.push(content.type);
   return false;
 }
 
@@ -108,15 +143,27 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
       continue;
     }
     const item = pending.get(space.id) ?? { space, texts: [], images: [] };
+    // Stop the wait while this message is read, so a slow download cannot let the check go
+    // out without it (and then go out again with it: two of the day's checks for one ad).
+    clearTimeout(item.timer);
+    const limits: Limits = {
+      maxPhotos: config.maxPhotos ?? MAX_PHOTOS,
+      maxPhotoBytes: config.maxPhotoBytes ?? MAX_PHOTO_BYTES,
+      skipped: [],
+    };
+    let used = false;
     try {
-      if (!(await collect(item, message))) continue;
+      used = await collect(item, message.content, limits);
     } catch {
       log("[sidecar] could not read one message; skipped it");
-      continue;
     }
-    pending.set(space.id, item);
-    clearTimeout(item.timer);
-    item.timer = setTimeout(() => flush(space.id), quietMs);
+    for (const kind of limits.skipped) {
+      log(`[sidecar] skipped a message type the check cannot read (${kind})`);
+    }
+    if (used) pending.set(space.id, item);
+    if (pending.get(space.id) === item) {
+      item.timer = setTimeout(() => flush(space.id), quietMs);
+    }
   }
   // The stream ended (shutdown, or a test): check what is still waiting, then finish.
   for (const [id, item] of [...pending]) {
@@ -149,7 +196,15 @@ export async function connectPhoton(
     throw new Error("Photon needs SPECTRUM_PROJECT_ID and SPECTRUM_PROJECT_SECRET in the env.");
   }
   const { Spectrum, imessage } = await load();
-  const app = await Spectrum({ projectId, projectSecret, providers: [imessage.config()] });
+  // The SDK's own logger can print chat ids, which hold phone numbers: errors only, and no
+  // telemetry leaves for Photon's collector.
+  const app = await Spectrum({
+    projectId,
+    projectSecret,
+    providers: [imessage.config()],
+    options: { logLevel: "error" },
+    telemetry: false,
+  });
   log("[sidecar] connected to Photon (iMessage)");
   return app;
 }

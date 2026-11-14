@@ -18,7 +18,7 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { type MessageClient } from "./handler";
-import { connectPhoton, runPhoton } from "./photon";
+import { connectPhoton, publicWebUrl, runPhoton } from "./photon";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -29,7 +29,6 @@ try {
 export { handleMessage, type InboundMessage } from "./handler";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
-const WEB_URL = process.env.WEB_URL ?? "http://localhost:5173";
 const allowed = (process.env.SIDECAR_ALLOWED_THREADS ?? "")
   .split(",")
   .map((s) => s.trim())
@@ -66,14 +65,17 @@ console.log(
 );
 
 if (photon) {
+  const webUrl = publicWebUrl(process.env); // a renter's phone cannot open localhost
+  const maxPhotoMb = Number(process.env.SNAPBACK_MAX_PHOTO_MB) || 10;
   const app = await connectPhoton(process.env);
   const stop = () => void app.stop?.().finally(() => process.exit(0));
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   await runPhoton(app, {
     apiUrl: API_URL,
-    webUrl: WEB_URL,
+    webUrl,
     allowedThreads: new Set(allowed),
     renterSalt,
+    maxPhotoBytes: maxPhotoMb * 1024 * 1024,
   });
 }
