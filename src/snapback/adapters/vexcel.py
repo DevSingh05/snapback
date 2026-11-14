@@ -10,7 +10,11 @@ the sponsor's Vexcel API 2.0 quickstart:
    `direction="nadir"` uses `POST ortho/extract` over every ortho layer instead.
 
 `X-API-KEY` comes from `.env`. A 429 is retried (Retry-After first, else exponential), and a wait
-over 30 s gives up. Tiles are cached under `data/vexcel/` for at most 7 days (`make purge`
+over 30 s gives up. One tile never takes more than 20 s in total (every request timeout and wait
+counts against that budget), so a request path can call this safely. A malformed reply means no
+tile, never an exception. `captured_on` is the oblique's last capture date; nadir (ortho) tiles
+have none here, because the ortho extract does not report one, so theirs is always None.
+Tiles are cached under `data/vexcel/` for at most 7 days (`make purge`
 deletes them). Imagery never goes into git, a log, an issue or an outside model. No tile means
 None, and the card ships record facts only.
 
@@ -47,11 +51,14 @@ CACHE_DAYS = 7
 MAX_RETRIES = 3
 MAX_WAIT_S = 30.0  # a longer Retry-After is over budget: give up, ship record facts only
 TIMEOUT_S = 60.0
+TOTAL_BUDGET_S = 20.0  # one tile, end to end, across every request and wait
 DIRECTIONS = ("north", "east", "south", "west", "nadir")
 _FROM_SETTINGS = object()
 _SAFE = re.compile(r"[^A-Za-z0-9_-]")
 
 Sleep = Callable[[float], None]
+_monotonic = time.monotonic  # replaced in tests
+_BAD_REPLY = (ValueError, TypeError, AttributeError, KeyError)
 
 
 class VexcelKeyMissingError(RuntimeError):
@@ -98,15 +105,31 @@ def _wait_s(response: httpx.Response, attempt: int) -> float | None:
 
 
 def _send(
-    http: httpx.Client, method: str, path: str, key: str, sleep: Sleep, **kwargs: Any
+    http: httpx.Client,
+    method: str,
+    path: str,
+    key: str,
+    sleep: Sleep,
+    deadline: float,
+    **kwargs: Any,
 ) -> httpx.Response | None:
-    """One API call with the 429 policy. None means rate limited past the budget."""
+    """One API call with the 429 policy and the tile's time budget. None means rate limited past
+    the budget or out of time."""
     for attempt in range(MAX_RETRIES + 1):
-        response = http.request(method, f"{BASE_URL}/{path}", headers={"X-API-KEY": key}, **kwargs)
+        remaining = deadline - _monotonic()
+        if remaining <= 0:
+            return None
+        response = http.request(
+            method,
+            f"{BASE_URL}/{path}",
+            headers={"X-API-KEY": key},
+            timeout=min(TIMEOUT_S, remaining),
+            **kwargs,
+        )
         if response.status_code != 429:
             return response
         wait = _wait_s(response, attempt)
-        if wait is None or attempt == MAX_RETRIES:
+        if wait is None or attempt == MAX_RETRIES or _monotonic() + wait >= deadline:
             return None
         sleep(wait)
     return None
@@ -120,15 +143,16 @@ def _capture_date(value: Any) -> date | None:
 
 
 def _oblique_capture(
-    http: httpx.Client, wkt: str, key: str, direction: str, sleep: Sleep
+    http: httpx.Client, wkt: str, key: str, direction: str, sleep: Sleep, deadline: float
 ) -> tuple[bool, date | None]:
-    """(this direction exists here, its newest capture date)."""
+    """(this direction exists here, its newest capture date). A malformed reply is (False, None)."""
     r = _send(
         http,
         "GET",
         "oriented/collections",
         key,
         sleep,
+        deadline,
         params={
             "wkt": wkt,
             "srid": 4326,
@@ -140,13 +164,16 @@ def _oblique_capture(
     if r is None or r.status_code != 200:
         return False, None  # 404: no oblique coverage at this location
     wanted = f"oblique-{direction}"
-    dates = [
-        _capture_date((f.get("properties") or {}).get("last-capture-date"))
-        for f in r.json().get("features", [])
-        if (f.get("properties") or {}).get("product-type") == wanted
-    ]
-    dates = [d for d in dates if d is not None]
-    return bool(dates), max(dates, default=None)
+    try:
+        dates = [
+            _capture_date((f.get("properties") or {}).get("last-capture-date"))
+            for f in r.json().get("features", [])
+            if (f.get("properties") or {}).get("product-type") == wanted
+        ]
+    except _BAD_REPLY:
+        return False, None
+    found = [d for d in dates if d is not None]
+    return bool(dates), max(found, default=None)
 
 
 def get_tile(
@@ -177,8 +204,11 @@ def get_tile(
     meta = path.with_suffix(".json")
     if path.is_file() and time.time() - path.stat().st_mtime < CACHE_DAYS * 24 * 3600:
         captured = None
-        if meta.is_file():
-            captured = _capture_date(json.loads(meta.read_text()).get("captured_on"))
+        try:
+            if meta.is_file():
+                captured = _capture_date(json.loads(meta.read_text()).get("captured_on"))
+        except (*_BAD_REPLY, OSError):
+            captured = None  # a damaged meta file only loses the date, never the tile
         return AerialTile(
             property_id=record.property_id,
             source=DataSource.LIVE,
@@ -188,6 +218,7 @@ def get_tile(
         )
 
     wkt = square_around(record.lat, record.lon)
+    deadline = _monotonic() + TOTAL_BUDGET_S
     owns_client = client is None
     http = client or httpx.Client(timeout=TIMEOUT_S)
     try:
@@ -197,7 +228,7 @@ def get_tile(
             body: dict[str, Any] = {"layer": ORTHO_LAYERS, "crop": "bounding_box"}
             body["image-format"] = "jpeg"
         else:
-            exists, captured = _oblique_capture(http, wkt, key, direction, sleep)
+            exists, captured = _oblique_capture(http, wkt, key, direction, sleep, deadline)
             if not exists:
                 return None
             endpoint = "oriented/extract"
@@ -209,7 +240,7 @@ def get_tile(
                 "image-format": "jpeg",
             }
         body |= {"wkt": wkt, "srid": 4326, "buffer-meter": BUFFER_M}
-        r = _send(http, "POST", endpoint, key, sleep, json=body)
+        r = _send(http, "POST", endpoint, key, sleep, deadline, json=body)
         if r is None or r.status_code != 200:
             return None
         if not r.headers.get("content-type", "").startswith("image/"):

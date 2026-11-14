@@ -186,3 +186,58 @@ def test_two_building_proof_has_both_tiles_and_the_distance(tmp_path):
     assert proof.claimed is not None and proof.claimed.property_id == "fx-prop-1"
     assert proof.matched is not None and proof.matched.property_id == "fx-prop-3"
     assert proof.distance_m is not None and proof.distance_m > 1000
+
+
+def test_a_hostile_property_id_stays_inside_the_cache(tmp_path):
+    evil = PropertyRecord(property_id="../../evil", source=DataSource.FIXTURE, lat=1.5, lon=-2.5)
+    api = Api(oriented__collections=[_coverage("north")], oriented__extract=[_image()])
+    tile = _live(tmp_path, api, record=evil)
+    assert tile is not None
+    assert Path(tile.path).resolve().parent == (tmp_path / "vexcel").resolve()
+    assert ".." not in Path(tile.path).name
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        httpx.Response(200, content=b"not json"),
+        httpx.Response(200, json=[1, 2, 3]),
+        httpx.Response(200, json={"features": [None]}),
+        httpx.Response(200, json={"features": [{"properties": None}]}),
+    ],
+)
+def test_a_malformed_coverage_reply_means_no_tile_not_a_crash(tmp_path, reply):
+    assert _live(tmp_path, Api(oriented__collections=[reply])) is None
+
+
+def test_a_truncated_meta_file_is_ignored(tmp_path):
+    first = _live(
+        tmp_path, Api(oriented__collections=[_coverage("north")], oriented__extract=[_image()])
+    )
+    assert first is not None
+    Path(first.path).with_suffix(".json").write_text('{"captured_on": ')
+    again = _live(tmp_path, Api())
+    assert again is not None and again.captured_on is None
+
+
+def test_one_tile_never_takes_longer_than_the_total_budget(tmp_path, monkeypatch):
+    from snapback.adapters import vexcel
+
+    now = [0.0]
+    monkeypatch.setattr(vexcel, "_monotonic", lambda: now[0])
+
+    def slow_sleep(seconds: float) -> None:
+        now[0] += seconds
+
+    api = Api(oriented__collections=[httpx.Response(429, headers={"Retry-After": "15"})] * 10)
+    tile = get_tile(
+        RECORD,
+        source=DataSource.LIVE,
+        data_dir=tmp_path,
+        api_key="fx-key",
+        client=api.client(),
+        sleep=slow_sleep,
+    )
+    assert tile is None
+    assert now[0] <= vexcel.TOTAL_BUDGET_S
+    assert len(api.seen) == 2  # a second 15 s wait would pass the 20 s budget
