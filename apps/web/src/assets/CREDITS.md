@@ -28,6 +28,7 @@ Licence check for `hero-day-brick.webp`, `hero-dusk-warm.webp` and `sample-kitch
 Unsplash License"; none is an Unsplash+ image. They were downloaded from images.unsplash.com and
 re-encoded to WebP (heroes 1920 px wide, the kitchen 900 px wide; each under 250 KB). The two
 heroes are Home's photograph in Day and in Dusk.
+
 ## Stories page (`src/assets/stories`)
 
 The Stories page (`/stories`) uses these photographs from [Unsplash](https://unsplash.com), under

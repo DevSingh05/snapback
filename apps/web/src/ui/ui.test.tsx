@@ -291,7 +291,9 @@ describe("stock photos", () => {
     const photos = tracked.filter((f) => /\.(webp|jpe?g|png|avif)$/i.test(f));
     expect(photos.length).toBeGreaterThan(0);
     for (const f of photos) expect(credits, f).toContain(f.split("/").pop()!);
-    expect(tracked.filter((f) => /(^|[/_.-])kit([/_.-]|$)|costar|matterport|vexcel/i.test(f))).toEqual([]);
+    expect(
+      tracked.filter((f) => /(^|[/_.-])kit([/_.-]|$)|costar|matterport|vexcel/i.test(f)),
+    ).toEqual([]);
     expect(credits).not.toMatch(/[\u2013\u2014]/);
   });
 });
