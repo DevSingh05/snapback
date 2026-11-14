@@ -6,7 +6,9 @@ gave, which photos were matched, and where to click on each platform.
 
 Everything in it is a fact from code:
 
-- the proof lines are `decide()`'s own reasons, the fixed strings in `card/strings.py`;
+- the proof lines are `decide()`'s own reasons, the fixed strings in `card/strings.py`, and
+  only the ones about the listing and the record (an allowlist). A reason that came from
+  the renter's own thread, such as a payment ask, never goes in a pack someone else pastes;
 - the status strip is what the card already carries in `for_sale`;
 - photos are named by their number, and pictures are only ever references to our own routes.
 
@@ -14,7 +16,8 @@ What is never in it: a match score, an inlier count or a threshold; a phone hash
 or a model id; image bytes; anything about the renter (no renter id, none of the text they
 sent); and a word about any person. A case is "reportable" only on proof or on a record that
 shows the home for sale. A hold on something not confirmed hands nobody report steps: the
-poster may be a real agent (conductor, Sat 03:15).
+poster may be a real agent (conductor, Sat 03:15). Nor does a home for sale whose ad carries
+the office's own phone on record: that is the brokerage offering it (ruling, Sat 03:36).
 """
 
 from snapback.card import strings
@@ -24,6 +27,7 @@ from snapback.contracts import (
     LocateStatus,
     MemoryHitKind,
     ModuleEvidence,
+    PhoneMatch,
     ReportPhotoPair,
     ReportPlatform,
     ReportResponse,
@@ -31,9 +35,21 @@ from snapback.contracts import (
     ReportSteps,
     VerdictState,
 )
-from snapback.verdict import _photo_number, decide, to_evidence
+from snapback.verdict import _photo_number, decide, presence_of, to_evidence
 
 MAX_BROKERAGE_CHARS = 80
+
+# The reasons that may go in a pack: facts about the listing and the record. Everything else
+# decide() says stays out. What the renter was asked for (a payment, a fee, pressure) is from
+# their own thread; who the poster is, presence and where photos were placed are about the
+# check, and the card is where those are read. The owner and licence reasons are listed for
+# when those rules are on main; a key the table does not have is skipped.
+_PACK_REASONS = (
+    "reason.for_sale",
+    "reason.photo_elsewhere",
+    "reason.license_not_found",
+    "reason.owner_not_poster",
+)
 MAX_STEPS = 5
 MAX_PAIRS = 40
 
@@ -75,6 +91,18 @@ def _photo_pairs(modules: ModuleEvidence, lang: str) -> list[ReportPhotoPair]:
     return [pairs[number] for number in sorted(pairs)][:MAX_PAIRS]
 
 
+def _proof_lines(modules: ModuleEvidence, reasons: list[str], lang: str) -> list[str]:
+    """decide()'s reasons, in its order, less everything not on the allowlist."""
+    allowed = {strings.text(key, lang) for key in _PACK_REASONS if strings.has(key, lang)}
+    if presence_of(modules).copies_listing_photo:
+        # "The reply is a copy of listing photo 2." names the photo, so it is the sentence
+        # the evidence carries, not a fixed key.
+        copied = to_evidence(modules, lang).forgery_reason
+        if copied:
+            allowed.add(copied)
+    return [reason for reason in reasons if reason in allowed]
+
+
 def _steps(platform: ReportPlatform, lang: str) -> ReportSteps:
     steps = []
     for number in range(1, MAX_STEPS + 1):
@@ -96,7 +124,12 @@ def build_report(
     names a building, so its aerial proof route has something to show."""
     verdict = decide(to_evidence(modules, lang), lang)
     strip = _status_strip(card)
-    for_sale = strip is not None and strip.status is ForSaleStatus.ACTIVE
+    # The ad's phone is the office's on record: the brokerage itself is offering the home,
+    # so a for-sale record is not a copy to report (ruling, Sat 03:36).
+    by_the_office = (
+        modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.YES
+    )
+    for_sale = strip is not None and strip.status is ForSaleStatus.ACTIVE and not by_the_office
     reportable = verdict.state is VerdictState.DONT_PAY or for_sale
 
     placed = {LocateStatus.LOCATED_IN_CLAIMED, LocateStatus.LOCATED_ELSEWHERE}
@@ -111,7 +144,7 @@ def build_report(
         state=verdict.state,
         reportable=reportable,
         status_strip=strip,
-        proof_lines=list(verdict.reasons),
+        proof_lines=_proof_lines(modules, verdict.reasons, lang),
         photo_pairs=_photo_pairs(modules, lang) if reportable else [],
         twin_url=f"/case/{case_id}/twin" if any_placed else None,
         aerial_url=f"/cases/{case_id}/aerial" if aerial else None,

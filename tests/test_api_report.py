@@ -7,6 +7,8 @@ anything. The cases here are the staged ones in fixtures/demo; nothing is from a
 
 import json
 import re
+from datetime import datetime
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,7 +19,10 @@ from snapback.api.report import build_report
 from snapback.card import strings
 from snapback.contracts import ModuleEvidence, ReportPlatform, ReportResponse, VerdictState
 from snapback.settings import Settings
+from snapback.verdict import build_card
 
+CONTRACTS = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
+CHECKED_AT = datetime.fromisoformat("2026-11-13T21:42:00-05:00")
 HEX_RUN = re.compile(r"[0-9a-fA-F]{16,}")
 NUMBER_WORDS = ("score", "inlier", "threshold", "confidence", "distance", "hash", "model_id")
 
@@ -130,7 +135,9 @@ def test_the_for_sale_case_shows_the_status_strip_and_the_brokerage(tmp_path):
     }
     # The proof lines are decide()'s own reasons, in its order.
     verdict, card = run_demo_case("c")
-    assert pack["proof_lines"] == verdict.reasons
+    # Only the reasons about the listing and the record go in the pack, in decide()'s order.
+    assert verdict.reasons == [strings.text("reason.for_sale"), strings.text("reason.not_indexed")]
+    assert pack["proof_lines"] == [strings.text("reason.for_sale")]
     assert pack["proof_lines"][0] == strings.text("reason.for_sale")
     assert pack["not_checked"] == card.not_checked
     assert [steps["platform"] for steps in pack["platforms"]] == [
@@ -221,17 +228,30 @@ def test_the_pack_has_no_hash_no_score_and_no_number(tmp_path, case_id):
 
 def test_the_pack_carries_nothing_about_the_renter(tmp_path):
     # Conductor, Sat 03:15: no renter id and none of the text they sent. Listing facts only.
+    # The thread here fires a payment rule and names a poster, so there is something to leak.
     client = client_for(tmp_path, demo_case="c")
     renter = "imsg-" + "0a1b2c3d4e5f" * 2
-    words = "Hi it is Fxrenter here, I really need this place by Friday for my kids."
+    words = "Fxposter here, send the deposit by Zelle today. Ask for Fxrenter at the door."
     made = client.post("/cases", data={"text": words, "renter_id": renter})
     assert made.status_code == 201, made.text
     case = made.json()
+    # The rule did fire, and the card (which is the renter's own) says so.
+    card = client.get(f"/cases/{case['case_id']}/card").json()
+    said = " ".join(line["text"] for row in card["rows"] for line in row["lines"])
+    assert "Zelle" in said
+
     got = report(client, case)
     assert got.status_code == 200, got.text
     body, pack = got.text, got.json()
+    assert pack["reportable"] is True  # the record shows the home for sale
     assert renter not in body and renter.removeprefix("imsg-") not in body
-    assert "Fxrenter" not in body and "Friday" not in body and "kids" not in body
+    # Not the names in the thread, not the sentence that fired the rule, not a word of it.
+    for word in ("Fxposter", "Fxrenter", "Zelle", "deposit", "door"):
+        assert word.lower() not in body.lower(), word
+    # And not the reasons that came from the thread.
+    for key in ("reason.payment_flag", "reason.rule_flag", "reason.price_flag"):
+        assert strings.text(key) not in pack["proof_lines"]
+    assert pack["proof_lines"] == [strings.text("reason.for_sale")]
     about_the_renter = ("renter", "owner_id", "client", "thread", "message", "text", "cookie")
     assert not [
         key for key in keys_of(pack) if any(word in key.lower() for word in about_the_renter)
@@ -320,5 +340,82 @@ def test_the_state_in_the_pack_is_the_card_s_own(tmp_path):
         modules = ModuleEvidence.model_validate(json.loads(_evidence_of(case_id)))
         pack = build_report(modules, card, case_id=card.case_id, lang="en", aerial=False)
         assert pack.state is card.state is verdict.state
-        assert pack.proof_lines == verdict.reasons
+        # decide()'s own reasons, in its order, less everything that is not about the
+        # listing or the record.
+        assert pack.proof_lines == [reason for reason in verdict.reasons if reason in LISTING]
+        assert pack.proof_lines, "each staged case has a listing fact to report"
         assert pack.reportable is (verdict.state is VerdictState.DONT_PAY or case_id == "c")
+
+
+LISTING = {
+    strings.text("reason.for_sale"),
+    strings.text("reason.photo_elsewhere"),
+    strings.text("reason.forged_copy", n=2),
+}
+
+
+def pack_for(**sections):
+    """A pack built straight from evidence, for cases the staged ones do not cover."""
+    raw = json.loads((CONTRACTS / "module_evidence_hold.json").read_text())
+    modules = ModuleEvidence.model_validate(raw | sections)
+    card = build_card(modules, checked_at=CHECKED_AT)
+    return build_report(modules, card, case_id=card.case_id, lang="en", aerial=False)
+
+
+def test_the_proof_lines_are_an_allowlist_of_listing_and_record_reasons():
+    # A held case with a reason of every other kind: who, presence, place, price, the thread.
+    pack = pack_for(
+        authority={"status": "unknown", "office_phone_match": "no", "link_domain": "lookalike"},
+        for_sale={"status": "active", "site": "Homes.com"},
+        price={"status": "below_range", "listed_rent": 900, "unit": "not_on_record"},
+    )
+    assert pack.state is VerdictState.HOLD and pack.reportable is True
+    assert pack.proof_lines == [strings.text("reason.for_sale")]
+    kept_out = [
+        "reason.payment_flag",
+        "reason.rule_flag",
+        "reason.price_flag",
+        "reason.phone_flag",
+        "reason.lookalike_link",
+        "reason.unit_flag",
+        "reason.located",
+        "reason.authority_unknown",
+        "reason.presence_proven_not_authority",
+        "reason.presence_missing",
+    ]
+    for key in kept_out:
+        assert strings.text(key) not in pack.proof_lines, key
+
+
+@pytest.mark.parametrize(
+    "authority",
+    [
+        # The phone is not the office's: not confirmed, and the poster may be a real agent.
+        {"status": "matches_record", "office_phone_match": "no"},
+        # The name is not the one on record: the same.
+        {"status": "mismatch", "poster_said": "Other Fixture Rentals"},
+        {"status": "unknown"},
+    ],
+)
+def test_a_hold_on_something_not_confirmed_is_not_reportable(authority):
+    pack = pack_for(authority=authority, rules=[], price=None)
+    assert pack.state is VerdictState.HOLD
+    assert pack.reportable is False
+    assert pack.platforms == [] and pack.photo_pairs == [] and pack.proof_lines == []
+
+
+def test_for_sale_by_the_office_on_record_is_not_reportable():
+    # Ruling, Sat 03:36: the record shows the home for sale and the ad's phone is the
+    # office's on record. That is the brokerage itself offering it, not a copy.
+    for_sale = {"status": "active", "site": "Homes.com", "offices": ["Fixture Realty Group"]}
+    theirs = pack_for(
+        authority={"status": "matches_record", "office_phone_match": "yes"}, for_sale=for_sale
+    )
+    assert theirs.reportable is False and theirs.platforms == []
+    assert theirs.status_strip is not None  # the facts are still there to read
+    for match in ("no", "not_checked"):
+        other = pack_for(
+            authority={"status": "matches_record", "office_phone_match": match},
+            for_sale=for_sale,
+        )
+        assert other.reportable is True and len(other.platforms) == 3
