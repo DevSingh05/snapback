@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from leakcheck import leaked
 from snapback.agent import CaseSession, FixtureModules, PolicyChooser, Trace, run_case
 from snapback.agent.intake import read_listing
 from snapback.agent.join import JoinedModules, KitLookups, KitMissing
@@ -507,7 +508,21 @@ def test_live_mode_without_the_kit_says_so_when_a_record_is_asked_for(tmp_path):
 
 
 def test_nothing_from_the_record_is_logged_or_traced(tmp_path, caplog):
-    lookups = Injected(contact_record(manager_company="Quiet Manager Co"))
+    # Sentinel rents (seven digits, so no timestamp or random token can hold them) stand in
+    # for the record's money values; the real ones ("1600") collide with trace timestamps.
+    rents = [
+        {"name": "2 bed / 2 bath", "beds": 2, "rent_min": 7654321, "rent_max": 7654322},
+        {"name": "Sentinel Plan", "beds": 4, "rent_min": 7654323, "rent_max": 7654324},
+    ]
+    lookups = Injected(
+        contact_record(
+            manager_company="Quiet Manager Co",
+            rent_min=7654325,
+            rent_median=7654326,
+            rent_max=7654327,
+            floor_plan_rents=rents,
+        )
+    )
     client = client_for(tmp_path, lookups, snapback_data_source="live")
     with caplog.at_level(logging.DEBUG):
         made = client.post(
@@ -516,8 +531,14 @@ def test_nothing_from_the_record_is_logged_or_traced(tmp_path, caplog):
         events = client.app.state.store.get(made["case_id"]).events()
     logged = " ".join(record.getMessage() for record in caplog.records)
     traced = " ".join(event.model_dump_json() for event in events)
-    for secret in ("Quiet Manager", "fixtureliving.example", "1600", "fx-prop-2"):
-        assert secret not in logged and secret not in traced
+    secrets = (
+        "Quiet Manager",
+        "fixtureliving.example",
+        "fx-prop-2",
+        "Sentinel Plan",
+        *(str(n) for n in range(7654321, 7654328)),
+    )
+    assert leaked(secrets, logged, traced) == []
 
 
 # --- through lane D's real for-sale lookup, on its synthetic kit (A15, #132) ----------------

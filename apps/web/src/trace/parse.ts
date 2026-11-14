@@ -1,6 +1,17 @@
 import type { TraceEvent } from "../contracts";
 
-const KINDS = ["choice", "tool", "status", "hitl", "verdict", "error"];
+const KINDS = [
+  "choice",
+  "tool",
+  "status",
+  "hitl",
+  "verdict",
+  "error",
+  "todo",
+  "agent",
+  "file",
+  "unsure",
+];
 
 // Returns null for anything that is not a well-formed TraceEvent, so one bad line never
 // breaks the panel.

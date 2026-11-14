@@ -1,0 +1,43 @@
+.of-panel {
+  background: var(--surface);
+  padding: clamp(16px, 4vw, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.of-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.of-panel h2 {
+  font-size: 1.35rem;
+}
+.of-panel p {
+  margin: 0;
+}
+.of-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.of-ad {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+.of-ad dt {
+  color: var(--muted);
+}
+.of-ad dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.of-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

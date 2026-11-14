@@ -15,11 +15,12 @@ from a record, and derived facts (counts and yes/no), never sponsor images or re
 """
 
 import random
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Literal
 
+from snapback.agent.casework import Note
 from snapback.agent.modules import ChallengeOutcome, Modules
 from snapback.agent.planner import ASK_FIELDS, Plan, PlanKind
 from snapback.agent.scope import ListingScope
@@ -136,6 +137,11 @@ class CaseSession:
         self._plan: Plan | None = None
         self._after_plan: Step | None = None  # where the case goes when the plan is done
         self.question: str | None = None  # the code-written question the renter is asked
+        # Working notes per check family (casework.py): derived text only, never read by decide().
+        self.notes: dict[str, Note] = {}
+        # Set by the API: researched places near the ad, as text. `search_places()` uses the code
+        # policy (code notes); `search_places(use_model=True)` is the search sub-agent's call.
+        self.search_places: Callable[..., str] | None = None
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -656,6 +662,28 @@ class CaseSession:
 
     # --- the end ---------------------------------------------------------------------------
 
+    def confirm_office(self, domain: str) -> None:
+        """Record that someone at the office's own website domain on record confirmed this case.
+
+        A "not ours" is sticky: a confirmation never clears it (a poster could say "email jane@
+        instead"), so the case stays on HOLD with both lines on the card. A finished case is
+        decided again on the evidence it now has, by `decide` and nowhere else, and the trace
+        gets a new verdict event so it matches the card. A case still running carries the
+        answer into its eventual decision."""
+        self._office_answer({"office_confirmed_domain": domain})
+
+    def decline_office(self, domain: str) -> None:
+        """The office at the domain on record said the ad is not theirs (holds the case).
+
+        It may clear an earlier confirmation; nothing clears it."""
+        self._office_answer({"office_confirmed_domain": None, "office_declined_domain": domain})
+
+    def _office_answer(self, update: dict[str, str | None]) -> None:
+        self.evidence = self.evidence.model_copy(update=update)
+        if self.verdict is not None:
+            self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
+            self._emit_verdict()
+
     def _finish(self) -> None:
         """Decide on the evidence gathered. This is the only way a case gets a state."""
         if self._replied and presence_of(self.evidence).status is PresenceStatus.WAITING:
@@ -663,6 +691,11 @@ class CaseSession:
             # card must stop telling the renter to ask for a photo. This changes no state.
             self.evidence = self.evidence.model_copy(update={"no_retry_left": True})
         self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
+        self._emit_verdict()
+        self.step = Step.DONE
+
+    def _emit_verdict(self) -> None:
+        assert self.verdict is not None
         reasons: list[str] = []
         for reason in self.verdict.reasons:
             if reasons and len(" ".join([*reasons, reason])) > 200:
@@ -673,4 +706,3 @@ class CaseSession:
             clean_reason(" ".join(reasons), self.verdict.state.value),
             pick=self.verdict.state.value,
         )
-        self.step = Step.DONE

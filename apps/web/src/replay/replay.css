@@ -111,7 +111,7 @@
 .site-nav .site-nav-case {
   padding: 8px 14px;
   background: var(--blue);
-  color: #fff;
+  color: var(--on-act);
   text-decoration: none;
 }
 
@@ -159,7 +159,7 @@
 .replay-run-btn {
   padding: 12px 20px;
   background: var(--blue);
-  color: #fff;
+  color: var(--on-act);
   font: inherit;
   font-weight: 700;
   border: 0;

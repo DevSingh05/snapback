@@ -75,7 +75,18 @@ export interface Card {
   lang: string;
 }
 
-export type TraceKind = "choice" | "tool" | "status" | "hitl" | "verdict" | "error";
+export type TraceKind =
+  | "choice"
+  | "tool"
+  | "status"
+  | "hitl"
+  | "verdict"
+  | "error"
+  // The deep agent's own steps (E0): todo list, sub-agent hand-off, file written, code-raised doubt.
+  | "todo"
+  | "agent"
+  | "file"
+  | "unsure";
 export type ChoiceKind =
   "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human" | "next_check";
 
@@ -95,6 +106,22 @@ export interface TraceEvent {
   reason: string;
   source: DataSource;
   chosen_by: ChosenBy;
+}
+
+// One working note the agent wrote (GET /cases/{id}/notes). Derived text only.
+export interface CaseNote {
+  path: string;
+  stem: string;
+  agent: string;
+  text: string;
+  written_by: ChosenBy;
+}
+
+export interface CaseNotes {
+  case_id: string;
+  source: DataSource;
+  notes: CaseNote[];
+  footer: string;
 }
 
 // Mirrors Pose and the parts of LocateResult the twin reads (src/snapback/contracts.py).
