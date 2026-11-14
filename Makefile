@@ -18,6 +18,7 @@ format: ## fix style and formatting in place
 
 test: ## run the python tests
 	uv run pytest
+	npm run test -w apps/web
 
 hygiene: ## fail if sponsor data, secrets or large files are tracked
 	bash scripts/check_repo_hygiene.sh
