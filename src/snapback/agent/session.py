@@ -18,10 +18,11 @@ import random
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from snapback.agent.casework import Note
 from snapback.agent.modules import ChallengeOutcome, Modules
+from snapback.agent.place import PlaceDesk, PlaceSearcher
 from snapback.agent.planner import ASK_FIELDS, Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
@@ -59,6 +60,7 @@ DECISIONS = (SEND, EDIT, CANCEL)
 
 class Step(StrEnum):
     CHECKS = "checks"
+    PLACE = "place"  # E1: the short retry budget for photos the base search could not place
     PLAN = "plan"  # A24: which evidence-gated check runs next (order only)
     ASK = "ask"  # A24 stretch: the renter was asked for the license number; waiting for them
     FLOOR_PLAN = "floor_plan"
@@ -119,6 +121,7 @@ class CaseSession:
         self._rng = rng or random.SystemRandom()
 
         self.step = Step.CHECKS
+        self._checks_pick = TWIN_RULES_CHALLENGE
         self.evidence = ModuleEvidence(case_id=case_id, source=trace.source)
         self.retries = 0
         self.late_replies = 0  # replies that came after the deadline and were not copies
@@ -142,6 +145,18 @@ class CaseSession:
         # Set by the API: researched places near the ad, as text. `search_places()` uses the code
         # policy (code notes); `search_places(use_model=True)` is the search sub-agent's call.
         self.search_places: Callable[..., str] | None = None
+        # E1: a retry search for unplaced photos. None (the default) means no retry: the base
+        # search stands. `place_scans` maps a scan alias (S1) to its model id, searcher-side only.
+        self.place_searcher: PlaceSearcher | None = None
+        self.place_scans: Mapping[str, str] | None = None
+        self.place_covers_unshown: Mapping[str, bool] | None = None
+        self.place_case_seconds_left: float | None = None  # what is left of the case's 25 s
+        self.place_desk: PlaceDesk | None = None
+        # E5: the walk. `walk_plan()` returns the case's TourPlan (set by whoever builds the
+        # tour); `walk_desk` and `walk_director` are filled by the walk sub-agent or the policy.
+        self.walk_plan: Callable[[], Any] | None = None
+        self.walk_desk: Any = None
+        self.walk_director: Any = None
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -175,6 +190,8 @@ class CaseSession:
         """The choice that is open now, or None when the next step is not a choice to make."""
         if self.step is Step.CHECKS:
             return self._checks_offer()
+        if self.step is Step.PLACE:
+            return self._place_offer()
         if self.step is Step.PLAN:
             return self._plan_offer()
         if self.step is Step.FLOOR_PLAN:
@@ -217,6 +234,7 @@ class CaseSession:
         )
 
     def _apply_checks(self, pick: str) -> None:
+        self._checks_pick = pick
         if pick == STATE_ONLY:
             self._finish()
             return
@@ -248,7 +266,11 @@ class CaseSession:
             if photos and all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
                 update["locate"] = unplaced
         self.evidence = self.evidence.model_copy(update=update)
+        if self._begin_place():
+            return  # the retry budget is a choice of its own; `_end_place` carries on
+        self._after_locate(pick)
 
+    def _after_locate(self, pick: str) -> None:
         if pick == RULES_ONLY:
             self._after_plan = None
         elif self._candidates:
@@ -258,6 +280,86 @@ class CaseSession:
         else:
             self._after_plan = None  # nothing to challenge against
         self._begin_plan()
+
+    # --- choice 1a: the short retry budget for unplaced photos (E1) -------------------------
+
+    def _begin_place(self) -> bool:
+        located = self.evidence.locate
+        if self.place_searcher is None or located is None:
+            return False
+        desk = PlaceDesk(
+            located,
+            self.place_searcher,
+            scans=self.place_scans,
+            covers_unshown=self.place_covers_unshown,
+            case_seconds_left=self.place_case_seconds_left,
+        )
+        for alias, bar in desk.unsure_lines():
+            self.trace.emit(
+                TraceKind.UNSURE,
+                self._say(
+                    f"trace.unsure.{bar}",
+                    photo=alias,
+                    n=desk.rows[desk.photo_of[alias]].location.inliers or 0,
+                    bar=desk.bar_of(alias),
+                ),
+                pick=alias,
+            )
+        if not desk.is_open():
+            self.place_desk = desk if desk.unplaced() else None
+            return False
+        self.place_desk = desk
+        self.step = Step.PLACE
+        return True
+
+    def _place_offer(self) -> Offer | None:
+        assert self.place_desk is not None
+        offer = self.place_desk.offer()
+        if offer is None:
+            self._end_place()
+            return self.offer()
+        return Offer(
+            kind=ChoiceKind(offer.kind),
+            options=offer.options,
+            aliases=offer.aliases,
+            facts=offer.for_chooser().facts,  # only what a model may see
+            default=offer.default,
+            default_reason=offer.default_reason,
+        )
+
+    def _apply_place(self, kind: ChoiceKind, label: str, by: Literal["model", "policy"]) -> None:
+        assert self.place_desk is not None
+        desk = self.place_desk
+        before = {pid: len(row.steps) for pid, row in desk.rows.items()}
+        desk.apply(kind.value, label, by)
+        for pid, row in desk.rows.items():
+            for step in row.steps[before[pid] :]:
+                if step.option not in ("stop",):
+                    self.trace.emit(
+                        TraceKind.TOOL,
+                        self._say(
+                            "trace.place.searched",
+                            photo=desk.alias_of[pid],
+                            option=self._say(f"place.option.{step.option.split(':')[0]}"),
+                            seconds=step.seconds or 0,
+                            result=self._say(f"place.result.{step.result}"),
+                        ),
+                        pick=f"search: {step.option}",
+                        chosen_by=by,
+                    )
+        if not desk.is_open():
+            self._end_place()
+
+    def _end_place(self) -> None:
+        """The budget is spent or nothing is left to try: keep what the retries found."""
+        assert self.place_desk is not None
+        located = self.place_desk.located()
+        update: dict[str, object] = {"locate": located}
+        self._candidates = [c for c in (located.chosen, *located.alternatives) if c]
+        placed = [p for p in located.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
+        self._model_id = placed[0].model_id if placed else None
+        self.evidence = self.evidence.model_copy(update=update)
+        self._after_locate(self._checks_pick)
 
     # --- choice 1b: which check next (A24) -------------------------------------------------
 
@@ -636,7 +738,9 @@ class CaseSession:
             chosen_by=by,
         )
 
-        if offer.kind is ChoiceKind.WHICH_CHECKS:
+        if offer.kind in (ChoiceKind.NEXT_SEARCH, ChoiceKind.WHICH_PHOTO):
+            self._apply_place(offer.kind, label, by)
+        elif offer.kind is ChoiceKind.WHICH_CHECKS:
             self._apply_checks(label)
         elif offer.kind is ChoiceKind.NEXT_CHECK:
             self._apply_plan(label)

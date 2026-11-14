@@ -1,119 +1,224 @@
-/* Minimal on purpose: the layout is plain so a design pass can restyle it. */
+/* Walk the Ad: the renter's own world. A white page on the sky, a sky stage with the room in
+   it, the facts under the stage, the agents down the right, and the stops along the bottom as
+   a strip that also says which rooms the ad showed. Sky, teal and ink only: a mismatch is said
+   in ink and slate with a mark and words, never in alarm colours. */
 .tour-page {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1320px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
+.tour-page.notice {
+  padding: clamp(18px, 4vw, 36px);
+  gap: 10px;
+}
+
 .tour-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
+  padding: 16px clamp(16px, 2.4vw, 28px);
 }
-.tour-scan {
-  margin: 0;
+.tour-head > .mono {
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--muted);
 }
-.tour-body {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  gap: 16px;
+.tour-head > .mono:first-of-type {
+  color: var(--act);
+  font-weight: 700;
+  margin-right: auto;
 }
-.tour-stage {
-  background: var(--surface);
+.tour-scan,
+.tour-render {
+  margin: 0;
+  padding: 0 clamp(16px, 2.4vw, 28px) 12px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.tour-render {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  margin-top: -8px;
+}
+.tour-mismatch {
+  margin: 0;
+  padding: 12px clamp(16px, 2.4vw, 28px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--v-slate);
+  color: var(--on-v);
+  font-weight: 700;
+}
+.tour-mismatch-mark {
+  flex: none;
+  width: 22px;
+  height: 14px;
+  background:
+    linear-gradient(currentColor, currentColor) 0 0 / 100% 4px no-repeat,
+    linear-gradient(currentColor, currentColor) 0 100% / 100% 4px no-repeat;
+  position: relative;
+}
+.tour-mismatch-mark::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: -5px;
+  width: 4px;
+  height: 24px;
+  background: currentColor;
+  transform: rotate(28deg);
+}
 
-  min-height: 360px;
+.tour-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "stage" "panel";
+}
+.tour-page[data-rail="on"] {
+  --rail-w: 372px;
+}
+.tour-page[data-rail="on"] .tour-body {
+  grid-template-columns: minmax(0, 1fr) var(--rail-w);
+  grid-template-areas: "stage rail" "panel rail";
+}
+
+.tour-stage {
+  grid-area: stage;
+  position: relative;
+  min-height: clamp(360px, 31vw, 450px);
   overflow: hidden;
   display: flex;
+  background: linear-gradient(180deg, var(--sky), var(--paper));
+}
+.tour-stage[data-drawer="open"] {
+  position: static;
 }
 .tour-frame,
 .tour-aerial {
   width: 100%;
-  min-height: 360px;
+  min-height: clamp(360px, 31vw, 450px);
   border: 0;
   object-fit: cover;
 }
-.tour-placeholder {
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-  background: var(--teal-soft);
-  color: var(--teal);
-  padding: 32px;
-}
-.tour-panel {
-  background: var(--surface);
 
-  padding: clamp(16px, 3vw, 24px);
-  display: flex;
+.tour-how {
+  position: absolute;
+  z-index: 4;
+  right: 168px;
+  top: 12px;
+  min-height: 48px;
+  padding: 12px 22px;
+  box-shadow: 5px 5px 0 var(--ink);
+}
+.tour-stage:has(.ma) {
   flex-direction: column;
-  gap: 10px;
+}
+.tour-stage:has(.ma) .tour-how {
+  position: static;
+  align-self: flex-end;
+  margin: 0 clamp(16px, 2.4vw, 28px) 24px;
+}
+.tour-how:active:not(:disabled) {
+  transform: translate(5px, 5px);
+  box-shadow: 0 0 0 var(--ink);
+}
+@media (hover: hover) {
+  .tour-how:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+}
+
+/* Under the stage: where you are and the controls on the left, the room's own notes (W3's
+   RoomStop) on the right. */
+.tour-panel {
+  grid-area: panel;
+  padding: clamp(16px, 2vw, 24px) clamp(18px, 2.4vw, 28px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  grid-template-rows: auto auto 1fr auto;
+  gap: 6px clamp(18px, 2.6vw, 36px);
+  align-items: start;
+}
+.tour-panel > * {
+  grid-column: 1;
+  margin: 0;
+}
+.tour-count {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--act);
+  font-weight: 700;
 }
 .tour-title {
-  margin: 0;
-  font-size: 1.5rem;
+  font-size: clamp(1.9rem, 3.2vw, 2.6rem);
+  line-height: 1.05;
 }
 .tour-note,
 .tour-status,
-.tour-src {
+.tour-src,
+.tour-photo-note {
+  margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
-  margin: 0;
 }
 .tour-src::before {
   content: "· ";
 }
-.tour-facts {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.tour-status {
+  min-height: 1.2em;
 }
-.tour-tip,
-.tour-photos,
 .tour-outro {
-  margin: 0;
+  grid-column: 1;
 }
 .tour-controls {
+  align-self: end;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.tour-rail {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
+.tour-controls button {
+  min-height: 48px;
+  background: var(--sky);
+  color: var(--ink);
 }
-.tour-rail button[aria-current="step"] {
-  background: var(--teal);
-  color: var(--surface);
+.tour-controls button:nth-child(2) {
+  background: var(--act);
+  color: var(--on-act);
+  padding-inline: 30px;
 }
-@media (max-width: 760px) {
-  .tour-body {
-    grid-template-columns: minmax(0, 1fr);
+.tour-controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (hover: hover) {
+  .tour-controls button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--sky) 86%, var(--ink));
   }
-  .tour-stage,
-  .tour-frame {
-    min-height: 240px;
+  .tour-controls button:nth-child(2):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--act) 88%, var(--ink));
   }
 }
 
-/* Room stop (W3). Structure lives in RoomStop.tsx; these are the only style hooks. */
-.tour-stage {
-  position: relative;
-}
 .tour-stop {
+  grid-column: 2;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+}
+.tour-stop[data-dwell="true"] {
+  padding-left: 14px;
+  border-left: 4px solid var(--act);
 }
 .tour-photo-row {
   display: flex;
@@ -121,57 +226,261 @@
   align-items: center;
   gap: 8px 12px;
 }
+.tour-photo-row button {
+  min-height: 44px;
+  background: var(--sky);
+  color: var(--ink);
+}
 .tour-photo-label {
   margin: 0;
   font-weight: 700;
-  color: var(--teal);
 }
 .tour-empty-frame {
   margin: 0;
-  padding: 14px;
-  background: repeating-linear-gradient(
-    135deg,
-    var(--paper),
-    var(--paper) 8px,
-    var(--line) 8px,
-    var(--line) 9px
-  );
-
-  color: var(--muted);
+  padding: 10px 14px;
+  background: var(--paper);
+  font-weight: 700;
+}
+/* The stage already says a room was never shown, in the same words. */
+.tour-stop[data-ad-view="none_placed"] .tour-empty-frame {
+  display: none;
 }
 .tour-details > summary {
   cursor: pointer;
   font-weight: 700;
+  min-height: 32px;
 }
-.tour-stop[data-dwell="true"] {
-  background: var(--teal-soft);
-
-  padding: 10px;
-}
+.tour-facts,
 .tour-claims {
-  margin: 0;
-  padding-left: 1.1rem;
-  color: var(--amber);
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.tour-coverage,
-.tour-banner {
-  margin: 0;
+.tour-facts li,
+.tour-claims li {
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
 }
-.tour-banner {
-  background: var(--amber-soft);
-  color: var(--amber);
-  padding: 10px 14px;
+.tour-claims::before {
+  content: "The ad says";
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.tour-tip {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--paper);
+}
+.tour-tip strong {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .tour-agent-slot:empty {
   display: none;
 }
-.tour-mode {
+
+/* Lines above the stage: which building this walk is in, and what the ad covered. */
+.tour-mode,
+.tour-banner {
   margin: 0;
+  padding: 12px clamp(16px, 2.4vw, 28px);
+  background: var(--v-slate);
+  color: var(--on-v);
   font-weight: 700;
 }
 .tour-mode-line {
   margin: 0;
+  padding: 8px clamp(16px, 2.4vw, 28px);
   color: var(--muted);
+}
+/* In the walk through the pictured building, rooms are not counted against the named home. */
+.tour-page[data-two-homes] .tour-coverage,
+.tour-page[data-two-homes] .tour-cover-key {
+  display: none;
+}
+.tour-coverage {
+  margin: 0;
+  padding: 0 clamp(16px, 2.4vw, 28px) 12px;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+/* The stops, as a strip. A filled square: an ad photo was placed in that room. A dashed top
+   edge: the ad showed no photo of it. */
+.tour-cover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 20px;
+  padding: 16px clamp(16px, 2.4vw, 28px) 0;
+  background: var(--paper);
+}
+.tour-cover-line {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+.tour-cover-key {
+  margin: 0 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.tour-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tour-key::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--act);
+}
+.tour-key-none::before {
+  width: 18px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 5px, transparent 5px 9px);
+}
+.tour-rail {
+  flex: 1 0 100%;
+  list-style: none;
+  margin: 10px calc(-1 * clamp(16px, 2.4vw, 28px)) 0;
+  padding: 0;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  background: var(--paper);
+}
+.tour-rail li {
+  flex: 1 0 auto;
+  display: flex;
+}
+.tour-rail button {
+  flex: 1;
+  position: relative;
+  min-height: 56px;
+  padding: 14px 16px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.tour-rail li[data-ad-view="placed"] button::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--act);
+  flex: none;
+}
+.tour-rail li[data-ad-view="none_placed"] button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 11px);
+}
+.tour-rail button[aria-current="step"] {
+  background: var(--band);
+  color: var(--band-ink);
+  font-weight: 700;
+}
+.tour-rail li[data-ad-view="placed"] button[aria-current="step"]::before {
+  background: var(--band-ink);
+}
+.tour-rail li[data-ad-view="none_placed"] button[aria-current="step"]::after {
+  background: repeating-linear-gradient(90deg, var(--band-ink) 0 6px, transparent 6px 11px);
+}
+@media (hover: hover) {
+  .tour-rail button:hover:not([aria-current="step"]) {
+    background: var(--sky);
+  }
+}
+
+@media (max-width: 1000px) {
+  .tour-page[data-rail="on"] {
+    --rail-w: 300px;
+  }
+  .tour-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+}
+@media (max-width: 760px) {
+  .tour-page[data-rail="on"] {
+    --rail-w: 0px;
+    margin-bottom: 76px;
+  }
+  .tour-page[data-rail="on"] .tour-body,
+  .tour-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "stage" "panel";
+  }
+  .tour-stage,
+  .tour-frame,
+  .tour-aerial {
+    min-height: 300px;
+  }
+  .tour-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .tour-stop {
+    order: 1;
+  }
+  .tour-status {
+    order: 2;
+  }
+  .tour-controls {
+    order: 3;
+  }
+  .tour-controls button {
+    flex: 1 0 auto;
+  }
+  .tour-stage {
+    flex-direction: column;
+  }
+  .tour-how {
+    position: static;
+    align-self: stretch;
+    margin: 12px 16px 16px;
+  }
+  .tour-stage:has(.ma) .tour-how {
+    align-self: stretch;
+    margin: 0 16px 16px;
+  }
+  .tour-cover-key {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tour-mismatch {
+    animation: tour-in 0.5s var(--ease-out) backwards;
+  }
+  @keyframes tour-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
 }
 .tour-photo-note {
   margin: 0;

@@ -46,12 +46,11 @@ describe("TourView in fixture mode (no SDK)", () => {
         /a 3D scan in this building \(it may be a model unit, not the one you'd rent\)/,
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Aerial view" })).toBeInTheDocument();
+    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
     expect(title()).toBe("Arrive outside");
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(title()).toBe("Front door");
-    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
     expect(screen.getByText(/Check this in person:/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(title()).toBe("Arrive outside");
@@ -188,12 +187,6 @@ const withScanDate = (): typeof FIXTURE_TOUR => ({
 });
 
 describe("Arrive and door (W4)", () => {
-  it("shows the aerial with its capture date, labelled as a fixture tile in fixture mode", () => {
-    render(<TourView plan={FIXTURE_TOUR} />);
-    expect(screen.getByRole("region", { name: "Aerial view" })).toBeInTheDocument();
-    expect(screen.getByText(/Aerial photo captured Mar 2, 2025 \(fixture tile\)/)).toBeVisible();
-  });
-
   it("the door stop names the kind of scan, its date and the age note", async () => {
     render(<TourView plan={withScanDate()} />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));

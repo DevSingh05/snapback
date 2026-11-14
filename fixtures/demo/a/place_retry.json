@@ -1,0 +1,42 @@
+{
+  "synthetic": true,
+  "label": "Synthetic FIXTURE outcomes written by the team to exercise the place retry. Not measured on any real photo, and not a result of the locate eval.",
+  "scans": { "S1": "fx-model-a", "S2": "fx-model-b" },
+  "extra_photos": [
+    {
+      "photo_id": "l4",
+      "status": "not_located",
+      "inliers": 24,
+      "inlier_ratio": 0.18,
+      "spread": 0.03,
+      "rival_ratio": 0.4,
+      "bar_failed": "inliers"
+    },
+    {
+      "photo_id": "l5",
+      "status": "not_located",
+      "inliers": 11,
+      "inlier_ratio": 0.08,
+      "spread": 0.01,
+      "rival_ratio": 0.2,
+      "bar_failed": "inliers"
+    }
+  ],
+  "outcomes": {
+    "l4": {
+      "focus_scan:S2": {
+        "location": {
+          "photo_id": "l4",
+          "status": "located_in_claimed",
+          "model_id": "fx-model-b",
+          "inliers": 88,
+          "inlier_ratio": 0.41,
+          "spread": 0.31,
+          "rival_ratio": 0.05
+        },
+        "seconds": 2.1
+      }
+    }
+  },
+  "default_seconds": 2.0
+}
