@@ -3,7 +3,9 @@ import { useState } from "react";
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource, TraceEvent } from "../contracts";
 import { FilesTree } from "../evidence/FilesTree";
+import { pickOutcome } from "../evidence/match";
 import { MatchLines } from "../evidence/MatchLines";
+import { PickCard } from "../evidence/PickCard";
 import { barsFor, findPhoto } from "../evidence/read";
 import type { EvidenceFile } from "../evidence/types";
 import {
@@ -12,7 +14,6 @@ import {
   lastLine,
   railFiles,
   railItems,
-  stampOf,
   summaryLine,
   type RailItem,
 } from "./rail";
@@ -45,8 +46,8 @@ function Proof({
     <>
       <MatchLines photo={photo} reduced mini />
       <span className="ar-proof-text mono">
-        {photo.alias}: {photo.points.n_total} matched points
-        {bar != null ? `, bar ${bar}` : ""}
+        {photo.alias}: {photo.points.n_total} matching points
+        {bar != null ? `, ${bar} needed` : ""}
       </span>
     </>
   );
@@ -105,19 +106,17 @@ function Line({
         )}
         {kind === "tool" && e.pick && <p className="ar-tool mono">{e.pick}</p>}
         {isPick && (
-          <p className="ar-pick">
-            {e.pick && <strong className="ar-pick-what">{e.pick}</strong>}
-            <span className="ar-stamp" data-testid="rail-stamp" data-by={e.chosen_by}>
-              {stampOf(e)}
-            </span>
-            {e.options.length > 1 && (
-              <span className="ar-options mono">from {e.options.length} options</span>
-            )}
-          </p>
+          <PickCard
+            options={e.options}
+            pick={e.pick ?? null}
+            by={e.choice === "which_spot" ? "random" : e.chosen_by}
+            why={e.reason}
+            result={
+              evidence && item.alias ? pickOutcome(findPhoto(evidence, item.alias), e.pick) : null
+            }
+          />
         )}
-        {e.reason && (
-          <p className={isPick ? "ar-reason ar-reason-quoted" : "ar-reason"}>{e.reason}</p>
-        )}
+        {!isPick && e.reason && <p className="ar-reason">{e.reason}</p>}
         {evidence && (isPick || kind === "unsure") && (
           <Proof item={item} evidence={evidence} onOpenPhoto={onOpenPhoto} />
         )}

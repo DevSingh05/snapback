@@ -85,12 +85,17 @@ describe("AgentRail: one line per event kind", () => {
       />,
     );
     const stamp = (seq: number) => within(lineOf(seq)).getByTestId("rail-stamp");
-    expect(stamp(0)).toHaveTextContent("picked by model");
+    expect(stamp(0)).toHaveTextContent("Picked by the model");
     expect(stamp(0)).toHaveAttribute("data-by", "model");
     expect(lineOf(0)).toHaveTextContent("Search scan S2 on its own.");
     expect(lineOf(0)).toHaveTextContent("from 3 options");
-    expect(stamp(1)).toHaveTextContent("picked by rules");
-    expect(stamp(2)).toHaveTextContent("random draw");
+    expect(within(lineOf(0)).getAllByTestId("pick-option")).toHaveLength(3);
+    expect(within(lineOf(0)).getByText(/Look closer at scan S2/)).toHaveAttribute(
+      "data-picked",
+      "true",
+    );
+    expect(stamp(1)).toHaveTextContent("Picked by our rules");
+    expect(stamp(2)).toHaveTextContent("Random draw");
   });
 
   it("unsure: the code's fixed sentence, marked Not sure", () => {
@@ -174,8 +179,8 @@ describe("AgentRail: only what the stream delivered", () => {
       />,
     );
     const proofs = screen.getAllByTestId("rail-proof");
-    expect(proofs[0]).toHaveTextContent("P3: 88 matched points, bar 30");
-    expect(proofs[1]).toHaveTextContent("P4: 24 matched points, bar 30");
+    expect(proofs[0]).toHaveTextContent("P3: 88 matching points, 30 needed");
+    expect(proofs[1]).toHaveTextContent("P4: 24 matching points, 30 needed");
     fireEvent.click(proofs[0]!);
     expect(onOpen).toHaveBeenCalledWith("P3");
   });

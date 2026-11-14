@@ -153,6 +153,35 @@
   --map-on-cluster: #ffffff;
   --panel: rgb(255 255 255 / 0.94);
   --glow-line: 0 0 14px rgb(31 182 193 / 0.7);
+
+  /* The photo match ("How we know"): an ink light-table in both themes, the matched points in
+     three teal strengths with a glow, the meter against the bar, and the coverage heat. */
+  --match-stage: #0f1a20;
+  --match-stage-2: #17262e;
+  --on-match-stage: #eaf5f7;
+  --match-stage-muted: #a9c0c9;
+  --match-scrim: rgb(15 26 32 / 0.6);
+  --match-scrim-real: rgb(15 26 32 / 0.3);
+  --match-case: rgb(8 16 20 / 0.6);
+  --match-strong: #9af5f1;
+  --match-mid: #35c6d0;
+  --match-faint: #2a94a1;
+  --match-glow: drop-shadow(0 0 5px rgb(95 212 220 / 0.85));
+  --match-sweep: rgb(154 245 241 / 0.55);
+  --meter-track: rgb(234 245 247 / 0.14);
+  --meter-fill: #1fb6c1;
+  --meter-fill-end: #9af5f1;
+  --meter-short: #7f95a0;
+  --meter-gap: rgb(234 245 247 / 0.3);
+  --meter-tick: #ffffff;
+  --meter-glow: 0 0 18px rgb(95 212 220 / 0.55);
+  --heat: #0d6672;
+  --heat-box: #0d6672;
+  --rival-this: #0d6672;
+  --rival-other: #7f95a0;
+  --pick-chosen: #0d6672;
+  --on-pick-chosen: #ffffff;
+  --pick-glow: 0 0 0 3px rgb(31 182 193 / 0.28);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -237,6 +266,15 @@
     --map-on-cluster: #ffffff;
     --panel: rgb(34 37 43 / 0.94);
     --glow-line: 0 0 16px rgb(95 212 220 / 0.75);
+    --heat: #5fd4dc;
+    --heat-box: #9af5f1;
+    --rival-this: #5fd4dc;
+    --rival-other: #7d8791;
+    --pick-chosen: #5fd4dc;
+    --on-pick-chosen: #14242d;
+    --pick-glow: 0 0 0 3px rgb(95 212 220 / 0.3);
+    --match-stage: #0c0d10;
+    --match-stage-2: #17191e;
   }
 }
 
@@ -321,4 +359,13 @@
   --map-on-cluster: #ffffff;
   --panel: rgb(34 37 43 / 0.94);
   --glow-line: 0 0 16px rgb(95 212 220 / 0.75);
+  --heat: #5fd4dc;
+  --heat-box: #9af5f1;
+  --rival-this: #5fd4dc;
+  --rival-other: #7d8791;
+  --pick-chosen: #5fd4dc;
+  --on-pick-chosen: #14242d;
+  --pick-glow: 0 0 0 3px rgb(95 212 220 / 0.3);
+  --match-stage: #0c0d10;
+  --match-stage-2: #17191e;
 }

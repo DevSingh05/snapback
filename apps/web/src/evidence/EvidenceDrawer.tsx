@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { SourceChip } from "../components/SourceChip";
-import { BarGauges } from "./BarGauges";
+import { BarGauges, PointsMeter } from "./BarGauges";
 import { ConfidenceChip } from "./ConfidenceChip";
 import "./evidence.css";
+import { drawMs, useCountUp } from "./match";
 import { MatchLines } from "./MatchLines";
-import { CHIP_LABEL, chipState, placeLine, searchLine } from "./read";
-import type { Calibration, EvidenceFile } from "./types";
+import { SearchSteps } from "./PickCard";
+import { CHIP_LABEL, chipState, placeLine } from "./read";
+import type { Calibration, EvidenceFile, EvidencePhoto } from "./types";
 import { ViewToggle, type ViewChoice } from "./ViewToggle";
 
 export const RENDER_NOTE = "Photos: renders made from the scan";
@@ -22,6 +24,53 @@ interface Props {
   /** Image URLs from our own server, keyed by photo alias (E3). None: stand-ins are drawn. */
   images?: Record<string, { ad?: string | null; scan?: string | null }>;
   calibration?: Calibration | null;
+}
+
+interface TableProps {
+  photo: EvidencePhoto;
+  bars: Record<string, number>;
+  adSrc?: string | null;
+  scanSrc?: string | null;
+  reduced: boolean;
+  stacked: boolean;
+}
+
+// The match on one dark table: the two pictures with their points, and under them the meter
+// whose count rises as the lines draw in. Remounted per photo, so the draw-in replays.
+function MatchTable(props: TableProps) {
+  const [run, setRun] = useState(0);
+  return <MatchRun key={run} {...props} onReplay={() => setRun((r) => r + 1)} />;
+}
+
+function MatchRun({
+  photo,
+  bars,
+  adSrc,
+  scanSrc,
+  reduced,
+  stacked,
+  onReplay,
+}: TableProps & { onReplay: () => void }) {
+  const drawn = photo.points?.sampled.length ?? 0;
+  const count = useCountUp(photo.inliers ?? 0, drawMs(drawn), reduced);
+  return (
+    <div
+      className="mt"
+      data-testid="match-table"
+      data-motion={reduced ? "reduced" : "full"}
+      style={{ "--draw-ms": `${drawMs(drawn)}ms` } as CSSProperties}
+    >
+      <MatchLines
+        photo={photo}
+        adSrc={adSrc}
+        scanSrc={scanSrc}
+        reduced={reduced}
+        stacked={stacked}
+        onReplay={onReplay}
+      />
+      <PointsMeter photo={photo} bars={bars} count={count} />
+    </div>
+  );
 }
 
 // "How we know": slides over the scan. One photo at a time: the ad photo and the scan view with
@@ -105,41 +154,37 @@ export function EvidenceDrawer({
                     : "Drawn stand-in: no real image is here for this photo."}
               </p>
             </div>
-            <MatchLines
+            <MatchTable
               key={`${photo.alias}-${stacked ? "s" : "w"}-${showReal ? "r" : "d"}`}
               photo={photo}
+              bars={file.bars}
               adSrc={showReal ? real?.ad : null}
               scanSrc={showReal ? real?.scan : null}
               reduced={reduced}
               stacked={stacked}
             />
             <div className="ev-side">
-              <h3 className="ev-place" data-testid="place-line">
-                {placeLine(photo)}
-              </h3>
-              {photo.room_label && <p className="ev-note">{LABEL_NOTE}</p>}
-              {photo.status === "located_elsewhere" && (
-                <p className="ev-note">
-                  Held to the stricter bar for a photo placed outside the home the ad names.
-                </p>
-              )}
-              <ConfidenceChip photo={photo} bars={file.bars} calibration={calibration} />
+              <div className="ev-result">
+                <h3 className="ev-place" data-testid="place-line">
+                  {placeLine(photo)}
+                </h3>
+                <ConfidenceChip photo={photo} bars={file.bars} calibration={calibration} />
+                {photo.room_label && <p className="ev-note">{LABEL_NOTE}</p>}
+                {photo.status === "located_elsewhere" && (
+                  <p className="ev-note">
+                    Held to the stricter bar for a photo placed outside the home the ad names.
+                  </p>
+                )}
+              </div>
               <BarGauges
                 key={photo.alias}
                 photo={photo}
                 bars={file.bars}
                 thresholdsVersion={file.thresholds_version}
+                adSrc={showReal ? real?.ad : null}
+                withPoints={false}
               />
-              {photo.searches.length > 0 && (
-                <p className="ev-searches" data-testid="search-steps">
-                  <span className="ev-searches-label">Searches</span>
-                  {photo.searches.map((s, i) => (
-                    <span key={i} className="ev-search" data-by={s.chosen_by}>
-                      {searchLine(s, i)}
-                    </span>
-                  ))}
-                </p>
-              )}
+              <SearchSteps searches={photo.searches} />
             </div>
           </div>
         </>
