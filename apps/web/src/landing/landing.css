@@ -76,10 +76,10 @@
   padding: clamp(18px, 3vw, 28px) 0 4px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 .hiw-title {
-  font-size: 1.25rem;
+  font-size: var(--fs-lg);
 }
 .hiw-steps {
   list-style: none;
@@ -87,23 +87,23 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--sp-3);
 }
 .hiw-step {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px 10px;
+  gap: 2px var(--sp-3);
   align-content: start;
-  padding: 0 0 14px;
-  background: var(--paper);
+  padding: 0 0 var(--sp-4);
+  background: var(--layer-2);
 }
 .hiw-art {
   grid-column: 1 / -1;
   height: 132px;
   display: grid;
   place-items: center;
-  margin-bottom: 10px;
-  background: linear-gradient(180deg, var(--sky), var(--paper));
+  margin-bottom: var(--sp-3);
+  background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
   overflow: hidden;
 }
 .hiw-art svg {
@@ -122,7 +122,7 @@ polygon.hiw-text {
 }
 .hiw-n {
   grid-row: span 2;
-  margin: 0 0 0 14px;
+  margin: 0 0 0 var(--sp-4);
   width: 28px;
   height: 28px;
   display: grid;
@@ -130,24 +130,24 @@ polygon.hiw-text {
   background: var(--act);
   color: var(--on-act);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
 }
 .hiw-step-title {
   margin: 0;
-  padding-right: 14px;
-  font-size: 1.02rem;
+  padding-right: var(--sp-4);
+  font-size: var(--fs-md);
   line-height: 1.25;
 }
 p.hiw-text {
-  padding-right: 14px;
-  font-size: 0.88rem;
+  padding-right: var(--sp-4);
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--muted);
 }
 
 /* The ad box leads the form: it is the one thing to do here. */
 .upload-body > .upload-label[for="listing"] {
-  font-size: 1.25rem;
+  font-size: var(--fs-lg);
 }
 .upload-body > #listing {
   min-height: 7.5rem;
@@ -165,7 +165,7 @@ p.hiw-text {
     margin-inline: clamp(18px, 4vw, 36px);
   }
   .upload-intro:has(.hs) .upload-eyebrow {
-    margin-top: 14px;
+    margin-top: var(--sp-4);
   }
   .hiw-steps {
     grid-template-columns: minmax(0, 1fr);
@@ -186,14 +186,14 @@ p.hiw-text {
     height: 84px;
   }
   .hiw-n {
-    margin: 12px 0 0 2px;
+    margin: var(--sp-3) 0 0 2px;
   }
   .hiw-step-title {
-    padding-top: 12px;
+    padding-top: var(--sp-3);
   }
   p.hiw-text {
     grid-column: 2 / -1;
-    padding-bottom: 12px;
+    padding-bottom: var(--sp-3);
   }
 }
 
@@ -215,4 +215,36 @@ p.hiw-text {
       stroke-dashoffset: 1;
     }
   }
+}
+
+/* ---------- Home inside the app shell ---------- */
+/* The bar carries the mark, so the form's own header keeps only the data label. */
+.home .upload .masthead .wordmark {
+  display: none;
+}
+.home .upload .masthead {
+  justify-content: flex-end;
+}
+.home .card-page {
+  max-width: none;
+  background: var(--layer-1);
+}
+.home .upload-intro {
+  background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
+}
+.home .upload-input,
+.home .upload-drop,
+.home .pf-budget {
+  background: var(--layer-2);
+}
+/* The data label sits as a quiet footer line under the form, not as an empty header. */
+.home .upload {
+  display: flex;
+  flex-direction: column;
+}
+.home .upload .masthead {
+  order: 9;
+  justify-content: flex-start;
+  padding-block: var(--sp-3);
+  border-top: 1px solid var(--line);
 }

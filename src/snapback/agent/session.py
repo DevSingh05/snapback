@@ -22,13 +22,14 @@ from typing import Any, Literal
 
 from snapback.agent.casework import Note
 from snapback.agent.modules import ChallengeOutcome, Modules
-from snapback.agent.place import PlaceDesk, PlaceSearcher
+from snapback.agent.place import PlaceDesk, PlaceSearcher, write_evidence_file
 from snapback.agent.planner import ASK_FIELDS, Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
 from snapback.contracts import (
     ChoiceKind,
+    EvidenceFile,
     FloorPlanCandidate,
     LocateStatus,
     ModuleEvidence,
@@ -293,6 +294,7 @@ class CaseSession:
             scans=self.place_scans,
             covers_unshown=self.place_covers_unshown,
             case_seconds_left=self.place_case_seconds_left,
+            points=self._live_points(),
         )
         for alias, bar in desk.unsure_lines():
             self.trace.emit(
@@ -349,6 +351,24 @@ class CaseSession:
                     )
         if not desk.is_open():
             self._end_place()
+
+    def _live_points(self) -> dict:
+        """The base search's matched pairs, when the modules have them (live cases only)."""
+        reader = getattr(self.modules, "live_points", None)
+        return dict(reader(self.case_id)) if reader is not None else {}
+
+    def evidence_file(self) -> EvidenceFile | None:
+        """The evidence file for the "How we know" drawer, with each photo's matched pairs, or
+        None before any photo was placed or checked. Built by code from the evidence; the pairs
+        go here and nowhere else (not the chooser, the trace or a log)."""
+        located = self.evidence.locate
+        if located is None or not located.photos:
+            return None
+        if self.place_desk is not None:
+            return self.place_desk.evidence_file(self.case_id, self.trace.source)
+        return write_evidence_file(
+            self.case_id, self.trace.source, located, points=self._live_points()
+        )
 
     def _end_place(self) -> None:
         """The budget is spent or nothing is left to try: keep what the retries found."""

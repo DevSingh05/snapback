@@ -537,13 +537,13 @@ def test_a_job_queued_behind_a_stuck_one_is_cancelled_and_never_runs(world, tmp_
     live = gated_live(tmp_path, adapter, gate)
     live._load()
     ran: list[str] = []
-    real = live._ready.locator.locate
+    real = live._ready.locator.locate_with_points  # what a live job calls
 
-    def counting(case_id, photos, claimed):
+    def counting(case_id, photos, claimed, **kwargs):
         ran.append(case_id)
-        return real(case_id, photos, claimed)
+        return real(case_id, photos, claimed, **kwargs)
 
-    live._ready.locator.locate = counting
+    live._ready.locator.locate_with_points = counting
     blob = [photo(sweeps, "fx-model-a", 2, 1)]
     live.locate("stuck", blob, "fx-prop-1")  # running on the one worker, blocked on the gate
     queued = live.locate("queued", [photo(sweeps, "fx-model-a", 0, 3)], "fx-prop-1")
@@ -609,3 +609,272 @@ def test_a_live_result_carries_the_room_label_when_the_cache_has_it(world, rooms
     placed = outcome.result.photos[0]
     assert placed.status is LocateStatus.LOCATED_IN_CLAIMED and placed.pano_id == "fx-sweep-02"
     assert placed.room_label == expected
+
+
+# --- E2b: matched pairs ride beside the result, for the evidence file only (#224) -------------
+
+
+def fresh_data(world, tmp_path):
+    """The world's index in a data dir of its own, so no earlier test's cache answers."""
+    data, sweeps, adapter = world
+    shutil.copytree(data / "index", tmp_path / "index")
+    return tmp_path, sweeps, adapter
+
+
+def pair_values(points):
+    return {round(v, 6) for p in points.values() for pair in p.sampled for v in pair}
+
+
+def test_a_live_claimed_case_carries_points_for_each_placed_photo(world, tmp_path):
+    from snapback.contracts import EvidencePoints
+
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    outcome = make_live(data, adapter).locate("c", blobs, "fx-prop-1")
+    placed = {
+        p.photo_id for p in outcome.result.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED
+    }
+    assert placed == {"l1", "l2"} and set(outcome.points) == placed
+    for points in outcome.points.values():
+        assert isinstance(points, EvidencePoints) and 0 < len(points.sampled) <= 48
+        assert all(0.0 <= v <= 1.0 for pair in points.sampled for v in pair)
+    assert "points" not in repr(outcome)  # never printed with the outcome
+
+
+def test_a_live_case_with_no_claimed_home_carries_points_too(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    outcome = make_live(data, adapter).locate("c", blobs, None)
+    placed = {p.photo_id for p in outcome.result.photos if p.matched_model_id}
+    assert set(outcome.points) == placed
+
+
+def test_points_are_kept_in_the_cache_body_but_never_in_its_key(world, tmp_path):
+    """#231 review: a second run of the same ad must still have lines to draw, so the pairs ride
+    in the cache file's body. The key stays the photo hashes, the claimed id and the
+    index/thresholds/matcher, with no pairs in it."""
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    live = make_live(data, adapter)
+    outcome = live.locate("c", blobs, "fx-prop-1")
+    assert outcome.points
+    files = list((data / "locate").glob("*.json"))
+    assert len(files) == 1
+    ready = live._load()
+    assert files[0] == live._cache_path(ready, blobs, "fx-prop-1")
+    # the key does not move whatever the pairs are
+    outcome.points.clear()
+    assert live._cache_path(ready, blobs, "fx-prop-1") == files[0]
+    stored = json.loads(files[0].read_text())
+    assert set(stored) == {"source", "identified_property_id", "result", "points"}
+    assert "points" not in json.dumps(stored["result"])  # never inside the result
+    for value in stored["points"].values():
+        assert len(value["sampled"]) <= 48
+        assert all(0.0 <= v <= 1.0 for pair in value["sampled"] for v in pair)
+
+
+def test_a_cached_run_still_carries_its_points(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    first = make_live(data, adapter, budget=120.0).locate("c1", blobs, "fx-prop-1")
+    assert first.points and not first.from_cache
+    # the matcher must not run: the answer and its pairs come from the cache
+    again = make_live(data, adapter, matcher=ExplodingMatcher).locate("c2", blobs, "fx-prop-1")
+    assert again.from_cache and again.result.case_id == "c2"
+    assert again.points == first.points
+    # same on the no-claimed-home path
+    whole = make_live(data, adapter, budget=120.0).locate("c3", blobs, None)
+    cached = make_live(data, adapter, matcher=ExplodingMatcher).locate("c4", blobs, None)
+    assert cached.from_cache and cached.points == whole.points
+
+
+def assert_no_pairs(points, texts):
+    """No pair field name and no run of pair values (as stored, 4 decimals) in any text."""
+    values = {str(v) for v in pair_values(points) if len(str(v)) >= 5}
+    assert values, "the live runs produced pairs"
+    for where, text in texts.items():
+        assert "sampled" not in text and "n_total" not in text, where
+        hits = sum(value in text for value in values)
+        assert hits <= len(values) // 10, where  # no run of pair values leaked
+
+
+def test_points_never_reach_a_log_the_trace_the_chooser_the_card_or_the_status(
+    world, tmp_path, caplog
+):
+    """#234 review: every path a live case takes, under caplog at DEBUG: a fresh claimed case,
+    a second (cached) case of the same ad, a no-claimed case, and a live SessionCase.advance()
+    with its card and status."""
+    from snapback.api.cases import SessionCase
+
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    seen: list = []
+    events: list = []
+    kept: dict = {}
+
+    class Watching(PolicyChooser):
+        def choose(self, offer):
+            seen.append(repr(offer))
+            return super().choose(offer)
+
+    def spied(live):
+        real = live.locate
+
+        def spy(*args, **kwargs):
+            outcome = real(*args, **kwargs)
+            if outcome is not None:
+                kept.update(outcome.points)
+            return outcome
+
+        live.locate = spy  # type: ignore[method-assign]
+        return live
+
+    def run_one(case_id, live, claimed):
+        case = CaseSession(case_id, joined(live, blobs, claimed), Trace(case_id, DataSource.LIVE))
+        case.trace.subscribe(events.append)
+        run_case(case, Watching(), lambda draft: "send")
+        return case
+
+    caplog.set_level("DEBUG")
+    fresh = run_one("LIVE-P1", spied(make_live(data, adapter)), "fx-prop-1")
+    cached_live = spied(make_live(data, adapter, matcher=ExplodingMatcher))
+    cached = run_one("LIVE-P2", cached_live, "fx-prop-1")  # (a) the same ad, from the cache
+    assert cached_live._load() is not None
+    unclaimed = run_one("LIVE-P3", spied(make_live(data, adapter)), None)  # (b) no claimed home
+
+    live, modules = live_session(world, tmp_path / "api")  # (c) the API's case
+    live.trace.subscribe(events.append)
+    api_case = SessionCase(
+        "LV9", live, modules._listing, lambda c: run_case(c, Watching(), lambda d: "send")
+    )
+    api_case.advance()
+    kept.update(modules.live_points("LIVE-E"))
+    assert api_case.files is not None and api_case.files.evidence is not None
+
+    texts = {
+        "logs": "\n".join(r.getMessage() for r in caplog.records),
+        "trace": "\n".join(repr(e) for e in events),
+        "chooser": "\n".join(seen),
+        "card": api_case.card("https://example.test").model_dump_json(),
+        "status": api_case.status(with_challenge=True).model_dump_json(),
+    }
+    for case in (fresh, cached, unclaimed, live):
+        texts[f"evidence {case.case_id}"] = case.evidence.model_dump_json()
+    assert_no_pairs(kept, texts)
+
+
+def test_a_retry_desk_keeps_the_first_pass_points_of_a_placed_photo(world, tmp_path):
+    """#234 review: the live pairs reach the retry desk (session.py, `points=`). One photo is
+    placed, one is not; a stub searcher retries the unplaced one and finds nothing."""
+    from snapback.agent.place import SearchOutcome
+    from snapback.contracts import PhotoLocation
+
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    noise = Image.new("RGB", (200, 170), (127, 127, 127))
+    out = io.BytesIO()
+    noise.save(out, format="JPEG")
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), out.getvalue()]
+    modules = joined(make_live(data, adapter), blobs, "fx-prop-1")
+
+    class StubSearcher:
+        calls = 0
+
+        def search(self, photo_id, option, claimed_property_id, thresholds, deadline_s=None):
+            StubSearcher.calls += 1
+            return SearchOutcome(PhotoLocation(photo_id=photo_id, status=LocateStatus.NOT_LOCATED))
+
+    session = CaseSession("LIVE-R", modules, Trace("LIVE-R", DataSource.LIVE))
+    session.place_searcher = StubSearcher()
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    pairs = modules.live_points("LIVE-R")
+    assert set(pairs) == {"l1"}  # only the placed photo has pairs
+    desk = session.place_desk
+    assert desk is not None and StubSearcher.calls >= 1  # the desk opened and retried l2
+    assert desk.rows["l1"].points == pairs["l1"]
+    assert desk.rows["l2"].points is None
+    evidence = session.evidence_file()
+    assert evidence.photos[0].points == pairs["l1"] and evidence.photos[1].points is None
+
+
+# --- the live evidence file: pairs reach EvidencePhoto.points and nowhere else (#231) ----------
+
+
+def live_session(world, tmp_path, claimed="fx-prop-1", source=DataSource.LIVE):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    modules = joined(make_live(data, adapter), blobs, claimed)
+    return CaseSession("LIVE-E", modules, Trace("LIVE-E", source)), modules
+
+
+def test_a_live_case_writes_an_evidence_file_with_each_placed_photos_points(world, tmp_path):
+    session, modules = live_session(world, tmp_path)
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    evidence = session.evidence_file()
+    assert evidence is not None and evidence.source is DataSource.LIVE
+    assert [p.alias for p in evidence.photos] == ["P1", "P2"]
+    pairs = modules.live_points("LIVE-E")
+    for photo_id, row in zip(["l1", "l2"], evidence.photos, strict=True):
+        assert row.status is LocateStatus.LOCATED_IN_CLAIMED and row.scan_alias == "S1"
+        assert row.points == pairs[photo_id] and 0 < len(row.points.sampled) <= 48
+        assert all(0.0 <= v <= 1.0 for pair in row.points.sampled for v in pair)
+    assert {"min_inliers", "claimed_min_spread", "ambiguity_ratio"} <= set(evidence.bars)
+    # the case's own evidence (what decide() and the card read) still carries no pairs
+    assert "sampled" not in session.evidence.model_dump_json()
+
+
+def test_a_cached_live_case_still_has_points_in_its_evidence_file(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    make_live(data, adapter).locate("warm", blobs, "fx-prop-1")  # fills the cache
+    modules = joined(make_live(data, adapter, matcher=ExplodingMatcher), blobs, "fx-prop-1")
+    session = CaseSession("LIVE-C", modules, Trace("LIVE-C", DataSource.LIVE))
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    evidence = session.evidence_file()
+    assert evidence.photos[0].points is not None and evidence.photos[0].points.sampled
+
+
+def test_a_case_with_no_live_pairs_writes_no_points(world, tmp_path):
+    from snapback.agent.place import write_evidence_file
+    from snapback.contracts import LocateResult, PhotoLocation
+
+    located = LocateResult(
+        case_id="x",
+        photos=[PhotoLocation(photo_id="l1", status=LocateStatus.NOT_LOCATED)],
+        thresholds_version="t",
+    )
+    evidence = write_evidence_file("x", DataSource.FIXTURE, located)
+    assert evidence.photos[0].points is None and evidence.photos[0].alias == "P1"
+
+
+def test_the_api_case_attaches_the_evidence_file_only_when_live(world, tmp_path):
+    from snapback.api.cases import SessionCase
+
+    def runner(session):
+        return run_case(session, PolicyChooser(), lambda draft: "send")
+
+    live, modules = live_session(world, tmp_path / "live")
+    case = SessionCase("LV1", live, modules._listing, runner)
+    case.advance()
+    assert case.files is not None and case.files.evidence is not None
+    assert all(p.points is not None for p in case.files.evidence.photos)
+
+    fixture, modules = live_session(world, tmp_path / "fx", source=DataSource.FIXTURE)
+    staged = SessionCase("FX1", fixture, modules._listing, runner)
+    staged.advance()
+    assert staged.files is None  # the routes keep serving the team-made fixture
+
+
+def test_a_cache_entry_from_before_the_pairs_were_kept_is_run_again(world, tmp_path):
+    """An entry written by older code has no "points" field: using it would show no lines for
+    that ad forever. It is run again, and the rewritten entry carries the pairs."""
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    live = make_live(data, adapter)
+    first = live.locate("c1", blobs, "fx-prop-1")
+    path = live._cache_path(live._load(), blobs, "fx-prop-1")
+    old = json.loads(path.read_text())
+    del old["points"]
+    path.write_text(json.dumps(old))
+    again = make_live(data, adapter).locate("c2", blobs, "fx-prop-1")
+    assert not again.from_cache and again.points == first.points
+    assert "points" in json.loads(path.read_text())

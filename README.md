@@ -14,10 +14,10 @@ researched places that fit your budget.
 [About](#about) · [How it works](#how-it-works) · [Screenshots](#screenshots) ·
 [Quickstart](#quickstart) · [Limits and status](#limits-and-status)
 
-<img src="docs/images/paste-the-ad.png" width="760" alt="The first screen. The eyebrow reads 'Trust the home, not the ad.' and the heading 'Found a place online? Paste the ad.' The sub-head reads 'See the real listing, the real office and a fair price, plus researched places that fit your budget.' A short house ad is pasted in the box, the max rent is 1,800, beds is set to 3 or more and Pets is ticked, above the 'Check this listing' button. A FIXTURE badge sits in the corner." />
+<img src="docs/images/worlds-hero.webp" width="760" alt="The SNAPBACK landing page in the light theme. On the left, the heading 'Found a place online? Paste the ad.' with a short description, a Paste a link, Upload photos and Text it switch, a sample ad and a Check this ad button. On the right, an isometric 3D house cut open to show its rooms, a For Sale sign on the lawn and a 'Checking the record' label, standing among pale city blocks." />
 
-<sub>The first screen: paste the ad you found. Budget and must-haves are optional. Fixture data
-made by the team.</sub>
+<sub>The first screen: paste the ad you found, in a link, photos or text. The house is the
+place being checked. Sample ad, fixture data made by the team.</sub>
 
 </div>
 
@@ -97,6 +97,12 @@ that is not the owner's never says Don't pay by itself, and SNAPBACK never calls
 scammer. Cards come as a web page and as a PNG with a verify link.
 
 ## Screenshots
+
+<p align="center">
+  <img src="docs/images/map-glass-light.webp" width="900" alt="The Houston map in the Glass light theme, tilted to show extruded city blocks. Teal columns mark sample places, each with a white 'from' rent chip such as from $1,450. A brief panel sits on the left and a strip of sample place cards runs along the bottom." />
+  <br />
+  <sub>The map: sample places stand as columns on the city, with the lowest asking rent on each.</sub>
+</p>
 
 <table>
   <tr>
@@ -221,6 +227,40 @@ interval) and runs a regression gate against `eval/baseline.csv`. The API serves
 `GET /eval/results.csv`, and its first line says FIXTURE or LIVE. Today its case-bank rows are
 synthetic and labelled FIXTURE, and its locate calibration rows were measured on renders of our
 scans and say so. Neither is accuracy on real ad photos, so this README quotes no accuracy number.
+
+## Forensics (Arlequin track)
+
+The investigator view at `/investigate` (API: `GET /forensics/rings`, `GET /forensics/rings/{id}`,
+`POST /forensics/ask`). One renter's check answers one ad; an investigator needs the ring behind
+many. **All data here is SYNTHETIC and FIXTURE**: about 300 generated rental ads in a made-up city
+(`fixtures/forensics/`, made by `uv run python -m snapback.forensics.generate`, seeded, same seed
+same bytes), 555 phone numbers, perceptual-hash-like photo ids. No CoStar, Matterport or Vexcel
+data, no real address or number.
+
+Pipeline (`src/snapback/forensics/`): claims and rule hits from the existing intake and rules code
+(the money-before-move-in rule and the payment rules), concept-folded TF-IDF for reworded text (no
+model, no network), a link graph of ads, photo-sets (ids within 6 bits), numbers and wordings,
+Louvain communities, then each ring's timeline. Every finding carries its evidence: ad ids, the
+matched sentence, photo ids, a score. The investigator Q&A answers only from that graph and says
+so when it has no evidence; an optional deepagents tool wraps it (not run in CI).
+
+Measured on the committed corpus (n = 301 ads, 4 seeded rings, 57 ring ads), against the seeded
+answer key, next to a keyword search that groups hits by exact number or photo id:
+
+| Method                              | Rings recovered | Ring recall | Ring ads found | Honest ads flagged |
+| ----------------------------------- | --------------- | ----------- | -------------- | ------------------ |
+| This pipeline                       | 4 of 4          | 100%        | 57 of 57       | 0 of 244           |
+| Keyword search + exact number/photo | 0 of 4          | 0%          | 11 of 57       | 0 of 244           |
+
+Honest limits: the corpus and the pipeline were built together and the folding lexicon is
+hand-written, so the table is a check that the method works on rings shaped like these, not an
+accuracy claim for real listings. On ten other seeded corpora (held-out seeds 101 to 110, about
+300 ads each; thresholds were set on the committed seed and seeds 1 to 3 before these were run, and
+three of them are also asserted in the tests) the pipeline averaged ring precision 0.88 and ring recall 0.93, and the
+keyword baseline ring recall 0.00 (`snapback.forensics.evaluate.evaluate_seed`). The existing
+money-before-move-in rule alone is not enough: it fires on honest wording such as "deposit due at
+lease signing", so the pipeline needs a second signal (shared wording, numbers or photos) before it
+calls anything a ring.
 
 ## Data and privacy
 

@@ -4,7 +4,8 @@ import { HouseGlyph } from "../components/HouseGlyph";
 import type { TourPlan, TourStop } from "../contracts";
 import { points, project } from "./iso";
 import { Parts } from "../draw/Parts";
-import { O, SIZE, box } from "./roomParts";
+import { PERSON_HEIGHT, Person } from "../draw/Person";
+import { O, SIZE } from "./roomParts";
 import { drawRoom, roomKind, type RoomKind } from "./rooms";
 import "./walk.css";
 
@@ -14,17 +15,31 @@ import "./walk.css";
 
 // Where the ad photo lands: on the left wall, clear of the furniture.
 const PHOTO = { y0: 60, y1: 180, z0: 68, z1: 140 };
-const CAMERA: [number, number, number] = [252, 122, 0];
+
+// "You are here": the person stands on open floor near the matched pose (the spot the ad photo
+// was taken from, toward the front right of the drawn room), one spot per room drawing, each
+// clear of every furniture footprint and with nothing drawn in front of it (walk.test checks
+// both). The cone runs from there to the photo's frame on the left wall. With no photo here the
+// cone is a plain view ahead that turns with the camera's pan (--wp-yaw on the stage).
+export const HERE_SPOT: Record<RoomKind, [number, number]> = {
+  kitchen: [256, 118],
+  bathroom: [252, 132],
+  bedroom: [272, 150],
+  living: [264, 148],
+  entry: [244, 124],
+  plain: [252, 154],
+};
 
 function Room({ kind, cone }: { kind: RoomKind; cone: boolean }) {
   const room = useMemo(() => drawRoom(kind), [kind]);
+  const [sx, sy] = HERE_SPOT[kind];
   return (
     <g className="rs-room">
       <Parts parts={room.base} />
       {cone && (
         <polygon
           className="rs-cone"
-          points={points(O, CAMERA, [0, PHOTO.y1, 0], [0, PHOTO.y0, 0])}
+          points={points(O, [sx, sy, 0], [0, PHOTO.y1, 0], [0, PHOTO.y0, 0])}
         />
       )}
       <Parts parts={room.things} />
@@ -40,16 +55,40 @@ const LAND = {
   "--rs-y": `${LAND_Y.toFixed(1)}px`,
 } as CSSProperties;
 
-const CAMERA_POST = [
-  { name: "camera", prims: box("teal", CAMERA[0] - 6, CAMERA[1] - 6, 0, 12, 12, 46) },
-];
+// The person is one rigid group: its parts never move on their own. The step in on arrival is
+// one transform on that group (player.css .rs-person), and with reduced motion it just stands.
+function HereMarker({ kind, placed }: { kind: RoomKind; placed: boolean }) {
+  const [sx, sy] = HERE_SPOT[kind];
+  const [fx, fy] = project([sx, sy, 0], O);
+  const [tx, ty] = project([sx, sy, PERSON_HEIGHT + 14], O);
+  const cone = points(O, [sx, sy, 0], [sx - 130, sy - 56, 0], [sx - 130, sy + 56, 0]);
+  const label = placed ? "You are here" : "You are here, roughly";
+  const half = placed ? 44 : 78;
+  return (
+    <g className="rs-here" data-testid="you-are-here" data-placed={placed ? "true" : undefined}>
+      {!placed && (
+        <g
+          className="rs-here-turn"
+          style={{ transformOrigin: `${fx.toFixed(1)}px ${fy.toFixed(1)}px` }}
+        >
+          <polygon className="rs-cone rs-here-cone" points={cone} />
+        </g>
+      )}
+      {/* The person and its label arrive together, as one group. */}
+      <g className="rs-person">
+        <Person origin={O} x={sx} y={sy} facing={180} />
+        <rect className="rs-photo-tag" x={tx - half} y={ty - 18} width={half * 2} height={18} />
+        <text className="rs-photo-tag-text mono" x={tx} y={ty - 5} textAnchor="middle">
+          {label}
+        </text>
+      </g>
+    </g>
+  );
+}
 
 function LandedPhoto({ alias, fly }: { alias: string; fly: boolean }) {
   return (
     <>
-      <g className="rs-camera">
-        <Parts parts={CAMERA_POST} />
-      </g>
       <g
         className="rs-photo"
         data-testid="stage-photo"
@@ -134,6 +173,7 @@ export function StopStage({
             />
             <Room kind={roomKind(stop)} cone={Boolean(photoAlias)} />
             {photoAlias && photoShown && <LandedPhoto alias={photoAlias} fly={!reduced} />}
+            <HereMarker kind={roomKind(stop)} placed={Boolean(photoAlias && photoShown)} />
             {!photoAlias && unshown && <MissingFrame />}
           </g>
         </svg>
@@ -159,11 +199,9 @@ export function StageCaption({ stop, photoAlias, unshown = false }: CaptionProps
   if (photoAlias)
     return (
       <p className="rs-caption rs-caption-placed" data-testid="stage-caption">
-        <strong>Taken here{stop.room_label ? `: ${stop.room_label}` : ""}</strong>
-        <span>
-          Your ad photo <span className="mono">{photoAlias}</span>, back where it was taken in this
-          scan.
-        </span>
+        <strong>
+          Taken here: ad photo <span className="mono">{photoAlias}</span>
+        </strong>
       </p>
     );
   if (unshown)

@@ -25,7 +25,15 @@ declare global {
 const SDK_SCRIPT = "https://static.matterport.com/showcase-sdk/latest.js";
 
 export function embedUrl(modelId: string, key: string): string {
-  const q = new URLSearchParams({ m: modelId, play: "1", qs: "1", help: "0", applicationKey: key });
+  // title=0: the space's own title would peek out behind the walk's room name.
+  const q = new URLSearchParams({
+    m: modelId,
+    play: "1",
+    qs: "1",
+    help: "0",
+    title: "0",
+    applicationKey: key,
+  });
   return `https://my.matterport.com/show/?${q.toString()}`;
 }
 
