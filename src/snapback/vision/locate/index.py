@@ -8,11 +8,17 @@ itself a perspective image, so these are exact narrower views, not approximation
 The top candidates go to geometric verification (V2), which decides; this only ranks.
 
 Index files live under `data/index/<name>/` (git-ignored): embeddings are derived from
-sponsor imagery.
+sponsor imagery. Build one from the command line (prints counts only, never ids):
+
+    uv run python -m snapback.vision.locate.index build            # DEMO_MODEL_IDS, DINOv2
+    uv run python -m snapback.vision.locate.index build <model id> ... --embedder tiny
 """
 
+import argparse
 import json
 import math
+import sys
+import time
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -21,8 +27,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from snapback.adapters.matterport import Sweep
-from snapback.vision.embed import Embedder, unit
+from snapback.adapters.matterport import MatterportSettings, Sweep, get_matterport
+from snapback.contracts import DataSource
+from snapback.vision.embed import Embedder, TinyEmbedder, unit
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 INDEX_ROOT = REPO_ROOT / "data" / "index"
@@ -153,3 +160,66 @@ class LocateIndex:
 
             index._embedder = TinyEmbedder()
         return index
+
+
+def _embedder(name: str) -> Embedder:
+    if name == "tiny":
+        return TinyEmbedder()
+    from snapback.vision.embed import Dinov2Embedder
+
+    return Dinov2Embedder()
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m snapback.vision.locate.index")
+    sub = parser.add_subparsers(dest="command", required=True)
+    build = sub.add_parser("build", help="fetch faces and build one index over the given models")
+    build.add_argument("model_ids", nargs="*", help="defaults to DEMO_MODEL_IDS from .env")
+    build.add_argument("--ids-file", type=Path, help="JSON list or object of more model ids")
+    build.add_argument("--embedder", choices=("dinov2", "tiny"), default="dinov2")
+    build.add_argument("--name", default="demo")
+    build.add_argument("--out", type=Path, help="index folder (default data/index/<name>)")
+    build.add_argument("--cache", type=Path, help="face cache folder (default by data source)")
+    build.add_argument("--source", choices=[s.value for s in DataSource], help="override .env")
+    args = parser.parse_args(argv)
+
+    settings = MatterportSettings()
+    if args.source:
+        settings = settings.model_copy(update={"snapback_data_source": DataSource(args.source)})
+    ids = list(args.model_ids or settings.demo_ids())
+    if args.ids_file:
+        extra = json.loads(args.ids_file.read_text())
+        ids += list(extra.values() if isinstance(extra, dict) else extra)
+    ids = list(dict.fromkeys(ids))
+    if not ids:
+        print("no model ids: pass some, set DEMO_MODEL_IDS in .env, or use --ids-file")
+        return 2
+
+    adapter = get_matterport(settings, cache_dir=args.cache)
+    started = time.monotonic()
+    sweeps: list[Sweep] = []
+    failed = 0
+    for model_id in ids:
+        try:
+            sweeps += adapter.sweeps(model_id)
+        except (RuntimeError, ValueError) as error:  # refused by the API, or wrong data source
+            failed += 1
+            print(f"skipped one model: {error}")
+    if not sweeps:
+        print(f"nothing to index: all {len(ids)} models were skipped")
+        return 1
+    fetched = time.monotonic()
+    index = LocateIndex.build(args.name, sweeps, _embedder(args.embedder))
+    out = args.out or INDEX_ROOT / args.name
+    index.save(out)
+    faces = sum(len(sweep.faces) for sweep in sweeps)
+    print(
+        f"models {len(ids) - failed} (skipped {failed}), sweeps {len(sweeps)}, faces {faces}, "
+        f"views {len(index)}, embedder {index.embedder_name}; fetch "
+        f"{fetched - started:.1f} s, embed {time.monotonic() - fetched:.1f} s; saved to {out.name}/"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
