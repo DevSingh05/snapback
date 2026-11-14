@@ -4,7 +4,8 @@ Routes the web app and the iMessage sidecar call:
 
     POST /cases                           start a check (form: link, text, renter_id, photos)
     GET  /cases/{case_id}                 where the case stands
-    GET  /cases/{case_id}/card            the Card
+    GET  /cases/{case_id}/card            the Card (?lang=en|es)
+    GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
@@ -42,6 +43,7 @@ from snapback.api.cases import (
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
+from snapback.card.render import render_card_png
 from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
@@ -49,6 +51,9 @@ from snapback.verdict import decide
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
+
+
+Language = Literal["en", "es"]
 
 
 class Approval(BaseModel):
@@ -285,9 +290,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return case.status(with_challenge=True)
 
     @app.get("/cases/{case_id}/card")
-    def get_card(case_id: str) -> Card:
+    def get_card(case_id: str, lang: Language = "en") -> Card:
         """The card for what is known so far. Its state is decide() on the evidence gathered."""
-        return find(case_id).card(settings.snapback_public_base_url)
+        return find(case_id).card(settings.snapback_public_base_url, lang)
+
+    @app.get("/cases/{case_id}/card.png")
+    def get_card_png(case_id: str, lang: Language = "en") -> Response:
+        """The same card drawn as a PNG, with the verify link as a QR code."""
+        card = find(case_id).card(settings.snapback_public_base_url, lang)
+        return Response(content=render_card_png(card), media_type="image/png")
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(

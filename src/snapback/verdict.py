@@ -25,6 +25,7 @@ from snapback.contracts import (
     CardRowKind,
     CardTone,
     Evidence,
+    ForSaleMatch,
     ForSaleStatus,
     LinkDomain,
     LocateStatus,
@@ -321,6 +322,17 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         site = modules.for_sale.site if modules.for_sale else ""
         return [_line(lang, "label.for_sale", CardTone.RED_FLAG, "place.for_sale", site=site)]
     if status is ForSaleStatus.RECENTLY_RENTED:
+        rented_on = modules.for_sale.changed_on if modules.for_sale else None
+        if rented_on is not None:
+            return [
+                _line(
+                    lang,
+                    "label.recently_rented",
+                    CardTone.HOLD,
+                    "place.recently_rented_dated",
+                    date=rented_on.isoformat(),
+                )
+            ]
         return [_line(lang, "label.recently_rented", CardTone.HOLD, "place.recently_rented")]
     return []
 
@@ -537,4 +549,13 @@ def build_card(
         ],
         verify_url=verify_url,
         lang=lang,
+        for_sale=_for_sale_finding(modules),
     )
+
+
+def _for_sale_finding(modules: ModuleEvidence) -> ForSaleMatch | None:
+    """The for-sale lookup, when it found something. "Looked up, nothing" is not a finding."""
+    found = modules.for_sale
+    if found is None or found.status is ForSaleStatus.NONE:
+        return None
+    return found

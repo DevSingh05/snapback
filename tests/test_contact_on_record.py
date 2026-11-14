@@ -118,8 +118,8 @@ def test_a_phone_that_is_not_the_office_holds_the_case_even_if_the_name_matches(
     tone, text = card_lines(modules, CardRowKind.PERSON)["Contact on record"]
     assert tone is CardTone.HOLD
     assert text == (
-        "The phone number in the listing is not the leasing office on record. "
-        "Call the manager on record yourself: Fixture Living LLC."
+        "The phone in the listing is not the leasing office on record. "
+        "Call Fixture Living LLC yourself."
     )
 
 
@@ -130,8 +130,8 @@ def test_a_matching_phone_says_so_and_still_does_not_lift_allowed_to_rent_it():
     person = card_lines(modules, CardRowKind.PERSON)
     assert person["Contact on record"] == (
         CardTone.OK,
-        "The phone number in the listing is the leasing office on record. "
-        "Call the manager on record yourself: Fixture Living LLC.",
+        "The phone in the listing is the leasing office on record. "
+        "Call Fixture Living LLC yourself.",
     )
     assert person["Allowed to rent it"][0] is CardTone.NOT_SHOWN
     assert person["Allowed to rent it"][1].startswith("Not confirmed.")
@@ -281,6 +281,41 @@ def test_recently_rented_holds_the_case_without_a_red_flag():
     assert tone is CardTone.HOLD
     assert "Red flag" not in text
 
+    dated = evidence(for_sale={"status": "recently_rented", "changed_on": "2026-11-01"})
+    assert card_lines(dated, CardRowKind.PLACE)["Recently rented"] == (
+        CardTone.HOLD,
+        "This home was rented on 2026-11-01.",
+    )
+
+
+def test_the_card_carries_the_for_sale_finding_and_its_line_together():
+    modules = evidence(for_sale={"status": "active", "listed_on": "2026-10-02"})
+    card = build_card(modules, checked_at=CHECKED_AT)
+    assert card.for_sale.listed_on.isoformat() == "2026-10-02"
+    assert "For sale" in card_lines(modules, CardRowKind.PLACE)
+
+
+def test_every_a7_line_exists_in_spanish_with_its_tone_in_words():
+    authority = check_authority(
+        ContactClaims(phones=[OTHER], links=["fixtureliving.co"]), record(), SALT
+    )
+    modules = evidence(
+        authority=authority.model_dump(mode="json"),
+        for_sale={"status": "active"},
+        price=check_price(1100, record(), beds=2, unit="999").model_dump(mode="json"),
+    )
+    english = build_card(modules, checked_at=CHECKED_AT)
+    spanish = build_card(modules, checked_at=CHECKED_AT, lang="es")
+    for en_row, es_row in zip(english.rows, spanish.rows, strict=True):
+        for en_line, es_line in zip(en_row.lines, es_row.lines, strict=True):
+            assert es_line.tone is en_line.tone
+            assert (es_line.label, es_line.text) != (en_line.label, en_line.text)
+            if es_line.tone is CardTone.RED_FLAG:
+                assert es_line.text.endswith("Señal de alerta.")
+            for banned in ("estafa", "seguro", "verificado"):
+                assert banned not in es_line.text.lower()
+    assert set(strings.TABLES["es"]) == set(strings.TABLES["en"])
+
 
 def test_a_lookup_that_found_nothing_adds_nothing():
     plain, looked = evidence(), evidence(for_sale={"status": "none"})
@@ -402,7 +437,7 @@ def test_a_floor_plan_priced_by_the_bed_is_never_compared_with_a_whole_unit_rent
     modules = evidence(price=result.model_dump(mode="json"))
     tone, text = card_lines(modules, CardRowKind.PRICE)["Rent vs record"]
     assert tone is CardTone.NOT_CHECKED
-    assert text.startswith("Not checked") and "by the bed" in text
+    assert text == "Not checked (priced per bed here, so the rent was not compared)."
 
 
 def test_a_building_priced_only_by_the_bed_is_not_compared_at_all():

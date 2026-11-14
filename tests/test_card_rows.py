@@ -334,3 +334,26 @@ def test_verify_link_uses_the_short_public_id():
 
 def test_card_carries_the_data_source_label():
     assert card_for(modules(source="live")).source == "live"
+
+
+# --- A7: the for-sale finding travels on the card, for the history strip -------------------
+
+
+def test_the_card_carries_a_for_sale_finding_with_its_dates():
+    found = {"status": "active", "site": "Homes.com", "listed_on": "2026-10-02"}
+    card = card_for(modules(for_sale=found))
+    assert card.for_sale is not None
+    assert (card.for_sale.status, card.for_sale.site) == ("active", "Homes.com")
+    assert card.for_sale.listed_on.isoformat() == "2026-10-02"
+    assert Card.model_validate_json(card.model_dump_json()).for_sale == card.for_sale
+
+    rented = card_for(modules(for_sale={"status": "recently_rented", "changed_on": "2026-11-01"}))
+    assert rented.for_sale.changed_on.isoformat() == "2026-11-01"
+
+
+def test_no_lookup_or_a_lookup_that_found_nothing_leaves_the_card_without_one():
+    assert card_for(modules()).for_sale is None
+    assert card_for(modules(for_sale={"status": "none"})).for_sale is None
+    old_card = json.loads((FIXTURES / "card_hold.json").read_text())
+    assert "for_sale" not in old_card  # cards written before this still parse
+    assert Card.model_validate(old_card).for_sale is None
