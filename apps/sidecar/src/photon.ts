@@ -25,8 +25,8 @@ import {
 import {
   MAX_VOICE_BYTES,
   MAX_VOICE_SECONDS,
-  VOICE_OFF,
   VOICE_TOO_LONG,
+  heardFailure,
   ffmpegToM4a,
   speak,
   spokenReply,
@@ -169,10 +169,11 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
     const spoken = (item.voices?.length ?? 0) > 0;
     for (const audio of item.voices ?? []) {
       const convert = config.convertVoice ?? ffmpegToM4a;
-      const text = await transcribe(audio, config.apiUrl, get, convert).catch(() => null);
-      if (text) item.texts.push(text);
+      const heard = await transcribe(audio, config.apiUrl, get, convert);
+      if ("text" in heard) item.texts.push(heard.text);
       else if (item.texts.length === 0 && item.images.length === 0) {
-        await item.space.send(VOICE_OFF); // nothing to check without the words
+        // nothing to check without the words: say why (off, too long, or not heard)
+        await item.space.send(heardFailure(heard.fail));
         return;
       }
     }

@@ -55,7 +55,10 @@ function app(items: [PhotonSpace, PhotonMessage][]): PhotonApp {
   };
 }
 
-function api(calls: Call[], opts: { stt?: number; tts?: number } = {}): typeof fetch {
+function api(
+  calls: Call[],
+  opts: { stt?: number; tts?: number; transcript?: string } = {},
+): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     calls.push({
@@ -66,7 +69,7 @@ function api(calls: Call[], opts: { stt?: number; tts?: number } = {}): typeof f
     });
     if (url.endsWith("/voice/stt")) {
       if (opts.stt) return Response.json({ reason: "voice not configured" }, { status: opts.stt });
-      return Response.json({ text: SPOKEN_AD });
+      return Response.json({ text: opts.transcript ?? SPOKEN_AD });
     }
     if (url.endsWith("/voice/tts")) {
       if (opts.tts) return Response.json({ reason: "voice not configured" }, { status: opts.tts });
@@ -82,7 +85,12 @@ function api(calls: Call[], opts: { stt?: number; tts?: number } = {}): typeof f
   }) as typeof fetch;
 }
 
-function config(calls: Call[], opts: Parameters<typeof api>[1] = {}, converted: string[] = []) {
+function config(
+  calls: Call[],
+  opts: Parameters<typeof api>[1] = {},
+  converted: string[] = [],
+  convert: { seconds?: number; fail?: boolean } = { seconds: 6 },
+) {
   return {
     apiUrl: "http://api.test",
     webUrl: "https://snapback.example",
@@ -94,7 +102,8 @@ function config(calls: Call[], opts: Parameters<typeof api>[1] = {}, converted: 
     // the CAF-to-m4a step, faked: records what it was asked to convert
     convertVoice: async (bytes: Uint8Array, mimeType: string) => {
       converted.push(mimeType);
-      return { bytes, mimeType: "audio/mp4" };
+      if (convert.fail) throw new Error("ffmpeg failed");
+      return { bytes, mimeType: "audio/mp4", seconds: convert.seconds };
     },
   };
 }
@@ -168,7 +177,7 @@ test("a memo over the length or size cap is not downloaded or sent anywhere", as
     const renter = space(RENTER);
     await runPhoton(app([[renter, memo(over)]]), config(calls));
     assert.equal(calls.length, 0, JSON.stringify(over));
-    assert.match(renter.sent[0]?.text ?? "", /under 2 minutes/);
+    assert.match(renter.sent[0]?.text ?? "", /under a minute/);
   }
 });
 
@@ -196,4 +205,60 @@ test("watch alerts stay text only, even for a thread that spoke its ad", async (
   const renter = space(RENTER);
   await runPhoton(app([[renter, memo()]]), { ...config(calls), watches: book });
   assert.equal(book.size(), 0);
+});
+
+// --- XO review of #245 --------------------------------------------------------------------------
+
+test("[M] one cap with the API: 60 seconds", () => {
+  assert.equal(MAX_VOICE_SECONDS, 60);
+});
+
+test("[M] Photon sends no duration: a memo too big for 60 s is refused before download", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  // no `duration`, as Spectrum's iMessage provider builds it; only the size says it is long
+  await runPhoton(app([[renter, memo({ size: MAX_VOICE_BYTES + 1 })]]), config(calls));
+  assert.equal(calls.length, 0);
+  assert.match(renter.sent[0]?.text ?? "", /under a minute/);
+});
+
+test("[M] with no duration, the length ffmpeg measures decides, and it is sent to the API", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  await runPhoton(app([[renter, memo()]]), config(calls, {}, [], { seconds: 61 }));
+  assert.equal(calls.filter((c) => c.url.endsWith("/voice/stt")).length, 0);
+  assert.match(renter.sent[0]?.text ?? "", /under a minute/);
+
+  const ok: Call[] = [];
+  await runPhoton(app([[space(RENTER), memo()]]), config(ok, {}, [], { seconds: 42 }));
+  const sent = (ok.find((c) => c.url.endsWith("/voice/stt"))?.body as FormData).get("seconds");
+  assert.equal(sent, "42");
+});
+
+test("[M] a 413 from the API is a too-long memo, not 'not set up'", async () => {
+  const calls: Call[] = [];
+  const renter = space(RENTER);
+  await runPhoton(app([[renter, memo()]]), config(calls, { stt: 413 }));
+  assert.match(renter.sent[0]?.text ?? "", /under a minute/);
+});
+
+for (const [why, opts, convert] of [
+  ["an empty transcript", { transcript: "" }, { seconds: 6 }],
+  ["an all-[removed] transcript", { transcript: "[removed] [removed]" }, { seconds: 6 }],
+  ["a 429", { stt: 429 }, { seconds: 6 }],
+  ["a failed ffmpeg", {}, { fail: true }],
+] as const) {
+  test(`[L] ${why} gets "I couldn't hear that", not "not set up"`, async () => {
+    const calls: Call[] = [];
+    const renter = space(RENTER);
+    await runPhoton(app([[renter, memo()]]), config(calls, opts, [], convert));
+    assert.match(renter.sent[0]?.text ?? "", /couldn't hear that/);
+    assert.doesNotMatch(renter.sent[0]?.text ?? "", /not set up/);
+    assert.equal(calls.filter((c) => c.url.endsWith("/cases")).length, 0);
+  });
+}
+
+test("[L] ffmpeg is killed after its time limit", async () => {
+  const { FFMPEG_TIMEOUT_MS } = await import("./voice");
+  assert.ok(FFMPEG_TIMEOUT_MS > 0 && FFMPEG_TIMEOUT_MS <= 20_000);
 });
