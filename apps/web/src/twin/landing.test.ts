@@ -4,6 +4,7 @@ import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import type { LocateResult } from "../contracts";
 import {
   FIXTURE_ROOM_LABELS,
+  hasDifferentHome,
   chooseLocate,
   landingFromLocate,
   landingLine,
@@ -37,10 +38,10 @@ describe("landingFromLocate", () => {
 
   // All four LocateStatus values in src/snapback/contracts.py, each with a pose present.
   it.each([
-    ["located_in_claimed", "match", "Taken here: Living room"],
-    ["located_elsewhere", "elsewhere", "Taken in a different home"],
-    ["not_located", "not_found", "Could not place this photo"],
-    ["not_indexed", "not_found", "Could not place this photo"],
+    ["located_in_claimed", "match", "Taken here: Living room"] as const,
+    ["located_elsewhere", "elsewhere", "Taken in a different home"] as const,
+    ["not_located", "not_found", "Could not place this photo"] as const,
+    ["not_indexed", "not_found", "Could not place this photo"] as const,
   ])("status %s reads %s", (status, kind, line) => {
     const l: LocateResult = {
       ...locate,
@@ -127,7 +128,7 @@ describe("landingFromLocate", () => {
   });
 
   it("not_located and not_indexed never read elsewhere, even with a stray matched property", () => {
-    for (const status of ["not_located", "not_indexed"]) {
+    for (const status of ["not_located", "not_indexed"] as const) {
       const l: LocateResult = {
         ...locate,
         photos: [{ photo_id: "l1", status, matched_property_id: "fx-prop-9" }],
@@ -158,6 +159,52 @@ describe("landingFromLocate", () => {
   it("leaves the room label null when the contract has none", () => {
     const s = landingFromLocate(locate, "l1", {});
     expect(s.kind === "match" && s.roomLabel).toBeNull();
+  });
+});
+
+describe("hasDifferentHome", () => {
+  const withPhotos = (photos: LocateResult["photos"], claimed: string | null = "fx-prop-1") =>
+    ({ ...locate, claimed_property_id: claimed, photos }) as LocateResult;
+  it("is true only for located_elsewhere with a known property that differs from the claimed one", () => {
+    expect(
+      hasDifferentHome(
+        withPhotos([{ photo_id: "a", status: "located_elsewhere", matched_property_id: "p9" }]),
+      ),
+    ).toBe(true);
+  });
+  it("is false for elsewhere in the claimed property's other twin", () => {
+    expect(
+      hasDifferentHome(
+        withPhotos([
+          { photo_id: "a", status: "located_elsewhere", matched_property_id: "fx-prop-1" },
+        ]),
+      ),
+    ).toBe(false);
+  });
+  it("is false for elsewhere with no matched property, or with no claimed property", () => {
+    expect(
+      hasDifferentHome(
+        withPhotos([{ photo_id: "a", status: "located_elsewhere", matched_property_id: null }]),
+      ),
+    ).toBe(false);
+    expect(
+      hasDifferentHome(
+        withPhotos(
+          [{ photo_id: "a", status: "located_elsewhere", matched_property_id: "p9" }],
+          null,
+        ),
+      ),
+    ).toBe(false);
+  });
+  it("is false for not_located and not_indexed even with a stray matched property", () => {
+    expect(
+      hasDifferentHome(
+        withPhotos([
+          { photo_id: "a", status: "not_located", matched_property_id: "p9" },
+          { photo_id: "b", status: "not_indexed", matched_property_id: "p9" },
+        ]),
+      ),
+    ).toBe(false);
   });
 });
 

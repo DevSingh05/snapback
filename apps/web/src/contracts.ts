@@ -105,10 +105,14 @@ export interface Pose {
   fov_deg?: number | null;
 }
 
-// Mirrors PhotoLocation. status is one of located_in_claimed, located_elsewhere, not_located, not_indexed.
+// Mirrors LocateStatus (contracts.py).
+export type LocateStatus =
+  "located_in_claimed" | "located_elsewhere" | "not_located" | "not_indexed";
+
+// Mirrors PhotoLocation.
 export interface LocatedPhoto {
   photo_id: string;
-  status: string;
+  status: LocateStatus;
   model_id?: string | null;
   pano_id?: string | null;
   inliers?: number | null;
@@ -135,7 +139,7 @@ export interface LocateResult {
   chosen?: FloorPlanCandidate | null;
   alternatives?: FloorPlanCandidate[];
   poses: Record<string, Pose>; // photo_id -> pose, located photos only
-  thresholds_version?: string;
+  thresholds_version: string;
 }
 
 // Mirrors PropertyRecord and AerialTile in src/snapback/contracts.py.

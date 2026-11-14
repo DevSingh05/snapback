@@ -121,6 +121,20 @@ describe("TwinView photo landing", () => {
     expect(screen.queryByText("The listing says here.")).toBeNull();
   });
 
+  it("elsewhere inside the claimed property, or with no matched property, shows no second building", () => {
+    const l = {
+      ...hold.locate,
+      case_id: "live",
+      photos: [
+        { photo_id: "l1", status: "located_elsewhere", matched_property_id: "fx-prop-1" },
+        { photo_id: "l2", status: "located_elsewhere", matched_property_id: null },
+      ],
+    } as unknown as LocateResult;
+    render(<TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={l} liveLocate />);
+    expect(screen.queryByText("The listing says here.")).toBeNull();
+    expect(screen.queryByTestId("aerial-distance")).toBeNull();
+  });
+
   it("keeps the trace as a collapsed strip", () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
     expect(screen.getByRole("button", { name: /Agent trace/ })).toHaveAttribute(
