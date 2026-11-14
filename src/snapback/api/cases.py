@@ -91,17 +91,28 @@ class RecordedCase:
     token = None  # a recorded case can never be written to, so it has no secret
     read_token = None
 
-    def __init__(self, case_id: str, card: Card, events: list[TraceEvent], photos: int) -> None:
+    def __init__(
+        self, case_id: str, card: Card, events: list[TraceEvent], evidence: ModuleEvidence
+    ) -> None:
         self.case_id = case_id
         self._card = card
         self._events = events
-        self._photos = photos
+        self._evidence = evidence
+        self._photos = len(evidence.locate.photos) if evidence.locate else 0
 
     def events(self) -> list[TraceEvent]:
         return self._events
 
-    def card(self, verify_base_url: str) -> Card:
-        return self._card
+    def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
+        """The recorded card as it is. In another language, the same evidence laid out again."""
+        if lang == self._card.lang:
+            return self._card
+        return build_card(
+            self._evidence,
+            checked_at=self._card.checked_at,
+            verify_base_url=verify_base_url,
+            lang=lang,
+        )
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         return CaseStatus(
@@ -149,12 +160,12 @@ class SessionCase:
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
 
-    def card(self, verify_base_url: str) -> Card:
+    def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
         return build_card(
             self.session.evidence,
             checked_at=self._checked_at or _now(),
             verify_base_url=verify_base_url,
-            lang=self.session.lang,
+            lang=lang,
         )
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
@@ -233,8 +244,7 @@ class CaseStore:
         evidence = ModuleEvidence.model_validate_json(
             (FIXTURES_DIR / "module_evidence_hold.json").read_text()
         )
-        photos = len(evidence.locate.photos) if evidence.locate else 0
-        self._cases[public_id(card.case_id)] = RecordedCase(card.case_id, card, events, photos)
+        self._cases[public_id(card.case_id)] = RecordedCase(card.case_id, card, events, evidence)
 
     def get(self, case_id: str) -> RecordedCase | SessionCase | None:
         return self._cases.get(public_id(case_id))

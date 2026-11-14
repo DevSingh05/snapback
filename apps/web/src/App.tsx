@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { CardPage } from "./pages/CardPage";
+import { ReplayPage } from "./replay/ReplayPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
 import { UploadPage } from "./upload/UploadPage";
@@ -10,9 +11,12 @@ type Route =
   | { name: "trace"; id: string }
   | { name: "twin"; id: string }
   | { name: "verify"; id: string }
+  | { name: "replay"; slug: string }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (replay?.[1]) return { name: "replay", slug: replay[1] };
   const trace = /^\/case\/([A-Za-z0-9_-]+)\/trace\/?$/.exec(path);
   if (trace?.[1]) return { name: "trace", id: trace[1] };
   const twin = /^\/case\/([A-Za-z0-9_-]+)\/twin\/?$/.exec(path);
@@ -39,6 +43,8 @@ export default function App() {
     <main className="shell">
       {route.name === "home" ? (
         <UploadPage />
+      ) : route.name === "replay" ? (
+        <ReplayPage key={route.slug} slug={route.slug} />
       ) : route.name === "trace" ? (
         <TracePage key={`trace-${route.id}`} caseId={route.id} />
       ) : route.name === "twin" ? (

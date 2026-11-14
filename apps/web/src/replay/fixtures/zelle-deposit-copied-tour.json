@@ -1,0 +1,66 @@
+{
+  "slug": "zelle-deposit-copied-tour",
+  "case_id": "7Q2M",
+  "title": "A Zelle deposit for a copied video tour",
+  "pattern": "place",
+  "fictional": true,
+  "amount_usd": 2500,
+  "steps": [
+    {
+      "id": "listing",
+      "kind": "listing",
+      "reported_on": "2024-03-04",
+      "label": "Listing seen",
+      "detail": "A two-bedroom is listed well under the area's rents, with a video tour."
+    },
+    {
+      "id": "chat",
+      "kind": "chat",
+      "reported_on": "2024-03-04",
+      "label": "Chat with the poster",
+      "detail": "The poster says they are out of the country and cannot show the place in person."
+    },
+    {
+      "id": "hold",
+      "kind": "hold_request",
+      "reported_on": "2024-03-05",
+      "label": "Asked to pay to hold it",
+      "detail": "Another applicant is said to be ready, so the renter is asked to send a deposit to hold it."
+    },
+    {
+      "id": "payment",
+      "kind": "payment",
+      "reported_on": "2024-03-05",
+      "label": "Paid by Zelle",
+      "detail": "The renter sends the deposit by Zelle before any viewing."
+    },
+    {
+      "id": "discovery",
+      "kind": "discovery",
+      "reported_on": "2024-03-12",
+      "label": "Found out",
+      "detail": "The real tenant tells the renter the unit is occupied and was never for rent."
+    }
+  ],
+  "snapback": {
+    "verdict": "dont_pay",
+    "stop_before": "payment",
+    "findings": [
+      {
+        "step_id": "listing",
+        "status": "doesnt_match",
+        "text": "This video tour was filmed in a different home."
+      },
+      {
+        "step_id": "chat",
+        "status": "not_confirmed",
+        "text": "The poster could not be confirmed as someone who may rent this place."
+      },
+      {
+        "step_id": "hold",
+        "status": "warning",
+        "text": "Asked to pay by Zelle before a viewing."
+      }
+    ]
+  }
+}
