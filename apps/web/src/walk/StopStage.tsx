@@ -4,7 +4,7 @@ import { HouseGlyph } from "../components/HouseGlyph";
 import type { TourPlan, TourStop } from "../contracts";
 import { points, project } from "./iso";
 import { Parts } from "../draw/Parts";
-import { Person } from "../draw/Person";
+import { PERSON_HEIGHT, Person } from "../draw/Person";
 import { O, SIZE } from "./roomParts";
 import { drawRoom, roomKind, type RoomKind } from "./rooms";
 import "./walk.css";
@@ -15,17 +15,31 @@ import "./walk.css";
 
 // Where the ad photo lands: on the left wall, clear of the furniture.
 const PHOTO = { y0: 60, y1: 180, z0: 68, z1: 140 };
-const CAMERA: [number, number, number] = [252, 122, 0];
+
+// "You are here": the person stands on open floor near the matched pose (the spot the ad photo
+// was taken from, toward the front right of the drawn room), one spot per room drawing, each
+// clear of every furniture footprint and with nothing drawn in front of it (walk.test checks
+// both). The cone runs from there to the photo's frame on the left wall. With no photo here the
+// cone is a plain view ahead that turns with the camera's pan (--wp-yaw on the stage).
+export const HERE_SPOT: Record<RoomKind, [number, number]> = {
+  kitchen: [256, 118],
+  bathroom: [252, 132],
+  bedroom: [272, 150],
+  living: [264, 148],
+  entry: [244, 124],
+  plain: [252, 154],
+};
 
 function Room({ kind, cone }: { kind: RoomKind; cone: boolean }) {
   const room = useMemo(() => drawRoom(kind), [kind]);
+  const [sx, sy] = HERE_SPOT[kind];
   return (
     <g className="rs-room">
       <Parts parts={room.base} />
       {cone && (
         <polygon
           className="rs-cone"
-          points={points(O, CAMERA, [0, PHOTO.y1, 0], [0, PHOTO.y0, 0])}
+          points={points(O, [sx, sy, 0], [0, PHOTO.y1, 0], [0, PHOTO.y0, 0])}
         />
       )}
       <Parts parts={room.things} />
@@ -41,50 +55,33 @@ const LAND = {
   "--rs-y": `${LAND_Y.toFixed(1)}px`,
 } as CSSProperties;
 
-// "You are here": where the camera stands in the drawn room. At a photo stop it stands where the
-// ad photo was taken (the cone runs to the photo's frame). Anywhere else the plan has no pose to
-// draw from, so the marker stands at the room's centre and says so; its cone turns with the
-// camera's pan (the player writes --wp-yaw on the stage).
-const HERE: [number, number, number] = [170, 150, 0];
-const [HERE_X, HERE_Y] = project(HERE, O);
-const [CAM_X, CAM_Y] = project([CAMERA[0], CAMERA[1], 46], O);
-const HERE_CONE = points(
-  O,
-  HERE,
-  [HERE[0] - 130, HERE[1] - 56, 0],
-  [HERE[0] - 130, HERE[1] + 56, 0],
-);
-
-// "You are here" is a person in the room, facing the way the camera looks (down -x, toward the
-// photo wall), with the faint view cone in front. It turns with the pan and steps to its spot.
-function HereMarker({ placed }: { placed: boolean }) {
-  const [x, y] = placed ? [CAM_X, CAM_Y - 14] : [HERE_X, HERE_Y - 66];
-  const [fx, fy] = placed ? [CAMERA[0], CAMERA[1]] : [HERE[0], HERE[1]];
-  const [ax, ay] = project([fx, fy, 0], O);
+// The person is one rigid group: its parts never move on their own. The step in on arrival is
+// one transform on that group (player.css .rs-person), and with reduced motion it just stands.
+function HereMarker({ kind, placed }: { kind: RoomKind; placed: boolean }) {
+  const [sx, sy] = HERE_SPOT[kind];
+  const [fx, fy] = project([sx, sy, 0], O);
+  const [tx, ty] = project([sx, sy, PERSON_HEIGHT + 14], O);
+  const cone = points(O, [sx, sy, 0], [sx - 130, sy - 56, 0], [sx - 130, sy + 56, 0]);
+  const label = placed ? "You are here" : "You are here, roughly";
+  const half = placed ? 44 : 78;
   return (
     <g className="rs-here" data-testid="you-are-here" data-placed={placed ? "true" : undefined}>
       {!placed && (
         <g
           className="rs-here-turn"
-          style={{ transformOrigin: `${HERE_X.toFixed(1)}px ${HERE_Y.toFixed(1)}px` }}
+          style={{ transformOrigin: `${fx.toFixed(1)}px ${fy.toFixed(1)}px` }}
         >
-          <polygon className="rs-cone rs-here-cone" points={HERE_CONE} />
+          <polygon className="rs-cone rs-here-cone" points={cone} />
         </g>
       )}
-      <g className="rs-person" style={{ transformOrigin: `${ax.toFixed(1)}px ${ay.toFixed(1)}px` }}>
-        <Person origin={O} x={fx} y={fy} facing={180} />
+      {/* The person and its label arrive together, as one group. */}
+      <g className="rs-person">
+        <Person origin={O} x={sx} y={sy} facing={180} />
+        <rect className="rs-photo-tag" x={tx - half} y={ty - 18} width={half * 2} height={18} />
+        <text className="rs-photo-tag-text mono" x={tx} y={ty - 5} textAnchor="middle">
+          {label}
+        </text>
       </g>
-      <rect
-        className="rs-photo-tag"
-        x={x - (placed ? 44 : 96)}
-        y={y - 34}
-        width={placed ? 88 : 192}
-        height={18}
-        rx={3}
-      />
-      <text className="rs-photo-tag-text mono" x={x} y={y - 21} textAnchor="middle">
-        {placed ? "You are here" : "You are here (room centre)"}
-      </text>
     </g>
   );
 }
@@ -176,7 +173,7 @@ export function StopStage({
             />
             <Room kind={roomKind(stop)} cone={Boolean(photoAlias)} />
             {photoAlias && photoShown && <LandedPhoto alias={photoAlias} fly={!reduced} />}
-            <HereMarker placed={Boolean(photoAlias && photoShown)} />
+            <HereMarker kind={roomKind(stop)} placed={Boolean(photoAlias && photoShown)} />
             {!photoAlias && unshown && <MissingFrame />}
           </g>
         </svg>
