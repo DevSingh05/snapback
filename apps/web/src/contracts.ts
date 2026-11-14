@@ -58,14 +58,6 @@ export interface AuthorityResult {
   link_domain: LinkDomain;
 }
 
-// Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
-// Used when the card API has not already put these lines in `rows`.
-export interface CardProofs {
-  price?: PriceResult | null;
-  authority?: AuthorityResult | null;
-  unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
-}
-
 export interface Card {
   for_sale?: ForSaleMatch | null; // D7; null or missing means not looked up
   case_id: string;
@@ -105,18 +97,41 @@ export interface Pose {
   fov_deg?: number | null;
 }
 
+// Mirrors LocateStatus (contracts.py).
+export type LocateStatus =
+  "located_in_claimed" | "located_elsewhere" | "not_located" | "not_indexed";
+
+// Mirrors PhotoLocation.
 export interface LocatedPhoto {
   photo_id: string;
-  status: string;
+  status: LocateStatus;
   model_id?: string | null;
   pano_id?: string | null;
   inliers?: number | null;
+  inlier_ratio?: number | null;
+  // The twin the photo was placed in, claimed or not; for located_elsewhere these name the OTHER building.
+  matched_model_id?: string | null;
+  matched_property_id?: string | null;
+  room_label?: string | null; // Matterport's room classification, e.g. "Kitchen"
+}
+
+// Mirrors FloorPlanCandidate.
+export interface FloorPlanCandidate {
+  property_id: string;
+  model_id: string;
+  floor_plan?: string | null;
+  photos_located: number;
+  total_inliers: number;
 }
 
 export interface LocateResult {
   case_id: string;
   photos: LocatedPhoto[];
-  poses: Record<string, Pose>;
+  claimed_property_id?: string | null;
+  chosen?: FloorPlanCandidate | null;
+  alternatives?: FloorPlanCandidate[];
+  poses: Record<string, Pose>; // photo_id -> pose, located photos only
+  thresholds_version: string;
 }
 
 // Mirrors PropertyRecord and AerialTile in src/snapback/contracts.py.

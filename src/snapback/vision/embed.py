@@ -17,6 +17,7 @@ from PIL import Image, ImageOps
 DINOV2_REPO = "facebookresearch/dinov2:7764ea0f912e53c92e82eb78a2a1631e92725fc8"
 # Preferred: the same ViT-S/14 DINOv2 weights through timm (CLS token, Apache-2.0).
 TIMM_DINOV2 = "vit_small_patch14_dinov2.lvd142m"
+TIMM_NAME = "dinov2_vits14_timm"
 
 
 class Embedder(Protocol):
@@ -72,8 +73,16 @@ class Dinov2Embedder:  # pragma: no cover - needs torch and a one-time download
             # weights (Apache-2.0) from Hugging Face; no repository code is downloaded or run.
             import timm
 
+            self.name = TIMM_NAME  # never mixed with an index built through torch.hub
+
+            from snapback.vision.locate.weights import dinov2_file
+
             model = timm.create_model(
-                TIMM_DINOV2, pretrained=True, num_classes=0, img_size=self.SIZE
+                TIMM_DINOV2,
+                pretrained=True,
+                num_classes=0,
+                img_size=self.SIZE,
+                pretrained_cfg_overlay={"file": str(dinov2_file())},  # pinned revision, checked
             )
         except ImportError:
             model = torch.hub.load(DINOV2_REPO, self.name, trust_repo=True)

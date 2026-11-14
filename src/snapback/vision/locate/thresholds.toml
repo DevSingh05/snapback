@@ -19,7 +19,7 @@ stop_at_inliers = 150  # good enough: stop verifying more candidates
 # A photo is called "another building" (which can mean DON'T PAY) only on a stricter bar than
 # "this building": the claimed twins are always tried first, and a match elsewhere needs about
 # twice the inliers, spread over enough of the photo that one planar object cannot carry it.
-elsewhere_min_inliers = 60
+elsewhere_min_inliers = 50  # p10 of true matches is 56 (n=30, #28); noise tops out at 5 to 7
 elsewhere_min_spread = 0.15  # inlier bounding box area / photo area
 
 [pose]

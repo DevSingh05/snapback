@@ -1,9 +1,10 @@
 """Locate gate (V2 #28): how many held-out views of a twin are placed, with pose, and how many
 views of another building are placed elsewhere.
 
-Nobody on the team can photograph these buildings, so the held-out views are RENDERS of the
-live scans at viewpoints the index never stored: random yaw (never within 5 degrees of a face
-centre), pitch -15 to 10, field of view 55 to 75, JPEG at quality 70, brightness 85 to 115%.
+Nobody on the team can photograph these buildings, so the held-out views are re-projections of
+the same panoramas from the same scan points: unseen directions from the indexed scan points
+(renders, not photos). Random yaw (never within 5 degrees of a face centre), pitch -15 to 10,
+field of view 55 to 75, JPEG at quality 70, brightness 85 to 115%.
 Every line this prints says so. Counts only: no ids, no pixels.
 
     uv run python -m snapback.eval.locate_gate --index data/index/all-tiny --n 20
@@ -133,7 +134,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         elsewhere += result.photos[0].status is LocateStatus.LOCATED_ELSEWHERE
         false_placed += result.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED
 
-    label = "RENDERS of live scans at unseen viewpoints, not phone photos"
+    label = "unseen directions from the indexed scan points (renders, not photos)"
     print(
         f"locate gate ({label}); index: {len(model_ids)} twins, {len(index)} views, "
         f"embedder {index.embedder_name}; matcher {matcher.name}; "
