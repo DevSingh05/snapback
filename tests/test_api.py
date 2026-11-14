@@ -77,10 +77,9 @@ def stream_trace(
     client: TestClient, case_id: str, last_event_id: str | None = None, token: str | None = None
 ):
     headers = {"Last-Event-ID": last_event_id} if last_event_id is not None else {}
-    params = {"token": token} if token else {}
-    with client.stream(
-        "GET", f"/cases/{case_id}/trace", headers=headers, params=params
-    ) as response:
+    if token:
+        headers["Authorization"] = f"Bearer {token}"  # a header, never the address
+    with client.stream("GET", f"/cases/{case_id}/trace", headers=headers) as response:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
         assert response.headers["cache-control"] == "no-cache"
@@ -417,15 +416,47 @@ def test_the_read_only_secret_cannot_approve(client):
 
 
 def test_the_write_secret_is_refused_in_a_query_string(client):
-    # Servers log the path and query of every request. The secret that approves a challenge
-    # must never be put there. The trace stream alone still takes the read-only secret in
-    # the address, because a browser's EventSource cannot send a header.
+    # Servers log the path and query of every request. No secret is ever put there: not the
+    # one that approves a challenge, and not the read-only one either (locked, Sat 02:27).
     case = create(client)
     approve(client, case)
     url = f"/cases/{case['case_id']}"
-    assert client.get(f"{url}/trace", params={"token": case["token"]}).status_code == 403
+    assert client.get(f"{url}/trace", params={"token": case["token"]}).status_code == 401
     assert client.get(url, params={"token": case["token"]}).status_code == 401
-    assert client.get(f"{url}/trace", params={"token": case["read_token"]}).status_code == 200
+    assert client.get(f"{url}/trace", params={"token": case["read_token"]}).status_code == 401
+
+
+@pytest.mark.parametrize(
+    "route", ["", "/report", "/trace", "/aerial", "/aerial/claimed.jpg", "/aerial/matched.jpg"]
+)
+def test_no_case_route_takes_a_token_in_the_address(client, route):
+    # Every route that reads a case with a secret: a token in the address is refused, the
+    # right one included, and even beside a good header. Nothing of the case comes back.
+    case = create(client)
+    approve(client, case)
+    url = f"/cases/{case['case_id']}{route}"
+    good_header = {"Authorization": f"Bearer {case['read_token']}"}
+    for secret in (case["read_token"], case["token"], "nope", ""):
+        for headers in ({}, good_header):
+            refused = client.get(url, params={"token": secret}, headers=headers)
+            assert refused.status_code == 401, (route, secret, headers)
+            assert "header" in refused.json()["detail"].lower()
+            assert case["read_token"] not in refused.text and case["token"] not in refused.text
+    # The same route with the header alone is not refused for lack of a secret.
+    assert client.get(url, headers=good_header).status_code != 401
+
+
+def test_nothing_in_the_api_can_read_a_secret_from_the_address():
+    # The read check takes a header and nothing else, and no route declares a `token`
+    # parameter, so a later route cannot quietly start reading the query again.
+    import inspect
+
+    from snapback.api import main
+
+    source = inspect.getsource(main)
+    assert "in_query" not in source
+    assert "token: str | None = None" not in source
+    assert 'query_params.get("token")' not in source
 
 
 def test_the_case_status_takes_no_token_in_the_address_not_even_the_right_one(client):
@@ -502,15 +533,18 @@ def test_the_trace_stream_needs_the_case_secret(client):
     approve(client, case)
     url = f"/cases/{case['case_id']}/trace"
     assert client.get(url).status_code == 401
-    assert client.get(url, params={"token": "nope"}).status_code == 403
-    assert client.get(url, params={"token": other["read_token"]}).status_code == 403
+    assert client.get(url, headers={"Authorization": "Bearer nope"}).status_code == 403
+    other_case = {"Authorization": f"Bearer {other['read_token']}"}
+    assert client.get(url, headers=other_case).status_code == 403
+    # Never from the address: the web reads the stream with a header (locked, Sat 02:27).
+    assert client.get(url, params={"token": case["read_token"]}).status_code == 401
 
-    # A browser's EventSource cannot set headers, so the read-only secret may ride in the query.
-    by_query = stream_trace(client, case["case_id"], token=case["read_token"])
+    # Either secret opens it, in either header, and both see the same stream.
+    with_read = stream_trace(client, case["case_id"], token=case["read_token"])
     with client.stream("GET", url, headers={"X-Case-Token": case["token"]}) as response:
-        by_header = read_sse(response)
-    assert by_query == by_header
-    assert json.loads(by_query[-1]["data"])["kind"] == "verdict"
+        with_write = read_sse(response)
+    assert with_read == with_write
+    assert json.loads(with_read[-1]["data"])["kind"] == "verdict"
 
 
 def test_the_recorded_fixture_trace_stays_open_to_read(client):

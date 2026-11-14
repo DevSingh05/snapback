@@ -28,8 +28,9 @@ export function saveCaseToken(caseId: string, token: string): void {
   }
 }
 
-// The read-only secret (POST /cases `read_token`). Only this one may travel in a URL, for the
-// SSE trace, because EventSource cannot send headers. The write token above never does.
+// The read-only secret (POST /cases `read_token`). Like the write token above it travels in
+// the Authorization header only and is never put in a URL (locked ruling, Sat 02:27): the API
+// answers 401 to a token in an address, on every case route, the trace stream included.
 const READ_TOKEN_PREFIX = "snapback.case-read-token.";
 
 export function saveCaseReadToken(caseId: string, token: string): void {

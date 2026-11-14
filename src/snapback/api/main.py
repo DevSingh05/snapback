@@ -18,8 +18,10 @@ Routes the web app and the iMessage sidecar call:
 A case's short id is accepted with or without the fixture prefix and in either case: `7Q2M`,
 `7q2m` and `fx-7Q2M` are the same case. Short ids can be guessed, so the id alone opens only
 the card and a summary. `POST /cases` returns two secrets for the case. `token` is needed for
-every write and is accepted in a header only. `read_token` opens the trace and the drafted
-challenge and is the only one accepted as `?token=`, because servers log addresses.
+every write. `read_token` opens the trace, the drafted challenge, the report and the aerial
+proof. Both travel in a header only (`Authorization: Bearer` or `X-Case-Token`). No route
+takes either in the address: servers log addresses, so a `token` there is answered 401,
+valid or not.
 """
 
 import asyncio
@@ -224,15 +226,12 @@ def create_app(
         if not same(in_header, case.token):
             raise HTTPException(status_code=403, detail="That token cannot write to this case.")
 
-    def check_read(
-        case: RecordedCase | SessionCase, in_header: str | None, in_query: str | None
-    ) -> None:
+    def check_read(case: RecordedCase | SessionCase, in_header: str | None) -> None:
         """Refuse unless the request may read this case's trace and challenge.
 
-        A header may carry either secret, since whoever may write may read. `in_query` is
-        for the trace stream alone, the one route a browser has to open without headers
-        (EventSource): there the address may carry the read-only secret, and never the write
-        one. Every other route passes None and takes a header only.
+        The secret comes from a header and nowhere else (locked ruling, Sat 02:27). A header
+        may carry either secret, since whoever may write may read. There is no way to hand
+        this a value from the address, so no route can start reading the query again.
         """
         if case.token is None:
             return
@@ -240,13 +239,6 @@ def create_app(
             if same(in_header, case.token) or same(in_header, case.read_token):
                 return
             raise HTTPException(status_code=403, detail="That token is not for this case.")
-        if in_query is not None:
-            if same(in_query, case.read_token):
-                return
-            raise HTTPException(
-                status_code=403,
-                detail="Only this case's read token is accepted in the address.",
-            )
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
     def no_token_in_the_address(request: Request) -> None:
@@ -406,7 +398,7 @@ def create_app(
         in_header = _bearer(authorization, x_case_token)
         if in_header is None:
             return case.status(with_challenge=False)
-        check_read(case, in_header, None)
+        check_read(case, in_header)
         return case.status(with_challenge=True)
 
     @app.get("/cases/{case_id}/card")
@@ -471,6 +463,7 @@ def create_app(
     @app.get("/cases/{case_id}/aerial")
     def get_aerial(
         case_id: str,
+        request: Request,
         direction: AerialDirection = "north",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
@@ -480,9 +473,10 @@ def create_app(
         Cases are private: this needs the case's read token in a header. Each tile is bounded at
         20 s and cached for 7 days under data/vexcel/ (`make purge` deletes it)."""
         case = find(case_id)
+        no_token_in_the_address(request)
         # check_read answers 401 for a case that has a secret and got none; the recorded fixture
         # case has no secret, so it is readable without one, as for the trace.
-        check_read(case, _bearer(authorization, x_case_token), None)
+        check_read(case, _bearer(authorization, x_case_token))
         proof = aerial_for(case, case_id, direction)
 
         # The image is served by our own route; the client never sees where it sits on disk.
@@ -501,6 +495,7 @@ def create_app(
     def get_aerial_image(
         case_id: str,
         side: Literal["claimed", "matched"],
+        request: Request,
         direction: AerialDirection = "north",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
@@ -509,7 +504,8 @@ def create_app(
         the image with the header and shows it through a blob URL. Only the side asked for is
         fetched."""
         case = find(case_id)
-        check_read(case, _bearer(authorization, x_case_token), None)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
         property_id = case.property_id if side == "claimed" else matched_id_of(case)
         if property_id is None:
             raise HTTPException(status_code=404, detail=NO_TILE)
@@ -556,7 +552,7 @@ def create_app(
         """
         case = find(case_id)
         no_token_in_the_address(request)
-        check_read(case, _bearer(authorization, x_case_token), None)
+        check_read(case, _bearer(authorization, x_case_token))
         return build_report(
             case.evidence,
             case.card(settings.snapback_public_base_url, lang),
@@ -568,23 +564,22 @@ def create_app(
     @app.get("/cases/{case_id}/trace")
     def get_trace(
         case_id: str,
-        token: str | None = None,
+        request: Request,
         last_event_id: Annotated[str | None, Header()] = None,
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> StreamingResponse:
         """Server-sent events: `event: trace`, `id` is the seq, `data` is a TraceEvent.
 
-        Needs a case secret, because the trace names the spot that was drawn. A browser's
-        EventSource cannot set headers, so the read-only `read_token` may be sent as
-        `?token=`; the write token is refused there. This is the only route that still takes
-        a token in the address, and only because the web's trace panel opens it that way: it
-        goes when the panel reads the stream with a header. Other clients can send either
-        secret as `Authorization: Bearer` or `X-Case-Token`. Send `Last-Event-ID` to resume
-        after that seq. The stream ends after the verdict event.
+        Needs a case secret, because the trace names the spot that was drawn. Either secret
+        is sent as `Authorization: Bearer` or `X-Case-Token`, never in the address: a `token`
+        there is answered 401. A browser reads the stream with `fetch` and a header, not with
+        EventSource, which cannot send one. Send `Last-Event-ID` to resume after that seq.
+        The stream ends after the verdict event.
         """
         case = find(case_id)
-        check_read(case, _bearer(authorization, x_case_token), token)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
         return StreamingResponse(
             _trace_stream(case, _after(last_event_id), settings.snapback_trace_pace_ms / 1000),
             media_type="text/event-stream",
