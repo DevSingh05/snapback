@@ -165,12 +165,19 @@ export function UploadPage({
 
   // Live mode tells the server what the renter decided, with the case token, before the page
   // moves on. Nothing moves on if the server refuses.
+  // A ref guards the first click at once; a second click in the same tick must not post again.
+  const deciding = useRef(false);
+  const [busy, setBusy] = useState(false);
   async function decide(decision: "send" | "cancel") {
-    if (state.step !== "approval") return;
+    if (state.step !== "approval" || deciding.current) return;
+    deciding.current = true;
+    setBusy(true);
     if (mode === "live") {
       try {
         await approveChallenge(state.caseId, decision);
       } catch (err) {
+        deciding.current = false;
+        setBusy(false);
         dispatch({
           type: "fail",
           message: err instanceof Error ? err.message : "Something went wrong. Try again.",
@@ -178,6 +185,8 @@ export function UploadPage({
         return;
       }
     }
+    deciding.current = false;
+    setBusy(false);
     dispatch({ type: decision === "send" ? "approve" : "skip" });
   }
 
@@ -457,12 +466,18 @@ export function UploadPage({
               </span>
             </div>
             <div className="upload-actions">
-              <button type="button" className="upload-submit" onClick={() => void decide("send")}>
+              <button
+                type="button"
+                className="upload-submit"
+                disabled={busy}
+                onClick={() => void decide("send")}
+              >
                 I approve it and I will send it
               </button>
               <button
                 type="button"
                 className="upload-secondary"
+                disabled={busy}
                 onClick={() => void decide("cancel")}
               >
                 Skip the live check

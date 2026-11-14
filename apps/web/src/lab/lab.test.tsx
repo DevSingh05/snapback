@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import sample from "../../../../fixtures/contracts/results_sample.csv?raw";
-import { LabPanel } from "./LabPanel";
+import { LabPanel, LabSection } from "./LabPanel";
 import {
   ResultsError,
   calibrationPoints,
@@ -169,5 +169,20 @@ a_after,calibration_bin:0.80-0.90,9,10,0.9,0.5958,0.9821,FIXTURE
   it("uses round axis ticks", () => {
     expect(niceTicks(0.375)).toEqual([0, 0.1, 0.2, 0.3, 0.4]);
     expect(niceTicks(1)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1]);
+  });
+});
+
+describe("LabSection against an API without results", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to the fixture sample with a FIXTURE chip on 404", async () => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    vi.stubGlobal("fetch", async () => new Response("nope", { status: 404 }));
+    render(<LabSection />);
+    expect(await screen.findByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
   });
 });

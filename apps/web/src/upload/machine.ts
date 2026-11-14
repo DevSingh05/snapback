@@ -52,7 +52,7 @@ export function reduce(state: UploadState, event: UploadEvent): UploadState {
         ? { step: "done", caseId: state.caseId, challengeSent: true, source: state.source }
         : state;
     case "fail":
-      return ["reading", "checking", "approval", "waiting"].includes(state.step)
+      return ["reading", "checking", "approval"].includes(state.step)
         ? { step: "error", message: event.message }
         : state;
     case "retry":

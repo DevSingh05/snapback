@@ -87,6 +87,9 @@ export const approveChallenge: ApproveChallenge = async (caseId, decision, text)
     body: JSON.stringify(text === undefined ? { decision } : { decision, text }),
     tokenFor: caseId,
   });
+  // 409: the case was already decided (a second click, or another tab). The answer stands, so
+  // this counts as success and the page goes on to the case.
+  if (res.status === 409) return;
   if (!res.ok) throw await failure(res);
 };
 

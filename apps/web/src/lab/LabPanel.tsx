@@ -282,11 +282,14 @@ export function LabSection() {
     const ctrl = new AbortController();
     const base = apiBase();
     const run = async () => {
-      if (!base) {
+      const sample = async () => {
         const mod = await import("../../../../fixtures/contracts/results_sample.csv?raw");
         return { csv: mod.default, source: "fixture" as const };
-      }
+      };
+      if (!base) return sample();
       const res = await apiFetch("/eval/results.csv", { signal: ctrl.signal });
+      // The API does not serve results yet: show the synthetic sample, labelled FIXTURE.
+      if (res.status === 404) return sample();
       if (!res.ok) throw new Error(String(res.status));
       return { csv: await res.text(), source: "live" as const };
     };

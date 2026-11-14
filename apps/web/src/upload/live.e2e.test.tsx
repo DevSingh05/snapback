@@ -103,7 +103,8 @@ describe("web against the API route shapes", () => {
     const navigate = vi.fn();
     render(<UploadPage mode="live" navigate={navigate} pollMs={5} />);
     // FIXTURE until /healthz says the API serves live data.
-    await waitFor(() => expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE"));
+    // The first chip is the card's; the Lab section below has its own (FIXTURE on a 404).
+    await waitFor(() => expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("LIVE"));
 
     await user.type(screen.getByLabelText(/listing link or text/i), "zillow.com/x/1");
     await user.click(screen.getByRole("button", { name: /check this listing/i }));
@@ -141,7 +142,8 @@ describe("web against the API route shapes", () => {
     expect(card.source).toBe("live");
     render(<CardPage caseId="7Q2M" variant="result" />);
     expect(await screen.findAllByTestId("source-chip")).not.toHaveLength(0);
-    await waitFor(() => expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE"));
+    // The first chip is the card's; the Lab section below has its own (FIXTURE on a 404).
+    await waitFor(() => expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("LIVE"));
   });
 
   it("with no challenge drafted it skips approval and goes to the card", async () => {
@@ -168,5 +170,44 @@ describe("web against the API route shapes", () => {
     await user.click(screen.getByRole("button", { name: /i approve it/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/401.*needs the case's token/);
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe("approval is sent once", () => {
+  it("two rapid clicks send exactly one approve request", async () => {
+    const calls = installServer({ challenge: "Send a photo, please." });
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    render(<UploadPage mode="live" navigate={navigate} pollMs={5} />);
+    await user.type(screen.getByLabelText(/listing link or text/i), "zillow.com/x/1");
+    await user.click(screen.getByRole("button", { name: /check this listing/i }));
+    const button = await screen.findByRole("button", { name: /i approve it/i });
+    button.click();
+    button.click();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("7Q2M"));
+    expect(calls.filter((c) => c.path.endsWith("/challenge/approve"))).toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("a 409 already-decided answer counts as success and goes on to the case", async () => {
+    installServer({ challenge: "Send a photo, please." });
+    const real = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) =>
+      url.endsWith("/challenge/approve")
+        ? new Response(JSON.stringify({ detail: "This case is not waiting for an approval." }), {
+            status: 409,
+          })
+        : real(url, init),
+    );
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    render(<UploadPage mode="live" navigate={navigate} pollMs={5} />);
+    await user.type(screen.getByLabelText(/listing link or text/i), "zillow.com/x/1");
+    await user.click(screen.getByRole("button", { name: /check this listing/i }));
+    await user.click(await screen.findByRole("button", { name: /i approve it/i }));
+    expect(
+      await screen.findByRole("heading", { name: /waiting for the poster/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
