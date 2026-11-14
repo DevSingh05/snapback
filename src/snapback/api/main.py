@@ -229,9 +229,10 @@ def create_app(
     ) -> None:
         """Refuse unless the request may read this case's trace and challenge.
 
-        A header may carry either secret, since whoever may write may read. The address may
-        carry only the read-only one: servers log addresses, so the write secret is refused
-        there.
+        A header may carry either secret, since whoever may write may read. `in_query` is
+        for the trace stream alone, the one route a browser has to open without headers
+        (EventSource): there the address may carry the read-only secret, and never the write
+        one. Every other route passes None and takes a header only.
         """
         if case.token is None:
             return
@@ -247,6 +248,17 @@ def create_app(
                 detail="Only this case's read token is accepted in the address.",
             )
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
+
+    def no_token_in_the_address(request: Request) -> None:
+        """Refuse a request whose address carries a token, valid or not (locked ruling, Sat
+        02:27). Addresses are what servers and proxies log; a secret belongs in a header."""
+        if "token" in request.query_params:
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "Send the case's read token in the Authorization header, not in the address."
+                ),
+            )
 
     def start_case(
         text: str, link: str, photos: list[UploadFile], property_id: str | None, owner: str
@@ -360,7 +372,14 @@ def create_app(
 
         if new_cookie:
             response.set_cookie(
-                CLIENT_COOKIE, new_cookie, max_age=30 * 24 * 3600, httponly=True, samesite="lax"
+                CLIENT_COOKIE,
+                new_cookie,
+                max_age=30 * 24 * 3600,
+                httponly=True,
+                samesite="lax",
+                # Over https the cookie is never sent in the clear. Local development has no
+                # TLS, so there it has to travel without the flag or it would not travel.
+                secure=settings.snapback_public_base_url.lower().startswith("https://"),
             )
         status = case.status(with_challenge=True)
         return CreateCaseResponse(
@@ -372,20 +391,22 @@ def create_app(
     @app.get("/cases/{case_id}")
     def get_case(
         case_id: str,
-        token: str | None = None,
+        request: Request,
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> CaseStatus:
         """Where the case stands. The drafted challenge is included only with the case's secret.
 
         Short ids can be guessed, so the id alone gives a summary and nothing that would help
-        someone answer the challenge.
+        someone answer the challenge. The secret travels in a header only: a token in the
+        address is refused with 401, even the right one.
         """
         case = find(case_id)
+        no_token_in_the_address(request)
         in_header = _bearer(authorization, x_case_token)
-        if in_header is None and token is None:
+        if in_header is None:
             return case.status(with_challenge=False)
-        check_read(case, in_header, token)
+        check_read(case, in_header, None)
         return case.status(with_challenge=True)
 
     @app.get("/cases/{case_id}/card")
@@ -534,13 +555,7 @@ def create_app(
         even beside a good header: addresses are what servers log. 404 for an unknown case.
         """
         case = find(case_id)
-        if "token" in request.query_params:
-            raise HTTPException(
-                status_code=401,
-                detail=(
-                    "Send the case's read token in the Authorization header, not in the address."
-                ),
-            )
+        no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token), None)
         return build_report(
             case.evidence,
@@ -562,9 +577,11 @@ def create_app(
 
         Needs a case secret, because the trace names the spot that was drawn. A browser's
         EventSource cannot set headers, so the read-only `read_token` may be sent as
-        `?token=`; the write token is refused there. Other clients can send either secret as
-        `Authorization: Bearer` or `X-Case-Token`. Send `Last-Event-ID` to resume after that
-        seq. The stream ends after the verdict event.
+        `?token=`; the write token is refused there. This is the only route that still takes
+        a token in the address, and only because the web's trace panel opens it that way: it
+        goes when the panel reads the stream with a header. Other clients can send either
+        secret as `Authorization: Bearer` or `X-Case-Token`. Send `Last-Event-ID` to resume
+        after that seq. The stream ends after the verdict event.
         """
         case = find(case_id)
         check_read(case, _bearer(authorization, x_case_token), token)
