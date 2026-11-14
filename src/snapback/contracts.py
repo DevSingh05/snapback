@@ -393,11 +393,13 @@ class CreateCaseRequest(BaseModel):
 
 
 class CreateCaseResponse(BaseModel):
-    """What `POST /cases` returns. `token` is the only time the case's secret is shown."""
+    """What `POST /cases` returns. This is the only time the case's secrets are shown."""
 
     case_id: str  # short public id, for display and for reading the case
     source: DataSource
-    token: str  # secret for this case; send it on every write (challenge approve)
+    token: str  # write secret for this case; send it on every write, in a header only
+    # Read-only secret: opens the trace and the challenge text, and may ride in `?token=`.
+    read_token: str | None = None
     status: CaseProgress
     state: VerdictState | None = None  # set once the case is done
     challenge_text: str | None = None  # the message the renter may forward; None if none drafted

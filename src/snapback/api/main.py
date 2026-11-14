@@ -10,9 +10,11 @@ Routes the web app and the iMessage sidecar call:
     GET  /healthz                         liveness and the data source
     POST /verdict                         decide() on evidence the caller already has
 
-Reading a case needs only its short id, which is accepted with or without the fixture prefix
-and in either case: `7Q2M`, `7q2m` and `fx-7Q2M` are the same case. Writing to a case needs the
-secret that `POST /cases` returned for it.
+A case's short id is accepted with or without the fixture prefix and in either case: `7Q2M`,
+`7q2m` and `fx-7Q2M` are the same case. Short ids can be guessed, so the id alone opens only
+the card and a summary. `POST /cases` returns two secrets for the case. `token` is needed for
+every write and is accepted in a header only. `read_token` opens the trace and the drafted
+challenge and is the only one accepted as `?token=`, because servers log addresses.
 """
 
 import asyncio
@@ -20,10 +22,12 @@ import secrets
 from collections.abc import AsyncIterator
 from typing import Annotated, Literal
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
+from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from starlette.datastructures import UploadFile
 
 from snapback.api.cases import (
     CaseStatus,
@@ -34,7 +38,7 @@ from snapback.api.cases import (
     SessionCase,
 )
 from snapback.api.limits import DailyLimit
-from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, read_images
+from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
@@ -96,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     per_client = DailyLimit(settings.snapback_daily_limit)
     per_address = DailyLimit(settings.snapback_daily_limit_per_address)
     max_photo_bytes = settings.snapback_max_photo_mb * MB
+    limit_reached = f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow."
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -130,15 +135,74 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Decide a verdict from evidence the caller already gathered. No model is involved."""
         return decide(evidence)
 
-    @app.post("/cases", status_code=201)
-    def create_case(
-        request: Request,
-        response: Response,
-        link: Annotated[str, Form()] = "",
-        text: Annotated[str, Form()] = "",
-        renter_id: Annotated[str, Form()] = "",
-        photos: Annotated[list[UploadFile] | None, File()] = None,
-    ) -> CreateCaseResponse:
+    def same(offered: str, secret: str | None) -> bool:
+        return secret is not None and secrets.compare_digest(offered.encode(), secret.encode())
+
+    def check_write(case: RecordedCase | SessionCase, in_header: str | None) -> None:
+        """Refuse unless the write secret came in a header. A recorded case has none to check."""
+        if case.token is None:
+            return
+        if in_header is None:
+            raise HTTPException(
+                status_code=401, detail="This needs the case's token in the Authorization header."
+            )
+        if not same(in_header, case.token):
+            raise HTTPException(status_code=403, detail="That token cannot write to this case.")
+
+    def check_read(
+        case: RecordedCase | SessionCase, in_header: str | None, in_query: str | None
+    ) -> None:
+        """Refuse unless the request may read this case's trace and challenge.
+
+        A header may carry either secret, since whoever may write may read. The address may
+        carry only the read-only one: servers log addresses, so the write secret is refused
+        there.
+        """
+        if case.token is None:
+            return
+        if in_header is not None:
+            if same(in_header, case.token) or same(in_header, case.read_token):
+                return
+            raise HTTPException(status_code=403, detail="That token is not for this case.")
+        if in_query is not None:
+            if same(in_query, case.read_token):
+                return
+            raise HTTPException(
+                status_code=403,
+                detail="Only this case's read token is accepted in the address.",
+            )
+        raise HTTPException(status_code=401, detail="This needs the case's read token.")
+
+    def start_case(text: str, link: str, photos: list[UploadFile]) -> SessionCase:
+        images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
+        listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
+        return store.create(listing_text, len(images))
+
+    @app.post(
+        "/cases",
+        status_code=201,
+        openapi_extra={
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "link": {"type": "string"},
+                                "text": {"type": "string"},
+                                "renter_id": {"type": "string"},
+                                "photos": {
+                                    "type": "array",
+                                    "items": {"type": "string", "format": "binary"},
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    )
+    async def create_case(request: Request, response: Response) -> CreateCaseResponse:
         """Start a check. Runs until it needs the renter's approval, then returns.
 
         The form is `CreateCaseRequest` in contracts.py plus `photos` as files. The link is
@@ -155,34 +219,64 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ),
             ) from None
 
-        # Who is asking. The sidecar names its renter; a browser is known by a cookie we set.
-        address = request.client.host if request.client else "unknown"
-        cookie = request.cookies.get(CLIENT_COOKIE)
-        new_cookie = None if renter_id or cookie else secrets.token_urlsafe(16)
-        client = f"renter:{renter_id}" if renter_id else f"browser:{cookie or new_cookie}"
-        if not per_client.has_room(client) or not per_address.has_room(address):
-            raise HTTPException(
-                status_code=429,
-                detail=f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow.",
+        form = await parse_form(request, settings.snapback_max_photos, max_photo_bytes)
+        try:
+            text, link, renter_id = (
+                str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
+            photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
 
-        images = read_images(photos or [], settings.snapback_max_photos, max_photo_bytes)
-        listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
-        case = store.create(listing_text, len(images))
+            # Who is asking. The sidecar names its renter; a browser is known by a cookie.
+            address = request.client.host if request.client else "unknown"
+            cookie = request.cookies.get(CLIENT_COOKIE)
+            new_cookie = None if renter_id or cookie else secrets.token_urlsafe(16)
+            client = f"renter:{renter_id}" if renter_id else f"browser:{cookie or new_cookie}"
 
-        # Counted only now, so a check that could not start costs nothing.
-        per_client.count(client)
-        per_address.count(address)
+            # A place is taken before the check starts, in one step, so two requests arriving
+            # together cannot both take the last one. It is given back if nothing starts.
+            if not per_client.reserve(client):
+                raise HTTPException(status_code=429, detail=limit_reached)
+            if not per_address.reserve(address):
+                per_client.release(client)
+                raise HTTPException(status_code=429, detail=limit_reached)
+            try:
+                case = await run_in_threadpool(start_case, text, link, photos)
+            except BaseException:
+                per_client.release(client)
+                per_address.release(address)
+                raise
+        finally:
+            await form.close()
+
         if new_cookie:
             response.set_cookie(
                 CLIENT_COOKIE, new_cookie, max_age=30 * 24 * 3600, httponly=True, samesite="lax"
             )
-        status = case.status()
-        return CreateCaseResponse(token=case.token, **status.model_dump(exclude={"challenge"}))
+        status = case.status(with_challenge=True)
+        return CreateCaseResponse(
+            token=case.token,
+            read_token=case.read_token,
+            **status.model_dump(exclude={"challenge"}),
+        )
 
     @app.get("/cases/{case_id}")
-    def get_case(case_id: str) -> CaseStatus:
-        return find(case_id).status()
+    def get_case(
+        case_id: str,
+        token: str | None = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseStatus:
+        """Where the case stands. The drafted challenge is included only with the case's secret.
+
+        Short ids can be guessed, so the id alone gives a summary and nothing that would help
+        someone answer the challenge.
+        """
+        case = find(case_id)
+        in_header = _bearer(authorization, x_case_token)
+        if in_header is None and token is None:
+            return case.status(with_challenge=False)
+        check_read(case, in_header, token)
+        return case.status(with_challenge=True)
 
     @app.get("/cases/{case_id}/card")
     def get_card(case_id: str) -> Card:
@@ -191,17 +285,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(
-        case_id: str, last_event_id: Annotated[str | None, Header()] = None
+        case_id: str,
+        token: str | None = None,
+        last_event_id: Annotated[str | None, Header()] = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
     ) -> StreamingResponse:
         """Server-sent events: `event: trace`, `id` is the seq, `data` is a TraceEvent.
 
-        Send `Last-Event-ID` to resume after that seq; a browser's EventSource does it by
-        itself. The stream ends after the verdict event.
+        Needs a case secret, because the trace names the spot that was drawn. A browser's
+        EventSource cannot set headers, so the read-only `read_token` may be sent as
+        `?token=`; the write token is refused there. Other clients can send either secret as
+        `Authorization: Bearer` or `X-Case-Token`. Send `Last-Event-ID` to resume after that
+        seq. The stream ends after the verdict event.
         """
+        case = find(case_id)
+        check_read(case, _bearer(authorization, x_case_token), token)
         return StreamingResponse(
-            _trace_stream(
-                find(case_id), _after(last_event_id), settings.snapback_trace_pace_ms / 1000
-            ),
+            _trace_stream(case, _after(last_event_id), settings.snapback_trace_pace_ms / 1000),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -219,19 +320,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         short id is for reading and display; on its own it lets nobody act for the renter.
         """
         case = find(case_id)
-        if case.token is not None:
-            offered = _bearer(authorization, x_case_token)
-            if offered is None:
-                raise HTTPException(status_code=401, detail="This needs the case's token.")
-            if not secrets.compare_digest(offered.encode(), case.token.encode()):
-                raise HTTPException(status_code=403, detail="That token is not for this case.")
+        check_write(case, _bearer(authorization, x_case_token))
         try:
             case.approve(approval.decision, approval.text)
         except NothingWaiting:
             raise HTTPException(
                 status_code=409, detail="This case is not waiting for an approval."
             ) from None
-        return case.status()
+        return case.status(with_challenge=True)
 
     return app
 

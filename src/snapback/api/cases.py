@@ -88,6 +88,7 @@ def _now() -> datetime:
 class RecordedCase:
     done = True
     token = None  # a recorded case can never be written to, so it has no secret
+    read_token = None
 
     def __init__(self, case_id: str, card: Card, events: list[TraceEvent], photos: int) -> None:
         self.case_id = case_id
@@ -101,7 +102,7 @@ class RecordedCase:
     def card(self, verify_base_url: str) -> Card:
         return self._card
 
-    def status(self) -> CaseStatus:
+    def status(self, with_challenge: bool = False) -> CaseStatus:
         return CaseStatus(
             case_id=self.case_id,
             source=self._card.source,
@@ -124,6 +125,9 @@ class SessionCase:
     ) -> None:
         self.case_id = case_id  # short, shown to people, enough to read the case
         self.token = secrets.token_urlsafe(24)  # 192 bits, needed for every write
+        # A second secret that can only read. It is the one a browser may put in an address,
+        # where servers log it, so it must never be able to approve anything.
+        self.read_token = secrets.token_urlsafe(24)
         self.session = session
         self._photos = photos
         self._runner = runner
@@ -152,7 +156,8 @@ class SessionCase:
             lang=self.session.lang,
         )
 
-    def status(self) -> CaseStatus:
+    def status(self, with_challenge: bool = False) -> CaseStatus:
+        """Where the case stands. The drafted challenge is left out unless asked for."""
         if self.session.done:
             status = CaseProgress.DONE
         elif self.session.waiting_for_approval:
@@ -160,7 +165,7 @@ class SessionCase:
         else:
             status = CaseProgress.RUNNING
         draft = self.session.pending_challenge
-        if status is not CaseProgress.WAITING_FOR_APPROVAL:
+        if status is not CaseProgress.WAITING_FOR_APPROVAL or not with_challenge:
             draft = None
         return CaseStatus(
             case_id=self.case_id,
