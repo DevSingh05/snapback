@@ -95,6 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="kit",
         help="kit: group twins by CoStar property (as the product does); twin: one per twin",
     )
+    parser.add_argument("--kit", type=Path, help="CoStar kit folder (default: the adapter's)")
     args = parser.parse_args(argv)
 
     settings = MatterportSettings()
@@ -120,9 +121,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             from snapback.adapters.costar_jsonl import load_records
 
-            records = list(load_records(settings.snapback_data_source).values())
+            records = list(load_records(settings.snapback_data_source, args.kit).values())
         except FileNotFoundError:
             print("catalog: no CoStar kit here, one property per twin")
+            args.catalog = "twin"
     catalog = gate_catalog(model_ids, records, {m: adapter.room_labels(m) for m in model_ids})
     claimed_property = catalog.property_of(claimed)
     if args.matcher == "disk":
