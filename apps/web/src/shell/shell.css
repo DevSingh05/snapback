@@ -15,7 +15,7 @@
   align-items: stretch;
   gap: var(--sp-4);
   padding-inline: var(--page-pad);
-  background: var(--layer-1);
+  background: var(--bar-bg);
   border-bottom: 1px solid var(--line);
 }
 .app-mark {
@@ -432,4 +432,76 @@
   width: 12px;
   height: 12px;
   background: var(--act);
+}
+
+/* The tabs and tools sit in the bar on wide screens. On phones the bar is one row (the mark
+   and Menu) and they open as a panel under it. */
+.app-menu {
+  display: contents;
+}
+.app-menu-btn {
+  display: none;
+}
+@media (max-width: 760px) {
+  .app {
+    --bar-h: 56px;
+  }
+  .app-bar {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .app-mark {
+    margin-right: auto;
+  }
+  .app-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    min-height: 44px;
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--layer-2);
+    color: var(--ink);
+    font-size: var(--fs-sm);
+  }
+  .app-menu {
+    display: none;
+  }
+  .app-menu[data-open] {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4) var(--sp-4);
+    background: var(--bar-bg);
+    box-shadow: var(--shadow-lift);
+  }
+  .app-menu[data-open] .app-tabs {
+    order: 0;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border-top: 0;
+    overflow: visible;
+  }
+  .app-menu[data-open] .app-tab {
+    min-height: 48px;
+    padding-inline: 0;
+    font-size: var(--fs-lg);
+  }
+  .app-menu[data-open] .app-tab[aria-current="page"]::after {
+    left: -16px;
+    right: auto;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    height: auto;
+  }
+  .app-menu[data-open] .app-tools {
+    align-self: flex-start;
+    flex-wrap: wrap;
+  }
 }

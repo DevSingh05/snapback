@@ -41,6 +41,18 @@ describe("Home is one box", () => {
     expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("FIXTURE");
   });
 
+  it("the hero photo has alt text, and every sample photo is stamped as one", () => {
+    render(<OneBox mode="fixture" />);
+    const hero = screen.getByTestId("hero-photo");
+    expect(hero).toHaveAttribute("alt", expect.stringMatching(/apartment building/i));
+    const samples = screen.getAllByTestId("sample-photo");
+    expect(samples).toHaveLength(3);
+    for (const s of samples) {
+      expect(s).toHaveTextContent("Sample photo");
+      expect(within(s).getByRole("img")).toHaveAttribute("alt", expect.stringMatching(/\w/));
+    }
+  });
+
   it("an empty send says what to do and starts nothing", async () => {
     const user = userEvent.setup();
     const createCase = made();
@@ -77,10 +89,11 @@ describe("routing each message, shown honestly", () => {
     expect(verdict).toHaveTextContent("Hold off for now");
     expect(verdict).toHaveTextContent("Code set this verdict");
     expect(within(verdict).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
-    expect(within(verdict).getByRole("link", { name: "Walk it first" })).toHaveAttribute(
-      "href",
-      "/case/7Q2M/twin",
-    );
+    // Walk it first: without a scan view from the API, a licensed sample photo, stamped.
+    const walk = within(verdict).getByTestId("ob-walk");
+    expect(walk).toHaveAttribute("href", "/case/7Q2M/twin");
+    expect(walk).toHaveTextContent("Walk it first");
+    expect(within(walk).getByTestId("sample-photo")).toHaveTextContent("Sample photo");
     expect(within(verdict).getByRole("link", { name: "Open the full result" })).toHaveAttribute(
       "href",
       "/case/7Q2M",

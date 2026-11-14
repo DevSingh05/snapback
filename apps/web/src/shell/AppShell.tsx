@@ -46,6 +46,8 @@ export function AppShell({ section, context, children }: Props) {
   useEffect(() => applyTheme(theme), [theme]);
   const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs());
   const [open, setOpen] = useState(false);
+  // Phones: one row (mark and Menu); the tabs and tools open below it.
+  const [menu, setMenu] = useState(false);
 
   const pick = (t: ThemeChoice) => {
     setPicked(t);
@@ -63,52 +65,67 @@ export function AppShell({ section, context, children }: Props) {
         <a className="app-mark" href="/home" aria-label="SNAPBACK home">
           <span className="wordmark app-wordmark">SNAPBACK</span>
         </a>
-        <nav className="app-tabs" aria-label="Main">
-          {shown.map((t) => (
-            <a
-              key={t.id}
-              className="app-tab"
-              href={t.href}
-              aria-current={section === t.id && !context ? "page" : undefined}
-              data-in={section === t.id ? "true" : undefined}
-            >
-              {t.label}
-            </a>
-          ))}
-          {context && (
-            <a className="app-tab app-tab-context" href={context.href} aria-current="page">
-              {context.label}
-            </a>
-          )}
-        </nav>
-        <div className="app-tools">
-          {SITE_URL && (
-            <a className="app-site" href={withTheme(SITE_URL, theme)}>
-              About SNAPBACK
-            </a>
-          )}
-          <div className="app-theme" role="group" aria-label="Light, dark or your device's setting">
-            {(["light", "dark", "system"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="app-theme-opt"
-                aria-pressed={theme === t}
-                onClick={() => pick(t)}
+        <button
+          type="button"
+          className="app-menu-btn"
+          aria-expanded={menu}
+          aria-controls="app-menu"
+          onClick={() => setMenu((m) => !m)}
+        >
+          {menu ? "Close" : "Menu"}
+        </button>
+        <div id="app-menu" className="app-menu" data-open={menu || undefined}>
+          <nav className="app-tabs" aria-label="Main">
+            {shown.map((t) => (
+              <a
+                key={t.id}
+                className="app-tab"
+                href={t.href}
+                aria-current={section === t.id && !context ? "page" : undefined}
+                data-in={section === t.id ? "true" : undefined}
               >
-                {t === "light" ? "Light" : t === "dark" ? "Dark" : "Auto"}
-              </button>
+                {t.label}
+              </a>
             ))}
+            {context && (
+              <a className="app-tab app-tab-context" href={context.href} aria-current="page">
+                {context.label}
+              </a>
+            )}
+          </nav>
+          <div className="app-tools">
+            {SITE_URL && (
+              <a className="app-site" href={withTheme(SITE_URL, theme)}>
+                About SNAPBACK
+              </a>
+            )}
+            <div
+              className="app-theme"
+              role="group"
+              aria-label="Light, dark or your device's setting"
+            >
+              {(["light", "dark", "system"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="app-theme-opt"
+                  aria-pressed={theme === t}
+                  onClick={() => pick(t)}
+                >
+                  {t === "light" ? "Light" : t === "dark" ? "Dark" : "Auto"}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="app-custom-open"
+              aria-expanded={open}
+              aria-controls="app-custom"
+              onClick={() => setOpen((o) => !o)}
+            >
+              Customize
+            </button>
           </div>
-          <button
-            type="button"
-            className="app-custom-open"
-            aria-expanded={open}
-            aria-controls="app-custom"
-            onClick={() => setOpen((o) => !o)}
-          >
-            Customize
-          </button>
         </div>
         {open && (
           <section

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
-import { apiBase, fetchCard } from "../api";
+import { apiBase, apiFetchRead, fetchCard } from "../api";
 import { STATE_WORD, toneWord } from "../cardStrings";
-import { KitArt } from "../components/KitArt";
+import heroPhoto from "../assets/hero-dusk-balconies.webp";
+import sampleBuilding from "../assets/sample-building.webp";
+import sampleLivingRoom from "../assets/sample-living-room.webp";
+import sampleLounge from "../assets/sample-lounge.webp";
 import { SourceChip } from "../components/SourceChip";
 import type {
   Card,
@@ -460,23 +463,37 @@ export function OneBox(props: Props) {
 
       {empty ? (
         <section className="ob-start" aria-labelledby="ob-title">
-          <h1 id="ob-title" className="ob-title">
-            Found a place online? Ask before you pay.
-          </h1>
-          <p className="ob-lead">
-            Paste the ad or its link, add a screenshot, or just say what you&apos;re looking for.
-          </p>
-          {composer}
-          {(error || fileErrors.length > 0) && <Problems error={error} fileErrors={fileErrors} />}
-          <ul className="ob-examples" aria-label="Try one">
-            {EXAMPLES.map((ex) => (
-              <li key={ex}>
-                <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
-                  {ex}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="ob-hero">
+            <img
+              className="ob-hero-img"
+              src={heroPhoto}
+              alt="An apartment building at dusk, its balconies lit against a pink sky"
+              data-testid="hero-photo"
+            />
+            <div className="ob-hero-in">
+              <h1 id="ob-title" className="ob-title">
+                Found a place online? Ask before you pay.
+              </h1>
+              <p className="ob-lead">
+                Paste the ad or its link, add a screenshot, or just say what you&apos;re looking
+                for.
+              </p>
+              {composer}
+              {(error || fileErrors.length > 0) && (
+                <Problems error={error} fileErrors={fileErrors} />
+              )}
+              <ul className="ob-examples" aria-label="Try one">
+                {EXAMPLES.map((ex) => (
+                  <li key={ex}>
+                    <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
+                      {ex}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="ob-credit">Photo: Tobias Wilden, Unsplash</p>
+            </div>
+          </div>
           <WhatYouCanDo onAsk={(w) => submit(w, [])} />
           <p className="ob-fine ob-honest">
             <SourceChip source={shownMode} />
@@ -564,22 +581,12 @@ function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
       <ul className="ob-can-list">
         <li>
           <button type="button" className="ob-can-item" onClick={() => onAsk(SAMPLE_AD)}>
-            <span className="ob-can-shot ob-shot-verdict" aria-hidden="true">
-              <span className="ob-shot-kicker">Case 7Q2M</span>
-              <span className="ob-shot-word">Hold off for now</span>
-              <span className="ob-shot-line">
-                <span>Payment ask</span>
-                <span className="ob-tone" data-tone="warn">
-                  Warning
-                </span>
+            <SamplePhoto src={sampleBuilding} alt="An apartment building, from below">
+              <span className="ob-over ob-over-verdict">
+                <span className="ob-over-kicker">Case 7Q2M</span>
+                <span className="ob-over-word">Hold off for now</span>
               </span>
-              <span className="ob-shot-line">
-                <span>Real photos</span>
-                <span className="ob-tone" data-tone="ok">
-                  Matches
-                </span>
-              </span>
-            </span>
+            </SamplePhoto>
             <span className="ob-can-name">Check an ad</span>
             <span className="ob-can-line">Try it on our sample ad</span>
           </button>
@@ -590,14 +597,11 @@ function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
             className="ob-can-item"
             onClick={() => onAsk("Find me a 1 bed near downtown")}
           >
-            <span className="ob-can-shot ob-shot-ask" aria-hidden="true">
-              <span className="ob-shot-q">What&apos;s your max rent a month?</span>
-              <span className="ob-shot-chips">
-                <span>$1,200</span>
-                <span>$1,500</span>
-                <span>$2,000</span>
+            <SamplePhoto src={sampleLounge} alt="A bright living room with a pale green sofa">
+              <span className="ob-over">
+                <span className="ob-over-word">1 bed, under $1,500</span>
               </span>
-            </span>
+            </SamplePhoto>
             <span className="ob-can-name">Find a place</span>
             <span className="ob-can-line">Say what you want; it asks the rest</span>
           </button>
@@ -608,9 +612,12 @@ function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
             className="ob-can-item"
             onClick={() => onAsk("Walk me through a place")}
           >
-            <span className="ob-can-shot ob-shot-walk" aria-hidden="true">
-              <KitArt kind="scan" className="ob-shot-art" detail="low" />
-            </span>
+            <SamplePhoto src={sampleLivingRoom} alt="A living room with a grey sofa and plants">
+              <span className="ob-over">
+                <span className="ob-play" aria-hidden="true" />
+                <span className="ob-over-word">Walk it first</span>
+              </span>
+            </SamplePhoto>
             <span className="ob-can-name">Walk it first</span>
             <span className="ob-can-line">See it room by room before you visit</span>
           </button>
@@ -643,6 +650,87 @@ function Learned({ kept, noticed }: { kept: string[]; noticed: string[] }) {
       )}{" "}
       <a href="/finder">See it in the Finder</a>
     </p>
+  );
+}
+
+/** A licensed stock photo, always stamped as a sample so nobody takes it for the place. */
+export function SamplePhoto({
+  src,
+  alt,
+  children,
+}: {
+  src: string;
+  alt: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <span className="ob-photo" data-testid="sample-photo">
+      <img src={src} alt={alt} loading="lazy" />
+      {children}
+      <span className="ob-photo-stamp">Sample photo</span>
+    </span>
+  );
+}
+
+/**
+ * The scan view this case's photo matched, read at run time from the API with the case's read
+ * token. Never bundled: kit pictures stay on the server. Null until it loads, or when there is
+ * none (fixture mode, no token, no placed photo).
+ */
+function useScanPhoto(caseId: string): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!apiBase()) return;
+    const ctrl = new AbortController();
+    let made: string | null = null;
+    (async () => {
+      try {
+        const ev = await apiFetchRead(`/cases/${encodeURIComponent(caseId)}/evidence`, caseId, {
+          signal: ctrl.signal,
+        });
+        if (!ev?.ok) return;
+        const body = (await ev.json()) as { photos?: { alias: string; status: string }[] };
+        const photo = body.photos?.find((p) => p.status !== "not_placed") ?? null;
+        if (!photo) return;
+        const img = await apiFetchRead(
+          `/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(photo.alias)}/scan.jpg`,
+          caseId,
+          { signal: ctrl.signal },
+        );
+        if (!img?.ok) return;
+        made = URL.createObjectURL(await img.blob());
+        if (!ctrl.signal.aborted) setUrl(made);
+      } catch {
+        // No picture: the sample photo stays, stamped as one.
+      }
+    })();
+    return () => {
+      ctrl.abort();
+      if (made) URL.revokeObjectURL?.(made);
+    };
+  }, [caseId]);
+  return url;
+}
+
+/** The "Walk it first" card under a verdict: the real scan view when the API has one. */
+function WalkCard({ caseId }: { caseId: string }) {
+  const scan = useScanPhoto(caseId);
+  const id = encodeURIComponent(caseId);
+  return (
+    <a className="ob-walk" href={`/case/${id}/twin`} data-testid="ob-walk">
+      {scan ? (
+        <span className="ob-photo">
+          <img src={scan} alt="The scan view this ad's photo matched" />
+          <span className="ob-photo-stamp">From the 3D scan</span>
+        </span>
+      ) : (
+        <SamplePhoto src={sampleLivingRoom} alt="A living room with a grey sofa and plants" />
+      )}
+      <span className="ob-walk-text">
+        <span className="ob-walk-name">Walk it first</span>
+        <span className="ob-can-line">See the place room by room before you go or pay.</span>
+      </span>
+    </a>
   );
 }
 
@@ -1323,13 +1411,11 @@ export function VerdictCard({
         <a className="ob-primary" href={`/case/${id}`}>
           Open the full result
         </a>
-        <a className="ob-secondary" href={`/case/${id}/twin`} data-testid="ob-walk">
-          Walk it first
-        </a>
         <a className="ob-quiet" href={`/case/${id}/prep`}>
           Get ready to visit
         </a>
       </div>
+      <WalkCard caseId={caseId} />
       {onFollow && (
         <ul className="ob-replies ob-follow" aria-label="Next">
           {["Find me safer places like this", "Show me on the map", "Replay a real case"].map(
