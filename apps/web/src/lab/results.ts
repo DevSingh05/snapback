@@ -80,8 +80,11 @@ export const CURVE_ORDER = [
   "rules_plus_model_v0",
   "rules_plus_model_v1",
   "rules_plus_model_v2",
-  "rules_plus_model_v2_memory",
 ] as const;
+
+// Any memory condition (rules_plus_model_vN_memory) is accepted and placed after the others.
+const MEMORY_CONDITION = /^rules_plus_model_v(\d+)_memory$/;
+const memoryVersion = (c: string): number => Number(MEMORY_CONDITION.exec(c)?.[1] ?? -1);
 
 export const CONDITION_LABEL: Record<string, string> = {
   rules_only: "Rules only",
@@ -91,11 +94,20 @@ export const CONDITION_LABEL: Record<string, string> = {
   rules_plus_model_v2_memory: "Rules + v2 + memory",
 };
 
+export function conditionLabel(c: string): string {
+  const v = MEMORY_CONDITION.exec(c)?.[1];
+  return CONDITION_LABEL[c] ?? (v ? `Rules + v${v} + memory` : c);
+}
+
 // Only conditions present in the file get a bar.
 export function curveBars(rows: ResultRow[]): ResultRow[] {
-  return CURVE_ORDER.flatMap((c) =>
+  const fixed = CURVE_ORDER.flatMap((c) =>
     rows.filter((r) => r.condition === c && r.metric === CURVE_METRIC),
   );
+  const memory = rows
+    .filter((r) => r.metric === CURVE_METRIC && MEMORY_CONDITION.test(r.condition))
+    .sort((a, b) => memoryVersion(a.condition) - memoryVersion(b.condition));
+  return [...fixed, ...memory];
 }
 
 export interface CalibrationPoint extends ResultRow {

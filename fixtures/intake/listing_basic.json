@@ -1,0 +1,11 @@
+{
+  "id": "fx-listing-basic",
+  "screenshot": "listing_basic.png",
+  "expect": {
+    "listed_rent": 1350,
+    "company_claim": "Fixture Living LLC",
+    "phones": 1,
+    "emails": 1,
+    "red_flag_rules": []
+  }
+}
