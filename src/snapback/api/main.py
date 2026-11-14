@@ -128,14 +128,31 @@ class Answer(BaseModel):
     text: str | None = Field(default=None, max_length=500)
 
 
-def _confirm_page(status: int, title: str, message: str) -> HTMLResponse:
+def _outcome_page(outcome: Outcome) -> HTMLResponse:
+    if outcome is Outcome.USED:
+        return _confirm_page(410, "Already used.", "This link was already used. It works once.")
+    if outcome is Outcome.EXPIRED:
+        return _confirm_page(
+            410, "This link expired.", "Links last 30 minutes. Ask the renter for a new one."
+        )
+    return _confirm_page(404, "Link not found.", "This link is not one we issued.")
+
+
+def _confirm_page(status: int, title: str, message: str, action: str | None = None) -> HTMLResponse:
     page = (
         '<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(title)}</title>"
         '<body style="font:16px system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem">'
         f"<h1>{escape(title)}</h1><p>{escape(message)}</p>"
-        "<p><small>SNAPBACK. A confirmation is information for the renter, not a guarantee."
+        + (
+            f'<form method="post" action="{escape(action, quote=True)}">'
+            '<button type="submit" style="font:inherit;padding:.6rem 1.2rem">Confirm</button>'
+            "</form>"
+            if action
+            else ""
+        )
+        + "<p><small>SNAPBACK. A confirmation is information for the renter, not a guarantee."
         "</small></p></body></html>"
     )
     return HTMLResponse(page, status_code=status, headers={"Cache-Control": "no-store"})
@@ -725,7 +742,23 @@ def create_app(
 
     @app.get("/confirm/{token}", response_class=HTMLResponse)
     def get_confirm(token: str) -> HTMLResponse:
-        """The page the one-time link opens. The first valid use marks the case confirmed."""
+        """The page the one-time link opens. It changes nothing (a mail scanner may open
+        it): it shows a Confirm button that POSTs to the same address."""
+        seen = office.peek(token)
+        if seen.outcome is Outcome.CONFIRMED:
+            return _confirm_page(
+                200,
+                "Confirm this listing?",
+                f"Someone asked SNAPBACK to check a rental listing for the property whose "
+                f"website on record is {seen.domain}. Press Confirm if you work at that "
+                "office and this listing is yours.",
+                action=f"/confirm/{token}",
+            )
+        return _outcome_page(seen.outcome)
+
+    @app.post("/confirm/{token}", response_class=HTMLResponse)
+    def post_confirm(token: str) -> HTMLResponse:
+        """The Confirm button. The first valid use marks the case confirmed; it works once."""
         redeemed = office.redeem(token)
         if redeemed.outcome is Outcome.CONFIRMED:
             found = store.get(redeemed.case_id or "")
@@ -738,13 +771,7 @@ def create_app(
                 f"Thank you. This listing is now confirmed through {redeemed.domain}, the "
                 "website on record for this office. You can close this page.",
             )
-        if redeemed.outcome is Outcome.USED:
-            return _confirm_page(410, "Already used.", "This link was already used. It works once.")
-        if redeemed.outcome is Outcome.EXPIRED:
-            return _confirm_page(
-                410, "This link expired.", "Links last 30 minutes. Ask the renter for a new one."
-            )
-        return _confirm_page(404, "Link not found.", "This link is not one we issued.")
+        return _outcome_page(redeemed.outcome)
 
     @app.get("/cases/{case_id}/alternatives")
     def get_alternatives(

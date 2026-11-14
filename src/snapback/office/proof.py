@@ -98,6 +98,18 @@ class OfficeProofs:
             number = self._count
         return self._write(case_id, number, address, domain, token)
 
+    def peek(self, token: str) -> Redeemed:
+        """What redeeming this token would do now, without using it (for the GET page)."""
+        with self._lock:
+            entry = self._entries.get(_hash(token))
+            if entry is None:
+                return Redeemed(Outcome.UNKNOWN)
+            if entry.used:
+                return Redeemed(Outcome.USED, entry.case_id, entry.domain)
+            if self._clock() >= entry.expires_at:
+                return Redeemed(Outcome.EXPIRED, entry.case_id, entry.domain)
+            return Redeemed(Outcome.CONFIRMED, entry.case_id, entry.domain)
+
     def redeem(self, token: str) -> Redeemed:
         """Use a token once. The first valid use confirms; every later use says it was used."""
         digest = _hash(token)

@@ -230,14 +230,14 @@ def test_the_full_flow_writes_the_outbox_then_the_link_confirms_once(client, tmp
     before = client.get(f"/cases/{case['case_id']}/office", headers=read).json()
     assert before["confirmed"] is False
 
-    ok = client.get(f"/confirm/{token}")
+    ok = client.post(f"/confirm/{token}")
     assert ok.status_code == 200 and DOMAIN in ok.text
     after = client.get(f"/cases/{case['case_id']}/office", headers=read).json()
     assert after["confirmed"] is True and after["confirmed_domain"] == DOMAIN
 
-    again = client.get(f"/confirm/{token}")
+    again = client.post(f"/confirm/{token}")
     assert again.status_code == 410 and "already" in again.text.lower()
-    nope = client.get("/confirm/not-a-token")
+    nope = client.post("/confirm/not-a-token")
     assert nope.status_code == 404
 
 
@@ -254,7 +254,7 @@ def test_an_expired_link_says_so(tmp_path):
     )
     token = token_in(outbox_files(tmp_path)[0])
     clock.now += timedelta(minutes=31).total_seconds()
-    gone = client.get(f"/confirm/{token}")
+    gone = client.post(f"/confirm/{token}")
     assert gone.status_code == 410 and "expired" in gone.text.lower()
     read = {"Authorization": f"Bearer {case['read_token']}"}
     assert client.get(f"/cases/{case['case_id']}/office", headers=read).json()["confirmed"] is False
@@ -277,7 +277,7 @@ def test_confirming_adds_the_card_line_and_leaves_the_verdict_alone(client, tmp_
     client.post(
         f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
     )
-    client.get(f"/confirm/{token_in(outbox_files(tmp_path)[0])}")
+    client.post(f"/confirm/{token_in(outbox_files(tmp_path)[0])}")
     card_after = client.get(f"/cases/{cid}/card").json()
     texts = [line["text"] for row in card_after["rows"] for line in row["lines"]]
     assert f"Confirmed through {DOMAIN}, the website CoStar has on record for this office." in texts
@@ -319,7 +319,28 @@ def test_the_case_status_and_the_card_agree_after_the_confirmation(client, tmp_p
     client.post(
         f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
     )
-    client.get(f"/confirm/{token_in(outbox_files(tmp_path)[0])}")
+    client.post(f"/confirm/{token_in(outbox_files(tmp_path)[0])}")
     status = client.get(f"/cases/{cid}", headers=read).json()
     card = client.get(f"/cases/{cid}/card").json()
     assert status["state"] in (None, card["state"])
+
+
+def test_a_get_changes_nothing_and_only_the_post_burns_the_token(client, tmp_path):
+    case = new_case(client)
+    cid = case["case_id"]
+    read = {"Authorization": f"Bearer {case['read_token']}"}
+    client.post(
+        f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
+    )
+    token = token_in(outbox_files(tmp_path)[0])
+    for _ in range(3):  # a mail scanner opening the link, again and again
+        page = client.get(f"/confirm/{token}")
+        assert page.status_code == 200 and "<form" in page.text and 'method="post"' in page.text
+        assert f'action="/confirm/{token}"' in page.text and DOMAIN in page.text
+    assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is False
+    done = client.post(f"/confirm/{token}")
+    assert done.status_code == 200 and "Confirmed" in done.text
+    assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is True
+    assert client.post(f"/confirm/{token}").status_code == 410
+    assert client.get(f"/confirm/{token}").status_code == 410  # used: no button any more
+    assert "<form" not in client.get(f"/confirm/{token}").text
