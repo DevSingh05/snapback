@@ -8,6 +8,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card            the Card (?lang=en|es)
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
+    GET  /cases/{case_id}/notes           the agent's working notes (read-only)
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
@@ -39,7 +40,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
-from snapback.adapters.vexcel import aerial_proof, aerial_side
+from snapback.adapters.vexcel import aerial_proof, aerial_side, known_capture_date
+from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
@@ -80,6 +82,8 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.events import EventBus
+from snapback.events.bus import seq_of
 from snapback.office.context import listing_context
 from snapback.office.domain import accepts_address, official_domain
 from snapback.office.models import (
@@ -93,15 +97,24 @@ from snapback.office.models import (
     OfficeTokenBody,
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
+from snapback.pack import TourPrepPack, build_tour_prep
 from snapback.preferences import merge as merge_preferences
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
-from snapback.search import AmbiguousPlace, NoOfficeOnRecord, draft_tour_request, place_for
+from snapback.search import (
+    AmbiguousPlace,
+    NoOfficeOnRecord,
+    draft_tour_request,
+    place_and_raw_for,
+    place_for,
+)
 from snapback.settings import Settings, get_settings
 from snapback.tour import (
     TourPlan,
     WalkResponse,
+    ad_beds_of,
+    ad_plan_word,
     attach_claims,
     build_tour,
     cached_sweeps,
@@ -111,6 +124,8 @@ from snapback.tour import (
     map_elsewhere,
     map_locate,
     must_have_kinds_of,
+    office_on_record,
+    scan_model_of,
 )
 from snapback.verdict import decide
 
@@ -174,6 +189,27 @@ def _bearer(authorization: str | None, case_token: str | None) -> str | None:
     return case_token
 
 
+async def _event_stream(events: EventBus, after: int, follow: bool) -> AsyncIterator[str]:
+    """Each event numbered above `after`, once and in order. With `follow`, more as they are
+    published, with a keep-alive when it is quiet; without, the stream ends when caught up."""
+    sent = after
+    quiet = 0.0
+    while True:
+        fresh = events.after(sent)
+        for event in fresh:
+            yield f"id: {event.id}\nevent: event\ndata: {event.model_dump_json()}\n\n"
+            sent = seq_of(event.id)
+            quiet = 0.0
+        if not follow:
+            return
+        if not fresh:
+            await asyncio.sleep(POLL_SECONDS)
+            quiet += POLL_SECONDS
+            if quiet >= KEEP_ALIVE_SECONDS:
+                yield ": keep-alive\n\n"
+                quiet = 0.0
+
+
 async def _trace_stream(
     case: RecordedCase | SessionCase, after: int, pace: float
 ) -> AsyncIterator[str]:
@@ -228,6 +264,9 @@ def create_app(
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
+    # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
+    events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
+    app.state.events = events
 
     app.add_middleware(
         UploadSizeGuard,
@@ -758,6 +797,51 @@ def create_app(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    @app.get("/events/stream")
+    def get_events(
+        request: Request,
+        follow: bool = True,
+        last_event_id: Annotated[str | None, Header()] = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_events_token: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        """Server-sent events: `event: event`, `id` is the event's own id, `data` is an Event.
+
+        Needs the events token (`SNAPBACK_EVENTS_TOKEN`) as `Authorization: Bearer` or
+        `X-Events-Token`, never in the address: a `token` there is answered 401. With no
+        token configured the stream is closed to everyone. Send `Last-Event-ID` to resume
+        after that event. `follow=false` sends what there is and ends.
+        """
+        no_token_in_the_address(request)
+        sent = _bearer(authorization, x_events_token)
+        if not sent:
+            raise HTTPException(status_code=401, detail="This needs the events token.")
+        expected = settings.snapback_events_token
+        if expected is None or not secrets.compare_digest(
+            sent.encode(), expected.get_secret_value().encode()
+        ):
+            raise HTTPException(status_code=403, detail="That token does not open the events.")
+        return StreamingResponse(
+            _event_stream(events, seq_of(last_event_id), follow),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.get("/cases/{case_id}/notes", response_model=CaseNotes)
+    def get_notes(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseNotes:
+        """The working notes the agent wrote for this case, read-only: one note per check
+        family, plus the explanation and tour questions when a model wrote them. Derived text
+        only, each stamped with who wrote it. Same read token as the trace, in a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        return case.notes()
+
     @app.post("/search")
     def post_search(
         brief: RenterBrief,
@@ -975,7 +1059,12 @@ def create_app(
             case.preferences = merge_preferences(case.preferences, body)
             return case.preferences
 
-    def tour_for(property_id: str, plan_key: str | None, any_plan: bool = False) -> TourPlan:
+    def tour_for(
+        property_id: str,
+        plan_key: str | None,
+        any_plan: bool = False,
+        model_id: str | None = None,
+    ) -> TourPlan:
         """The walkthrough plan for a researched place, from its record and the scan's cache."""
         try:
             place = place_for(property_id, None, lookups, None, plan_key)
@@ -994,12 +1083,11 @@ def create_app(
             raise HTTPException(status_code=404, detail="No researched place with that id.")
         source = place.source if place else (record.source if record else DataSource.FIXTURE)
         sweeps: list = []
-        for model_id in record.model_ids if record is not None else []:
-            sweeps = (
-                fixture_sweeps(model_id)
-                if source is DataSource.FIXTURE
-                else cached_sweeps(model_id)
-            )
+        # The scan the photos were placed in comes first; only then the record's other scans.
+        wanted = [model_id] if model_id else []
+        wanted += [m for m in (record.model_ids if record is not None else []) if m != model_id]
+        for each in wanted:
+            sweeps = fixture_sweeps(each) if source is DataSource.FIXTURE else cached_sweeps(each)
             if sweeps:
                 break
         aerial_on = None
@@ -1054,6 +1142,9 @@ def create_app(
         except Exception:
             return []
 
+    def office_of(property_id: str) -> str | None:
+        return office_on_record(lookups, property_id)
+
     def case_tour(
         case_id: str, request: Request, authorization, x_case_token, mode: str = "claimed"
     ) -> tuple:
@@ -1067,26 +1158,23 @@ def create_app(
                 raise HTTPException(
                     status_code=404, detail="No photo of this case was placed in another building."
                 )
-            plan = tour_for(other, None, any_plan=True)
-            office = None
-            try:
-                found = place_for(other, None, lookups, None, None)
-            except Exception:  # an ambiguous or missing plan: the office is simply not named
-                found = None
-            if found is not None:
-                office = found.office_on_record
-            plan, fields = map_elsewhere(plan, locate, other, office)
-            return choose_walk(plan), locate, fields
+            model = scan_model_of(locate, other)
+            plan = tour_for(other, None, any_plan=True, model_id=model)
+            plan, fields = map_elsewhere(plan, locate, other, office_of(other))
+            return choose_walk(plan), locate, fields, model
         if case.property_id is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
-        plan = tour_for(case.property_id, None, any_plan=True)
+        model = scan_model_of(locate)
+        plan = tour_for(case.property_id, None, any_plan=True, model_id=model)
         if locate is None:
-            return plan, None, {}
+            return plan, None, {}, model
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
-        plan, fields = map_locate(plan, locate, scan_plan=scan_plan, ad_plan=None)
+        plan, fields = map_locate(
+            plan, locate, scan_plan=scan_plan, ad_plan=ad_plan_word(ad_beds_of(case))
+        )
         plan = attach_claims(plan, ad_notes_of(case))
         prefs = getattr(case, "preferences", None)
-        return choose_walk(plan, None, must_have_kinds_of(prefs)), locate, fields
+        return choose_walk(plan, None, must_have_kinds_of(prefs)), locate, fields, model
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(
@@ -1110,8 +1198,90 @@ def create_app(
         """The case-scoped walk: the tour plan plus the case's locate result, so the page can
         show which ad photos were placed, which were taken elsewhere and which could not be
         placed. Needs the case's read token in a header."""
-        plan, locate, fields = case_tour(case_id, request, authorization, x_case_token, mode)
-        return WalkResponse(plan=plan, locate=locate, photos=fields)
+        plan, locate, fields, model = case_tour(case_id, request, authorization, x_case_token, mode)
+        return WalkResponse(plan=plan, model_id=model, locate=locate, photos=fields)
+
+    def capture_date_of(record):
+        """The aerial capture date when already known (never a fetch), else None."""
+        if record is None:
+            return None
+        return known_capture_date(record, source=record.source, data_dir=settings.snapback_data_dir)
+
+    @app.get("/cases/{case_id}/tour-prep")
+    def get_tour_prep(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> TourPrepPack:
+        """The tour-prep pack for a checked ad: what the record says, questions to ask, and
+        steps before paying. Built by code from fixed text, EN or ES. Needs the case's read
+        token in a header (a token in the address is refused with 401); the owner of record
+        and licence lines come from the case."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        evidence = case.evidence
+        record = None
+        if case.property_id:
+            try:
+                record = lookups.record(case.property_id)
+            except KitMissing:
+                record = None
+        photos = evidence.locate.photos if evidence.locate else []
+        # A fixture case is FIXTURE even beside a live record: the label never overstates.
+        live = evidence.source is DataSource.LIVE and (
+            record is None or record.source is DataSource.LIVE
+        )
+        return build_tour_prep(
+            source=DataSource.LIVE if live else DataSource.FIXTURE,
+            lang=lang,
+            record=record,
+            owner=evidence.owner,
+            licence=evidence.license,
+            room_labels=[
+                p.room_label
+                for p in photos
+                if p.room_label and p.status is LocateStatus.LOCATED_IN_CLAIMED
+            ],
+            aerial_on=capture_date_of(record),
+        )
+
+    @app.get("/places/{property_id}/tour-prep")
+    def get_place_tour_prep(
+        property_id: str,
+        request: Request,
+        plan_key: Annotated[str | None, Query(max_length=128)] = None,
+        lang: Language = "en",
+    ) -> TourPrepPack:
+        """The tour-prep pack for a researched place. Public, and built only from the place's own
+        record (no owner, licence or case data). 404 for a place we do not hold, 422 when a
+        building has several floor plans and no `plan_key` was sent."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            found = place_and_raw_for(property_id, None, lookups, None, plan_key)
+            record = lookups.record(property_id)
+        except AmbiguousPlace:
+            raise HTTPException(
+                status_code=422,
+                detail="Several floor plans share that building. Send the plan_key you picked.",
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if found is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        place, raw = found
+        return build_tour_prep(
+            source=place.source,
+            lang=lang,
+            place=place,
+            raw=raw,
+            record=record,
+            aerial_on=capture_date_of(record),
+        )
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(

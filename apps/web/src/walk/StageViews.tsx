@@ -9,6 +9,9 @@ interface Props {
   /** The team's 3D drawing. Always there, always labelled as a drawing. */
   drawing: ReactNode;
   reduced: boolean;
+  /** The real view is there but must not be shown (the loaded scan is not this home's). It
+   *  stays mounted and hidden, and the drawing fills the stage. */
+  realHidden?: boolean;
 }
 
 export const REAL_LABEL = "Real view";
@@ -17,8 +20,8 @@ export const DRAWING_LABEL = "3D drawing";
 // Two views of one stop, like a video call: one fills the stage and the other sits as a small
 // window in the corner. Tap the window, or use the 3D | Real switch, to swap them. Real fills
 // the stage whenever a real view exists. Both stay mounted, so the live scan keeps its place.
-export function StageViews({ real, drawing, reduced }: Props) {
-  const hasReal = real !== null;
+export function StageViews({ real, drawing, reduced, realHidden = false }: Props) {
+  const hasReal = real !== null && !realHidden;
   const [choice, setChoice] = useState<ViewChoice>("real");
   const main: ViewChoice = hasReal ? choice : "drawing";
   const swap = () => setChoice(main === "real" ? "drawing" : "real");
@@ -54,6 +57,7 @@ export function StageViews({ real, drawing, reduced }: Props) {
       data-motion={reduced ? "reduced" : "full"}
     >
       {hasReal && pane("real", real)}
+      {real !== null && realHidden && <div hidden>{real}</div>}
       {pane("drawing", drawing)}
       <div className="sv-switch">
         <ViewToggle

@@ -37,6 +37,12 @@ function tourHref(place: PlaceMatch): string {
   return `/tour/${encodeURIComponent(place.property_id)}${q}`;
 }
 
+// The tour-prep pack for a researched place. The plan is picked by its key, never its label.
+function prepHref(place: PlaceMatch): string {
+  const q = place.plan_key ? `?plan_key=${encodeURIComponent(place.plan_key)}` : "";
+  return `/prep/place/${encodeURIComponent(place.property_id)}${q}`;
+}
+
 const SCAN_LABEL = "a 3D scan in this building";
 
 function PlaceRow({
@@ -104,6 +110,9 @@ function PlaceRow({
         </p>
       )}
 
+      <a className="pf-action pf-link" href={prepHref(place)} data-testid="tour-prep-link">
+        Tour prep
+      </a>
       {caseId && place.office_on_record && draft.status !== "ready" && (
         <button
           type="button"

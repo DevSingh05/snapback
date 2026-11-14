@@ -15,11 +15,12 @@ from a record, and derived facts (counts and yes/no), never sponsor images or re
 """
 
 import random
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Literal
 
+from snapback.agent.casework import Note
 from snapback.agent.modules import ChallengeOutcome, Modules
 from snapback.agent.planner import ASK_FIELDS, Plan, PlanKind
 from snapback.agent.scope import ListingScope
@@ -136,6 +137,11 @@ class CaseSession:
         self._plan: Plan | None = None
         self._after_plan: Step | None = None  # where the case goes when the plan is done
         self.question: str | None = None  # the code-written question the renter is asked
+        # Working notes per check family (casework.py): derived text only, never read by decide().
+        self.notes: dict[str, Note] = {}
+        # Set by the API: researched places near the ad, as text. `search_places()` uses the code
+        # policy (code notes); `search_places(use_model=True)` is the search sub-agent's call.
+        self.search_places: Callable[..., str] | None = None
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -218,6 +224,7 @@ class CaseSession:
         update: dict[str, object] = {
             "rules": self.modules.rules(self.case_id),
             "record_source": self.modules.record_source(self.case_id),
+            "property_type": self.modules.property_type(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:
             self.trace.emit(

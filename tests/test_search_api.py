@@ -128,3 +128,23 @@ def test_make_api_runs_without_proxy_headers_so_the_peer_address_is_real():
     makefile = (Path(__file__).resolve().parent.parent / "Makefile").read_text()
     api_line = next(line for line in makefile.splitlines() if "uvicorn" in line)
     assert "--no-proxy-headers" in api_line
+
+
+# --- GET /cases/{id}/notes (the agent's working notes) ---------------------------------------
+
+
+def test_notes_need_the_read_token_in_a_header_and_are_written_by_code_in_policy_mode(client):
+    case = new_case(client)
+    url = f"/cases/{case['case_id']}/notes"
+    assert client.get(url).status_code == 401
+    assert client.get(f"{url}?token={case['read_token']}").status_code == 401
+    ok = client.get(url, headers={"Authorization": f"Bearer {case['read_token']}"})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["source"] == "fixture"
+    stems = [n["stem"] for n in body["notes"]]
+    assert stems[:4] == ["record", "office", "owner", "place"]
+    assert {n["written_by"] for n in body["notes"]} == {"policy"}
+    assert all(n["path"].startswith(f"/case/{body['case_id']}/") for n in body["notes"])
+    # derived text only: no image data, nothing that looks like a phone number
+    assert not any("base64" in n["text"] or PHONE.search(n["text"]) for n in body["notes"])
