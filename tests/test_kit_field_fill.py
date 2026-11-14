@@ -27,7 +27,7 @@ def test_the_fixture_uses_the_real_kit_key_names():
         for line in (FIXTURE_KIT / name).read_text(encoding="utf-8").splitlines():
             if line.strip():
                 _keys(json.loads(line), keys)
-    assert REAL_KEYS <= keys
+    assert keys >= REAL_KEYS
     assert not (INVENTED_KEYS & keys), INVENTED_KEYS & keys
 
 
