@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import { LabSection } from "../lab";
+import { replayForCase } from "../replay";
 import type { Card, CardLine, CardTone, VerdictState } from "../contracts";
 
 const ROW_LABEL = { place: "PLACE", person: "PERSON", price: "PRICE" } as const;
@@ -157,6 +158,14 @@ export function CardView({
       </section>
 
       {withLab ? <LabSection /> : null}
+
+      {replayForCase(card.case_id) ? (
+        <p className="replay-link">
+          <a href={`/replay/${replayForCase(card.case_id)?.slug}`}>
+            See a case like this, re-created from a public report
+          </a>
+        </p>
+      ) : null}
 
       <footer className="rules">
         {card.footer.map((line) => (

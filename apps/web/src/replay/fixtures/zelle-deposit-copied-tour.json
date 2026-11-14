@@ -1,0 +1,65 @@
+{
+  "slug": "zelle-deposit-copied-tour",
+  "case_id": "7Q2M",
+  "title": "A Zelle deposit for a copied video tour",
+  "pattern": "place",
+  "fictional": true,
+  "source": {
+    "name": "FTC Consumer Advice, rental listing scams (pattern source; this example is fictional)",
+    "url": "https://consumer.ftc.gov/articles/rental-listing-scams",
+    "published_on": "2024-01-01"
+  },
+  "amount_usd": 2500,
+  "steps": [
+    {
+      "id": "listing",
+      "kind": "listing",
+      "reported_on": "2024-03-04",
+      "label": "Listing seen",
+      "detail": "A two-bedroom is listed well under the area's rents, with a video tour."
+    },
+    {
+      "id": "chat",
+      "kind": "chat",
+      "reported_on": "2024-03-04",
+      "label": "Chat with the poster",
+      "detail": "The poster says they are out of the country and cannot show the place in person."
+    },
+    {
+      "id": "hold",
+      "kind": "hold_request",
+      "reported_on": "2024-03-05",
+      "label": "Asked to pay to hold it",
+      "detail": "Another applicant is said to be ready, so the renter is asked to send a deposit to hold it."
+    },
+    {
+      "id": "payment",
+      "kind": "payment",
+      "reported_on": "2024-03-05",
+      "label": "Paid by Zelle",
+      "detail": "The renter sends the deposit by Zelle before any viewing."
+    },
+    {
+      "id": "discovery",
+      "kind": "discovery",
+      "reported_on": "2024-03-12",
+      "label": "Found out",
+      "detail": "The real tenant tells the renter the unit is occupied and was never for rent."
+    }
+  ],
+  "snapback": {
+    "verdict": "dont_pay",
+    "stop_before": "payment",
+    "findings": [
+      {
+        "step_id": "listing",
+        "text": "The video tour was checked against the building's own scan."
+      },
+      {
+        "step_id": "chat",
+        "text": "Person not shown. The poster could not be matched to the building."
+      },
+      { "step_id": "hold", "text": "Zelle before a viewing. Red flag." }
+    ]
+  }
+}

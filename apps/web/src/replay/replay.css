@@ -1,0 +1,200 @@
+/* Replay timeline. Sharp corners, no outlines: planes of tone and one shadow carry the structure. */
+
+.replay-page {
+  width: min(1320px, 100%);
+  margin-inline: auto;
+  padding-block: 24px 64px;
+  display: grid;
+  gap: 24px;
+}
+
+.replay-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.replay-label {
+  margin: 0 0 6px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color: var(--blue);
+}
+
+.replay-head h1 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.replay-source,
+.replay-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.replay-note {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 6px 10px;
+  background: var(--amber-soft);
+  color: var(--ink);
+}
+
+.replay-legend {
+  display: grid;
+  grid-template-columns: 1fr;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.replay-legend span:last-child {
+  display: none;
+}
+
+/* Desktop: one row of columns. Each column is a reported step over what SNAPBACK showed. */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  align-items: stretch;
+}
+
+.tl-step {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 4px;
+  animation: tl-in 480ms ease-out both;
+}
+
+.tl-real,
+.tl-snap {
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tl-real time {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tl-real h2 {
+  margin: 6px 0;
+  font-size: 1.1rem;
+}
+
+.tl-real p,
+.tl-snap p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tl-snap {
+  background: var(--teal-soft);
+}
+
+.tl-snap .muted {
+  color: var(--muted);
+}
+
+.tl-after .tl-real {
+  background: var(--coral-soft);
+}
+
+.tl-after .tl-snap {
+  background: var(--paper);
+  box-shadow: none;
+}
+
+.tl-stop {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--coral);
+  color: #fff;
+  animation:
+    tl-in 480ms ease-out both,
+    stop-pulse 2.4s ease-in-out 600ms 3;
+}
+
+.tl-stop-hold {
+  background: var(--amber);
+}
+
+.stop-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stop-words {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.stop-amount {
+  font-weight: 700;
+}
+
+.replay-foot {
+  color: var(--muted);
+}
+
+.replay-foot p {
+  margin: 0;
+}
+
+.replay-missing {
+  padding-block: 64px;
+}
+
+@keyframes tl-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes stop-pulse {
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+/* Phone and narrow: stack vertically, the stop marker stays between the steps. */
+@media (max-width: 800px) {
+  .timeline {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    gap: 12px;
+  }
+
+  .tl-step {
+    grid-template-rows: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-step,
+  .tl-stop {
+    animation: none;
+  }
+}
