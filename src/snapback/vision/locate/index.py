@@ -178,6 +178,37 @@ class LocateIndex:
         return index
 
 
+def warm_features(
+    index: "LocateIndex",
+    sweeps: dict,
+    is_cached,
+    extract,
+) -> dict[str, int]:
+    """Extract matcher features for every face in the index that is not cached yet, so the
+    first live case in a building does not spend its time budget on extraction. Each face is
+    handed over with its feature key (model/sweep/face) set, as the locator does."""
+    from snapback.vision.locate.verify import FEATURE_KEY
+
+    by_id = {(m, s.sweep_id): s for m, model_sweeps in sweeps.items() for s in model_sweeps}
+    faces = sorted({(e.model_id, e.sweep_id, e.face) for e in index.entries})
+    extracted = missing = 0
+    for model_id, sweep_id, face in faces:
+        key = f"{model_id}/{sweep_id}/{face}"
+        if is_cached(key):
+            continue
+        sweep = by_id.get((model_id, sweep_id))
+        path = sweep.faces[face] if sweep is not None and face < len(sweep.faces) else None
+        if path is None or not Path(path).is_file():
+            missing += 1
+            continue
+        with Image.open(path) as opened:
+            image = opened.convert("RGB")
+        image.info[FEATURE_KEY] = key
+        extract(image)
+        extracted += 1
+    return {"faces": len(faces), "extracted": extracted, "missing": missing}
+
+
 def _embedder(name: str) -> Embedder:
     if name == "tiny":
         return TinyEmbedder()
@@ -197,7 +228,35 @@ def main(argv: Sequence[str] | None = None) -> int:
     build.add_argument("--out", type=Path, help="index folder (default data/index/<name>)")
     build.add_argument("--cache", type=Path, help="face cache folder (default by data source)")
     build.add_argument("--source", choices=[s.value for s in DataSource], help="override .env")
+    warm = sub.add_parser("warm", help="extract DISK features for every face of an index, ahead")
+    warm.add_argument("--name", default="demo")
+    warm.add_argument("--index", type=Path, help="index folder (default data/index/<name>)")
+    warm.add_argument("--cache", type=Path, help="face cache folder (default: the live cache)")
     args = parser.parse_args(argv)
+
+    if args.command == "warm":  # pragma: no cover - needs torch and the local face cache
+        from snapback.adapters.matterport import LIVE_CACHE, _read_manifest, _safe
+        from snapback.vision.locate.verify import DiskLightGlue
+
+        folder = args.index or INDEX_ROOT / args.name
+        index = LocateIndex.load(folder, TinyEmbedder())
+        cache = args.cache or LIVE_CACHE
+        sweeps = {m: _read_manifest(m, cache / _safe(m)) or [] for m in index.model_ids()}
+        features = folder.parent / "features"
+        matcher = DiskLightGlue(feature_dir=features)
+        started = time.monotonic()
+        report = warm_features(
+            index,
+            sweeps,
+            is_cached=lambda key: (features / f"{key}.npz").is_file(),
+            extract=matcher._features,
+        )
+        print(
+            f"faces {report['faces']}, extracted {report['extracted']}, missing "
+            f"{report['missing']}, {time.monotonic() - started:.0f} s; features in "
+            f"{features.name}/"
+        )
+        return 0
 
     settings = MatterportSettings()
     if args.source:

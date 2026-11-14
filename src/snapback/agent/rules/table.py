@@ -55,6 +55,21 @@ class Rule:
     needs_link: bool = False
 
 
+# Pieces of the "money before move-in" rule. A deposit that is "no deposit" or "without
+# deposit" is not money asked for, and "not required" is not an ask.
+# A deposit that is refused is not asked for: "no deposit", "no pet deposit", "zero deposit".
+_A_DEPOSIT = (
+    r"(?<!no )(?<!no security )(?<!no pet )(?<!no holding )(?<! or pet )"
+    r"(?<!without )(?<!zero )\bdeposit\b"
+)
+_MONEY = (
+    r"(?:" + _A_DEPOSIT + r"|\bfirst month(?:'s)?\b|\bmonth'?s rent\b"
+    r"|\$\d[\d,]{0,12})"
+)
+_NOT = r"(?<!not )(?<!n't )(?<!never )(?<!dont )"
+_DOLLARS = r"\$[1-9][\d,]{0,12}"  # "$0 deposit" asks for nothing
+_BEFORE_MOVE_IN = r"\b(?:before|prior to|ahead of)\b[^.!?]{0,15}\bmov(?:e|ing)[- ]?in\b"
+
 RULES: tuple[Rule, ...] = (
     # --- payment method: money that cannot be taken back ----------------------------------
     Rule(
@@ -160,6 +175,59 @@ RULES: tuple[Rule, ...] = (
         excused_when_refused=True,
         excused_after_approval=True,
         excused_through_portal=True,
+    ),
+    Rule(
+        # Rent or a deposit asked for before move-in. Honest listings say this too, so it is
+        # never a red flag and can hold nothing. It only stops the card saying "Matches"
+        # about the payment ask, and puts the owner's own rule beside it when the owner
+        # publishes one (conductor, Sat 10:03).
+        rule_id="fee.money_before_move_in",
+        category=RuleCategory.FEE_ASK,
+        red_flag=False,
+        patterns=(
+            # "the deposit is due before move-in"
+            _MONEY
+            + r"[^.!?$]{0,40}"  # no "$" in the gap: a run of "$1," cannot stall the match
+            + _NOT
+            + r"\b(?:due|required|needed|payable|paid|pay|send|collected|owed)\b"
+            + r"[^.!?]{0,25}"
+            + _BEFORE_MOVE_IN,
+            # "you pay the deposit before moving in"
+            _NOT
+            + r"\b(?:pay|send|need|needs|require|requires|collect|owe)\b[^.!?]{0,40}"
+            + _MONEY
+            + r"[^.!?]{0,25}"
+            + _BEFORE_MOVE_IN,
+            # "before move-in we need the deposit"
+            _BEFORE_MOVE_IN
+            + r"[^.!?]{0,40}"
+            + _NOT
+            + r"\b(?:pay|send|need|require|due|owe)[a-z]{0,3}\b[^.!?]{0,40}"
+            + _MONEY,
+            # "you need first month and deposit to move in"
+            _NOT
+            + r"\b(?:need|needs|needed|require[sd]?|pay|send|bring|due)\b[^.!?]{0,40}"
+            + _MONEY
+            + r"[^.!?]{0,40}\bto move in\b",
+            # "to move in you need $2,200"
+            r"\bto move in\b[^.!?]{0,30}"
+            + _NOT
+            + r"\b(?:need|pay|send|require|bring)[a-z]{0,3}\b[^.!?]{0,40}"
+            + _MONEY,
+            r"\bmove[- ]?in (?:cost|costs|total|amount|funds|money)\b",
+            # A deposit is paid before move-in by its nature, so naming one is the ask:
+            # "the deposit is $1,100", "$1,100 deposit", "deposit required",
+            # "deposit is one month's rent".
+            _A_DEPOSIT + r"[^.!?$]{0,20}" + _DOLLARS,
+            _DOLLARS + r"(?:(?! no | without | zero )[^.!?$]){0,15}\bdeposit\b",
+            _A_DEPOSIT + r"[^.!?]{0,15}" + _NOT + r"\b(?:due|required|needed|payable)\b",
+            _A_DEPOSIT + r"[^.!?]{0,15}\b(?:one|two|1|2|a|first|last) month",
+            # The first month asked for ahead of time, and "first and last".
+            r"\bfirst month(?:'s)?(?: rent)?\b[^.!?]{0,20}"
+            r"\b(?:up ?front|in advance|at signing)\b",
+            r"\bfirst and last month'?s?\b(?: rent)?",  # not "first and last name"
+        ),
+        excused_when_refused=True,
     ),
     # --- data asks: details that let someone take money or an identity ---------------------
     Rule(

@@ -103,6 +103,10 @@ class Modules(Protocol):
         """Where price, authority and for_sale came from, if not from where the case did."""
         ...
 
+    def property_type(self, case_id: str) -> str | None:
+        """The record's kind of home ("house", "multifamily"), or None with no record."""
+        ...
+
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None: ...
 
     def new_code(self, case_id: str) -> str: ...
@@ -262,6 +266,9 @@ class FixtureModules:
 
     def record_source(self, case_id: str) -> DataSource | None:
         return None  # all of a fixture case is fixture
+
+    def property_type(self, case_id: str) -> str | None:
+        return self.record.property_type
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None:
         if self._spots_available is None:

@@ -12,12 +12,12 @@ pytest.importorskip("snapback.tour")
 walk_helpers = pytest.importorskip("test_walk_director")
 
 from langchain_core.messages import AIMessage, ToolMessage  # noqa: E402
-from snapback.tour import choose_walk, policy_director  # noqa: E402
 
 from snapback.agent import casework  # noqa: E402
 from snapback.agent.graph import build_agent, build_subagents, run_case_with_agent  # noqa: E402
 from snapback.agent.walk_agent import WalkDesk  # noqa: E402
 from snapback.contracts import ChoiceKind, TraceKind  # noqa: E402
+from snapback.tour import choose_walk, policy_director  # noqa: E402
 from test_agent_subagents import FakeCrew, _call, demo_session  # noqa: E402
 
 
