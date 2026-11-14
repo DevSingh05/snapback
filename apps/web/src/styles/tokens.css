@@ -80,6 +80,34 @@
   --shadow-lift: 0 2px 4px rgb(20 36 45 / 0.1), 0 18px 36px rgb(20 36 45 / 0.2);
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* The city map (map/mapStyle.ts reads these at run time): land, water, streets, the pale
+     glass buildings, and the columns that mark researched places. Sky, teal and ink only. */
+  --map-land: #d0dee7;
+  --map-water: #b4d3e6;
+  --map-park: #bcd9c8;
+  --map-road: #ffffff;
+  --map-road-case: #a3bac8;
+  --map-road-glow: rgb(255 255 255 / 0);
+  --map-bldg: #a9c9dc;
+  --map-bldg-flat: #d0dde6;
+  --map-roof: #ffffff;
+  --map-win: #9fbfd3;
+  --map-chip: #ffffff;
+  --map-on-chip: #14242d;
+  --map-label: #43555f;
+  --map-halo: #ffffff;
+  --map-sky: #bfdcec;
+  --map-horizon: #f2f8fb;
+  --map-col: #1fc3cf;
+  --map-col-off: #9fb4c1;
+  --map-col-cap: #ffffff;
+  --map-glow: #1fb6c1;
+  --map-pick: #0d6672;
+  --map-cluster: #0d6672;
+  --map-on-cluster: #ffffff;
+  --panel: rgb(255 255 255 / 0.94);
+  --glow-line: 0 0 14px rgb(31 182 193 / 0.7);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -131,6 +159,31 @@
     --h-shade: rgb(0 0 0 / 0.35);
     --sweep: rgb(255 255 255 / 0.05);
     --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 36px rgb(0 0 0 / 0.7);
+    --map-land: #171c23;
+    --map-water: #0f2b3b;
+    --map-park: #1a2b27;
+    --map-road: #35414f;
+    --map-road-case: #1f252e;
+    --map-road-glow: #2b8794;
+    --map-bldg: #3a4a5d;
+    --map-bldg-flat: #262f3b;
+    --map-roof: #5b7088;
+    --map-win: #b9f1f4;
+    --map-chip: #14242d;
+    --map-on-chip: #f1f6f8;
+    --map-label: #b7c3cc;
+    --map-halo: #0e0f12;
+    --map-sky: #0d1823;
+    --map-horizon: #25495d;
+    --map-col: #5fd4dc;
+    --map-col-off: #56646f;
+    --map-col-cap: #f1f6f8;
+    --map-glow: #5fd4dc;
+    --map-pick: #f1f6f8;
+    --map-cluster: #1c7f8a;
+    --map-on-cluster: #ffffff;
+    --panel: rgb(34 37 43 / 0.94);
+    --glow-line: 0 0 16px rgb(95 212 220 / 0.75);
   }
 }
 
@@ -182,4 +235,29 @@
   --h-shade: rgb(0 0 0 / 0.35);
   --sweep: rgb(255 255 255 / 0.05);
   --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 36px rgb(0 0 0 / 0.7);
+  --map-land: #171c23;
+  --map-water: #0f2b3b;
+  --map-park: #1a2b27;
+  --map-road: #35414f;
+  --map-road-case: #1f252e;
+  --map-road-glow: #2b8794;
+  --map-bldg: #3a4a5d;
+  --map-bldg-flat: #262f3b;
+  --map-roof: #5b7088;
+  --map-win: #b9f1f4;
+  --map-chip: #14242d;
+  --map-on-chip: #f1f6f8;
+  --map-label: #b7c3cc;
+  --map-halo: #0e0f12;
+  --map-sky: #0d1823;
+  --map-horizon: #25495d;
+  --map-col: #5fd4dc;
+  --map-col-off: #56646f;
+  --map-col-cap: #f1f6f8;
+  --map-glow: #5fd4dc;
+  --map-pick: #f1f6f8;
+  --map-cluster: #1c7f8a;
+  --map-on-cluster: #ffffff;
+  --panel: rgb(34 37 43 / 0.94);
+  --glow-line: 0 0 16px rgb(95 212 220 / 0.75);
 }
