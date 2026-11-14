@@ -71,3 +71,18 @@ describe("upload state machine", () => {
     expect(reduce(initialState, { type: "created", ...created })).toBe(initialState);
   });
 });
+
+describe("no challenge drafted", () => {
+  it("skips the approval and goes straight to done", () => {
+    const s = reduce(
+      { step: "reading" },
+      { type: "created", caseId: "9ZZZ", challengeText: null, source: "live" },
+    );
+    expect(s).toEqual({ step: "done", caseId: "9ZZZ", challengeSent: false, source: "live" });
+  });
+
+  it("a server refusal during approval lands on the error step", () => {
+    const approval = { step: "approval", caseId: "A", challengeText: "t", source: "live" } as const;
+    expect(reduce(approval, { type: "fail", message: "no" }).step).toBe("error");
+  });
+});
