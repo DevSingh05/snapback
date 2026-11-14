@@ -123,18 +123,45 @@ def test_a_phone_that_is_not_the_office_holds_the_case_even_if_the_name_matches(
     )
 
 
-def test_a_matching_phone_says_so_and_still_does_not_lift_allowed_to_rent_it():
+def test_a_matching_phone_is_a_supporting_line_and_never_authority():
+    # XO ruling on #87: anyone can copy the office's public number into a listing.
     authority = check_authority(ContactClaims(phones=[OFFICE]), record(), SALT)
-    assert authority.status is AuthorityStatus.MATCHES_RECORD
+    assert authority.office_phone_match is PhoneMatch.YES
+    assert authority.status is AuthorityStatus.UNKNOWN
+
     modules = evidence(authority=authority.model_dump(mode="json"))
     person = card_lines(modules, CardRowKind.PERSON)
     assert person["Contact on record"] == (
         CardTone.OK,
-        "The phone in the listing is the leasing office on record. "
-        "Call Fixture Living LLC yourself.",
+        "The phone matches the leasing office on record. Call it yourself to confirm.",
     )
-    assert person["Allowed to rent it"][0] is CardTone.NOT_SHOWN
-    assert person["Allowed to rent it"][1].startswith("Not confirmed.")
+    assert person["Allowed to rent it"] == (
+        CardTone.NOT_SHOWN,
+        strings.text("allowed.not_shown"),
+    )
+
+
+def test_a_matching_phone_with_presence_proven_and_no_company_is_not_verified():
+    authority = check_authority(ContactClaims(phones=[OFFICE]), record(), SALT)
+    modules = evidence(authority=authority.model_dump(mode="json"), rules=[], price=None)
+    assert to_evidence(modules).presence == "proven"
+    assert not any(
+        (to_evidence(modules).rule_flag, to_evidence(modules).price_flag)
+    )  # nothing else holds it
+    assert state(modules) is VerdictState.HOLD
+
+    # The same case with the company named is what VERIFIED takes.
+    named = check_authority(
+        ContactClaims(company="Fixture Living LLC", phones=[OFFICE]), record(), SALT
+    )
+    assert state(evidence(authority=named.model_dump(mode="json"), rules=[], price=None)) is (
+        VerdictState.VERIFIED
+    )
+
+
+def test_a_different_company_is_a_mismatch_whatever_the_phone_says():
+    claims = ContactClaims(company="Sunrise Property Group", phones=[OFFICE])
+    assert check_authority(claims, record(), SALT).status is AuthorityStatus.MISMATCH
 
 
 def test_no_phone_number_or_hash_or_web_address_reaches_card_verdict_or_evidence():
@@ -277,12 +304,13 @@ def test_for_sale_alone_is_never_dont_pay_whatever_else_is_true():
 def test_recently_rented_holds_the_case_without_a_red_flag():
     modules = evidence(for_sale={"status": "recently_rented"})
     assert state(modules) is VerdictState.HOLD
-    tone, text = card_lines(modules, CardRowKind.PLACE)["Recently rented"]
+    # Lane T replaces its own line by these two labels: "For sale" and "Rental history".
+    tone, text = card_lines(modules, CardRowKind.PLACE)["Rental history"]
     assert tone is CardTone.HOLD
     assert "Red flag" not in text
 
     dated = evidence(for_sale={"status": "recently_rented", "changed_on": "2026-11-01"})
-    assert card_lines(dated, CardRowKind.PLACE)["Recently rented"] == (
+    assert card_lines(dated, CardRowKind.PLACE)["Rental history"] == (
         CardTone.HOLD,
         "This home was rented on 2026-11-01.",
     )
@@ -337,12 +365,34 @@ def test_a_lookup_that_found_nothing_adds_nothing():
         ("3 bedroom house, big yard", None, 3),
         ("Two rooms. Call 555-010-0142.", None, None),
         ("Suite 12 with 1 bd", "12", 1),
+        ("2 bed at 12 Fixture St #305, near the park", "305", 2),
+        ("Unit 4, 1 bed", "4", 1),
     ],
 )
 def test_unit_and_bedrooms_are_read_from_the_listing(text, unit, beds):
     assert (extract_unit(text), extract_beds(text)) == (unit, beds)
     listing = read_listing(text)
     assert (listing.unit, listing.beds) == (unit, beds)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Spacious apartment 2 bedrooms, 1 bath",
+        "#1 rated community in Fixture City",
+        "Studio apartment 1 block from campus",
+        "Gate code #4521, ask the office",
+        "Apartment 5 minutes from downtown",
+        "Suite of 3 rooms; unit 2 bath remodel",
+        "Call 555-010-0142 #2",
+    ],
+)
+def test_a_number_that_counts_something_is_not_read_as_a_unit(text):
+    # XO review of #87: with a unit list on record, each of these gave a false HOLD.
+    assert extract_unit(text) is None
+    assert check_unit(extract_unit(text), extract_beds(text), record()) is not (
+        UnitStatus.NOT_ON_RECORD
+    )
 
 
 @pytest.mark.parametrize(
