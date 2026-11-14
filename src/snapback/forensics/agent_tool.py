@@ -42,13 +42,27 @@ def build_agent(model: str = "claude-opus-5-5") -> Any:
     return create_deep_agent(model=model, tools=[ask_graph], system_prompt=SYSTEM_PROMPT)
 
 
+_NUMBER = re.compile(r"\d+")
+_NAME_PAIR = re.compile(r"\b[A-Z][a-z]+\s+[A-Z][a-z]+\b")
+
+
 def accept_model_reply(analysis: Analysis, base: Answer, reply: str) -> Answer:
-    """Keep the model's wording only if it stays inside the evidence the tool returned."""
-    cited = {int(n) for n in re.findall(r"\bads?\s+#?(\d+)", reply, re.IGNORECASE)}
-    allowed = {e.ad_id for e in base.evidence}
+    """Keep the model's wording only if it stays inside the evidence the tool returned.
+
+    Every number in the reply must be an ad id the tool cited or a number the tool's own answer
+    already contains (dates, counts), whatever the surrounding word ("ad", "ads", "listing",
+    "posting", "ad#9", "Ad-9"). Every capitalised word pair must already be in the tool's answer:
+    the model may not introduce a name, a street or a person (AGENTS.md rule 7)."""
     if not verify_answer(analysis, base):
         return base
-    if base.grounded and (not cited or not cited <= allowed):
+    allowed = {e.ad_id for e in base.evidence} | {int(n) for n in _NUMBER.findall(base.answer)}
+    numbers = {int(n) for n in _NUMBER.findall(reply)}
+    if not numbers <= allowed:
+        return base
+    if any(pair not in base.answer for pair in _NAME_PAIR.findall(reply)):
+        return base
+    cited = {int(n) for n in re.findall(r"\b(?:ads?|listings?|postings?)\W{0,2}(\d+)", reply, re.I)}
+    if base.grounded and not cited & {e.ad_id for e in base.evidence}:
         return base
     if not base.grounded and cited:
         return base

@@ -248,8 +248,9 @@ answer key, next to a keyword search that groups hits by exact number or photo i
 
 Honest limits: the corpus and the pipeline were built together and the folding lexicon is
 hand-written, so the table is a check that the method works on rings shaped like these, not an
-accuracy claim for real listings. On ten other seeded corpora never used while tuning (seeds 101
-to 110, about 300 ads each) the pipeline averaged ring precision 0.88 and ring recall 0.93, and the
+accuracy claim for real listings. On ten other seeded corpora (held-out seeds 101 to 110, about
+300 ads each; thresholds were set on the committed seed and seeds 1 to 3 before these were run, and
+three of them are also asserted in the tests) the pipeline averaged ring precision 0.88 and ring recall 0.93, and the
 keyword baseline ring recall 0.00 (`snapback.forensics.evaluate.evaluate_seed`). The existing
 money-before-move-in rule alone is not enough: it fires on honest wording such as "deposit due at
 lease signing", so the pipeline needs a second signal (shared wording, numbers or photos) before it

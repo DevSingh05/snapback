@@ -11,6 +11,7 @@ import re
 
 from pydantic import BaseModel, Field
 
+from snapback.forensics.extract import split_sentences
 from snapback.forensics.pipeline import Analysis
 from snapback.forensics.rings import Evidence, Ring
 
@@ -256,36 +257,54 @@ def same_phone(analysis: Analysis, question: str, ad_id: int) -> Answer:
     )
 
 
+# Questions about who someone is. The graph holds ads, numbers and photos, never people, so
+# these get the no-evidence reply before any other intent can claim them.
+_IDENTITY = re.compile(
+    r"\b(?:who|whom|whose|name|names|named|address|addresses|owner|owners|person|people|email|"
+    r"emails|family|password|passwords|surname|landlord|identity)\b",
+    re.IGNORECASE,
+)
+_PHOTO = re.compile(r"\b(?:photos?|pictures?|images?)\b")
+_COPIED = re.compile(r"\b(?:copy|copies|copied|from|source|stole|stolen)\b")
+_PHONE = re.compile(r"\b(?:phone|phones|number|numbers|call)\b")
+_AD_RING = re.compile(r"\b(?:ring|part of|members?|belong|belongs|scam|operator)\b")
+_START = re.compile(r"\b(?:start|started|began|begin|first|origin)\b")
+_END = re.compile(r"\b(?:end|ended|last|stop|stopped|latest|finish)\b")
+_WORDING = re.compile(r"\b(?:words?|wording|phrasing|phrases?|asks?|money|pay|say)\b")
+_SIZE = re.compile(r"\b(?:how many|size|which ads|members|ads)\b")
+_LIST = re.compile(r"\b(?:list|all|which|what|show)\b.*\brings\b")
+
+
 def ask(analysis: Analysis, question: str) -> Answer:
     q = question.strip()
     low = q.lower()
+    if _IDENTITY.search(q):
+        return _none(q, "identity")
     ad_id, ring_letter = _ids(q)
     ring = analysis.ring(ring_letter) if ring_letter else None
-    if re.search(r"\b(list|all|which|what|show)\b.*\brings\b", low) and ring_letter is None:
+    if _LIST.search(low) and ring_letter is None:
         return list_rings(analysis, q)
     if ad_id is not None:
-        if re.search(r"photo|picture|image", low) and re.search(
-            r"cop(y|ied)|from|source|stole", low
-        ):
+        if _PHOTO.search(low) and _COPIED.search(low):
             return copied_from(analysis, q, ad_id)
-        if re.search(r"photo|picture|image", low):
+        if _PHOTO.search(low):
             return shared_photos(analysis, q, ad_id)
-        if re.search(r"phone|number|call", low):
+        if _PHONE.search(low):
             return same_phone(analysis, q, ad_id)
-        if re.search(r"\bring\b|part of|member|belong|scam|operator", low):
+        if _AD_RING.search(low):
             return ring_of_ad(analysis, q, ad_id)
     if ring_letter is not None:
         if ring is None:
             return _none(q, "ring", f"There is no ring {ring_letter} in the graph.")
-        if re.search(r"\b(start|began|begin|first|origin)", low):
+        if _START.search(low):
             return ring_start(analysis, q, ring)
-        if re.search(r"\b(end|last|stop|latest|finish)", low):
+        if _END.search(low):
             return ring_start(analysis, q, ring, end=True)
-        if re.search(r"phone|number", low):
+        if _PHONE.search(low):
             return ring_phones(analysis, q, ring)
-        if re.search(r"word|phras|ask|money|pay|say", low):
+        if _WORDING.search(low):
             return ring_wording(analysis, q, ring)
-        if re.search(r"how many|size|which ads|members|ads", low):
+        if _SIZE.search(low):
             return ring_size(analysis, q, ring)
     return _none(q, "unknown")
 
@@ -303,7 +322,7 @@ def verify_answer(analysis: Analysis, answer: Answer) -> bool:
         ad = graph.ads.get(e.ad_id)
         if ad is None:
             return False
-        if e.span is not None and e.span not in ad.text:
+        if e.span is not None and e.span not in split_sentences(ad.text):
             return False
         if any(p not in ad.photos for p in e.photo_ids):
             return False

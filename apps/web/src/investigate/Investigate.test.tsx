@@ -9,6 +9,8 @@ import type { Answer, RingResponse, RingsResponse } from "./types";
 const score = {
   ad_precision: 1,
   ad_recall: 1,
+  honest_flagged: 0,
+  n_honest: 244,
   ring_precision: 1,
   ring_recall: 1,
   rings_found: 2,
@@ -196,6 +198,7 @@ describe("/investigate", () => {
     expect(within(measure).getByText("This pipeline")).toBeInTheDocument();
     expect(within(measure).getByText(/Keyword search/)).toBeInTheDocument();
     expect(percent(0.193)).toBe("19%");
+    expect(within(measure).getAllByText("0 of 244")).toHaveLength(2);
   });
 
   it("switches rings from the tabs", () => {

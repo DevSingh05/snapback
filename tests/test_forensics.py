@@ -101,6 +101,8 @@ def test_ring_recovery_on_the_seed(analysis):
     assert pipe["ring_precision"] == 1.0
     assert pipe["ad_precision"] >= 0.95
     assert pipe["ad_recall"] >= 0.95
+    assert pipe["honest_flagged"] == 0 and pipe["n_honest"] == metrics["n_ads"] - 57
+    assert metrics["keyword_baseline"]["n_honest"] == pipe["n_honest"]
     assert [len(r.ad_ids) for r in analysis.rings] == [22, 15, 12, 8]
 
 
@@ -232,6 +234,10 @@ def test_no_evidence_means_it_says_so(analysis):
         "What is the weather like?",
         "Which ads share photos with ad 99999?",
         "When did ring Z start?",
+        "What is the first name of the person behind ring A?",
+        "What is ring A's password?",
+        "Which roads are in ring B?",
+        "What did the operator of ring C say about his family?",
     ]:
         answer = ask(analysis, q)
         assert answer.grounded is False, q
@@ -261,6 +267,22 @@ def test_model_reply_must_stay_inside_the_evidence(analysis):
     assert ok.mode == "model"
     drift = accept_model_reply(analysis, base, "Ring B began with ad 3 and ad 4.")
     assert drift.mode == "fixture" and drift.answer == base.answer
+    forged = [
+        f"Ring B began with ads {cited}, 9999 and 8888.",
+        f"Ring B began with ad {cited}, same operator as listing 9999.",
+        f"Ring B began with ad {cited} and ad#9999.",
+        f"Ring B began with ad {cited} and Ad-9999.",
+        f"Ring B began with ad {cited} and posting #9999.",
+        f"Ring B began with ad {cited}. The operator is John Smith of 12 Main Street, a scammer.",
+    ]
+    for reply in forged:
+        out = accept_model_reply(analysis, base, reply)
+        assert out.mode == "fixture" and out.answer == base.answer, reply
+    # a model may repeat a date or a name that is already in the tool's answer
+    again = accept_model_reply(
+        analysis, base, f"Ring B started on {analysis.rings[1].first_seen}, with ad {cited}."
+    )
+    assert again.mode == "model"
     uncited = accept_model_reply(analysis, base, "It started in March.")
     assert uncited.mode == "fixture"
     none = ask(analysis, "What is the weather like?")
@@ -321,3 +343,20 @@ def test_api_ask_shape(client):
 def test_corpus_type_roundtrip():
     corpus = load_corpus()
     assert Corpus.model_validate(json.loads(corpus.model_dump_json())) == corpus
+
+
+def test_api_ask_body_is_capped(client):
+    big = json.dumps({"question": "x" * 5000})
+    res = client.post("/forensics/ask", content=big, headers={"Content-Type": "application/json"})
+    assert res.status_code == 413
+    ok = client.post("/forensics/ask", json={"question": "List the rings."})
+    assert ok.status_code == 200
+
+
+def test_span_must_be_a_whole_sentence_of_the_ad(analysis):
+    good = ask(analysis, "How does ring D ask for money?")
+    assert verify_answer(analysis, good)
+    partial = good.model_copy(deep=True)
+    ad = analysis.graph.ads[partial.evidence[0].ad_id]
+    partial.evidence[0].span = ad.text.split(" ")[0]  # a word of the ad, not a sentence
+    assert not verify_answer(analysis, partial)

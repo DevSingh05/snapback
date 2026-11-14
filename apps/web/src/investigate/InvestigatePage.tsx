@@ -351,7 +351,9 @@ function ScoreRow({ label, score, tone }: { label: string; score: Score; tone: s
         </div>
         <div>
           <dt>honest ads wrongly flagged</dt>
-          <dd>{percent(1 - score.ad_precision)}</dd>
+          <dd>
+            {score.honest_flagged} of {score.n_honest}
+          </dd>
         </div>
       </dl>
     </div>

@@ -55,6 +55,8 @@ export interface RingSummary {
 export interface Score {
   ad_precision: number;
   ad_recall: number;
+  honest_flagged: number;
+  n_honest: number;
   ring_precision: number;
   ring_recall: number;
   rings_found: number;

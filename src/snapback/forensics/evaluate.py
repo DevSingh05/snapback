@@ -48,7 +48,7 @@ def keyword_groups(corpus: Corpus) -> list[set[int]]:
     return [g for g in groups.values() if len(g) >= MIN_ADS]
 
 
-def _score(found: list[set[int]], truth: dict[str, set[int]]) -> dict[str, Any]:
+def _score(found: list[set[int]], truth: dict[str, set[int]], n_ads: int) -> dict[str, Any]:
     called = set().union(*found) if found else set()
     real = set().union(*truth.values())
     tp = len(called & real)
@@ -67,6 +67,8 @@ def _score(found: list[set[int]], truth: dict[str, set[int]]) -> dict[str, Any]:
     return {
         "ad_precision": round(tp / len(called), 3) if called else 0.0,
         "ad_recall": round(tp / len(real), 3),
+        "honest_flagged": len(called - real),
+        "n_honest": n_ads - len(real),
         "ring_precision": round(recovered / len(found), 3) if found else 0.0,
         "ring_recall": round(recovered / len(truth), 3),
         "rings_found": len(found),
@@ -89,8 +91,8 @@ def evaluate(analysis: Analysis | None = None, truth: dict[str, list[int]] | Non
         "n_ads": len(corpus.ads),
         "n_true_rings": len(truth_sets),
         "n_true_ring_ads": sum(len(v) for v in truth_sets.values()),
-        "pipeline": _score(found, truth_sets),
-        "keyword_baseline": _score(keyword_groups(corpus), truth_sets),
+        "pipeline": _score(found, truth_sets, len(corpus.ads)),
+        "keyword_baseline": _score(keyword_groups(corpus), truth_sets, len(corpus.ads)),
     }
 
 
