@@ -13,6 +13,7 @@ import { MismatchAerials } from "../walk/MismatchAerials";
 import { RealStill, StageViews } from "../walk/StageViews";
 import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
+import { WalkMap } from "../walk/WalkMap";
 import { useWalkLive } from "../walk/useWalkLive";
 import { photoAt, walkLook } from "../walk/walkLook";
 import { fetchTour, type TourResult, type TourTarget } from "./api";
@@ -351,6 +352,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             Step {Math.min(index, last) + 1} of {plan.stops.length}
           </p>
           <h1 className="tour-title">{stop.title}</h1>
+          <WalkMap stops={plan.stops} current={Math.min(index, last)} onPick={setIndex} />
           <RoomStop
             stop={stop}
             plan={plan}

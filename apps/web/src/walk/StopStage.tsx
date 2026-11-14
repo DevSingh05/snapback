@@ -119,6 +119,7 @@ export function StopStage({
         </div>
       ) : (
         <svg className="rs-svg" viewBox="0 0 800 520" aria-hidden="true" focusable="false">
+          <ellipse className="rs-glow" cx={400} cy={420} rx={300} ry={70} />
           <ellipse className="rs-shadow" cx={400} cy={438} rx={250} ry={46} />
           <g className="rs-sway">
             <polygon
