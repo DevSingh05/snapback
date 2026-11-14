@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -163,5 +163,43 @@ describe("WalkPlayer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     tick(PLAIN + 100);
     expect(title()).toBe("Front door");
+  });
+});
+
+describe("WalkPlayer on the real scan", () => {
+  it("hands over when the person's first touch lands in the scan, and the scan keeps the tap", async () => {
+    const clock = fakeClock();
+    const sdk = {
+      disconnect: () => {},
+      Sweep: {
+        moveTo: () => Promise.resolve(),
+        data: { subscribe: () => ({ cancel: () => {} }) },
+      },
+    };
+    render(
+      <div className="tour-page">
+        <section className="tour-stage">
+          <div className="sv" data-main="real">
+            <iframe title="3D view" />
+          </div>
+          <WalkPlayer
+            stops={STOPS}
+            index={0}
+            onIndex={() => {}}
+            reduced={false}
+            clock={clock}
+            sdk={sdk}
+            sweeps={["fx-sweep-00"]}
+          />
+        </section>
+      </div>,
+    );
+    const player = screen.getByTestId("walk-player");
+    await waitFor(() => expect(player).toHaveAttribute("data-surface", "scan"));
+    expect(player).toHaveAttribute("data-mode", "playing");
+    // The shield is out of the way on the scan, so a tap reaches it; the tap shows as a focus move.
+    screen.getByTitle("3D view").focus();
+    fireEvent.blur(window);
+    await waitFor(() => expect(player).toHaveAttribute("data-mode", "exploring"));
   });
 });

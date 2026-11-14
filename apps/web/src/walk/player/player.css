@@ -66,8 +66,9 @@
 .wp-shield:active {
   cursor: grabbing;
 }
-/* In explore the scan itself takes every tap and drag. */
-.wp[data-mode="exploring"][data-surface="scan"] .wp-shield {
+/* On the real scan the scan itself takes every tap and drag, so the first touch is never wasted:
+   a tap on the floor walks there, and the player hands over (see WalkPlayer). */
+.wp[data-surface="scan"] .wp-shield {
   display: none;
 }
 

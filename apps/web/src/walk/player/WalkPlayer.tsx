@@ -207,10 +207,28 @@ export function WalkPlayer({
     };
   }, [transport]);
 
+  // On the real scan the first touch must not be spent on the player: the scan takes the tap (a
+  // tap on the floor walks there) and the page learns of it because the view takes the focus.
+  // The player then hands over, exactly as if the person had pressed Explore.
+  useEffect(() => {
+    if (surface !== "scan" || exploring) return;
+    const onBlur = () =>
+      setTimeout(() => {
+        const frame = document.activeElement;
+        if (frame instanceof HTMLIFrameElement && stageOf()?.contains(frame)) startExploreRef.current();
+      }, 0);
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, [surface, exploring]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const startExplore = () => {
     hand.current = { ...(reduced ? REST_POSE : drawnPose(moment.sweep)) };
     transport.explore();
   };
+  const startExploreRef = useRef(startExplore);
+  useEffect(() => {
+    startExploreRef.current = startExplore;
+  });
   const resume = () => transport.resume(surface === "scan" ? driver?.nearestStop(stops) : null);
 
   // ---- the scrubber ----
