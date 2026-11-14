@@ -186,3 +186,20 @@ def test_prose_after_apartment_is_not_a_unit_number():
 def test_the_zip_is_the_first_five_digits_after_the_street():
     text = "12345 Fixture Lane Fixture City 00001 deposit 10000"
     assert for_sale_lookup(text, DataSource.FIXTURE, today=TODAY).status is ForSaleStatus.ACTIVE
+
+
+def test_the_article_a_is_not_a_unit():
+    text = "Sunny apartment a short walk to the park"
+    near = for_sale_lookup(text, DataSource.FIXTURE, today=TODAY, lat=10.0002, lon=10.0)
+    assert near.status is ForSaleStatus.ACTIVE
+    street = for_sale_lookup(
+        "100 Fixture Lane apartment a block from transit", DataSource.FIXTURE, today=TODAY
+    )
+    assert street.status is ForSaleStatus.ACTIVE
+
+
+def test_a_real_letter_unit_still_counts():
+    # fx-home-1's unit is "2": a named letter unit is a different home
+    for text in ("100 Fixture Lane Apt B", "100 Fixture Lane, unit b.", "100 Fixture Lane #C"):
+        match = for_sale_lookup(text, DataSource.FIXTURE, today=TODAY)
+        assert match.status is ForSaleStatus.NONE, text
