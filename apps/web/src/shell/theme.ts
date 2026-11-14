@@ -1,29 +1,38 @@
 // One theme across the website (outside) and the app (inside), as one attribute on the root
-// (`data-theme`), which tokens.css reads.
-// - The choice lives under one shared key, "snapback-theme": "light" | "dark" | "system".
-// - A link can carry it: `?theme=dark` (or light, system) applies it and remembers it, so
+// (`data-theme`), which tokens.css reads. The two themes are Day (the default) and Dusk.
+// - The choice lives under one shared key, "snapback-theme". The stored words stay "light" and
+//   "dark" (the attribute values the website and tokens.css already read).
+// - Migration: an older "system" (follow the device) is dropped, so the page opens in Day; the
+//   words "day" and "dusk" are read as light and dark too. There is no OS-follow any more.
+// - A link can carry it: `?theme=dusk` (or dark, day, light) applies it and remembers it, so
 //   stepping from the website into the app keeps the same look.
-// - Until the person has chosen, the map opens in dark and every other page in light.
-// - "system" follows the device: the attribute is removed and tokens.css uses the OS setting.
 // Storage can be blocked, so every access is guarded.
 
 export type Theme = "light" | "dark";
-export type ThemeChoice = Theme | "system";
+/** Kept as an alias: a choice is always one of the two themes now. */
+export type ThemeChoice = Theme;
 
 export const THEME_KEY = "snapback-theme";
 
-const isChoice = (v: unknown): v is ThemeChoice => v === "light" || v === "dark" || v === "system";
+/** What the bar calls each theme. */
+export const THEME_WORDS: Record<Theme, string> = { light: "Day", dark: "Dusk" };
 
-export function savedTheme(): ThemeChoice | null {
+/** Reads any stored or carried word as a theme: old and new names, never "system". */
+export function themeFrom(v: unknown): Theme | null {
+  if (v === "light" || v === "day") return "light";
+  if (v === "dark" || v === "dusk") return "dark";
+  return null;
+}
+
+export function savedTheme(): Theme | null {
   try {
-    const v = window.localStorage.getItem(THEME_KEY);
-    return isChoice(v) ? v : null;
+    return themeFrom(window.localStorage.getItem(THEME_KEY));
   } catch {
     return null;
   }
 }
 
-export function saveTheme(choice: ThemeChoice): void {
+export function saveTheme(choice: Theme): void {
   try {
     window.localStorage.setItem(THEME_KEY, choice);
   } catch {
@@ -32,22 +41,20 @@ export function saveTheme(choice: ThemeChoice): void {
 }
 
 /** A theme carried in the address (`?theme=`), if it names one. */
-export function themeFromAddress(search: string): ThemeChoice | null {
-  const v = new URLSearchParams(search).get("theme");
-  return isChoice(v) ? v : null;
+export function themeFromAddress(search: string): Theme | null {
+  return themeFrom(new URLSearchParams(search).get("theme"));
 }
 
 /** The choice in force: the address wins and is remembered, else what was saved. */
-export function initialChoice(search: string): ThemeChoice | null {
+export function initialChoice(search: string): Theme | null {
   const carried = themeFromAddress(search);
   if (carried) saveTheme(carried);
   return carried ?? savedTheme();
 }
 
-/** The theme a page opens in when nothing was chosen. */
-export const defaultTheme = (onMap: boolean): Theme => (onMap ? "dark" : "light");
+/** The theme a page opens in when nothing was chosen: Day, on every page, the map included. */
+export const defaultTheme = (): Theme => "light";
 
-export function applyTheme(choice: ThemeChoice): void {
-  if (choice === "system") delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = choice;
+export function applyTheme(choice: Theme): void {
+  document.documentElement.dataset.theme = choice;
 }
