@@ -35,6 +35,11 @@ class PhotoLocation(BaseModel):
     pano_id: str | None = None
     inliers: int | None = None
     inlier_ratio: float | None = None
+    # Which twin the photo was placed in (claimed or not), for located_in_claimed and
+    # located_elsewhere; for located_elsewhere these name the OTHER building (V2, #41).
+    matched_model_id: str | None = None
+    matched_property_id: str | None = None
+    room_label: str | None = None  # Matterport's room classification, e.g. "Kitchen"
 
 
 class AuthorityStatus(StrEnum):
