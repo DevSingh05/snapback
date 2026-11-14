@@ -170,6 +170,56 @@ def test_an_office_shaped_like_a_street_address_is_never_shown(name):
 
 
 @pytest.mark.parametrize(
+    "name",
+    ["4821 Quillfeather LLC", "77 Maple Holdings", "123456 Oak Partners", "9 Heron Group Inc"],
+)
+def test_a_name_that_starts_with_a_bare_number_is_never_shown(name):
+    # "<number> <street> LLC" is an address wearing a company suffix.
+    assert matched_office_of(StubLookups({"fx-prop-3": name}), evidence().locate) is None
+
+
+def test_a_name_whose_first_two_words_are_the_records_street_address_is_never_shown():
+    from snapback.contracts import PropertyRecord
+
+    class Lookups:
+        def record(self, pid):
+            return PropertyRecord(
+                property_id=pid,
+                source=DataSource.FIXTURE,
+                manager_company="One Quillfeather Partners",
+                street_address="One Quillfeather Plaza",
+            )
+
+    assert matched_office_of(Lookups(), evidence().locate) is None
+
+
+def test_a_name_that_only_shares_one_word_with_the_street_address_is_kept():
+    from snapback.contracts import PropertyRecord
+
+    class Lookups:
+        def record(self, pid):
+            return PropertyRecord(
+                property_id=pid,
+                source=DataSource.FIXTURE,
+                manager_company="Quillfeather Partners",
+                street_address="One Quillfeather Plaza",
+            )
+
+    assert matched_office_of(Lookups(), evidence().locate) == "Quillfeather Partners"
+
+
+def test_demo_case_b_shows_the_office_of_the_home_its_third_photo_was_placed_in():
+    from snapback.agent.demo import run_demo_case
+
+    _, card = run_demo_case("b", checked_at=CHECKED_AT)
+    place = next(r for r in card.rows if r.kind is CardRowKind.PLACE)
+    lines = [ln for ln in place.lines if ln.label == "Home in the photos"]
+    assert len(lines) == 1
+    assert "Lantern Row Property Group" in lines[0].text
+    assert "for rent" not in lines[0].text.lower()
+
+
+@pytest.mark.parametrize(
     "name", ["Fixture Property Management Co", "Greystar Real Estate Partners", "ABC 123 Homes LLC"]
 )
 def test_a_company_name_is_kept(name):

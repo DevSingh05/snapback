@@ -121,6 +121,19 @@ _STREET_WORDS = (
 ADDRESS_LIKE = re.compile(
     rf"\b\d{{1,6}}\s+(?:[A-Za-z0-9.'-]+\s+){{0,4}}(?:{_STREET_WORDS})\b", re.I
 )
+# A name that opens with a bare number ("4821 Quillfeather LLC") is an address with a suffix.
+_STARTS_WITH_NUMBER = re.compile(r"^\d{1,6}\s")
+
+
+def _first_two_words(text: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+", text.lower())[:2])
+
+
+def _looks_like_address(company: str, street_address: str | None) -> bool:
+    if ADDRESS_LIKE.search(company) or _STARTS_WITH_NUMBER.match(company):
+        return True
+    words = _first_two_words(company)
+    return len(words) == 2 and words == _first_two_words(street_address or "")
 
 
 def matched_office_of(lookups: object, locate: LocateResult | None) -> str | None:
@@ -135,7 +148,7 @@ def matched_office_of(lookups: object, locate: LocateResult | None) -> str | Non
             continue
         record = lookups.record(found)  # type: ignore[attr-defined]
         company = (record.manager_company or "").strip() if record is not None else ""
-        if not company or ADDRESS_LIKE.search(company):
+        if not company or _looks_like_address(company, record.street_address):
             return None
         return company[:MAX_OFFICE_CHARS]
     return None
