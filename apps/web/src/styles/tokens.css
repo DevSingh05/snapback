@@ -1,0 +1,74 @@
+/* SNAPBACK design tokens. Lanes T2 to T6 reuse these; do not hard-code colours elsewhere.
+   Meaning: teal = place proven, amber = person not shown / on hold, blue = information,
+   coral = only for "did not hold up" and red flags. Colour never carries meaning alone:
+   every use sits next to words. */
+
+:root {
+  color-scheme: light;
+
+  --paper: #f4f7f6;
+  --surface: #ffffff;
+  --ink: #15232b;
+  --muted: #53636b;
+  --line: #dbe4e1;
+
+  --teal: #0b7a6c;
+  --teal-soft: #dff3ee;
+  --amber: #8f5800;
+  --amber-soft: #fdf0d3;
+  --blue: #2457c5;
+  --blue-soft: #e4ecfc;
+  --coral: #b8322a;
+  --coral-soft: #fde6e2;
+
+  --focus: #2457c5;
+  --shadow: 0 1px 2px rgb(21 35 43 / 0.06), 0 12px 32px rgb(21 35 43 / 0.08);
+
+  --font-display: "Bricolage Grotesque Variable", "Avenir Next", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius: 18px;
+  --radius-sm: 10px;
+  --gutter: clamp(16px, 4vw, 32px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0d1518;
+    --surface: #152024;
+    --ink: #e8f0ee;
+    --muted: #9db0b0;
+    --line: #26363a;
+    --teal: #55d1bd;
+    --teal-soft: #11332e;
+    --amber: #f0b955;
+    --amber-soft: #38290e;
+    --blue: #8fb0ff;
+    --blue-soft: #17294d;
+    --coral: #ff9a8f;
+    --coral-soft: #44201c;
+    --focus: #8fb0ff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.35);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0d1518;
+  --surface: #152024;
+  --ink: #e8f0ee;
+  --muted: #9db0b0;
+  --line: #26363a;
+  --teal: #55d1bd;
+  --teal-soft: #11332e;
+  --amber: #f0b955;
+  --amber-soft: #38290e;
+  --blue: #8fb0ff;
+  --blue-soft: #17294d;
+  --coral: #ff9a8f;
+  --coral-soft: #44201c;
+  --focus: #8fb0ff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.35);
+}
