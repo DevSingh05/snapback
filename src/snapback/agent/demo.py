@@ -25,6 +25,7 @@ from snapback.agent.session import CaseSession
 from snapback.agent.trace import Trace
 from snapback.card import strings
 from snapback.contracts import Card, DataSource, ForSaleMatch, Verdict
+from snapback.replays import replay_for_case, replay_note
 from snapback.verdict import build_card
 
 DEMO_DIR = Path(__file__).resolve().parents[3] / "fixtures" / "demo"
@@ -79,9 +80,11 @@ def demo_modules(case: DemoCase, listing: Listing) -> FixtureModules:
     )
 
 
-def staged(card: Card) -> Card:
-    """The same card, saying first in its footer that it is a staged example."""
-    note = strings.text("footer.staged", card.lang)
+def staged(card: Card, demo_case_id: str | None = None) -> Card:
+    """The same card, saying first in its footer that it is a staged example. A replay of a
+    reported case says instead what it replays: the source and its date."""
+    replay = replay_for_case(demo_case_id) if demo_case_id else None
+    note = (replay and replay_note(replay, card.lang)) or strings.text("footer.staged", card.lang)
     return card.model_copy(update={"footer": [note, *card.footer]})
 
 
@@ -95,7 +98,7 @@ def run_demo_case(
     session = CaseSession(full_id, demo_modules(case, listing), Trace(full_id, DataSource.FIXTURE))
     verdict = run_case(session, PolicyChooser(), lambda draft: "send")
     assert verdict is not None  # an approver was given, so the run cannot pause
-    return verdict, staged(build_card(session.evidence, checked_at=checked_at, lang=lang))
+    return verdict, staged(build_card(session.evidence, checked_at=checked_at, lang=lang), case_id)
 
 
 def main() -> None:
