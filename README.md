@@ -50,19 +50,19 @@ include an IP assignment to CoStar).
 
 ## Layout
 
-| Path                        | What it is                                                                       | Lane       |
-| --------------------------- | -------------------------------------------------------------------------------- | ---------- |
-| `src/snapback/contracts.py` | Shared data shapes every lane reads and writes                                   | integrator |
-| `src/snapback/verdict.py`   | Evidence in, verdict out. Pure code, no model                                    | integrator |
-| `src/snapback/api/`         | FastAPI service                                                                  | integrator |
-| `src/snapback/agent/`       | Agent orchestration                                                              | integrator |
-| `src/snapback/vision/`      | Photo index, matching, forgery checks                                            | vision     |
-| `src/snapback/eval/`        | Eval harness that produces every number we quote                                 | vision     |
-| `src/snapback/adapters/`    | CoStar and Vexcel adapters, live and fixture (`matterport.py` belongs to vision) | data       |
-| `apps/sidecar/`             | Intake bridge for inbound renter messages                                        | data       |
-| `apps/web/`                 | Vite + React + TypeScript app                                                    | web        |
-| `fixtures/`                 | Synthetic, team-made test data only                                              | everyone   |
-| `tests/`                    | Python tests                                                                     | everyone   |
+| Path                        | What it is                                            | Lane       |
+| --------------------------- | ----------------------------------------------------- | ---------- |
+| `src/snapback/contracts.py` | Shared data shapes every lane reads and writes        | integrator |
+| `src/snapback/verdict.py`   | Evidence in, verdict out. Pure code, no model         | integrator |
+| `src/snapback/api/`         | FastAPI service                                       | integrator |
+| `src/snapback/agent/`       | Agent orchestration                                   | integrator |
+| `src/snapback/vision/`      | Photo index, matching, forgery checks                 | vision     |
+| `src/snapback/eval/`        | Eval harness that produces every number we quote      | vision     |
+| `src/snapback/adapters/`    | Matterport, CoStar and Vexcel adapters (live/fixture) | data       |
+| `apps/sidecar/`             | Intake bridge for inbound renter messages             | data       |
+| `apps/web/`                 | Vite + React + TypeScript app                         | web        |
+| `fixtures/`                 | Synthetic, team-made test data only                   | everyone   |
+| `tests/`                    | Python tests                                          | everyone   |
 
 ## Rules that are not negotiable
 
