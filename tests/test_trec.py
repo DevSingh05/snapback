@@ -431,7 +431,7 @@ def test_the_slogan_intro_with_a_strict_shape_makes_no_lookup(tmp_path):
     text = "I'm Very Excited, a licensed agent here to help."
     result = _check(text, _client([], seen=seen), tmp_path)
     assert result.status is LicenseStatus.NOT_CHECKED
-    assert seen == [] and detect_claim(text) is None or detect_claim(text).first is None
+    assert seen == [] and detect_claim(text) is None
 
 
 def test_a_sponsor_is_named_only_for_exactly_one_company(tmp_path):
