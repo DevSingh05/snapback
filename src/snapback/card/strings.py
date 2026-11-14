@@ -142,45 +142,17 @@ EN: dict[str, str] = {
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
-    # A number that is not the office's, from a poster who claims a license they do not
-    # hold: the "agents often use their own" excuse is gone, so it is a red flag again.
-    "contact.phone_mismatch_unlicensed": (
-        "This number is not the leasing office's on record, and we found no active Texas "
-        "license under the name they gave. Red flag."
-    ),
-    "contact.phone_mismatch_unlicensed_unnamed": (
-        "This number is not the leasing office's on record, and we found no active Texas "
-        "license under the name they gave. Call the office on record yourself. Red flag."
-    ),
-    # The license line (A18, #124), from the Texas Real Estate Commission's public list.
-    # Never a person's name and never a license number: a role, a yes/no, a company.
-    "license.role.agent": "agent",
-    "license.role.broker": "broker",
-    "license.role.locator": "locator",
-    "license.not_found": (
-        "Says they're a licensed {role}. We found no active Texas license under that name. "
-        "Ask for their license number and look it up yourself at trec.texas.gov. Red flag."
-    ),
-    "license.not_found_unspecified": (
-        "Says they're licensed. We found no active Texas license under that name. "
-        "Ask for their license number and look it up yourself at trec.texas.gov. Red flag."
-    ),
-    "license.not_found_company": (
-        "Says a brokerage lists this home. We found no active Texas license under that "
-        "company's name. Ask for its license number and look it up yourself at "
-        "trec.texas.gov. Red flag."
-    ),
     "license.licensed": "Licensed in Texas.",
     "license.licensed_sponsored": "Licensed in Texas, sponsored by {broker}.",
-    "license.licensed_company": "The brokerage they named is licensed in Texas.",
-    "license.not_checked_no_claim": (
-        "Not checked (the poster did not say they are an agent, broker or locator)."
+    # D10 (#128): NOT_FOUND only from a license number the ad itself gives. A name never gives it.
+    "license.not_found": (
+        "The license number in the ad is not an active Texas license. "
+        "Look it up yourself at trec.texas.gov."
     ),
-    "license.not_checked_failed": (
-        "Not checked (we could not look the poster up in the Texas license list)."
+    "license.not_checked_claimed": (
+        "Says they're licensed. Ask for their Texas license number and look it up at "
+        "trec.texas.gov."
     ),
-    # The owner of record (A19, #125), from the county's public owner roll. A company is
-    # named. A person never is: the card says "a private owner" and a yes or a no.
     "owner.company_not_poster": "Not confirmed. Owner of record: {company}, not the poster.",
     "owner.company": "Not confirmed. Owner of record: {company}.",
     "owner.company_matches": "The company they named is the owner of record: {company}.",
@@ -367,9 +339,7 @@ EN: dict[str, str] = {
     ),
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
-    "reason.license_not_found": (
-        "The poster says they are licensed, and we found no active Texas license under that name."
-    ),
+    "reason.license_not_found": "The license number in the ad is not an active Texas license.",
     "reason.owner_not_poster": (
         "The poster says they are the owner, and the owner of record is someone else."
     ),
@@ -540,41 +510,14 @@ ES: dict[str, str] = {
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
-    "contact.phone_mismatch_unlicensed": (
-        "Este número no es el de la oficina de alquiler que figura en el registro, y no "
-        "encontramos ninguna licencia activa de Texas con el nombre que dio. Señal de alerta."
-    ),
-    "contact.phone_mismatch_unlicensed_unnamed": (
-        "Este número no es el de la oficina de alquiler que figura en el registro, y no "
-        "encontramos ninguna licencia activa de Texas con el nombre que dio. Llame usted "
-        "mismo a la oficina que figura en el registro. Señal de alerta."
-    ),
-    "license.role.agent": "agente",
-    "license.role.broker": "corredor",
-    "license.role.locator": "localizador de apartamentos",
-    "license.not_found": (
-        "Dice ser {role} con licencia. No encontramos ninguna licencia activa de Texas con "
-        "ese nombre. Pídale su número de licencia y búsquelo usted mismo en trec.texas.gov. "
-        "Señal de alerta."
-    ),
-    "license.not_found_unspecified": (
-        "Dice tener licencia. No encontramos ninguna licencia activa de Texas con ese "
-        "nombre. Pídale su número de licencia y búsquelo usted mismo en trec.texas.gov. "
-        "Señal de alerta."
-    ),
-    "license.not_found_company": (
-        "Dice que una agencia inmobiliaria anuncia esta vivienda. No encontramos ninguna "
-        "licencia activa de Texas a nombre de esa empresa. Pida su número de licencia y "
-        "búsquelo usted mismo en trec.texas.gov. Señal de alerta."
-    ),
     "license.licensed": "Con licencia en Texas.",
     "license.licensed_sponsored": "Con licencia en Texas, patrocinada por {broker}.",
-    "license.licensed_company": "La agencia que nombró tiene licencia en Texas.",
-    "license.not_checked_no_claim": (
-        "No comprobado (quien publica no dijo ser agente, corredor ni localizador)."
+    "license.not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas. "
+        "Búsquelo usted mismo en trec.texas.gov."
     ),
-    "license.not_checked_failed": (
-        "No comprobado (no pudimos buscar a quien publica en la lista de licencias de Texas)."
+    "license.not_checked_claimed": (
+        "Dice tener licencia. Pídale su número de licencia de Texas y búsquelo en trec.texas.gov."
     ),
     "owner.company_not_poster": (
         "Sin confirmar. Propietario registrado: {company}, no quien publica."
@@ -799,8 +742,7 @@ ES: dict[str, str] = {
     ),
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
     "reason.license_not_found": (
-        "Quien publica dice tener licencia, y no encontramos ninguna licencia activa de "
-        "Texas con ese nombre."
+        "El número de licencia del anuncio no es una licencia activa de Texas."
     ),
     "reason.owner_not_poster": (
         "Quien publica dice ser el propietario, y el propietario registrado es otro."

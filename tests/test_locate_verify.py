@@ -506,13 +506,124 @@ def test_elsewhere_bar_follows_the_ruling():
     assert t.elsewhere_min_inliers == 50 and t.elsewhere_min_spread == 0.15
 
 
+# --- ambiguity rule (conductor ruling 03:46 on #28) ----------------------------------------------
+
+
+def _scripted_verify(script):
+    """A verify() stand-in. script maps a model to what its faces get: an inlier count, a
+    (count, spread) pair, or a list of those handed out one per call (the last one repeats).
+    A plain count has spread 0.5. A callable gets the face key ("model/sweep/face") so every
+    face keeps its own value across passes. Every call is appended to fake.calls."""
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    calls = dict.fromkeys(script, 0)
+
+    def fake(matcher, photo, face, ransac_px):
+        key = face.info[FEATURE_KEY]
+        fake.calls.append(key)
+        model = key.split("/")[0]
+        spec = script.get(model, 0)
+        if callable(spec):
+            spec = spec(key)
+        elif isinstance(spec, list):
+            spec = spec[min(calls[model], len(spec) - 1)]
+            calls[model] += 1
+        n, spread = spec if isinstance(spec, tuple) else (spec, 0.5)
+        return Verification(max(n, 4), n, np.eye(3) if n else None, spread if n else 0.0)
+
+    fake.calls = []
+    return fake
+
+
+def _per_face(first, rest):
+    """A per-face script: the first face seen gets `first`, every other face `rest`, and each
+    face keeps that value however many times it is verified."""
+    values = {}
+
+    def spec(key):
+        return values.setdefault(key, first if not values else rest)
+
+    return spec
+
+
+@pytest.mark.parametrize(
+    ("claimed_inliers", "other_inliers", "expected"),
+    [
+        (70, 390, LocateStatus.NOT_LOCATED),  # another building is far stronger: could not place
+        (390, 70, LocateStatus.LOCATED_IN_CLAIMED),
+        (100, 290, LocateStatus.LOCATED_IN_CLAIMED),  # under 3x: claimed-first still holds
+        (100, 300, LocateStatus.NOT_LOCATED),  # exactly 3x counts as far stronger
+        (70, 45, LocateStatus.LOCATED_IN_CLAIMED),  # 45 clears the strict bar (16) but not 3x
+        (70, 10, LocateStatus.LOCATED_IN_CLAIMED),  # under the strict bar: never counts
+        (70, 254, LocateStatus.NOT_LOCATED),  # seed 6, C6-L1 view: 70 claimed vs 254 in its own
+    ],
+)
+def test_a_far_stronger_match_elsewhere_makes_the_photo_unplaced(
+    twins, locator, monkeypatch, claimed_inliers, other_inliers, expected
+):
+    sweeps, _, _ = twins
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted_verify({"fx-model-a": claimed_inliers, "fx-model-b": other_inliers}),
+    )
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    result = locator.locate("fx-amb", {"p": photo}, "fx-prop-1")
+    assert result.photos[0].status is expected
+    if expected is LocateStatus.NOT_LOCATED:
+        assert result.photos[0].matched_model_id is None and "p" not in result.poses
+
+
+@pytest.mark.parametrize(
+    ("script", "expected"),
+    [
+        # claimed stops early at its first face (70 >= stop 60); a later claimed face is 200,
+        # so the rival's 210 is not 3x the claimed maximum
+        ({"fx-model-a": _per_face(70, 200), "fx-model-b": 210}, LocateStatus.LOCATED_IN_CLAIMED),
+        # rival at 3x+ but clumped (spread 0.05 < 0.15): it fails the strict bar, never counts
+        ({"fx-model-a": 12, "fx-model-b": (300, 0.05)}, LocateStatus.LOCATED_IN_CLAIMED),
+        # the rival search must not stop early at its first strong face (65) and miss the 300
+        ({"fx-model-a": 70, "fx-model-b": [65, 300]}, LocateStatus.NOT_LOCATED),
+    ],
+    ids=["claimed-early-stop", "rival-fails-strict", "rival-no-early-stop"],
+)
+def test_ambiguity_compares_full_searches_and_the_strict_bar(
+    twins, locator, monkeypatch, script, expected
+):
+    sweeps, _, _ = twins
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", _scripted_verify(script))
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    result = locator.locate("fx-amb2", {"p": photo}, "fx-prop-1")
+    assert result.photos[0].status is expected
+
+
+def test_no_claimed_rerun_when_the_first_pass_could_not_have_stopped_early(twins, monkeypatch):
+    # seed 6 shape: claimed 70, rival 254, stop 150. 70 < 150, so the claimed pass was already
+    # exhaustive; each claimed face must be verified exactly once.
+    sweeps, index, catalog = twins
+    t = replace(THRESHOLDS, stop_at_inliers=150)
+    fake = _scripted_verify({"fx-model-a": 70, "fx-model-b": 254})
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", fake)
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), t)
+    result = locator.locate(
+        "fx-norerun", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    claimed = [k for k in fake.calls if k.startswith("fx-model-a/")]
+    assert claimed and len(claimed) == len(set(claimed))
+
+
+def test_ambiguity_ratio_is_in_thresholds():
+    assert load_thresholds().ambiguity_ratio == 3.0
+
+
 # --- identification never depends on index order, and its guards each have a test ---------------
 
 
+@pytest.mark.parametrize("stop", [60, 12])  # at 12 the fixtures reach it: an early stop fires
 @pytest.mark.parametrize("sister_first", [True, False])
 @pytest.mark.parametrize("n_photos", [1, 2])
 def test_tract_twin_makes_identification_ambiguous_in_either_index_order(
-    twins, tmp_path, sister_first, n_photos
+    twins, tmp_path, sister_first, n_photos, stop
 ):
     sweeps, _, catalog = twins
     sister = sister_sweeps(sweeps, tmp_path)
@@ -520,7 +631,13 @@ def test_tract_twin_makes_identification_ambiguous_in_either_index_order(
     index = LocateIndex.build("fx-tract", [s for group in ordered for s in group], TinyEmbedder())
     models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
     all_sweeps = {"fx-model-a": sweeps["fx-model-a"], "fx-model-sister": sister}
-    locator = Locator(index, all_sweeps, Catalog(models), PatchMatcher(), THRESHOLDS)
+    locator = Locator(
+        index,
+        all_sweeps,
+        Catalog(models),
+        PatchMatcher(),
+        replace(THRESHOLDS, stop_at_inliers=stop),
+    )
 
     photos = {
         "p1": listing_photo(sweeps, "fx-model-a", 2, 1),
@@ -550,3 +667,19 @@ def test_unmapped_twin_does_not_identify(twins):
     assert result.photos[0].status is LocateStatus.NOT_LOCATED
     assert result.photos[0].matched_property_id is None
     assert result.identified_by_scan is False and result.claimed_property_id is None
+
+
+@pytest.mark.parametrize("ratio", ["1.0", "0.5"])
+def test_thresholds_reject_an_ambiguity_ratio_of_one_or_less(tmp_path, ratio):
+    import re
+
+    from snapback.vision.locate.thresholds import THRESHOLDS_FILE
+
+    text, swapped = re.subn(
+        r"ambiguity_ratio = [\d.]+", f"ambiguity_ratio = {ratio}", THRESHOLDS_FILE.read_text()
+    )
+    assert swapped == 1
+    copy = tmp_path / "t.toml"
+    copy.write_text(text)
+    with pytest.raises(ValueError, match="ambiguity_ratio"):
+        load_thresholds(copy)

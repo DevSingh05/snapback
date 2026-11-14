@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # from the fixture. "reply" waits for the poster's real reply photo, sent to
     # POST /cases/{id}/reply, and checks it.
     snapback_challenge: Literal["stand_in", "reply"] = "stand_in"
+    # A22: the live locator. Index folder under data/index, and the time one case may spend
+    # placing its photos (a photo not done in time reads "not located", never "elsewhere").
+    snapback_locate_index: str = "demo"
+    snapback_locate_budget_s: float = 25.0
     # The zone a card's times are shown in: the building's, not the server's. Houston is
     # America/Chicago.
     snapback_card_timezone: str = "America/Chicago"

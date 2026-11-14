@@ -42,7 +42,7 @@ Max 8 words per tagline, max 20 per subline. Honesty check on each.
    Honesty: a principle, not a claim. Same rent and manager caveat as 4.
 6. **Your listings are the bait. Check them first.**
    Subline: Scammers copy real listings. SNAPBACK checks each new listing against the building before renters ever see it.
-   Honesty: "Your listings are the bait" is the brief's own section line and true (Huberman fake ran on Apartments.com). Listing-time checks for platforms are **planned** (auditor fix, not in the MVP): say "can check", or keep this for the roadmap slide.
+   Honesty: "Your listings are the bait" is the brief's own section line and true (the Pasadena fake ran on Apartments.com). Listing-time checks for platforms are **planned** (auditor fix, not in the MVP): say "can check", or keep this for the roadmap slide.
 7. **Your 3D scans can stop fake rentals.**
    Subline: The Matterport twin already knows every room. SNAPBACK uses it to check where a listing's photos were taken.
    Honesty: "stop" is too strong on its own; the photo-to-twin match is real but only for buildings with a scan. Use "can help stop" if kept. Weakest for honesty.
@@ -53,8 +53,8 @@ Max 8 words per tagline, max 20 per subline. Honesty check on each.
    Subline: The place, the person or the price. SNAPBACK checks all three before money moves.
    Honesty: "every scam lies" is true by definition. "We check where" means we check those three places, not that we always find the lie. A judge may push; answer: "and when we can't tell, the card says so."
 9. **The house was real. The landlord wasn't.**
-   Subline: Pam Yeager sent $2,575. SNAPBACK checks the person too, not just the photos.
-   Honesty: true story (Yeager, Aug 2026, VERIFIED). This is the old line in story form; good opener, too narrow for the tagline (Vidyut's direction).
+   Subline: A renter in Fullerton, CA sent $2,575. SNAPBACK checks the person too, not just the photos.
+   Honesty: true story (Fullerton, Aug 2026, VERIFIED). This is the old line in story form; good opener, too narrow for the tagline (Vidyut's direction).
 10. **No deposit until the listing checks out.**
     Subline: Forward any rental. SNAPBACK checks the place, the person and the price against the building.
     Honesty: "checks out" can read as "proven safe", which the card never says. Usable as a spoken rule, risky as the printed tagline.
@@ -71,7 +71,7 @@ Pairing to try on the realtor page: headline "Make the listing prove it." then t
 
 "The photos are real. The person isn't." leaves the hero (artifact/snapback-brief.html line 171 still uses it; master-designer should swap it). It stays as a **story beat**, not a promise:
 
-- In the pitch, it is the turn after the Yeager story: "The house was real. The tour was real. The landlord wasn't." It explains why the Person row exists and why reverse image search is not enough.
+- In the pitch, it is the turn after the Fullerton story: "The house was real. The tour was real. The landlord wasn't." It explains why the Person row exists and why reverse image search is not enough.
 - In the problem section of the page and README, under "Every check looks at the photos. The photos aren't the lie."
 - Never as the tagline, the Devpost one-liner or the title of the result card, because it describes one scam and Vidyut wants all of them covered.
 
@@ -90,8 +90,8 @@ Number source: FTC Data Spotlight, Dec 22 2025: nearly 65,000 rental scam report
 - Checks: CoStar record, Matterport twin, Vexcel aerial, photo and reply store, payment and pressure rules, presence challenge: the brief from the main session (product spec, 21:15).
 - Result card rows Place, Person, Price; never SAFE or SCAM: brief; angles.md plain summary item 2.
 - Median loss $1,000 and 65,000 reports: FTC Data Spotlight Dec 22 2025 (need-evidence.md, VERIFIED).
-- Yeager, $2,575, real house and tour: framing-evidence.md plain answer 1 (VERIFIED).
-- Huberman fake on Apartments.com: need-evidence.md section 4 (VERIFIED).
+- Fullerton renter, $2,575, real house and tour: framing-evidence.md plain answer 1 (VERIFIED).
+- Pasadena fake on Apartments.com: need-evidence.md section 4 (VERIFIED).
 - Building checks need a CoStar record; demo coverage is Houston: costar-answers.md plain answer 2 (REPORTED, our probe confirms).
 - Rent and leasing contact fields may be missing: costar-answers.md plain answer 5. Lines 4 and 5 depend on it.
 - Platform listing-time checks: planned (decisions.md 17:32 auditor fix).

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,7 @@ from snapback.adapters.costar_jsonl import (
     _load_enums,
     decode,
 )
-from snapback.contracts import DataSource, ForSaleMatch, ForSaleStatus
+from snapback.contracts import DataSource, ForSaleMatch, ForSaleStatus, PropertyRecord
 from snapback.settings import get_settings
 
 RESIDENTIAL_FILE = "residential-listings.jsonl"
@@ -351,6 +352,58 @@ def _matterport_models(rec: dict[str, Any]) -> list[str]:
         and m.get("videoKey")
     ]
     return list(dict.fromkeys(keys))
+
+
+def house_records(
+    source: DataSource | None = None, kit_dir: Path | None = None
+) -> dict[str, PropertyRecord]:
+    """A PropertyRecord for each PUBLIC detached house with a Matterport model, by our id (the kit's
+    `propertyId` as text). Lat/lon are the listing's, the models are `_matterport_models`.
+    A house on several listings is one record holding every model. Nothing else (price,
+    owner, address) is kept: the locator only needs the home's id, models and position."""
+    source = source or get_settings().snapback_data_source
+    kit = kit_dir or (FIXTURE_KIT if source == DataSource.FIXTURE else DEFAULT_KIT)
+    path = _find(kit, RESIDENTIAL_FILE)
+    if path is None:
+        return {}
+    out: dict[str, PropertyRecord] = {}
+    for rec in _iter_jsonl(path):
+        pid, models = rec.get("propertyId"), _matterport_models(rec)
+        if (
+            not _public(rec)
+            or not models
+            or isinstance(pid, bool)
+            or not isinstance(pid, int)
+            or _get_any(rec, ["property.listingPropertyType"]) != DETACHED
+        ):
+            continue
+        found = out.get(str(pid))
+        if found is not None:
+            found.model_ids = list(dict.fromkeys([*found.model_ids, *models]))
+            continue
+        lat, lon = (
+            _get_any(rec, RESIDENTIAL_FIELDS["lat"]),
+            _get_any(rec, RESIDENTIAL_FIELDS["lon"]),
+        )
+        city = _get_any(rec, ["property.address.city"])
+        out[str(pid)] = PropertyRecord(
+            property_id=str(pid),
+            source=source,
+            market=city.strip().title() if isinstance(city, str) and city.strip() else None,
+            property_type="house",
+            lat=float(lat) if isinstance(lat, (int, float)) else None,
+            lon=float(lon) if isinstance(lon, (int, float)) else None,
+            model_ids=models,
+        )
+    # A model on more than one house cannot say which house a photo is in, and the catalog
+    # would keep the last owner: such a model belongs to none of them, so it can place no
+    # photo anywhere (never "elsewhere", never an identification).
+    owners = Counter(model for record in out.values() for model in record.model_ids)
+    for property_id, record in list(out.items()):
+        record.model_ids = [model for model in record.model_ids if owners[model] == 1]
+        if not record.model_ids:
+            del out[property_id]
+    return out
 
 
 def _sold_on(rec: dict[str, Any]) -> date | None:
