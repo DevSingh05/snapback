@@ -6,12 +6,11 @@ the run cannot be made (a requested model has no results); nothing is written th
 """
 
 import argparse
-import hashlib
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from snapback.eval.bank import FIXTURE_BANK, REPO_ROOT, load_bank
+from snapback.eval.bank import FIXTURE_BANK, REPO_ROOT, bank_digest, load_bank
 from snapback.eval.harness import check_holdout, check_injections, check_regression, evaluate
 from snapback.eval.results import read_meta, read_results, write_results
 
@@ -34,9 +33,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cases = load_bank(args.bank)
-    synthetic = all(case.synthetic for case in cases)
-    frozen_at = args.frozen_at or ("FIXTURE" if synthetic else "unfrozen")
     split = None if args.split == "all" else args.split
+    scored = [case for case in cases if split is None or case.split == split]
+    kinds = {case.synthetic for case in scored}
+    if len(kinds) > 1:
+        # One n would mix synthetic and real cases, and one label could not be true for both.
+        print(
+            f"eval: the scored cases mix synthetic ({sum(c.synthetic for c in scored)}) and real "
+            f"({sum(not c.synthetic for c in scored)}) cases; score them as separate banks"
+        )
+        return 2
+    synthetic = kinds != {False}
+    frozen_at = args.frozen_at or ("FIXTURE" if synthetic else "unfrozen")
 
     try:
         rows = evaluate(cases, args.models, split=split, frozen_at=frozen_at)
@@ -47,7 +55,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     meta = {
         "split": args.split,
         "bank": args.bank.name,
-        "bank_sha256": hashlib.sha256(args.bank.read_bytes()).hexdigest(),
+        "bank_sha256": bank_digest(args.bank),
         "models": ",".join(args.models),
     }
 

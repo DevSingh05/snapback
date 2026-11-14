@@ -272,10 +272,11 @@ def test_committed_results_pass_the_gate_against_the_frozen_baseline(tmp_path):
 
 
 def _padded_bank(tmp_path) -> Path:
-    """The bank plus three copies of a forged case every condition catches."""
+    """The bank plus three copies of a forged case every condition catches, so no rate rises:
+    only the bank-hash and n guards can fail the run."""
     lines = BANK.read_text().splitlines()
-    caught = next(line for line in lines if '"fx-ev-f03"' in line)
-    extra = [caught.replace('"fx-ev-f03"', f'"fx-ev-f03-copy{i}"') for i in range(3)]
+    caught = next(line for line in lines if '"fx-ev-f06"' in line)  # rejected under every condition
+    extra = [caught.replace('"fx-ev-f06"', f'"fx-ev-f06-copy{i}"') for i in range(3)]
     padded = tmp_path / "padded.jsonl"
     padded.write_text("\n".join([*lines, *extra]) + "\n")
     return padded
@@ -332,3 +333,64 @@ def test_meta_records_the_bank_hash(tmp_path):
     assert main(["--bank", str(BANK), "--out", str(out)]) == 0
     meta = read_meta(out)
     assert len(meta["bank_sha256"]) == 64
+
+
+# --- third review (#62): LIVE only when every scored case is real -------------------------------
+
+
+def _bank_with(tmp_path, *, real_ids: set[str]) -> Path:
+    """The fixture bank with the named cases marked real (synthetic false)."""
+    out = []
+    for line in BANK.read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            row = json.loads(line)
+            if row["case_id"] in real_ids:
+                row["synthetic"] = False
+            line = json.dumps(row)
+        out.append(line)
+    path = tmp_path / "bank.jsonl"
+    path.write_text("\n".join(out) + "\n")
+    return path
+
+
+def test_a_mixed_scored_set_is_refused(tmp_path, capsys):
+    bank = _bank_with(tmp_path, real_ids={"fx-ev-f01"})  # one real h0 case among synthetic ones
+    out = tmp_path / "results.csv"
+    assert main(["--bank", str(bank), "--out", str(out)]) == 2
+    assert not out.exists()
+    assert "synthetic" in capsys.readouterr().out
+
+
+def test_label_comes_from_the_scored_cases_not_the_whole_bank(tmp_path):
+    # A real case in dev is not scored on h0: the h0 run is still FIXTURE.
+    bank = _bank_with(tmp_path, real_ids={"fx-ev-f08"})
+    out = tmp_path / "results.csv"
+    assert main(["--bank", str(bank), "--out", str(out)]) == 0
+    assert out.read_text().startswith("# FIXTURE")
+    assert all(row.frozen_at == "FIXTURE" for row in read_results(out))
+
+
+def test_live_only_when_every_scored_case_is_real(tmp_path):
+    h0 = [
+        json.loads(line)["case_id"]
+        for line in BANK.read_text().splitlines()
+        if line.strip() and not line.startswith("#") and json.loads(line)["split"] == "h0"
+    ]
+    bank = _bank_with(tmp_path, real_ids=set(h0))
+    out = tmp_path / "results.csv"
+    assert main(["--bank", str(bank), "--out", str(out), "--frozen-at", "h0-test"]) == 0
+    assert out.read_text().startswith("# LIVE")
+
+
+def test_bank_hash_covers_the_base_fixtures(tmp_path):
+    import shutil
+
+    from snapback.eval.bank import bank_digest
+
+    bases = tmp_path / "bases"
+    shutil.copytree(REPO / "fixtures" / "contracts", bases)
+    before = bank_digest(BANK, bases)
+    (bases / "module_evidence_hold.json").write_text(
+        (bases / "module_evidence_hold.json").read_text().replace('"proven"', '"waiting"', 1)
+    )
+    assert bank_digest(BANK, bases) != before

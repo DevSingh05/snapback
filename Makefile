@@ -41,5 +41,6 @@ purge: ## delete everything under data/ (sponsor caches, memory DB); sponsor ter
 eval: ## eval harness: writes eval/results.csv (aggregate numbers only) and runs the gate
 	uv run python -m snapback.eval --baseline eval/baseline.csv
 
-eval-baseline: ## freeze the current eval/results.csv as the gate's baseline (a deliberate step)
+eval-baseline: ## rescore without the regression gate, then freeze it as the baseline (deliberate)
+	uv run python -m snapback.eval
 	cp eval/results.csv eval/baseline.csv

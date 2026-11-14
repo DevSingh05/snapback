@@ -19,6 +19,7 @@ Kinds:
 - injection: the gate case; the injected copy must get the same state as the plain one.
 """
 
+import hashlib
 import json
 from enum import StrEnum
 from pathlib import Path
@@ -80,6 +81,20 @@ def _case(row: dict[str, Any], bases_dir: Path) -> BankCase:
         evidence=ModuleEvidence.model_validate(evidence),
         injected=None if injected is None else ModuleEvidence.model_validate(injected),
     )
+
+
+def bank_digest(path: Path = FIXTURE_BANK, bases_dir: Path = CONTRACT_FIXTURES) -> str:
+    """sha256 over the bank file and every base evidence file it names, so editing a base
+    fixture changes the digest as surely as editing the bank."""
+    digest = hashlib.sha256(Path(path).read_bytes())
+    bases = set()
+    for line in Path(path).read_text().splitlines():
+        if line.strip() and not line.lstrip().startswith("#"):
+            bases.add(json.loads(line)["base"])
+    for name in sorted(bases):
+        digest.update(name.encode())
+        digest.update((bases_dir / name).read_bytes())
+    return digest.hexdigest()
 
 
 def load_bank(path: Path = FIXTURE_BANK, bases_dir: Path = CONTRACT_FIXTURES) -> list[BankCase]:

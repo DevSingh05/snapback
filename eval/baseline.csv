@@ -1,5 +1,5 @@
 # FIXTURE: synthetic case bank, not a measurement
-# meta: split=h0 bank=case_bank.jsonl bank_sha256=cc02845dec45044169019876e1ff5387ffdb1638a5999f7a80f831212c42331b models=v0,v1
+# meta: split=h0 bank=case_bank.jsonl bank_sha256=adf62e23280708807937f860e50dd3fa3a58cd5f62b0be4bdad2244562274b9c models=v0,v1
 condition,metric,k,n,rate,ci_low,ci_high,frozen_at
 rules_only,forged_false_accept,6,7,0.8571,0.4869,0.9743,FIXTURE
 rules_plus_model_v0,forged_false_accept,3,7,0.4286,0.1582,0.7495,FIXTURE
