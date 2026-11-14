@@ -1,14 +1,21 @@
-"""Vexcel aerial adapter (lane D, D2): one oblique tile per building, `AerialTile` out.
+"""Vexcel aerial adapter (lane D, D2): oblique tiles per building, `AerialTile` out.
 
-Fixture mode returns the synthetic tile in `fixtures/contracts/aerial_tile.json`. Live mode calls
-the Vexcel REST API with `X-API-KEY` from `.env`, backs off on 429 (Retry-After first, then
-exponential), and caches the tile under `data/vexcel/` for at most 7 days. Imagery never goes into
-git, a log, an issue or an outside model.
+Fixture mode returns the synthetic tile in `fixtures/contracts/aerial_tile.json`. Live mode follows
+the sponsor's Vexcel API 2.0 quickstart:
 
-If no tile comes back, this returns None and the card ships record facts only.
+1. `GET oriented/collections` over a small square around the building (layer `urban`, product
+   type `oblique`) lists which oblique directions exist and their last capture date. Obliques only
+   exist in the `urban` layer; a 404 means no oblique coverage here.
+2. `POST oriented/extract` with `product-type: oblique-<direction>` returns the image bytes.
+   `direction="nadir"` uses `POST ortho/extract` over every ortho layer instead.
 
-UNCONFIRMED: the tile route and its query names (`TILE_PATH`, `_params`) are our best reading of
-the sponsor's description; check them with one live call once a key is in `.env`.
+`X-API-KEY` comes from `.env`. A 429 is retried (Retry-After first, else exponential), and a wait
+over 30 s gives up. Tiles are cached under `data/vexcel/` for at most 7 days (`make purge`
+deletes them). Imagery never goes into git, a log, an issue or an outside model. No tile means
+None, and the card ships record facts only.
+
+`two_building_proof` puts the claimed building and the building the photos matched side by side,
+with the distance between them.
 """
 
 from __future__ import annotations
@@ -18,7 +25,10 @@ import math
 import re
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -29,26 +39,48 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_TILE = REPO_ROOT / "fixtures" / "contracts" / "aerial_tile.json"
 
 BASE_URL = "https://api.vexcelgroup.com/v2"
-TILE_PATH = "/images/oblique"
+ORTHO_LAYERS = "urban,urban-r,wide-area,urban-g"  # the API picks the best one here
+OBLIQUE_LAYER = "urban"  # the only layer with obliques
+HALF_SIDE_M = 40  # square around the building's point: 80 m across
+BUFFER_M = 10
 CACHE_DAYS = 7
 MAX_RETRIES = 3
 MAX_WAIT_S = 30.0  # a longer Retry-After is over budget: give up, ship record facts only
-TIMEOUT_S = 15.0
+TIMEOUT_S = 60.0
+DIRECTIONS = ("north", "east", "south", "west", "nadir")
 _FROM_SETTINGS = object()
 _SAFE = re.compile(r"[^A-Za-z0-9_-]")
+
+Sleep = Callable[[float], None]
 
 
 class VexcelKeyMissingError(RuntimeError):
     pass
 
 
-def _fixture(record: PropertyRecord) -> AerialTile:
+def _fixture(record: PropertyRecord, direction: str) -> AerialTile:
     tile = AerialTile.model_validate(json.loads(FIXTURE_TILE.read_text(encoding="utf-8")))
-    return tile.model_copy(update={"property_id": record.property_id})
+    return tile.model_copy(update={"property_id": record.property_id, "direction": direction})
 
 
-def _params(record: PropertyRecord, direction: str) -> dict[str, str]:
-    return {"lat": str(record.lat), "lon": str(record.lon), "orientation": direction}
+def square_around(lat: float, lon: float, half_m: float = HALF_SIDE_M) -> str:
+    """WKT square centred on the point. WKT is (lon lat), the reverse of lat, lon."""
+    dlat = half_m / 111_320
+    dlon = half_m / (111_320 * math.cos(math.radians(lat)))
+    w, e, s, n = lon - dlon, lon + dlon, lat - dlat, lat + dlat
+    return f"POLYGON(({w} {s},{e} {s},{e} {n},{w} {n},{w} {s}))"
+
+
+def distance_m(a: PropertyRecord, b: PropertyRecord) -> float | None:
+    """Great-circle distance between two buildings, or None when either has no coordinates."""
+    if None in (a.lat, a.lon, b.lat, b.lon):
+        return None
+    lat1, lon1, lat2, lon2 = map(math.radians, (a.lat, a.lon, b.lat, b.lon))  # type: ignore[arg-type]
+    h = (
+        math.sin((lat2 - lat1) / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    )
+    return 2 * 6_371_000 * math.asin(math.sqrt(h))
 
 
 def _wait_s(response: httpx.Response, attempt: int) -> float | None:
@@ -65,6 +97,58 @@ def _wait_s(response: httpx.Response, attempt: int) -> float | None:
     return max(0.0, wait)
 
 
+def _send(
+    http: httpx.Client, method: str, path: str, key: str, sleep: Sleep, **kwargs: Any
+) -> httpx.Response | None:
+    """One API call with the 429 policy. None means rate limited past the budget."""
+    for attempt in range(MAX_RETRIES + 1):
+        response = http.request(method, f"{BASE_URL}/{path}", headers={"X-API-KEY": key}, **kwargs)
+        if response.status_code != 429:
+            return response
+        wait = _wait_s(response, attempt)
+        if wait is None or attempt == MAX_RETRIES:
+            return None
+        sleep(wait)
+    return None
+
+
+def _capture_date(value: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _oblique_capture(
+    http: httpx.Client, wkt: str, key: str, direction: str, sleep: Sleep
+) -> tuple[bool, date | None]:
+    """(this direction exists here, its newest capture date)."""
+    r = _send(
+        http,
+        "GET",
+        "oriented/collections",
+        key,
+        sleep,
+        params={
+            "wkt": wkt,
+            "srid": 4326,
+            "layer": OBLIQUE_LAYER,
+            "product-type": "oblique",
+            "include": "product-type,collection,last-capture-date",
+        },
+    )
+    if r is None or r.status_code != 200:
+        return False, None  # 404: no oblique coverage at this location
+    wanted = f"oblique-{direction}"
+    dates = [
+        _capture_date((f.get("properties") or {}).get("last-capture-date"))
+        for f in r.json().get("features", [])
+        if (f.get("properties") or {}).get("product-type") == wanted
+    ]
+    dates = [d for d in dates if d is not None]
+    return bool(dates), max(dates, default=None)
+
+
 def get_tile(
     record: PropertyRecord,
     direction: str = "north",
@@ -73,54 +157,97 @@ def get_tile(
     data_dir: Path | None = None,
     api_key: str | None | object = _FROM_SETTINGS,
     client: httpx.Client | None = None,
-    sleep: Callable[[float], None] = time.sleep,
+    sleep: Sleep = time.sleep,
 ) -> AerialTile | None:
     settings = get_settings()
     source = source or settings.snapback_data_source
     if source == DataSource.FIXTURE:
-        return _fixture(record)
-    if record.lat is None or record.lon is None:
+        return _fixture(record, direction)
+    if record.lat is None or record.lon is None or direction not in DIRECTIONS:
         return None
     if api_key is _FROM_SETTINGS:
         secret = settings.vexcel_api_key
         api_key = secret.get_secret_value() if secret else None
     if not api_key:
         raise VexcelKeyMissingError("VEXCEL_API_KEY is not set in .env; live tiles need it.")
+    key = str(api_key)
 
     cache = Path(data_dir or settings.snapback_data_dir) / "vexcel"
     path = cache / f"{_SAFE.sub('_', record.property_id)}-{_SAFE.sub('_', direction)}.jpg"
-    tile = AerialTile(
-        property_id=record.property_id, source=DataSource.LIVE, direction=direction, path=str(path)
-    )
+    meta = path.with_suffix(".json")
     if path.is_file() and time.time() - path.stat().st_mtime < CACHE_DAYS * 24 * 3600:
-        return tile
+        captured = None
+        if meta.is_file():
+            captured = _capture_date(json.loads(meta.read_text()).get("captured_on"))
+        return AerialTile(
+            property_id=record.property_id,
+            source=DataSource.LIVE,
+            direction=direction,
+            captured_on=captured,
+            path=str(path),
+        )
 
+    wkt = square_around(record.lat, record.lon)
     owns_client = client is None
     http = client or httpx.Client(timeout=TIMEOUT_S)
     try:
-        for attempt in range(MAX_RETRIES + 1):
-            response = http.get(
-                BASE_URL + TILE_PATH,
-                params=_params(record, direction),
-                headers={"X-API-KEY": str(api_key)},
-            )
-            if response.status_code == 429:
-                wait = _wait_s(response, attempt)
-                if wait is None:
-                    return None
-                if attempt < MAX_RETRIES:
-                    sleep(wait)
-                continue
-            if response.status_code != 200:
+        captured: date | None = None
+        if direction == "nadir":
+            endpoint = "ortho/extract"
+            body: dict[str, Any] = {"layer": ORTHO_LAYERS, "crop": "bounding_box"}
+            body["image-format"] = "jpeg"
+        else:
+            exists, captured = _oblique_capture(http, wkt, key, direction, sleep)
+            if not exists:
                 return None
-            if not response.headers.get("content-type", "").startswith("image/"):
-                return None
-            cache.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(response.content)
-            return tile
-        return None
+            endpoint = "oriented/extract"
+            body = {
+                "layer": OBLIQUE_LAYER,
+                "product-type": f"oblique-{direction}",
+                "rotation": "natural",
+                "crop": "bbox",
+                "image-format": "jpeg",
+            }
+        body |= {"wkt": wkt, "srid": 4326, "buffer-meter": BUFFER_M}
+        r = _send(http, "POST", endpoint, key, sleep, json=body)
+        if r is None or r.status_code != 200:
+            return None
+        if not r.headers.get("content-type", "").startswith("image/"):
+            return None
+        cache.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(r.content)
+        meta.write_text(json.dumps({"captured_on": captured.isoformat() if captured else None}))
+        return AerialTile(
+            property_id=record.property_id,
+            source=DataSource.LIVE,
+            direction=direction,
+            captured_on=captured,
+            path=str(path),
+        )
     except httpx.HTTPError:
         return None
     finally:
         if owns_client:
             http.close()
+
+
+@dataclass(frozen=True)
+class TwoBuildingProof:
+    """The claimed building and the building the photos matched, from the air, side by side."""
+
+    claimed: AerialTile | None
+    matched: AerialTile | None
+    distance_m: float | None  # None when either record has no coordinates
+
+
+def two_building_proof(
+    claimed: PropertyRecord,
+    matched: PropertyRecord,
+    direction: str = "north",
+    **kwargs: Any,
+) -> TwoBuildingProof:
+    return TwoBuildingProof(
+        claimed=get_tile(claimed, direction, **kwargs),
+        matched=get_tile(matched, direction, **kwargs),
+        distance_m=distance_m(claimed, matched),
+    )

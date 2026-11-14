@@ -1,25 +1,66 @@
-"""D2: Vexcel tile adapter. Fixture mode, 429 back-off, 7-day cache under data/."""
+"""D2: Vexcel adapter. Fixture mode, the oriented/collections + extract flow, 429 budget, cache,
+and the two-building proof (claimed vs matched building, with the distance)."""
 
+import json
 import os
 import time
+from datetime import date
 from pathlib import Path
 
 import httpx
 import pytest
 
-from snapback.adapters.vexcel import VexcelKeyMissingError, get_tile
+from snapback.adapters.vexcel import (
+    VexcelKeyMissingError,
+    distance_m,
+    get_tile,
+    two_building_proof,
+)
 from snapback.contracts import DataSource, PropertyRecord
 
 JPEG = b"\xff\xd8\xff\xe0fake-tile"
 RECORD = PropertyRecord(property_id="fx-prop-1", source=DataSource.FIXTURE, lat=1.5, lon=-2.5)
+OTHER = PropertyRecord(property_id="fx-prop-3", source=DataSource.FIXTURE, lat=1.5, lon=-2.49)
 
 
-def _client(responses: list[httpx.Response], seen: list[httpx.Request]) -> httpx.Client:
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return responses.pop(0)
+def _image() -> httpx.Response:
+    return httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
 
-    return httpx.Client(transport=httpx.MockTransport(handler))
+
+def _coverage(*directions: str, captured: str = "2025-06-01T00:00:00Z") -> httpx.Response:
+    feats = [
+        {"properties": {"product-type": f"oblique-{d}", "last-capture-date": captured}}
+        for d in directions
+    ]
+    return httpx.Response(200, json={"features": feats})
+
+
+class Api:
+    """Mock Vexcel: a queue of responses per route; records every request."""
+
+    def __init__(self, **routes: list[httpx.Response]) -> None:
+        self.routes = {k.replace("__", "/"): v for k, v in routes.items()}
+        self.seen: list[httpx.Request] = []
+
+    def client(self) -> httpx.Client:
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.seen.append(request)
+            route = request.url.path.removeprefix("/v2/")
+            return self.routes[route].pop(0)
+
+        return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def _live(tmp_path: Path, api: Api, sleeps: list[float] | None = None, **kw):
+    return get_tile(
+        kw.pop("record", RECORD),
+        kw.pop("direction", "north"),
+        source=DataSource.LIVE,
+        data_dir=tmp_path,
+        api_key="fx-key",
+        client=api.client(),
+        sleep=(sleeps.append if sleeps is not None else lambda s: None),
+    )
 
 
 def test_fixture_tile_mode(tmp_path):
@@ -30,58 +71,85 @@ def test_fixture_tile_mode(tmp_path):
     assert tile.path.startswith("fixtures/")
 
 
-def test_429_backs_off(tmp_path):
-    seen: list[httpx.Request] = []
-    sleeps: list[float] = []
-    responses = [
-        httpx.Response(429, headers={"Retry-After": "2"}),
-        httpx.Response(429),
-        httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"}),
-    ]
-    tile = get_tile(
-        RECORD,
-        source=DataSource.LIVE,
-        data_dir=tmp_path,
-        api_key="fx-key",
-        client=_client(responses, seen),
-        sleep=sleeps.append,
-    )
+def test_live_oblique_checks_coverage_then_extracts(tmp_path):
+    api = Api(oriented__collections=[_coverage("north", "east")], oriented__extract=[_image()])
+    tile = _live(tmp_path, api)
     assert tile is not None and tile.source == DataSource.LIVE
-    assert len(seen) == 3
+    assert tile.captured_on == date(2025, 6, 1)
+    assert Path(tile.path).read_bytes() == JPEG
+    coverage, extract = api.seen
+    assert coverage.method == "GET" and coverage.url.params["layer"] == "urban"
+    body = json.loads(extract.content)
+    assert body["product-type"] == "oblique-north" and body["srid"] == 4326
+    assert body["wkt"].startswith("POLYGON((-2.5")  # WKT is lon lat
+    assert all(r.headers["X-API-KEY"] == "fx-key" for r in api.seen)
+
+
+def test_no_oblique_in_that_direction_means_no_tile(tmp_path):
+    api = Api(oriented__collections=[_coverage("east")])
+    assert _live(tmp_path, api) is None
+    assert len(api.seen) == 1  # no extract was tried
+
+
+def test_no_oblique_coverage_404_means_no_tile(tmp_path):
+    api = Api(oriented__collections=[httpx.Response(404)])
+    assert _live(tmp_path, api) is None
+
+
+def test_nadir_uses_the_ortho_extract(tmp_path):
+    api = Api(ortho__extract=[_image()])
+    tile = _live(tmp_path, api, direction="nadir")
+    assert tile is not None and tile.direction == "nadir"
+    assert "urban-r" in json.loads(api.seen[0].content)["layer"]
+
+
+def test_429_backs_off(tmp_path):
+    sleeps: list[float] = []
+    api = Api(
+        oriented__collections=[
+            httpx.Response(429, headers={"Retry-After": "2"}),
+            httpx.Response(429),
+            _coverage("north"),
+        ],
+        oriented__extract=[_image()],
+    )
+    tile = _live(tmp_path, api, sleeps)
+    assert tile is not None
     assert sleeps[0] == 2.0  # Retry-After wins
     assert sleeps[1] > 0
-    assert Path(tile.path).read_bytes() == JPEG
-    assert seen[0].headers["X-API-KEY"] == "fx-key"
+    assert len(api.seen) == 4
 
 
 def test_gives_up_after_retries_and_returns_none(tmp_path):
-    seen: list[httpx.Request] = []
-    tile = get_tile(
-        RECORD,
-        source=DataSource.LIVE,
-        data_dir=tmp_path,
-        api_key="fx-key",
-        client=_client([httpx.Response(429) for _ in range(10)], seen),
-        sleep=lambda s: None,
-    )
-    assert tile is None  # the card ships record facts only
-    assert len(seen) == 4
+    api = Api(oriented__collections=[httpx.Response(429) for _ in range(10)])
+    assert _live(tmp_path, api) is None  # the card ships record facts only
+    assert len(api.seen) == 4
+
+
+@pytest.mark.parametrize("retry_after", ["86400", "inf", "nan"])
+def test_retry_after_over_budget_gives_up_without_sleeping(tmp_path, retry_after):
+    sleeps: list[float] = []
+    api = Api(oriented__collections=[httpx.Response(429, headers={"Retry-After": retry_after})])
+    assert _live(tmp_path, api, sleeps) is None
+    assert sleeps == []
+    assert len(api.seen) == 1
 
 
 def test_cached_tile_skips_the_network_for_seven_days(tmp_path):
-    seen: list[httpx.Request] = []
-    ok = httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
-    args = dict(source=DataSource.LIVE, data_dir=tmp_path, api_key="fx-key", sleep=lambda s: None)
-    first = get_tile(RECORD, client=_client([ok], seen), **args)
-    again = get_tile(RECORD, client=_client([], seen), **args)
+    first = _live(
+        tmp_path, Api(oriented__collections=[_coverage("north")], oriented__extract=[_image()])
+    )
+    again_api = Api()
+    again = _live(tmp_path, again_api)
     assert first is not None and again is not None and again.path == first.path
-    assert len(seen) == 1
+    assert again.captured_on == date(2025, 6, 1)  # kept beside the cached image
+    assert again_api.seen == []
 
     old = time.time() - 8 * 24 * 3600
     os.utime(first.path, (old, old))
-    fresh = httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
-    assert get_tile(RECORD, client=_client([fresh], seen), **args) is not None
-    assert len(seen) == 2
+    fresh = Api(oriented__collections=[_coverage("north")], oriented__extract=[_image()])
+    assert _live(tmp_path, fresh) is not None
+    assert len(fresh.seen) == 2
 
 
 def test_live_without_a_key_says_so(tmp_path):
@@ -95,48 +163,26 @@ def test_record_without_coordinates_has_no_tile(tmp_path):
 
 
 def test_non_image_reply_is_not_cached(tmp_path):
-    seen: list[httpx.Request] = []
-    bad = httpx.Response(200, json={"error": "nope"})
-    tile = get_tile(
-        RECORD,
-        source=DataSource.LIVE,
-        data_dir=tmp_path,
-        api_key="fx-key",
-        client=_client([bad], seen),
-        sleep=lambda s: None,
+    api = Api(
+        oriented__collections=[_coverage("north")],
+        oriented__extract=[httpx.Response(200, json={"error": "nope"})],
     )
-    assert tile is None
+    assert _live(tmp_path, api) is None
     assert not list(tmp_path.rglob("*.jpg"))
 
 
-@pytest.mark.parametrize("retry_after", ["86400", "inf", "nan"])
-def test_retry_after_over_budget_gives_up_without_sleeping(tmp_path, retry_after):
-    seen: list[httpx.Request] = []
-    sleeps: list[float] = []
-    tile = get_tile(
-        RECORD,
-        source=DataSource.LIVE,
-        data_dir=tmp_path,
-        api_key="fx-key",
-        client=_client([httpx.Response(429, headers={"Retry-After": retry_after})], seen),
-        sleep=sleeps.append,
-    )
-    assert tile is None
-    assert sleeps == []
-    assert len(seen) == 1
-
-
 def test_direction_cannot_walk_out_of_the_cache(tmp_path):
-    seen: list[httpx.Request] = []
-    ok = httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
-    tile = get_tile(
-        RECORD,
-        "../../evil",
-        source=DataSource.LIVE,
-        data_dir=tmp_path,
-        api_key="fx-key",
-        client=_client([ok], seen),
-        sleep=lambda s: None,
-    )
-    assert tile is not None
-    assert Path(tile.path).resolve().parent == (tmp_path / "vexcel").resolve()
+    assert _live(tmp_path, Api(), direction="../../evil") is None  # not a known direction
+
+
+def test_distance_between_two_buildings():
+    d = distance_m(RECORD, OTHER)
+    assert d is not None and 1100 < d < 1125  # 0.01 degrees of longitude near the equator
+    assert distance_m(RECORD, PropertyRecord(property_id="fx-x", source=DataSource.FIXTURE)) is None
+
+
+def test_two_building_proof_has_both_tiles_and_the_distance(tmp_path):
+    proof = two_building_proof(RECORD, OTHER, source=DataSource.FIXTURE, data_dir=tmp_path)
+    assert proof.claimed is not None and proof.claimed.property_id == "fx-prop-1"
+    assert proof.matched is not None and proof.matched.property_id == "fx-prop-3"
+    assert proof.distance_m is not None and proof.distance_m > 1000
