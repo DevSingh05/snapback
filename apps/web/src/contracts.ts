@@ -108,6 +108,22 @@ export interface TraceEvent {
   chosen_by: ChosenBy;
 }
 
+// One working note the agent wrote (GET /cases/{id}/notes). Derived text only.
+export interface CaseNote {
+  path: string;
+  stem: string;
+  agent: string;
+  text: string;
+  written_by: ChosenBy;
+}
+
+export interface CaseNotes {
+  case_id: string;
+  source: DataSource;
+  notes: CaseNote[];
+  footer: string;
+}
+
 // Mirrors Pose and the parts of LocateResult the twin reads (src/snapback/contracts.py).
 export interface Pose {
   sweep_id?: string | null;
