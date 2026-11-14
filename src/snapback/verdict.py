@@ -515,10 +515,22 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     else:
         main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
 
+    matched = []
+    if elsewhere and modules.matched_office:
+        matched = [
+            _line(
+                lang,
+                "label.matched_home",
+                CardTone.NOT_CHECKED,
+                "place.matched_office",
+                office=modules.matched_office,
+            )
+        ]
     return CardRow(
         kind=CardRowKind.PLACE,
         lines=[
             main,
+            *_from_record(modules, matched),
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_seen_before_lines(modules, lang, replies=False),
         ],

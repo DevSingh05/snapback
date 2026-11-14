@@ -19,6 +19,11 @@ DEFAULT_LANG = "en"
 EN: dict[str, str] = {
     # --- line labels -----------------------------------------------------------------------
     "label.real": "Real",
+    "label.matched_home": "Home in the photos",
+    "place.matched_office": (
+        "The home in these photos is listed by its office on CoStar's record: {office}. "
+        "We can't tell you if it is for rent, or at this price."
+    ),
     "label.here_now": "Here now",
     "label.allowed": "Allowed to rent it",
     "label.payment_ask": "Payment ask",
@@ -465,6 +470,11 @@ EN: dict[str, str] = {
 # "No comprobado".
 ES: dict[str, str] = {
     "label.real": "Real",
+    "label.matched_home": "Vivienda de las fotos",
+    "place.matched_office": (
+        "La vivienda de estas fotos figura con esta oficina en el registro de CoStar: {office}. "
+        "No podemos decirle si está en alquiler, ni a este precio."
+    ),
     "label.here_now": "Aquí ahora",
     "label.allowed": "Con permiso para alquilarlo",
     "label.payment_ask": "Pago que piden",

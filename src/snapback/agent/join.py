@@ -111,6 +111,25 @@ def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
         return None
 
 
+MAX_OFFICE_CHARS = 80
+
+
+def matched_office_of(lookups: object, locate: LocateResult | None) -> str | None:
+    """The office on CoStar's record for the home a photo was placed in (the first such photo),
+    company name only. None when no photo was placed elsewhere, the home is not held, or its
+    record names no company. Nothing is looked up for the claimed home."""
+    if lookups is None or locate is None:
+        return None
+    for photo in locate.photos:
+        found = photo.matched_property_id
+        if photo.status is not LocateStatus.LOCATED_ELSEWHERE or not found:
+            continue
+        record = lookups.record(found)  # type: ignore[attr-defined]
+        company = (record.manager_company or "").strip() if record is not None else ""
+        return company[:MAX_OFFICE_CHARS] or None
+    return None
+
+
 class KitLookups:
     """Lane D's adapters. The kit is parsed once and kept for the life of the process."""
 
@@ -299,6 +318,14 @@ class JoinedModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
+
+    def matched_office(self, case_id: str, locate: LocateResult | None) -> str | None:
+        """X1: the office on record for the home the photos were placed in, if elsewhere."""
+        try:
+            return matched_office_of(self._lookups, locate)
+        except Exception as error:  # a lookup that breaks leaves the line out, never the case
+            log.warning("matched office not read (%s)", type(error).__name__)
+            return None
 
     def ad_notes(self, case_id: str) -> list[AdNote]:
         """Ad vs record: the ad's claims against the home's record. No record, no notes."""

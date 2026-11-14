@@ -227,6 +227,9 @@ class CaseSession:
             )
             located = self.modules.locate(self.case_id)
             update["locate"] = located
+            office_of = getattr(self.modules, "matched_office", None)
+            if office_of is not None and located is not None:
+                update["matched_office"] = office_of(self.case_id, located)
             if located is not None:
                 self._candidates = [c for c in (located.chosen, *located.alternatives) if c]
                 placed = [p for p in located.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
