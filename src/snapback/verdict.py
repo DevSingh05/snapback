@@ -540,6 +540,24 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
 MAX_BROKERAGE_CHARS = 80
 
 
+def for_sale_record(found: ForSaleMatch, lang: str) -> tuple[str, str | None]:
+    """What the for-sale record says, in the card's LOCKED words, and the brokerage it names.
+    One place builds this sentence, so a search line and the card never word it differently."""
+    offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
+    brokerage = next((name for name in offices if name), None)
+    since = found.listed_on.isoformat() if found.listed_on else None
+    record_key = {
+        (True, True): "place.for_sale_record",
+        (True, False): "place.for_sale_record_no_date",
+        (False, True): "place.for_sale_record_no_brokerage",
+        (False, False): "place.for_sale_record_bare",
+    }[(brokerage is not None, since is not None)]
+    record = strings.text(
+        record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
+    )
+    return record, brokerage
+
+
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     status = _for_sale(modules)
     if status is ForSaleStatus.ACTIVE:
@@ -547,18 +565,7 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         # for sale are sometimes also offered for lease, and whether this one is leased is
         # something we do not know. The line says what the record says and who to ask.
         found = modules.for_sale
-        offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
-        brokerage = next((name for name in offices if name), None)
-        since = found.listed_on.isoformat() if found.listed_on else None
-        record_key = {
-            (True, True): "place.for_sale_record",
-            (True, False): "place.for_sale_record_no_date",
-            (False, True): "place.for_sale_record_no_brokerage",
-            (False, False): "place.for_sale_record_bare",
-        }[(brokerage is not None, since is not None)]
-        record = strings.text(
-            record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
-        )
+        record, brokerage = for_sale_record(found, lang)
         if _the_ad_is_the_office_s(modules):
             # The brokerage itself is offering the home (ruling, Sat 03:36). Information
             # only: it holds nothing, and the renter is told who to ask.

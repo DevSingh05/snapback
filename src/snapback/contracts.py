@@ -8,7 +8,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DataSource(StrEnum):
@@ -840,7 +840,44 @@ class PlaceMatch(BaseModel):
     has_3d_scan: bool = False
     scan_text: str | None = None  # "a 3D scan in this building"
     office_on_record: str | None = None  # company name only
+    # True only for a place that got the record-side deep check (the model picks up to three
+    # per search); every other place is "researched" only. The line is built by code from the
+    # record, so it is the same for the same place whoever chose it.
+    checked: bool = False
+    check_line: str | None = None
     source: DataSource
+
+
+class SearchDecision(BaseModel):
+    """One choice the search agent made, in the trace's own shape. `chosen_by` is "model" only
+    when a language model picked from the options code wrote; a menu of one is always "policy"."""
+
+    kind: Literal["deep_check", "tradeoff", "tour_gate"]
+    options: list[str]
+    pick: str
+    reason: str
+    chosen_by: Literal["model", "policy"]
+
+
+class CasePreferences(BaseModel):
+    """What the agent remembers about one renter's session. Code-defined keys only: a rejected
+    walk-up, a parking need, a lower budget, places to stop showing. Never free text."""
+
+    no_walkup: bool = False
+    needs_parking: bool = False
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class PreferencesUpdate(BaseModel):
+    """`POST /cases/{id}/preferences`: the renter rejected something. Each field is optional."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    no_walkup: bool | None = None
+    needs_parking: bool | None = None
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class SearchResponse(BaseModel):
@@ -849,6 +886,11 @@ class SearchResponse(BaseModel):
     n_considered: int  # priced places looked at before the brief's filters
     n_matches: int  # places that passed, before max_results cut the list
     matches: list[PlaceMatch]
+    # What the agent decided, in order, each stamped model or policy with a reason.
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None  # the one trade-off question to put to the renter
+    ask_first: bool = False  # ask it before drafting a tour request
+    remembered: list[str] = Field(default_factory=list)  # preference keys applied to this search
 
 
 class AlternativesResponse(BaseModel):
@@ -856,6 +898,10 @@ class AlternativesResponse(BaseModel):
     source: DataSource
     as_of: str = AS_OF
     matches: list[PlaceMatch]
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None
+    ask_first: bool = False
+    remembered: list[str] = Field(default_factory=list)
 
 
 class TourDraftRequest(BaseModel):

@@ -232,7 +232,19 @@ export interface PlaceMatch {
   has_3d_scan: boolean;
   scan_text?: string | null; // "a 3D scan in this building"
   office_on_record?: string | null; // company name only
+  checked?: boolean; // true only for a place that got the deep check; the rest are "researched"
+  check_line?: string | null; // built by code: "Checked: listed for rent by ...; ..."
   source: DataSource;
+}
+
+// One choice the search agent made. "model" only when a language model picked from options
+// code wrote; a menu of one is always "policy". Show "picked by model" from chosen_by.
+export interface SearchDecision {
+  kind: "deep_check" | "tradeoff" | "tour_gate";
+  options: string[];
+  pick: string;
+  reason: string;
+  chosen_by: "model" | "policy";
 }
 
 export interface SearchResponse {
@@ -241,6 +253,10 @@ export interface SearchResponse {
   n_considered: number;
   n_matches: number;
   matches: PlaceMatch[];
+  decisions?: SearchDecision[];
+  question?: string | null; // the one trade-off question to put to the renter
+  ask_first?: boolean; // ask it before drafting a tour request
+  remembered?: string[]; // preference keys applied to this search
 }
 
 export interface AlternativesResponse {
@@ -248,6 +264,25 @@ export interface AlternativesResponse {
   source: DataSource;
   as_of: string;
   matches: PlaceMatch[];
+  decisions?: SearchDecision[];
+  question?: string | null;
+  ask_first?: boolean;
+  remembered?: string[];
+}
+
+// POST /cases/{id}/preferences (write token header). Code-defined keys only.
+export interface PreferencesUpdate {
+  no_walkup?: boolean | null;
+  needs_parking?: boolean | null;
+  max_rent?: number | null;
+  avoid_property_id?: string | null;
+}
+
+export interface CasePreferences {
+  no_walkup: boolean;
+  needs_parking: boolean;
+  max_rent: number | null;
+  avoid_property_ids: string[];
 }
 
 export interface TourDraftRequest {
