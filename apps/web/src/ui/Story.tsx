@@ -146,7 +146,7 @@ export function Story() {
           />
           <label className="st-field">
             A quiet field
-            <input type="text" placeholder="Paste an ad" />
+            <input className="ui-field" type="text" placeholder="Paste an ad" />
           </label>
         </div>
       </section>

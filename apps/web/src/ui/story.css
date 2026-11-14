@@ -94,14 +94,6 @@
   margin-top: var(--sp-4);
   font-weight: 700;
 }
-.st-field input {
-  min-height: 48px;
-  padding: 0 var(--sp-3);
-  border: 0;
-  background: var(--layer-2);
-  color: var(--ink);
-  font: inherit;
-}
 @media (max-width: 760px) {
   .st-photos {
     grid-template-columns: repeat(2, minmax(0, 1fr));

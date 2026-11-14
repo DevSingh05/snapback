@@ -394,6 +394,17 @@
     inset 0 -2px 0 var(--ink);
 }
 
+/* A quiet field: the same edge as a quiet button, in both themes. */
+.ui-field {
+  min-height: 48px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  background: var(--layer-2);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  color: var(--ink);
+  font: inherit;
+}
+
 /* ---------- empty, loading, problem ---------- */
 .ui-empty,
 .ui-problem,
@@ -480,14 +491,35 @@
 }
 
 @media (max-width: 760px) {
-  .ui-rail {
+  /* The rail keeps the numbers and names only the step in hand: "01 02 Walk it first". */
+  .ui-rail ol {
+    flex: 1 1 auto;
     overflow: hidden;
   }
   .ui-rail li.ui-rail-later {
     display: none;
   }
+  .ui-rail li.ui-rail-done:not(:last-child) b {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
   .ui-rail li + li::before {
-    width: 16px;
-    margin-inline: 10px;
+    width: 12px;
+    margin-inline: 8px;
+  }
+  .ui-rail-end {
+    flex: none;
+  }
+  /* The strip scrolls sideways inside itself instead of cutting room names short. */
+  .ui-chapters {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(max-content, 1fr);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 }
