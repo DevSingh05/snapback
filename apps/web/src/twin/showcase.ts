@@ -3,8 +3,13 @@ import { pickSweep } from "./pose";
 
 // Minimal slice of the Matterport Showcase SDK we use.
 export interface ShowcaseSdk {
+  disconnect(): void;
   Sweep: {
-    data: { subscribe(o: { onCollectionUpdated(c: Record<string, unknown>): void }): unknown };
+    data: {
+      subscribe(o: { onCollectionUpdated(c: Record<string, unknown>): void }): {
+        cancel(): void;
+      };
+    };
     moveTo(id: string, o: SdkMoveTo["options"]): Promise<unknown>;
   };
 }
@@ -44,17 +49,14 @@ export async function connectShowcase(
   return window.MP_SDK.connect(iframe, key, "3.10");
 }
 
-export function sweepIds(sdk: ShowcaseSdk): Promise<string[]> {
-  return new Promise((resolve) => {
-    let done = false;
-    sdk.Sweep.data.subscribe({
-      onCollectionUpdated(c) {
-        if (done) return;
-        done = true;
-        resolve(Object.keys(c));
-      },
-    });
+/** Call onIds with the sweep ids of the model; the returned function cancels the subscription. */
+export function watchSweeps(sdk: ShowcaseSdk, onIds: (ids: string[]) => void): () => void {
+  const sub = sdk.Sweep.data.subscribe({
+    onCollectionUpdated(c) {
+      onIds(Object.keys(c));
+    },
   });
+  return () => sub.cancel();
 }
 
 /** Fly to the pose. Returns whether the model's own sweep was used or a stand-in. */
