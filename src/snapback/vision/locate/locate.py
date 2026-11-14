@@ -242,11 +242,12 @@ class Locator:
         # the photo is placed nowhere. No false pass, and no false DON'T PAY either.
         rival = self._best(photo, other_hits, strict, stop_early=False)
         if rival is not None and rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
-            # The claimed search may have stopped early at a merely strong face; compare the
-            # rival with the claimed maximum before calling the photo ambiguous.
-            full = self._best(photo, claimed_hits, claimed_ok, stop_early=False)
-            if full is not None and full.check.inliers > placed.check.inliers:
-                placed = full
+            # The claimed search may have stopped early at a strong face (only possible at or
+            # above stop_at_inliers); compare the rival with the claimed maximum first.
+            if placed.check.inliers >= t.stop_at_inliers:
+                full = self._best(photo, claimed_hits, claimed_ok, stop_early=False)
+                if full is not None and full.check.inliers > placed.check.inliers:
+                    placed = full
             if rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
                 return None
         return placed

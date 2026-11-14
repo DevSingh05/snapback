@@ -512,21 +512,38 @@ def test_elsewhere_bar_follows_the_ruling():
 def _scripted_verify(script):
     """A verify() stand-in. script maps a model to what its faces get: an inlier count, a
     (count, spread) pair, or a list of those handed out one per call (the last one repeats).
-    A plain count has spread 0.5."""
+    A plain count has spread 0.5. A callable gets the face key ("model/sweep/face") so every
+    face keeps its own value across passes. Every call is appended to fake.calls."""
     from snapback.vision.locate.verify import FEATURE_KEY, Verification
 
     calls = dict.fromkeys(script, 0)
 
     def fake(matcher, photo, face, ransac_px):
-        model = face.info[FEATURE_KEY].split("/")[0]
+        key = face.info[FEATURE_KEY]
+        fake.calls.append(key)
+        model = key.split("/")[0]
         spec = script.get(model, 0)
-        if isinstance(spec, list):
+        if callable(spec):
+            spec = spec(key)
+        elif isinstance(spec, list):
             spec = spec[min(calls[model], len(spec) - 1)]
             calls[model] += 1
         n, spread = spec if isinstance(spec, tuple) else (spec, 0.5)
         return Verification(max(n, 4), n, np.eye(3) if n else None, spread if n else 0.0)
 
+    fake.calls = []
     return fake
+
+
+def _per_face(first, rest):
+    """A per-face script: the first face seen gets `first`, every other face `rest`, and each
+    face keeps that value however many times it is verified."""
+    values = {}
+
+    def spec(key):
+        return values.setdefault(key, first if not values else rest)
+
+    return spec
 
 
 @pytest.mark.parametrize(
@@ -561,7 +578,7 @@ def test_a_far_stronger_match_elsewhere_makes_the_photo_unplaced(
     [
         # claimed stops early at its first face (70 >= stop 60); a later claimed face is 200,
         # so the rival's 210 is not 3x the claimed maximum
-        ({"fx-model-a": [70, 200], "fx-model-b": 210}, LocateStatus.LOCATED_IN_CLAIMED),
+        ({"fx-model-a": _per_face(70, 200), "fx-model-b": 210}, LocateStatus.LOCATED_IN_CLAIMED),
         # rival at 3x+ but clumped (spread 0.05 < 0.15): it fails the strict bar, never counts
         ({"fx-model-a": 12, "fx-model-b": (300, 0.05)}, LocateStatus.LOCATED_IN_CLAIMED),
         # the rival search must not stop early at its first strong face (65) and miss the 300
@@ -577,6 +594,22 @@ def test_ambiguity_compares_full_searches_and_the_strict_bar(
     photo = listing_photo(sweeps, "fx-model-a", 2, 1)
     result = locator.locate("fx-amb2", {"p": photo}, "fx-prop-1")
     assert result.photos[0].status is expected
+
+
+def test_no_claimed_rerun_when_the_first_pass_could_not_have_stopped_early(twins, monkeypatch):
+    # seed 6 shape: claimed 70, rival 254, stop 150. 70 < 150, so the claimed pass was already
+    # exhaustive; each claimed face must be verified exactly once.
+    sweeps, index, catalog = twins
+    t = replace(THRESHOLDS, stop_at_inliers=150)
+    fake = _scripted_verify({"fx-model-a": 70, "fx-model-b": 254})
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", fake)
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), t)
+    result = locator.locate(
+        "fx-norerun", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    claimed = [k for k in fake.calls if k.startswith("fx-model-a/")]
+    assert claimed and len(claimed) == len(set(claimed))
 
 
 def test_ambiguity_ratio_is_in_thresholds():
