@@ -554,6 +554,17 @@ def test_other_mentions_of_an_owner_in_spanish_are_not_a_claim(text):
         "Ann Arbor MI house near campus.",
         "Mi Casa Apartments, 2 bed available.",
         "Welcome to Mi Casa Townhomes.",
+        # One sentence for each excluded word, so removing any one of them fails a test.
+        "Linens supplied by owner.",
+        "Repairs handled by the owner.",
+        "Internet included by owner.",
+        "Upstairs unit occupied by owner.",
+        "Se renta por el dueño anterior.",
+        "En venta por el dueño pasado.",
+        # A home between the verb and "por" does not turn something the owner paid for
+        # into a claim.
+        "Se renta casa pagada por el dueño.",
+        "Se renta departamento con agua pagada por el dueño.",
     ],
 )
 def test_more_mentions_that_are_not_a_claim_in_either_language(text):
@@ -574,6 +585,18 @@ def test_more_mentions_that_are_not_a_claim_in_either_language(text):
         "Es mi casa y la estoy rentando.",
         "Rento mi propiedad mientras trabajo fuera.",
         "Alquilo mi casa por temporada.",
+        # The most common headers put the home between the verb and "por" (review of #178).
+        "Se renta casa por dueño",
+        "Se vende casa por dueño",
+        "Vendo casa por dueño",
+        "Se renta departamento por el dueño",
+        "Se alquila habitación por su dueño",
+        "Se renta casa directo por dueño",
+        "Renta de casa por su propietario",
+        # "Se renta mi casa" is the home being offered as mine.
+        "Se renta mi casa.",
+        "Se alquila mi propiedad amueblada.",
+        "Se vende mi casa.",
     ],
 )
 def test_the_claims_are_still_heard_after_the_exclusions(text):

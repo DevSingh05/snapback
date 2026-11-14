@@ -66,20 +66,26 @@ _SAYS_OWNER = re.compile(
 #
 # Two of the forms are common words in other sentences, so they count only beside a word that
 # makes them about renting or selling the home:
-#   "por (el) dueño"  after renta / alquila / venta ...  not "pagadas por el dueño",
-#                     "pregunte por el dueño", "vendido por el dueño"
+#   "por (el) dueño"  after renta / alquila / venta ..., with the home between them or not
+#                     ("se renta por dueño", "se renta casa por dueño"); not "pagadas por el
+#                     dueño", "pregunte por el dueño", "vendido por el dueño", nor "se renta
+#                     casa pagada por el dueño"
 #   "mi casa"         after es / rento / alquilo ...      not "cerca de mi casa", "desde mi
 #                     casa", "mi casa es su casa", "Mi Casa Apartments", "Detroit, MI Townhouse"
 _DUENO = r"(?:due[ñn][oa]s?|propietari[oa]s?)"
-_CASA = r"(?:casa|propiedad|vivienda|condominio|d[úu]plex|townhouse)"
+_CASA_WORDS = r"casa|propiedad|vivienda|condominio|d[úu]plex|townhouse"
+_CASA = r"(?:" + _CASA_WORDS + r")"
 _RENTS_OR_SELLS = r"(?:renta|rento|alquila|alquilo|alquiler|vende|vendo|venta)"
-_OFFERS_MINE = r"(?:es|rento|alquilo|ofrezco|vendo|rentando|alquilando)"
+_OFFERS_MINE = r"(?:es|rento|alquilo|ofrezco|vendo|rentando|alquilando|renta|alquila|vende)"
+# What is offered may sit between the verb and "por": "se renta CASA por dueño".
+_OFFERED = r"(?:" + _CASA_WORDS + r"|departamento|depa|cuarto|habitaci[óo]n|terreno|local)"
 _SAYS_OWNER_ES = re.compile(
     r"(?i:"
     r"(?<!no )\b(?:soy|somos)\s{1,3}(?:(?:el|la|los|las)\s{1,3})?" + _DUENO + r"\b"
     # Not a pet's owner: "dueño de un perro", "del perro", "de la gata", "de mascotas".
     r"(?!\s{1,3}del?\s{1,3}(?:(?:la|las|los|un|una|mi|mis|dos|tres)\s{1,3})?(?:perr|gat|mascota))"
-    r"|\b" + _RENTS_OR_SELLS + r"\s{1,3}(?:direct[oa]\s{1,3})?por\s{1,3}"
+    r"|\b" + _RENTS_OR_SELLS + r"\s{1,3}(?:(?:de\s{1,3})?" + _OFFERED + r"\s{1,3})?"
+    r"(?:direct[oa]\s{1,3})?por\s{1,3}"
     r"(?:(?:el|la|su|los)\s{1,3})?" + _DUENO + r"\b(?!\s{1,3}(?:anterior|pasad))"
     r"|\btrato\s{1,3}directo\s{1,3}con\s{1,3}(?:(?:el|la)\s{1,3})?" + _DUENO + r"\b"
     r"|\b" + _DUENO + r"\s{1,3}direct[oa]\b"
