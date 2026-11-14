@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     snapback_eval_locate_real: Path = Path("eval/locate_real.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
+    # M3: what opens GET /events/stream, sent in a header. Unset closes the stream to everyone.
+    snapback_events_token: SecretStr | None = None
     # What happens after the renter approves the challenge (A14). "stand_in" answers at once
     # from the fixture. "reply" waits for the poster's real reply photo, sent to
     # POST /cases/{id}/reply, and checks it.
