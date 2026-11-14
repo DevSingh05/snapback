@@ -32,9 +32,9 @@ describe("PhotoLanding states", () => {
     expect(screen.getByTestId("view-cone")).toBeInTheDocument();
   });
 
-  it("not found: says Not found in this building and shows no photo, marker or cone", () => {
+  it("not found: says Could not place this photo and shows no photo, marker or cone", () => {
     render(<PhotoLanding {...base} state={{ kind: "not_found" }} />);
-    expect(screen.getByText("Not found in this building")).toBeInTheDocument();
+    expect(screen.getByText("Could not place this photo")).toBeInTheDocument();
     expect(screen.queryByTestId("photo-overlay")).toBeNull();
     expect(screen.queryByTestId("camera-marker")).toBeNull();
     expect(screen.queryByTestId("view-cone")).toBeNull();
@@ -42,16 +42,22 @@ describe("PhotoLanding states", () => {
 
   it("placed: says Taken here with a no-camera-angle note and draws no cone or photo", () => {
     render(<PhotoLanding {...base} state={{ kind: "placed", photoId: "l2", roomLabel: null }} />);
-    expect(screen.getByText("Taken here: this building")).toBeInTheDocument();
+    expect(screen.getByText("Taken here: this home")).toBeInTheDocument();
     expect(screen.getByText("No camera angle for this photo")).toBeInTheDocument();
     expect(screen.queryByTestId("view-cone")).toBeNull();
     expect(screen.queryByTestId("photo-overlay")).toBeNull();
   });
 
-  it("elsewhere: says Not taken here and shows no cone", () => {
+  it("elsewhere: says Taken in a different home and shows no cone", () => {
     render(<PhotoLanding {...base} state={{ kind: "elsewhere" }} />);
-    expect(screen.getByText("Not taken here")).toBeInTheDocument();
+    expect(screen.getByText("Taken in a different home")).toBeInTheDocument();
     expect(screen.queryByTestId("view-cone")).toBeNull();
+  });
+
+  it("a positive yaw (camera turned toward -X in the Y-up frame) turns the cone counter-clockwise", () => {
+    render(<PhotoLanding {...base} state={match} />);
+    // Plan view: -Z is up, +X is right, so yaw +44.7 looks up and to the left: CSS rotate(-44.7deg).
+    expect(screen.getByTestId("view-cone").style.transform).toBe("rotate(-44.7deg)");
   });
 
   it("loading: announces it politely and shows no result line", () => {
@@ -60,7 +66,7 @@ describe("PhotoLanding states", () => {
     expect(status).toHaveTextContent(/Placing the photo/);
     expect(status).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByText(/Taken here/)).toBeNull();
-    expect(screen.queryByText(/Not found/)).toBeNull();
+    expect(screen.queryByText(/Could not place/)).toBeNull();
   });
 
   it("SDK unavailable: falls back to a static plan that still shows the cone and the photo", () => {
