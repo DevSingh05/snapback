@@ -83,7 +83,8 @@
 }
 .upload-secondary,
 .upload-remove {
-  background: transparent;
+  background: var(--sky);
+  color: var(--ink);
 }
 .upload-actions {
   display: flex;
