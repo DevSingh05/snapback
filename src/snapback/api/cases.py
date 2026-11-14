@@ -270,6 +270,29 @@ class SessionCase:
             question=self.session.question,
         )
 
+    @property
+    def office_record(self) -> object | None:
+        """The property record this case runs on, if any. Read-only, for the office proof."""
+        return getattr(self.session.modules, "record", None)
+
+    @property
+    def office_confirmed_domain(self) -> str | None:
+        return self.session.evidence.office_confirmed_domain
+
+    @property
+    def office_declined_domain(self) -> str | None:
+        return self.session.evidence.office_declined_domain
+
+    def confirm_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Yes, ours"."""
+        with self._lock:
+            self.session.confirm_office(domain)
+
+    def decline_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Not ours"."""
+        with self._lock:
+            self.session.decline_office(domain)
+
     def approve(self, decision: str, text: str | None) -> None:
         with self._lock:
             try:

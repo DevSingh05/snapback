@@ -171,3 +171,46 @@ def test_the_a14_reply_shapes_parse_and_waiting_for_a_reply_is_a_progress_value(
     # Cases made before this still report the three values they knew.
     created = contracts.CreateCaseResponse.model_validate_json(load("create_case_response.json"))
     assert created.status in set(contracts.CaseProgress)
+
+
+# --- E0: the evidence file and the agent's trace kinds -----------------------------------------
+
+
+def test_evidence_fixture_validates_and_keeps_points_a_bounded_sample():
+    from snapback.contracts import EvidenceFile
+
+    doc = EvidenceFile.model_validate_json(
+        (FIXTURES.parent / "demo" / "evidence.fixture.json").read_text()
+    )
+    assert doc.source.value == "fixture" and doc.written_by == "code"
+    assert [p.alias for p in doc.photos] == ["P1", "P2", "P3", "P4"]
+    assert all(p.points is None or len(p.points.sampled) <= 48 for p in doc.photos)
+    near_miss = doc.photos[2]  # not placed by the base search, placed on a retry the model picked
+    assert [(s.option, s.chosen_by, s.result) for s in near_miss.searches] == [
+        ("base", "policy", "not_placed"),
+        ("focus_scan:S2", "model", "placed"),
+    ]
+    assert doc.photos[3].bar_failed == "inliers" and doc.photos[3].status.value == "not_located"
+    again = EvidenceFile.model_validate_json(doc.model_dump_json())
+    assert again == doc
+
+
+def test_evidence_points_refuse_more_than_48_pairs():
+    from pydantic import ValidationError
+
+    from snapback.contracts import EvidencePoints
+
+    with pytest.raises(ValidationError):
+        EvidencePoints(n_total=60, sampled=[(0.1, 0.1, 0.1, 0.1)] * 49)
+
+
+def test_new_trace_kinds_are_additive_and_old_ones_unchanged():
+    assert {k.value for k in TraceKind} >= {"choice", "tool", "status", "hitl", "verdict", "error"}
+    assert {"todo", "agent", "file", "unsure"} <= {k.value for k in TraceKind}
+
+
+def test_photo_location_evidence_fields_are_optional():
+    from snapback.contracts import PhotoLocation
+
+    p = PhotoLocation(photo_id="x", status="not_located")
+    assert p.spread is None and p.rival_ratio is None and p.bar_failed is None

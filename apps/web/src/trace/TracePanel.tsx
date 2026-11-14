@@ -23,6 +23,10 @@ const KIND_LABELS: Record<TraceEvent["kind"], string> = {
   hitl: "Your OK",
   verdict: "Verdict",
   error: "Error",
+  todo: "Plan",
+  agent: "Sub-agent",
+  file: "File",
+  unsure: "Not sure",
 };
 
 const STATUS_TEXT: Record<StreamStatus, string> = {
