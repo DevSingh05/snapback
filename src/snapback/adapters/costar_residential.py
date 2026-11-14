@@ -360,6 +360,199 @@ def _matterport_models(rec: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(keys))
 
 
+FEATURES_FILE = "residential-listing-features.jsonl"
+SOLD_UPDATE = 8  # ListingUpdateType NewlySold (enums.json)
+# SceneClassificationType codes (enums.json) that say something an ad can be held to.
+SCENE_FLOOR = {126: "carpet", 218: "carpet", 219: "carpet", 220: "carpet", 221: "carpet",
+               222: "carpet", 117: "tile", 180: "wood"}  # fmt: skip
+SCENE_POOL = {19, 33}
+SCENE_YARD = {65, 129}
+SCENE_MACHINE = {135, 163}  # InUnitLaundry, StackedWasherAndDryer
+_SHARED_POOL = re.compile(
+    r"community|association|shared|common|club|hoa|resort|complex|building|view", re.IGNORECASE
+)
+_WOOD_LOOK = re.compile(r"wood[- ]?(?:look|grain)", re.IGNORECASE)
+
+
+def floor_kind(text: str, *, need_floor_word: bool = False) -> str | None:
+    """The floor kind a label names ("wood", "carpet", "tile", "laminate"), or None.
+
+    A photo keyword counts only if it names a floor (`need_floor_word`): "Wood Staircase" and
+    "Brick Siding" do not. Wood-look tile is tile."""
+    low = text.lower()
+    if need_floor_word and not ("floor" in low or "carpet" in low):
+        return None
+    if "carpet" in low:
+        return "carpet"
+    if _WOOD_LOOK.search(low):
+        return "tile" if "tile" in low else None
+    if "wood" in low or "parquet" in low:
+        return "wood"
+    if "laminate" in low or "vinyl" in low:
+        return "laminate"
+    if any(word in low for word in ("tile", "ceramic", "porcelain", "stone", "marble", "slate")):
+        return "tile"
+    return None
+
+
+def _features_by_listing(kit: Path) -> dict[int, dict[str, Any]]:
+    """`residential-listing-features.jsonl` by listing id: the feature names under their
+    subcategory, and the derived parking count. Names stay in memory; the record keeps words."""
+    path = _find(kit, FEATURES_FILE)
+    if path is None:
+        return {}
+    out: dict[int, dict[str, Any]] = {}
+    for rec in _iter_jsonl(path):
+        listing_id = rec.get("id")
+        if isinstance(listing_id, bool) or not isinstance(listing_id, int):
+            continue
+        names: dict[str, list[str]] = {}
+        for feature in rec.get("features") or []:
+            if isinstance(feature, dict) and isinstance(feature.get("name"), str):
+                names.setdefault(str(feature.get("subcategory1")), []).append(feature["name"])
+        derived = rec.get("derivedValues")
+        out[listing_id] = {
+            "names": names,
+            "parking": _whole(derived.get("totalParkingSpaces"))
+            if isinstance(derived, dict)
+            else None,
+        }
+    return out
+
+
+def _unique(items: list[str]) -> list[str]:
+    return list(dict.fromkeys(items))
+
+
+def _laundry_kind(name: str) -> str:
+    low = name.lower()
+    if "hookup" in low or "hook up" in low or "hook-up" in low:
+        return "hookup"
+    if "washer" in low or "dryer" in low or "in unit" in low or "in-unit" in low:
+        return "machine"
+    return "room"
+
+
+def _home_facts(rec: dict[str, Any], features: dict[str, Any] | None) -> dict[str, Any]:
+    """What an ad can be held to, as words and numbers, from one listing. Nothing from the kit
+    is kept as text: floors, laundry and the rest become the fixed words the compare uses."""
+    photo_floors: list[str] = []
+    floor_photos = 0
+    pool_photo = yard_photo = machine_photo = False
+    for item in rec.get("media") or []:
+        if not isinstance(item, dict):
+            continue
+        kinds = [
+            SCENE_FLOOR[s["type"]]
+            for s in item.get("scenes") or []
+            if isinstance(s, dict) and s.get("type") in SCENE_FLOOR
+        ]
+        words = [w for w in item.get("computerVisionKeywords") or [] if isinstance(w, str)]
+        kinds += [k for k in (floor_kind(w, need_floor_word=True) for w in words) if k]
+        if kinds:
+            floor_photos += 1
+            photo_floors += kinds
+        scenes = {s.get("type") for s in item.get("scenes") or [] if isinstance(s, dict)}
+        lowered = [w.lower() for w in words]
+        pool_photo |= bool(scenes & SCENE_POOL) or any("pool" in w for w in lowered)
+        yard_photo |= bool(scenes & SCENE_YARD) or any("yard" in w or "fence" in w for w in lowered)
+        machine_photo |= bool(scenes & SCENE_MACHINE)
+    names = features["names"] if features else {}
+    everything = [name.lower() for group in names.values() for name in group]
+    laundry = _unique([_laundry_kind(n) for n in names.get("Laundry", [])])
+    if machine_photo and "machine" not in laundry:
+        laundry.append("machine")
+    # A community, association or shared pool, or a pool view, is not this home's pool.
+    own_pool = [n for n in everything if "pool" in n and not _SHARED_POOL.search(n)]
+    shared_pool = any("pool" in n and _SHARED_POOL.search(n) for n in everything)
+    pool: bool | None = None
+    if pool_photo or own_pool:
+        pool = True
+    elif shared_pool:
+        pool = None  # only a shared pool is listed: the record cannot say about a private one
+    elif everything:
+        pool = False  # a listed feature set that names no pool, and no photo shows one
+    prop = rec.get("property") if isinstance(rec.get("property"), dict) else {}
+    # isPetFriendly is a default (False on nearly every house), not an answer. An answer is a
+    # Pet Policy feature: "No Pets Allowed" says no; "Pets/Cats/Dogs Allowed" or a True flag
+    # says yes.
+    policy = [n.lower() for n in names.get("Pet Policy", [])]
+    flag = _get_any(rec, ["resoValues.isPetFriendly"])
+    if any(n.startswith("no pets") for n in policy):
+        pets: bool | None = False
+    elif flag is True or any(n in ("pets allowed", "cats allowed", "dogs allowed") for n in policy):
+        pets = True
+    else:
+        pets = None
+    sold = [
+        d
+        for d in (
+            _date(_first(h, HISTORY_FIELDS["date"]))
+            for h in rec.get("history") or []
+            if isinstance(h, dict) and _first(h, HISTORY_FIELDS["type"]) == SOLD_UPDATE
+        )
+        if d
+    ]
+    parking = features["parking"] if features and features["parking"] is not None else None
+    if parking is None:
+        parking = _whole(prop.get("totalParkingSpaces"))
+
+    def span(low_key: str, high_key: str, cast: Any) -> tuple[Any, Any] | None:
+        low, high = prop.get(low_key), prop.get(high_key)
+        low = low if isinstance(low, (int, float)) and not isinstance(low, bool) else high
+        high = high if isinstance(high, (int, float)) and not isinstance(high, bool) else low
+        if not isinstance(low, (int, float)) or isinstance(low, bool) or low <= 0:
+            return None
+        return cast(min(low, high)), cast(max(low, high))
+
+    return {
+        "floors_photos": _unique(photo_floors),
+        "floor_photo_count": floor_photos,
+        "floors_listing": _unique(
+            [k for k in (floor_kind(n) for n in names.get("Flooring", [])) if k]
+        ),
+        "laundry_listing": laundry,
+        "pool_on_record": pool,
+        "parking_spaces": parking,
+        "yard_on_record": True
+        if yard_photo or any("yard" in n or "fenced" in n for n in everything)
+        else None,
+        "pets_ok": pets,
+        "beds_range": span("bedsMin", "bedsMax", int),
+        "baths_range": span("bathsMin", "bathsMax", float),
+        "sqft_range": span("sqftMin", "sqftMax", int),
+        # other recently sold or off-market listings of this home mean the history is not whole
+        "sale_history_known": bool(rec.get("history"))
+        and rec.get("hasOtherRecentlySoldOrOffMarketListings") is not True,
+        "last_sale": max(sold, default=None),
+    }
+
+
+def _merge_facts(into: PropertyRecord, facts: dict[str, Any]) -> None:
+    """Fold a second listing of the same house into its record."""
+    for key in ("floors_photos", "floors_listing", "laundry_listing"):
+        setattr(into, key, _unique([*getattr(into, key), *facts[key]]))
+    into.floor_photo_count += facts["floor_photo_count"]
+    if facts["pool_on_record"] is True or into.pool_on_record is None:
+        into.pool_on_record = facts["pool_on_record"] or into.pool_on_record
+    into.yard_on_record = into.yard_on_record or facts["yard_on_record"]
+    if into.parking_spaces is None:
+        into.parking_spaces = facts["parking_spaces"]
+    if into.pets_ok is None:
+        into.pets_ok = facts["pets_ok"]
+    elif facts["pets_ok"] is not None and facts["pets_ok"] != into.pets_ok:
+        into.pets_ok = None  # two listings disagree: the record gives no answer
+    for key in ("beds_range", "baths_range", "sqft_range"):
+        old, new = getattr(into, key), facts[key]
+        if old is None or new is None:
+            setattr(into, key, old or new)
+        else:
+            setattr(into, key, (min(old[0], new[0]), max(old[1], new[1])))
+    into.sale_history_known = into.sale_history_known and facts["sale_history_known"]
+    sales = [d for d in (into.last_sale, facts["last_sale"]) if d]
+    into.last_sale = max(sales, default=None)
+
+
 def house_records(
     source: DataSource | None = None, kit_dir: Path | None = None
 ) -> dict[str, PropertyRecord]:
@@ -373,6 +566,7 @@ def house_records(
     if path is None:
         return {}
     out: dict[str, PropertyRecord] = {}
+    features = _features_by_listing(kit)
     for rec in _iter_jsonl(path):
         pid, models = rec.get("propertyId"), _matterport_models(rec)
         if (
@@ -383,9 +577,12 @@ def house_records(
             or _get_any(rec, ["property.listingPropertyType"]) != DETACHED
         ):
             continue
+        listing_id = rec.get("id")
+        facts = _home_facts(rec, features.get(listing_id) if isinstance(listing_id, int) else None)
         found = out.get(str(pid))
         if found is not None:
             found.model_ids = list(dict.fromkeys([*found.model_ids, *models]))
+            _merge_facts(found, facts)
             continue
         lat, lon = (
             _get_any(rec, RESIDENTIAL_FIELDS["lat"]),
@@ -400,6 +597,7 @@ def house_records(
             lat=float(lat) if isinstance(lat, (int, float)) else None,
             lon=float(lon) if isinstance(lon, (int, float)) else None,
             model_ids=models,
+            **facts,
         )
     # A model on more than one house cannot say which house a photo is in, and the catalog
     # would keep the last owner: such a model belongs to none of them, so it can place no
@@ -454,7 +652,8 @@ def rental_houses(
         if pid is None or isinstance(pid, bool):
             continue
         parking = _get_any(rec, ["property.totalParkingSpaces"])
-        pets = _get_any(rec, ["resoValues.isPetFriendly"])
+        # a False flag is a default, not an answer (see _home_facts): only True is kept
+        pets = True if _get_any(rec, ["resoValues.isPetFriendly"]) is True else None
         baths = _get_any(rec, ["property.bathsMin"])
         beds = _get_any(rec, ["property.bedsMin"])
         offices = _offices(rec)
@@ -467,7 +666,7 @@ def rental_houses(
                 baths=float(baths) if isinstance(baths, (int, float)) else None,
                 rent_min=_whole(rec.get("rentMin")),
                 rent_max=_whole(rec.get("rentMax")),
-                pets_ok=pets if isinstance(pets, bool) else None,
+                pets_ok=pets,
                 parking_spaces=_whole(parking),
                 available_on=_date(rec.get("availabilityDate")),
                 office=offices[0] if offices else None,
