@@ -180,6 +180,18 @@ def test_clean_words_strips_contacts_and_addresses_and_caps():
     assert finder.clean_words(f"{BAIT_PHONE}") == "" and finder.clean_words(None) == ""
 
 
+def test_saying_no_walkups_is_offered_to_keep_and_applies_only_on_yes(tmp_path):
+    s = new_session(tmp_path)
+    reply = run_turn(s, finder.read_text("under $1,800, no walk-ups"))
+    offer = [p for p in reply.proposals if p.key == "propose_no_walkup"]
+    assert offer and offer[0].evidence == "you said no walk-ups"
+    assert s.applied == CasePreferences() and s.learned()["said_no_walkup"] is True
+    s.decide(offer[0].id, accept=True)
+    assert s.applied.no_walkup is True
+    walkups = {p.pid for p in s.places if p.walkup}
+    assert s.picks and not walkups & {p.pid for p in s.picks}
+
+
 def test_a_budget_with_a_comma_is_read():
     signals = finder.read_text("under $1,500 please")
     assert [(x.brief_field, x.rent_max) for x in signals] == [("budget", 1500)]

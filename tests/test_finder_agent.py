@@ -283,3 +283,12 @@ def test_without_words_the_model_gets_only_the_plan_order(tmp_path):
     s = new_session(tmp_path, m)
     run_turn(s, SCRIPT)
     assert "<renter_words>\n" not in "\n".join(m.seen)
+
+
+def test_a_long_model_reply_ends_on_a_whole_sentence():
+    long = "I noticed you skip walk-ups. " * 20
+    out = finder.ok_reply(long)
+    assert out and len(out) <= finder.MAX_REPLY and out.endswith("walk-ups.")
+    assert finder.ok_reply("This place is verified and safe.") is None
+    assert finder.ok_reply("It costs 1450 a month.") is None
+    assert finder.ok_reply("") is None
