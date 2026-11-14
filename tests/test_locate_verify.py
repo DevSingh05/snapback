@@ -579,8 +579,9 @@ def test_a_far_stronger_match_elsewhere_makes_the_photo_unplaced(
         # claimed stops early at its first face (70 >= stop 60); a later claimed face is 200,
         # so the rival's 210 is not 3x the claimed maximum
         ({"fx-model-a": _per_face(70, 200), "fx-model-b": 210}, LocateStatus.LOCATED_IN_CLAIMED),
-        # rival at 3x+ but clumped (spread 0.05 < 0.15): it fails the strict bar, never counts
-        ({"fx-model-a": 12, "fx-model-b": (300, 0.05)}, LocateStatus.LOCATED_IN_CLAIMED),
+        # rival at 3x+ but clumped (spread 0.05 < 0.15): ruling (a) 09:26 on #74, a rival only
+        # blocks, so it needs inliers and ratio, not spread: could not place
+        ({"fx-model-a": 12, "fx-model-b": (300, 0.05)}, LocateStatus.NOT_LOCATED),
         # the rival search must not stop early at its first strong face (65) and miss the 300
         ({"fx-model-a": 70, "fx-model-b": [65, 300]}, LocateStatus.NOT_LOCATED),
     ],
@@ -683,3 +684,110 @@ def test_thresholds_reject_an_ambiguity_ratio_of_one_or_less(tmp_path, ratio):
     copy.write_text(text)
     with pytest.raises(ValueError, match="ambiguity_ratio"):
         load_thresholds(copy)
+
+
+# --- claimed spread floor (#28, seed-6 replay: a 70-inlier claimed match spread over 0.018) ------
+
+
+def _scripted(per_model):
+    """verify() stand-in: model -> (inliers, spread) for every face of that model."""
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    def fake(matcher, photo, face, ransac_px):
+        n, spread = per_model.get(face.info[FEATURE_KEY].split("/")[0], (0, 0.0))
+        return Verification(max(n, 4), n, np.eye(3) if n else None, spread)
+
+    return fake
+
+
+@pytest.mark.parametrize(
+    ("claimed", "other", "expected"),
+    [
+        # One planar object in the claimed building, another building clearly elsewhere: the
+        # floor must not open a new route to DON'T PAY, so this is could-not-place.
+        ((70, 0.018), (119, 0.218), LocateStatus.NOT_LOCATED),
+        # Same tight claimed match, nothing elsewhere: could not place (never DON'T PAY).
+        ((70, 0.018), (0, 0.0), LocateStatus.NOT_LOCATED),
+        # An ordinary claimed match spread over the photo still places it.
+        ((70, 0.30), (119, 0.218), LocateStatus.LOCATED_IN_CLAIMED),
+    ],
+)
+def test_a_claimed_match_on_one_small_patch_does_not_place_the_photo(
+    twins, locator, monkeypatch, claimed, other, expected
+):
+    sweeps, _, _ = twins
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted({"fx-model-a": claimed, "fx-model-b": other}),
+    )
+    result = locator.locate(
+        "fx-spread", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is expected
+
+
+def test_claimed_spread_floor_is_below_the_elsewhere_floor():
+    t = load_thresholds()
+    assert 0.0 < t.claimed_min_spread <= t.elsewhere_min_spread
+
+
+@pytest.mark.parametrize(
+    ("claimed", "other", "expected"),
+    [
+        # House probe decoy view 3 (#74): weak claimed match, the decoy's own house far stronger
+        # but clumped. Ruling (a): could not place, never a false "taken here".
+        ((51, 0.056), (263, 0.039), LocateStatus.NOT_LOCATED),
+        # An honest claimed placement with no strong rival still passes.
+        ((200, 0.40), (100, 0.05), LocateStatus.LOCATED_IN_CLAIMED),
+    ],
+)
+def test_ambiguity_rival_needs_inliers_not_spread(
+    twins, locator, monkeypatch, claimed, other, expected
+):
+    sweeps, _, _ = twins
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted({"fx-model-a": claimed, "fx-model-b": other}),
+    )
+    result = locator.locate(
+        "fx-rival", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is expected
+
+
+def test_a_rival_under_the_elsewhere_inlier_floor_never_blocks_even_at_3x(twins, monkeypatch):
+    """Rival 45 is over 3x the claimed 13 but under the floor (60 here): only the floor stops it."""
+    sweeps, index, catalog = twins
+    strict_floor = Locator(
+        index, sweeps, catalog, PatchMatcher(), replace(THRESHOLDS, elsewhere_min_inliers=60)
+    )
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted({"fx-model-a": (13, 0.40), "fx-model-b": (45, 0.05)}),
+    )
+    result = strict_floor.locate(
+        "fx-floor", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED
+
+
+def test_each_claimed_face_is_verified_at_most_once(twins, locator, monkeypatch):
+    """A claimed match failing only the spread floor must not cost a second pass (#186 review)."""
+    from snapback.vision.locate.verify import FEATURE_KEY
+
+    calls = {}
+    scripted = _scripted({"fx-model-a": (70, 0.018), "fx-model-b": (0, 0.0)})
+
+    def counting(matcher, photo, face, ransac_px):
+        key = face.info[FEATURE_KEY]
+        calls[key] = calls.get(key, 0) + 1
+        return scripted(matcher, photo, face, ransac_px)
+
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", counting)
+    sweeps, _, _ = twins
+    result = locator.locate(
+        "fx-once", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    claimed = {k: n for k, n in calls.items() if k.startswith("fx-model-a/")}
+    assert claimed and max(claimed.values()) == 1
