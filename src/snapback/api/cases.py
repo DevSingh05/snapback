@@ -12,6 +12,7 @@ creating a case in live mode says so instead of pretending.
 """
 
 import json
+import logging
 import secrets
 import threading
 from collections.abc import Callable
@@ -43,6 +44,8 @@ from snapback.contracts import (
 )
 from snapback.settings import Settings
 from snapback.verdict import FIXTURE_ID_PREFIX, build_card
+
+log = logging.getLogger("snapback.api")
 
 
 class NothingWaiting(Exception):
@@ -259,6 +262,15 @@ class CaseStore:
         )
         if settings.snapback_data_source is DataSource.FIXTURE:
             self._add_recorded_fixture()
+        elif settings.demo_case:
+            # Easy to set both and expect the staged cards. A live case carries no stand-in,
+            # so the pack gives only its listing text and the cards read "not checked".
+            log.warning(
+                "DEMO_CASE=%s with SNAPBACK_DATA_SOURCE=live: only the staged listing text "
+                "is used. Photos and presence will read 'Not checked'. For the staged cards "
+                "run with SNAPBACK_DATA_SOURCE=fixture.",
+                settings.demo_case,
+            )
 
     def _add_recorded_fixture(self) -> None:
         card = Card.model_validate_json((FIXTURES_DIR / "card_hold.json").read_text())
