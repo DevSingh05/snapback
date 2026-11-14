@@ -6,6 +6,7 @@ Change this file only through a pull request reviewed by the integrator lane.
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -437,6 +438,7 @@ class ChoiceKind(StrEnum):
     WHICH_SPOT = "which_spot"
     RETRY_OR_STOP = "retry_or_stop"
     ASK_HUMAN = "ask_human"
+    NEXT_CHECK = "next_check"  # A24: which evidence-gated check to run next (order only)
 
 
 class TraceKind(StrEnum):
@@ -460,6 +462,10 @@ class TraceEvent(BaseModel):
     pick: str | None = None
     reason: str  # one plain sentence; may be model-written, never sets a state
     source: DataSource
+    # A24: who made this step happen. "model" only when a language model picked from the
+    # code-written options; everything else (the code policy, a fallback, a tool code ran,
+    # a random draw, the renter's own answer) is "policy".
+    chosen_by: Literal["model", "policy"] = "policy"
 
 
 # ---------------------------------------------------------------------------------------------

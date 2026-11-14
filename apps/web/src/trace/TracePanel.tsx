@@ -13,6 +13,7 @@ export const CHOICE_LABELS: Record<ChoiceKind, string> = {
   which_spot: "Which spot",
   retry_or_stop: "Retry or stop",
   ask_human: "Ask the human",
+  next_check: "Which check next",
 };
 
 const KIND_LABELS: Record<TraceEvent["kind"], string> = {
@@ -54,6 +55,12 @@ export function isWaitingForHuman(events: TraceEvent[]): boolean {
   return last?.kind === "hitl" && !last.pick;
 }
 
+// The spot is a random draw: neither the model nor a rule picks it.
+function byLabel(event: TraceEvent): string {
+  if (event.choice === "which_spot") return "random draw";
+  return event.chosen_by === "model" ? "picked by model" : "picked by rules";
+}
+
 export function TraceLine({ event }: { event: TraceEvent }) {
   const isChoice = event.kind === "choice" || (event.kind === "hitl" && !!event.choice);
   const title = event.choice ? CHOICE_LABELS[event.choice] : KIND_LABELS[event.kind];
@@ -67,6 +74,11 @@ export function TraceLine({ event }: { event: TraceEvent }) {
     >
       <div className="trace-head">
         <span className="trace-title">{title}</span>
+        {event.kind === "choice" && (
+          <span className="mono trace-by" data-testid="trace-by" data-by={event.chosen_by}>
+            {byLabel(event)}
+          </span>
+        )}
         <span className="mono trace-time">{timeOf(event.at)}</span>
       </div>
       {event.options.length > 0 && (
