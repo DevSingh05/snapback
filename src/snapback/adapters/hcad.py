@@ -46,14 +46,18 @@ NAME = ["name", "owner_name", "ownername"]
 STREET = ["site_addr_1", "site_address", "site_addr"]
 CITY = ["site_addr_2", "site_city"]
 
-# A whole word from this set makes the owner a company or institution. Not here on purpose: a
-# bare CO (left by "CO-TRUSTEES"), and CHURCH / CITY / STATE / COUNTY, which are surnames too and
-# count only in an institution pattern (see `classify`).
-_COMPANY_WORDS = {
-    "LLC", "INC", "INCORPORATED", "LP", "LLP", "LTD", "CORP", "CORPORATION", "COMPANY", "BANK",
-    "PROPERTIES", "PROPERTY", "HOMES", "REIT", "ASSOCIATION", "ASSN", "PARTNERS", "PARTNERSHIP",
-    "FUND", "HOLDINGS", "INVESTMENTS", "CAPITAL", "GROUP", "REALTY", "MANAGEMENT", "AUTHORITY",
-    "DISTRICT", "VENTURES", "ENTERPRISES", "SERVICES", "BORROWER", "OPENDOOR", "OFFERPAD",
+# Owner kind is decided by the shape of the name, not by a list of blocked markers (conductor
+# ruling 07:28 on #160). When unsure, a private owner: then no name can reach the card.
+_ALLOWED_CHARS = re.compile(r"[A-Za-z0-9 .\-']+")
+_PERSON_TOKENS = {
+    "AND", "FBO", "CUSTODIAN", "ATTN", "TTEE", "TRSTE", "TRST", "TRUSTE", "ETAL", "ET", "EST",
+    "ESTATE", "IRA", "AS", "AGENT", "JR", "SR", "II", "III", "IV", "UX", "FAMILY", "LIVING",
+    "TRUST", "TR", "TRS", "TRUSTEE", "TRUSTEES", "DBA", "FOR",
+}  # fmt: skip
+_ENTITY_SUFFIXES = {"LLC", "INC", "LP", "LTD", "CORP", "CO", "REIT"}
+_COMPANY_LAST_WORDS = {
+    "HOMES", "PROPERTIES", "HOLDINGS", "MANAGEMENT", "REALTY", "CAPITAL", "INVESTMENTS",
+    "GROUP", "PARTNERS", "BANK", "ASSOCIATION", "AUTHORITY",
 }  # fmt: skip
 _MY_NAME = re.compile(
     r"(?i:\bmy[ \t]+name[ \t]+is)[ \t]+([A-Z][A-Za-z'\-]{1,30})[ \t]+([A-Z][A-Za-z'\-]{1,30})"
@@ -84,32 +88,35 @@ def _salt_fingerprint(salt: str) -> str:
 
 
 def classify(owner_name: str) -> OwnerKind:
-    """A company or institution, or a private owner. When in doubt, a private owner: then the
-    card says "a private owner" and no name can be shown."""
-    upper = owner_name.upper()
-    tokens = re.findall(r"[A-Z0-9&]+", upper)  # hyphens and dots split words
-    if not tokens:
-        return OwnerKind.PERSON
+    """COMPANY only when the whole name has the shape of one company or institution: an entity
+    suffix or company word as the last word, or an institution form. Everything else, and every
+    name that joins, names or acts for a person, is a private owner."""
+    name = owner_name.strip().upper()
+    if not name or not _ALLOWED_CHARS.fullmatch(name):
+        return OwnerKind.PERSON  # '&', '/', '+', ',', '%' ... join or point at another party
+    tokens = re.findall(r"[A-Z0-9']+", name)  # spaces, dots and hyphens split words
     joined = " ".join(tokens)
-    # A COMPANY only when the whole name is one company entity (conductor's call, #160 r2):
-    # anything joining or naming a second party, or any trust that is not a trust company,
-    # is a private owner, so a person's name can never reach the card.
-    if (
-        "&" in upper
-        or "C/O" in upper
-        or {"DBA", "FOR", "TR", "TRS", "TRUSTEE", "TRUSTEES"} & set(tokens)
-        or re.search(r"\bET AL\b", joined)
-        or re.search(r"\bTRUST\b(?! COMPANY\b)", joined)
-    ):
+    # whole-name institution forms
+    if re.fullmatch(r"(CITY|STATE|COUNTY) OF( \w+)+", joined):
+        return OwnerKind.COMPANY
+    trust_company = joined.endswith(" TRUST COMPANY")
+    words = tokens[:-2] if trust_company else tokens  # TRUST in "... TRUST COMPANY" is not a trust
+    if set(words) & _PERSON_TOKENS:
         return OwnerKind.PERSON
-    if re.match(r"(CITY|STATE|COUNTY) OF\b", joined) or re.search(r"\bCHURCH OF \w+", joined):
+    if trust_company or re.fullmatch(r"\w+( \w+)* CHURCH( OF \w+)?", joined):
         return OwnerKind.COMPANY
-    if tokens[-1] == "CHURCH" or "TRUST COMPANY" in joined:
+    if len(tokens) < 2:
+        return OwnerKind.PERSON  # no company word counts in position 0
+    if tokens[-2:] == ["N", "A"]:
+        return (
+            OwnerKind.COMPANY
+            if len(tokens) >= 3 and tokens[-3] in {"BANK", "ASSOCIATION"}
+            else OwnerKind.PERSON
+        )
+    last = tokens[-1]
+    if last in _ENTITY_SUFFIXES or last in _COMPANY_LAST_WORDS:
         return OwnerKind.COMPANY
-    if re.search(r"\bBANK N A$|\bN A$", joined) and tokens[0] != "BANK":
-        return OwnerKind.COMPANY  # N.A. only after BANK or as the last tokens
-    company_words = set(tokens[1:] if tokens[0] == "BANK" else tokens)  # BANK first: a surname
-    return OwnerKind.COMPANY if company_words & _COMPANY_WORDS else OwnerKind.PERSON
+    return OwnerKind.PERSON
 
 
 def _rows(source: Path, name: str) -> Iterator[dict[str, str]]:
