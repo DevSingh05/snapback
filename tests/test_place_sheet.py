@@ -2,6 +2,7 @@
 
 import json
 import re
+from urllib.parse import quote, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -47,7 +48,13 @@ def test_the_sheet_names_the_company_on_record_the_scan_badge_and_the_walk_link(
     assert body["office_on_record"] == "Fixture Property Management Co"
     assert body["has_3d_scan"] is True
     assert body["scan_text"] == "a 3D scan in this building"
-    assert body["walk_path"] == "/tour/fx-prop-3"
+    first_key = body["plans"][0]["plan_key"]
+    assert first_key
+    assert body["walk_path"] == f"/tour/fx-prop-3?plan_key={quote(first_key, safe='')}"
+    # Follow the link: the web route /tour/{pid} reads the API's /places/{pid}/tour.
+    parsed = urlsplit(body["walk_path"])
+    walked = client.get(f"/places/{parsed.path.removeprefix('/tour/')}/tour?{parsed.query}")
+    assert walked.status_code == 200
     no_scan = client.get("/places/fx-prop-4").json()
     assert no_scan["has_3d_scan"] is False and no_scan["scan_text"] is None
 

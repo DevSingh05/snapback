@@ -16,6 +16,7 @@ import threading
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
+from urllib.parse import quote
 
 from pydantic import BaseModel, ConfigDict
 
@@ -221,6 +222,16 @@ def captured_line(captured_on: date | None, source: DataSource) -> str | None:
     return f"Aerial photo captured {day} ({who})"
 
 
+def _walk_path(property_id: str, plans: list[PlaceMatch]) -> str | None:
+    """The Walk it first link. A building with several floor plans needs the plan picked by its
+    key (the tour answers 422 without it), the same way PlacesStrip.tourHref builds it."""
+    if not any(p.has_3d_scan for p in plans):
+        return None
+    key = plans[0].plan_key
+    q = f"?plan_key={quote(key, safe='')}" if key else ""
+    return f"/tour/{quote(property_id, safe='')}{q}"
+
+
 def place_sheet(property_id: str, lookups: Any) -> PlaceSheet | None:
     """The sheet for one place by id, whatever the budget; None when it has no priced plan."""
     source = _source_of(lookups)
@@ -248,7 +259,7 @@ def place_sheet(property_id: str, lookups: Any) -> PlaceSheet | None:
         office_on_record=first.office_on_record,
         has_3d_scan=any(p.has_3d_scan for p in plans),
         scan_text=first.scan_text if any(p.has_3d_scan for p in plans) else None,
-        walk_path=f"/tour/{property_id}" if any(p.has_3d_scan for p in plans) else None,
+        walk_path=_walk_path(property_id, plans),
         plans=plans,
     )
 
