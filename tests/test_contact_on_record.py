@@ -457,6 +457,54 @@ def test_one_matching_number_among_several_is_not_the_office_calling():
     assert strings.text("reason.phone_flag") in verdict.reasons
 
 
+def test_with_no_property_record_the_brokerages_on_record_are_still_compared():
+    # A15 (#132): a home that is for sale usually has no property record at all. The
+    # for-sale lookup still names the listing brokerages, and those are on record.
+    offices = ["Fixture Realty Group", "Sample Homes Brokerage"]
+    named = check_authority(ContactClaims(company="Fixture Realty Group LLC"), None, SALT, offices)
+    assert named.status is AuthorityStatus.MATCHES_RECORD
+    assert named.manager_on_record == "Fixture Realty Group"  # who to call: a company on record
+    assert named.poster_said == "Fixture Realty Group LLC"
+    # There is no office phone and no website to compare with, so those stay unchecked.
+    assert (named.office_phone_match, named.link_domain) == (
+        PhoneMatch.NOT_CHECKED,
+        LinkDomain.NOT_CHECKED,
+    )
+    second = check_authority(ContactClaims(company="Sample Homes"), None, SALT, offices)
+    assert second.manager_on_record == "Sample Homes Brokerage"
+
+    other = check_authority(ContactClaims(company="Somebody Else Realty"), None, SALT, offices)
+    assert other.status is AuthorityStatus.MISMATCH and other.manager_on_record is None
+
+    silent = check_authority(ContactClaims(), None, SALT, offices)
+    assert (silent.status, silent.manager_on_record) == (AuthorityStatus.UNKNOWN, None)
+    # With nothing on record at all, nothing is claimed, as before.
+    nothing = check_authority(ContactClaims(company="Fixture Realty Group"), None, SALT)
+    assert (nothing.status, nothing.manager_on_record) == (AuthorityStatus.UNKNOWN, None)
+    blank = check_authority(ContactClaims(company="Fixture Realty Group"), None, SALT, ["", " "])
+    assert blank.status is AuthorityStatus.UNKNOWN
+
+
+def test_a_phone_in_the_listing_never_matches_when_there_is_no_office_on_record():
+    # No record means no office phone on record. A number in the ad is compared with nothing,
+    # so a brokerage named in a for-sale home's ad can never pass on its own (red team H1).
+    offices = ["Fixture Realty Group"]
+    claims = ContactClaims(company="Fixture Realty Group", phones=[OFFICE])
+    found = check_authority(claims, None, SALT, offices)
+    assert found.status is AuthorityStatus.MATCHES_RECORD
+    assert found.office_phone_match is PhoneMatch.NOT_CHECKED
+    modules = evidence(authority=found.model_dump(mode="json"), rules=[], price=None)
+    assert to_evidence(modules).phone_confirmed is False
+    assert state(modules) is VerdictState.HOLD
+
+
+def test_the_manager_is_named_before_a_brokerage_when_both_are_on_record():
+    offices = ["Fixture Realty Group"]
+    result = check_authority(ContactClaims(company="Fixture Realty Group"), record(), SALT, offices)
+    assert result.status is AuthorityStatus.MATCHES_RECORD
+    assert result.manager_on_record == "Fixture Living LLC"
+
+
 def test_naming_a_listing_brokerage_on_record_matches_as_naming_the_manager_does():
     # Ruling, Sat 01:20: the manager, the leasing office and the listing brokerage on record
     # may all market a home. Lane D passes the brokerage names (D7, `ForSaleMatch.offices`).
