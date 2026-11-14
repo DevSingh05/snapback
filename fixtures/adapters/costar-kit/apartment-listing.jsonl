@@ -1,2 +1,3 @@
 {"propertyId": "fx-prop-1", "apartmentModels": [{"beds": 2, "baths": 2}, {"beds": 1, "baths": 1}]}
 {"propertyId": "fx-prop-3", "propertyManagementCompanyName": "Fixture Property Management Co", "minRent": 1400, "maxRent": 2600, "apartmentModels": [{"beds": 0, "baths": 1, "minRent": 1400, "maxRent": 1600}, {"beds": 1, "baths": 1, "minRent": 1700, "maxRent": 1900}, {"beds": 2, "baths": 2, "minRent": 2300, "maxRent": 2600}]}
+{"propertyId": "fx-prop-4", "propertyManagementCompanyName": "Fixture Living LLC", "apartmentModels": [{"beds": 1, "baths": 1, "minRent": 1200, "maxRent": 1400, "rentPricingType": 1}, {"beds": 2, "baths": 2, "minRent": 1600, "maxRent": 1900, "rentPricingType": 1}, {"beds": 4, "baths": 4, "minRent": 700, "maxRent": 850, "rentPricingType": 2}]}
