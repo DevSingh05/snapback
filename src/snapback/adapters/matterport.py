@@ -344,6 +344,17 @@ class LiveMatterport:
         return response
 
 
+def cached_room_labels(model_id: str, cache_dir: Path = LIVE_CACHE) -> dict[str, str | None]:
+    """Sweep id -> room label from the local cache only (rooms.json, written by room_labels).
+    No network and no key, for the live path; an empty dict when nothing is cached."""
+    path = Path(cache_dir) / _safe(model_id) / "rooms.json"
+    try:
+        labels = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return labels if isinstance(labels, dict) else {}
+
+
 def purge(cache_dir: Path = LIVE_CACHE, *, index_dir: Path = INDEX_CACHE) -> None:
     """Delete every cached face and every index built from them (sponsor terms: all copies
     and derivatives deleted after the event)."""

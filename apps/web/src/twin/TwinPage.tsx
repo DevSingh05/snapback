@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import { SourceChip } from "../components/SourceChip";
+import { Wordmark } from "../components/HouseGlyph";
 import type { LocateResult } from "../contracts";
 import { TracePanel } from "../trace";
 import { AerialProof, type AerialSide } from "./AerialProof";
@@ -23,7 +24,7 @@ import { usePrefersReducedMotion } from "./useReducedMotion";
 const PLACEHOLDER_PHOTO =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#dff3ee"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0b7a6c">Listing photo (fixture)</text></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#d3eedc"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0e5630">Listing photo (fixture)</text></svg>`,
   );
 
 const NO_LABELS: Record<string, string> = {};
@@ -204,7 +205,7 @@ function TwinViewInner({
   return (
     <div className="twin-page">
       <header className="twin-head">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <span className="mono">Model</span>
         {live && sdkFailed ? (
           <span className="chip chip-fixture" data-testid="source-chip">

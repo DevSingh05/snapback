@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
+import { HouseGlyph, Wordmark } from "../components/HouseGlyph";
 import { LabSection } from "../lab";
 import { loadBrief } from "../search/api";
 import { PlacesStrip } from "../search/PlacesStrip";
@@ -50,14 +51,17 @@ function EvidenceRow({
   first,
   label,
   row,
+  index,
 }: {
   line: CardLine;
   first: boolean;
   label: string;
   row: CardRowKind;
+  // Where this line sits in the whole card: the lines land one after another.
+  index: number;
 }) {
   return (
-    <tr className={first ? "row-first" : undefined}>
+    <tr className={first ? "row-first" : undefined} style={{ "--i": index } as CSSProperties}>
       <th scope="row" className="cell-kind">
         {first ? (
           <span className="kind" data-testid="row-label">
@@ -86,14 +90,16 @@ export function CardView({
   const rows = card.rows;
   const history = historySteps(card.for_sale);
   const stateTone = STATE_TONE[card.state];
+  const firstIndex = rows.map((_, r) => rows.slice(0, r).reduce((n, g) => n + g.lines.length, 0));
   return (
     <article className={`card-page variant-${variant}`}>
       <header className="masthead">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <SourceChip source={card.source} />
       </header>
 
-      <section className="hero" aria-labelledby="card-title">
+      <section className={`hero hero-${stateTone}`} aria-labelledby="card-title">
+        <HouseGlyph className="hero-house" />
         <p className="eyebrow">
           Case{" "}
           <span className="mono case-id" data-testid="case-id">
@@ -131,7 +137,7 @@ export function CardView({
                 <th>Status</th>
               </tr>
             </thead>
-            {rows.map((row) => (
+            {rows.map((row, r) => (
               <tbody key={row.kind} className={`group group-${row.kind}`}>
                 {row.lines.map((line, i) => (
                   <EvidenceRow
@@ -140,6 +146,7 @@ export function CardView({
                     first={i === 0}
                     label={ROW_LABEL[row.kind]}
                     row={row.kind}
+                    index={(firstIndex[r] ?? 0) + i}
                   />
                 ))}
               </tbody>
@@ -229,10 +236,11 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     );
   return (
     <div className="card-page notice" role="status">
-      <span className="wordmark">SNAPBACK</span>
+      <Wordmark />
       {load.status === "loading" && <p>Loading the result for case {caseId}…</p>}
       {load.status === "missing" && (
         <>
+          <HouseGlyph className="notice-house" lit={false} />
           <h1>No result for case {caseId}</h1>
           <p>Check the code on your message. Results are kept for 24 hours, then removed.</p>
         </>
