@@ -2,7 +2,8 @@
 
 Routes the web app and the iMessage sidecar call:
 
-    POST /cases                           start a check (form: link, text, renter_id, photos)
+    POST /cases                           start a check (form: link, text, renter_id,
+                                          property_id, photos)
     GET  /cases/{case_id}                 where the case stands
     GET  /cases/{case_id}/card            the Card (?lang=en|es)
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
@@ -33,13 +34,14 @@ from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
 from snapback.agent.intake import read_listing
+from snapback.agent.join import KitMissing, Lookups
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
-    LiveModeNotWired,
     NothingWaiting,
     RecordedCase,
     SessionCase,
+    UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
@@ -53,6 +55,8 @@ from snapback.verdict import decide
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
+# Our ids for records: short, and nothing that could be a path or a sentence.
+PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 # What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
 # Nothing else is accepted, so a raw phone number or a name can never be stored as one.
 RENTER_ID = re.compile(r"imsg-[0-9a-f]{24}")
@@ -115,11 +119,15 @@ async def _trace_stream(
 
 
 def create_app(
-    settings: Settings | None = None, *, registry: CaseRegistry | None | object = _DEFAULT
+    settings: Settings | None = None,
+    lookups: Lookups | None = None,
+    *,
+    registry: CaseRegistry | None | object = _DEFAULT,
 ) -> FastAPI:
-    """The API. `registry` records who started each case; the default is lane D's store."""
+    """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
+    started each case; the default is lane D's safety store."""
     settings = settings or get_settings()
-    store = CaseStore(settings)
+    store = CaseStore(settings, lookups)
     if registry is _DEFAULT:
         registry = SafetyRegistry(settings.snapback_data_dir)
     # One allowance per renter or per browser, and a ceiling per network address so that
@@ -211,9 +219,11 @@ def create_app(
             )
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
-    def start_case(text: str, link: str, photos: list[UploadFile], owner: str) -> SessionCase:
-        images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
-        listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
+    def start_case(
+        text: str, link: str, photos: list[UploadFile], property_id: str | None, owner: str
+    ) -> SessionCase:
+        if property_id is not None and not PROPERTY_ID.fullmatch(property_id):
+            raise HTTPException(status_code=422, detail="That is not one of our building ids.")
 
         def register(case_id: str) -> None:
             # So lane D's delete finds every case this renter started (A11).
@@ -224,10 +234,12 @@ def create_app(
             except Exception:
                 raise NotRegistered from None
 
+        images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
+        listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
         try:
-            case = store.create(read_listing(listing_text, images), register)
+            case = store.create(read_listing(listing_text, images), property_id, register)
             case.owner = owner if registry is not None else None
             return case
         except NotRegistered:
@@ -235,6 +247,12 @@ def create_app(
                 status_code=503,
                 detail="The check could not be recorded, so it was not started. Try again.",
             ) from None
+        except UnknownProperty:
+            raise HTTPException(
+                status_code=422, detail="We hold no record for that building id."
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
 
     @app.post(
         "/cases",
@@ -249,6 +267,7 @@ def create_app(
                                 "link": {"type": "string"},
                                 "text": {"type": "string"},
                                 "renter_id": {"type": "string"},
+                                "property_id": {"type": "string"},
                                 "photos": {
                                     "type": "array",
                                     "items": {"type": "string", "format": "binary"},
@@ -265,24 +284,16 @@ def create_app(
 
         The form is `CreateCaseRequest` in contracts.py plus `photos` as files, which may be
         listing photos or screenshots of the listing. The link is read as part of the
-        listing's text and is never fetched.
+        listing's text and is never fetched. `property_id` is our id for the building the
+        listing claims; with it the check runs on that building's record (422 if we hold
+        none, 503 if the kit is not on this server).
         """
-        try:
-            store.check_can_create()
-        except LiveModeNotWired:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Live mode needs the locate, record and challenge modules, which are "
-                    "not wired yet. Run with SNAPBACK_DATA_SOURCE=fixture."
-                ),
-            ) from None
-
         form = await parse_form(request, settings.snapback_max_photos, max_photo_bytes)
         try:
             text, link, renter_id = (
                 str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
+            property_id = str(form.get("property_id") or "").strip() or None
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
             if renter_id and not RENTER_ID.fullmatch(renter_id):
                 raise HTTPException(status_code=422, detail="That is not a renter id.")
@@ -308,7 +319,7 @@ def create_app(
                 per_client.release(client)
                 raise HTTPException(status_code=429, detail=limit_reached)
             try:
-                case = await run_in_threadpool(start_case, text, link, photos, owner)
+                case = await run_in_threadpool(start_case, text, link, photos, property_id, owner)
             except BaseException:
                 per_client.release(client)
                 per_address.release(address)

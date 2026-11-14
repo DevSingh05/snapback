@@ -12,6 +12,7 @@ creating a case in live mode says so instead of pretending.
 """
 
 import json
+import logging
 import secrets
 import threading
 from collections.abc import Callable
@@ -28,7 +29,9 @@ from snapback.agent import (
 )
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
+from snapback.agent.join import JoinedModules, KitLookups, Lookups
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
+from snapback.agent.rules.contact import phone_salt
 from snapback.card import strings
 from snapback.contracts import (
     Card,
@@ -42,13 +45,15 @@ from snapback.contracts import (
 from snapback.settings import Settings
 from snapback.verdict import FIXTURE_ID_PREFIX, build_card
 
+log = logging.getLogger("snapback.api")
+
 
 class NothingWaiting(Exception):
     """An approval arrived for a case that is not waiting for one."""
 
 
-class LiveModeNotWired(Exception):
-    """A case was asked for in live mode before the live modules exist."""
+class UnknownProperty(Exception):
+    """A check named a building we hold no record for."""
 
 
 class ChallengeView(BaseModel):
@@ -100,6 +105,16 @@ class RecordedCase:
         self._evidence = evidence
         self._photos = len(evidence.locate.photos) if evidence.locate else 0
 
+    @property
+    def evidence(self) -> ModuleEvidence:
+        """What the modules found for this case. Read-only for other lanes' routes."""
+        return self._evidence
+
+    @property
+    def property_id(self) -> str | None:
+        """Our id for the building the listing claims, if it named one."""
+        return self._evidence.locate.claimed_property_id if self._evidence.locate else None
+
     def events(self) -> list[TraceEvent]:
         return self._events
 
@@ -145,6 +160,7 @@ class SessionCase:
         self._listing = listing
         self._runner = runner
         self.staged = False  # made from a staged demo case (fixtures/demo)
+        self.property_id: str | None = None  # our id for the building the listing claims
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 
@@ -158,6 +174,11 @@ class SessionCase:
             self._runner(self.session)
             if self.session.done and self._checked_at is None:
                 self._checked_at = _now()
+
+    @property
+    def evidence(self) -> ModuleEvidence:
+        """What the modules found for this case so far. Read-only for other lanes' routes."""
+        return self.session.evidence
 
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
@@ -231,8 +252,10 @@ def _deepagents_runner() -> Callable[[CaseSession], object]:
 
 
 class CaseStore:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, lookups: Lookups | None = None) -> None:
         self._settings = settings
+        # Lane D's adapters: the record and the for-sale lookup (A10). The kit is read once.
+        self._lookups = lookups or KitLookups(settings.snapback_data_source)
         self._cases: dict[str, RecordedCase | SessionCase] = {}
         self._lock = threading.Lock()
         self._runner = (
@@ -240,6 +263,15 @@ class CaseStore:
         )
         if settings.snapback_data_source is DataSource.FIXTURE:
             self._add_recorded_fixture()
+        elif settings.demo_case:
+            # Easy to set both and expect the staged cards. A live case carries no stand-in,
+            # so the pack gives only its listing text and the cards read "not checked".
+            log.warning(
+                "DEMO_CASE=%s with SNAPBACK_DATA_SOURCE=live: only the staged listing text "
+                "is used. Photos and presence will read 'Not checked'. For the staged cards "
+                "run with SNAPBACK_DATA_SOURCE=fixture.",
+                settings.demo_case,
+            )
 
     def _add_recorded_fixture(self) -> None:
         card = Card.model_validate_json((FIXTURES_DIR / "card_hold.json").read_text())
@@ -259,10 +291,6 @@ class CaseStore:
             if candidate not in self._cases:
                 return candidate
 
-    def check_can_create(self) -> None:
-        if self._settings.snapback_data_source is not DataSource.FIXTURE:
-            raise LiveModeNotWired
-
     def __len__(self) -> int:
         return len(self._cases)
 
@@ -272,46 +300,73 @@ class CaseStore:
             self._cases.pop(public_id(case_id), None)
 
     def create(
-        self, listing: Listing, register: Callable[[str], None] | None = None
+        self,
+        listing: Listing,
+        property_id: str | None = None,
+        register: Callable[[str], None] | None = None,
     ) -> SessionCase:
-        """Start a check. `register` is told the new case's id before anything runs.
+        """Start a check. `property_id` is our id for the building the listing claims.
 
-        If `register` raises, there is no case: a check that could not be recorded for later
-        deletion is not started.
+        `register` is told the new case's id before anything runs. If it raises, there is no
+        case: a check that could not be recorded for later deletion is not started.
+
+        The record and the for-sale lookup come from lane D's adapters and feed the price,
+        unit and contact rules.
+
+        The twin and the challenge are still stand-ins, and stand-ins are fixture data. They
+        are used only in a fixture case. A live case, or any case on a live record, gets
+        none: its photos are "not checked" and nobody is asked to prove presence, so it can
+        never read VERIFIED on the strength of a stand-in.
+
+        Raises `UnknownProperty` for an id we hold no record for, and `KitMissing` when the
+        record is asked for and the kit is not on this machine.
         """
-        self.check_can_create()
+        record = None
+        if property_id:
+            record = self._lookups.record(property_id)
+            if record is None:
+                raise UnknownProperty
+
+        demo = load_demo_case(self._settings.demo_case) if self._settings.demo_case else None
+        if demo is not None and not listing.text:
+            # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
+            own = read_listing(demo.listing_text)
+            listing = own.model_copy(
+                update={"photos": listing.photos, "screenshots": listing.screenshots}
+            )
+        for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+
+        live = self._settings.snapback_data_source is DataSource.LIVE or (
+            record is not None and record.source is DataSource.LIVE
+        )
+        source = DataSource.LIVE if live else DataSource.FIXTURE
+
         with self._lock:
             short_id = self._new_id()
-            full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
+            # Fixture ids are marked as such. A live case carries no stand-in and no mark.
+            full_id = short_id if live else f"{FIXTURE_ID_PREFIX}{short_id}"
             if register is not None:
                 register(full_id)
-            # The fixture modules stand in for the twin, the record and the challenge. What
-            # the renter sent is real: its scope, its rule hits and its rent come from intake.
-            if self._settings.demo_case:
-                # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
-                demo = load_demo_case(self._settings.demo_case)
-                if not listing.text:
-                    staged = read_listing(demo.listing_text)
-                    listing = staged.model_copy(
-                        update={"photos": listing.photos, "screenshots": listing.screenshots}
-                    )
+            if demo is not None and not live and record is None:
+                # The demo pack brings its own stand-ins, record included.
                 modules = demo_modules(demo, listing)
             else:
-                modules = FixtureModules(
-                    listing_scope=listing.scope,
-                    rules=listing.rule_hits if listing.text else None,
-                    listed_rent=listing.listed_rent,
-                    contacts=listing.contacts,
-                    unit=listing.unit,
-                    beds=listing.beds,
+                modules = JoinedModules(
+                    stand_in=None if live else FixtureModules(listing_scope=listing.scope),
+                    listing=listing,
+                    record=record,
+                    for_sale=for_sale,
+                    salt=phone_salt(self._settings),
+                    record_source=record.source if record else source,
                 )
-            session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
+            session = CaseSession(full_id, modules, Trace(full_id, source))
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner)
-            case.staged = bool(self._settings.demo_case)
+            case.staged = demo is not None
+            case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()
         return case

@@ -294,6 +294,44 @@ def test_with_the_flag_text_the_presenter_pastes_is_what_gets_read(tmp_path):
     assert card["state"] == "dont_pay"  # and the staged photo evidence still decides
 
 
+def test_the_flag_in_live_mode_gives_only_the_listing_and_says_so_at_start(tmp_path, caplog):
+    # XO review of #101: easy to set both and expect the staged cards on demo day.
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        made = Settings(
+            _env_file=None,
+            snapback_data_dir=tmp_path,
+            demo_case="a",
+            snapback_data_source="live",
+        )
+        client = TestClient(create_app(made))
+    warned = " ".join(record.getMessage() for record in caplog.records)
+    assert "DEMO_CASE=a" in warned and "Not checked" in warned
+
+    case = client.post("/cases", data={}).json()
+    assert (case["status"], case["source"]) == ("done", "live")
+    card = client.get(f"/cases/{case['case_id']}/card").json()
+    assert card["state"] == "unverified"  # not the staged "don't pay": no stand-in is used
+    tones = {line["label"]: line["tone"] for row in card["rows"] for line in row["lines"]}
+    assert tones["Real"] == "not_checked" and tones["Here now"] == "not_checked"
+    assert card["footer"][0].startswith("Staged example.")  # the listing is still staged
+
+
+def test_the_flag_in_fixture_mode_logs_no_warning(tmp_path, caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        client_for(tmp_path, "a")
+    assert not [record for record in caplog.records if "DEMO_CASE" in record.getMessage()]
+
+
+def test_the_readme_says_what_the_flag_does_in_each_mode():
+    readme = (DEMO_DIR / "README.md").read_text()
+    assert "SNAPBACK_DATA_SOURCE=fixture" in readme and "SNAPBACK_DATA_SOURCE=live" in readme
+    assert "supplies only the listing text" in readme
+
+
 def test_without_the_flag_nothing_changes(tmp_path):
     client = client_for(tmp_path, None)
     case = client.post("/cases", data={"text": "Two bed near the park."}).json()

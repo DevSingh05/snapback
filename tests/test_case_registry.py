@@ -216,3 +216,19 @@ def test_a_browsers_case_is_deleted_and_dropped_the_same_way(tmp_path):
     owner = f"browser:{first.cookies['snapback_client']}"
     assert delete_renter(owner, tmp_path) == [f"fx-{first.json()['case_id']}"]
     assert client.get(f"/cases/{first.json()['case_id']}/card").status_code == 404
+
+
+def test_a_live_case_is_registered_and_deleted_under_its_own_id(tmp_path):
+    # Since the live join (#101) a live case has no "fx-" mark on its id. It must be
+    # registered, found and dropped under the id it actually has.
+    from snapback.agent.join import KitLookups
+    from snapback.contracts import DataSource
+
+    made = Settings(_env_file=None, snapback_data_dir=tmp_path, snapback_data_source="live")
+    lookups = KitLookups(DataSource.LIVE, kit_dir=tmp_path / "no-kit")
+    client = TestClient(create_app(made, lookups))
+    case = client.post("/cases", data={"text": "x", "renter_id": RENTER_1}).json()
+    assert SafetyStore(tmp_path).cases_of(RENTER_1) == [case["case_id"]]
+
+    assert delete_renter(RENTER_1, tmp_path) == [case["case_id"]]
+    assert client.get(f"/cases/{case['case_id']}/card").status_code == 404

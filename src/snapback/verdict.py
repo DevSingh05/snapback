@@ -312,11 +312,22 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         kind=CardRowKind.PLACE,
         lines=[
             main,
-            *_for_sale_lines(modules, lang),
-            *_unit_lines(modules, lang),
+            *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_seen_before_lines(modules, lang, replies=False),
         ],
     )
+
+
+def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLine]:
+    """Mark lines that came from the record, when the record is not from where the case is.
+
+    A case can hold a real record beside stand-ins for the twin and the challenge. The card
+    as a whole then stays FIXTURE, and these lines say for themselves that they are LIVE.
+    """
+    source = modules.record_source
+    if source is None or source is modules.source:
+        return lines
+    return [line.model_copy(update={"source": source}) for line in lines]
 
 
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
@@ -440,8 +451,7 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
         kind=CardRowKind.PERSON,
         lines=[
             _here_now_line(modules, lang, zone),
-            _allowed_line(modules, lang),
-            *_contact_lines(modules, lang),
+            *_from_record(modules, [_allowed_line(modules, lang), *_contact_lines(modules, lang)]),
             *_seen_before_lines(modules, lang, replies=True),
         ],
     )
@@ -497,6 +507,14 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
 
 
+def _rent_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    line = _rent_line(modules, lang)
+    price = modules.price
+    # A rent line that compared nothing says nothing about the record.
+    compared = price is not None and (price.status is not PriceStatus.NOT_CHECKED or price.per_bed)
+    return _from_record(modules, [line]) if compared else [line]
+
+
 def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     # The line never repeats the unit number: it is the renter's own text, and the card is
     # passed around.
@@ -511,7 +529,7 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     return CardRow(
         kind=CardRowKind.PRICE,
-        lines=[*_rule_lines(modules, lang), _rent_line(modules, lang)],
+        lines=[*_rule_lines(modules, lang), *_rent_lines(modules, lang)],
     )
 
 
