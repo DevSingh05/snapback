@@ -170,3 +170,19 @@ def test_the_lat_lon_match_applies_the_unit_rule():
         "Apt 2, nice place", DataSource.FIXTURE, today=TODAY, lat=10.0002, lon=10.0
     )
     assert same.status is ForSaleStatus.ACTIVE
+
+
+def test_prose_after_apartment_is_not_a_unit_number():
+    near = for_sale_lookup(
+        "Spacious apartment near the park", DataSource.FIXTURE, today=TODAY, lat=10.0002, lon=10.0
+    )
+    assert near.status is ForSaleStatus.ACTIVE
+    street = for_sale_lookup("100 Fixture Lane apartment for rent", DataSource.FIXTURE, today=TODAY)
+    assert street.status is ForSaleStatus.ACTIVE
+    other = for_sale_lookup("Apt 7", DataSource.FIXTURE, today=TODAY, lat=10.0002, lon=10.0)
+    assert other.status is ForSaleStatus.NONE  # a real unit number still counts
+
+
+def test_the_zip_is_the_first_five_digits_after_the_street():
+    text = "12345 Fixture Lane Fixture City 00001 deposit 10000"
+    assert for_sale_lookup(text, DataSource.FIXTURE, today=TODAY).status is ForSaleStatus.ACTIVE
