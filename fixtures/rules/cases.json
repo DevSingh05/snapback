@@ -93,7 +93,7 @@
     "id": "fx-rule-deposit-at-signing",
     "category": "fee_ask",
     "text": "The security deposit is one month of rent, due at lease signing.",
-    "expect": []
+    "expect": ["fee.money_before_move_in"]
   },
   {
     "id": "fx-rule-no-fee-this-month",
@@ -213,7 +213,7 @@
     "id": "fx-rule-never-ask-but-send-deposit",
     "category": "fee_ask",
     "text": "We never ask for a deposit before you tour, but send the $500 deposit by Zelle today to hold it.",
-    "expect": ["fee.holding_deposit_before_viewing"]
+    "expect": ["fee.holding_deposit_before_viewing", "fee.money_before_move_in"]
   },
   {
     "id": "fx-rule-pay-today-keys-after-signing",
@@ -273,6 +273,24 @@
     "id": "fx-rule-apply-fee-at-office",
     "category": "fee_ask",
     "text": "Apply at https://apply.example.com, application fee $40 paid to the management office.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-move-in-deposit-due",
+    "category": "fee_ask",
+    "text": "First month and a $1,200 deposit are due before move-in.",
+    "expect": ["fee.money_before_move_in"]
+  },
+  {
+    "id": "fx-rule-move-in-cost",
+    "category": "fee_ask",
+    "text": "Total move-in cost is $2,400, paid at the leasing office.",
+    "expect": ["fee.money_before_move_in"]
+  },
+  {
+    "id": "fx-rule-move-in-no-deposit",
+    "category": "fee_ask",
+    "text": "Move-in ready. No deposit is needed before move-in.",
     "expect": []
   }
 ]
