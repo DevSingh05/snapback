@@ -354,12 +354,35 @@ LISTING = {
 }
 
 
-def pack_for(**sections):
+def pack_for(lang="en", **sections):
     """A pack built straight from evidence, for cases the staged ones do not cover."""
     raw = json.loads((CONTRACTS / "module_evidence_hold.json").read_text())
     modules = ModuleEvidence.model_validate(raw | sections)
     card = build_card(modules, checked_at=CHECKED_AT)
-    return build_report(modules, card, case_id=card.case_id, lang="en", aerial=False)
+    return build_report(modules, card, case_id=card.case_id, lang=lang, aerial=False)
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+@pytest.mark.parametrize(
+    "authority",
+    [
+        None,  # the hold fixture's own authority, poster_said "Fixture Living LLC"
+        {"status": "mismatch", "poster_said": "Fxposter Rentals LLC"},
+    ],
+)
+def test_the_pack_leaks_no_poster_name_and_no_thread_text(authority, lang):
+    # The fixture's payment rule fired on a sentence from the thread and the poster named
+    # themselves. Neither may appear anywhere in the pack, in any field or language.
+    sections = {"for_sale": {"status": "active", "site": "Homes.com"}}
+    if authority is not None:
+        sections["authority"] = authority
+    pack = pack_for(lang=lang, **sections)
+    assert pack.reportable is True  # a pack that is not reportable would hide a leak
+    body = pack.model_dump_json()
+    said = ["Fixture Living LLC", "Fxposter Rentals LLC"]
+    spans = ["send the deposit by Zelle and I will mail the keys", "Zelle"]
+    for leak in said + spans:
+        assert leak.lower() not in body.lower(), leak
 
 
 def test_the_proof_lines_are_an_allowlist_of_listing_and_record_reasons():
