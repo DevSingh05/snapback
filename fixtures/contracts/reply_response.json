@@ -1,0 +1,9 @@
+{
+  "case_id": "7Q2M",
+  "source": "fixture",
+  "status": "done",
+  "check": "copy_of_listing_photo",
+  "presence": "forged",
+  "state": "dont_pay",
+  "challenge_text": null
+}

@@ -471,6 +471,9 @@ class AerialTile(BaseModel):
 class CaseProgress(StrEnum):
     RUNNING = "running"
     WAITING_FOR_APPROVAL = "waiting_for_approval"  # a challenge is drafted; the renter decides
+    # A14: the challenge was sent and the poster's reply photo has not come, or another is
+    # asked for. The card reads HOLD meanwhile: no reply is never a failure.
+    WAITING_FOR_REPLY = "waiting_for_reply"
     DONE = "done"
 
 
@@ -499,3 +502,36 @@ class CreateCaseResponse(BaseModel):
     photos: int = 0
     screenshots: int = 0  # images that were read as text
     injection_noticed: bool = False  # the listing had text written for an AI system
+
+
+# ---------------------------------------------------------------------------------------------
+# The poster's reply (A14, lane A's API; the upload page and the iMessage sidecar call it).
+# ---------------------------------------------------------------------------------------------
+
+
+class ReplyCheck(StrEnum):
+    """What checking one reply photo found. Each is a fact about the photo, not about a person."""
+
+    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"  # one of the listing's own photos: forged
+    CODE_NOT_READ = "code_not_read"  # the code is not on the paper in the photo: forged
+    LATE = "late"  # it came after the deadline, so it was not checked
+    # The code is there and the photo is not a copy, but nothing has checked that it was taken
+    # at the spot (that needs locate, V2). Not confirmed, never proven.
+    CODE_READ_SPOT_NOT_CHECKED = "code_read_spot_not_checked"
+    ASK_AGAIN = "ask_again"  # not at the spot, or it looks like a photo of a screen: ask again
+    NEXT_SPOT = "next_spot"  # the first spot matched; a second one is asked for
+    PROVEN = "proven"  # both spots matched
+    IGNORED = "ignored"  # the challenge is over; this photo changed nothing
+
+
+class ReplyResponse(BaseModel):
+    """What `POST /cases/{id}/reply` returns: the poster's reply photo, checked."""
+
+    case_id: str  # short public id
+    source: DataSource
+    status: CaseProgress  # waiting_for_reply while another photo is wanted, else done
+    check: ReplyCheck
+    presence: PresenceStatus
+    state: VerdictState | None = None  # set once the case is done
+    # The next message for the renter to forward, when another photo is asked for.
+    challenge_text: str | None = None
