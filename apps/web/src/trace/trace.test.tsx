@@ -74,9 +74,9 @@ describe("TracePanel with a duplicate seq", () => {
     const labels = screen.getAllByTestId("trace-by");
     expect(labels.map((l) => l.textContent)).toEqual(["picked by model", "picked by rules"]);
     expect(parseTraceEvent(MIN)?.chosen_by).toBe("policy");
-    expect(parseTraceEvent(MIN.replace('"source"', '"chosen_by":"model","source"'))?.chosen_by).toBe(
-      "model",
-    );
+    expect(
+      parseTraceEvent(MIN.replace('"source"', '"chosen_by":"model","source"'))?.chosen_by,
+    ).toBe("model");
   });
   it("labels the plan's choice", () => {
     const next: TraceEvent = { ...at(0), choice: "next_check", chosen_by: "model" };
