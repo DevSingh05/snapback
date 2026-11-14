@@ -292,3 +292,15 @@ def test_a_long_model_reply_ends_on_a_whole_sentence():
     assert finder.ok_reply("This place is verified and safe.") is None
     assert finder.ok_reply("It costs 1450 a month.") is None
     assert finder.ok_reply("") is None
+
+
+def test_amounts_in_the_renters_words_are_removed_before_the_model(tmp_path):
+    m = crew(prefs=ALL_FOUR)
+    s = new_session(tmp_path, m)
+    text = "budget under $1,800, nothing over 1500 dollars, and I liked the one at $1,000"
+    run_turn(s, [*SCRIPT, *finder.read_text(text)], text)
+    blob = "\n".join(m.seen)
+    assert "<renter_words>\n" in blob
+    for bait in ("1800", "1,800", "1500", "1,500", "1000", "1,000"):
+        assert bait not in blob
+    assert s.budget() == 1800  # code still read it

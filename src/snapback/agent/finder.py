@@ -343,18 +343,21 @@ _STREET = re.compile(
     re.IGNORECASE,
 )
 _UNIT = re.compile(r"\b(?:unit|apt|apartment|suite|ste)\s*#?\s*\d[\w-]*|#\s*\d[\w-]*", re.I)
+# Money and any other 3+ digit number: the renter's amounts are as private as their address,
+# and code has already read the budget out of them.
+_AMOUNT = re.compile(r"\$\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\b\d{1,3}(?:,\d{3})+\b|\b\d{3,}\b")
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>{}`]")
 REMOVED = "[removed]"
 
 
 def clean_words(text: str | None) -> str:
     """The renter's words as the main agent may see them: phone numbers, emails, links, street
-    addresses and unit numbers replaced with [removed], fence characters dropped, whitespace
-    folded, capped at `MAX_WORDS`. Empty when nothing is left."""
+    addresses, unit numbers and amounts replaced with [removed], fence characters dropped,
+    whitespace folded, capped at `MAX_WORDS`. Empty when nothing is left."""
     if not text:
         return ""
     out = _CONTROL.sub(" ", text)
-    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT):
+    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT, _AMOUNT):
         out = pattern.sub(REMOVED, out)
     out = " ".join(out.split())
     if len(out) > MAX_WORDS:
