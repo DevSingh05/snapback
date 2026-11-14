@@ -60,9 +60,6 @@ rests on those facts.
 - Two steps are not decisions for you. The spot for the photo challenge is drawn at random by \
 `draw_spot`, so that nobody can predict it. The message to the poster goes out only after the \
 renter approves it: call `send_challenge` and the system pauses for them.
-- Plan first. Before the first choice, call `write_todos` with the steps: work the open \
-choices, hand each check family to its sub-agent, read their notes, write the explanation and \
-the tour questions. Tick them off as you go.
 - When `open_choice` shows the checks are done (it says `next: call draw_spot`, or the case \
 is finished), delegate with the `task` tool, ONE call at a time, to each sub-agent: `record`, \
 `office-and-licence`, `owner`, `place`, `search`. Each sees only its own tools, reads its facts \
@@ -83,7 +80,31 @@ poster as honest or dishonest. We report what was shown and what was not.
 
 When `open_choice` says the case is finished, reply with one short sentence and stop."""
 
-KICKOFF = "A new case is ready. Work through it."
+KICKOFF = (
+    "A new case is ready. Your first action is a write_todos call with your plan; then work "
+    "through the case."
+)
+
+
+def plan_instruction(case: CaseSession) -> str:
+    """The plan the main agent opens with: one todo per step, one per check family. The todos are
+    the model's own words in its own tool call; the trace shows them as written by the agent."""
+    families = [casework.AGENT_NAMES[stem] for stem in _stems_of(case)]
+    steps = [
+        "Work the open choices",
+        *(f"Hand the {name} checks to the {name} sub-agent" for name in families),
+        "Read the notes and write explanation.md",
+        "Write tour_prep.md",
+    ]
+    listing = "; ".join(f'"{step}"' for step in steps)
+    return (
+        "\n\nYour plan. Your very first action, before `open_choice` or anything else, is one "
+        "`write_todos` call with exactly these todos, the first marked in_progress and the rest "
+        f"pending: {listing}. Each time a sub-agent hands its findings back, or you finish a "
+        "step, call `write_todos` again with the finished todo marked completed and the next one "
+        "in_progress. The renter watches this plan, so keep it true: never mark a step "
+        "completed before it is done."
+    )
 
 
 def describe(case: CaseSession) -> str:
@@ -179,7 +200,7 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
     return create_deep_agent(
         model=model,
         tools=[open_choice, choose_option, draw_spot, send_challenge],
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=SYSTEM_PROMPT + plan_instruction(case),
         subagents=build_subagents(case),
         # The main agent may write its own two notes and nothing else: the family notes belong
         # to the sub-agents.

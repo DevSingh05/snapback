@@ -55,6 +55,7 @@ class FakeCrew(BaseChatModel):
 
     case: Any
     pick_last_for_plan: bool = False
+    todos: bool = True
     agents: list = CHECK_AGENTS
     delegate: bool = True
 
@@ -102,7 +103,7 @@ class FakeCrew(BaseChatModel):
         asked = [tc for m in messages if isinstance(m, AIMessage) for tc in m.tool_calls]
         names = [tc["name"] for tc in asked]
         case = self.case
-        if "write_todos" not in names:
+        if self.todos and "write_todos" not in names:
             return _call(
                 "write_todos",
                 todos=[
@@ -507,3 +508,49 @@ def test_a_finished_case_still_tells_the_model_to_delegate_until_the_notes_are_t
     for stem in casework.STEMS:
         casework.keep_note(session, casework.note_path(session.case_id, stem), "x", "model")
     assert json.loads(describe(session)) == {"finished": True}
+
+
+# --- the opening plan (write_todos) ----------------------------------------------------------
+
+
+def test_the_main_prompt_opens_with_a_write_todos_plan_with_one_todo_per_family():
+    from snapback.agent.graph import KICKOFF, SYSTEM_PROMPT, plan_instruction
+
+    text = plan_instruction(demo_session("a"))
+    assert "very first action" in text and "write_todos" in text
+    for name in CHECK_AGENTS:
+        assert f"Hand the {name} checks to the {name} sub-agent" in text
+    assert "completed" in text and "never mark a step completed before it is done" in text
+    assert "write_todos" in KICKOFF
+    assert "write_todos" in SYSTEM_PROMPT + text
+
+
+def test_a_walk_case_gets_a_walk_todo_too_and_a_plain_case_does_not():
+    from snapback.agent.graph import plan_instruction
+
+    session = demo_session("a")
+    assert "walk" not in plan_instruction(session)
+    session.walk_plan = lambda: None
+    assert "Hand the walk checks to the walk sub-agent" in plan_instruction(session)
+
+
+def test_the_todo_event_is_stamped_as_the_agent_s_own():
+    session = demo_session("a")
+    run_with_crew(session)
+    todos = [e for e in session.trace.events if e.kind.value == "todo"]
+    assert len(todos) == 1 and todos[0].chosen_by == "model" and len(todos[0].options) == 3
+
+
+def test_a_run_without_todos_and_the_policy_path_still_work():
+    from snapback.agent import PolicyChooser, run_case
+
+    plain = demo_session("a")
+    verdict = run_with_crew(plain, todos=False)  # a model that skips the plan
+    assert verdict is not None
+    assert not [e for e in plain.trace.events if e.kind.value == "todo"]
+    assert set(plain.notes) >= set(casework.STEMS)  # the case and its notes still complete
+
+    policy = demo_session("a")
+    run_case(policy, PolicyChooser(), lambda draft: "send")
+    assert not [e for e in policy.trace.events if e.kind.value == "todo"]
+    assert policy.verdict == verdict  # same result with or without a plan
