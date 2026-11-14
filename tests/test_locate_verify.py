@@ -391,3 +391,47 @@ def test_seam_neighbours_add_the_faces_either_side_of_the_top_two_hits():
 def test_elsewhere_bar_follows_the_ruling():
     t = load_thresholds()
     assert t.elsewhere_min_inliers == 50 and t.elsewhere_min_spread == 0.15
+
+
+# --- ambiguity rule (conductor ruling 03:46 on #28) ----------------------------------------------
+
+
+def _scripted_verify(inliers_by_model):
+    """A verify() stand-in: every face of a model gets that model's inlier count, spread 0.5."""
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    def fake(matcher, photo, face, ransac_px):
+        model = face.info[FEATURE_KEY].split("/")[0]
+        n = inliers_by_model.get(model, 0)
+        return Verification(max(n, 4), n, np.eye(3) if n else None, 0.5 if n else 0.0)
+
+    return fake
+
+
+@pytest.mark.parametrize(
+    ("claimed_inliers", "other_inliers", "expected"),
+    [
+        (70, 390, LocateStatus.NOT_LOCATED),  # another building is far stronger: could not place
+        (390, 70, LocateStatus.LOCATED_IN_CLAIMED),
+        (100, 290, LocateStatus.LOCATED_IN_CLAIMED),  # under 3x: claimed-first still holds
+        (100, 300, LocateStatus.NOT_LOCATED),  # exactly 3x counts as far stronger
+        (70, 45, LocateStatus.LOCATED_IN_CLAIMED),  # other under the strict bar never counts
+    ],
+)
+def test_a_far_stronger_match_elsewhere_makes_the_photo_unplaced(
+    twins, locator, monkeypatch, claimed_inliers, other_inliers, expected
+):
+    sweeps, _, _ = twins
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted_verify({"fx-model-a": claimed_inliers, "fx-model-b": other_inliers}),
+    )
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    result = locator.locate("fx-amb", {"p": photo}, "fx-prop-1")
+    assert result.photos[0].status is expected
+    if expected is LocateStatus.NOT_LOCATED:
+        assert result.photos[0].matched_model_id is None and "p" not in result.poses
+
+
+def test_ambiguity_ratio_is_in_thresholds():
+    assert load_thresholds().ambiguity_ratio == 3.0
