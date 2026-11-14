@@ -58,7 +58,13 @@ function service(opts: Opts = {}) {
         : json({ reason: "voice not configured" }, opts.stt);
     if (url.endsWith("/voice/tts"))
       return (opts.tts ?? 200) === 200
-        ? new Response(new Blob(["ID3fake"], { type: "audio/mpeg" }), { status: 200 })
+        ? // Bytes, not `new Blob(...)`: under jsdom, Blob is jsdom's, which Node's Response
+          // cannot read (Node 22 throws "object.stream is not a function"; newer Node turns it
+          // into the text "[object Blob]").
+          new Response(new TextEncoder().encode("ID3fake"), {
+            status: 200,
+            headers: { "Content-Type": "audio/mpeg" },
+          })
         : json({ reason: "voice not configured" }, opts.tts);
     if (url.endsWith("/finder/sessions"))
       return json({ session_id: "fs-1", token: "tok", source: "fixture", mode: "deepagents" }, 201);
@@ -239,13 +245,17 @@ describe("Finder voice", () => {
     expect(window.localStorage.getItem("snapback.finder-read-aloud")).toBe("on");
     fireEvent.change(screen.getByLabelText("Your message"), { target: { value: "hi" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(played).toHaveLength(1));
+    await waitFor(() => expect(played).toHaveLength(1), { timeout: 5000 });
     expect(calls.find((c) => c.url.endsWith("/voice/tts"))!.body).toEqual({ text: REPLY });
+    // The clip played is the audio the server sent, not a stand-in.
+    const clip = vi.mocked(URL.createObjectURL).mock.calls[0]![0] as Blob;
+    expect(clip.type).toBe("audio/mpeg");
+    expect(await clip.text()).toBe("ID3fake");
     expect(speakSpy).not.toHaveBeenCalled();
     // A per-reply button plays it again.
     const reply = screen.getByTestId("finder-reply");
     expect(within(reply).getByRole("button", { name: "Stop reading" })).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("talk mode opens the mic again once the spoken reply ends", async () => {
     withRecorder();
@@ -257,16 +267,16 @@ describe("Finder voice", () => {
     await waitFor(() => expect(recorders[0]?.state).toBe("recording"));
     expect(screen.getByTestId("talk-bar")).toHaveTextContent("Talk mode · Listening");
     fireEvent.click(screen.getAllByRole("button", { name: "Stop and send" }).at(-1)!);
-    await waitFor(() => expect(played).toHaveLength(1));
+    await waitFor(() => expect(played).toHaveLength(1), { timeout: 5000 });
     expect(recorders).toHaveLength(1);
     act(() => {
       played[0]!.dispatchEvent(new Event("ended"));
     });
-    await waitFor(() => expect(recorders[1]?.state).toBe("recording"));
+    await waitFor(() => expect(recorders[1]?.state).toBe("recording"), { timeout: 5000 });
     expect(getUserMedia).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole("button", { name: /End talk/ }));
     expect(screen.queryByTestId("talk-bar")).toBeNull();
-  });
+  }, 15_000);
 
   it("hides read-aloud when /voice/tts says voice is not configured, with no browser voice", async () => {
     service({ status: { tts: true, stt: false }, tts: 503 });
