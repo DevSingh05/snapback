@@ -46,6 +46,9 @@ class ChallengeOutcome:
     challenge: ChallengeResult
     recapture: list[RecaptureResult] = field(default_factory=list)
     memory: list[MemoryResult] = field(default_factory=list)
+    # A14: the message was handed over and the poster's reply has not come. The case waits
+    # (HOLD, never a failure) until `CaseSession.reply` is given the checked reply.
+    awaiting_reply: bool = False
 
 
 class Modules(Protocol):

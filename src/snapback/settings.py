@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     snapback_eval_results: Path = Path("eval/results.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
+    # What happens after the renter approves the challenge (A14). "stand_in" answers at once
+    # from the fixture. "reply" waits for the poster's real reply photo, sent to
+    # POST /cases/{id}/reply, and checks it.
+    snapback_challenge: Literal["stand_in", "reply"] = "stand_in"
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
     # Checks one renter (or one browser) may start per day, and a ceiling per network address

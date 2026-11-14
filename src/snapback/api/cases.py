@@ -28,22 +28,26 @@ from snapback.agent import (
 )
 from snapback.agent.intake import Listing
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
+from snapback.agent.reply import ReplyModules
 from snapback.card import strings
 from snapback.contracts import (
     Card,
     CaseProgress,
     DataSource,
     ModuleEvidence,
+    PresenceStatus,
+    ReplyCheck,
     TraceEvent,
     TraceKind,
     VerdictState,
 )
 from snapback.settings import Settings
-from snapback.verdict import FIXTURE_ID_PREFIX, build_card
+from snapback.verdict import FIXTURE_ID_PREFIX, build_card, presence_of
+from snapback.vision.memory.store import PhotoMemory
 
 
 class NothingWaiting(Exception):
-    """An approval arrived for a case that is not waiting for one."""
+    """An approval or a reply arrived for a case that is not waiting for one."""
 
 
 class LiveModeNotWired(Exception):
@@ -125,6 +129,12 @@ class RecordedCase:
     def approve(self, decision: str, text: str | None) -> None:
         raise NothingWaiting(self.case_id)
 
+    def reply(self, photo: bytes) -> ReplyCheck:
+        raise NothingWaiting(self.case_id)
+
+    def presence(self) -> PresenceStatus:
+        return presence_of(self._evidence).status
+
 
 class SessionCase:
     def __init__(
@@ -173,6 +183,8 @@ class SessionCase:
             status = CaseProgress.DONE
         elif self.session.waiting_for_approval:
             status = CaseProgress.WAITING_FOR_APPROVAL
+        elif self.session.waiting_for_reply:
+            status = CaseProgress.WAITING_FOR_REPLY
         else:
             status = CaseProgress.RUNNING
         draft = self.session.pending_challenge
@@ -202,6 +214,24 @@ class SessionCase:
                 raise NothingWaiting(self.case_id) from error
         self.advance()
 
+    def reply(self, photo: bytes) -> ReplyCheck:
+        """Check the poster's reply photo and carry the case on (A14).
+
+        Raises `NothingWaiting` unless a reply is awaited, and `UnreadablePhoto` if the file
+        is not a picture; in both cases nothing about the case changes.
+        """
+        with self._lock:
+            modules = self.session.modules
+            if not self.session.waiting_for_reply or not isinstance(modules, ReplyModules):
+                raise NothingWaiting(self.case_id)
+            check, outcome = modules.check_reply(self.session.case_id, photo)
+            self.session.reply(outcome)
+        self.advance()
+        return check
+
+    def presence(self) -> PresenceStatus:
+        return presence_of(self.session.evidence).status
+
 
 def _policy_runner(session: CaseSession) -> object:
     return run_case(session, PolicyChooser())
@@ -230,6 +260,7 @@ class CaseStore:
         self._settings = settings
         self._cases: dict[str, RecordedCase | SessionCase] = {}
         self._lock = threading.Lock()
+        self._memory: PhotoMemory | None = None
         self._runner = (
             _deepagents_runner() if settings.snapback_agent == "deepagents" else _policy_runner
         )
@@ -258,7 +289,15 @@ class CaseStore:
         if self._settings.snapback_data_source is not DataSource.FIXTURE:
             raise LiveModeNotWired
 
-    def create(self, listing: Listing) -> SessionCase:
+    def _photo_memory(self) -> PhotoMemory:
+        """Lane V's photo memory under the data dir, opened the first time it is needed."""
+        if self._memory is None:
+            path = self._settings.snapback_data_dir / "memory" / "photo_memory.sqlite"
+            self._memory = PhotoMemory(path)
+        return self._memory
+
+    def create(self, listing: Listing, photos: list[bytes] | None = None) -> SessionCase:
+        """Start a check. `photos` are the listing photos as sent, in order."""
         self.check_can_create()
         with self._lock:
             short_id = self._new_id()
@@ -273,6 +312,11 @@ class CaseStore:
                 unit=listing.unit,
                 beds=listing.beds,
             )
+            if self._settings.snapback_challenge == "reply":
+                # The poster's real reply is awaited and checked (A14). The listing photos
+                # go into the photo memory now, so a reply that copies one is caught.
+                modules = ReplyModules(modules, self._photo_memory())
+                modules.remember_listing_photos(full_id, photos or [])
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))

@@ -8,6 +8,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
+    POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /healthz                         liveness and the data source
     POST /verdict                         decide() on evidence the caller already has
@@ -31,7 +32,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
-from snapback.agent.intake import read_listing
+from snapback.agent.intake import OcrUnavailable, read_listing
+from snapback.agent.reply import UnreadablePhoto
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
@@ -44,7 +46,7 @@ from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.card.render import render_card_png
-from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
+from snapback.contracts import Card, CreateCaseResponse, Evidence, ReplyResponse, Verdict
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -186,7 +188,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
-        return store.create(read_listing(listing_text, images))
+        listing = read_listing(listing_text, images)
+        return store.create(listing, [images[index] for index in listing.photo_indexes])
 
     @app.post(
         "/cases",
@@ -345,6 +348,57 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=409, detail="This case is not waiting for an approval."
             ) from None
         return case.status(with_challenge=True)
+
+    @app.post("/cases/{case_id}/reply")
+    async def post_reply(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> ReplyResponse:
+        """The photo the poster sent back, checked (A14). One image, in the form field `photo`.
+
+        Needs the case's write secret in a header, as the approval does. The photo is checked
+        on this machine: is it a copy of one of the listing's own photos, and is the code on
+        it? A copy is forged. A right code is not yet "proven": whether it was taken at the
+        spot needs locate, so it stays not confirmed. 409 unless a reply is awaited.
+        """
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        form = await parse_form(request, 1, max_photo_bytes)
+        try:
+            files = [item for item in form.getlist("photo") if isinstance(item, UploadFile)]
+            if len(files) != 1:
+                raise HTTPException(status_code=422, detail="Send one image as `photo`.")
+            [photo] = read_images(files, 1, max_photo_bytes)
+            try:
+                check = await run_in_threadpool(case.reply, photo)
+            except NothingWaiting:
+                raise HTTPException(
+                    status_code=409, detail="This case is not waiting for a reply."
+                ) from None
+            except UnreadablePhoto:
+                raise HTTPException(
+                    status_code=415, detail="That file is not a picture we can open."
+                ) from None
+            except OcrUnavailable:
+                raise HTTPException(
+                    status_code=503,
+                    detail="The reader for the code is not installed on this server.",
+                ) from None
+        finally:
+            await form.close()
+
+        status = case.status(with_challenge=True)
+        return ReplyResponse(
+            case_id=status.case_id,
+            source=status.source,
+            status=status.status,
+            check=check,
+            presence=case.presence(),
+            state=status.state,
+            challenge_text=status.challenge_text,
+        )
 
     @app.get("/eval/results.csv")
     def get_eval_results() -> Response:

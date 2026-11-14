@@ -66,6 +66,14 @@ EN: dict[str, str] = {
     "here_now.proven_bare": "Someone with access to a unit here proved it just now.",
     "here_now.waiting": "No reply yet. An honest landlord may need time.",
     "here_now.retry": "The reply photo could not be accepted. Ask for a new photo at a new spot.",
+    # A14: a reply came. What it showed, and what nothing has checked yet.
+    "here_now.code_only": (
+        "Not confirmed. The reply shows the code we asked for, but nothing has checked "
+        "that it was taken at the spot."
+    ),
+    "here_now.code_missing": (
+        "The reply did not show the code we asked for. Ask for a new photo at a new spot."
+    ),
     "here_now.not_requested": "Not checked (no one has been asked to prove they are inside yet).",
     "here_now.forged_copy": "The reply is a copy of listing photo {n}. Red flag.",
     "here_now.forged_copy_unknown": "The reply is a copy of one of the listing photos. Red flag.",
@@ -184,6 +192,10 @@ EN: dict[str, str] = {
         "Waiting for the renter to approve the message. Nothing is sent until then."
     ),
     "trace.hitl.send": "The renter approved the challenge text.",
+    "trace.reply.waiting": (
+        "The message is with the renter to pass on. Waiting for the poster's reply photo."
+    ),
+    "trace.tool.reply": "Checked the reply photo for the code and against the listing photos.",
     "trace.hitl.edit": "The renter edited the challenge text and approved it.",
     "trace.hitl.cancel": "The renter chose not to send a challenge.",
     "trace.retry.accept_both": "Both spots matched with the code read and no recapture flag.",
@@ -192,6 +204,10 @@ EN: dict[str, str] = {
     ),
     "trace.retry.forged": "The reply failed the check, so there is nothing to retry.",
     "trace.retry.again": "The reply could not be accepted, so we ask again at a new spot.",
+    "trace.retry.code_only": (
+        "The reply shows the code. Whether it was taken at the spot cannot be checked yet, "
+        "so it stays not confirmed."
+    ),
     "trace.retry.stop": (
         "The reply could not be accepted and no retry is left, so the result stays on hold."
     ),
@@ -307,6 +323,13 @@ ES: dict[str, str] = {
     "here_now.proven_bare": "Alguien con acceso a una unidad aquí lo demostró ahora mismo.",
     "here_now.waiting": "Aún sin respuesta. Un arrendador honesto puede necesitar tiempo.",
     "here_now.retry": "No se pudo aceptar la foto de respuesta. Pida una foto nueva en otro punto.",
+    "here_now.code_only": (
+        "Sin confirmar. La respuesta muestra el código que pedimos, pero nada ha comprobado "
+        "que se tomó en el punto indicado."
+    ),
+    "here_now.code_missing": (
+        "La respuesta no mostró el código que pedimos. Pida una foto nueva en otro punto."
+    ),
     "here_now.not_requested": (
         "No comprobado (aún no se ha pedido a nadie que demuestre que está dentro)."
     ),
@@ -451,6 +474,13 @@ ES: dict[str, str] = {
         "Esperando a que el inquilino apruebe el mensaje. No se envía nada hasta entonces."
     ),
     "trace.hitl.send": "El inquilino aprobó el texto del reto.",
+    "trace.reply.waiting": (
+        "El mensaje está con el inquilino para que lo pase. Esperando la foto de respuesta "
+        "del anunciante."
+    ),
+    "trace.tool.reply": (
+        "Se revisó la foto de respuesta: el código y su parecido con las fotos del anuncio."
+    ),
     "trace.hitl.edit": "El inquilino editó el texto del reto y lo aprobó.",
     "trace.hitl.cancel": "El inquilino decidió no enviar un reto.",
     "trace.retry.accept_both": (
@@ -460,6 +490,10 @@ ES: dict[str, str] = {
         "{matched} de {total} puntos coincidieron, con el código leído y sin aviso de recaptura."
     ),
     "trace.retry.forged": "La respuesta no pasó la revisión, así que no hay nada que reintentar.",
+    "trace.retry.code_only": (
+        "La respuesta muestra el código. Todavía no se puede comprobar si se tomó en el punto "
+        "indicado, así que queda sin confirmar."
+    ),
     "trace.retry.again": "No se pudo aceptar la respuesta, así que pedimos otra en un punto nuevo.",
     "trace.retry.stop": (
         "No se pudo aceptar la respuesta y no quedan reintentos, así que el resultado queda "

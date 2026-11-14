@@ -364,6 +364,16 @@ def _here_now_line(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardLine
         return _line(lang, label, CardTone.HOLD, "here_now.retry")
 
     if presence.status is PresenceStatus.WAITING:
+        # A reply may have come and settled nothing (A14). Say what it showed.
+        answered = [
+            spot
+            for spot in (modules.challenge.spots if modules.challenge else [])
+            if spot.replied_at is not None
+        ]
+        if answered and answered[-1].code_read is False:
+            return _line(lang, label, CardTone.HOLD, "here_now.code_missing")
+        if answered and answered[-1].code_read and answered[-1].located is None:
+            return _line(lang, label, CardTone.NOT_SHOWN, "here_now.code_only")
         return _line(lang, label, CardTone.HOLD, "here_now.waiting")
 
     if presence.status is PresenceStatus.NOT_REQUESTED:

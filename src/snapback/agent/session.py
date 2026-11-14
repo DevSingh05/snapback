@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from snapback.agent.modules import Modules
+from snapback.agent.modules import ChallengeOutcome, Modules
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -58,6 +58,7 @@ class Step(StrEnum):
     FLOOR_PLAN = "floor_plan"
     SPOT = "spot"
     APPROVAL = "approval"
+    REPLY = "reply"  # the challenge was sent; waiting for the poster's reply photo (A14)
     RETRY = "retry"
     DONE = "done"
 
@@ -132,6 +133,11 @@ class CaseSession:
     @property
     def waiting_for_approval(self) -> bool:
         return self.step is Step.APPROVAL and self._decision is None
+
+    @property
+    def waiting_for_reply(self) -> bool:
+        """The challenge was sent and the poster's reply photo has not been checked yet."""
+        return self.step is Step.REPLY
 
     @property
     def recorded_decision(self) -> str | None:
@@ -371,6 +377,15 @@ class CaseSession:
         outcome = self.modules.challenge(
             self.case_id, self._spot, draft.code, draft.text, self.retries
         )
+        self._take(outcome)
+        if outcome.awaiting_reply:
+            # Nothing to judge yet. The case waits here: no reply is HOLD, never a failure.
+            self.trace.emit(TraceKind.STATUS, self._say("trace.reply.waiting"))
+            self.step = Step.REPLY
+        else:
+            self.step = Step.RETRY
+
+    def _take(self, outcome: ChallengeOutcome) -> None:
         self.evidence = self.evidence.model_copy(
             update={
                 "challenge": outcome.challenge,
@@ -378,7 +393,19 @@ class CaseSession:
                 "memory": outcome.memory,
             }
         )
-        self.step = Step.RETRY
+
+    def reply(self, outcome: ChallengeOutcome) -> None:
+        """Take the poster's reply, already checked. The retry-or-stop choice comes next.
+
+        An outcome that is still `awaiting_reply` (the photo came too late to count, say)
+        leaves the case waiting.
+        """
+        if self.step is not Step.REPLY:
+            raise RuntimeError("no reply is awaited now")
+        self._take(outcome)
+        if not outcome.awaiting_reply:
+            self.trace.emit(TraceKind.TOOL, self._say("trace.tool.reply"), pick="reply")
+            self.step = Step.RETRY
 
     # --- choice 5: retry or stop -----------------------------------------------------------
 
@@ -394,8 +421,23 @@ class CaseSession:
         can_retry = not forged and self.retries < MAX_RETRIES and bool(self._spots()[0])
         options = (ACCEPT, RETRY, STOP) if can_retry else (ACCEPT, STOP)
 
+        # A14: the reply showed the code, and nothing has checked that it was taken at the
+        # spot (that needs locate). Asking again cannot change that, so the case stops here,
+        # not confirmed.
+        last = spots[-1] if spots else None
+        code_only = (
+            not forged
+            and not proven
+            and last is not None
+            and last.replied_at is not None
+            and last.code_read is True
+            and last.located is None
+        )
+
         if forged:
             default, reason = ACCEPT, self._say("trace.retry.forged")
+        elif code_only:
+            default, reason = STOP, self._say("trace.retry.code_only")
         elif proven and matched == len(spots) == 2:
             default, reason = ACCEPT, self._say("trace.retry.accept_both")
         elif proven:
