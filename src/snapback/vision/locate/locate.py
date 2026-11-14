@@ -37,7 +37,7 @@ from snapback.contracts import (
     PropertyRecord,
 )
 from snapback.vision.embed import unit
-from snapback.vision.locate.cube import face_basis, face_intrinsics, intrinsics
+from snapback.vision.locate.cube import SIDE_FACES, face_basis, face_intrinsics, intrinsics
 from snapback.vision.locate.geometry import (
     camera_quaternion,
     matrix_from_quaternion,
@@ -45,7 +45,7 @@ from snapback.vision.locate.geometry import (
 )
 from snapback.vision.locate.index import LocateIndex
 from snapback.vision.locate.thresholds import Thresholds, load_thresholds
-from snapback.vision.locate.verify import Matcher, Verification, verify
+from snapback.vision.locate.verify import FEATURE_KEY, Matcher, Verification, verify
 
 _EXIF_IFD = 0x8769
 _FOCAL_35MM = 0xA405
@@ -134,7 +134,9 @@ class Locator:
 
     def _load_face(self, model_id: str, sweep_id: str, face: int) -> Image.Image:
         with Image.open(self._sweeps[(model_id, sweep_id)].faces[face]) as opened:
-            return opened.convert("RGB")
+            image = opened.convert("RGB")
+        image.info[FEATURE_KEY] = f"{model_id}/{sweep_id}/{face}"
+        return image
 
     # --- one photo ---------------------------------------------------------------------------
 
@@ -144,9 +146,11 @@ class Locator:
         vector = unit(embedder.embed(photo)) if embedder is not None else None
         hits = self.index.search(photo, k=t.top_k, vector=vector)
         if claimed_models:
-            hits += self.index.search(
-                photo, k=t.top_k_claimed, model_ids=claimed_models, vector=vector
+            # The claimed building's side faces (where listing photos look), best first.
+            claimed = self.index.search(
+                photo, k=4 * t.top_k_claimed, model_ids=claimed_models, vector=vector
             )
+            hits += [h for h in claimed if h.entry.face in SIDE_FACES][: t.top_k_claimed]
         seen, out = set(), []
         for hit in sorted(hits, key=lambda h: -h.score):
             key = (hit.entry.model_id, hit.entry.sweep_id, hit.entry.face)

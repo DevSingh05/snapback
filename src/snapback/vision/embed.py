@@ -15,6 +15,8 @@ from PIL import Image, ImageOps
 
 # Pinned so the code torch.hub runs never changes under us (main as of 2026-06-03, Apache-2.0).
 DINOV2_REPO = "facebookresearch/dinov2:7764ea0f912e53c92e82eb78a2a1631e92725fc8"
+# Preferred: the same ViT-S/14 DINOv2 weights through timm (CLS token, Apache-2.0).
+TIMM_DINOV2 = "vit_small_patch14_dinov2.lvd142m"
 
 
 class Embedder(Protocol):
@@ -65,7 +67,16 @@ class Dinov2Embedder:  # pragma: no cover - needs torch and a one-time download
         if device is None:
             device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.device = device
-        model = torch.hub.load(DINOV2_REPO, self.name, trust_repo=True)
+        try:
+            # timm builds the network from its own (version-locked) code and fetches only the
+            # weights (Apache-2.0) from Hugging Face; no repository code is downloaded or run.
+            import timm
+
+            model = timm.create_model(
+                TIMM_DINOV2, pretrained=True, num_classes=0, img_size=self.SIZE
+            )
+        except ImportError:
+            model = torch.hub.load(DINOV2_REPO, self.name, trust_repo=True)
         self._model = model.eval().to(device)
 
     def _tensor(self, image: Image.Image):
