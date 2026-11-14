@@ -21,8 +21,10 @@ floor plan", never a unit number.
 
 import logging
 import math
+import threading
+import time
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from functools import lru_cache
 
 import numpy as np
@@ -127,6 +129,53 @@ def seam_neighbours(hits: list, top: int = 2) -> list:
     return out
 
 
+# --- E2a: the place sub-agent's retry options ----------------------------------------------------
+
+SEARCH_OPTIONS = ("focus_scan", "wider_index", "deeper_claimed", "stop")
+# The only thresholds a retry may change: how many candidates are verified, never a bar.
+RETRIEVAL_FIELDS = frozenset({"top_k", "top_k_claimed"})
+FOCUS_SWEEPS = 2  # focus_scan: every face of the sweeps the best this many hits came from
+
+
+def retrieve_only(thresholds: Thresholds, **changes) -> Thresholds:
+    """A copy of the thresholds that differs in retrieval only. Any bar change is refused, so a
+    retry can look at more candidates but never accept weaker evidence."""
+    known = {f.name for f in fields(thresholds)}
+    bad = sorted(set(changes) - RETRIEVAL_FIELDS)
+    if bad:
+        kind = "unknown" if set(bad) - known else "a bar"
+        raise ValueError(f"a search option changes retrieval only, not {kind}: {', '.join(bad)}")
+    return replace(thresholds, **changes)
+
+
+def search_thresholds(base: Thresholds, option: str) -> Thresholds:
+    """The thresholds a retry option runs with (the A-lane place step calls this): wider_index
+    verifies twice the candidates over every building (top_k 6 -> 12), deeper_claimed twice the
+    claimed building's faces (top_k_claimed 48 -> 96); focus_scan and stop keep the base."""
+    if option == "wider_index":
+        return retrieve_only(base, top_k=2 * base.top_k)
+    if option == "deeper_claimed":
+        return retrieve_only(base, top_k_claimed=2 * base.top_k_claimed)
+    if option in ("focus_scan", "stop", "base"):
+        return base
+    raise ValueError(f"unknown search option {option!r}; use one of {SEARCH_OPTIONS}")
+
+
+@dataclass(frozen=True)
+class SearchResult:
+    """What one retry found. No pixels and no ids beyond the twin and sweep it landed in."""
+
+    option: str
+    status: LocateStatus | None  # None for "stop": nothing was searched
+    model_id: str | None = None
+    sweep_id: str | None = None
+    face: int | None = None
+    inliers: int | None = None
+    spread: float | None = None
+    verified: int = 0  # how many faces were verified
+    seconds: float = 0.0
+
+
 @dataclass(frozen=True)
 class _Placement:
     model_id: str
@@ -144,6 +193,7 @@ class Locator:
         matcher: Matcher,
         thresholds: Thresholds | None = None,
     ) -> None:
+        self._counter = threading.local()  # verify calls, per thread, for search()
         self.index = index
         self.catalog = catalog
         self.matcher = matcher
@@ -155,6 +205,10 @@ class Locator:
         }
         self._face = lru_cache(maxsize=512)(self._load_face)
 
+    def _verify(self, photo: Image.Image, face: Image.Image, t: Thresholds) -> Verification:
+        self._counter.calls = getattr(self._counter, "calls", 0) + 1
+        return verify(self.matcher, photo, face, t.ransac_px)
+
     def _load_face(self, model_id: str, sweep_id: str, face: int) -> Image.Image:
         with Image.open(self._sweeps[(model_id, sweep_id)].faces[face]) as opened:
             image = opened.convert("RGB")
@@ -163,8 +217,14 @@ class Locator:
 
     # --- one photo ---------------------------------------------------------------------------
 
-    def _candidates(self, photo: Image.Image, claimed_models: set[str]) -> list:
-        t = self.thresholds
+    def _candidates(
+        self,
+        photo: Image.Image,
+        claimed_models: set[str],
+        t: Thresholds | None = None,
+        extra: list | None = None,
+    ) -> list:
+        t = t or self.thresholds
         embedder = self.index.embedder
         vector = unit(embedder.embed(photo)) if embedder is not None else None
         hits = self.index.search(photo, k=t.top_k, vector=vector)
@@ -174,6 +234,7 @@ class Locator:
                 photo, k=4 * t.top_k_claimed, model_ids=claimed_models, vector=vector
             )
             hits += [h for h in claimed if h.entry.face in SIDE_FACES][: t.top_k_claimed]
+        hits += extra or []
         seen, out = set(), []
         for hit in sorted(hits, key=lambda h: -h.score):
             key = (hit.entry.model_id, hit.entry.sweep_id, hit.entry.face)
@@ -188,14 +249,15 @@ class Locator:
         hits: list,
         passes: Callable[[Verification], bool],
         stop_early: bool = True,
+        t: Thresholds | None = None,
     ):
         """The passing candidate with the most inliers, or None. Stops at a very strong one."""
-        t = self.thresholds
+        t = t or self.thresholds
         best = None
         for hit in hits:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
-            check = verify(self.matcher, photo, face, t.ransac_px)
+            check = self._verify(photo, face, t)
             if passes(check) and (best is None or check.inliers > best.check.inliers):
                 best = _Placement(
                     entry.model_id,
@@ -208,17 +270,21 @@ class Locator:
         return best
 
     def _scan_claimed(
-        self, photo: Image.Image, hits: list, claimed_ok: Callable[[Verification], bool]
+        self,
+        photo: Image.Image,
+        hits: list,
+        claimed_ok: Callable[[Verification], bool],
+        t: Thresholds | None = None,
     ) -> tuple[_Placement | None, bool]:
         """One pass over the claimed candidates, each verified once: the best that passes the
         claimed bar (stopping at a very strong one, as _best does), and whether any cleared
         inliers and ratio (a candidate that fails only the spread floor)."""
-        t = self.thresholds
+        t = t or self.thresholds
         best, doubtful = None, False
         for hit in hits:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
-            check = verify(self.matcher, photo, face, t.ransac_px)
+            check = self._verify(photo, face, t)
             if check.inliers >= t.min_inliers and check.ratio >= t.min_inlier_ratio:
                 doubtful = True
             if claimed_ok(check) and (best is None or check.inliers > best.check.inliers):
@@ -232,14 +298,20 @@ class Locator:
                 break
         return best, doubtful
 
-    def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
+    def _place(
+        self,
+        photo: Image.Image,
+        claimed_models: set[str],
+        t: Thresholds | None = None,
+        extra: list | None = None,
+    ) -> _Placement | None:
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
         building places it only on the stricter elsewhere bar (it can lead to DON'T PAY). When
         the claimed match passes but another building clears the strict bar with ambiguity_ratio
         times its inliers, the photo is not placed at all."""
-        t = self.thresholds
-        hits = self._candidates(photo, claimed_models)
+        t = t or self.thresholds
+        hits = self._candidates(photo, claimed_models, t, extra)
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
         other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
         seen = {(h.entry.model_id, h.entry.sweep_id, h.entry.face) for h in other_hits}
@@ -264,14 +336,14 @@ class Locator:
                 and c.spread >= t.claimed_min_spread
             )
 
-        placed, doubtful = self._scan_claimed(photo, claimed_hits, claimed_ok)
+        placed, doubtful = self._scan_claimed(photo, claimed_hits, claimed_ok, t)
         if placed is None:
             # A claimed match that clears inliers and ratio but fails only the spread floor is
             # doubtful, not absent: could not place, and never search elsewhere (no new route to
             # DON'T PAY; ruling 07:43, #28).
             if doubtful:
                 return None
-            return self._best(photo, other_hits, strict)
+            return self._best(photo, other_hits, strict, t=t)
 
         # Ambiguity (ruling 03:46): another building far stronger than the claimed match means
         # the photo is placed nowhere. No false pass, and no false DON'T PAY either.
@@ -281,28 +353,30 @@ class Locator:
         def rival_ok(c: Verification) -> bool:
             return c.inliers >= t.elsewhere_min_inliers and c.ratio >= t.min_inlier_ratio
 
-        rival = self._best(photo, other_hits, rival_ok, stop_early=False)
+        rival = self._best(photo, other_hits, rival_ok, stop_early=False, t=t)
         if rival is not None and rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
             # The claimed search may have stopped early at a strong face (only possible at or
             # above stop_at_inliers); compare the rival with the claimed maximum first.
             if placed.check.inliers >= t.stop_at_inliers:
-                full = self._best(photo, claimed_hits, claimed_ok, stop_early=False)
+                full = self._best(photo, claimed_hits, claimed_ok, stop_early=False, t=t)
                 if full is not None and full.check.inliers > placed.check.inliers:
                     placed = full
             if rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
                 return None
         return placed
 
-    def _identify(self, photo: Image.Image) -> tuple[_Placement | None, bool]:
+    def _identify(
+        self, photo: Image.Image, t: Thresholds | None = None, extra: list | None = None
+    ) -> tuple[_Placement | None, bool]:
         """The ad names no home. Verify EVERY candidate on the strict bar, with no early stop, so
         the answer never depends on index order. Returns (best placement, ambiguous): ambiguous
         when the photo passes in more than one property (tract twins, sister buildings)."""
-        t = self.thresholds
+        t = t or self.thresholds
         best, homes = None, set()
-        for hit in self._candidates(photo, set()):
+        for hit in self._candidates(photo, set(), t, extra):
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
-            check = verify(self.matcher, photo, face, t.ransac_px)
+            check = self._verify(photo, face, t)
             if not (
                 check.inliers >= t.elsewhere_min_inliers
                 and check.ratio >= t.min_inlier_ratio
@@ -318,6 +392,85 @@ class Locator:
                     check,
                 )
         return best, len(homes) > 1
+
+    # --- E2a: retry with more candidates of one kind, same bars ---------------------------
+
+    def _option_thresholds(self, option: str) -> Thresholds:
+        return search_thresholds(self.thresholds, option)
+
+    def _focus(self, photo: Image.Image, claimed_models: set[str]) -> list:
+        """Every face of the sweeps the best hits came from: a photo looking across a seam or
+        up at a ceiling line splits its matches between faces of one sweep."""
+        from snapback.vision.locate.index import Entry, Hit
+
+        base = self._candidates(photo, claimed_models)
+        floor = min((h.score for h in base), default=0.0) - 1e-3
+        sweeps = []
+        for hit in base:
+            key = (hit.entry.model_id, hit.entry.sweep_id)
+            if key not in sweeps:
+                sweeps.append(key)
+            if len(sweeps) == FOCUS_SWEEPS:
+                break
+        return [
+            Hit(Entry(model_id, sweep_id, face, "face"), floor)
+            for model_id, sweep_id in sweeps
+            for face in range(len(self._sweeps[(model_id, sweep_id)].faces))
+        ]
+
+    def candidates_for(self, photo: Image.Image, claimed_models: set[str], option: str) -> list:
+        """The candidates an option would verify ("base" for the ordinary run)."""
+        if option == "focus_scan":
+            return self._candidates(photo, claimed_models, extra=self._focus(photo, claimed_models))
+        if option in ("base", "wider_index", "deeper_claimed"):
+            return self._candidates(photo, claimed_models, self._option_thresholds(option))
+        raise ValueError(f"unknown search option {option!r}; use one of {SEARCH_OPTIONS}")
+
+    def search(
+        self, photo: Image.Image, option: str, claimed_property_id: str | None
+    ) -> SearchResult:
+        """Re-run placement for one photo with more candidates of the kind `option` names:
+        focus_scan (every face of the best sweeps), wider_index (twice the candidates over every
+        building), deeper_claimed (twice the claimed building's faces), or stop (no work). The
+        bars are the locator's own; only retrieval changes, so a retry finds more, never accepts
+        less. The result is placed, elsewhere, or not, as locate() would say."""
+        if option not in SEARCH_OPTIONS:
+            raise ValueError(f"unknown search option {option!r}; use one of {SEARCH_OPTIONS}")
+        if option == "stop":
+            return SearchResult(option="stop", status=None)
+        photo = photo.convert("RGB")
+        started = time.monotonic()
+        self._counter.calls = 0
+        claimed_models = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
+        t = self._option_thresholds(option)
+        extra = self._focus(photo, claimed_models) if option == "focus_scan" else None
+        if claimed_property_id is None:
+            placed, ambiguous = self._identify(photo, t, extra)
+            if ambiguous:
+                placed = None
+        else:
+            placed = self._place(photo, claimed_models, t, extra)
+        if placed is None:
+            status = (
+                LocateStatus.NOT_LOCATED
+                if claimed_models or claimed_property_id is None
+                else LocateStatus.NOT_INDEXED
+            )
+        elif placed.model_id in claimed_models:
+            status = LocateStatus.LOCATED_IN_CLAIMED
+        else:
+            status = LocateStatus.LOCATED_ELSEWHERE
+        return SearchResult(
+            option=option,
+            status=status,
+            model_id=placed.model_id if placed else None,
+            sweep_id=placed.sweep.sweep_id if placed else None,
+            face=placed.face if placed else None,
+            inliers=placed.check.inliers if placed else None,
+            spread=round(placed.check.spread, 4) if placed else None,
+            verified=self._counter.calls,
+            seconds=round(time.monotonic() - started, 3),
+        )
 
     def _pose(self, photo: Image.Image, placed: _Placement) -> Pose | None:
         if placed.check.homography is None or placed.sweep.position is None:
