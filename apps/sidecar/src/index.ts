@@ -94,7 +94,10 @@ if (photon) {
   } else {
     console.log("[sidecar] SNAPBACK_EVENTS_TOKEN is not set: watch alerts will not be sent.");
   }
+  // Voice replies (Best Voice Agent): the SDK's own builder sends a native voice memo bubble.
+  const { voice } = await import("spectrum-ts");
   await runPhoton(app, {
+    makeVoice: (bytes: Uint8Array, mimeType: string) => voice(Buffer.from(bytes), { mimeType }),
     watches,
     apiUrl: API_URL,
     webUrl,
