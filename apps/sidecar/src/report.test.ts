@@ -23,17 +23,40 @@ const summarised = {
   ],
 };
 
-type Call = { url: string; method: string };
+type Call = { url: string; method: string; auth?: string | null };
 
-function api(calls: Call[], body: object = summarised, challenge: string | null = null) {
+const READ = "fx-secret-read-token";
+const REAL = {
+  case_id: card.case_id,
+  source: "fixture",
+  property_id: "fx-prop-1",
+  which: "claimed",
+  manager_company: "Fixture Living LLC",
+  website_host: "oakcourt.example",
+  plans: [{ beds: 2, rent_min: 1450, rent_max: 1600 }], // record rents: never in a reply
+};
+
+function api(
+  calls: Call[],
+  body: object = summarised,
+  challenge: string | null = null,
+  real: object | null = REAL,
+) {
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
-    calls.push({ url, method: init?.method ?? "GET" });
+    calls.push({
+      url,
+      method: init?.method ?? "GET",
+      auth: new Headers(init?.headers).get("authorization"),
+    });
     if (url.endsWith("/cases") && init?.method === "POST") {
       return Response.json(
-        { case_id: card.case_id, token: TOKEN, challenge_text: challenge },
+        { case_id: card.case_id, token: TOKEN, read_token: READ, challenge_text: challenge },
         { status: 201 },
       );
+    }
+    if (url.endsWith(`/cases/${card.case_id}/real-listing`)) {
+      return real ? Response.json(real) : new Response("no record", { status: 404 });
     }
     if (url.endsWith(`/cases/${card.case_id}/card`)) return Response.json(body);
     if (url.endsWith(`/cases/${card.case_id}/card.png`)) {
@@ -57,13 +80,18 @@ function client() {
   };
 }
 
-function config(calls: Call[], body?: object, challenge: string | null = null) {
+function config(
+  calls: Call[],
+  body?: object,
+  challenge: string | null = null,
+  real: object | null = REAL,
+) {
   return {
     apiUrl: "http://api.test",
     webUrl: "http://web.test",
     allowedThreads: new Set([THREAD]),
     renterSalt: "fx-salt",
-    fetch: api(calls, body, challenge),
+    fetch: api(calls, body, challenge, real),
     memory: new CaseMemory(),
   };
 }
@@ -77,26 +105,62 @@ const ad = (text: string): InboundMessage => ({
 
 // --- 1. the reply is a short report ------------------------------------------------------------
 
-test("the reply is a short report: verdict, two reasons, one next step, the link", () => {
+test("U2: headline, 'Before you pay:' with two reasons, one next step, 'Full report:'", () => {
   const text = reportText(summarised, LINK);
   const lines = text.split("\n");
   assert.equal(lines[0], "Hold off for now"); // the locked headline, never our own words
-  assert.match(text, /Payment ask: Zelle before a viewing\. Red flag\./);
-  assert.match(text, /Allowed to rent it: NOT SHOWN/);
-  assert.doesNotMatch(text, /Rent vs record/, "only the top two reasons");
+  assert.ok(lines.includes("Before you pay:"));
+  // Card.summary first: it has one line, so the first does_not fills the second reason
+  assert.match(text, /- The poster asks for Zelle before a viewing\./);
+  assert.match(text, /- Payment ask: Zelle before a viewing\. Red flag\./);
+  assert.doesNotMatch(text, /Allowed to rent it/, "only two reasons");
   assert.match(text, /Next: Two rules: never pay before a signed lease and a viewing/);
-  assert.match(text, new RegExp(`Full result: ${LINK}`));
-  assert.ok(text.length < 700, `short enough for one message (${text.length})`);
+  assert.match(text, new RegExp(`Full report: ${LINK}`));
+  assert.ok(text.length < 600, `short enough for one message (${text.length})`);
+});
+
+test("U2: with the office on record (#250), the next step is to call it through its own site", () => {
+  const text = reportText(summarised, LINK, null, {
+    manager_company: "Fixture Living LLC",
+    website_host: "oakcourt.example",
+  });
+  assert.match(
+    text,
+    /Next: Call Fixture Living LLC through oakcourt\.example, not the number in the ad\./,
+  );
+});
+
+test("U2: record rents never appear in the reply", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  await handleMessage(ad("2 bed $900, Zelle first"), c, config(calls));
+  const text = c.texts.join("\n");
+  assert.doesNotMatch(text, /1,?450|1,?600/);
+  assert.match(text, /Call Fixture Living LLC through oakcourt\.example/);
+  // the read token went to our API in a header, never into the reply
+  const real = calls.find((x) => x.url.endsWith("/real-listing"));
+  assert.equal(real?.auth, `Bearer ${READ}`);
+  assert.ok(!text.includes(READ));
+});
+
+test("U2: with no real listing (404), the next step falls back to the card", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  await handleMessage(ad("2 bed $900, Zelle first"), c, config(calls, summarised, null, null));
+  assert.match(c.texts[0] ?? "", /Next: Two rules:/);
 });
 
 test("the reasons come from the card, not from the sidecar", () => {
-  const text = reportText({ ...summarised, does_not: ["X: line one.", "Y: line two."] }, LINK);
+  const text = reportText(
+    { ...summarised, summary: [], does_not: ["X: line one.", "Y: line two."] },
+    LINK,
+  );
   assert.match(text, /X: line one\./);
   assert.match(text, /Y: line two\./);
 });
 
 test("checks passed: the reasons are what checked out", () => {
-  const verified = { ...summarised, state: "verified", does_not: [] };
+  const verified = { ...summarised, state: "verified", summary: [], does_not: [] };
   const text = reportText(verified, LINK);
   assert.match(text.split("\n")[0] ?? "", /^Checks passed\./);
   assert.match(text, /Real: Taken in this building/);
@@ -105,7 +169,7 @@ test("checks passed: the reasons are what checked out", () => {
 test("a card from before #250 (no summary fields) still gets a report from its own lines", () => {
   const text = reportText(card, LINK);
   assert.match(text, /Payment ask: Zelle before a viewing/); // red flag first
-  assert.match(text, /Full result:/);
+  assert.match(text, /Full report:/);
 });
 
 test("with a challenge, the next step is to send it to the poster", () => {
@@ -152,7 +216,7 @@ test("'why?' after a check lists the reasons from the same case, with no new che
   const why = c.texts[1] ?? "";
   assert.match(why, /Rent vs record: Not checked/); // all the reasons now, not just two
   assert.match(why, /Not checked: ID, lease, ownership/);
-  assert.match(why, /Full result:/);
+  assert.match(why, /Full report:/);
 });
 
 test("'what should I do?' gives the next steps from the same case", async () => {
@@ -222,4 +286,94 @@ test("through Photon, the card picture goes to the same thread right after the t
   );
   assert.equal(typeof sent[0], "string");
   assert.deepEqual(sent[1], { picture: "image/png", bytes: 9 });
+});
+
+// --- U3: ask for what is missing ------------------------------------------------------------------
+
+test("U3: an ad with no photos gets asked for them, in the same reply", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  await handleMessage(ad("2 bed $900, Zelle first"), c, config(calls));
+  assert.match(
+    c.texts[0] ?? "",
+    /Send the ad's photos too and I can check where they were taken\./,
+  );
+});
+
+test("U3: an ad with photos is not asked for them", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  const withPhoto = { ...ad("2 bed $900"), images: [new Blob(["jpeg"], { type: "image/jpeg" })] };
+  await handleMessage(withPhoto, c, config(calls));
+  assert.doesNotMatch(c.texts[0] ?? "", /Send the ad's photos/);
+});
+
+test("U3: only a Marketplace link gets 'paste the words and screenshots', and no check is used", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  await handleMessage(ad("https://www.facebook.com/marketplace/item/123456789/"), c, config(calls));
+  assert.equal(calls.filter((x) => x.method === "POST").length, 0);
+  assert.equal(c.texts[0], "I can't open Marketplace links. Paste the ad's words and screenshots.");
+});
+
+test("U3: a Marketplace link with the ad's words is checked as usual", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  await handleMessage(
+    ad("https://www.facebook.com/marketplace/item/1/ 2 bed $900, Zelle first"),
+    c,
+    config(calls),
+  );
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+});
+
+// --- U1: one "checking" reply per batch ---------------------------------------------------------
+
+test("U1: through Photon, one 'checking' reply goes out before the report", async () => {
+  const { runPhoton } = await import("./photon");
+  const calls: Call[] = [];
+  const sent: unknown[] = [];
+  const renter = { id: THREAD, send: async (content: unknown) => void sent.push(content) };
+  const messages = (async function* () {
+    // the ad and its photo arrive as two messages: one batch, one "checking" reply
+    yield [
+      renter,
+      { direction: "inbound", content: { type: "text", text: "2 bed $900, Zelle first" } },
+    ] as const;
+    yield [
+      renter,
+      {
+        direction: "inbound",
+        content: {
+          type: "attachment",
+          mimeType: "image/jpeg",
+          read: async () => new Uint8Array([1, 2]),
+        },
+      },
+    ] as const;
+  })();
+  await runPhoton(
+    { messages: messages as AsyncIterable<[typeof renter, never]> },
+    { ...config(calls), quietMs: 5, acknowledge: true },
+  );
+  assert.equal(
+    sent[0],
+    "Got it. Checking this against CoStar's record before you pay anyone. About a minute.",
+  );
+  assert.equal(sent.filter((x) => typeof x === "string" && x.startsWith("Got it.")).length, 1);
+  assert.match(String(sent[1]), /^Hold off for now/);
+});
+
+test("U1: a follow-up gets no 'checking' reply", async () => {
+  const { runPhoton } = await import("./photon");
+  const calls: Call[] = [];
+  const cfg = { ...config(calls), quietMs: 5, acknowledge: true };
+  cfg.memory.remember(THREAD, card.case_id, null);
+  const sent: unknown[] = [];
+  const renter = { id: THREAD, send: async (content: unknown) => void sent.push(content) };
+  const messages = (async function* () {
+    yield [renter, { direction: "inbound", content: { type: "text", text: "why?" } }] as const;
+  })();
+  await runPhoton({ messages: messages as AsyncIterable<[typeof renter, never]> }, cfg);
+  assert.ok(!sent.some((x) => typeof x === "string" && x.startsWith("Got it.")));
 });

@@ -101,6 +101,7 @@ if (photon) {
     makeImage: (bytes: Uint8Array, mimeType: string) =>
       attachment(Buffer.from(bytes), { mimeType, name: "snapback-card.png" }),
     memory: new CaseMemory(),
+    acknowledge: true,
     watches,
     apiUrl: API_URL,
     webUrl,

@@ -16,6 +16,7 @@
  */
 
 import {
+  CHECKING,
   handleMessage,
   isAllowed,
   renterId,
@@ -73,6 +74,8 @@ export type PhotonConfig = SidecarConfig & {
   watches?: WatchBook;
   /** Voice replies: the SDK's `voice(buffer, { mimeType })` builder. Without it, text only. */
   makeVoice?: (bytes: Uint8Array, mimeType: string) => unknown;
+  /** U1: one "checking" reply per batch before a new check (not for follow-ups). */
+  acknowledge?: boolean;
   /** The card picture: the SDK's `attachment(buffer, { mimeType, name })`. Without it, text only. */
   makeImage?: (bytes: Uint8Array, mimeType: string) => unknown;
   /** CAF to m4a before speech to text. Defaults to ffmpeg. */
@@ -209,7 +212,10 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
           }
         : {}),
     };
-    await handleMessage(msg, client, config);
+    const checking = config.acknowledge
+      ? async () => void (await item.space.send(CHECKING))
+      : undefined;
+    await handleMessage(msg, client, config, checking);
     if (!spoken || !replied || !config.makeVoice) return;
     // A spoken ad gets a spoken answer too. If it fails, the text has already gone out.
     try {
