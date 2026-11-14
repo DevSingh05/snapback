@@ -16,6 +16,7 @@ from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
     ChallengeResult,
+    DataSource,
     FloorPlanCandidate,
     ForSaleMatch,
     LocateResult,
@@ -71,6 +72,10 @@ class Modules(Protocol):
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         """Is the home listed for sale, or just rented? None when it was not looked up."""
+        ...
+
+    def record_source(self, case_id: str) -> DataSource | None:
+        """Where price, authority and for_sale came from, if not from where the case did."""
         ...
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None: ...
@@ -176,6 +181,9 @@ class FixtureModules:
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         return self._for_sale if self._for_sale is not None else self.evidence.for_sale
+
+    def record_source(self, case_id: str) -> DataSource | None:
+        return None  # all of a fixture case is fixture
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None:
         if self._spots_available is None:

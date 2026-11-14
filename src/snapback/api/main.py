@@ -2,7 +2,8 @@
 
 Routes the web app and the iMessage sidecar call:
 
-    POST /cases                           start a check (form: link, text, renter_id, photos)
+    POST /cases                           start a check (form: link, text, renter_id,
+                                          property_id, photos)
     GET  /cases/{case_id}                 where the case stands
     GET  /cases/{case_id}/card            the Card (?lang=en|es)
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
@@ -20,6 +21,7 @@ challenge and is the only one accepted as `?token=`, because servers log address
 """
 
 import asyncio
+import re
 import secrets
 from collections.abc import AsyncIterator
 from typing import Annotated, Literal
@@ -32,18 +34,19 @@ from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
 from snapback.agent.intake import read_listing
+from snapback.agent.join import KitMissing, Lookups
+from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
-    LiveModeNotWired,
     NothingWaiting,
     RecordedCase,
     SessionCase,
+    UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
-from snapback.card.render import render_card_png
 from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
@@ -51,6 +54,8 @@ from snapback.verdict import decide
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
+# Our ids for records: short, and nothing that could be a path or a sentence.
+PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 
 
 Language = Literal["en", "es"]
@@ -100,15 +105,18 @@ async def _trace_stream(
                 quiet = 0.0
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, lookups: Lookups | None = None) -> FastAPI:
+    """The API. `lookups` replaces lane D's adapters, for tests."""
     settings = settings or get_settings()
-    store = CaseStore(settings)
+    store = CaseStore(settings, lookups)
     # One allowance per renter or per browser, and a ceiling per network address so that
     # clearing cookies is not a way around it.
     per_client = DailyLimit(settings.snapback_daily_limit)
     per_address = DailyLimit(settings.snapback_daily_limit_per_address)
     max_photo_bytes = settings.snapback_max_photo_mb * MB
     limit_reached = f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow."
+
+    pictures = CardPictures()
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -181,12 +189,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
-    def start_case(text: str, link: str, photos: list[UploadFile]) -> SessionCase:
+    def start_case(
+        text: str, link: str, photos: list[UploadFile], property_id: str | None
+    ) -> SessionCase:
+        if property_id is not None and not PROPERTY_ID.fullmatch(property_id):
+            raise HTTPException(status_code=422, detail="That is not one of our building ids.")
         images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
         listing_text = "\n".join(part for part in (text.strip(), link.strip()) if part)
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
-        return store.create(read_listing(listing_text, images))
+        try:
+            return store.create(read_listing(listing_text, images), property_id)
+        except UnknownProperty:
+            raise HTTPException(
+                status_code=422, detail="We hold no record for that building id."
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
 
     @app.post(
         "/cases",
@@ -201,6 +220,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 "link": {"type": "string"},
                                 "text": {"type": "string"},
                                 "renter_id": {"type": "string"},
+                                "property_id": {"type": "string"},
                                 "photos": {
                                     "type": "array",
                                     "items": {"type": "string", "format": "binary"},
@@ -217,24 +237,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         The form is `CreateCaseRequest` in contracts.py plus `photos` as files, which may be
         listing photos or screenshots of the listing. The link is read as part of the
-        listing's text and is never fetched.
+        listing's text and is never fetched. `property_id` is our id for the building the
+        listing claims; with it the check runs on that building's record (422 if we hold
+        none, 503 if the kit is not on this server).
         """
-        try:
-            store.check_can_create()
-        except LiveModeNotWired:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Live mode needs the locate, record and challenge modules, which are "
-                    "not wired yet. Run with SNAPBACK_DATA_SOURCE=fixture."
-                ),
-            ) from None
-
         form = await parse_form(request, settings.snapback_max_photos, max_photo_bytes)
         try:
             text, link, renter_id = (
                 str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
+            property_id = str(form.get("property_id") or "").strip() or None
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
 
             # Who is asking. The sidecar names its renter; a browser is known by a cookie.
@@ -251,7 +263,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 per_client.release(client)
                 raise HTTPException(status_code=429, detail=limit_reached)
             try:
-                case = await run_in_threadpool(start_case, text, link, photos)
+                case = await run_in_threadpool(start_case, text, link, photos, property_id)
             except BaseException:
                 per_client.release(client)
                 per_address.release(address)
@@ -295,10 +307,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return find(case_id).card(settings.snapback_public_base_url, lang)
 
     @app.get("/cases/{case_id}/card.png")
-    def get_card_png(case_id: str, lang: Language = "en") -> Response:
-        """The same card drawn as a PNG, with the verify link as a QR code."""
+    def get_card_png(
+        case_id: str,
+        lang: Language = "en",
+        if_none_match: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """The same card drawn as a PNG, with the verify link as a QR code.
+
+        Each distinct card is drawn once and kept. The reply carries an `ETag`; send it back
+        as `If-None-Match` and an unchanged picture comes back as 304 with no body.
+        """
         card = find(case_id).card(settings.snapback_public_base_url, lang)
-        return Response(content=render_card_png(card), media_type="image/png")
+        tag = f'"{pictures.etag(card)}"'
+        headers = {"ETag": tag, "Cache-Control": "no-cache"}
+        if if_none_match is not None and tag in if_none_match:
+            return Response(status_code=304, headers=headers)
+        return Response(content=pictures.png(card), media_type="image/png", headers=headers)
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(

@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 01:47. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sat Nov 14 2026, 02:07. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
 
 ## Decisions (locked)
 
@@ -33,6 +33,7 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - Sat 01:31 Ruling: A14 approved, the poster's reply for real (#109): reply route + "waiting for a reply" state, joining D3 challenge and V5 photo memory. A right code that is not a copy stays Not confirmed until V2. Contract merged (#110). (conductor, #8)
 - Sat 01:34 Ruling: V2 contract approved: optional `PhotoLocation.matched_model_id`, `matched_property_id`, `room_label`; set for located_in_claimed and located_elsewhere (elsewhere names the OTHER building). (conductor, #41)
 - Sat 01:42 Ruling: D9 aerial route contract approved: `GET /cases/{id}/aerial` -> `AerialProofResponse` (claimed + matched side, tile, record, image_url on our route; Vexcel key server side), 20 s bound, 7-day cache covered by `make purge`; `record` trimmed to company names and building facts (no phone hash, no site host); read token on both routes. Rishit builds builder + routes in ONE PR, Dev reviews api/. (conductor, #41)
+- Sat 02:00 Ruling: an ACTIVE for-sale match gives HOLD (for-sale reason first) even when no photo was placed; it outranks "Could not place". DON'T PAY still only on proof. When the record has model ids but no index, Real reads "Not checked (this building's scan is not indexed yet)"; "no 3D scan" only when there are no model ids. Lane A task #119, PR #120. (conductor, #101)
 - No "SAFE", "VERIFIED" or "SCAM" state anywhere. Card words come from code, never from a model. Say "could not verify", never "scam", about a person. (spec v3)
 
 ## Who is doing what
@@ -40,12 +41,12 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
 `epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                                                                                                                                     |
-| ------- | ----------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dev     | DevSingh05  | A. agent and backend                 | A7 #87, A9 #91, A10 contract #98, A14 contract #110 merged. Open: #101 A10 live join, #106 A12 card cache, #107 A11 register_case (FIX posted on all three), #96 A8 harness (run blocked on V2 + kit). Next: A14 flow #109, then A15 (ForSaleMatch.offices as marketers), then A13 #104 |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | T8 #90, T9 #94, housekeeping #108 merged; T7/T8/T9/T11 done on fixtures. Next: T7 live wiring on V2 names (#111), T9 live on D9, T10 #79 locked design; design r8 artifact                                                                                                              |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | V5 #61, V1 follow-ups #99 merged. Open: #111 V2 verify and pose (gate: 14 of 20 placed, pose for 5 met, on renders), #62 V6 (FIX open). Queue (#10): DINOv2 rerun, #62, V9 #74, secure_delete, V3 #29                                                                                   |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | Claude Pro. D3 #82, D4 #83, D5 #84 merged. Open: #95 D7 (FIX done at ef2c153), #100 D2b Vexcel flow (FIX open). Next: D9 aerial route (one PR), D8 replays #71                                                                                                                          |
+| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                                                                                                                                                        |
+| ------- | ----------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dev     | DevSingh05  | A. agent and backend                 | A10 live join #101 merged 02:04 (ebe491f). #106 A12 PASS 02:04 (merge by conductor). #107 A11 ready (evicts deleted case). Then #120 A16 for-sale HOLD + 'not indexed' wording (issue #119, assigned). Queued: #117 A14 reply flow. #96 A8 waits on V2. Next: A15, A13 #104                                |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | T7/T8/T9/T11 done on fixtures. Next: T7 live wiring on V2 names (#111): map "Taken here" by `matched_property_id == claimed`, not by the chosen model (`apps/web/src/twin/landing.ts:43`), and read `photo.room_label`; then T9 live on D9 (#113), T10 #79 locked design                                   |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | #111 V2 FIX r1 (H: claimed twin loses an equal match elsewhere by index order, false DON'T PAY; 2 M, 1 L): do FIRST. Then #112 V4 FIX r1 (H: train/test leakage across the split; 3 M, 1 L). Queued: #114 V3 (stacked on #111), #118 secure_delete. #62 V6 FIX open. V9 house via Rishit's picker #116     |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | Claude Pro. #95 D7 FIX r3 done at 11115a2, in re-review. #100 D2b in review. #113 D9 aerial: Dev reviewed api/ (2 H: fixture case 7Q2M always 401, whole kit parsed per request; 2 M, 1 L), rest for the conductor. #115 DATA_USE right after #107; #116 house picker stacked on #95. Next: D8 replays #71 |
 
 ## Data facts (REPORTED until our probe confirms)
 
@@ -76,6 +77,7 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Open questions
 
+- Sat 01:55 Human list for 07:30 (lane V): browser check of kit photo URLs (403 to scripts, #68); V4 team photos (#30, about 40 genuine / 15 screen / 10 print each); V3 60 s walkthrough video plus one photo of a room we can stand in (#29)
 - Fri 21:15 CoStar q1: may kit data go to Claude? (CoStar, via Discord)
 - Fri 21:15 CoStar: may we cache Matterport faces and embeddings locally for the weekend? (CoStar)
 - Fri 21:15 Does the kit have listing photos, owner of record, rent or leasing contact? (our probe first)
@@ -83,9 +85,9 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Live facts
 
-- Nothing deployed yet (NOT re-checked at 01:47). main = cd65e3d (Sat 01:45).
+- Nothing deployed yet (NOT re-checked at 02:07). main = ebe491f (Sat 02:04, #101 A10). 24 merges since midnight.
 - Merged 01:04-01:45: #61 V5, #82 D3, #83 D4, #84 D5, #87 A7 rules, #90 T8, #91 A9, #94 T9, #98 A10 contract, #99 V1 follow-ups, #105 CODEOWNERS, #108 T housekeeping, #110 A14 contract.
-- Open PRs at 01:46: #62 (Jeffrey V6, FIX open), #95 (D7, FIX answered), #96 (A8, blocked on V2), #100 (D2b, FIX), #101 (A10 live join, FIX), #106 (A12, FIX), #107 (A11, FIX), #111 (V2, new). Reviews and merges: conductor only.
+- Open FIX heads at 02:07: #111@e339dc7 (V2, H), #112@890152d (V4, H), #62@8a653b7 (V6). In review: #95@11115a2, #100@0f6aa7b. #106@53c14fe PASS. Queued: #107, #115, #113, #114, #116, #117, #118, #120. Blocked: #96 on V2. Reviews and merges: conductor only.
 - Contract fields on main (#88, #92), additive and optional: `PropertyRecord.site_phone_hash` (keyed hash, never digits; both lanes use the same phone hash helper), `website_host` (host only), `floor_plan_rents[]` (name, beds 0=studio, rent_min, rent_max, per_bed), `units[]` (unit, beds, floor_plan); `AuthorityResult.office_phone_match`, `link_domain` (yes/no only); `ForSaleMatch` (status active / recently_rented / none, site, listed_on, changed_on) on `ModuleEvidence.for_sale` and `Card.for_sale`. Pending in #87: `PriceResult.compared_beds`.
 - Fri 22:10 data gate GO: 3/3 Houston multifamily Matterport models load on Vidyut's key (issue #5); apartment-listing has min/max rent per floor plan and the management company.
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace/status; may go in `?token=`). `/c/:id` card stays public.
@@ -108,4 +110,7 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 - Sat 01:00 `.github/` is owned by Vidyut and the XO; lane PRs must not touch `ci.yml` (pushing it needs the `workflow` token scope anyway).
 - Per-bed rents (`per_bed`) are never compared with a whole-unit rent.
 - Sat 01:45 V2 gate numbers (#28) are on RENDERS of the scans at unseen viewpoints, not phone photos. Say "renders" in any claim until real photos are run (A8).
-- Sat 01:31 #91 and #101 both touch `CaseStore.create`; A13 waits until both merge.
+- Sat 01:31 #91 and #101 both touch `CaseStore.create`; A13 waits until both merge (both now merged).
+- Sat 02:02 Twin matching: never let index order break a tie between the claimed building and another one; check the claimed twin first and hold "elsewhere" to a stricter bar (#111). A tie must never produce DON'T PAY.
+- Sat 02:03 ML splits: split train and test by building (or capture session), never by photo, or the score leaks (#112).
+- Sat 01:59 A recorded case with no secret (fixture `7Q2M`) must go straight to `check_read`; an early "no token -> 401" locks it out for good (#113).

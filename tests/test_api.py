@@ -2,10 +2,12 @@
 
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 
+from snapback.agent.join import KitLookups
 from snapback.api.main import app, create_app
 from snapback.card import strings
 from snapback.card.render import render_card_png
@@ -14,14 +16,23 @@ from snapback.contracts import (
     CreateCaseRequest,
     CreateCaseResponse,
     DataSource,
+    ModuleEvidence,
     TraceEvent,
     TraceKind,
     VerdictState,
 )
 from snapback.settings import Settings
+from snapback.verdict import build_card
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 FIXTURE_CARD = Card.model_validate_json((FIXTURES / "card_hold.json").read_text())
+# The recorded case as the API serves it: the same evidence at the same moment, on the
+# building's clock (Houston), not the clock it was saved on.
+HOUSTON_CARD = build_card(
+    ModuleEvidence.model_validate_json((FIXTURES / "module_evidence_hold.json").read_text()),
+    checked_at=FIXTURE_CARD.checked_at.astimezone(ZoneInfo("America/Chicago")),
+    verify_base_url=Settings(_env_file=None).snapback_public_base_url,
+)
 FIXTURE_TRACE = [
     TraceEvent.model_validate(json.loads(line))
     for line in (FIXTURES / "trace_events.jsonl").read_text().strip().splitlines()
@@ -31,9 +42,14 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"synthetic png body" * 4
 HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00" + b"synthetic heic body" * 4
 
 
-def make_client(tmp_path, **overrides) -> TestClient:
+def make_client(tmp_path, lookups=None, **overrides) -> TestClient:
     settings = Settings(_env_file=None, snapback_data_dir=tmp_path, **overrides)
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, lookups=lookups))
+
+
+def no_kit(tmp_path) -> KitLookups:
+    """Lane D's adapters pointed at an empty folder, so no test reads a real kit."""
+    return KitLookups(DataSource.LIVE, kit_dir=tmp_path / "no-kit")
 
 
 @pytest.fixture
@@ -116,7 +132,11 @@ def test_verdict_endpoint_round_trips_the_contract():
 def test_card_route_returns_card_contract(client, case_id):
     response = client.get(f"/cases/{case_id}/card")
     assert response.status_code == 200
-    assert Card.model_validate(response.json()) == FIXTURE_CARD
+    served = Card.model_validate(response.json())
+    assert served == HOUSTON_CARD
+    # The same case as it was saved, apart from the clock its times are read on.
+    assert (served.state, served.checked_at) == (FIXTURE_CARD.state, FIXTURE_CARD.checked_at)
+    assert [row.kind for row in served.rows] == [row.kind for row in FIXTURE_CARD.rows]
 
 
 def test_trace_route_streams_fixture_events_in_order(client):
@@ -487,8 +507,13 @@ def test_one_address_cannot_start_checks_without_end(tmp_path):
 
 
 def test_a_check_that_could_not_start_is_not_counted(tmp_path):
-    live = make_client(tmp_path, snapback_data_source="live", snapback_daily_limit=2)
-    assert [live.post("/cases", data={"text": "x"}).status_code for _ in range(5)] == [503] * 5
+    # Live mode with no kit on the machine: asking for a record cannot work, and costs nothing.
+    live = make_client(
+        tmp_path, no_kit(tmp_path), snapback_data_source="live", snapback_daily_limit=2
+    )
+    asks = {"text": "x", "property_id": "any-id"}
+    assert [live.post("/cases", data=asks).status_code for _ in range(5)] == [503] * 5
+    assert live.post("/cases", data={"text": "x"}).status_code == 201
 
     fixture = make_client(tmp_path, snapback_daily_limit=2)
     bad_file = [("photos", ("run.exe", b"MZ\x90\x00", "application/x-msdownload"))]
@@ -625,7 +650,7 @@ def test_card_png_route_returns_a_png_of_the_card(client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
-    assert response.content == render_card_png(FIXTURE_CARD)
+    assert response.content == render_card_png(HOUSTON_CARD)
 
 
 def test_card_and_png_can_be_asked_for_in_spanish(client):
@@ -682,12 +707,26 @@ def test_only_send_edit_or_cancel_are_accepted(client, decision):
     assert client.get(f"/cases/{case['case_id']}").json()["status"] == "waiting_for_approval"
 
 
-def test_live_mode_says_plainly_that_the_modules_are_not_wired(tmp_path):
-    live = make_client(tmp_path, snapback_data_source="live")
+def test_live_mode_runs_a_check_with_no_stand_in_in_it(tmp_path):
+    # A10: the record side is joined, so live mode starts a check. The twin and the challenge
+    # are still stand-ins, which are fixture data, so a live case gets neither: nothing is
+    # placed, nobody is asked to prove presence, and the card cannot read VERIFIED.
+    live = make_client(tmp_path, no_kit(tmp_path), snapback_data_source="live")
     assert live.get("/healthz").json()["data_source"] == "live"
-    response = live.post("/cases", data={"text": "x"})
-    assert response.status_code == 503
-    # Fixture cases are not served as if they were live.
+    made = live.post("/cases", data={"text": "x"})
+    assert made.status_code == 201
+    assert (made.json()["source"], made.json()["status"]) == ("live", "done")
+    assert made.json()["challenge_text"] is None
+
+    card = live.get(f"/cases/{made.json()['case_id']}/card").json()
+    assert card["source"] == "live" and card["state"] == "unverified"
+    tones = {line["label"]: line["tone"] for row in card["rows"] for line in row["lines"]}
+    assert tones["Real"] == "not_checked" and tones["Here now"] == "not_checked"
+
+    # Without the kit there is no record to read, and that is said plainly.
+    asked = live.post("/cases", data={"text": "x", "property_id": "any-id"})
+    assert asked.status_code == 503 and "kit" in asked.json()["detail"].lower()
+    # The recorded fixture case is not served as if it were live.
     assert live.get("/cases/fx-7Q2M/card").status_code == 404
 
 
