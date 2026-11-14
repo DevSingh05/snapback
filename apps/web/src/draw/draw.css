@@ -100,3 +100,15 @@
 [data-detail="low"] .dk-fine {
   display: none;
 }
+
+/* The house glyph's own pieces. */
+.house-plinth-left {
+  fill: color-mix(in srgb, var(--h-wall-shade) 92%, var(--ink));
+}
+.house-plinth-right {
+  fill: color-mix(in srgb, var(--h-wall-shade) 76%, var(--ink));
+}
+/* At low detail the shutters go too, and the door keeps its flat colour. */
+[data-detail="low"] [data-part="porch-roof"] {
+  display: none;
+}
