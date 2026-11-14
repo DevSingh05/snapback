@@ -21,7 +21,7 @@ from enum import StrEnum
 from typing import Literal
 
 from snapback.agent.modules import ChallengeOutcome, Modules
-from snapback.agent.planner import PICK_KEY, Plan, PlanKind
+from snapback.agent.planner import Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -279,7 +279,7 @@ class CaseSession:
             aliases=labels,
             facts=self._plan.facts(),
             default=labels[0],
-            default_reason=self._say(PICK_KEY[kinds[0]]),
+            default_reason=self._say(self._plan.pick_key(kinds[0])),
         )
 
     def _apply_plan(self, pick: str) -> None:

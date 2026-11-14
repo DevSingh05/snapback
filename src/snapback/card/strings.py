@@ -129,6 +129,9 @@ EN: dict[str, str] = {
         "Not checked (no phone number in the listing could be compared with the leasing "
         "office on record)."
     ),
+    # A15: a home for sale with no property record. Whatever the ad says, there is no phone
+    # on record for the brokerage to compare it with.
+    "contact.no_brokerage_phone": "Not checked (we hold no phone for the listing brokerage).",
     # Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
     # number. The line is Not confirmed, and it says who to call.
     "contact.phone_mismatch": (
@@ -295,6 +298,8 @@ EN: dict[str, str] = {
     "trace.hitl.cancel": "The renter chose not to send a challenge.",
     # --- the evidence-driven plan (A24): which check runs next -------------------------------
     "plan.pick.record": "The home's own record gives the rent band and who is on record. Read it.",
+    # With a listing active, who is on record is the brokerage step's finding (A15).
+    "plan.pick.record_rent": "The home's own record gives the rent band. Read it.",
     "plan.pick.brokerage": "The home is listed for sale right now. Check the listing office.",
     "plan.pick.license": "The ad names a license. Look it up with the state.",
     "plan.pick.owner": "An owner is on public record. Compare it with who is posting.",
@@ -351,6 +356,10 @@ EN: dict[str, str] = {
     "reason.phone_not_confirmed": (
         "The contact in the listing was not shown to be the leasing office on record."
     ),
+    "reason.phone_not_confirmed_brokerage": (
+        "We hold no phone for the listing brokerage, so the contact in the listing could not "
+        "be compared."
+    ),
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
     "reason.license_not_found": "The license number in the ad is not an active Texas license.",
@@ -364,6 +373,9 @@ EN: dict[str, str] = {
     "reason.not_located": "The photos could not be located in this property's 3D twin.",
     "reason.located": "The photos were located in this property.",
     "reason.authority_matches": ("The ad names the manager on record. Anyone can type that name."),
+    "reason.authority_matches_brokerage": (
+        "The ad names the listing brokerage on record. Anyone can type that name."
+    ),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
@@ -511,6 +523,9 @@ ES: dict[str, str] = {
     "contact.phone_unchecked": (
         "No comprobado (ningún teléfono del anuncio se pudo comparar con el de la oficina de "
         "alquiler que figura en el registro)."
+    ),
+    "contact.no_brokerage_phone": (
+        "No comprobado (no tenemos un teléfono de la agencia que anuncia la vivienda)."
     ),
     "contact.phone_mismatch": (
         "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
@@ -701,6 +716,7 @@ ES: dict[str, str] = {
     "plan.pick.record": (
         "El registro propio de la vivienda da el rango de renta y quién figura. Leerlo."
     ),
+    "plan.pick.record_rent": "El registro propio de la vivienda da el rango de renta. Leerlo.",
     "plan.pick.brokerage": "La vivienda está en venta ahora. Revisar la oficina que la anuncia.",
     "plan.pick.license": "El anuncio menciona una licencia. Buscarla en el estado.",
     "plan.pick.owner": "Hay un propietario en el registro público. Compararlo con quien publica.",
@@ -768,6 +784,10 @@ ES: dict[str, str] = {
         "No se demostró que el contacto del anuncio sea la oficina de alquiler que figura en "
         "el registro."
     ),
+    "reason.phone_not_confirmed_brokerage": (
+        "No tenemos un teléfono de la agencia que anuncia la vivienda, así que no se pudo "
+        "comparar el contacto del anuncio."
+    ),
     "reason.phone_flag": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),
@@ -787,6 +807,10 @@ ES: dict[str, str] = {
     "reason.located": "Las fotos se ubicaron en esta propiedad.",
     "reason.authority_matches": (
         "El anuncio nombra al administrador del registro. Cualquiera puede escribir ese nombre."
+    ),
+    "reason.authority_matches_brokerage": (
+        "El anuncio nombra a la agencia que figura en el registro. Cualquiera puede escribir "
+        "ese nombre."
     ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",
