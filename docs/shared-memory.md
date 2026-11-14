@@ -22,12 +22,12 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
 `epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                                                       |
-| ------- | ----------- | ------------------------------------ | --------------------------------------------------------- |
+| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                  |
+| ------- | ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dev     | DevSingh05  | A. agent and backend                 | A1-A4 merged (#49 #54 #56 #60). #58 A5 FIX open (regex DoS, more slow patterns found); agent hit usage limit 23:32, waits for Dev to restart it. #59 A6 waits on #58 |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | #53 #55 #64 #65 merged (web wired to real API, read token); design direction A+C being built |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | V1 #63 merged; #61 V5 photo memory FIX (SQLite threads, screenshot crops); #62 V6 eval FIX (phantom bars, gate dodge, make eval) |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | D1-D6 pushed on 6 branches 23:07-23:26, no PRs yet; asked on #11 to open them (d/40 conflicts with main) |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | #53 #55 #64 #65 merged (web wired to real API, read token); design direction A+C being built                                                                         |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | V1 #63 merged; #61 V5 photo memory FIX (SQLite threads, screenshot crops); #62 V6 eval FIX (phantom bars, gate dodge, make eval)                                     |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | D1-D6 pushed on 6 branches 23:07-23:26, no PRs yet; asked on #11 to open them (d/40 conflicts with main)                                                             |
 
 ## Data facts (REPORTED until our probe confirms)
 
