@@ -32,7 +32,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from snapback.contracts import AS_OF, DataSource, LocateResult, PlaceMatch, PropertyRecord
+from snapback.contracts import (
+    AS_OF,
+    DataSource,
+    LocateResult,
+    LocateStatus,
+    PlaceMatch,
+    PropertyRecord,
+)
 
 ROOM_LINK_M = 4.0  # same-label sweeps closer than this (metres) belong to one room
 MAX_ROOM_STOPS = 12
@@ -177,11 +184,22 @@ class TourPlan(BaseModel):
     director: TourDirector | None = None
 
 
+class PhotoWalkFields(BaseModel):
+    """What the walk knows about one ad photo, keyed by photo id. `stop_alias` is the alias (S1..)
+    of the stop that holds it, or None when it is on no stop. `covers_unshown_room` is True when
+    the photo's own room label names a stop that no placed photo covers (the agent's photo
+    budget weighs these first)."""
+
+    stop_alias: str | None = None
+    covers_unshown_room: bool = False
+
+
 class WalkResponse(BaseModel):
     """`GET /cases/{id}/walk`: the plan with the case's placed photos, and the locate result."""
 
     plan: TourPlan
     locate: LocateResult | None = None
+    photos: dict[str, PhotoWalkFields] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -604,3 +622,139 @@ def cached_sweeps(model_id: str, cache_dir=None) -> list[TourSweep]:
     return [
         TourSweep(s.sweep_id, s.position, s.rotation_quat, labels.get(s.sweep_id)) for s in sweeps
     ]
+
+
+# --- the ad's photos on the stops (W1) -----------------------------------------------------------
+
+WALKED = ("door", "room", "stop")  # the stop kinds that are places in the scan
+
+
+def stop_aliases(plan: TourPlan) -> dict[str, str]:
+    """Stop key -> alias S1..Sn over the stops inside the scan, in walking order. Aliases are
+    what a model may see in place of room names and ids."""
+    keys = [s.key for s in plan.stops if s.kind in WALKED]
+    return {key: f"S{i}" for i, key in enumerate(keys, start=1)}
+
+
+def _plural_photos(n: int) -> str:
+    return f"{n} photo" if n == 1 else f"{n} photos"
+
+
+def coverage_line(
+    *, counted: str, total: int, with_photo: int, unplaced: int, elsewhere: int
+) -> str:
+    base = (
+        f"The ad showed {with_photo} of the {total} rooms in this scan."
+        if counted == "rooms"
+        else f"The ad's photos were taken at {with_photo} of {total} spots in this scan."
+    )
+    if unplaced:
+        base += f" {_plural_photos(unplaced)} could not be placed, so the real count may be higher."
+    if elsewhere:
+        was = "was" if elsewhere == 1 else "were"
+        base += f" {_plural_photos(elsewhere)} {was} taken in a different building and not counted."
+    return base
+
+
+def map_locate(
+    plan: TourPlan,
+    locate: LocateResult,
+    *,
+    scan_plan: str | None = None,
+    ad_plan: str | None = None,
+) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
+    """Put the ad's placed photos on the stops that hold their sweep, set each stop's `ad_view`,
+    and count coverage. Only `located_in_claimed` photos ever enter a room: a photo taken in
+    another building, or one that could not be placed, is counted but never put in a room.
+
+    `ad_view` is "placed" for a stop with a photo; "none_placed" for one without only when every
+    ad photo was placed in this home (so "the ad showed no photo of this room" is true); else
+    "unknown". When an apartment scan's floor plan differs from the ad's, rooms are not counted.
+    """
+    status = {p.photo_id: p.status for p in locate.photos}
+    placed_ids = [p.photo_id for p in locate.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
+    elsewhere = sum(s is LocateStatus.LOCATED_ELSEWHERE for s in status.values())
+    unplaced = len(status) - len(placed_ids) - elsewhere
+    all_placed = bool(status) and len(placed_ids) == len(status)
+
+    by_stop: dict[str, list[TourPhoto]] = {}
+    where: dict[str, str] = {}  # photo id -> stop key
+    for photo in locate.photos:
+        if photo.photo_id not in placed_ids:
+            continue
+        pose = locate.poses.get(photo.photo_id)
+        sweep = photo.pano_id or (pose.sweep_id if pose else None)
+        stop = next(
+            (s for s in plan.stops if s.kind in WALKED and sweep and sweep in s.sweep_ids), None
+        )
+        if stop is None:
+            continue  # placed, but in a sweep that is no stop: never forced onto a nearby room
+        by_stop.setdefault(stop.key, []).append(
+            TourPhoto(
+                photo_id=photo.photo_id,
+                sweep_id=sweep,
+                position=tuple(pose.position) if pose else None,
+                rotation_quat=tuple(pose.rotation_quat) if pose else None,
+                fov_deg=pose.fov_deg if pose else None,
+            )
+        )
+        where[photo.photo_id] = stop.key
+
+    stops = []
+    for stop in plan.stops:
+        if stop.kind not in WALKED:
+            stops.append(stop)
+            continue
+        mine = by_stop.get(stop.key, [])
+        view = "placed" if mine else ("none_placed" if all_placed else "unknown")
+        stops.append(stop.model_copy(update={"photos": mine, "ad_view": view}))
+
+    walked = [s for s in stops if s.kind in WALKED]
+    with_photo = sum(bool(s.photos) for s in walked)
+    counted = "rooms" if plan.rooms_labelled else "spots"
+    line: str | None
+    if not walked:
+        counted, line = "none", None
+    elif scan_plan and ad_plan and scan_plan.strip().lower() != ad_plan.strip().lower():
+        counted = "none"
+        line = (
+            f"This scan is a {scan_plan} floor plan and the ad is for a {ad_plan}, "
+            "so we show the scan without counting rooms."
+        )
+    elif not placed_ids:
+        counted = "none"
+        line = (
+            "None of the ad's photos could be placed in this scan, "
+            "so we show it without counting rooms."
+        )
+    else:
+        line = coverage_line(
+            counted=counted,
+            total=len(walked),
+            with_photo=with_photo,
+            unplaced=unplaced,
+            elsewhere=elsewhere,
+        )
+    coverage = WalkCoverage(
+        counted=counted,  # type: ignore[arg-type]
+        total=len(walked) if counted != "none" else 0,
+        with_photo=with_photo if counted != "none" else 0,
+        placed=len(placed_ids),
+        elsewhere=elsewhere,
+        unplaced=unplaced,
+        line=line,
+    )
+
+    aliases = stop_aliases(plan)
+    unshown = {
+        (s.room_label or "").strip().lower() for s in walked if not s.photos and s.room_label
+    }
+    fields: dict[str, PhotoWalkFields] = {}
+    for photo in locate.photos:
+        key = where.get(photo.photo_id)
+        label = (photo.room_label or "").strip().lower()
+        fields[photo.photo_id] = PhotoWalkFields(
+            stop_alias=aliases.get(key) if key else None,
+            covers_unshown_room=bool(label and label in unshown),
+        )
+    return plan.model_copy(update={"stops": stops, "coverage": coverage}), fields
