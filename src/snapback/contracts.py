@@ -22,7 +22,9 @@ class LocateStatus(StrEnum):
 
     LOCATED_IN_CLAIMED = "located_in_claimed"  # geometrically verified inside the claimed property
     LOCATED_ELSEWHERE = "located_elsewhere"  # verified inside a different indexed property
-    NOT_LOCATED = "not_located"  # the claimed property is indexed and the photo matches nowhere
+    NOT_LOCATED = (
+        "not_located"  # claimed home indexed, photo matches nowhere; or no claim and no single home
+    )
     NOT_INDEXED = "not_indexed"  # the claimed property has no twin in our index
 
 
@@ -75,6 +77,8 @@ class Evidence(BaseModel):
     for_sale_flag: bool = False  # the home is listed for sale, not for rent
     recently_rented_flag: bool = False  # the record shows it was rented out recently
     phone_flag: bool = False  # the phone in the listing is not the leasing office on record
+    # A23 (H1): the phone in the listing IS the leasing office's on record. VERIFIED needs it.
+    phone_confirmed: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
 
@@ -128,6 +132,10 @@ class LocateResult(BaseModel):
     case_id: str
     photos: list[PhotoLocation]
     claimed_property_id: str | None = None
+    # True when the ad named no home and the scan identified it: claimed_property_id is then
+    # the home the photos were placed in.
+    identified_by_scan: bool = False
+    identified_photos: int = 0  # photos that placed in that home on the strict bar
     chosen: FloorPlanCandidate | None = None
     alternatives: list[FloorPlanCandidate] = Field(default_factory=list)
     poses: dict[str, Pose] = Field(default_factory=dict)  # photo_id -> pose, located photos only

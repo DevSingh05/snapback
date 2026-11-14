@@ -63,7 +63,11 @@ def test_rent_range_and_manager_company_come_from_the_apartment_listing():
 def test_live_mode_reads_a_kit_dir_and_labels_records_live(tmp_path):
     kit = tmp_path / "kit"
     (kit / "data").mkdir(parents=True)
-    line = {"propertyId": "fx-live-1", "propertyType": 11, "yearBuilt": 2001}
+    line = {
+        "propertyId": "fx-live-1",
+        "propertyType": 11,
+        "constructionEvents": [{"eventType": 2, "year": 2001}],
+    }
     (kit / "data" / "commercial-property.jsonl").write_text(json.dumps(line) + "\n\n{broken\n")
     records = load_records(DataSource.LIVE, kit_dir=kit)
     assert list(records) == ["fx-live-1"]
@@ -83,6 +87,28 @@ def test_default_source_comes_from_settings(monkeypatch):
 def test_coverage_reports_counts_and_field_paths_only():
     report = coverage(costar_jsonl.FIXTURE_KIT)
     assert report["records"] == 4
-    assert report["fields"]["year_built"]["yearBuilt"] == 3  # the enum-0 record does not count
+    assert report["year_built_events"] == 2  # fx-prop-1 and -4; the year-0 record does not count
     text = json.dumps(report)
     assert "fx-" not in text and "Fixture" not in text  # no ids or values, safe to paste
+
+
+def test_year_built_is_the_earliest_construction_complete_event():
+    records = load_records(DataSource.FIXTURE)
+    # fx-prop-1: eventType 1 in 2010 is ignored; eventType 2 in 2015 and 2018 -> 2015
+    assert records["fx-prop-1"].year_built == 2015
+    # fx-prop-3: no construction event; the apartment listing's yearBuilt is the fallback
+    assert records["fx-prop-3"].year_built == 1998
+    # fx-prop-2: a year of 0 is unknown
+    assert records["fx-prop-2"].year_built is None
+
+
+def test_a_units_own_beds_win_over_its_model():
+    units = {u.unit: u for u in load_records(DataSource.FIXTURE)["fx-prop-4"].units}
+    assert units["206"].beds == 3  # listed under the 2-bed model, but the unit says 3
+    assert units["204"].beds == 2  # no beds of its own: the model's
+
+
+def test_coverage_counts_model_and_unit_fields():
+    report = coverage(costar_jsonl.FIXTURE_KIT)
+    assert report["model_fields"]["numBeds"] > 0 and report["model_fields"]["numBaths"] > 0
+    assert report["unit_fields"]["unitNumber"] > 0 and report["unit_fields"]["numBeds"] > 0

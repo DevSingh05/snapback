@@ -19,6 +19,7 @@ by photos placed, then inliers. Model units per floor plan: a match claims "this
 floor plan", never a unit number.
 """
 
+import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -46,6 +47,8 @@ from snapback.vision.locate.geometry import (
 from snapback.vision.locate.index import LocateIndex
 from snapback.vision.locate.thresholds import Thresholds, load_thresholds
 from snapback.vision.locate.verify import FEATURE_KEY, Matcher, Verification, verify
+
+log = logging.getLogger(__name__)
 
 _EXIF_IFD = 0x8769
 _FOCAL_35MM = 0xA405
@@ -201,7 +204,8 @@ class Locator:
     def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
-        building places it only on the stricter elsewhere bar (it can lead to DON'T PAY)."""
+        building places it only on the stricter elsewhere bar (it can lead to DON'T PAY).
+        """
         t = self.thresholds
         hits = self._candidates(photo, claimed_models)
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
@@ -230,9 +234,35 @@ class Locator:
             ),
         )
 
+    def _identify(self, photo: Image.Image) -> tuple[_Placement | None, bool]:
+        """The ad names no home. Verify EVERY candidate on the strict bar, with no early stop, so
+        the answer never depends on index order. Returns (best placement, ambiguous): ambiguous
+        when the photo passes in more than one property (tract twins, sister buildings)."""
+        t = self.thresholds
+        best, homes = None, set()
+        for hit in self._candidates(photo, set()):
+            entry = hit.entry
+            face = self._face(entry.model_id, entry.sweep_id, entry.face)
+            check = verify(self.matcher, photo, face, t.ransac_px)
+            if not (
+                check.inliers >= t.elsewhere_min_inliers
+                and check.ratio >= t.min_inlier_ratio
+                and check.spread >= t.elsewhere_min_spread
+            ):
+                continue
+            homes.add(self.catalog.property_of(entry.model_id))
+            if best is None or check.inliers > best.check.inliers:
+                best = _Placement(
+                    entry.model_id,
+                    self._sweeps[(entry.model_id, entry.sweep_id)],
+                    entry.face,
+                    check,
+                )
+        return best, len(homes) > 1
+
     def _pose(self, photo: Image.Image, placed: _Placement) -> Pose | None:
-        if placed.check.homography is None:
-            return None
+        if placed.check.homography is None or placed.sweep.position is None:
+            return None  # no geometry, e.g. a walkthrough video frame
         hfov = photo_hfov(photo, self.thresholds.default_hfov_deg)
         face_size = self._face(placed.model_id, placed.sweep.sweep_id, placed.face).size[0]
         photo_to_face = rotation_from_homography(
@@ -262,13 +292,27 @@ class Locator:
         claimed_property_id: str | None,
     ) -> LocateResult:
         claimed_models = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
+        # Where a photo may be placed:
+        #   claimed home set and indexed -> claimed first, strict bar elsewhere (can say elsewhere)
+        #   claimed home set, not indexed -> nothing is placed: NOT_INDEXED, never elsewhere
+        #   no claimed home -> identify: the strict bar in any building ("identified as P")
+        identify = claimed_property_id is None
         locations: list[PhotoLocation] = []
         poses: dict[str, Pose] = {}
         per_model: dict[str, list[int]] = {}
 
+        placements: dict[str, _Placement | None] = {}
+        tangled = False  # a photo passed in more than one property
         for photo_id, image in photos.items():
+            if not identify and not claimed_models:
+                placements[photo_id] = None
+                continue
             photo = image.convert("RGB")
-            placed = self._place(photo, claimed_models)
+            if identify:
+                placed, ambiguous = self._identify(photo)
+                tangled = tangled or ambiguous
+            else:
+                placed = self._place(photo, claimed_models)
             if (
                 placed is not None
                 and placed.model_id not in claimed_models
@@ -277,8 +321,51 @@ class Locator:
                 # Never "somewhere else" without a known other building: the catalog may just be
                 # missing the claimed property's own twin.
                 placed = None
+            placements[photo_id] = placed
+
+        identified_by_scan = conflict = False
+        identified_photos = 0
+        if identify:
+            found = {
+                self.catalog.property_of(p.model_id) for p in placements.values() if p is not None
+            }
+            strict_placed = sum(p is not None for p in placements.values())
+            if tangled:
+                log.warning("case %s: a photo matches more than one property", case_id)
+                placements = dict.fromkeys(placements)
+                conflict = True
+            elif found and len(photos) >= 2 and strict_placed < 2:
+                # One lone strict match among several photos is not enough to name a home.
+                log.warning(
+                    "case %s: only %d of %d photos identify a home",
+                    case_id,
+                    strict_placed,
+                    len(photos),
+                )
+                placements = dict.fromkeys(placements)
+                conflict = True
+            elif len(found) > 1:
+                # Photos from different homes: do not pick one.
+                log.warning(
+                    "case %s: photos identify different properties %s", case_id, sorted(found)
+                )
+                placements = dict.fromkeys(placements)
+                conflict = True
+            elif found:
+                (claimed_property_id,) = found
+                claimed_models = (
+                    self.catalog.models_of(claimed_property_id) & self.index.model_ids()
+                )
+                identified_by_scan = True
+                identified_photos = strict_placed
+
+        for photo_id, placed in placements.items():
             if placed is None:
-                status = LocateStatus.NOT_LOCATED if claimed_models else LocateStatus.NOT_INDEXED
+                status = (
+                    LocateStatus.NOT_LOCATED
+                    if claimed_models or conflict or (identify and self.index.model_ids())
+                    else LocateStatus.NOT_INDEXED
+                )
                 locations.append(PhotoLocation(photo_id=photo_id, status=status))
                 continue
             in_claimed = placed.model_id in claimed_models
@@ -299,7 +386,7 @@ class Locator:
                     room_label=self.catalog.room(placed.model_id, placed.sweep.sweep_id),
                 )
             )
-            pose = self._pose(photo, placed)
+            pose = self._pose(photos[photo_id].convert("RGB"), placed)
             if pose is not None:
                 poses[photo_id] = pose
             if in_claimed:
@@ -325,6 +412,8 @@ class Locator:
             case_id=case_id,
             photos=locations,
             claimed_property_id=claimed_property_id,
+            identified_by_scan=identified_by_scan,
+            identified_photos=identified_photos,
             chosen=chosen,
             alternatives=[c for c in candidates if c is not chosen],
             poses=poses,

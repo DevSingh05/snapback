@@ -44,7 +44,27 @@ EN: dict[str, str] = {
     "place.seen_before_dated": "A listing photo also appeared in another check on {date}.",
     "place.seen_before": "A listing photo also appeared in another check.",
     # For sale is a red flag, never proof: it holds a case and cannot set DON'T PAY by itself.
-    "place.for_sale": "This home is listed for sale on {site}, not for rent. Red flag.",
+    # A warning, never a red flag, and never "not for rent" (red team H5, Sat 03:25). We do
+    # not know whether a home is leased; the record says it is for sale, and so do we. The
+    # line is what the record says ({record}, one of the four below) and then who to ask.
+    "place.for_sale_record": "Listed for sale on {site} by {brokerage} since {date}.",
+    "place.for_sale_record_no_date": "Listed for sale on {site} by {brokerage}.",
+    "place.for_sale_record_no_brokerage": "Listed for sale on {site} since {date}.",
+    "place.for_sale_record_bare": "Listed for sale on {site}.",
+    "place.for_sale": (
+        "{record} Homes for sale are sometimes also offered for lease, so confirm with that "
+        "brokerage before you pay."
+    ),
+    "place.for_sale_ask_listing": (
+        "{record} Homes for sale are sometimes also offered for lease, so confirm with the "
+        "listing brokerage before you pay."
+    ),
+    # The ad's phone is the office's on record: the brokerage itself is offering the home.
+    # Information only; it holds nothing (ruling, Sat 03:36).
+    "place.for_sale_office": (
+        "Not confirmed. {record} The contact in this listing is the office on record, so ask "
+        "them whether it is also offered for lease."
+    ),
     # Lease status is something we do not know and never claim (ruling, Sat 01:20). This is
     # an information line: it carries no flag and holds no case by itself.
     "place.recently_rented": (
@@ -100,6 +120,11 @@ EN: dict[str, str] = {
     # A match is a supporting line only. It never counts as matching the record by itself.
     "contact.phone_match": (
         "The phone matches the leasing office on record. Call it yourself to confirm."
+    ),
+    # H1: the name matches the record and there was no phone to compare with the office's.
+    "contact.phone_unchecked": (
+        "Not checked (no phone number in the listing could be compared with the leasing "
+        "office on record)."
     ),
     # Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
     # number. The line is Not confirmed, and it says who to call.
@@ -270,7 +295,13 @@ EN: dict[str, str] = {
     "reason.price_flag": "The rent is far below comparable units.",
     "reason.payment_flag": "Payment was requested before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
-    "reason.for_sale": "This home is listed for sale, not for rent.",
+    "reason.for_sale": (
+        "This home is listed for sale. Confirm with the listing brokerage that it is also "
+        "offered for lease."
+    ),
+    "reason.phone_not_confirmed": (
+        "The contact in the listing was not shown to be the leasing office on record."
+    ),
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
@@ -279,7 +310,7 @@ EN: dict[str, str] = {
     ),
     "reason.not_located": "The photos could not be located in this property's 3D twin.",
     "reason.located": "The photos were located in this property.",
-    "reason.authority_matches": "The poster matches the contact on the property record.",
+    "reason.authority_matches": ("The ad names the manager on record. Anyone can type that name."),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
@@ -346,7 +377,22 @@ ES: dict[str, str] = {
     "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
-    "place.for_sale": "Esta vivienda está en venta en {site}, no en alquiler. Señal de alerta.",
+    "place.for_sale_record": "En venta en {site} por {brokerage} desde el {date}.",
+    "place.for_sale_record_no_date": "En venta en {site} por {brokerage}.",
+    "place.for_sale_record_no_brokerage": "En venta en {site} desde el {date}.",
+    "place.for_sale_record_bare": "En venta en {site}.",
+    "place.for_sale": (
+        "{record} Las viviendas en venta a veces también se ofrecen en alquiler, así que "
+        "confírmelo con esa agencia antes de pagar."
+    ),
+    "place.for_sale_ask_listing": (
+        "{record} Las viviendas en venta a veces también se ofrecen en alquiler, así que "
+        "confírmelo con la agencia que la anuncia antes de pagar."
+    ),
+    "place.for_sale_office": (
+        "Sin confirmar. {record} El contacto de este anuncio es la oficina que figura en el "
+        "registro, así que pregúnteles si también se ofrece en alquiler."
+    ),
     "place.recently_rented": (
         "Sin confirmar. El registro muestra que se alquiló hace poco. "
         "Pregunte al administrador que figura en el registro si sigue disponible."
@@ -405,6 +451,10 @@ ES: dict[str, str] = {
     "contact.phone_match": (
         "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
         "Llame usted mismo para confirmarlo."
+    ),
+    "contact.phone_unchecked": (
+        "No comprobado (ningún teléfono del anuncio se pudo comparar con el de la oficina de "
+        "alquiler que figura en el registro)."
     ),
     "contact.phone_mismatch": (
         "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
@@ -602,7 +652,14 @@ ES: dict[str, str] = {
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
     "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
-    "reason.for_sale": "Esta vivienda está en venta, no en alquiler.",
+    "reason.for_sale": (
+        "Esta vivienda está en venta. Confirme con la agencia que la anuncia que también se "
+        "ofrece en alquiler."
+    ),
+    "reason.phone_not_confirmed": (
+        "No se demostró que el contacto del anuncio sea la oficina de alquiler que figura en "
+        "el registro."
+    ),
     "reason.phone_flag": (
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),
@@ -615,7 +672,7 @@ ES: dict[str, str] = {
     "reason.not_located": "Las fotos no se pudieron ubicar en el gemelo 3D de esta propiedad.",
     "reason.located": "Las fotos se ubicaron en esta propiedad.",
     "reason.authority_matches": (
-        "Quien publicó el anuncio coincide con el contacto del registro de la propiedad."
+        "El anuncio nombra al administrador del registro. Cualquiera puede escribir ese nombre."
     ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",

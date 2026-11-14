@@ -366,6 +366,119 @@ def test_thresholds_reject_an_elsewhere_bar_below_the_placement_bar(tmp_path):
         load_thresholds(copy)
 
 
+# --- locate semantics (red team H2/H3): elsewhere needs a named, indexed home ------------------
+
+
+def _sister_locator(twins, tmp_path):
+    """Only a same-plan neighbour (prop-9) is indexed; the claimed prop-3 is on record only."""
+    sweeps, _, catalog = twins
+    sister = sister_sweeps(sweeps, tmp_path)
+    index = LocateIndex.build("fx-h3", list(sister), TinyEmbedder())
+    models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
+    return Locator(index, {"fx-model-sister": sister}, Catalog(models), PatchMatcher(), THRESHOLDS)
+
+
+def test_no_claimed_home_identifies_the_home_never_elsewhere(twins, locator):
+    sweeps, _, _ = twins
+    photos = {"p1": listing_photo(sweeps, "fx-model-a", 2, 1)}
+    result = locator.locate("fx-id", photos, None)
+
+    photo = result.photos[0]
+    assert photo.status is LocateStatus.LOCATED_IN_CLAIMED
+    assert photo.matched_property_id == "fx-prop-1"
+    assert result.identified_by_scan is True
+    assert result.claimed_property_id == "fx-prop-1"
+    assert result.chosen.model_id == "fx-model-a"
+    assert "p1" in result.poses
+
+
+def test_claimed_home_set_keeps_identified_by_scan_false(twins, locator):
+    sweeps, _, _ = twins
+    result = locator.locate("fx-id2", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1")
+    assert result.identified_by_scan is False and result.claimed_property_id == "fx-prop-1"
+
+
+def test_unindexed_claimed_home_is_not_indexed_never_elsewhere(twins, tmp_path):
+    sweeps, _, _ = twins
+    locator = _sister_locator(twins, tmp_path)
+    photo = locator.locate(
+        "fx-h3", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-3"
+    ).photos[0]
+    assert photo.status is LocateStatus.NOT_INDEXED
+    assert photo.matched_property_id is None
+
+
+def test_photos_of_different_homes_with_no_claim_are_not_located(twins, locator):
+    sweeps, _, _ = twins
+    photos = {
+        "a": listing_photo(sweeps, "fx-model-a", 2, 1),
+        "b": listing_photo(sweeps, "fx-model-b", 0, 1),
+    }
+    result = locator.locate("fx-mixed", photos, None)
+    assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * 2
+    assert result.identified_by_scan is False and result.claimed_property_id is None
+    assert result.chosen is None
+
+
+def test_verdicts_on_identified_and_unindexed_results_are_never_dont_pay(twins, locator, tmp_path):
+    from snapback.contracts import DataSource, Evidence
+    from snapback.verdict import VerdictState, decide
+
+    sweeps, _, _ = twins
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    identified = locator.locate("v1", {"p": photo}, None)
+    unindexed = _sister_locator(twins, tmp_path).locate("v2", {"p": photo}, "fx-prop-3")
+    for result in (identified, unindexed):
+        evidence = Evidence(case_id=result.case_id, source=DataSource.FIXTURE, photos=result.photos)
+        assert decide(evidence).state in {VerdictState.HOLD, VerdictState.UNVERIFIED}
+
+
+# --- identification is strict and needs agreement (coordinator tightening) ---------------------
+
+
+def test_single_weak_match_does_not_identify(twins):
+    sweeps, index, catalog = twins
+    strict = replace(
+        THRESHOLDS, elsewhere_min_inliers=40
+    )  # a match that clears only the normal bar
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), strict)
+    result = locator.locate("fx-weak", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    assert result.identified_by_scan is False and result.claimed_property_id is None
+    assert result.identified_photos == 0
+
+
+def test_one_strict_photo_identifies_with_count_one(twins, locator):
+    sweeps, _, _ = twins
+    result = locator.locate("fx-one", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.identified_by_scan is True and result.identified_photos == 1
+
+
+def test_two_photos_agreeing_identify_with_count_two(twins, locator):
+    sweeps, _, _ = twins
+    photos = {
+        "p1": listing_photo(sweeps, "fx-model-a", 2, 1),
+        "p2": listing_photo(sweeps, "fx-model-a", 0, 3),
+    }
+    result = locator.locate("fx-two", photos, None)
+    assert result.identified_by_scan is True and result.identified_photos == 2
+    assert result.claimed_property_id == "fx-prop-1"
+    assert [p.status for p in result.photos] == [LocateStatus.LOCATED_IN_CLAIMED] * 2
+
+
+def test_two_photos_with_one_strict_and_one_weak_do_not_identify(twins, locator):
+    # Rule: with 2 or more photos, at least 2 must place strictly in the same home.
+    sweeps, _, _ = twins
+    noise = Image.fromarray(
+        np.random.default_rng(11).integers(0, 255, (180, 220, 3), dtype=np.uint8), "RGB"
+    )
+    photos = {"p1": listing_photo(sweeps, "fx-model-a", 2, 1), "p2": noise}
+    result = locator.locate("fx-lone", photos, None)
+    assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * 2
+    assert result.identified_by_scan is False and result.identified_photos == 0
+    assert result.claimed_property_id is None
+
+
 def test_thresholds_version_names_the_matcher(twins, locator):
     sweeps, _, _ = twins
     photo = listing_photo(sweeps, "fx-model-a", 2, 1)
@@ -391,3 +504,49 @@ def test_seam_neighbours_add_the_faces_either_side_of_the_top_two_hits():
 def test_elsewhere_bar_follows_the_ruling():
     t = load_thresholds()
     assert t.elsewhere_min_inliers == 50 and t.elsewhere_min_spread == 0.15
+
+
+# --- identification never depends on index order, and its guards each have a test ---------------
+
+
+@pytest.mark.parametrize("sister_first", [True, False])
+@pytest.mark.parametrize("n_photos", [1, 2])
+def test_tract_twin_makes_identification_ambiguous_in_either_index_order(
+    twins, tmp_path, sister_first, n_photos
+):
+    sweeps, _, catalog = twins
+    sister = sister_sweeps(sweeps, tmp_path)
+    ordered = [sister, sweeps["fx-model-a"]] if sister_first else [sweeps["fx-model-a"], sister]
+    index = LocateIndex.build("fx-tract", [s for group in ordered for s in group], TinyEmbedder())
+    models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
+    all_sweeps = {"fx-model-a": sweeps["fx-model-a"], "fx-model-sister": sister}
+    locator = Locator(index, all_sweeps, Catalog(models), PatchMatcher(), THRESHOLDS)
+
+    photos = {
+        "p1": listing_photo(sweeps, "fx-model-a", 2, 1),
+        "p2": listing_photo(sweeps, "fx-model-a", 0, 3),
+    }
+    result = locator.locate("fx-tract", dict(list(photos.items())[:n_photos]), None)
+
+    assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * n_photos
+    assert result.identified_by_scan is False and result.identified_photos == 0
+    assert result.claimed_property_id is None and result.chosen is None
+
+
+def test_clumped_inliers_do_not_identify(twins):
+    sweeps, index, catalog = twins
+    clumped = replace(THRESHOLDS, elsewhere_min_spread=0.99)  # inliers pass, spread does not
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), clumped)
+    result = locator.locate("fx-clump", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    assert result.identified_by_scan is False
+
+
+def test_unmapped_twin_does_not_identify(twins):
+    sweeps, index, _ = twins
+    catalog = Catalog([ModelInfo("fx-model-b", "fx-prop-2")])  # fx-model-a is not mapped
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), THRESHOLDS)
+    result = locator.locate("fx-unmapped2", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    assert result.photos[0].matched_property_id is None
+    assert result.identified_by_scan is False and result.claimed_property_id is None

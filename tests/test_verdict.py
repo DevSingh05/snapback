@@ -74,11 +74,12 @@ def test_presence_with_record_mismatch_stays_hold():
     assert result.state is VerdictState.HOLD
 
 
-def test_presence_and_authority_together_verify():
-    result = decide(
-        evidence(presence=PresenceStatus.PROVEN, authority=AuthorityStatus.MATCHES_RECORD)
-    )
-    assert result.state is VerdictState.VERIFIED
+def test_presence_authority_and_the_office_phone_together_verify():
+    proven = {"presence": PresenceStatus.PROVEN, "authority": AuthorityStatus.MATCHES_RECORD}
+    assert decide(evidence(**proven, phone_confirmed=True)).state is VerdictState.VERIFIED
+    # Red team H1 (Sat 03:25): a name match and a presence photo are not enough. Anyone can
+    # type the manager's public name, and a door code gets a photo taken inside.
+    assert decide(evidence(**proven)).state is VerdictState.HOLD
 
 
 def test_forged_reply_is_dont_pay_with_its_reason():
@@ -107,6 +108,7 @@ def test_any_red_flag_blocks_the_top_state(flag):
         evidence(
             presence=PresenceStatus.PROVEN,
             authority=AuthorityStatus.MATCHES_RECORD,
+            phone_confirmed=True,
             **{flag: True},
         )
     )
@@ -118,13 +120,14 @@ def test_dont_pay_needs_proof_and_the_top_state_needs_everything():
     # Every combination that has no forged reply and no photo from another building.
     not_forged = [PresenceStatus.NOT_REQUESTED, PresenceStatus.WAITING, PresenceStatus.PROVEN]
     flags = [False, True]
-    for authority, presence, price, payment, rules in itertools.product(
-        AuthorityStatus, not_forged, flags, flags, flags
+    for authority, presence, phone, price, payment, rules in itertools.product(
+        AuthorityStatus, not_forged, flags, flags, flags, flags
     ):
         state = decide(
             evidence(
                 authority=authority,
                 presence=presence,
+                phone_confirmed=phone,
                 price_flag=price,
                 payment_flag=payment,
                 rule_flag=rules,
@@ -134,6 +137,7 @@ def test_dont_pay_needs_proof_and_the_top_state_needs_everything():
         everything = (
             presence is PresenceStatus.PROVEN
             and authority is AuthorityStatus.MATCHES_RECORD
+            and phone  # H1: the ad's phone is the leasing office's on record
             and not (price or payment or rules)
         )
         assert (state is VerdictState.VERIFIED) == everything
@@ -282,7 +286,12 @@ def test_pressure_and_link_rules_do_not_set_the_payment_flag(category):
     assert flat.rule_flag is True
 
 
-MATCHES = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+# A name match alone never verifies (red team H1): the ad's phone must be the office's too.
+MATCHES = {
+    "status": "matches_record",
+    "manager_on_record": "Fixture Living LLC",
+    "office_phone_match": "yes",
+}
 IN_RANGE = {"status": "within_range", "listed_rent": 1900}
 
 
