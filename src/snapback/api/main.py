@@ -82,6 +82,8 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.events import EventBus
+from snapback.events.bus import seq_of
 from snapback.office.context import listing_context
 from snapback.office.domain import accepts_address, official_domain
 from snapback.office.models import (
@@ -187,6 +189,27 @@ def _bearer(authorization: str | None, case_token: str | None) -> str | None:
     return case_token
 
 
+async def _event_stream(events: EventBus, after: int, follow: bool) -> AsyncIterator[str]:
+    """Each event numbered above `after`, once and in order. With `follow`, more as they are
+    published, with a keep-alive when it is quiet; without, the stream ends when caught up."""
+    sent = after
+    quiet = 0.0
+    while True:
+        fresh = events.after(sent)
+        for event in fresh:
+            yield f"id: {event.id}\nevent: event\ndata: {event.model_dump_json()}\n\n"
+            sent = seq_of(event.id)
+            quiet = 0.0
+        if not follow:
+            return
+        if not fresh:
+            await asyncio.sleep(POLL_SECONDS)
+            quiet += POLL_SECONDS
+            if quiet >= KEEP_ALIVE_SECONDS:
+                yield ": keep-alive\n\n"
+                quiet = 0.0
+
+
 async def _trace_stream(
     case: RecordedCase | SessionCase, after: int, pace: float
 ) -> AsyncIterator[str]:
@@ -241,6 +264,9 @@ def create_app(
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
+    # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
+    events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
+    app.state.events = events
 
     app.add_middleware(
         UploadSizeGuard,
@@ -767,6 +793,36 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         return StreamingResponse(
             _trace_stream(case, _after(last_event_id), settings.snapback_trace_pace_ms / 1000),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.get("/events/stream")
+    def get_events(
+        request: Request,
+        follow: bool = True,
+        last_event_id: Annotated[str | None, Header()] = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_events_token: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        """Server-sent events: `event: event`, `id` is the event's own id, `data` is an Event.
+
+        Needs the events token (`SNAPBACK_EVENTS_TOKEN`) as `Authorization: Bearer` or
+        `X-Events-Token`, never in the address: a `token` there is answered 401. With no
+        token configured the stream is closed to everyone. Send `Last-Event-ID` to resume
+        after that event. `follow=false` sends what there is and ends.
+        """
+        no_token_in_the_address(request)
+        sent = _bearer(authorization, x_events_token)
+        if not sent:
+            raise HTTPException(status_code=401, detail="This needs the events token.")
+        expected = settings.snapback_events_token
+        if expected is None or not secrets.compare_digest(
+            sent.encode(), expected.get_secret_value().encode()
+        ):
+            raise HTTPException(status_code=403, detail="That token does not open the events.")
+        return StreamingResponse(
+            _event_stream(events, seq_of(last_event_id), follow),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { SourceChip } from "../components/SourceChip";
 import { EvidenceDrawer, RENDER_NOTE } from "../evidence/EvidenceDrawer";
-import type { TourPlan, TourStop } from "../contracts";
+import type { TourPlan } from "../contracts";
 import { PhotoLanding } from "../twin/PhotoLanding";
 import { connectShowcase, embedUrl, watchSweeps, type ShowcaseSdk } from "../twin/showcase";
 import { useLiveAerial, canGoLive } from "../twin/useLiveAerial";
