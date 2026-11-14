@@ -377,3 +377,15 @@ def test_warm_counts_faces_whose_files_are_missing(tmp_path):
         index, {"fx-model-a": sweeps}, is_cached=lambda key: False, extract=lambda image: None
     )
     assert report["missing"] == 1 and report["extracted"] == 6 * len(sweeps) - 1
+
+
+def test_cached_room_labels_read_the_cache_and_never_the_network(tmp_path, monkeypatch):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m7").mkdir()
+    (tmp_path / "m7" / "rooms.json").write_text(json.dumps({"sw1": "Kitchen", "sw2": None}))
+    monkeypatch.setattr(httpx.Client, "request", lambda *a, **k: pytest.fail("network used"))
+    assert cached_room_labels("m7", cache_dir=tmp_path) == {"sw1": "Kitchen", "sw2": None}
+    assert cached_room_labels("never-fetched", cache_dir=tmp_path) == {}
+    (tmp_path / "m7" / "rooms.json").write_text("{not json")
+    assert cached_room_labels("m7", cache_dir=tmp_path) == {}

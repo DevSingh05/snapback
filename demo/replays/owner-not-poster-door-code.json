@@ -59,12 +59,17 @@
       {
         "step_id": "chat",
         "status": "not_confirmed",
-        "text": "Not confirmed. Owner of record: Invitation Homes, not the poster. Invitation Homes says: \"we only accept applications and leasing funds through invitationhomes.com\" (invitationhomes.com/preventing-leasing-fraud, read 2026-11-14)."
+        "text": "Not confirmed. Owner of record: Invitation Homes, not the poster."
       },
       {
         "step_id": "chat",
         "status": "not_confirmed",
         "text": "NOT SHOWN. Being inside does not mean they may rent it."
+      },
+      {
+        "step_id": "hold",
+        "status": "warning",
+        "text": "Invitation Homes, the owner of record, says: \"we only accept applications and leasing funds through invitationhomes.com\" (invitationhomes.com/preventing-leasing-fraud, read 2026-11-14)."
       }
     ]
   },
