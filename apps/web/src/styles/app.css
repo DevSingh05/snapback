@@ -758,3 +758,16 @@ button {
   text-transform: uppercase;
   color: var(--muted);
 }
+
+.replay-link {
+  margin: 20px clamp(18px, 4vw, 36px) 0;
+  font-weight: 700;
+}
+.replay-link a {
+  color: var(--act);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+.replay-link a:hover {
+  color: var(--ink);
+}

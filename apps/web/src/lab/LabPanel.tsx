@@ -20,7 +20,7 @@ import {
 
 const W = 760;
 const H = 290;
-const M = { top: 12, right: 16, bottom: 72, left: 52 };
+const M = { top: 12, right: 16, bottom: 72, left: 76 };
 
 function CurveChart({ bars }: { bars: ResultRow[] }) {
   const tickVals = niceTicks(Math.max(0.05, ...bars.map((b) => b.ci_high)));
@@ -121,7 +121,7 @@ const SERIES_CLASS = ["lab-s0", "lab-s1", "lab-s2"];
 
 function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> }) {
   const S = 280;
-  const m = { top: 12, right: 16, bottom: 40, left: 48 };
+  const m = { top: 12, right: 16, bottom: 40, left: 76 };
   const x = linearScale([0, 1], [m.left, S - m.right]);
   const y = linearScale([0, 1], [S - m.bottom, m.top]);
   const entries = [...series.entries()];
