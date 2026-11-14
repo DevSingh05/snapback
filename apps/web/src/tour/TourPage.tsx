@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { STATE_WORD } from "../cardStrings";
 import { SourceChip } from "../components/SourceChip";
 import { EvidenceDrawer, RENDER_NOTE } from "../evidence/EvidenceDrawer";
-import type { TourPlan } from "../contracts";
+import type { TourPlan, VerdictState } from "../contracts";
 import { PhotoLanding } from "../twin/PhotoLanding";
 import { connectShowcase, embedUrl, watchSweeps, type ShowcaseSdk } from "../twin/showcase";
 import { useLiveAerial, canGoLive } from "../twin/useLiveAerial";
@@ -14,7 +15,7 @@ import { RealStill, StageViews } from "../walk/StageViews";
 import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
 import { seeingLine, waysOut } from "../walk/seeing";
-import { WalkPlayer, buildChapters, totalMs } from "../walk/player";
+import { WalkPlayer, buildChapters, totalMs, type PlayerPhoto } from "../walk/player";
 import { ScanOffer } from "./ScanOffer";
 import { WalkMap } from "../walk/WalkMap";
 import { useWalkLive } from "../walk/useWalkLive";
@@ -25,6 +26,8 @@ import { useAdPhoto } from "./useAdPhoto";
 import "./tour.css";
 
 const LANDED_OPACITY = 0.6;
+/** How long the walk waits for the real scan before it plays on the drawing. */
+export const SCAN_WAIT_MS = 8000;
 
 // Synthetic stand-in for an ad photo (team-made, not sponsor imagery). An image cannot read page
 // CSS variables, so the design tokens are resolved here and written into the picture.
@@ -54,10 +57,20 @@ interface ViewProps {
   rail?: ReactNode;
   /** Said above the tour when the case's own photos could not be loaded. */
   notice?: string | null;
+  /** The sample walk: its rooms are drawn, so the scan is never walked, only offered whole. */
+  sample?: boolean;
 }
 
-export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }: ViewProps) {
-  const live = Boolean(sdkKey && modelId);
+export function TourView({
+  plan: given,
+  sdkKey,
+  modelId,
+  caseId,
+  rail,
+  notice,
+  sample = false,
+}: ViewProps) {
+  const live = Boolean(sdkKey && modelId) && !sample;
   const reduced = usePrefersReducedMotion();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [sdk, setSdk] = useState<ShowcaseSdk | null>(null);
@@ -78,10 +91,11 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
         setSdk(s);
         cancelSweeps = watchSweeps(s, (ids) => !cancelled && setSweeps(ids));
       })
-      .catch((e: unknown) => {
+      .catch(() => {
         if (cancelled) return;
         setSdkFailed(true);
-        setStatus(e instanceof Error ? e.message : "Could not connect");
+        // Never the SDK's own words: they can carry the key and the page address.
+        setStatus("The 3D scan could not load here, so the walk plays on the drawing.");
       });
     return () => {
       cancelled = true;
@@ -89,6 +103,16 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
       connected?.disconnect();
     };
   }, [live, sdkKey]);
+
+  // The walk never sits frozen on a scan that is slow to load (or a browser without WebGL):
+  // after a short wait it plays on the drawing, and the scan takes over whenever it connects.
+  const [late, setLate] = useState(false);
+  const waiting = live && !sdk && !sdkFailed;
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => setLate(true), SCAN_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [waiting]);
 
   // The loaded model must be this home's scan. When the plan has sweep stops and the model holds
   // none of them, the 3D view is some other home: show the placeholder and say so. Never walk
@@ -124,6 +148,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
     : live
       ? "Placeholder: the ad's own photo could not be loaded here."
       : "Placeholder photo (fixture).";
+  const aerialSrc = aerial.status === "ready" ? aerial.claimed.imageUrl : null;
   const showAerial = stop.kind === "arrive" && aerial.status === "ready" && aerial.claimed.imageUrl;
 
   // The look layer: evidence, real images, trace events and the two-buildings case.
@@ -154,6 +179,12 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
         src={embedUrl(modelId!, sdkKey!)}
         allow="fullscreen; xr-spatial-tracking"
       />
+      {/* Open outside: the building's aerial over the scan while it sits in its dollhouse. */}
+      {stop.kind === "arrive" && aerialSrc && !wrongModel && (
+        <div className="tour-aerial-over" data-testid="tour-aerial-over">
+          <RealStill src={aerialSrc} label="Vexcel aerial" alt="Aerial view of the building" />
+        </div>
+      )}
       {landing && !wrongModel && (
         <PhotoLanding
           state={landing}
@@ -181,6 +212,31 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
     />
   ) : null;
   const twoHomes = look.mismatch && stop.kind === "arrive" && !liveScan;
+
+  // The ad photo at every stop that has one, for the highlight strip and the photo beat: the
+  // real image when this browser has it, else null (the player draws a labelled stand-in).
+  const playerPhotos = useMemo(() => {
+    const out: Record<string, PlayerPhoto> = {};
+    for (const s of plan.stops) {
+      if (s.photos.length === 0) continue;
+      const alias = photoAt(s, look.evidence)?.alias ?? s.photos[0]!.alias ?? s.photos[0]!.photo_id;
+      const src = look.images[alias]?.ad ?? (s.key === stop.key ? realPhoto : null) ?? null;
+      out[s.key] = { alias, src };
+    }
+    return out;
+  }, [plan.stops, look.evidence, look.images, stop.key, realPhoto]);
+
+  // The end card: the verdict the trace carried (code sets it), and one thing to do next.
+  const verdictPick = [...look.events].reverse().find((e) => e.kind === "verdict")?.pick;
+  const verdict =
+    verdictPick && verdictPick in STATE_WORD ? STATE_WORD[verdictPick as VerdictState] : null;
+  const office = look.mismatch?.officeName ?? null;
+  const endAction = office
+    ? {
+        label: "Call the listing office on record",
+        href: caseId ? `/case/${encodeURIComponent(caseId)}` : plan.links.tour_prep,
+      }
+    : { label: "Tour prep: what to ask", href: plan.links.tour_prep };
   return (
     <div
       className="tour-page"
@@ -275,6 +331,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
               reduced={reduced}
               real={realView}
               realHidden={wrongModel}
+              realReady={!liveScan || Boolean(sdk)}
               drawing={
                 <>
                   <StopStage
@@ -311,10 +368,13 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             reduced={reduced}
             sdk={wrongModel ? null : sdk}
             sweeps={sweeps}
-            loading={live && !sdk && !sdkFailed}
+            loading={waiting && !late}
+            scanLate={waiting && late}
             onStatus={setStatus}
             onPhoto={setShowPhoto}
-            endAction={{ label: "Tour prep: what to ask", href: plan.links.tour_prep }}
+            photos={playerPhotos}
+            verdict={verdict}
+            endAction={endAction}
             summary={plan.coverage?.line}
           />
           <StageCaption
@@ -413,7 +473,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
           />
         )}
       </div>
-      {wrongModel && modelId && sdkKey && (
+      {(wrongModel || sample) && modelId && sdkKey && (
         <ScanOffer modelId={modelId} sdkKey={sdkKey} source={plan.source} />
       )}
       <ListingPhotos photos={[]} site="" asOf={plan.as_of} />
@@ -474,6 +534,8 @@ export function TourPage({ target }: { target: TourTarget }) {
         }
         caseId={load.result.fromCase ? target.caseId : null}
         notice={load.result.notice}
+        // The sample walk (no case, a drawn fixture plan) stays on its drawing.
+        sample={!load.result.fromCase && load.result.plan.source === "fixture"}
       />
     );
   return (

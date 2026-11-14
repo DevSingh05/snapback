@@ -55,6 +55,11 @@
 .wp-ghost > .rs * {
   animation: none !important;
 }
+/* The copy is a picture of the room only: its label plates would show as empty boxes. */
+.wp-ghost .rs-standin,
+.wp-ghost .rs-aerial-date {
+  display: none;
+}
 
 .wp-shield {
   position: absolute;
@@ -128,6 +133,10 @@
 
 .wp[data-ended] .wp-over {
   display: none;
+}
+/* The end card is the one thing on the stage: the view switch steps out of its way. */
+.tour-stage:has(.wp[data-ended]) .sv-switch {
+  visibility: hidden;
 }
 
 /* ---------- The big play mark while paused ---------- */
@@ -605,9 +614,32 @@
 }
 
 /* ---------- "You are here" in the drawn room: the cone turns with the camera's pan ---------- */
+.rs-here {
+  --turn: calc(var(--wp-yaw, 0deg) * 3.4);
+}
+/* The cone turns with the person, about the same vertical axis (see draw/Person.tsx). */
 .rs-here-turn {
   transform-box: view-box;
-  transform: rotate(calc(var(--wp-yaw, 0deg) * 3.4));
+  transform: scale(1, 0.577) rotate(var(--turn)) scale(1, 1.732);
+}
+.rs[data-motion="reduced"] .rs-here {
+  --turn: 0deg;
+}
+/* On arrival the person steps in to its spot (never with reduced motion). */
+@media (prefers-reduced-motion: no-preference) {
+  .rs[data-motion="full"] .rs-person {
+    transform-box: view-box;
+    animation: rs-step 0.7s var(--ease-out) 0.35s backwards;
+  }
+  @keyframes rs-step {
+    from {
+      opacity: 0;
+      transform: translate(26px, 15px);
+    }
+    60% {
+      opacity: 1;
+    }
+  }
 }
 .rs-here-cone {
   fill: color-mix(in srgb, var(--act) 26%, transparent);
@@ -615,4 +647,283 @@
 /* In the corner window the drawing is a thumbnail: the marker and its cone stay, the words go. */
 .sv-pane[data-role="corner"] .rs-here :is(rect, text) {
   display: none;
+}
+
+/* ---------- The ad photo over the view, at the pose it was taken from ---------- */
+.wp-flash {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 var(--wp-bar) 0;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+  background: var(--v-band);
+}
+.wp > .wp-flash {
+  pointer-events: none;
+}
+.wp-flash[data-on] {
+  opacity: 0.97;
+}
+.wp-flash-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A thin frame inside the edge: this is a photograph laid over the view, not the view. */
+.wp-flash::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.wp-flash-tag {
+  position: absolute;
+  right: 14px;
+  top: 72px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--wp-plate);
+  color: var(--wp-ink);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+}
+.wp-flash-standin {
+  padding: 1px 6px;
+  background: var(--zing);
+  color: var(--on-zing);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+/* While the photo is up, the stage's own caption ("Taken here: ad photo P2") is lit. */
+.tour-stage:has(.wp-flash[data-on]) .rs-caption-placed {
+  z-index: 4;
+  box-shadow:
+    inset 4px 0 0 var(--zing),
+    var(--glow-line);
+}
+
+/* The drawn stand-in photo (StandInPhoto.tsx). */
+.sp-ceil {
+  fill: color-mix(in srgb, var(--h-wall) 88%, var(--surface));
+}
+.sp-wall-l {
+  fill: color-mix(in srgb, var(--h-wall) 86%, var(--ink));
+}
+.sp-wall-r {
+  fill: color-mix(in srgb, var(--h-wall) 78%, var(--ink));
+}
+.sp-back {
+  fill: var(--h-wall);
+}
+.sp-floor {
+  fill: color-mix(in srgb, var(--h-wood) 70%, var(--h-wall-shade));
+}
+.sp-seam,
+.sp-mullion,
+.sp-cord {
+  stroke: color-mix(in srgb, var(--ink) 22%, transparent);
+  stroke-width: 1.5;
+}
+.sp-mullion {
+  stroke: var(--h-wall);
+  stroke-width: 3;
+}
+.sp-window {
+  fill: var(--h-unlit);
+}
+.sp-light {
+  fill: color-mix(in srgb, var(--surface) 30%, transparent);
+}
+.sp-counter-top {
+  fill: color-mix(in srgb, var(--h-roof) 34%, var(--h-wall));
+}
+.sp-counter {
+  fill: color-mix(in srgb, var(--h-door) 70%, var(--ink));
+}
+.sp-counter-end {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--ink));
+}
+.sp-pendant {
+  fill: var(--h-roof);
+}
+.sp-door {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--surface));
+}
+
+/* ---------- The highlight strip: the ad photos in the chapter row ---------- */
+.wp-chapter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.wp-chapter-name {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wp-shot {
+  position: relative;
+  display: block;
+  width: min(100%, 76px);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--wp-soft);
+  opacity: 0.62;
+  box-shadow: inset 0 0 0 1px var(--wp-soft);
+}
+.wp-shot img,
+.wp-shot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wp-shot-tag {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 1px 4px;
+  background: var(--wp-plate);
+  color: var(--wp-ink);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+.wp-chapter[aria-current] .wp-shot {
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px var(--zing),
+    var(--glow-line);
+}
+.wp-chapter[aria-current] .wp-shot-tag {
+  background: var(--zing);
+  color: var(--on-zing);
+}
+@media (hover: hover) {
+  .wp-chapter:hover .wp-shot {
+    opacity: 0.9;
+  }
+}
+.tour-stage:has(.wp-shot) {
+  --wp-bar: 172px;
+  min-height: clamp(500px, 42vw, 620px);
+}
+.tour-stage:has(.wp-shot) .sv-pane[data-role="main"] .rs {
+  padding-bottom: calc(var(--wp-bar) * 0.78);
+}
+.tour-stage:has(.wp-shot):has(.wp[data-motion="reduced"]) {
+  --wp-bar: 204px;
+}
+
+/* ---------- The scan is late: a quiet chip, and the tour plays on the drawing ---------- */
+.wp-late {
+  position: absolute;
+  z-index: 5;
+  right: 14px;
+  top: 50px;
+  margin: 0;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--wp-plate);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.wp-late-mark {
+  width: 7px;
+  height: 7px;
+  background: var(--zing);
+}
+
+.wp-end-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--zing);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wp-flash {
+    transition: opacity 0.38s var(--ease-out);
+  }
+  .wp-flash[data-on] .wp-flash-img {
+    animation: wp-settle 1.5s var(--ease-out) both;
+  }
+  @keyframes wp-settle {
+    from {
+      transform: scale(1.04);
+    }
+  }
+  .wp-late-mark {
+    animation: wp-blink 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes wp-blink {
+    to {
+      opacity: 0.3;
+    }
+  }
+  /* Leaving the outside beat: the first room pushes in from outside the building. */
+  .tour-stage[data-wp-enter] .sv-pane[data-role="main"] .rs {
+    animation: wp-push 1.2s var(--ease-out) both;
+  }
+  @keyframes wp-push {
+    from {
+      opacity: 0.2;
+      transform: scale(0.62) translateY(-6%);
+      filter: blur(3px);
+    }
+    55% {
+      opacity: 1;
+      filter: none;
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  .tour-stage:has(.wp-shot),
+  .tour-stage:has(.wp-shot):has(.wp[data-motion="reduced"]) {
+    --wp-bar: 0px;
+    min-height: 0;
+  }
+  .wp-flash {
+    inset: 0 0 auto;
+    height: 75cqw;
+  }
+  .wp-flash-tag {
+    top: auto;
+    right: auto;
+    left: 10px;
+    bottom: 10px;
+  }
+  /* On a phone the strip is the ad photos only, in a row under the view. */
+  .wp-chapters:has(.wp-shot) {
+    display: flex;
+    gap: 6px;
+  }
+  .wp-chapters:has(.wp-shot) .wp-chapter:not([data-photo]) {
+    display: none;
+  }
+  .wp-chapters:has(.wp-shot) .wp-chapter[data-photo] {
+    flex: 0 0 auto !important;
+  }
+  .wp-chapter[data-photo] .wp-chapter-name {
+    display: none;
+  }
+  .wp-shot {
+    width: 64px;
+  }
+  .wp-late {
+    top: 46px;
+    right: 10px;
+  }
 }

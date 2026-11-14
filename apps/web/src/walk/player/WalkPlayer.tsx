@@ -21,10 +21,18 @@ import {
   clockText,
   drawnPose,
   momentAt,
+  outsidePose,
   type DrawnPose,
 } from "./timeline";
 import { Transport, frameClock, type Clock, type Cue } from "./transport";
+import { StandInPhoto } from "./StandInPhoto";
 import "./player.css";
+
+/** An ad photo for the strip and the photo beat: the real image, or null for the drawn stand-in. */
+export interface PlayerPhoto {
+  alias: string;
+  src: string | null;
+}
 
 // The walk as a video: play and pause, a scrubber with one chapter per stop, and an Explore
 // switch that hands the view to the person. It mounts once, inside the tour's stage, and lays
@@ -50,6 +58,12 @@ export interface WalkPlayerProps {
   endAction?: { label: string; href: string };
   /** What the walk found, in one line: it is the end card's headline when there is one. */
   summary?: string | null;
+  /** The ad photo at each stop that has one, keyed by stop key. */
+  photos?: Record<string, PlayerPhoto>;
+  /** The verdict in a few words: the end card's headline. */
+  verdict?: string | null;
+  /** The real scan has not connected after the wait: the tour plays on the drawing meanwhile. */
+  scanLate?: boolean;
   /** Start playing on arrival, like a video. Never with reduced motion. */
   autoStart?: boolean;
   clock?: Clock;
@@ -95,6 +109,9 @@ export function WalkPlayer({
   onPhoto,
   endAction,
   summary,
+  photos = {},
+  verdict = null,
+  scanLate = false,
   autoStart = true,
   clock = frameClock,
 }: WalkPlayerProps) {
@@ -173,8 +190,25 @@ export function WalkPlayer({
     const stage = stageOf();
     if (!stage) return;
     if (exploring) writePose(stage, hand.current);
-    else writePose(stage, reduced ? REST_POSE : drawnPose(moment.sweep));
-  }, [exploring, reduced, moment.sweep]);
+    else if (reduced) writePose(stage, REST_POSE);
+    else writePose(stage, chapter.outside ? outsidePose(moment.sweep) : drawnPose(moment.sweep));
+  }, [exploring, reduced, moment.sweep, chapter.outside]);
+
+  // Leaving the outside beat, the drawn room arrives with a push in from outside the building
+  // (the real scan flies in from its dollhouse on its own).
+  const lastIndex = useRef(state.index);
+  useEffect(() => {
+    const stage = stageOf();
+    const from = transport.chapters[lastIndex.current];
+    lastIndex.current = state.index;
+    if (!stage || reduced || !from?.outside || state.index !== from.index + 1) return;
+    stage.dataset.wpEnter = "in";
+    const done = setTimeout(() => delete stage.dataset.wpEnter, 1300);
+    return () => {
+      clearTimeout(done);
+      delete stage.dataset.wpEnter;
+    };
+  }, [state.index, reduced, transport]);
   useEffect(() => {
     const stage = stageOf();
     if (!stage) return;
@@ -320,6 +354,8 @@ export function WalkPlayer({
   }, [exploring, surface]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop = stops[state.index]!;
+  const flash = photos[stop.key] ?? null;
+  const flashOn = Boolean(flash) && state.landing && !exploring;
   const position = transport.position();
   const playLabel = playing ? "Pause" : state.ended ? "Play again" : "Play";
 
@@ -334,6 +370,37 @@ export function WalkPlayer({
       data-motion={reduced ? "reduced" : "full"}
     >
       <Crossfade index={index} off={reduced} />
+      {flash && (
+        <figure
+          key={stop.key}
+          className="wp-flash"
+          data-testid="wp-flash"
+          data-on={flashOn ? "true" : undefined}
+          data-stand-in={flash.src ? undefined : "true"}
+          aria-hidden={flashOn ? undefined : true}
+        >
+          {flash.src ? (
+            <img className="wp-flash-img" src={flash.src} alt={`Ad photo ${flash.alias}`} />
+          ) : (
+            <StandInPhoto className="wp-flash-img" label={`Stand-in for ad photo ${flash.alias}`} />
+          )}
+          <figcaption className="wp-flash-tag mono">
+            {flash.src ? (
+              <>Ad photo {flash.alias}, from the ad</>
+            ) : (
+              <>
+                Ad photo {flash.alias} <span className="wp-flash-standin">stand-in</span>
+              </>
+            )}
+          </figcaption>
+        </figure>
+      )}
+      {scanLate && (
+        <p className="wp-late mono" data-testid="wp-scan-late" role="status">
+          <span className="wp-late-mark" aria-hidden="true" />
+          3D scan still loading
+        </p>
+      )}
       <div
         className="wp-shield"
         data-testid="wp-shield"
@@ -353,7 +420,7 @@ export function WalkPlayer({
         </p>
         {(loading || captionOf(stop)) && (
           <p className="wp-caption" data-testid="wp-caption">
-            {loading ? "Loading the 3D view…" : captionOf(stop)}
+            {loading ? "Loading the 3D scan…" : captionOf(stop)}
           </p>
         )}
         {state.landing && (
@@ -366,8 +433,13 @@ export function WalkPlayer({
 
       {state.ended && !exploring && (
         <div className="wp-end" data-testid="wp-end">
-          <p className="wp-end-title">{summary || "That is the whole walk."}</p>
-          <p className="wp-end-line">Now see it in person, before you pay anything.</p>
+          {verdict && <p className="wp-end-kicker mono">The result</p>}
+          <p className="wp-end-title" data-testid="wp-end-verdict">
+            {verdict || summary || "That is the whole walk."}
+          </p>
+          <p className="wp-end-line">
+            {verdict && summary ? `${summary} ` : ""}See it in person before you pay anything.
+          </p>
           <div className="wp-end-acts">
             {endAction && (
               <a className="wp-end-act" href={endAction.href}>
@@ -474,19 +546,29 @@ export function WalkPlayer({
               />
             </div>
             <div className="wp-chapters" data-testid="wp-chapters">
-              {transport.chapters.map((c) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  className="wp-chapter"
-                  style={{ flexGrow: c.duration }}
-                  aria-current={c.index === state.index ? "true" : undefined}
-                  aria-label={`Chapter ${c.index + 1}: ${c.title}`}
-                  onClick={() => transport.jumpTo(c.index)}
-                >
-                  <span>{c.title}</span>
-                </button>
-              ))}
+              {transport.chapters.map((c) => {
+                const shot = photos[c.key];
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    className="wp-chapter"
+                    data-photo={shot ? "true" : undefined}
+                    style={{ flexGrow: c.duration }}
+                    aria-current={c.index === state.index ? "true" : undefined}
+                    aria-label={`Chapter ${c.index + 1}: ${c.title}`}
+                    onClick={() => transport.jumpTo(c.index)}
+                  >
+                    {shot && (
+                      <span className="wp-shot" data-testid="wp-shot" aria-hidden="true">
+                        {shot.src ? <img src={shot.src} alt="" /> : <StandInPhoto label="" small />}
+                        <span className="wp-shot-tag mono">{shot.alias}</span>
+                      </span>
+                    )}
+                    <span className="wp-chapter-name">{c.title}</span>
+                  </button>
+                );
+              })}
             </div>
             <div className="wp-row">
               <button

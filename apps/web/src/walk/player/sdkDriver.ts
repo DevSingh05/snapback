@@ -10,6 +10,10 @@ import type { ShowcaseSdk } from "../../twin/showcase";
 /** The slice of the Showcase SDK the player uses, on top of the app's own slice. Every extra
  *  part is optional, so an SDK (or a test fake) without it still walks the stops. */
 export type PlayerSdk = ShowcaseSdk & {
+  /** Dollhouse for the opening beat outside; the next Sweep.moveTo flies back in. */
+  Mode?: {
+    moveTo(mode: string, options?: { transition?: string }): Promise<unknown>;
+  };
   Camera?: {
     rotate(horizontal: number, vertical: number, options?: { speed?: number }): Promise<unknown>;
   };
@@ -40,6 +44,9 @@ interface Options {
 }
 
 const FLY_MS = 2000;
+const DOLLHOUSE = "mode.dollhouse";
+const FLY = "transition.fly";
+const INSTANT = "transition.instant";
 
 const wrap = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
 type Places = Record<string, { x: number; z: number }>;
@@ -76,6 +83,21 @@ export function createSdkDriver(sdk: PlayerSdk, { sweeps, onStatus }: Options): 
 
   return {
     goto(stop, { panDeg, instant, speed, next }) {
+      // Open outside: the whole model from above (Matterport's dollhouse), so the first stop is
+      // a fly-in from outside the building. The next Sweep.moveTo takes the camera back inside.
+      if (stop.kind === "arrive") {
+        if (!sdk.Mode) return;
+        const mine = ++move;
+        moving = true;
+        sdk.Mode.moveTo(DOLLHOUSE, { transition: instant ? INSTANT : FLY })
+          .catch(() => {
+            // A model with no dollhouse stays where it is; the tour still flies to the first stop.
+          })
+          .finally(() => {
+            if (mine === move) moving = false;
+          });
+        return;
+      }
       const to = stopMove(stop, instant);
       if (!to) return;
       if (!sweeps.includes(to.sweepId)) {

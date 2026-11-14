@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { FIXTURE_TOUR } from "../../tour/fixtureTour";
-import { ARRIVE_MS, LAND_MS, PAN_DEG, PAN_MS, buildChapters, locate, totalMs } from "./timeline";
+import {
+  ARRIVE_MS,
+  LAND_MS,
+  OUTSIDE_MS,
+  PAN_DEG,
+  PAN_MS,
+  buildChapters,
+  locate,
+  totalMs,
+} from "./timeline";
 import { Transport, fakeClock, type Cue } from "./transport";
 
 const STOPS = FIXTURE_TOUR.stops;
@@ -17,18 +26,22 @@ function setup(options: { reduced?: boolean; ready?: boolean } = {}) {
 }
 
 describe("the timeline", () => {
-  it("has one chapter per stop, and a stop with an ad photo holds a second longer", () => {
+  it("opens with a short beat outside, and a stop with an ad photo holds for its photo", () => {
     const chapters = buildChapters(STOPS);
     expect(chapters.map((c) => c.title)).toEqual(STOPS.map((s) => s.title));
-    expect(chapters[0]!.duration).toBe(PLAIN);
+    expect(chapters[0]!).toMatchObject({ duration: OUTSIDE_MS, outside: true });
+    expect(OUTSIDE_MS).toBeGreaterThanOrEqual(2000);
+    expect(OUTSIDE_MS).toBeLessThanOrEqual(3000);
+    expect(chapters[1]!.duration).toBe(PLAIN);
     expect(chapters[KITCHEN]!.duration).toBe(PLAIN + LAND_MS);
-    expect(totalMs(chapters)).toBe(STOPS.length * PLAIN + LAND_MS);
+    expect(LAND_MS).toBe(1500);
+    expect(totalMs(chapters)).toBe(OUTSIDE_MS + (STOPS.length - 1) * PLAIN + LAND_MS);
   });
 
   it("finds the stop and the time inside it for any point", () => {
     const chapters = buildChapters(STOPS);
     expect(locate(chapters, 0)).toEqual({ index: 0, t: 0 });
-    expect(locate(chapters, PLAIN + 1200)).toEqual({ index: 1, t: 1200 });
+    expect(locate(chapters, OUTSIDE_MS + 1200)).toEqual({ index: 1, t: 1200 });
     expect(locate(chapters, -50)).toEqual({ index: 0, t: 0 });
     expect(locate(chapters, 1e9).index).toBe(STOPS.length - 1);
   });
@@ -42,7 +55,7 @@ describe("the transport", () => {
     expect(at()).toMatchObject({ index: 0, t: 0 });
 
     transport.play();
-    clock.advance(PLAIN - 100);
+    clock.advance(OUTSIDE_MS - 100);
     expect(at().index).toBe(0);
     clock.advance(200);
     expect(at()).toMatchObject({ index: 1, mode: "playing" });
@@ -59,29 +72,41 @@ describe("the transport", () => {
 
   it("pauses and picks up where it left off", () => {
     const { clock, transport, at } = setup();
+    transport.jumpTo(1);
     transport.play();
     clock.advance(3000);
     transport.pause();
     clock.advance(60_000);
-    expect(at()).toMatchObject({ index: 0, t: 3000, mode: "paused" });
+    expect(at()).toMatchObject({ index: 1, t: 3000, mode: "paused" });
     transport.toggle();
     clock.advance(1000);
-    expect(at()).toMatchObject({ index: 0, t: 4000, mode: "playing" });
+    expect(at()).toMatchObject({ index: 1, t: 4000, mode: "playing" });
   });
 
-  it("waits while the real 3D view is still loading", () => {
+  it("plays the beat outside while the real 3D view loads, then holds at the door", () => {
     const { clock, transport, at } = setup({ ready: false });
     transport.play();
-    clock.advance(5000);
-    expect(at().t).toBe(0);
-    transport.setReady(true);
     clock.advance(1000);
-    expect(at().t).toBe(1000);
+    expect(at()).toMatchObject({ index: 0, t: 1000 });
+    clock.advance(10_000);
+    expect(at()).toMatchObject({ index: 0, t: OUTSIDE_MS - 1 });
+    transport.setReady(true);
+    clock.advance(1001);
+    expect(at()).toMatchObject({ index: 1, t: 1000 });
+  });
+
+  it("never moves a stop inside the building while the real 3D view loads", () => {
+    const { clock, transport, at } = setup({ ready: false });
+    transport.jumpTo(2);
+    transport.play();
+    clock.advance(5000);
+    expect(at()).toMatchObject({ index: 2, t: 0 });
   });
 
   it("plays one and a half times as fast at 1.5x", () => {
     const { clock, transport, at } = setup();
     transport.setSpeed(1.5);
+    transport.jumpTo(1);
     transport.play();
     clock.advance(2000);
     expect(at().t).toBe(3000);
@@ -146,7 +171,7 @@ describe("the transport", () => {
     expect(pans.reduce((sum, c) => sum + c.deg, 0)).toBeCloseTo(PAN_DEG);
   });
 
-  it("lands the ad photo: pins it for one second, then lets it go as the pan starts", () => {
+  it("lands the ad photo: pins it for a second and a half, then lets it go as the pan starts", () => {
     const { clock, transport, cues, at } = setup();
     transport.jumpTo(KITCHEN);
     transport.play();
@@ -165,7 +190,7 @@ describe("the transport", () => {
   it("explore stops the tour and sends nothing until resume", () => {
     const { clock, transport, cues, at } = setup();
     transport.play();
-    clock.advance(PLAIN + 1000);
+    clock.advance(OUTSIDE_MS + 1000);
     transport.explore();
     const sent = cues.length;
     clock.advance(120_000);

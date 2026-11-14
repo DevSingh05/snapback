@@ -11,8 +11,10 @@ export function Parts({ parts }: { parts: Part[] }) {
           {p.prims.map((s, j) =>
             s.k === "poly" ? (
               <polygon key={j} className={s.c} points={s.pts} />
-            ) : (
+            ) : s.k === "line" ? (
               <line key={j} className={s.c} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} />
+            ) : (
+              <circle key={j} className={s.c} cx={s.cx} cy={s.cy} r={s.r} />
             ),
           )}
         </g>

@@ -245,7 +245,16 @@ export class Transport {
 
   private tick(dtMs: number): void {
     const s = this.state;
-    if (s.mode !== "playing" || !s.ready) return;
+    if (s.mode !== "playing") return;
+    // While the real scan loads, the opening beat outside still plays; the tour then holds at
+    // the door until the scan is in (or the page gives up waiting and plays on the drawing).
+    if (!s.ready) {
+      const c = this.chapters[s.index];
+      if (!c?.outside) return;
+      const t = Math.min(s.t + dtMs * s.speed, c.duration - 1);
+      if (t !== s.t) this.set({ t });
+      return;
+    }
     let index = s.index;
     let t = s.t + dtMs * s.speed;
     let chapter = this.chapters[index]!;

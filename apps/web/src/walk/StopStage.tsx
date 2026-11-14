@@ -4,7 +4,8 @@ import { HouseGlyph } from "../components/HouseGlyph";
 import type { TourPlan, TourStop } from "../contracts";
 import { points, project } from "./iso";
 import { Parts } from "../draw/Parts";
-import { O, SIZE, box } from "./roomParts";
+import { Person } from "../draw/Person";
+import { O, SIZE } from "./roomParts";
 import { drawRoom, roomKind, type RoomKind } from "./rooms";
 import "./walk.css";
 
@@ -40,10 +41,6 @@ const LAND = {
   "--rs-y": `${LAND_Y.toFixed(1)}px`,
 } as CSSProperties;
 
-const CAMERA_POST = [
-  { name: "camera", prims: box("teal", CAMERA[0] - 6, CAMERA[1] - 6, 0, 12, 12, 46) },
-];
-
 // "You are here": where the camera stands in the drawn room. At a photo stop it stands where the
 // ad photo was taken (the cone runs to the photo's frame). Anywhere else the plan has no pose to
 // draw from, so the marker stands at the room's centre and says so; its cone turns with the
@@ -51,7 +48,6 @@ const CAMERA_POST = [
 const HERE: [number, number, number] = [170, 150, 0];
 const [HERE_X, HERE_Y] = project(HERE, O);
 const [CAM_X, CAM_Y] = project([CAMERA[0], CAMERA[1], 46], O);
-const HERE_POST = [{ name: "here", prims: box("teal", HERE[0] - 6, HERE[1] - 6, 0, 12, 12, 46) }];
 const HERE_CONE = points(
   O,
   HERE,
@@ -59,8 +55,12 @@ const HERE_CONE = points(
   [HERE[0] - 130, HERE[1] + 56, 0],
 );
 
+// "You are here" is a person in the room, facing the way the camera looks (down -x, toward the
+// photo wall), with the faint view cone in front. It turns with the pan and steps to its spot.
 function HereMarker({ placed }: { placed: boolean }) {
-  const [x, y] = placed ? [CAM_X, CAM_Y] : [HERE_X, HERE_Y - 52];
+  const [x, y] = placed ? [CAM_X, CAM_Y - 14] : [HERE_X, HERE_Y - 66];
+  const [fx, fy] = placed ? [CAMERA[0], CAMERA[1]] : [HERE[0], HERE[1]];
+  const [ax, ay] = project([fx, fy, 0], O);
   return (
     <g className="rs-here" data-testid="you-are-here" data-placed={placed ? "true" : undefined}>
       {!placed && (
@@ -71,11 +71,9 @@ function HereMarker({ placed }: { placed: boolean }) {
           <polygon className="rs-cone rs-here-cone" points={HERE_CONE} />
         </g>
       )}
-      {!placed && (
-        <g className="rs-camera">
-          <Parts parts={HERE_POST} />
-        </g>
-      )}
+      <g className="rs-person" style={{ transformOrigin: `${ax.toFixed(1)}px ${ay.toFixed(1)}px` }}>
+        <Person origin={O} x={fx} y={fy} facing={180} />
+      </g>
       <rect
         className="rs-photo-tag"
         x={x - (placed ? 44 : 96)}
@@ -94,9 +92,6 @@ function HereMarker({ placed }: { placed: boolean }) {
 function LandedPhoto({ alias, fly }: { alias: string; fly: boolean }) {
   return (
     <>
-      <g className="rs-camera">
-        <Parts parts={CAMERA_POST} />
-      </g>
       <g
         className="rs-photo"
         data-testid="stage-photo"

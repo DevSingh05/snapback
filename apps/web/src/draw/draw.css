@@ -112,3 +112,36 @@
 [data-detail="low"] [data-part="porch-roof"] {
   display: none;
 }
+
+/* ---------- A person (draw/Person.tsx) ---------- */
+.dk-person .dk-teal {
+  --c: var(--act);
+}
+.dk-limb {
+  stroke: color-mix(in srgb, var(--ink) 78%, var(--h-roof));
+  stroke-width: 3.2;
+  stroke-linecap: square;
+  fill: none;
+}
+.dk-foot {
+  stroke-width: 3.6;
+}
+.dk-head {
+  fill: color-mix(in srgb, var(--h-wall) 82%, var(--h-wood));
+  stroke: color-mix(in srgb, var(--ink) 70%, transparent);
+  stroke-width: 1.2;
+}
+.dk-head-lit {
+  fill: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.dk-person-cam {
+  fill: color-mix(in srgb, var(--band) 70%, var(--h-roof));
+}
+.dk-person-shadow {
+  opacity: 0.9;
+}
+/* The turn about the person's own vertical axis: squash to the floor plane, rotate, unsquash. */
+.dk-person-turn {
+  transform-box: view-box;
+  transform: scale(1, 0.577) rotate(var(--turn, 0deg)) scale(1, 1.732);
+}

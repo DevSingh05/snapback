@@ -206,3 +206,30 @@ describe("the scan's camera", () => {
     });
   });
 });
+
+describe("opening outside on the real scan", () => {
+  it("shows the whole model from above outside, then flies in to the first stop", async () => {
+    const { sdk } = fakeSdk();
+    const mode = { moveTo: vi.fn().mockResolvedValue(undefined) };
+    const driver = createSdkDriver({ ...sdk, Mode: mode } as unknown as PlayerSdk, {
+      sweeps: SWEEPS,
+    });
+    driver.goto(STOPS[0]!, { panDeg: 0, instant: false, speed: 1, next: STOPS[1] });
+    expect(mode.moveTo).toHaveBeenCalledWith("mode.dollhouse", { transition: "transition.fly" });
+    expect(sdk.Sweep.moveTo).not.toHaveBeenCalled();
+    await Promise.resolve();
+    await Promise.resolve();
+    driver.goto(STOPS[1]!, { panDeg: 0, instant: false, speed: 1, next: STOPS[2] });
+    expect(sdk.Sweep.moveTo).toHaveBeenCalledWith(
+      "fx-sweep-00",
+      expect.objectContaining({ transition: "transition.fly" }),
+    );
+  });
+
+  it("without a dollhouse in the SDK, the opening beat leaves the camera alone", () => {
+    const { sdk } = fakeSdk();
+    const driver = createSdkDriver(sdk as unknown as PlayerSdk, { sweeps: SWEEPS });
+    driver.goto(STOPS[0]!, { panDeg: 0, instant: false, speed: 1 });
+    expect(sdk.Sweep.moveTo).not.toHaveBeenCalled();
+  });
+});
