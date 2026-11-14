@@ -630,3 +630,27 @@ def test_a_parking_need_never_makes_a_trade_off_question():
     ]
     keys = {t.key for t in tradeoffs_for(brief, Fake(records))}
     assert "parking" not in keys
+
+
+# --- review round 2 ----------------------------------------------------------------------------
+
+
+def test_no_label_and_no_key_in_a_multi_plan_building_is_ambiguous_not_the_cheapest():
+    with pytest.raises(AmbiguousPlace):
+        place_for("fx-twin", None, Fake([same_label_building()]))
+    one = Fake([building("fx-one", [plan(lo=1000, hi=1100)])])
+    assert place_for("fx-one", None, one) is not None
+
+
+def test_walkup_question_needs_a_saving_of_at_least_fifty_dollars():
+    def options(walkup_low):
+        records = [
+            building("fx-flat", [plan(lo=1500, hi=1600)], is_walkup=False),
+            building("fx-walk", [plan(lo=walkup_low, hi=1600)], is_walkup=True),
+        ]
+        brief = RenterBrief(max_rent_month=2000, needs_no_walkup=True)
+        return {t.key for t in tradeoffs_for(brief, Fake(records))}
+
+    assert "walkup" in options(1450)
+    assert "walkup" not in options(1451)
+    assert "walkup" not in options(1500)

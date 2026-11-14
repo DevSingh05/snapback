@@ -112,3 +112,19 @@ def test_search_has_a_body_cap_and_a_per_address_rate_limit(client):
     assert big.status_code == 413
     codes = [client.post("/search", json={}).status_code for _ in range(40)]
     assert codes[:30] == [200] * 30 and 429 in codes[30:]
+
+
+def test_a_forwarded_for_header_does_not_buy_a_fresh_search_allowance(client):
+    codes = [client.post("/search", json={}).status_code for _ in range(30)]
+    assert codes == [200] * 30
+    for n in range(5):
+        spoofed = client.post("/search", json={}, headers={"X-Forwarded-For": f"203.0.113.{n}"})
+        assert spoofed.status_code == 429  # the bucket is the peer's, not the header's
+
+
+def test_make_api_runs_without_proxy_headers_so_the_peer_address_is_real():
+    from pathlib import Path
+
+    makefile = (Path(__file__).resolve().parent.parent / "Makefile").read_text()
+    api_line = next(line for line in makefile.splitlines() if "uvicorn" in line)
+    assert "--no-proxy-headers" in api_line

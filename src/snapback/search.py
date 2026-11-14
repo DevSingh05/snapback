@@ -403,7 +403,7 @@ def place_for(
         and (floor_plan is None or raw.floor_plan == floor_plan)
         if (m := _match(raw, open_brief, source)) is not None
     ]
-    if plan_key_ is None and len({m.plan_key for m in found}) > 1 and floor_plan is not None:
+    if plan_key_ is None and len({m.plan_key for m in found}) > 1:  # no silent cheapest pick
         raise AmbiguousPlace(property_id)
     found.sort(key=order_key)
     return found[0] if found else None

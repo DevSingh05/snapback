@@ -317,6 +317,7 @@ class Plan:
 # ---------------------------------------------------------------------------------------------
 
 DEEP_CHECK_COUNT = 3
+MIN_SAVING = 50  # dollars a month: a smaller saving is not worth a question
 SHORTLIST_SIZE = 6
 NO_QUESTION = "Ask nothing; show the matches as they are"
 
@@ -557,7 +558,7 @@ def tradeoffs_for(
             )
         ]
         low = cheapest(walkups)
-        if low is not None and base is not None and low < base:
+        if low is not None and base is not None and base - low >= MIN_SAVING:
             out.append(
                 TradeOff(
                     "walkup",

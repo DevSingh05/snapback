@@ -48,6 +48,9 @@ class DailyLimit:
 class PerMinuteLimit:
     """A sliding one-minute allowance per key, in memory (resets on restart)."""
 
+    SWEEP_ABOVE = 10_000  # keys held before stale ones are dropped
+    MAX_KEYS = 50_000  # hard cap on keys held
+
     def __init__(self, per_minute: int, clock: Callable[[], float] = time.monotonic) -> None:
         self.per_minute = per_minute
         self._clock = clock
@@ -57,10 +60,19 @@ class PerMinuteLimit:
     def allow(self, key: str) -> bool:
         now = self._clock()
         with self._lock:
+            if len(self._hits) > self.SWEEP_ABOVE:
+                self._sweep(now)
             recent = [t for t in self._hits.get(key, []) if now - t < 60.0]
+            if key not in self._hits and len(self._hits) >= self.MAX_KEYS:
+                return False  # full of live keys: refuse rather than grow
             if len(recent) >= self.per_minute:
                 self._hits[key] = recent
                 return False
             recent.append(now)
             self._hits[key] = recent
             return True
+
+    def _sweep(self, now: float) -> None:
+        """Drop every key whose newest hit is over a minute old."""
+        for key in [k for k, hits in self._hits.items() if not hits or now - hits[-1] >= 60.0]:
+            del self._hits[key]
