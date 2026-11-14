@@ -19,6 +19,8 @@ export type InboundMessage = {
   threadId: string;
   text?: string;
   imageUrls: string[];
+  /** Photos already in hand (Photon hands over attachment bytes, not links). */
+  images?: Blob[];
   receivedAt: string;
 };
 
@@ -65,6 +67,14 @@ export function renterId(threadId: string, salt: string): string {
   return "imsg-" + createHmac("sha256", salt).update(threadId).digest("hex").slice(0, 24);
 }
 
+/** The allowlist holds a thread id, or its keyed hash (so no handle needs to sit in the env). */
+export function isAllowed(threadId: string, config: SidecarConfig): boolean {
+  return (
+    config.allowedThreads.has(threadId) ||
+    config.allowedThreads.has(renterId(threadId, config.renterSalt))
+  );
+}
+
 export function cardText(card: Card, link: string, challenge?: string | null): string {
   const lines = [
     HEADLINES[card.state] ?? HEADLINES.hold,
@@ -96,7 +106,8 @@ async function check(msg: InboundMessage, config: SidecarConfig): Promise<string
   const form = new FormData();
   form.set("renter_id", renterId(msg.threadId, config.renterSalt));
   form.set("text", msg.text ?? "");
-  const images = await photos(msg.imageUrls, config.maxPhotos ?? MAX_PHOTOS, get);
+  const max = config.maxPhotos ?? MAX_PHOTOS;
+  const images = [...(msg.images ?? []), ...(await photos(msg.imageUrls, max, get))].slice(0, max);
   images.forEach((blob, i) => form.append("photos", blob, `photo-${i + 1}.jpg`));
 
   const created = await get(`${api}/cases`, { method: "POST", body: form });
@@ -117,7 +128,7 @@ export async function handleMessage(
   client: MessageClient,
   config: SidecarConfig,
 ): Promise<boolean> {
-  if (!config.allowedThreads.has(msg.threadId)) return false;
+  if (!isAllowed(msg.threadId, config)) return false;
   let text: string;
   try {
     text = await check(msg, config);

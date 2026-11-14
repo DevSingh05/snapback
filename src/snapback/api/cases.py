@@ -38,6 +38,7 @@ from snapback.agent.rules.contact import phone_salt
 from snapback.card import strings
 from snapback.contracts import (
     Card,
+    CasePreferences,
     CaseProgress,
     DataSource,
     ModuleEvidence,
@@ -107,6 +108,8 @@ class RecordedCase:
     done = True
     token = None  # a recorded case can never be written to, so it has no secret
     read_token = None
+    # What the renter rejected; a recorded case is read-only, so this stays empty.
+    preferences = CasePreferences()
 
     def __init__(
         self,
@@ -195,6 +198,8 @@ class SessionCase:
         self._runner = runner
         self.staged = False  # made from a staged demo case (fixtures/demo)
         self.demo_case_id: str | None = None  # which one, so a replay can name its source
+        # What the renter rejected in this case ("no walk-ups", a place), code-defined keys only.
+        self.preferences = CasePreferences()
         self.property_id: str | None = None  # our id for the building the listing claims
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()

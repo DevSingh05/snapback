@@ -16,7 +16,19 @@ MAX_REASON = 200
 # A reason may be written by a model, and the trace is shown on screen. These words are the
 # ones the product never uses about a listing or a person; a reason containing one is dropped
 # in favour of the code-written fallback.
-_BANNED_IN_REASONS = ("scam", "fraud", "safe", "verified", "legit")
+_BANNED_IN_REASONS = (
+    "scam",
+    "fraud",
+    "safe",
+    "verified",
+    "legit",
+    "available now",
+    "neighborhood",
+    "neighbourhood",
+    "school",
+    "family",
+    "families",
+)
 
 
 def clean_reason(text: object, fallback: str) -> str:
