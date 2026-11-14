@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
+import { Wordmark } from "../components/HouseGlyph";
+import { KitArt } from "../components/KitArt";
 import { SourceChip } from "../components/SourceChip";
 import type { TourPrepPack } from "../contracts";
 import { fetchPack, packToText, PackNeedsToken, type Lang, type PackTarget } from "./api";
@@ -90,12 +92,13 @@ export function TourPrepPage({ target, back }: { target: PackTarget; back: strin
       </nav>
 
       {load.status === "loading" && (
-        <p className="pf-note" role="status">
+        <p className="pf-note wait" role="status">
           Loading…
         </p>
       )}
       {load.status === "error" && (
         <div className="pf-empty" role="alert">
+          <KitArt kind="house" className="pf-empty-house" lit={false} />
           <p>We could not load the tour prep.</p>
           <p className="pf-note">{load.message}</p>
           <button type="button" className="pf-action" onClick={() => setAttempt((n) => n + 1)}>
@@ -111,12 +114,16 @@ export function TourPrepPage({ target, back }: { target: PackTarget; back: strin
 function Pack({ pack }: { pack: TourPrepPack }) {
   return (
     <div className="tp-sheet" lang={pack.lang}>
+      <div className="tp-mast">
+        <Wordmark />
+        <SourceChip source={pack.source} />
+      </div>
       <header className="tp-head">
         <div>
           <h1>{pack.title}</h1>
           <p className="tp-sub">{pack.subtitle}</p>
         </div>
-        <SourceChip source={pack.source} />
+        <KitArt kind="prep" className="tp-art" />
       </header>
 
       <section aria-labelledby="tp-facts">
@@ -127,7 +134,18 @@ function Pack({ pack }: { pack: TourPrepPack }) {
               <li key={f.key}>
                 <p className="tp-text">{f.text}</p>
                 <p className="tp-src">
-                  {[...f.sources, ...(f.as_of ? [f.as_of] : [])].join(" · ")}
+                  {f.sources.map((src, i) => (
+                    <Fragment key={src}>
+                      {i > 0 ? " · " : null}
+                      <span className="prov">{src}</span>
+                    </Fragment>
+                  ))}
+                  {f.as_of ? (
+                    <>
+                      {f.sources.length > 0 ? " · " : null}
+                      {f.as_of}
+                    </>
+                  ) : null}
                 </p>
               </li>
             ))}

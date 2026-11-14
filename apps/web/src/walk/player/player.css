@@ -1,0 +1,924 @@
+/* The walk player (wp): a video-style bar laid over the tour's stage. A frosted ink bar, aqua
+   progress, sharp corners, tokens only. It also moves the stage's own overlays up out of the
+   bar's way and gives the drawn room its camera, through variables the player writes. */
+
+.tour-stage:has(.wp) {
+  --wp-bar: 104px;
+  min-height: clamp(430px, 37vw, 560px);
+}
+.tour-stage:has(.wp[data-motion="reduced"]) {
+  --wp-bar: 136px;
+}
+.tour-stage:has(.wp) .rs-caption,
+.tour-stage:has(.wp) .sv-pane[data-role="corner"] {
+  bottom: calc(var(--wp-bar) + 14px);
+}
+.tour-stage:has(.wp) .sv-pane[data-role="main"] .rs {
+  padding-bottom: calc(var(--wp-bar) * 0.55);
+}
+
+/* The drawn room's camera. */
+.tour-stage[data-wp] .sv-pane[data-role="main"] :is(.rs-svg, .rs-outside, .sv-still-img) {
+  transform: perspective(1600px) translate(var(--wp-x, 0), var(--wp-y, 0)) scale(var(--wp-zoom, 1))
+    rotateY(var(--wp-yaw, 0deg));
+  transform-origin: 50% 58%;
+}
+
+.wp {
+  --wp-ink: var(--on-v-band);
+  --wp-plate: color-mix(in srgb, var(--v-band) 82%, transparent);
+  --wp-soft: color-mix(in srgb, var(--on-v-band) 16%, transparent);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--wp-ink);
+}
+.wp > * {
+  pointer-events: auto;
+}
+.tour-stage[data-drawer="open"] .wp {
+  display: none;
+}
+
+.wp-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  pointer-events: none;
+  overflow: hidden;
+}
+.wp-ghost > .rs {
+  padding-bottom: calc(var(--wp-bar) * 0.55);
+  opacity: 0;
+}
+.wp-ghost > .rs * {
+  animation: none !important;
+}
+/* The copy is a picture of the room only: its label plates would show as empty boxes. */
+.wp-ghost .rs-standin,
+.wp-ghost .rs-aerial-date,
+.wp-ghost .rs-photo-tag {
+  display: none;
+}
+
+.wp-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: grab;
+  touch-action: none;
+}
+.wp-shield:active {
+  cursor: grabbing;
+}
+/* On the real scan the scan itself takes every tap and drag, so the first touch is never wasted:
+   a tap on the floor walks there, and the player hands over (see WalkPlayer). */
+.wp[data-surface="scan"] .wp-shield {
+  display: none;
+}
+
+/* ---------- Room name and one line on what is on screen ---------- */
+.wp-over {
+  position: absolute;
+  z-index: 5;
+  left: 14px;
+  top: 50px;
+  max-width: min(420px, calc(100% - 28px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.wp-room,
+.wp-caption,
+.wp-pin {
+  margin: 0;
+  background: var(--wp-plate);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+}
+.wp-room {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 14px 9px;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  line-height: 1.15;
+}
+.wp-count {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--zing);
+}
+.wp-caption {
+  padding: 6px 14px;
+  font-size: 0.95rem;
+}
+.wp-pin {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-shadow: inset 4px 0 0 var(--zing);
+}
+.wp-pin-mark {
+  width: 9px;
+  height: 9px;
+  background: var(--zing);
+  box-shadow: var(--glow-line);
+}
+
+.wp[data-ended] .wp-over {
+  display: none;
+}
+/* The end card is the one thing on the stage: the view switch steps out of its way. */
+.tour-stage:has(.wp[data-ended]) .sv-switch {
+  visibility: hidden;
+}
+
+/* ---------- The big play mark while paused ---------- */
+.wp-big {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: calc(50% - var(--wp-bar) / 2);
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: var(--wp-plate);
+  color: var(--wp-ink);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--shadow-lift);
+}
+.wp-big .wp-icon {
+  width: 40px;
+  height: 40px;
+}
+
+/* ---------- The end card: one thing to do next ---------- */
+.wp-end {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: calc(50% - var(--wp-bar) / 2);
+  width: min(440px, calc(100% - 32px));
+  transform: translate(-50%, -50%);
+  padding: 22px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: color-mix(in srgb, var(--v-band) 86%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: var(--shadow-lift);
+}
+.wp-end-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.wp-end-line {
+  margin: 0;
+  color: color-mix(in srgb, var(--on-v-band) 78%, transparent);
+}
+.wp-end-acts {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+.wp-end-act {
+  min-height: 48px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--zing);
+  color: var(--on-zing);
+  font-weight: 700;
+  text-decoration: none;
+}
+.wp-end-again {
+  min-height: 48px;
+  padding: 0 4px;
+  background: transparent;
+  color: var(--wp-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  box-shadow: none;
+}
+.wp-end :is(a, button):focus-visible {
+  outline: 2px solid var(--wp-ink);
+  outline-offset: 2px;
+}
+
+/* ---------- The bar ---------- */
+.wp-bar {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: var(--wp-bar);
+  padding: 12px clamp(12px, 1.6vw, 20px) 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  background: var(--wp-plate);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+.wp-icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  display: block;
+  flex: none;
+}
+
+.wp-track {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  height: 20px;
+  padding: 7px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+.wp-seg {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 6px;
+  background: var(--wp-soft);
+  overflow: hidden;
+}
+.wp-seg[data-current] {
+  background: color-mix(in srgb, var(--on-v-band) 34%, transparent);
+}
+.wp-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--zing);
+  transform-origin: 0 50%;
+}
+/* A notch where an ad photo lands. */
+.wp-seg[data-photo]::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--wp-notch, 0.3) * 100%);
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--wp-ink);
+}
+.wp-thumb {
+  position: absolute;
+  top: 2px;
+  width: 6px;
+  height: 16px;
+  margin-left: -3px;
+  background: var(--wp-ink);
+  box-shadow: var(--glow-line);
+  pointer-events: none;
+}
+.wp-track:focus-visible {
+  outline: 2px solid var(--zing);
+  outline-offset: 2px;
+}
+
+.wp-chapters {
+  display: flex;
+  gap: 3px;
+}
+.wp-chapter {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 0 4px;
+  background: transparent;
+  color: color-mix(in srgb, var(--on-v-band) 62%, transparent);
+  font-size: 0.74rem;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: none;
+}
+.wp-chapter span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wp-chapter[aria-current] {
+  color: var(--zing);
+  font-weight: 700;
+}
+
+.wp-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wp-btn,
+.wp-zoom button,
+.wp-chip,
+.wp-resume {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--wp-ink);
+  font-size: 0.92rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+.wp-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.wp-play .wp-icon {
+  width: 26px;
+  height: 26px;
+}
+.wp-time {
+  margin-left: 8px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.wp-dim {
+  opacity: 0.62;
+}
+.wp-now {
+  visibility: hidden;
+  flex: 1;
+  min-width: 0;
+  margin-left: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.wp-speed {
+  min-width: 52px;
+  font-size: 0.82rem;
+}
+.wp-go,
+.wp-resume {
+  padding: 0 16px;
+  background: var(--zing);
+  color: var(--on-zing);
+}
+.wp-bar button:focus-visible {
+  outline: 2px solid var(--zing);
+  outline-offset: 2px;
+}
+.wp-go:focus-visible,
+.wp-resume:focus-visible {
+  outline-color: var(--wp-ink);
+}
+.wp-bar button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+@media (hover: hover) {
+  .wp-btn:hover:not(:disabled),
+  .wp-zoom button:hover,
+  .wp-chip:hover {
+    background: var(--wp-soft);
+  }
+  .wp-chapter:hover {
+    color: var(--wp-ink);
+    background: transparent;
+  }
+  .wp-go:hover:not(:disabled),
+  .wp-resume:hover {
+    background: color-mix(in srgb, var(--zing) 84%, var(--on-v-band));
+  }
+  .wp-track:hover .wp-seg {
+    height: 8px;
+    margin-top: -1px;
+  }
+  .wp-big:hover {
+    background: color-mix(in srgb, var(--v-band) 88%, transparent);
+  }
+}
+
+/* ---------- Explore ---------- */
+.wp-explore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.wp-hint {
+  margin: 0;
+  font-size: 0.92rem;
+  color: color-mix(in srgb, var(--on-v-band) 78%, transparent);
+}
+.wp-rooms {
+  order: 3;
+  flex: 1 0 100%;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.wp-rooms > span {
+  flex: none;
+}
+.wp-chip {
+  min-height: 36px;
+  padding: 0 12px;
+  background: var(--wp-soft);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.wp-chip[aria-current] {
+  background: var(--wp-ink);
+  color: var(--v-band);
+  font-weight: 700;
+}
+.wp-zoom {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.wp-reduced {
+  margin: 0;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--on-v-band) 78%, transparent);
+}
+
+/* The copied-ad case shows two aerials side by side: the bar sits under them, not over. */
+.tour-stage:has(.ma) .wp {
+  position: static;
+}
+.tour-stage:has(.ma) .wp-bar {
+  position: static;
+}
+.tour-stage:has(.ma) :is(.wp-shield, .wp-over, .wp-big, .wp-ghost) {
+  display: none;
+}
+
+/* Phone: the stage is a column (the view, then its captions), so the bar sits right under the
+   view instead of over it, and the overlays keep to the view's own 4:3 box. */
+@media (max-width: 760px) {
+  .tour-stage:has(.wp),
+  .tour-stage:has(.wp[data-motion="reduced"]) {
+    --wp-bar: 0px;
+    min-height: 0;
+    container-type: inline-size;
+  }
+  .tour-stage:has(.wp) .sv-pane[data-role="corner"] {
+    bottom: 10px;
+  }
+  .wp,
+  .wp-bar {
+    position: static;
+  }
+  .wp-bar {
+    min-height: 0;
+    padding: 6px 10px 8px;
+    background: var(--v-band);
+  }
+  .wp-shield,
+  .wp-ghost {
+    inset: 0 0 auto;
+    height: 75cqw;
+  }
+  .wp-big,
+  .wp-end {
+    top: 37.5cqw;
+  }
+  .wp-end {
+    padding: 14px 16px 16px;
+  }
+  .wp-end-title {
+    font-size: 1.2rem;
+  }
+  .wp-end-line {
+    display: none;
+  }
+  .wp-over {
+    left: 10px;
+    top: 46px;
+  }
+  .wp-room {
+    font-size: 1.1rem;
+    padding: 6px 10px 7px;
+  }
+  .wp-caption {
+    display: none;
+  }
+  .wp-pin {
+    font-size: 0.86rem;
+    padding: 5px 10px;
+  }
+  .wp-chapters,
+  .wp-now,
+  .wp-dim,
+  .wp-go .wp-icon {
+    display: none;
+  }
+  .wp-row {
+    gap: 2px;
+  }
+  .wp-time {
+    margin: 0 auto 0 6px;
+  }
+  .wp-speed {
+    min-width: 44px;
+  }
+  .wp-go {
+    padding: 0 14px;
+  }
+  .wp-hint {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.84rem;
+  }
+  .wp-explore .wp-zoom {
+    display: none;
+  }
+  .wp-big {
+    width: 64px;
+    height: 64px;
+    margin: -32px 0 0 -32px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wp-ghost > .rs {
+    animation: wp-fade 0.52s ease-out;
+  }
+  @keyframes wp-fade {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  .wp-over > * {
+    animation: wp-rise 0.4s var(--ease-out) backwards;
+  }
+  .wp-pin {
+    animation: wp-pin 0.45s var(--ease-out) backwards;
+  }
+  @keyframes wp-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @keyframes wp-pin {
+    from {
+      opacity: 0;
+      transform: translateX(-14px);
+    }
+  }
+  .wp-big {
+    animation: wp-rise 0.25s var(--ease-out) backwards;
+  }
+  .wp-end {
+    animation: wp-end 0.45s var(--ease-out) backwards;
+  }
+  @keyframes wp-end {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -44%);
+    }
+  }
+  .wp-bar button,
+  .wp-seg {
+    transition:
+      background-color 0.15s ease-out,
+      transform 0.12s ease-out,
+      height 0.12s ease-out;
+  }
+}
+
+/* ---------- "You are here" in the drawn room: the cone turns with the camera's pan ---------- */
+/* The view cone turns with the camera's pan, about the person's spot on the floor: squash to
+   the floor plane, rotate, unsquash. The person itself never turns or moves part by part. */
+.rs-here-turn {
+  transform-box: view-box;
+  transform: scale(1, 0.577) rotate(calc(var(--wp-yaw, 0deg) * 3.4)) scale(1, 1.732);
+}
+.rs[data-motion="reduced"] .rs-here-turn {
+  transform: none;
+}
+/* On arrival the whole person steps in to its spot as one group (never with reduced motion). */
+@media (prefers-reduced-motion: no-preference) {
+  .rs[data-motion="full"] .rs-person {
+    animation: rs-step 0.6s var(--ease-out) 0.3s backwards;
+  }
+  @keyframes rs-step {
+    from {
+      opacity: 0;
+      transform: translate(20px, 11.5px);
+    }
+  }
+}
+.rs-here-cone {
+  fill: color-mix(in srgb, var(--act) 26%, transparent);
+}
+/* In the corner window the drawing is a thumbnail: the marker and its cone stay, the words go. */
+.sv-pane[data-role="corner"] .rs-here :is(rect, text) {
+  display: none;
+}
+
+/* ---------- The ad photo over the view, at the pose it was taken from ---------- */
+.wp-flash {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 var(--wp-bar) 0;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+  background: var(--v-band);
+}
+.wp > .wp-flash {
+  pointer-events: none;
+}
+.wp-flash[data-on] {
+  opacity: 0.97;
+}
+.wp-flash-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A thin frame inside the edge: this is a photograph laid over the view, not the view. */
+.wp-flash::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.wp-flash-tag {
+  position: absolute;
+  right: 14px;
+  top: 72px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--wp-plate);
+  color: var(--wp-ink);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+}
+.wp-flash-standin {
+  padding: 1px 6px;
+  background: var(--zing);
+  color: var(--on-zing);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+/* While the photo is up, the stage's own caption ("Taken here: ad photo P2") is lit. */
+.tour-stage:has(.wp-flash[data-on]) .rs-caption-placed {
+  z-index: 4;
+  box-shadow:
+    inset 4px 0 0 var(--zing),
+    var(--glow-line);
+}
+
+/* The drawn stand-in photo (StandInPhoto.tsx). */
+.sp-ceil {
+  fill: color-mix(in srgb, var(--h-wall) 88%, var(--surface));
+}
+.sp-wall-l {
+  fill: color-mix(in srgb, var(--h-wall) 86%, var(--ink));
+}
+.sp-wall-r {
+  fill: color-mix(in srgb, var(--h-wall) 78%, var(--ink));
+}
+.sp-back {
+  fill: var(--h-wall);
+}
+.sp-floor {
+  fill: color-mix(in srgb, var(--h-wood) 70%, var(--h-wall-shade));
+}
+.sp-seam,
+.sp-mullion,
+.sp-cord {
+  stroke: color-mix(in srgb, var(--ink) 22%, transparent);
+  stroke-width: 1.5;
+}
+.sp-mullion {
+  stroke: var(--h-wall);
+  stroke-width: 3;
+}
+.sp-window {
+  fill: var(--h-unlit);
+}
+.sp-light {
+  fill: color-mix(in srgb, var(--surface) 30%, transparent);
+}
+.sp-counter-top {
+  fill: color-mix(in srgb, var(--h-roof) 34%, var(--h-wall));
+}
+.sp-counter {
+  fill: color-mix(in srgb, var(--h-door) 70%, var(--ink));
+}
+.sp-counter-end {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--ink));
+}
+.sp-pendant {
+  fill: var(--h-roof);
+}
+.sp-door {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--surface));
+}
+
+/* ---------- The highlight strip: the ad photos in the chapter row ---------- */
+.wp-chapter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.wp-chapter-name {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wp-shot {
+  position: relative;
+  display: block;
+  width: min(100%, 76px);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--wp-soft);
+  opacity: 0.62;
+  box-shadow: inset 0 0 0 1px var(--wp-soft);
+}
+.wp-shot img,
+.wp-shot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wp-shot-tag {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 1px 4px;
+  background: var(--wp-plate);
+  color: var(--wp-ink);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+.wp-chapter[aria-current] .wp-shot {
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px var(--zing),
+    var(--glow-line);
+}
+.wp-chapter[aria-current] .wp-shot-tag {
+  background: var(--zing);
+  color: var(--on-zing);
+}
+@media (hover: hover) {
+  .wp-chapter:hover .wp-shot {
+    opacity: 0.9;
+  }
+}
+.tour-stage:has(.wp-shot) {
+  --wp-bar: 172px;
+  min-height: clamp(500px, 42vw, 620px);
+}
+.tour-stage:has(.wp-shot) .sv-pane[data-role="main"] .rs {
+  padding-bottom: calc(var(--wp-bar) * 0.78);
+}
+.tour-stage:has(.wp-shot):has(.wp[data-motion="reduced"]) {
+  --wp-bar: 204px;
+}
+
+/* ---------- The scan is late: a quiet chip, and the tour plays on the drawing ---------- */
+.wp-late {
+  position: absolute;
+  z-index: 5;
+  right: 14px;
+  top: 50px;
+  margin: 0;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--wp-plate);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.wp-late-mark {
+  width: 7px;
+  height: 7px;
+  background: var(--zing);
+}
+
+.wp-end-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--zing);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wp-flash {
+    transition: opacity 0.38s var(--ease-out);
+  }
+  .wp-flash[data-on] .wp-flash-img {
+    animation: wp-settle 1.5s var(--ease-out) both;
+  }
+  @keyframes wp-settle {
+    from {
+      transform: scale(1.04);
+    }
+  }
+  .wp-late-mark {
+    animation: wp-blink 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes wp-blink {
+    to {
+      opacity: 0.3;
+    }
+  }
+  /* Leaving the outside beat: the first room pushes in from outside the building. */
+  .tour-stage[data-wp-enter] .sv-pane[data-role="main"] .rs {
+    animation: wp-push 1.2s var(--ease-out) both;
+  }
+  @keyframes wp-push {
+    from {
+      opacity: 0.2;
+      transform: scale(0.62) translateY(-6%);
+      filter: blur(3px);
+    }
+    55% {
+      opacity: 1;
+      filter: none;
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  .tour-stage:has(.wp-shot),
+  .tour-stage:has(.wp-shot):has(.wp[data-motion="reduced"]) {
+    --wp-bar: 0px;
+    min-height: 0;
+  }
+  .wp-flash {
+    inset: 0 0 auto;
+    height: 75cqw;
+  }
+  .wp-flash-tag {
+    top: auto;
+    right: auto;
+    left: 10px;
+    bottom: 10px;
+  }
+  /* On a phone the strip is the ad photos only, in a row under the view. */
+  .wp-chapters:has(.wp-shot) {
+    display: flex;
+    gap: 6px;
+  }
+  .wp-chapters:has(.wp-shot) .wp-chapter:not([data-photo]) {
+    display: none;
+  }
+  .wp-chapters:has(.wp-shot) .wp-chapter[data-photo] {
+    flex: 0 0 auto !important;
+  }
+  .wp-chapter[data-photo] .wp-chapter-name {
+    display: none;
+  }
+  .wp-shot {
+    width: 64px;
+  }
+  .wp-late {
+    top: 46px;
+    right: 10px;
+  }
+}

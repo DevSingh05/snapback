@@ -312,6 +312,7 @@ export interface PreferencesUpdate {
   needs_parking?: boolean | null;
   max_rent?: number | null;
   avoid_property_id?: string | null;
+  prefer_scans?: boolean | null;
 }
 
 export interface CasePreferences {
@@ -319,6 +320,7 @@ export interface CasePreferences {
   needs_parking: boolean;
   max_rent: number | null;
   avoid_property_ids: string[];
+  prefer_scans: boolean; // M9: orders the list (3D-scan places first), never filters it
 }
 
 export interface TourDraftRequest {
@@ -440,4 +442,119 @@ export interface TourPrepPack {
   facts: PackLine[];
   questions: PackLine[];
   before_you_pay: string[];
+}
+
+// M9: the finder (src/snapback/agent/finder.py, api/finder.py). Mirrors the Finder* models in
+// contracts.py. Nothing the agent learns applies until the renter accepts a proposal.
+export type FinderProposalKey =
+  "propose_no_walkup" | "propose_parking" | "propose_prefer_scans" | "propose_lower_budget";
+
+export interface FinderSessionStarted {
+  session_id: string;
+  token: string; // shown once; send as Authorization: Bearer or X-Finder-Token, never in the address
+  source: DataSource;
+  mode: "policy" | "deepagents";
+}
+
+export interface FinderSignal {
+  kind: "pick" | "pass" | "brief";
+  place_kind?: "apartment" | "house" | null;
+  has_scan?: boolean | null;
+  rent_from?: number | null;
+  walkup?: boolean | null;
+  parking?: boolean | null;
+  brief_field?: "budget" | "beds" | "parking" | "no_walkup" | "pets" | null;
+  rent_max?: number | null;
+}
+
+export interface FinderMessageRequest {
+  text?: string | null; // up to 500; code reads it into signals, the model sees it cleaned
+  signals?: FinderSignal[];
+}
+
+export interface FinderProposal {
+  id: string;
+  key: FinderProposalKey;
+  update: PreferencesUpdate;
+  text: string; // the question for the renter, written by code
+  evidence: string;
+  reason: string;
+  chosen_by: ChosenBy;
+  status: "proposed" | "accepted" | "declined";
+  at: string;
+}
+
+export interface FinderPick {
+  pid: string;
+  rank: number;
+  kind: "apartment" | "house";
+  has_scan: boolean;
+  line: string; // code-built from the record, "as of CoStar's last research"
+  why: string; // one sentence from the search sub-agent
+  chosen_by: ChosenBy;
+  as_of: string;
+  // The record's facts behind the line, so a pass or pick can go back as a signal.
+  rent_from?: number | null;
+  walkup?: boolean | null;
+  parking?: boolean | null;
+}
+
+export interface FinderNote {
+  path: string;
+  text: string;
+  written_by: ChosenBy;
+}
+
+export interface FinderTraceEvent {
+  session_id: string;
+  seq: number;
+  at: string;
+  kind: TraceKind;
+  options: string[];
+  pick?: string | null;
+  reason: string;
+  source: DataSource;
+  chosen_by: ChosenBy;
+}
+
+export interface FinderReply {
+  session_id: string;
+  source: DataSource;
+  mode: "policy" | "deepagents";
+  reply: string;
+  reply_by: ChosenBy;
+  proposals: FinderProposal[];
+  picks: FinderPick[];
+  as_of: string;
+}
+
+export interface FinderState {
+  session_id: string;
+  source: DataSource;
+  mode: "policy" | "deepagents";
+  applied: CasePreferences;
+  proposals: FinderProposal[];
+  picks: FinderPick[];
+  learned: Record<string, string | boolean>; // "what I've learned about you"
+  notes: FinderNote[];
+  trace: FinderTraceEvent[];
+  as_of: string;
+  watch?: FinderWatchStatus | null; // set by POST /finder/{session}/watch
+}
+
+export interface FinderWatchRequest {
+  channel: "imessage";
+}
+
+export interface FinderWatchStatus {
+  session_id: string;
+  channel: "imessage";
+  kind: "brief"; // the session's brief, never one place
+  event_id: string; // the watch_added event on the bus
+  source: DataSource;
+  at: string;
+}
+
+export interface FinderDecision {
+  decision: "accept" | "decline";
 }
