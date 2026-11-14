@@ -54,7 +54,7 @@
       {
         "step_id": "listing",
         "status": "matches",
-        "text": "Taken in this building (3 of 3 photos)."
+        "text": "Taken in this home (3 of 3 photos)."
       },
       {
         "step_id": "chat",
@@ -65,6 +65,11 @@
         "step_id": "chat",
         "status": "not_confirmed",
         "text": "NOT SHOWN. Being inside does not mean they may rent it."
+      },
+      {
+        "step_id": "hold",
+        "status": "warning",
+        "text": "The ad asks you to pay rent or a deposit before move-in, and the owner of record is not the poster."
       },
       {
         "step_id": "hold",

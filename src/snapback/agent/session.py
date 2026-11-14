@@ -224,6 +224,7 @@ class CaseSession:
         update: dict[str, object] = {
             "rules": self.modules.rules(self.case_id),
             "record_source": self.modules.record_source(self.case_id),
+            "property_type": self.modules.property_type(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:
             self.trace.emit(

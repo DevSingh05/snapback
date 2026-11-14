@@ -421,6 +421,9 @@ class ModuleEvidence(BaseModel):
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
+    # The record's own kind of home ("house", "multifamily"), when there is a record. The
+    # card says "this home" about a house and "this building" otherwise. It changes no state.
+    property_type: str | None = None
     # A14: a reply came, could not be accepted, and no further photo will be asked for. The
     # card then says "we could not confirm", not "ask for a new photo". It changes no state.
     no_retry_left: bool = False

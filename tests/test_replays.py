@@ -260,5 +260,14 @@ def test_the_owner_replay_holds_on_the_owner_line_and_quotes_the_owner_s_rule():
     ]
     row = PUBLISHED_RULES[0]
     assert len(owner) == 1
-    assert owner[0].startswith(f"Not confirmed. Owner of record: {row.company}, not the poster.")
-    assert f'"{row.rule}"' in owner[0]
+    assert owner[0] == f"Not confirmed. Owner of record: {row.company}, not the poster."
+    # Conductor, Sat 10:03: the ad names rent and a deposit, so the owner's rule is quoted
+    # once, beside the payment ask it speaks to, and both of those lines are warnings.
+    price = next(found for found in card.rows if found.kind.value == "price")
+    labels = [line.label for line in price.lines]
+    at = labels.index(strings.text("label.owner_rule"))
+    assert labels[at - 1] == strings.text("label.payment_ask")
+    assert [price.lines[at - 1].tone.value, price.lines[at].tone.value] == ["hold", "hold"]
+    assert f'"{row.rule}"' in price.lines[at].text
+    quoted = [line for found in card.rows for line in found.lines if f'"{row.rule}"' in line.text]
+    assert len(quoted) == 1
