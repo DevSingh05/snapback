@@ -11,8 +11,11 @@ How to read a rule:
 - `excused_after_viewing`: the ask is ordinary once the renter has toured the unit or signed the
   lease, so a sentence that puts it after one of those does not fire. Rules without this fire
   whenever they match: nobody legitimate takes gift cards at any stage.
-- `excused_when_refused`: a sentence in which the writer says they never ask for or accept the
-  thing ("we never ask for payment by Zelle") is a warning, not an ask.
+- `excused_when_refused`: a clause in which the writer says they never ask for or accept the
+  thing ("we never ask for payment by Zelle"), or warns the renter off it ("never pay by
+  Zelle"), is a warning, not an ask. The refusal has to come before the thing, in its clause.
+- `excused_as_rent_terms`: a clause that describes how tenants pay rent ("tenants can pay rent
+  by Venmo or Zelle") and asks for nothing now is not an ask either.
 - `needs_link`: the sentence must also contain a web link.
 - `red_flag`: shown on the card as a red flag. Rules that are not red flags are recorded for the
   agent's trace only, because honest listings use the same words ("won't last").
@@ -38,6 +41,7 @@ class Rule:
     patterns: tuple[str, ...]
     excused_after_viewing: bool = False
     excused_when_refused: bool = False
+    excused_as_rent_terms: bool = False
     needs_link: bool = False
 
 
@@ -50,6 +54,7 @@ RULES: tuple[Rule, ...] = (
         patterns=(r"\bzelle\b",),
         excused_after_viewing=True,
         excused_when_refused=True,
+        excused_as_rent_terms=True,
     ),
     Rule(
         rule_id="payment.wire_before_viewing",
@@ -63,6 +68,7 @@ RULES: tuple[Rule, ...] = (
         ),
         excused_after_viewing=True,
         excused_when_refused=True,
+        excused_as_rent_terms=True,
     ),
     Rule(
         rule_id="payment.p2p_app_before_viewing",
@@ -71,6 +77,7 @@ RULES: tuple[Rule, ...] = (
         patterns=(r"\bcash ?app\b", r"\bvenmo\b", r"\bpaypal\b", r"\bapple cash\b"),
         excused_after_viewing=True,
         excused_when_refused=True,
+        excused_as_rent_terms=True,
     ),
     Rule(
         rule_id="payment.gift_card",

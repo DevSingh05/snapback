@@ -196,5 +196,83 @@
     "category": "link",
     "text": "You can pay at the leasing office during your visit.",
     "expect": []
+  },
+  {
+    "id": "fx-rule-refuses-checks-asks-zelle",
+    "category": "payment_method",
+    "text": "I don't take checks, Zelle the deposit today please.",
+    "expect": ["payment.zelle_before_viewing"]
+  },
+  {
+    "id": "fx-rule-never-ask-but-send",
+    "category": "payment_method",
+    "text": "We never ask for a deposit before you tour, but send the $500 deposit by Zelle today to hold it.",
+    "expect": ["payment.zelle_before_viewing"]
+  },
+  {
+    "id": "fx-rule-never-ask-but-send-deposit",
+    "category": "fee_ask",
+    "text": "We never ask for a deposit before you tour, but send the $500 deposit by Zelle today to hold it.",
+    "expect": ["fee.holding_deposit_before_viewing"]
+  },
+  {
+    "id": "fx-rule-pay-today-keys-after-signing",
+    "category": "payment_method",
+    "text": "Zelle the deposit today, after signing you get the keys.",
+    "expect": ["payment.zelle_before_viewing"]
+  },
+  {
+    "id": "fx-rule-deposit-today-keys-after-signing",
+    "category": "fee_ask",
+    "text": "Zelle the deposit today, after signing you get the keys.",
+    "expect": ["fee.holding_deposit_before_viewing"]
+  },
+  {
+    "id": "fx-rule-fullwidth-zelle",
+    "category": "payment_method",
+    "text": "Send the deposit by Ｚｅｌｌｅ.",
+    "expect": ["payment.zelle_before_viewing"]
+  },
+  {
+    "id": "fx-rule-zero-width-zelle",
+    "category": "payment_method",
+    "text": "Send the deposit by Zel​le.",
+    "expect": ["payment.zelle_before_viewing"]
+  },
+  {
+    "id": "fx-rule-tenants-pay-rent",
+    "category": "payment_method",
+    "text": "Tenants can pay rent by Venmo or Zelle.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-warning-not-to-pay",
+    "category": "payment_method",
+    "text": "Do not pay anyone by Zelle before a showing.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-curly-licence",
+    "category": "data_ask",
+    "text": "Send a copy of your driver’s license.",
+    "expect": ["data.id_before_viewing"]
+  },
+  {
+    "id": "fx-rule-curly-cannot-show",
+    "category": "pressure",
+    "text": "I’m out of the country so I can’t show the apartment.",
+    "expect": ["pressure.cannot_show"]
+  },
+  {
+    "id": "fx-rule-apply-link-fee-at-office",
+    "category": "link",
+    "text": "Apply at https://apply.example.com, application fee $40 paid to the management office.",
+    "expect": ["link.lease_link"]
+  },
+  {
+    "id": "fx-rule-apply-fee-at-office",
+    "category": "fee_ask",
+    "text": "Apply at https://apply.example.com, application fee $40 paid to the management office.",
+    "expect": []
   }
 ]
