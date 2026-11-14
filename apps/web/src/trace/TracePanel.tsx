@@ -30,6 +30,7 @@ const STATUS_TEXT: Record<StreamStatus, string> = {
   live: "Streaming",
   reconnecting: "Reconnecting",
   lost: "Connection lost",
+  locked: "Locked: this trace needs the case link",
   done: "Done",
 };
 
