@@ -455,3 +455,75 @@ button {
 .trace-status {
   color: var(--muted);
 }
+
+/* S2 twin: structure only, visual pass comes later. */
+.twin-page {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  gap: 12px;
+  padding: var(--gutter);
+}
+.twin-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.twin-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+}
+.twin-stage {
+  position: relative;
+  min-height: 60vh;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.twin-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.twin-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 60vh;
+  color: var(--muted);
+}
+.twin-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.twin-side {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.twin-photos {
+  display: grid;
+  gap: 8px;
+}
+.twin-trace {
+  min-height: 120px;
+}
+@media (max-width: 800px) {
+  .twin-body {
+    grid-template-columns: 1fr;
+  }
+  .twin-stage,
+  .twin-placeholder {
+    min-height: 45vh;
+  }
+}
