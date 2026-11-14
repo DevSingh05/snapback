@@ -39,7 +39,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
-from snapback.adapters.vexcel import aerial_proof, aerial_side
+from snapback.adapters.vexcel import aerial_proof, aerial_side, known_capture_date
 from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
@@ -94,11 +94,18 @@ from snapback.office.models import (
     OfficeTokenBody,
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
+from snapback.pack import TourPrepPack, build_tour_prep
 from snapback.preferences import merge as merge_preferences
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
-from snapback.search import AmbiguousPlace, NoOfficeOnRecord, draft_tour_request, place_for
+from snapback.search import (
+    AmbiguousPlace,
+    NoOfficeOnRecord,
+    draft_tour_request,
+    place_and_raw_for,
+    place_for,
+)
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -948,6 +955,88 @@ def create_app(
         with case._lock:  # two writes at once must both land
             case.preferences = merge_preferences(case.preferences, body)
             return case.preferences
+
+    def capture_date_of(record):
+        """The aerial capture date when already known (never a fetch), else None."""
+        if record is None:
+            return None
+        return known_capture_date(record, source=record.source, data_dir=settings.snapback_data_dir)
+
+    @app.get("/cases/{case_id}/tour-prep")
+    def get_tour_prep(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> TourPrepPack:
+        """The tour-prep pack for a checked ad: what the record says, questions to ask, and
+        steps before paying. Built by code from fixed text, EN or ES. Needs the case's read
+        token in a header (a token in the address is refused with 401); the owner of record
+        and licence lines come from the case."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        evidence = case.evidence
+        record = None
+        if case.property_id:
+            try:
+                record = lookups.record(case.property_id)
+            except KitMissing:
+                record = None
+        photos = evidence.locate.photos if evidence.locate else []
+        # A fixture case is FIXTURE even beside a live record: the label never overstates.
+        live = evidence.source is DataSource.LIVE and (
+            record is None or record.source is DataSource.LIVE
+        )
+        return build_tour_prep(
+            source=DataSource.LIVE if live else DataSource.FIXTURE,
+            lang=lang,
+            record=record,
+            owner=evidence.owner,
+            licence=evidence.license,
+            room_labels=[
+                p.room_label
+                for p in photos
+                if p.room_label and p.status is LocateStatus.LOCATED_IN_CLAIMED
+            ],
+            aerial_on=capture_date_of(record),
+        )
+
+    @app.get("/places/{property_id}/tour-prep")
+    def get_place_tour_prep(
+        property_id: str,
+        request: Request,
+        plan_key: Annotated[str | None, Query(max_length=128)] = None,
+        lang: Language = "en",
+    ) -> TourPrepPack:
+        """The tour-prep pack for a researched place. Public, and built only from the place's own
+        record (no owner, licence or case data). 404 for a place we do not hold, 422 when a
+        building has several floor plans and no `plan_key` was sent."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            found = place_and_raw_for(property_id, None, lookups, None, plan_key)
+            record = lookups.record(property_id)
+        except AmbiguousPlace:
+            raise HTTPException(
+                status_code=422,
+                detail="Several floor plans share that building. Send the plan_key you picked.",
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if found is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        place, raw = found
+        return build_tour_prep(
+            source=place.source,
+            lang=lang,
+            place=place,
+            raw=raw,
+            record=record,
+            aerial_on=capture_date_of(record),
+        )
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(
