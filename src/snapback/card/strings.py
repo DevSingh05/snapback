@@ -166,6 +166,11 @@ EN: dict[str, str] = {
         "Only trust a SNAPBACK result you asked for yourself. "
         "SNAPBACK never texts first or asks for money."
     ),
+    # On every card made from a staged demo case (fixtures/demo), first in the footer.
+    "footer.staged": (
+        "Staged example. The SNAPBACK team wrote this listing to show the checks. "
+        "It is not a real poster."
+    ),
     # --- the challenge message the renter relays, and the agent's own trace lines ----------
     "challenge.text": (
         "Before you pay, ask them to send a photo of {spot} with the code {code} written on paper."
@@ -444,6 +449,10 @@ ES: dict[str, str] = {
     "footer.only_trust": (
         "Confíe solo en un resultado de SNAPBACK que usted mismo pidió. SNAPBACK nunca "
         "escribe primero ni pide dinero."
+    ),
+    "footer.staged": (
+        "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
+        "revisiones. No es un anunciante real."
     ),
     "challenge.text": (
         "Antes de pagar, pídales que envíen una foto de {spot} con el código {code} escrito "

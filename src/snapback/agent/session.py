@@ -215,6 +215,13 @@ class CaseSession:
                 self._model_id = placed[0].model_id if placed else None
         elif pick == RULES_CHALLENGE:
             self._candidates = self.modules.floor_plans(self.case_id)
+        else:
+            # No twin to place photos in. If photos were sent, keep that they could not be
+            # checked, so the card does not say none were sent.
+            unplaced = self.modules.locate(self.case_id)
+            photos = unplaced.photos if unplaced is not None else []
+            if photos and all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
+                update["locate"] = unplaced
         self.evidence = self.evidence.model_copy(update=update)
 
         if pick == RULES_ONLY:
