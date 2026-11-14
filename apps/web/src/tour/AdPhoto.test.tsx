@@ -29,8 +29,7 @@ import { TourView } from "./TourPage";
 
 const jpeg = () =>
   Promise.resolve(
-    // Bytes, not a jsdom Blob: Node's Response cannot read a jsdom Blob on every Node version.
-    new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+    new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff])]), {
       status: 200,
       headers: { "content-type": "image/jpeg" },
     }),
