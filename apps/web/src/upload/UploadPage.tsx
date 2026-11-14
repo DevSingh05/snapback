@@ -1,8 +1,11 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
-import type { DataSource } from "../contracts";
+import type { DataSource, RenterBrief } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
 import { TracePanel } from "../trace";
+import { BudgetFields, EMPTY_BUDGET, budgetToBrief, type BudgetForm } from "../search/BudgetFields";
+import { briefIsEmpty, saveBrief } from "../search/api";
+import { PlacesStrip } from "../search/PlacesStrip";
 import {
   MODE,
   fetchApiSource,
@@ -63,6 +66,10 @@ export function UploadPage({
   }, [mode]);
   const shownMode: DataSource = mode === "live" ? apiSource : mode;
   const [text, setText] = useState("");
+  const [budget, setBudget] = useState<BudgetForm>(EMPTY_BUDGET);
+  // The brief the places strip searched for: set only when the button is pressed, so typing in
+  // the budget row never fires a search.
+  const [shownBrief, setShownBrief] = useState<RenterBrief | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
@@ -149,6 +156,8 @@ export function UploadPage({
     dispatch({ type: "submit" });
     try {
       const made = await createCase({ link: v.link, text: v.text, files: v.files });
+      const brief = budgetToBrief(budget);
+      if (!briefIsEmpty(brief)) saveBrief(made.case_id, brief);
       dispatch({
         type: "created",
         caseId: made.case_id,
@@ -210,15 +219,17 @@ export function UploadPage({
           <SourceChip source={shownMode} />
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
+          <p className="upload-eyebrow">Trust the home, not the ad.</p>
           <h1 ref={heading} tabIndex={-1}>
-            Check a rental before you pay.
+            Found a place online? Paste the ad.
           </h1>
           <p className="upload-lead">
-            Paste the listing link, or add screenshots of it. We read it and check the place.
+            See the real listing, the real office and a fair price, plus researched places that fit
+            your budget.
           </p>
 
           <label htmlFor="listing" className="upload-label">
-            Listing link or text
+            Paste the ad you found <span className="upload-hint">(listing link or text)</span>
           </label>
           <textarea
             id="listing"
@@ -314,12 +325,28 @@ export function UploadPage({
             </p>
           )}
 
+          <BudgetFields value={budget} onChange={setBudget} />
+
           <button type="submit" className="upload-submit">
             Check this listing
           </button>
+          <button
+            type="button"
+            className="upload-secondary"
+            disabled={briefIsEmpty(budgetToBrief(budget))}
+            onClick={() => setShownBrief(budgetToBrief(budget))}
+          >
+            Just show places that fit my budget
+          </button>
+          {briefIsEmpty(budgetToBrief(budget)) && (
+            <p className="upload-hint">Add a max rent or a must-have first.</p>
+          )}
           <p className="upload-hint">
             SNAPBACK never texts anyone for you. You approve and send any message yourself.
           </p>
+          {shownBrief && !briefIsEmpty(shownBrief) && (
+            <PlacesStrip caseId={null} brief={shownBrief} />
+          )}
         </form>
       </div>
     );

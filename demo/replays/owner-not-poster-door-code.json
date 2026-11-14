@@ -1,0 +1,72 @@
+{
+  "slug": "owner-not-poster-door-code",
+  "case_id": "replay-owner-not-poster-door-code",
+  "title": "A $2,200 move-in paid to a poster who did not own the house",
+  "pattern": "person",
+  "fictional": false,
+  "source": {
+    "name": "ABC13 Houston",
+    "url": "https://abc13.com/post/conroe-woman-loses-2200-fears-homelessness-renting-home-landlord-did-not-own-property/15907951/",
+    "published_on": "2025-02-15"
+  },
+  "amount_usd": 2200,
+  "steps": [
+    {
+      "id": "listing",
+      "kind": "listing",
+      "reported_on": "",
+      "label": "Listing seen",
+      "detail": "A renter in the Houston area finds a house for rent on Craigslist."
+    },
+    {
+      "id": "chat",
+      "kind": "chat",
+      "reported_on": "",
+      "label": "Says he is the landlord",
+      "detail": "The poster says he is the landlord and gives her a door code, so she can let herself in and see the house."
+    },
+    {
+      "id": "hold",
+      "kind": "hold_request",
+      "reported_on": "",
+      "label": "Asked to pay to move in",
+      "detail": "The poster asks for $1,100 rent and a $1,100 deposit before she moves in."
+    },
+    {
+      "id": "payment",
+      "kind": "payment",
+      "reported_on": "",
+      "label": "Paid $2,200",
+      "detail": "She pays $1,100 rent and a $1,100 deposit, part of it borrowed from a friend, and moves in."
+    },
+    {
+      "id": "discovery",
+      "kind": "discovery",
+      "reported_on": "",
+      "label": "Found out",
+      "detail": "Two days later the real owner, a rental company, tells her the poster does not own the house. She is told to leave, and her bank will not refund the money."
+    }
+  ],
+  "snapback": {
+    "verdict": "hold",
+    "stop_before": "payment",
+    "findings": [
+      {
+        "step_id": "listing",
+        "status": "matches",
+        "text": "Taken in this building (3 of 3 photos)."
+      },
+      {
+        "step_id": "chat",
+        "status": "not_confirmed",
+        "text": "Not confirmed. Owner of record: Invitation Homes, not the poster. Invitation Homes says: \"we only accept applications and leasing funds through invitationhomes.com\" (invitationhomes.com/preventing-leasing-fraud, read 2026-11-14)."
+      },
+      {
+        "step_id": "chat",
+        "status": "not_confirmed",
+        "text": "NOT SHOWN. Being inside does not mean they may rent it."
+      }
+    ]
+  },
+  "cant_catch": "A door code gets the poster and the renter inside, so a photo from inside proves nothing about who may rent the house. SNAPBACK cannot catch a poster when the owner of record is a private person who rents through family, or when the county roll has no owner for the house."
+}
