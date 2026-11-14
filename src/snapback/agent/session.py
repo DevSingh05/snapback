@@ -193,6 +193,7 @@ class CaseSession:
             "rules": self.modules.rules(self.case_id),
             "price": self.modules.price(self.case_id),
             "authority": self.modules.authority(self.case_id),
+            "for_sale": self.modules.for_sale(self.case_id),
         }
         if pick == TWIN_RULES_CHALLENGE:
             self.trace.emit(
