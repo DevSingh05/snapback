@@ -1,7 +1,8 @@
-// Pure reads for the match picture: how each drawn pair is shaded, where the drawn points fall
-// on the ad photo, how long the draw-in runs, and the plain sentences beside the meter. Every
-// number shown comes from the evidence row or from `bars`; shading and the coverage picture are
-// worked out from the drawn pairs themselves, never typed in.
+// Pure reads for the match picture: which few pairs are circled as numbered spots, how the ad
+// photo is lined up when it is laid over the scan view, how each drawn pair is shaded, where the drawn points fall on the ad photo, how long the draw-in runs,
+// and the plain sentences beside the meter. Every number shown comes from the evidence row or
+// from `bars`; the spots, the shading and the coverage picture are worked out from the drawn
+// pairs themselves, never typed in.
 import { useEffect, useState } from "react";
 
 import { barsFor } from "./read";
@@ -15,16 +16,22 @@ const median = (v: number[]): number => {
   return s.length === 0 ? 0 : s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 };
 
-/** Shades each pair by how closely its shift from ad to scan agrees with the typical shift of
- *  all drawn pairs: the closest third is "strong", the furthest third "faint". The evidence file
- *  carries no per-point score, so this is the one honest strength the web can read. */
-export function pairTiers(pairs: PointPair[]): Tier[] {
-  if (pairs.length === 0) return [];
+/** How far each pair's shift from ad to scan sits from the typical shift of all drawn pairs.
+ *  The evidence file carries no per-point score, so this is the one honest strength the web can
+ *  read: a small number means the pair agrees with the rest. */
+function offsets(pairs: PointPair[]): number[] {
   const dx = pairs.map(([ax, , bx]) => bx - ax);
   const dy = pairs.map(([, ay, , by]) => by - ay);
   const mx = median(dx);
   const my = median(dy);
-  const off = pairs.map((_, i) => Math.hypot(dx[i]! - mx, dy[i]! - my));
+  return pairs.map((_, i) => Math.hypot(dx[i]! - mx, dy[i]! - my));
+}
+
+/** Shades each pair by how closely it agrees with the rest: the closest third is "strong", the
+ *  furthest third "faint". */
+export function pairTiers(pairs: PointPair[]): Tier[] {
+  if (pairs.length === 0) return [];
+  const off = offsets(pairs);
   const order = off.map((_, i) => i).sort((a, b) => off[a]! - off[b]!);
   const tiers: Tier[] = new Array<Tier>(pairs.length).fill("faint");
   order.forEach((idx, rank) => {
@@ -32,6 +39,114 @@ export function pairTiers(pairs: PointPair[]): Tier[] {
     tiers[idx] = share < 1 / 3 ? "strong" : share < 2 / 3 ? "mid" : "faint";
   });
   return tiers;
+}
+
+/** Maps a place on the ad photo to the same place on the scan view, both 0 to 1:
+ *  x' = xx*x + xy*y + x0 and y' = yx*x + yy*y + y0. */
+export interface Fit {
+  xx: number;
+  xy: number;
+  x0: number;
+  yx: number;
+  yy: number;
+  y0: number;
+}
+
+/** The straight-line map that best carries the drawn ad points onto their scan points (least
+ *  squares over every drawn pair). It is what lines the ad photo up when it is laid over the
+ *  scan view, so a loose match shows as a picture that does not sit right. With too few pairs,
+ *  or pairs on one line, it falls back to the typical shift alone. */
+export function fitPairs(pairs: PointPair[]): Fit {
+  const shift: Fit = {
+    xx: 1,
+    xy: 0,
+    x0: median(pairs.map(([ax, , bx]) => bx - ax)),
+    yx: 0,
+    yy: 1,
+    y0: median(pairs.map(([, ay, , by]) => by - ay)),
+  };
+  const n = pairs.length;
+  if (n < 3) return shift;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let sxy = 0;
+  let syy = 0;
+  for (const [x, y] of pairs) {
+    sx += x;
+    sy += y;
+    sxx += x * x;
+    sxy += x * y;
+    syy += y * y;
+  }
+  // Normal equations for [x y 1]: solve the same 3 by 3 for the scan x and the scan y.
+  const det = sxx * (syy * n - sy * sy) - sxy * (sxy * n - sy * sx) + sx * (sxy * sy - syy * sx);
+  if (Math.abs(det) < 1e-9) return shift;
+  const solve = (pick: (p: PointPair) => number): [number, number, number] => {
+    let tx = 0;
+    let ty = 0;
+    let t1 = 0;
+    for (const p of pairs) {
+      const v = pick(p);
+      tx += p[0] * v;
+      ty += p[1] * v;
+      t1 += v;
+    }
+    return [
+      (tx * (syy * n - sy * sy) - sxy * (ty * n - sy * t1) + sx * (ty * sy - syy * t1)) / det,
+      (sxx * (ty * n - t1 * sy) - tx * (sxy * n - sy * sx) + sx * (sxy * t1 - ty * sx)) / det,
+      (sxx * (syy * t1 - sy * ty) - sxy * (sxy * t1 - ty * sx) + tx * (sxy * sy - syy * sx)) / det,
+    ];
+  };
+  const [xx, xy, x0] = solve((p) => p[2]);
+  const [yx, yy, y0] = solve((p) => p[3]);
+  const scale = xx * yy - xy * yx;
+  return scale > 0.25 && scale < 4 ? { xx, xy, x0, yx, yy, y0 } : shift;
+}
+
+/** The most numbered spots the match picture circles. */
+export const SPOT_MAX = 8;
+/** Two spots closer than this (as a share of the picture's width, in either picture) would have
+ *  touching rings, so the second is left out. */
+export const SPOT_GAP = 0.12;
+/** The pictures are drawn 4 wide by 3 high. */
+const ASPECT = 0.75;
+
+/** Picks a few of the drawn pairs to circle, spread out across both pictures: it starts from
+ *  the pair that agrees most closely with the rest, then keeps taking the pair furthest from
+ *  every spot already picked, skipping the loosest third when there are enough without it.
+ *  Returns indexes into `pairs`, left to right on the ad photo, so spot 1 is the leftmost. */
+export function pickSpots(pairs: PointPair[], max = SPOT_MAX, gap = SPOT_GAP): number[] {
+  if (pairs.length === 0 || max <= 0) return [];
+  const off = offsets(pairs);
+  const tiers = pairTiers(pairs);
+  const all = pairs.map((_, i) => i);
+  const close = all.filter((i) => tiers[i] !== "faint");
+  const pool = close.length >= max ? close : all;
+  const apart = (i: number, j: number): number => {
+    const [ax, ay, bx, by] = pairs[i]!;
+    const [cx, cy, dx, dy] = pairs[j]!;
+    return Math.min(
+      Math.hypot(ax - cx, (ay - cy) * ASPECT),
+      Math.hypot(bx - dx, (by - dy) * ASPECT),
+    );
+  };
+  const picked = [pool.reduce((best, i) => (off[i]! < off[best]! ? i : best))];
+  while (picked.length < max) {
+    let next = -1;
+    let far = gap;
+    for (const i of pool) {
+      if (picked.includes(i)) continue;
+      const d = Math.min(...picked.map((j) => apart(i, j)));
+      if (d >= far) {
+        far = d;
+        next = i;
+      }
+    }
+    if (next < 0) break;
+    picked.push(next);
+  }
+  return picked.sort((i, j) => pairs[i]![0] - pairs[j]![0] || i - j);
 }
 
 export const HEAT_COLS = 8;
@@ -69,11 +184,11 @@ export function coverage(pairs: PointPair[]): Coverage {
   };
 }
 
-/** One pair every STEP_MS, then a short settle. */
-export const STEP_MS = 40;
-export const drawMs = (pairs: number): number => (pairs === 0 ? 0 : pairs * STEP_MS + 450);
+/** One spot is circled every STEP_MS, then a short settle. */
+export const STEP_MS = 110;
+export const drawMs = (spots: number): number => (spots === 0 ? 0 : spots * STEP_MS + 450);
 
-/** Counts from 0 to `total` over `ms`, in step with the lines drawing in. Under reduced motion,
+/** Counts from 0 to `total` over `ms`, in step with the spots being circled. Under reduced motion,
  *  or with nothing to draw, it is the final number from the first frame. */
 export function useCountUp(total: number, ms: number, reduced: boolean): number {
   const still = reduced || ms <= 0 || total <= 0;

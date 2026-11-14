@@ -160,14 +160,14 @@
   --match-stage-2: #17262e;
   --on-match-stage: #eaf5f7;
   --match-stage-muted: #a9c0c9;
-  --match-scrim: rgb(15 26 32 / 0.6);
+  --match-scrim: rgb(15 26 32 / 0.42);
   --match-scrim-real: rgb(15 26 32 / 0.3);
+  --match-scrim-ad: rgb(15 26 32 / 0.14);
   --match-case: rgb(8 16 20 / 0.6);
   --match-strong: #9af5f1;
   --match-mid: #35c6d0;
   --match-faint: #2a94a1;
   --match-glow: drop-shadow(0 0 5px rgb(95 212 220 / 0.85));
-  --match-sweep: rgb(154 245 241 / 0.55);
   --meter-track: rgb(234 245 247 / 0.14);
   --meter-fill: #1fb6c1;
   --meter-fill-end: #9af5f1;

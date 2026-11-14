@@ -4,7 +4,7 @@ import { SourceChip } from "../components/SourceChip";
 import type { DataSource, TraceEvent } from "../contracts";
 import { FilesTree } from "../evidence/FilesTree";
 import { pickOutcome } from "../evidence/match";
-import { MatchLines } from "../evidence/MatchLines";
+import { MatchSpots } from "../evidence/MatchSpots";
 import { PickCard } from "../evidence/PickCard";
 import { barsFor, findPhoto } from "../evidence/read";
 import type { EvidenceFile } from "../evidence/types";
@@ -44,7 +44,7 @@ function Proof({
   const bar = barsFor(photo, evidence.bars).inliers;
   const body = (
     <>
-      <MatchLines photo={photo} reduced mini />
+      <MatchSpots photo={photo} reduced mini />
       <span className="ar-proof-text mono">
         {photo.alias}: {photo.points.n_total} matching points
         {bar != null ? `, ${bar} needed` : ""}
