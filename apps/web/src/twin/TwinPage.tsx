@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import { SourceChip } from "../components/SourceChip";
-import { Wordmark } from "../components/HouseGlyph";
 import type { LocateResult } from "../contracts";
 import { TracePanel } from "../trace";
+import { Photo } from "../ui/Photo";
+import { PathRail } from "../ui/PathRail";
+import { photoFor } from "../ui/photoFor";
 import { AerialProof, type AerialSide } from "./AerialProof";
 import { PhotoLanding, type FlyFrom, type LandingPhase } from "./PhotoLanding";
 import { TraceStrip } from "./TraceStrip";
+import { TwinOnStop } from "./StageRows";
 import {
   FIXTURE_ROOM_LABELS,
   chooseLocate,
@@ -19,13 +22,12 @@ import { poseToSdkCall } from "./pose";
 import { COPIED_LOCATE, FIXTURE_CLAIMED, FIXTURE_MATCHED } from "./proofFixtures";
 import { connectShowcase, embedUrl, flyToPose, watchSweeps, type ShowcaseSdk } from "./showcase";
 import { usePrefersReducedMotion } from "./useReducedMotion";
+import "./twin.css";
 
-// Synthetic stand-in for a listing photo (team-made, not sponsor imagery).
-const PLACEHOLDER_PHOTO =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#d3eedc"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#0e5630">Listing photo (fixture)</text></svg>`,
-  );
+// The listing photo stand-in on a FIXTURE run: a licensed stock interior, stamped SAMPLE PHOTO
+// wherever it shows (never passed off as the listed home).
+const SAMPLE = photoFor({ source: "fixture", stock: "interior", seed: "twin" });
+const PLACEHOLDER_PHOTO = SAMPLE.src ?? "";
 
 const NO_LABELS: Record<string, string> = {};
 const FLIGHT_MS = 900;
@@ -207,24 +209,31 @@ function TwinViewInner({
 
   return (
     <div className="twin-page">
-      <header className="twin-head">
-        <Wordmark />
-        <span className="mono">Model</span>
-        {live && sdkFailed ? (
-          <span className="chip chip-fixture" data-testid="source-chip">
-            <span className="chip-dot" aria-hidden="true" />
-            UNAVAILABLE
-            <span className="sr-only">. The 3D view could not load; a schematic is shown</span>
-          </span>
-        ) : (
-          <SourceChip source={live ? "live" : "fixture"} />
-        )}
-        <span className="mono">Photo poses</span>
-        <SourceChip source={poseIsLive ? "live" : "fixture"} />
-        <span className="mono">{caseId}</span>
+      <PathRail
+        className="twin-path"
+        next={2}
+        hrefs={{ 1: `/case/${encodeURIComponent(caseId)}`, 3: "/listings" }}
+      >
+        <span className="twin-tag">{caseId}</span>
+        <span className="twin-tag">
+          3D view{" "}
+          {live && sdkFailed ? (
+            <span className="chip chip-fixture" data-testid="source-chip">
+              <span className="chip-dot" aria-hidden="true" />
+              UNAVAILABLE
+              <span className="sr-only">. The 3D view could not load; a schematic is shown</span>
+            </span>
+          ) : (
+            <SourceChip source={live ? "live" : "fixture"} />
+          )}
+        </span>
+        <span className="twin-tag">
+          Photo poses <SourceChip source={poseIsLive ? "live" : "fixture"} />
+        </span>
+      </PathRail>
+      <nav className="twin-ways" aria-label="Where next">
         {mismatch && otherHome && (
           <a
-            className="mono"
             href={`/tour/${encodeURIComponent(otherHome)}?case=${encodeURIComponent(caseId)}&where=photos`}
             data-testid="where-photos-link"
           >
@@ -233,14 +242,13 @@ function TwinViewInner({
         )}
         {locate.claimed_property_id && (
           <a
-            className="mono"
             href={`/tour/${encodeURIComponent(locate.claimed_property_id)}?case=${encodeURIComponent(caseId)}`}
             data-testid="walk-it-first-link"
           >
             Walk it first
           </a>
         )}
-      </header>
+      </nav>
       <div className="twin-body">
         <section className="twin-stage" aria-label="3D view" ref={stageRef}>
           {live && sdkKey && modelId ? (
@@ -264,9 +272,15 @@ function TwinViewInner({
             from={from}
           />
         </section>
+        <TwinOnStop photoId={photoId} state={state} src={PLACEHOLDER_PHOTO} sample />
         <aside className="twin-side">
           <figure className="listing-card" ref={cardRef}>
-            <img src={PLACEHOLDER_PHOTO} alt={`Listing photo ${photoId}`} />
+            <Photo
+              src={PLACEHOLDER_PHOTO}
+              alt={`Listing photo ${photoId}`}
+              stamp="sample"
+              className="listing-card-photo"
+            />
             <figcaption className="mono">Listing photo {photoId}</figcaption>
           </figure>
           <div className="twin-photos">

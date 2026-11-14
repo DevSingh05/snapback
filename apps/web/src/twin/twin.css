@@ -1,0 +1,154 @@
+/* The twin page around the player (design v4 6.3 ticket 6). Loaded after app.css, so these rules
+   replace its structure-only twin block: a path rail with the page's LIVE or FIXTURE tags, a
+   matte stage edge to edge, "On this stop" as two rows under it, the rest below. */
+.twin-page {
+  max-width: var(--page-max);
+  gap: 0;
+  padding: 0;
+}
+.twin-path,
+.twin-ways {
+  padding-inline: var(--page-pad);
+}
+.twin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: var(--sp-3);
+}
+.twin-ways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-5);
+}
+.twin-ways a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--act);
+  font-weight: 700;
+}
+.twin-ways:empty {
+  display: none;
+}
+.twin-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.twin-stage {
+  min-height: 0;
+  height: min(62vh, 640px);
+  background: var(--matte);
+  color: var(--on-matte);
+  box-shadow: none;
+}
+.twin-placeholder {
+  color: var(--on-matte-muted);
+}
+.twin-onstop {
+  padding: var(--sp-4) var(--page-pad) var(--sp-2);
+  display: grid;
+  gap: var(--sp-3);
+}
+.twin-onstop-h {
+  margin: 0;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--act);
+  font-weight: 700;
+}
+.twin-onstop-row {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr) auto;
+  gap: var(--sp-1) var(--sp-4);
+  align-items: start;
+}
+.twin-onstop-k,
+.twin-onstop-v {
+  margin: 0;
+}
+.twin-onstop-k {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 0.2em;
+}
+.twin-onstop-v {
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  max-width: 60ch;
+}
+/* The ad's photo; the hand-off from the case result lands on it (same name as the Walk's). */
+.twin-adthumb {
+  width: 132px;
+  aspect-ratio: 4 / 3;
+  view-transition-name: ad-photo;
+}
+.twin-side {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--page-pad) var(--sp-5);
+  align-items: start;
+}
+.listing-card {
+  margin: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+.listing-card-photo {
+  aspect-ratio: 4 / 3;
+}
+.aerial-proof {
+  background: transparent;
+  padding: 0;
+}
+.twin-photos button {
+  min-height: 48px;
+}
+@media (max-width: 800px) {
+  .twin-stage {
+    height: 62vh;
+    min-height: 0;
+  }
+  .twin-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .twin-onstop-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .twin-onstop-k {
+    grid-column: 1 / -1;
+  }
+  .twin-adthumb {
+    width: 72px;
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+/* The schematic on a matte stage: the plan's floor is a faint bone wash, the label reads on matte. */
+.twin-stage .plan-floor {
+  fill: color-mix(in srgb, var(--on-matte) 10%, transparent);
+}
+.twin-stage .landing-schematic {
+  color: var(--on-matte-muted);
+}
+@media (max-width: 800px) {
+  /* Three tags do not fit one line at phone width: they wrap inside the rail. */
+  .twin-path {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .twin-path .ui-rail-end {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .twin-tag:first-child {
+    margin-left: 0;
+  }
+}
