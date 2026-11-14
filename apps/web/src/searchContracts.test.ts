@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AS_OF } from "./contracts";
-import type { PlaceMatch, RenterBrief, SearchResponse, TourDraft } from "./contracts";
+import type {
+  CasePreferences,
+  PlaceMatch,
+  RenterBrief,
+  SearchResponse,
+  TourDraft,
+} from "./contracts";
 
 // Synthetic: mirrors what POST /search returns on the fixture kit.
 const place: PlaceMatch = {
@@ -48,5 +54,41 @@ describe("search contracts", () => {
     };
     expect(draft.sent).toBe(false);
     expect(draft.status).toBe("draft");
+  });
+
+  it("a researched place is unchecked; a checked one carries a code-built line and the decisions say who chose", () => {
+    const checked: PlaceMatch = {
+      ...place,
+      checked: true,
+      check_line: `Checked: listed for rent by Fixture Office; not listed for sale, ${AS_OF}.`,
+    };
+    const response: SearchResponse = {
+      source: "fixture",
+      as_of: AS_OF,
+      n_considered: 7,
+      n_matches: 2,
+      matches: [checked, place],
+      decisions: [
+        {
+          kind: "deep_check",
+          options: ["The first 2 in the list", "The 2 cheapest"],
+          pick: "The 2 cheapest",
+          reason: "Price matters most here.",
+          chosen_by: "model",
+        },
+      ],
+      question: null,
+      ask_first: false,
+      remembered: ["no_walkup"],
+    };
+    expect(response.matches[1]?.checked ?? false).toBe(false);
+    expect(response.decisions?.[0]?.chosen_by).toBe("model");
+    const prefs: CasePreferences = {
+      no_walkup: true,
+      needs_parking: false,
+      max_rent: null,
+      avoid_property_ids: [],
+    };
+    expect(prefs.no_walkup).toBe(true);
   });
 });

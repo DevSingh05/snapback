@@ -495,7 +495,7 @@ def test_one_option_menus_never_go_to_the_model_and_are_stamped_policy(kit):
     plan_ = plan_search(
         _matches(kit)[:1], [], chooser
     )  # one match: one deep-check set; no questions
-    assert [s.chosen_by for s in plan_.steps] == ["policy", "policy"]
+    assert [s.chosen_by for s in plan_.steps] == ["policy", "policy", "policy"]
     assert chooser.seen == []
     assert plan_.question is None
 
@@ -525,12 +525,12 @@ def test_the_tradeoff_choice_asks_one_code_written_question_or_none():
     offer = tradeoff_offer(options, 4)
     assert offer.options[-1] == NO_QUESTION and offer.default == options[0].question
     asked = plan_search([], options, Scripted(offer.aliases[1]))
-    assert asked.question == options[1].question and asked.steps[-1].chosen_by == "model"
+    assert asked.question == options[1].question and asked.steps[0].chosen_by == "model"
     nothing = plan_search([], options, Scripted(offer.aliases[2]))
     assert nothing.question is None
     default = plan_search([], options, PolicyChooser())
-    assert default.question == options[0].question and default.steps[-1].chosen_by == "policy"
-    assert plan_search([], [], Scripted("x")).steps[-1].chosen_by == "policy"  # a menu of one
+    assert default.question == options[0].question and default.steps[0].chosen_by == "policy"
+    assert plan_search([], [], Scripted("x")).steps[0].chosen_by == "policy"  # a menu of one
 
 
 def test_tradeoffs_come_from_a_second_search_with_one_need_relaxed(kit):
