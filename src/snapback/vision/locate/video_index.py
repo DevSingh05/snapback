@@ -12,6 +12,7 @@ team-made.
 
 import argparse
 import json
+import math
 import sys
 import time
 from collections.abc import Sequence
@@ -26,6 +27,10 @@ from snapback.vision.locate.index import INDEX_ROOT, LocateIndex
 REPO_ROOT = Path(__file__).resolve().parents[4]
 VIDEO_ROOT = REPO_ROOT / "data" / "video"
 MAX_SIDE = 1280
+MAX_BYTES = 500_000_000  # a 60 s phone video is well under this
+MAX_SECONDS = 180.0  # longer walkthroughs are refused, never silently cut
+MAX_FPS = 240.0  # a reported fps above this is treated as unknown
+BUDGET_S = 120.0  # wall-clock budget for reading one video
 
 
 def _shrink(image: Image.Image) -> Image.Image:
@@ -36,17 +41,42 @@ def _shrink(image: Image.Image) -> Image.Image:
     return image
 
 
+def _spread(frames: list[tuple[float, Image.Image]], max_frames: int) -> list:
+    """At most max_frames, evenly over the whole list (the last room stays in the index)."""
+    if len(frames) <= max_frames:
+        return frames
+    keep = sorted({round(i * (len(frames) - 1) / (max_frames - 1)) for i in range(max_frames)})
+    return [frames[i] for i in keep]
+
+
+def _too_long(seconds: float) -> ValueError:
+    return ValueError(
+        f"the walkthrough is {seconds:.0f} s; keep it under {MAX_SECONDS:.0f} s "
+        "(one room or a short route)"
+    )
+
+
 def _frames_pil(path: Path, every_s: float, max_frames: int) -> list[tuple[float, Image.Image]]:
     out, clock, next_at = [], 0.0, 0.0
+    started = time.monotonic()
     with Image.open(path) as clip:
         for frame in ImageSequence.Iterator(clip):
+            if time.monotonic() - started >= BUDGET_S:
+                raise ValueError(
+                    f"reading {path.name} took longer than the {BUDGET_S:.0f} s budget"
+                )
+            if clock > MAX_SECONDS:
+                raise _too_long(clock)
             if clock + 1e-9 >= next_at:
                 out.append((clock, _shrink(frame.copy())))
                 next_at += every_s
-                if len(out) >= max_frames:
-                    break
             clock += (frame.info.get("duration") or 100) / 1000.0
-    return out
+    return _spread(out, max_frames)
+
+
+def _usable_fps(value: float) -> float | None:
+    """An fps that is finite and plausible for a phone video, else None (unknown)."""
+    return value if math.isfinite(value) and 0 < value <= MAX_FPS else None
 
 
 def _frames_cv(path: Path, every_s: float, max_frames: int) -> list[tuple[float, Image.Image]]:
@@ -55,28 +85,53 @@ def _frames_cv(path: Path, every_s: float, max_frames: int) -> list[tuple[float,
     capture = cv2.VideoCapture(str(path))
     if not capture.isOpened():
         return []
-    fps = capture.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = _usable_fps(float(capture.get(cv2.CAP_PROP_FPS) or 0.0))
+    count = float(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0)
+    duration = count / fps if fps and count > 0 else None
+    if duration is not None:
+        if duration > MAX_SECONDS:
+            capture.release()
+            raise _too_long(duration)
+        every_s = max(every_s, duration / max_frames)  # spread the cap over the whole video
     out, number, next_at = [], 0, 0.0
+    started = time.monotonic()
     try:
-        while len(out) < max_frames:
+        while True:
+            if time.monotonic() - started >= BUDGET_S:
+                raise ValueError(
+                    f"reading {path.name} took longer than the {BUDGET_S:.0f} s budget"
+                )
             ok, bgr = capture.read()
             if not ok:
                 break
-            at = number / fps
+            # The video's own clock; frame number over fps only when it gives none.
+            at = float(capture.get(cv2.CAP_PROP_POS_MSEC) or 0.0) / 1000.0
+            if not math.isfinite(at) or (at <= 0 and number > 0):
+                at = number / (fps or 30.0)
+            if at > MAX_SECONDS:
+                raise _too_long(at)
             if at + 1e-9 >= next_at:
                 out.append((at, _shrink(Image.fromarray(bgr[:, :, ::-1]))))
                 next_at += every_s
             number += 1
     finally:
         capture.release()
-    return out
+    return _spread(out, max_frames)
 
 
 def sample_frames(
     path: Path, every_s: float = 0.5, max_frames: int = 240
 ) -> list[tuple[float, Image.Image]]:
-    """(seconds, frame) every `every_s` seconds, at most `max_frames`, frames at most 1280 px."""
+    """(seconds, frame) every `every_s` seconds, at most `max_frames` spread over the whole
+    video, frames at most 1280 px. Refuses a file over MAX_BYTES or a video over MAX_SECONDS,
+    and stops at BUDGET_S of reading, each with a ValueError that says why."""
     path = Path(path)
+    size = path.stat().st_size
+    if size > MAX_BYTES:
+        raise ValueError(
+            f"{path.name} is too large ({size // 1_000_000} MB; at most "
+            f"{MAX_BYTES // 1_000_000} MB)"
+        )
     frames: list[tuple[float, Image.Image]] = []
     try:
         frames = _frames_pil(path, every_s, max_frames)

@@ -84,3 +84,95 @@ def test_unreadable_clip_is_a_clear_error(tmp_path):
     bad.write_bytes(b"not a video")
     with pytest.raises(ValueError, match="could not read"):
         sample_frames(bad)
+
+
+# --- review (#114): caps, budget, timestamps, bad fps, frames spread over the whole video --------
+
+
+class FakeCapture:
+    """A cv2.VideoCapture stand-in: `count` frames at `true_fps`, reporting `reported_fps`."""
+
+    def __init__(self, count: int, true_fps: float, reported_fps: float) -> None:
+        self.count, self.true_fps, self.reported_fps, self.at = count, true_fps, reported_fps, 0
+
+    def isOpened(self) -> bool:  # noqa: N802 - cv2's name
+        return True
+
+    def get(self, prop):
+        if prop == "fps":
+            return self.reported_fps
+        if prop == "count":
+            return float(self.count)
+        if prop == "msec":
+            return 1000.0 * max(0, self.at - 1) / self.true_fps
+        return 0.0
+
+    def read(self):
+        if self.at >= self.count:
+            return False, None
+        self.at += 1
+        return True, np.full((48, 64, 3), self.at % 255, dtype=np.uint8)
+
+    def release(self) -> None:
+        pass
+
+
+def fake_cv2(monkeypatch, count: int, true_fps: float, reported_fps: float) -> None:
+    import sys
+    import types
+
+    module = types.SimpleNamespace(
+        CAP_PROP_FPS="fps",
+        CAP_PROP_FRAME_COUNT="count",
+        CAP_PROP_POS_MSEC="msec",
+        VideoCapture=lambda path: FakeCapture(count, true_fps, reported_fps),
+    )
+    monkeypatch.setitem(sys.modules, "cv2", module)
+
+
+@pytest.mark.parametrize("reported", [30.0, 0.0, float("nan"), 1000.0])
+def test_mp4_path_uses_the_video_clock_whatever_fps_it_reports(tmp_path, monkeypatch, reported):
+    clip = tmp_path / "walk.mp4"
+    clip.write_bytes(b"\x00" * 64)  # Pillow cannot read it, so the OpenCV path runs
+    fake_cv2(monkeypatch, count=300, true_fps=30.0, reported_fps=reported)  # a 10 s video
+    frames = sample_frames(clip, every_s=0.5)
+    assert len(frames) == 20
+    assert [round(t, 2) for t, _ in frames[:3]] == [0.0, 0.5, 1.0]
+
+
+def test_a_long_video_is_refused_with_a_clear_error(tmp_path, monkeypatch):
+    clip = tmp_path / "walk.mp4"
+    clip.write_bytes(b"\x00" * 64)
+    fake_cv2(monkeypatch, count=30 * 240, true_fps=30.0, reported_fps=30.0)  # 4 minutes
+    with pytest.raises(ValueError, match="180 s"):
+        sample_frames(clip)
+
+
+def test_frames_spread_over_the_whole_video_when_the_cap_bites(tmp_path, monkeypatch):
+    clip = tmp_path / "walk.mp4"
+    clip.write_bytes(b"\x00" * 64)
+    fake_cv2(monkeypatch, count=30 * 150, true_fps=30.0, reported_fps=30.0)  # 150 s
+    frames = sample_frames(clip, every_s=0.5, max_frames=100)
+    assert len(frames) <= 100
+    assert frames[-1][0] > 140  # the last room is still in the index
+
+
+def test_a_file_over_the_size_cap_is_refused(tmp_path, monkeypatch):
+    import snapback.vision.locate.video_index as vi
+
+    clip = tmp_path / "walk.mp4"
+    clip.write_bytes(b"\x00" * 2048)
+    monkeypatch.setattr(vi, "MAX_BYTES", 1024)
+    with pytest.raises(ValueError, match="too large"):
+        sample_frames(clip)
+
+
+def test_reading_stops_at_the_time_budget(tmp_path, monkeypatch):
+    import snapback.vision.locate.video_index as vi
+
+    clip = tmp_path / "walk.mp4"
+    clip.write_bytes(b"\x00" * 64)
+    fake_cv2(monkeypatch, count=300, true_fps=30.0, reported_fps=30.0)
+    monkeypatch.setattr(vi, "BUDGET_S", 0.0)
+    with pytest.raises(ValueError, match="budget"):
+        sample_frames(clip)
