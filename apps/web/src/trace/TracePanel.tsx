@@ -4,7 +4,7 @@ import { SourceChip } from "../components/SourceChip";
 import type { ChoiceKind, DataSource, TraceEvent } from "../contracts";
 import traceRaw from "../../../../fixtures/contracts/trace_events.jsonl?raw";
 import { mergeEvent, parseFixtureLines } from "./parse";
-import { apiBase, loadCaseToken } from "../api";
+import { apiBase, loadCaseReadToken } from "../api";
 import { openLiveTrace, openReplayTrace, type StreamStatus } from "./stream";
 
 export const CHOICE_LABELS: Record<ChoiceKind, string> = {
@@ -113,7 +113,7 @@ export function TracePanel({
     if (resolved === "static") return;
     const add = (e: TraceEvent) => setEvents((list) => mergeEvent(list, e));
     if (resolved === "live" && base)
-      return openLiveTrace(base, caseId, add, setStatus, loadCaseToken(caseId));
+      return openLiveTrace(base, caseId, add, setStatus, loadCaseReadToken(caseId));
     const source = replaySource ?? fixtureTrace.map((e) => ({ ...e, case_id: caseId }));
     return openReplayTrace(source, add, setStatus);
   }, [caseId, resolved, base, replaySource]);

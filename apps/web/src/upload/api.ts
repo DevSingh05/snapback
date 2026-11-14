@@ -1,5 +1,5 @@
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
-import { apiFetch, dataMode, saveCaseToken } from "../api";
+import { apiFetch, dataMode, saveCaseReadToken, saveCaseToken } from "../api";
 import type { DataSource } from "../contracts";
 
 export interface CreatedCase {
@@ -69,9 +69,11 @@ export const createCase: CreateCase = async (input, signal) => {
     case_id: string;
     source: DataSource;
     token: string;
+    read_token?: string | null;
     challenge_text?: string | null;
   };
   saveCaseToken(made.case_id, made.token);
+  if (made.read_token) saveCaseReadToken(made.case_id, made.read_token);
   return {
     case_id: made.case_id,
     source: made.source,

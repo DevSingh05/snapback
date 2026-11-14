@@ -28,6 +28,26 @@ export function saveCaseToken(caseId: string, token: string): void {
   }
 }
 
+// The read-only secret (POST /cases `read_token`). Only this one may travel in a URL, for the
+// SSE trace, because EventSource cannot send headers. The write token above never does.
+const READ_TOKEN_PREFIX = "snapback.case-read-token.";
+
+export function saveCaseReadToken(caseId: string, token: string): void {
+  try {
+    window.sessionStorage.setItem(READ_TOKEN_PREFIX + caseId.toUpperCase(), token);
+  } catch {
+    // Storage blocked: the live trace shows its locked state.
+  }
+}
+
+export function loadCaseReadToken(caseId: string): string | null {
+  try {
+    return window.sessionStorage.getItem(READ_TOKEN_PREFIX + caseId.toUpperCase());
+  } catch {
+    return null;
+  }
+}
+
 export function loadCaseToken(caseId: string): string | null {
   try {
     return window.sessionStorage.getItem(TOKEN_PREFIX + caseId.toUpperCase());
