@@ -11,13 +11,13 @@ const s = makeScene(ORIGIN);
 
 const street = (y: number): Part[] => [
   part("pavement", [
-    s.onZ("dk-path", 0.05, -120, y - 10, 520, 10),
-    s.onZ("dk-path", 0.05, -120, y + 40, 520, 10),
+    s.onZ("dk-path", 0.05, -400, y - 10, 1100, 10),
+    s.onZ("dk-path", 0.05, -400, y + 40, 1100, 10),
   ]),
-  part("street", [s.onZ("dk-asphalt", 0.05, -120, y, 520, 40)]),
+  part("street", [s.onZ("dk-asphalt", 0.05, -400, y, 1100, 40)]),
   part(
     "street-lines",
-    between(-120, 400, 15).map((x) => s.line("dk-paint", [x, y + 20, 0.2], [x + 14, y + 20, 0.2])),
+    between(-400, 700, 32).map((x) => s.line("dk-paint", [x, y + 20, 0.2], [x + 14, y + 20, 0.2])),
     true,
   ),
 ];
@@ -26,7 +26,7 @@ const street = (y: number): Part[] => [
 const HOME = { x: 96, y: 62, w: 74, d: 56, h: 28 };
 
 const FAR: Part[] = [
-  part("ground", [s.onZ("dk-lawn", 0, -120, -90, 520, 420)]),
+  part("ground", [s.onZ("dk-lawn", 0, -400, -400, 1100, 1100)]),
   s.tree(-64, 20, 1.6),
   ...s.house(-40, 66, 62, 50, 24, "pale"),
   s.tree(40, 54, 1.5),
@@ -54,9 +54,9 @@ const LIT: Part[] = [
 
 // Three ad photos, floating above the street, each traced to a spot on the lit home.
 const PHOTOS = [
-  { x: 26, y: 18, to: [HOME.x + 20, HOME.y + HOME.d, 16] as const },
-  { x: 118, y: 4, to: [HOME.x + 54, HOME.y + HOME.d, 16] as const },
-  { x: 210, y: 22, to: [HOME.x + HOME.w, HOME.y + 38, 12] as const },
+  { x: 92, y: 10, to: [HOME.x + 20, HOME.y + HOME.d, 16] as const },
+  { x: 192, y: 2, to: [HOME.x + 54, HOME.y + HOME.d, 16] as const },
+  { x: 300, y: 16, to: [HOME.x + HOME.w, HOME.y + 38, 12] as const },
 ];
 const PW = 62;
 const PH = 44;

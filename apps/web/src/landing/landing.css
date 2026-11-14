@@ -13,10 +13,11 @@
   grid-template-areas: "eyebrow scene" "title scene" "lead scene";
   align-content: center;
   column-gap: clamp(12px, 3vw, 32px);
-  padding-right: clamp(12px, 2vw, 24px);
-  padding-block: clamp(20px, 3vw, 30px) 0;
+  padding-right: 0;
+  padding-block: 0;
 }
 .upload-intro:has(.hs) .upload-eyebrow {
+  margin-top: clamp(20px, 3vw, 30px);
   grid-area: eyebrow;
   justify-self: start;
   align-self: end;
@@ -157,8 +158,14 @@ p.hiw-text {
   .upload-intro:has(.hs) {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "scene" "eyebrow" "title" "lead";
-    padding-top: 8px;
-    padding-right: clamp(18px, 4vw, 36px);
+    padding-top: 0;
+    padding-inline: 0;
+  }
+  .upload-intro:has(.hs) > :not(.hs) {
+    margin-inline: clamp(18px, 4vw, 36px);
+  }
+  .upload-intro:has(.hs) .upload-eyebrow {
+    margin-top: 14px;
   }
   .hiw-steps {
     grid-template-columns: minmax(0, 1fr);
