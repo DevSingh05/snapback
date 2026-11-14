@@ -42,7 +42,7 @@ MARKETS = {14: "Houston", 20: "Los Angeles"}
 # Candidate key paths per output field, first present wins. Dotted paths walk nested objects.
 FIELDS: dict[str, list[str]] = {
     "property_id": ["propertyId", "id"],
-    "floors": ["numberOfStories", "stories", "buildingStories", "floors"],
+    "floors": ["numStoriesAboveGrade"],  # real kit key, 3,327 records (#152)
     "year_built": ["yearBuilt", "builtYear"],
     "lat": ["primaryAddress.latitude", "location.latitude", "latitude"],
     "lon": ["primaryAddress.longitude", "location.longitude", "longitude"],
@@ -69,15 +69,15 @@ LISTING_FIELDS: dict[str, list[str]] = {
     "rent_pricing": ["rentPricingType"],
 }
 MODEL_FIELDS: dict[str, list[str]] = {
-    "beds": ["beds", "bedrooms", "bedroomCount"],
-    "baths": ["baths", "bathrooms", "bathroomCount"],
+    "beds": ["numBeds"],  # real kit keys on models and units (#152)
+    "baths": ["numBaths"],
     "rent_min": ["minRent"],
     "rent_max": ["maxRent"],
     "rent_pricing": ["rentPricingType"],
 }
 UNIT_FIELDS: dict[str, list[str]] = {
     "unit": ["unitNumber", "unit", "name"],
-    "beds": ["beds", "bedrooms", "bedroomCount"],
+    "beds": ["numBeds"],
     "floor_plan": ["floorPlanName", "floorPlan", "modelName"],
 }
 ENUMS_FILE = "enums.json"
