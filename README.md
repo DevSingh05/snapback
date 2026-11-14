@@ -102,11 +102,11 @@ scammer. Cards come as a web page and as a PNG with a verify link.
   <tr>
     <td width="40%" valign="top"><img src="docs/images/paste-the-ad.png" alt="The first screen. The eyebrow reads 'Trust the home, not the ad.' and the heading 'Found a place online? Paste the ad.' A short house ad is pasted in the box, the max rent is 1800, beds is set to 3 or more and Pets is ticked, above the 'Check this listing' button." /></td>
     <td width="38%" valign="top"><img src="docs/images/places-tour-draft.png" alt="The 'Researched places that fit your budget' strip. A 1 bed, 1 bath floor plan at $1,100 to $1,250 a month as of CoStar's last research, with walk-up, utilities, parking and pet lines, a '3D scan in this building' tag, the leasing office on record, and an open tour-request draft addressed to that office with a Copy button." /></td>
-    <td width="22%" valign="top"><img src="docs/images/phone-verdict.png" alt="The same Don't pay card on a phone, 390 pixels wide, with each check stacked above its status chip." /></td>
+    <td width="22%" valign="top"><img src="docs/images/phone-verdict.png" alt="The Don't pay card for the same staged ad, on a phone, 390 pixels wide, with each check stacked above its status chip." /></td>
   </tr>
   <tr>
     <td valign="top"><sub>Paste the ad you found. Budget and must-haves are optional.</sub></td>
-    <td valign="top"><sub>Researched places that fit the budget, and a tour request drafted to the office on record. You copy it and send it yourself.</sub></td>
+    <td valign="top"><sub>Researched places that fit the budget (a separate search), and a tour request drafted to the office on record. You copy it and send it yourself.</sub></td>
     <td valign="top"><sub>The card on a phone.</sub></td>
   </tr>
 </table>
@@ -190,7 +190,8 @@ Lanes: A agent and backend, T front end, V vision and ML, D data and iMessage. O
   kit's listing photos. No accuracy number appears here, in the demo or on a card until the
   harness measures it, with n shown.
 - **Numbers so far are on renders, not photos.** The locate gate is measured on renders of the
-  scans, and every line it prints says so. Apartment buildings and houses are both indexed now.
+  scans, and every line it prints says so. Three demo houses are now indexed beside the apartment
+  scans; house results so far are on renders too.
 - **Houston only.** Search covers CoStar's Houston listings.
 - **Owner of record and license: Houston/Texas only.** The owner comes from the Harris County record
   (Houston houses only), and the license check uses Texas (TREC) data.
