@@ -6,16 +6,24 @@ the run cannot be made (a requested model has no results); nothing is written th
 """
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from snapback.eval.bank import FIXTURE_BANK, REPO_ROOT, bank_digest, load_bank
-from snapback.eval.harness import check_holdout, check_injections, check_regression, evaluate
+from snapback.eval.harness import (
+    calibration_rows,
+    check_holdout,
+    check_injections,
+    check_regression,
+    evaluate,
+)
 from snapback.eval.results import read_meta, read_results, write_results
 
 # Git-tracked: aggregate numbers only. The API serves this file at GET /eval/results.csv.
 DEFAULT_OUT = REPO_ROOT / "eval" / "results.csv"
+DEFAULT_CALIBRATION = REPO_ROOT / "eval" / "locate_calibration.json"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -30,6 +38,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--baseline", type=Path, help="earlier results.csv the run must not lose to"
     )
     parser.add_argument("--frozen-at", help="H0 freeze tag; FIXTURE for the synthetic bank")
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=DEFAULT_CALIBRATION,
+        help="locate calibration bins to append as calibration_bin rows, if the file exists",
+    )
     args = parser.parse_args(argv)
 
     cases = load_bank(args.bank)
@@ -73,7 +87,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Nothing is written: the results file the API serves stays the last one that passed.
         print(f"gate failed: {args.out} left as it was")
         return 1
-    write_results(rows, args.out, comment=label, meta=meta)
+    comment = label
+    if args.calibration.is_file():
+        calibration = json.loads(args.calibration.read_text())
+        rows = [*rows, *calibration_rows(args.calibration)]
+        comment += f"\ncalibration rows: {calibration['source']} ({calibration['version']})"
+    write_results(rows, args.out, comment=comment, meta=meta)
     print(f"wrote {len(rows)} rows to {args.out} ({len(cases)} cases in the bank)")
     print("gate: ok")
     return 0

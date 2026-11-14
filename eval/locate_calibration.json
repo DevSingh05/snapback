@@ -1,0 +1,38 @@
+{
+  "source": "renders: unseen directions from the indexed scan points, not photos",
+  "version": "cal-20261114-0404",
+  "n_fit": 80,
+  "n_test": 80,
+  "bins": [
+    {
+      "low": 0.0,
+      "high": 0.1,
+      "k": 3,
+      "n": 37
+    },
+    {
+      "low": 0.5,
+      "high": 0.6,
+      "k": 2,
+      "n": 4
+    },
+    {
+      "low": 0.6,
+      "high": 0.7,
+      "k": 1,
+      "n": 3
+    },
+    {
+      "low": 0.8,
+      "high": 0.9,
+      "k": 4,
+      "n": 6
+    },
+    {
+      "low": 0.9,
+      "high": 1.0,
+      "k": 30,
+      "n": 30
+    }
+  ]
+}

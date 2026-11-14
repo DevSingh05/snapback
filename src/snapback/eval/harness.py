@@ -9,7 +9,9 @@ A condition decides which module outputs the verdict code may see:
 Every number comes from `snapback.verdict`, so the harness measures the product as shipped.
 """
 
+import json
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 
 from snapback.contracts import MemoryHitKind, ModuleEvidence, PresenceStatus
 from snapback.eval.bank import BankCase, CaseKind
@@ -24,8 +26,9 @@ COPY_ATTACK_PREFIX = "copy"  # attacks that reuse a listing photo: copy, copy_cr
 # Metrics where a higher rate is worse; the regression gate watches these.
 GATED_METRICS = (FORGED_FALSE_ACCEPT,)
 
-# TODO(#93): emit `calibration_bin:LO-HI` rows (condition place_real_after) once
-# locate produces calibrated scores (V2 #28, V7 #33). Schema: the comment on #32.
+# Locate calibration (V7 #33, #93): reliability bins measured on renders of live scans, so
+# their own condition, never mixed with the bank's rows.
+CALIBRATION_CONDITION = "place_real_renders"
 
 Condition = Callable[[ModuleEvidence], ModuleEvidence]
 
@@ -94,6 +97,23 @@ def evaluate(
         )
         rows.append(ResultRow.measure("memory", MEMORY_CATCH, caught, len(copies), frozen_at))
     return rows
+
+
+def calibration_rows(path: Path) -> list[ResultRow]:
+    """`calibration_bin:LO-HI` rows from `python -m snapback.vision.locate.calibrate`'s file:
+    rate = share of placements in the bin that were right, with k and n."""
+    data = json.loads(Path(path).read_text())
+    return [
+        ResultRow.measure(
+            CALIBRATION_CONDITION,
+            f"calibration_bin:{b['low']:.2f}-{b['high']:.2f}",
+            int(b["k"]),
+            int(b["n"]),
+            data["version"],
+        )
+        for b in data["bins"]
+        if int(b["n"]) > 0
+    ]
 
 
 def check_injections(cases: Sequence[BankCase]) -> list[str]:
