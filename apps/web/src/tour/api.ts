@@ -1,5 +1,5 @@
 import { apiBase, apiFetch, apiFetchRead } from "../api";
-import type { TourPlan } from "../contracts";
+import type { TourPlan, WalkResponse } from "../contracts";
 import { FIXTURE_TOUR } from "./fixtureTour";
 
 export interface TourTarget {
@@ -15,10 +15,11 @@ export async function fetchTour(target: TourTarget, signal?: AbortSignal): Promi
   const q = target.planKey ? `?plan_key=${encodeURIComponent(target.planKey)}` : "";
   const place = `/places/${encodeURIComponent(target.propertyId)}/tour${q}`;
   const withCase = target.caseId
-    ? apiFetchRead(`/cases/${encodeURIComponent(target.caseId)}/tour`, target.caseId, { signal })
+    ? apiFetchRead(`/cases/${encodeURIComponent(target.caseId)}/walk`, target.caseId, { signal })
     : null;
-  let res = withCase ? await withCase : null;
-  if (!res || !res.ok) res = await apiFetch(place, { signal });
+  const caseRes = withCase ? await withCase : null;
+  if (caseRes?.ok) return ((await caseRes.json()) as WalkResponse).plan;
+  const res = await apiFetch(place, { signal });
   if (res.status === 404) throw new Error("No researched place with that id.");
   if (res.status === 422) throw new Error("This building has several floor plans. Pick one first.");
   if (!res.ok) throw new Error(`The tour could not load (${res.status}).`);

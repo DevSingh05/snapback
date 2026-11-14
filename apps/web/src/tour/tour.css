@@ -106,3 +106,58 @@
     min-height: 240px;
   }
 }
+
+/* Room stop (W3). Structure lives in RoomStop.tsx; these are the only style hooks. */
+.tour-stage {
+  position: relative;
+}
+.tour-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tour-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.tour-photo-label {
+  margin: 0;
+  font-weight: 700;
+  color: var(--teal);
+}
+.tour-empty-frame {
+  margin: 0;
+  padding: 14px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+.tour-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.tour-stop[data-dwell="true"] {
+  background: var(--teal-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.tour-claims {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--amber);
+}
+.tour-coverage,
+.tour-banner {
+  margin: 0;
+}
+.tour-banner {
+  background: var(--amber-soft);
+  color: var(--amber);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+.tour-agent-slot:empty {
+  display: none;
+}

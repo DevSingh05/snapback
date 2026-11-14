@@ -63,7 +63,7 @@ describe("TourView in fixture mode (no SDK)", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
     expect(title()).toBe("Kitchen");
     expect(screen.getByRole("button", { name: "Kitchen" })).toHaveAttribute("aria-current", "step");
-    expect(screen.getByText(/Your ad photo photo-1 was placed in this room/)).toBeInTheDocument();
+    expect(screen.getByText("The photo you sent, taken here.")).toBeInTheDocument();
     expect(screen.getByText(/automatic labels/)).toBeInTheDocument();
   });
 
