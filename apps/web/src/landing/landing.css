@@ -1,7 +1,7 @@
 /* Home's hero photograph and the four-step path (design v4 ticket 2). Every colour is a token
    (tokens.css); corners are sharp and nothing is boxed. */
 
-/* ---------- The hero photograph: day and dusk, crossfading with the theme ---------- */
+/* ---------- The hero photograph: one daylight picture ---------- */
 .hs {
   position: absolute;
   inset: 0;
@@ -19,23 +19,8 @@
   object-position: 62% 38%;
   filter: var(--hero-filter);
 }
-.hs-dusk {
-  opacity: 0;
-  object-position: 36% 82%;
-}
-:root[data-theme="dark"] .hs-dusk {
-  opacity: 1;
-}
-:root[data-theme="dark"] .hs-day {
-  opacity: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .hs-img {
-    transition: opacity 600ms var(--ease-out);
-  }
-}
 /* The matte scrim: two flat ink gradients, heavier on the left where the words sit and at the
-   top and bottom edges. --scrim-o lightens it at Dusk so the lit building shows. */
+   top and bottom edges. */
 .hs-scrim {
   position: absolute;
   inset: 0;

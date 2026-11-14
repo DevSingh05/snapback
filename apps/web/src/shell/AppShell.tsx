@@ -2,14 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Lockup } from "../ui/Mark";
 import { loadPrefs, savePrefs, TABS, type Prefs, type Section } from "./prefs";
-import {
-  applyTheme,
-  defaultTheme,
-  initialChoice,
-  saveTheme,
-  THEME_WORDS,
-  type Theme,
-} from "./theme";
 import "./shell.css";
 
 export type { Section };
@@ -36,17 +28,10 @@ export const PURPOSE: Record<string, string> = {
   "Tour prep": "Get ready to visit: what to ask and what to check.",
 };
 
-/** The website's address, when the app is built knowing it. Links to it carry the theme. */
+/** The website's address, when the app is built knowing it.  */
 const SITE_URL = import.meta.env.VITE_SITE_URL as string | undefined;
 
-/** Adds the theme in force to a link, so the other side opens in the same look. */
-export function withTheme(href: string, theme: string): string {
-  const [path, hash = ""] = href.split("#");
-  const sep = path!.includes("?") ? "&" : "?";
-  return `${path}${sep}theme=${encodeURIComponent(theme)}${hash ? `#${hash}` : ""}`;
-}
-
-/** Phones: under this width the tabs sit fixed at the bottom and the theme is one button. */
+/** Phones: under this width the tabs sit fixed at the bottom. */
 const PHONE = "(max-width: 760px)";
 
 function usePhone(): boolean {
@@ -63,12 +48,9 @@ function usePhone(): boolean {
 }
 
 // The app's frame: one bar on every page with the mark, the views the renter chose, Stories, the
-// Day or Dusk switch and Customize. On a phone the five views are words fixed at the bottom.
+// Customize. On a phone the five views are words fixed at the bottom.
 // No account, no sign-in: nothing here pretends there is one.
 export function AppShell({ section, context, bar, children }: Props) {
-  const [picked, setPicked] = useState<Theme | null>(() => initialChoice(window.location.search));
-  const theme: Theme = picked ?? defaultTheme();
-  useEffect(() => applyTheme(theme), [theme]);
   const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs());
   const [open, setOpen] = useState(false);
   const phone = usePhone();
@@ -84,16 +66,11 @@ export function AppShell({ section, context, bar, children }: Props) {
     if (refocus) customBtn.current?.focus();
   };
 
-  const pick = (t: Theme) => {
-    setPicked(t);
-    saveTheme(t);
-  };
   const change = (next: Prefs) => {
     setPrefs(next);
     savePrefs(next);
   };
   const shown = TABS.filter((t) => !prefs.hidden.includes(t.id));
-  const other: Theme = theme === "light" ? "dark" : "light";
 
   const customizeButton = (
     <button
@@ -108,7 +85,7 @@ export function AppShell({ section, context, bar, children }: Props) {
     </button>
   );
   const siteLink = SITE_URL ? (
-    <a className="app-site" href={withTheme(SITE_URL, theme)}>
+    <a className="app-site" href={SITE_URL}>
       About SNAPBACK
     </a>
   ) : null;
@@ -141,30 +118,6 @@ export function AppShell({ section, context, bar, children }: Props) {
           <a className="app-tool app-stories" href="/stories">
             Stories
           </a>
-          {phone ? (
-            <button
-              type="button"
-              className="app-tool app-theme-one"
-              aria-label={`Switch to ${THEME_WORDS[other]}`}
-              onClick={() => pick(other)}
-            >
-              {THEME_WORDS[other]}
-            </button>
-          ) : (
-            <div className="app-theme" role="group" aria-label="Day or Dusk">
-              {(["light", "dark"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className="app-tool app-theme-opt"
-                  aria-pressed={theme === t}
-                  onClick={() => pick(t)}
-                >
-                  {THEME_WORDS[t]}
-                </button>
-              ))}
-            </div>
-          )}
           {!phone && customizeButton}
           {!phone && siteLink}
         </div>

@@ -1,4 +1,4 @@
-/* The app frame: one bar on every page. Mark, tabs, Stories, Day or Dusk. Sharp corners, tokens
+/* The app frame: one bar on every page. Mark, tabs, Stories, Customize. Sharp corners, tokens
    only. At 390 the five tabs are words fixed at the bottom (56px plus the safe area).
    --tabbar-h is that height (0 on wide screens): any fixed or sticky bottom bar elsewhere must
    sit at `bottom: var(--tabbar-h)` so the tab bar never covers it. */
@@ -75,16 +75,12 @@
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
-/* Right side: Stories (a text link), then Day and Dusk as two words, then Customize. */
+/* Right side: Stories (a text link), then Customize. */
 .app-tools {
   align-self: center;
   display: flex;
   align-items: center;
   gap: var(--sp-1);
-}
-.app-theme {
-  display: inline-flex;
-  align-items: center;
 }
 .app-tool,
 .app-custom-open,
@@ -105,19 +101,6 @@
 .app-stories {
   color: var(--ink);
   margin-right: var(--sp-2);
-}
-.app-theme-opt[aria-pressed="true"] {
-  color: var(--ink);
-}
-/* The chosen theme word is underlined. */
-.app-theme-opt[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  left: var(--sp-3);
-  right: var(--sp-3);
-  bottom: 9px;
-  height: 2px;
-  background: var(--ink);
 }
 @media (hover: hover) {
   .app-tab:hover,
@@ -151,17 +134,12 @@
 }
 :is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
   > .app-bar
-  :is(
-    .app-tab[data-in="true"],
-    .app-tab[aria-current="page"],
-    .app-stories,
-    .app-theme-opt[aria-pressed="true"]
-  ) {
+  :is(.app-tab[data-in="true"], .app-tab[aria-current="page"], .app-stories) {
   color: var(--on-hero);
 }
 :is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
   > .app-bar
-  :is(.app-tab[aria-current="page"], .app-theme-opt[aria-pressed="true"])::after {
+  :is(.app-tab[aria-current="page"])::after {
   background: var(--on-hero);
 }
 
@@ -179,7 +157,7 @@
   height: calc(100dvh - var(--bar-h));
 }
 
-/* ---------- Phones: tabs fixed at the bottom, one theme button, Customize in the footer ---------- */
+/* ---------- Phones: tabs fixed at the bottom, Customize in the footer ---------- */
 @media (max-width: 760px) {
   .app {
     --bar-h: 56px;

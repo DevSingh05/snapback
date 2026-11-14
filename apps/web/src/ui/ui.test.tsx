@@ -249,9 +249,8 @@ describe("empty, loading and problem", () => {
 });
 
 describe("the primitives page", () => {
-  it("renders every primitive, in Day and in Dusk", () => {
-    for (const theme of ["light", "dark"]) {
-      document.documentElement.dataset.theme = theme;
+  it("renders every primitive, in Day", () => {
+    for (const theme of ["light"]) {
       const { container, unmount } = render(<Story />);
       for (const cls of [
         "ui-mark-a",
@@ -275,7 +274,6 @@ describe("the primitives page", () => {
         expect(container.querySelector(`.${cls}`), `${theme} .${cls}`).not.toBeNull();
       unmount();
     }
-    delete document.documentElement.dataset.theme;
   });
 });
 

@@ -9,10 +9,7 @@ import "../styles/app.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { applyTheme, initialChoice } from "../shell/theme";
 import { Story } from "./Story";
-
-applyTheme(initialChoice(window.location.search) ?? "light");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

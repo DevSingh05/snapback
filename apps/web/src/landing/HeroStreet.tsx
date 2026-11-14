@@ -2,10 +2,10 @@ import heroDay from "../assets/hero-day-brick.webp";
 import heroDusk from "../assets/hero-dusk-warm.webp";
 import "./landing.css";
 
-// Home's hero: a real photograph of an apartment building under the matte scrim. Two files, one
-// in daylight and one at dusk, stacked; the theme decides which shows and they crossfade when it
-// changes (landing.css). Licensed stock, credited in src/assets/CREDITS.md and stamped as a
-// sample: neither is claimed to be a listed home or to be in Houston.
+// Home's hero: a real photograph of an apartment building in daylight under the matte scrim. The
+// app is light only, so the hero is one picture. The dusk photograph is kept for other pages
+// (HERO_PHOTOS.dusk). Licensed stock, credited in src/assets/CREDITS.md and stamped as a sample:
+// neither is claimed to be a listed home or to be in Houston.
 
 export const HERO_PHOTOS = {
   day: {
@@ -28,13 +28,6 @@ export function HeroStreet({ strip = false }: { strip?: boolean }) {
         src={HERO_PHOTOS.day.src}
         alt={HERO_PHOTOS.day.alt}
         data-testid="hero-photo"
-        decoding="async"
-      />
-      <img
-        className="hs-img hs-dusk"
-        src={HERO_PHOTOS.dusk.src}
-        alt={HERO_PHOTOS.dusk.alt}
-        data-testid="hero-photo-dusk"
         decoding="async"
       />
       <span className="hs-scrim" aria-hidden="true" />

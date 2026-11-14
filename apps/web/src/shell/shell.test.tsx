@@ -3,18 +3,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { seeingLine, waysOut } from "../walk/seeing";
-import { AppShell, PURPOSE, withTheme } from "./AppShell";
+import { AppShell, PURPOSE } from "./AppShell";
 import { FinderPage } from "./FinderPage";
 import { briefFromChips, chipFromWords, loadLearned } from "./finderRules";
 import { loadFinderEvents, recordFinderEvent } from "./finderStore";
 import { clean, DEFAULT_PREFS, loadPrefs } from "./prefs";
-import { defaultTheme, initialChoice, savedTheme, THEME_KEY } from "./theme";
 import { YourChecks } from "./YourChecks";
 
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
-  delete document.documentElement.dataset.theme;
 });
 afterEach(() => {
   window.localStorage.clear();
@@ -44,59 +42,21 @@ describe("the app shell", () => {
     expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
-  it("opens every page in Day, the map included, until the person picks", () => {
-    expect(defaultTheme()).toBe("light");
+  it("is light only: no Day or Dusk switch, and nothing sets a theme on the root", () => {
     const { unmount } = render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(screen.queryByRole("button", { name: /^(Day|Dusk|Light|Dark|Auto)$/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: /Day or Dusk/ })).toBeNull();
     unmount();
+    // A stored or carried "dark" from an older build changes nothing.
+    window.localStorage.setItem("snapback-theme", "dark");
+    window.history.replaceState(null, "", "/home?theme=dusk");
     render(<AppShell section="home">home</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
-  });
-
-  it("shows Day and Dusk as two words, remembers the pick and uses it on every page", () => {
-    const { unmount } = render(<AppShell section="home">home</AppShell>);
-    expect(screen.queryByRole("button", { name: /^(Light|Dark|Auto)$/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Day" })).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByRole("button", { name: "Dusk" }));
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(screen.getByRole("button", { name: "Dusk" })).toHaveAttribute("aria-pressed", "true");
-    expect(savedTheme()).toBe("dark");
-    unmount();
-    render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    fireEvent.click(screen.getByRole("button", { name: "Day" }));
-    expect(savedTheme()).toBe("light");
-  });
-
-  it("shares one key with the website and takes the theme from the address", () => {
-    expect(THEME_KEY).toBe("snapback-theme");
-    expect(initialChoice("?theme=dusk")).toBe("dark");
-    expect(window.localStorage.getItem("snapback-theme")).toBe("dark");
-    expect(initialChoice("?theme=purple")).toBe("dark"); // not a theme: the saved one stands
-    window.localStorage.clear();
-    expect(initialChoice("")).toBeNull();
-    // A link from the website carries its theme into the map too.
-    window.history.replaceState(null, "", "/map?theme=light");
-    render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
     window.history.replaceState(null, "", "/");
   });
 
-  it("maps an older stored choice to Day or Dusk, and drops the device-follow one", () => {
-    window.localStorage.setItem(THEME_KEY, "light");
-    expect(savedTheme()).toBe("light");
-    window.localStorage.setItem(THEME_KEY, "dark");
-    expect(savedTheme()).toBe("dark");
-    window.localStorage.setItem(THEME_KEY, "dusk");
-    expect(savedTheme()).toBe("dark");
-    // "system" is gone: nothing follows the device, so the page opens in Day.
-    window.localStorage.setItem(THEME_KEY, "system");
-    expect(savedTheme()).toBeNull();
-    render(<AppShell section="home">home</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
-  });
-
-  it("has Stories as a link and orders the bar mark, tabs, Stories, Day, Dusk", () => {
+  it("has Stories as a link and orders the bar mark, tabs, Stories, Customize", () => {
     render(<AppShell section="home">page</AppShell>);
     expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
     const order = [...document.querySelectorAll<HTMLElement>(".app-bar :is(a, button)")].map(
@@ -104,10 +64,10 @@ describe("the app shell", () => {
     );
     expect(order.slice(0, 1)).toEqual(["SNAPBACK home"]);
     expect(order.slice(1, 6)).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
-    expect(order.slice(6, 9)).toEqual(["Stories", "Day", "Dusk"]);
+    expect(order.slice(6, 8)).toEqual(["Stories", "Customize"]);
   });
 
-  it("on a phone the theme is one button naming the other theme, and Customize is in the footer", () => {
+  it("on a phone there is no theme button, and Customize is in the footer", () => {
     const real = window.matchMedia;
     window.matchMedia = ((q: string) => ({
       matches: true,
@@ -117,11 +77,8 @@ describe("the app shell", () => {
     })) as unknown as typeof window.matchMedia;
     try {
       render(<AppShell section="home">page</AppShell>);
-      expect(screen.queryByRole("button", { name: "Day" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Switch to (Day|Dusk)/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "Switch to Dusk" }));
-      expect(document.documentElement.dataset.theme).toBe("dark");
-      expect(screen.getByRole("button", { name: "Switch to Day" })).toBeInTheDocument();
       expect(
         within(document.querySelector<HTMLElement>(".app-foot")!).getByRole("button", {
           name: "Customize",
@@ -259,7 +216,7 @@ describe("Finder: a conversation, what it learned, and what fits", () => {
   });
 });
 
-describe("one purpose per page, and a theme that travels", () => {
+describe("one purpose per page", () => {
   it("says what the page is for in one line", () => {
     const { unmount } = render(<AppShell section="map">map</AppShell>);
     expect(screen.getByTestId("page-purpose")).toHaveTextContent("Find a home by where it is.");
@@ -271,13 +228,6 @@ describe("one purpose per page, and a theme that travels", () => {
     );
     expect(screen.getByTestId("page-purpose")).toHaveTextContent("See the home, room by room");
     expect(Object.keys(PURPOSE)).toHaveLength(7);
-  });
-
-  it("adds the theme to a link out, keeping its query and hash", () => {
-    expect(withTheme("https://site.example/", "dark")).toBe("https://site.example/?theme=dark");
-    expect(withTheme("https://site.example/a?x=1#top", "light")).toBe(
-      "https://site.example/a?x=1&theme=light#top",
-    );
   });
 });
 

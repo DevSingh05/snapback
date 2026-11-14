@@ -1,5 +1,5 @@
 // Every primitive on one page, for screenshots and for the test that renders them all.
-// Opened in dev at /src/ui/story.html (add ?theme=dark for Dusk). Not part of the app build.
+// Opened in dev at /src/ui/story.html. Not part of the app build.
 import { useState } from "react";
 
 import {

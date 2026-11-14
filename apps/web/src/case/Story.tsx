@@ -1,5 +1,5 @@
 // The case pieces on one page, for screenshots and layout checks. Opened in dev at
-// /src/case/story.html (add ?theme=dark for Dusk). Not part of the app build.
+// /src/case/story.html. Not part of the app build.
 // Everything shown is FIXTURE: the committed contract card, the synthetic evidence file, and the
 // staged listing and record of demo case "a". Stock photos stand in for the ad and the scan, so
 // the pins here show layout only, not a match.

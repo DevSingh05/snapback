@@ -7,17 +7,15 @@ import { HeroStreet } from "./HeroStreet";
 import { HowItWorks } from "./HowItWorks";
 
 describe("Home's photographs", () => {
-  it("the hero is two real photographs, day and dusk, each described and stamped as a sample", () => {
+  it("the hero is one real daylight photograph, described and stamped as a sample", () => {
     render(<HeroStreet />);
     const day = screen.getByTestId("hero-photo");
-    const dusk = screen.getByTestId("hero-photo-dusk");
+    expect(screen.queryByTestId("hero-photo-dusk")).toBeNull();
     expect(day).toHaveAttribute("alt", expect.stringMatching(/apartment building.*daylight/i));
-    expect(dusk).toHaveAttribute("alt", expect.stringMatching(/apartment building.*dusk/i));
-    expect(day.getAttribute("src")).not.toBe(dusk.getAttribute("src"));
     // Stock, never passed off as a listed home or as Houston.
     const hero = screen.getByTestId("hero-street");
     expect(hero).toHaveTextContent("Sample photo · Unsplash");
-    expect(`${day.getAttribute("alt")} ${dusk.getAttribute("alt")}`).not.toMatch(/houston|listed/i);
+    expect(day.getAttribute("alt")).not.toMatch(/houston|listed/i);
   });
 
   it("collapsed behind the thread it keeps the photographs and drops the stamp line", () => {
