@@ -271,7 +271,6 @@ def create_app(
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
     app.state.events = events
-    app.include_router(forensics_router)  # the investigator view: SYNTHETIC data only
     # M9: the finder. A chat model (tests pass a scripted one) runs deepagents mode; with the
     # runner setting on and a key present it is Claude; otherwise the code policy runs.
     model = finder_model
@@ -280,6 +279,7 @@ def create_app(
 
         model = build_model(settings.anthropic_api_key.get_secret_value())
     app.include_router(finder_router(events, model))
+    app.include_router(forensics_router)  # the investigator view: SYNTHETIC data only
 
     app.add_middleware(
         UploadSizeGuard,

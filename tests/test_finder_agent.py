@@ -57,7 +57,13 @@ class FakeCrew(BaseChatModel):
         system = str(messages[0].content)
         if "preferences checker" in system:
             reply = self._sub(
-                messages, system, "read_learned", self.prefs, "prefs_choose", "option"
+                messages,
+                system,
+                "read_learned",
+                self.prefs,
+                "prefs_choose",
+                "option",
+                opener="prefs_open_choice",
             )
         elif "search checker" in system:
             reply = self._sub(messages, system, "read_ranked", self.leads, "lead_pick", "alias")
@@ -65,13 +71,16 @@ class FakeCrew(BaseChatModel):
             reply = self._main(messages)
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
-    def _sub(self, messages, system, reader, picks, chooser, arg):
+    def _sub(self, messages, system, reader, picks, chooser, arg, opener=None):
         path = re.search(r"path `([^`]+)`", system).group(1)
         tools = [m for m in messages if isinstance(m, ToolMessage)]
         names = [m.name for m in tools]
         if reader not in names:
             return _call(reader)
         done = names.count(chooser)
+        # as the prompt says: look at the open decision before each choice
+        if opener and done < len(picks) and names.count(opener) <= done:
+            return _call(opener)
         if done < len(picks):
             return _call(chooser, **{arg: picks[done], "reason": "It fits what the renter did."})
         if "write_file" not in names:
@@ -176,7 +185,19 @@ def test_the_model_is_shown_nothing_it_may_not_see(tmp_path):
     run_turn(s, [*SCRIPT, *finder.read_text(text)])
     blob = "\n".join(m.seen)
     assert m.seen
-    for bait in (BAIT_ADDRESS, BAIT_PHONE, BAIT_COMPANY, "fx-fnd", "call 713", "1450", "1620"):
+    # the renter's own amounts (budget, the rents of what they picked and passed, the cap code
+    # would propose) are as private as an address
+    amounts = ("1800", "1,800", "1500", "1,500", "1000", "1,000", "1100", "1,100")
+    for bait in (
+        BAIT_ADDRESS,
+        BAIT_PHONE,
+        BAIT_COMPANY,
+        "fx-fnd",
+        "call 713",
+        "1450",
+        "1620",
+        *amounts,
+    ):
         assert bait not in blob
     assert "P1" in blob and "passed_walkups" in blob  # it did see the allowed things
 
@@ -204,6 +225,27 @@ def test_a_model_reason_with_a_number_or_a_claim_is_replaced_by_code(tmp_path):
 def test_the_fixture_places_load_clean():
     places = load_fixture_places()
     assert len(places) == 10 and all(p.pid.startswith("fx-fnd-") for p in places)
+
+
+def test_model_turns_have_a_daily_cap_per_address(tmp_path):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from snapback.api.finder import make_router
+    from snapback.events import EventBus
+
+    app = FastAPI()
+    app.include_router(
+        make_router(EventBus(tmp_path / "log.jsonl"), crew(prefs=ALL_FOUR), model_turns_per_day=1)
+    )
+    c = TestClient(app)
+    b = c.post("/finder/sessions").json()
+    assert b["mode"] == "deepagents"
+    auth = {"Authorization": f"Bearer {b['token']}"}
+    url = f"/finder/{b['session_id']}/message"
+    assert c.post(url, headers=auth, json={}).status_code == 200
+    capped = c.post(url, headers=auth, json={})
+    assert capped.status_code == 429 and "today" in capped.json()["detail"]
 
 
 def test_the_renters_cleaned_words_reach_the_model_as_words_and_no_contact_does(tmp_path):
@@ -250,3 +292,15 @@ def test_a_long_model_reply_ends_on_a_whole_sentence():
     assert finder.ok_reply("This place is verified and safe.") is None
     assert finder.ok_reply("It costs 1450 a month.") is None
     assert finder.ok_reply("") is None
+
+
+def test_amounts_in_the_renters_words_are_removed_before_the_model(tmp_path):
+    m = crew(prefs=ALL_FOUR)
+    s = new_session(tmp_path, m)
+    text = "budget under $1,800, nothing over 1500 dollars, and I liked the one at $1,000"
+    run_turn(s, [*SCRIPT, *finder.read_text(text)], text)
+    blob = "\n".join(m.seen)
+    assert "<renter_words>\n" in blob
+    for bait in ("1800", "1,800", "1500", "1,500", "1000", "1,000"):
+        assert bait not in blob
+    assert s.budget() == 1800  # code still read it

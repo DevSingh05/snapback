@@ -30,6 +30,9 @@ import json
 import re
 import secrets
 import threading
+import unicodedata
+from collections import OrderedDict
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,6 +62,7 @@ from snapback.contracts import (
     FinderSignal,
     FinderState,
     FinderTraceEvent,
+    FinderWatchStatus,
     TraceKind,
 )
 from snapback.events import EventBus, EventKind, EventSource, new_event
@@ -321,7 +325,7 @@ class SearchDesk:
 
 # --- the renter's words, read by code ------------------------------------------------------------
 
-_BUDGET = re.compile(r"\$\s?(\d{1,2},\d{3}|\d{3,5})")
+_BUDGET = re.compile(r"\$\s?(\d{1,2},\d{3}|\d{3,5})\b")
 
 # What `clean_words` takes out before the model sees a renter's words.
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
@@ -340,18 +344,30 @@ _STREET = re.compile(
     re.IGNORECASE,
 )
 _UNIT = re.compile(r"\b(?:unit|apt|apartment|suite|ste)\s*#?\s*\d[\w-]*|#\s*\d[\w-]*", re.I)
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>{}`]")
+# Money and any other 3+ digit number: the renter's amounts are as private as their address,
+# and code has already read the budget out of them.
+_AMOUNT = re.compile(r"\$\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\b\d{1,3}(?:,\d{3})+\b|\b\d{3,}\b")
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>{}`\u2039\u203a\u2329\u232a\u3008-\u300b]")
 REMOVED = "[removed]"
 
 
 def clean_words(text: str | None) -> str:
     """The renter's words as the main agent may see them: phone numbers, emails, links, street
-    addresses and unit numbers replaced with [removed], fence characters dropped, whitespace
-    folded, capped at `MAX_WORDS`. Empty when nothing is left."""
+    addresses, unit numbers and amounts replaced with [removed], fence characters dropped,
+    whitespace folded, capped at `MAX_WORDS`. Empty when nothing is left."""
     if not text:
         return ""
-    out = _CONTROL.sub(" ", text)
-    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT):
+    # Fold lookalikes first (fullwidth "＜" becomes "<", "７" becomes "7"), then drop format
+    # characters (U+202E, zero-width spaces) and turn control characters into spaces, so no
+    # pattern below can be stepped around and no fence can be faked.
+    folded = unicodedata.normalize("NFKC", text)
+    out = "".join(
+        " " if unicodedata.category(ch) == "Cc" else ch
+        for ch in folded
+        if unicodedata.category(ch) != "Cf"
+    )
+    out = _CONTROL.sub(" ", out)
+    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT, _AMOUNT):
         out = pattern.sub(REMOVED, out)
     out = " ".join(out.split())
     if len(out) > MAX_WORDS:
@@ -359,18 +375,38 @@ def clean_words(text: str | None) -> str:
     return "" if out.replace(REMOVED, "").strip(" .,;:-") == "" else out
 
 
+# A no to walk-ups only when the no sits next to them ("no walk-ups", "skip the walk-ups",
+# "walk-ups are a no"); "walk-ups are fine" or "not a problem" is the opposite.
+_WALKUP = r"(?:walk[- ]?ups?|stairs)"
+_NO_WALKUP = re.compile(
+    rf"\b(?:no|not|avoid|hate|skip|without|never)\s+(?:\w+\s+){{0,2}}?{_WALKUP}\b"
+    rf"|\b{_WALKUP}\s+(?:are|is)\s+(?:a\s+)?(?:no|out|a dealbreaker)\b"
+)
+_WALKUP_OK = re.compile(
+    rf"\b{_WALKUP}\s+(?:are|is|'re)\s+(?:fine|ok|okay|good|alright|not a problem|no problem)"
+    rf"|\b(?:don't|do not|wouldn't|would not)\s+mind\s+(?:\w+\s+){{0,2}}?{_WALKUP}"
+)
+_PARKING = re.compile(r"\b(?:parking|garage)\b")
+# "no parking needed", "don't need parking", "parking doesn't matter", "no car".
+_PARKING_NOT_NEEDED = re.compile(
+    r"\b(?:no|don't|do not|doesn't|does not|not|never)\s+(?:\w+\s+){0,2}?(?:parking|garage)\b"
+    r"|\b(?:parking|garage)\s+(?:\w+\s+){0,2}?(?:doesn't|does not|isn't|is not|not|never)\b"
+    r"|\b(?:don't|do not)\s+(?:have|own|drive)\s+(?:a\s+)?car\b|\bno car\b"
+)
+
+
 def read_text(text: str | None) -> list[FinderSignal]:
     """Turn a renter's message into signals with a few fixed patterns. These are what code acts
     on; the words themselves go onto no bus and into no preference."""
     if not text:
         return []
-    low = text.lower()
+    low = unicodedata.normalize("NFKC", text).lower().replace("\u2019", "'")
     out: list[FinderSignal] = []
-    if re.search(r"walk[- ]?ups?|stairs", low) and re.search(r"\b(no|not|avoid|hate|skip)\b", low):
+    if _NO_WALKUP.search(low) and not _WALKUP_OK.search(low):
         out.append(FinderSignal(kind="brief", brief_field="no_walkup"))
-    if "parking" in low:
+    if _PARKING.search(low) and not _PARKING_NOT_NEEDED.search(low):
         out.append(FinderSignal(kind="brief", brief_field="parking"))
-    if "pet" in low:
+    if re.search(r"\bpets?\b", low) and not re.search(r"\bno\s+pets?\b", low):
         out.append(FinderSignal(kind="brief", brief_field="pets"))
     m = _BUDGET.search(text)
     if m and re.search(r"budget|under|max|up to|at most|below|less than", low):
@@ -380,6 +416,21 @@ def read_text(text: str | None) -> list[FinderSignal]:
 
 
 # --- the session ---------------------------------------------------------------------------------
+
+
+class FinderBusy(RuntimeError):
+    """A turn is already running for this session. Refused, never queued: a model turn takes
+    tens of seconds, and a request waiting on it would hold a worker the whole time."""
+
+
+@contextmanager
+def _turn(session: FinderSession):
+    if not session.lock.acquire(blocking=False):
+        raise FinderBusy("The finder is still working on your last message. Try again shortly.")
+    try:
+        yield
+    finally:
+        session.lock.release()
 
 
 @dataclass
@@ -415,6 +466,8 @@ class FinderSession:
         self.todos_seen = False
         self.turn = 0
         self.lock = threading.Lock()
+        self.watch: FinderWatchStatus | None = None
+        self._watch_lock = threading.Lock()
 
     @property
     def mode(self) -> Literal["policy", "deepagents"]:
@@ -558,7 +611,7 @@ class FinderSession:
     # -- the renter's answer --
     def decide(self, proposal_id: str, accept: bool) -> FinderProposal:
         """The renter's yes or no. The only place a preference is applied."""
-        with self.lock:
+        with _turn(self):
             found = next((p for p in self.proposals if p.id == proposal_id), None)
             if found is None:
                 raise KeyError(proposal_id)
@@ -578,6 +631,29 @@ class FinderSession:
                 self.emit(TraceKind.CHOICE, f"The renter said no to {found.key}.", pick=found.key)
             return found
 
+    def add_watch(self, channel: str) -> FinderWatchStatus:
+        """Watch this session's brief on `channel`. Publishes `watch_added` once per session; a
+        second tap returns the same watch."""
+        with self._watch_lock:
+            if self.watch is None:
+                event = self.bus.publish(
+                    new_event(
+                        kind=EventKind.WATCH_ADDED,
+                        source=EventSource.RENTER,
+                        subject=self.id,
+                        payload={"session": self.id, "kind": "brief"},
+                    )
+                )
+                self.watch = FinderWatchStatus(
+                    session_id=self.id,
+                    channel=channel,  # type: ignore[arg-type]
+                    event_id=event.id,
+                    source=self.source,
+                    at=event.at,
+                )
+                self.emit(TraceKind.STATUS, f"Watching on {channel}.", pick="watch")
+            return self.watch
+
     def state(self) -> FinderState:
         return FinderState(
             session_id=self.id,
@@ -589,7 +665,54 @@ class FinderSession:
             learned=self.learned(),
             notes=list(self.notes.values()),
             trace=list(self.trace),
+            watch=self.watch,
         )
+
+
+class FinderAccess(LookupError):
+    """A session lookup that must be refused, with the HTTP status to refuse it with."""
+
+    def __init__(self, status: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
+class SessionStore:
+    """Every finder session in this process, so other routes (M4's watch, M10's sidecar side)
+    can find a session and check its token the same way. In memory: a restart forgets them.
+    The oldest session is dropped past `max_sessions`."""
+
+    def __init__(self, max_sessions: int = 200) -> None:
+        self.max_sessions = max_sessions
+        self._sessions: OrderedDict[str, FinderSession] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def add(self, session: FinderSession) -> FinderSession:
+        with self._lock:
+            while len(self._sessions) >= self.max_sessions:
+                self._sessions.popitem(last=False)
+            self._sessions[session.id] = session
+        return session
+
+    def get(self, session_id: str, token: str | None) -> FinderSession:
+        """The session, if `token` is its token. `FinderAccess` 404 (no such session), 401 (no
+        token) or 403 (another token) otherwise."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+        if session is None:
+            raise FinderAccess(404, "No finder session with that id.")
+        if token is None:
+            raise FinderAccess(401, "This needs the session's token.")
+        if not secrets.compare_digest(token.encode(), session.token.encode()):
+            raise FinderAccess(403, "That token is not for this session.")
+        return session
+
+    def __len__(self) -> int:
+        return len(self._sessions)
+
+
+SESSIONS = SessionStore()
 
 
 # --- a turn --------------------------------------------------------------------------------------
@@ -614,8 +737,9 @@ def run_turn(
 ) -> FinderReply:
     """Publish the signals, run the crew (model if the session has one, else the policy), and
     return the reply. Code finishes whatever the model leaves undone. `words` is the renter's
-    message; only `clean_words(words)` reaches the model, and only the main agent."""
-    with session.lock:
+    message; only `clean_words(words)` reaches the model, and only the main agent. Raises
+    `FinderBusy` if a turn is already running for this session."""
+    with _turn(session):
         session.turn += 1
         n = session.publish(signals)
         prefs = session.prefs_desk()
@@ -695,7 +819,7 @@ def build_agent(session: FinderSession, prefs: PrefDesk, search: SearchDesk) -> 
         """The open decision: which proposal to offer, from a list code wrote."""
         if not prefs.open():
             return json.dumps({"open_choice": None, "note": "nothing is open"})
-        facts = {k: v for k, v in session.learned().items() if k in FINDER_FACT_KEYS}
+        facts = guard_facts({k: v for k, v in session.learned().items() if k in FINDER_FACT_KEYS})
         return json.dumps({"open_choice": "offer", "options": prefs.menu(), "facts": facts})
 
     @tool

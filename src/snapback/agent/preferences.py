@@ -73,7 +73,7 @@ class Signals:
     walkups_passed: int = 0
     walkups_seen: int = 0
     no_parking_passed: int = 0
-    parking_seen: int = 0
+    no_parking_seen: int = 0
     scan_picked: int = 0
     picks: int = 0
     below_budget_picked: int = 0
@@ -88,7 +88,7 @@ class Signals:
 def read_signals(events: list[Event], session: str) -> Signals:
     """Count one session's picks, passes and budget. Only RENTER events count: a scripted or
     pipeline event never teaches the agent anything about a person."""
-    walkups_passed = walkups_seen = no_parking_passed = parking_seen = 0
+    walkups_passed = walkups_seen = no_parking_passed = no_parking_seen = 0
     scan_picked = picks = 0
     picked_rents: list[int] = []
     budget: int | None = None
@@ -104,16 +104,19 @@ def read_signals(events: list[Event], session: str) -> Signals:
                 budget = int(p["rent_max"])  # type: ignore[arg-type]
             said_no_walkup = said_no_walkup or p.get("brief_field") == "no_walkup"
             said_parking = said_parking or p.get("brief_field") == "parking"
-        elif event.kind is EventKind.PLACE_PASSED:
+        elif event.kind in (EventKind.PLACE_PASSED, EventKind.PLACE_PICKED):
+            # Every walk-up (or place without parking) the renter saw counts, picked or passed:
+            # passing on 2 walk-ups while picking 4 is not a dislike of walk-ups.
             n += 1
-            if isinstance(p.get("walkup"), bool):
+            passed = event.kind is EventKind.PLACE_PASSED
+            if p.get("walkup") is True:
                 walkups_seen += 1
-                walkups_passed += 1 if p["walkup"] else 0
-            if isinstance(p.get("parking"), bool):
-                parking_seen += 1
-                no_parking_passed += 0 if p["parking"] else 1
-        elif event.kind is EventKind.PLACE_PICKED:
-            n += 1
+                walkups_passed += 1 if passed else 0
+            if p.get("parking") is False:
+                no_parking_seen += 1
+                no_parking_passed += 1 if passed else 0
+            if passed:
+                continue
             picks += 1
             scan_picked += 1 if p.get("has_scan") is True else 0
             if isinstance(p.get("rent_from"), int):
@@ -125,7 +128,7 @@ def read_signals(events: list[Event], session: str) -> Signals:
         walkups_passed=walkups_passed,
         walkups_seen=walkups_seen,
         no_parking_passed=no_parking_passed,
-        parking_seen=parking_seen,
+        no_parking_seen=no_parking_seen,
         scan_picked=scan_picked,
         picks=picks,
         below_budget_picked=below,
@@ -144,8 +147,8 @@ def facts_of(signals: Signals) -> dict[str, object]:
     out: dict[str, object] = {"budget_set": signals.budget is not None}
     if signals.walkups_seen:
         out["passed_walkups"] = f"{signals.walkups_passed} of {signals.walkups_seen}"
-    if signals.parking_seen:
-        out["passed_no_parking"] = f"{signals.no_parking_passed} of {signals.parking_seen}"
+    if signals.no_parking_seen:
+        out["passed_no_parking"] = f"{signals.no_parking_passed} of {signals.no_parking_seen}"
     if signals.picks:
         out["picked_with_scan"] = f"{signals.scan_picked} of {signals.picks}"
     if signals.budget is not None and signals.priced_picks:
@@ -193,13 +196,13 @@ def candidates(signals: Signals, applied: CasePreferences) -> dict[str, Candidat
             else "you said no walk-ups",
             "passed_walkups" if walkups else "said_no_walkup",
         )
-    parking = _lopsided(s.no_parking_passed, s.parking_seen)
+    parking = _lopsided(s.no_parking_passed, s.no_parking_seen)
     if not applied.needs_parking and (parking or s.said_parking):
         out["propose_parking"] = Candidate(
             "propose_parking",
             PreferencesUpdate(needs_parking=True),
             "Only show places with parking?",
-            f"you passed on {s.no_parking_passed} of {s.parking_seen} places without parking"
+            f"you passed on {s.no_parking_passed} of {s.no_parking_seen} places without parking"
             if parking
             else "you asked about parking",
             "passed_no_parking" if parking else "said_parking",
