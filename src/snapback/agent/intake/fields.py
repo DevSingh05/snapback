@@ -47,9 +47,19 @@ _BARE_LINK = re.compile(
     rf"(?<![\w.@/-])((?:[\w-]{{1,63}}\.){{1,4}}(?:{_ENDINGS}))(?![\w-])", re.IGNORECASE
 )
 
+# A unit is named by a unit word ("Unit 204", "Apt #4B") or by "#N" straight after a street
+# name ("12 Fixture St #204"). A number that counts something is not a unit: "apartment 2
+# bedrooms", "apartment 1 block from campus". A bare "#N" is not one either: "#1 rated",
+# "gate code #4521".
+_COUNTED = (
+    r"bed|br\b|bd|bath|ba\b|block|min|mile|sq|stor|car|month|mo\b|year|yr|week|day|night|"
+    r"person|people|room|unit|floor|level|percent|%|star|rated|pool|gym|pet|acre|lot|ft|foot|feet"
+)
+_STREET = r"st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|ct|court|pl|place"
 _UNIT = re.compile(
     r"\b(?:unit|apt|apartment|suite|ste)\b\.?\s{0,3}#?\s{0,3}([a-z]?\d{1,5}[a-z]?)\b"
-    r"|(?<![\w#])#\s{0,3}(\d{1,5}[a-z]?)\b",
+    rf"(?!\s{{0,3}}-?\s{{0,3}}(?:{_COUNTED}))"
+    rf"|\b(?:{_STREET})\b\.?,?\s{{0,3}}#\s{{0,3}}(\d{{1,5}}[a-z]?)\b",
     re.IGNORECASE,
 )
 _BEDS = re.compile(
