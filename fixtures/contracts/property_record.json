@@ -1,0 +1,16 @@
+{
+  "property_id": "fx-prop-1",
+  "source": "fixture",
+  "market": "Fixture City",
+  "property_type": "multifamily",
+  "floors": 4,
+  "year_built": 2015,
+  "lat": 0.0,
+  "lon": 0.0,
+  "model_ids": ["fx-model-a", "fx-model-b"],
+  "floor_plans": ["2 bed / 2 bath", "1 bed / 1 bath"],
+  "manager_company": null,
+  "rent_min": null,
+  "rent_median": null,
+  "rent_max": null
+}

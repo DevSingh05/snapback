@@ -1,5 +1,8 @@
 # Kickoff prompt for your coding agent
 
+> Use your personal, filled-in prompt instead: `kickoff-dev.md`, `kickoff-jeffrey.md`,
+> `kickoff-rishit.md` or `kickoff-vidyut.md` in this folder. This generic one is the fallback.
+
 Paste the box below into your agent at the start of a session. Replace `<NAME>` and `<LANE>`
 first. The standing rules are in [AGENTS.md](../../AGENTS.md) (Claude Code loads it through
 `CLAUDE.md`); this prompt only adds the session routine.

@@ -12,6 +12,7 @@ from snapback.contracts import (
     MemoryResult,
     ModuleEvidence,
     PresenceStatus,
+    SpotRanking,
     TraceEvent,
     TraceKind,
 )
@@ -61,3 +62,21 @@ def test_trace_fixture_is_ordered_and_covers_the_choices():
     assert events[-1].kind is TraceKind.VERDICT
     choices = {e.choice for e in events if e.choice}
     assert len(choices) == 5
+
+
+def test_spot_ranking_fixture_has_five_drawable_spots_and_one_excluded():
+    ranking = SpotRanking.model_validate_json(load("spot_ranking.json"))
+    drawable = [s for s in ranking.spots if not s.overlaps_listing_photo]
+    assert len(drawable) == 5
+    assert any(s.overlaps_listing_photo for s in ranking.spots)
+
+
+@pytest.mark.parametrize(
+    ("name", "model"),
+    [("property_record.json", "PropertyRecord"), ("aerial_tile.json", "AerialTile")],
+)
+def test_data_fixtures_parse(name, model):
+    import snapback.contracts as contracts
+
+    parsed = getattr(contracts, model).model_validate_json(load(name))
+    assert parsed.property_id.startswith("fx-")
