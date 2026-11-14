@@ -45,3 +45,25 @@ export interface TraceEvent {
   reason: string;
   source: DataSource;
 }
+
+// Mirrors Pose and the parts of LocateResult the twin reads (src/snapback/contracts.py).
+export interface Pose {
+  sweep_id?: string | null;
+  position: [number, number, number];
+  rotation_quat: [number, number, number, number]; // x, y, z, w
+  fov_deg?: number | null;
+}
+
+export interface LocatedPhoto {
+  photo_id: string;
+  status: string;
+  model_id?: string | null;
+  pano_id?: string | null;
+  inliers?: number | null;
+}
+
+export interface LocateResult {
+  case_id: string;
+  photos: LocatedPhoto[];
+  poses: Record<string, Pose>;
+}
