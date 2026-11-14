@@ -57,7 +57,8 @@
 }
 /* The copy is a picture of the room only: its label plates would show as empty boxes. */
 .wp-ghost .rs-standin,
-.wp-ghost .rs-aerial-date {
+.wp-ghost .rs-aerial-date,
+.wp-ghost .rs-photo-tag {
   display: none;
 }
 
@@ -614,30 +615,24 @@
 }
 
 /* ---------- "You are here" in the drawn room: the cone turns with the camera's pan ---------- */
-.rs-here {
-  --turn: calc(var(--wp-yaw, 0deg) * 3.4);
-}
-/* The cone turns with the person, about the same vertical axis (see draw/Person.tsx). */
+/* The view cone turns with the camera's pan, about the person's spot on the floor: squash to
+   the floor plane, rotate, unsquash. The person itself never turns or moves part by part. */
 .rs-here-turn {
   transform-box: view-box;
-  transform: scale(1, 0.577) rotate(var(--turn)) scale(1, 1.732);
+  transform: scale(1, 0.577) rotate(calc(var(--wp-yaw, 0deg) * 3.4)) scale(1, 1.732);
 }
-.rs[data-motion="reduced"] .rs-here {
-  --turn: 0deg;
+.rs[data-motion="reduced"] .rs-here-turn {
+  transform: none;
 }
-/* On arrival the person steps in to its spot (never with reduced motion). */
+/* On arrival the whole person steps in to its spot as one group (never with reduced motion). */
 @media (prefers-reduced-motion: no-preference) {
   .rs[data-motion="full"] .rs-person {
-    transform-box: view-box;
-    animation: rs-step 0.7s var(--ease-out) 0.35s backwards;
+    animation: rs-step 0.6s var(--ease-out) 0.3s backwards;
   }
   @keyframes rs-step {
     from {
       opacity: 0;
-      transform: translate(26px, 15px);
-    }
-    60% {
-      opacity: 1;
+      transform: translate(20px, 11.5px);
     }
   }
 }
