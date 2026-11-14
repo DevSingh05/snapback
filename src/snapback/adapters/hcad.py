@@ -46,24 +46,33 @@ NAME = ["name", "owner_name", "ownername"]
 STREET = ["site_addr_1", "site_address", "site_addr"]
 CITY = ["site_addr_2", "site_city"]
 
-# A whole word from this set makes the owner a company or institution
+# A whole word from this set makes the owner a company or institution. Not here on purpose: a
+# bare CO (left by "CO-TRUSTEES"), and CHURCH / CITY / STATE / COUNTY, which are surnames too and
+# count only in an institution pattern (see `classify`).
 _COMPANY_WORDS = {
-    "LLC", "L.L.C.", "INC", "INCORPORATED", "LP", "LLP", "LTD", "CORP", "CORPORATION", "CO",
-    "COMPANY", "BANK", "PROPERTIES", "PROPERTY", "HOMES", "REIT", "ASSOCIATION", "ASSN",
-    "PARTNERS", "PARTNERSHIP", "FUND", "HOLDINGS", "INVESTMENTS", "CAPITAL", "GROUP", "REALTY",
-    "MANAGEMENT", "CHURCH", "CITY", "COUNTY", "STATE", "AUTHORITY", "DISTRICT", "TRUST",
-    "VENTURES", "ENTERPRISES", "SERVICES", "BORROWER", "OPENDOOR", "OFFERPAD",
+    "LLC", "INC", "INCORPORATED", "LP", "LLP", "LTD", "CORP", "CORPORATION", "COMPANY", "BANK",
+    "PROPERTIES", "PROPERTY", "HOMES", "REIT", "ASSOCIATION", "ASSN", "PARTNERS", "PARTNERSHIP",
+    "FUND", "HOLDINGS", "INVESTMENTS", "CAPITAL", "GROUP", "REALTY", "MANAGEMENT", "AUTHORITY",
+    "DISTRICT", "VENTURES", "ENTERPRISES", "SERVICES", "BORROWER", "OPENDOOR", "OFFERPAD",
 }  # fmt: skip
-# ...unless it is a trust that carries a person's name
-_PERSONAL_TRUST = {"FAMILY", "LIVING", "REVOCABLE", "IRREVOCABLE", "ESTATE"}
-_NAME_INTRO = re.compile(
-    r"(?i:\b(?:my[ \t]+name[ \t]+is|this[ \t]+is|i'?m|i[ \t]+am))[ \t]+"
-    r"([A-Z][A-Za-z'\-]{1,30})[ \t]+([A-Z][A-Za-z'\-]{1,30})"
+# Any of these makes the name a trust, and a trust is a private owner (it carries a person's
+# name) unless an unambiguous institution marker is also there
+_TRUST_WORDS = {"TRUST", "TR", "TRUSTEE", "TRUSTEES", "TRS"}
+_INSTITUTION_MARKERS = {"BANK", "LLC", "INC", "LP", "REIT"}
+_MY_NAME = re.compile(
+    r"(?i:\bmy[ \t]+name[ \t]+is)[ \t]+([A-Z][A-Za-z'\-]{1,30})[ \t]+([A-Z][A-Za-z'\-]{1,30})"
 )
 _SIGNATURE = re.compile(
     r"[-\u2013\u2014][ \t]*([A-Z][A-Za-z'\-]{1,30})[ \t]+([A-Z][A-Za-z'\-]{1,30})[ \t]*$"
 )
+# Words that start slogans after a dash, never a person's name
+_NOT_NAMES = {
+    "HOME", "HOUSE", "MOVE", "FOR", "RELOCATING", "CALL", "TEXT", "AVAILABLE", "SPACIOUS",
+    "LOVELY", "BEAUTIFUL", "NEW", "GREAT", "PRIVATE", "OWNER", "LANDLORD", "RENT", "LEASE",
+    "TODAY", "NOW", "THANKS", "THANK", "CONTACT", "APPLY", "VIEW", "TOUR", "READY",
+}  # fmt: skip
 _MAX_TEXT = 2_000
+FINGERPRINT_INPUT = b"snapback-hcad-salt-fingerprint"
 
 
 def _key(street: str) -> str:
@@ -74,10 +83,26 @@ def _token_hash(word: str, salt: str) -> str:
     return hmac.new(salt.encode(), word.upper().encode(), hashlib.sha256).hexdigest()
 
 
+def _salt_fingerprint(salt: str) -> str:
+    return hmac.new(salt.encode(), FINGERPRINT_INPUT, hashlib.sha256).hexdigest()
+
+
 def classify(owner_name: str) -> OwnerKind:
-    words = set(re.findall(r"[A-Z.&]+", owner_name.upper()))
-    if "TRUST" in words and words & _PERSONAL_TRUST:
-        return OwnerKind.PERSON
+    """A company or institution, or a private owner. When in doubt, a private owner: then the
+    card says "a private owner" and no name can be shown."""
+    tokens = re.findall(r"[A-Z0-9&]+", owner_name.upper())  # hyphens and dots split words
+    words = set(tokens)
+    joined = " ".join(tokens)
+    if words & _TRUST_WORDS:
+        institution = (
+            words & _INSTITUTION_MARKERS
+            or "TRUST COMPANY" in joined
+            or "NATIONAL ASSOCIATION" in joined
+            or re.search(r"\bN A\b", joined) is not None  # N.A.
+        )
+        return OwnerKind.COMPANY if institution else OwnerKind.PERSON
+    if re.match(r"(CITY|STATE|COUNTY) OF\b", joined) or (tokens and tokens[-1] == "CHURCH"):
+        return OwnerKind.COMPANY
     return OwnerKind.COMPANY if words & _COMPANY_WORDS else OwnerKind.PERSON
 
 
@@ -130,6 +155,9 @@ def build_subset(source: Path, kit_streets: Iterable[str], out: Path, salt: str)
     out.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     with out.open("w", encoding="utf-8") as fh:
+        # first line: which salt keyed the name hashes, so a server with another salt says
+        # NOT_CHECKED rather than a false NO
+        fh.write(json.dumps({"salt_fingerprint": _salt_fingerprint(salt)}) + "\n")
         for acct, names in owners.items():
             primary = names[0]
             kind = classify(primary)
@@ -145,8 +173,12 @@ def build_subset(source: Path, kit_streets: Iterable[str], out: Path, salt: str)
 
 
 def _poster_name(text: str) -> tuple[str, str] | None:
-    m = _NAME_INTRO.search(text) or _SIGNATURE.search(text.strip())
-    return (m.group(1), m.group(2)) if m else None
+    """The poster's own name: only 'my name is' or a signature at the end, never a bare
+    "I'm" / "this is" (which read 'I'm Relocating For Work' as a name)."""
+    for m in (_MY_NAME.search(text), _SIGNATURE.search(text.strip())):
+        if m and not {m.group(1).upper(), m.group(2).upper()} & _NOT_NAMES:
+            return m.group(1), m.group(2)
+    return None
 
 
 def _street_windows(text: str) -> Iterator[str]:
@@ -165,29 +197,31 @@ def owner(listing_text: str, subset: Path, salt: str) -> OwnerResult | None:
     text = listing_text[:_MAX_TEXT]
     keys = {hashlib.sha256(w.encode()).hexdigest() for w in _street_windows(text)}
     try:
-        entry = next(
-            (
-                e
-                for e in map(json.loads, subset.read_text(encoding="utf-8").splitlines() or [])
-                if e.get("key") in keys
-            ),
-            None,
-        )
-    except ValueError:
+        rows = [json.loads(line) for line in subset.read_text(encoding="utf-8").splitlines()]
+    except (OSError, ValueError):
         return None
-    if entry is None:
-        return None
+    fingerprint = next((r.get("salt_fingerprint") for r in rows if "salt_fingerprint" in r), None)
+    found = [r for r in rows if r.get("key") in keys]
+    if len(found) != 1:
+        return None  # no match, or two accounts / two kit streets: never pick one at random
+    entry = found[0]
     if entry.get("kind") == OwnerKind.COMPANY.value:
         company = (entry.get("company") or "").strip()
         if not company:
             return None  # a company owner is never sent without its name (A19 review)
         return OwnerResult(kind=OwnerKind.COMPANY, company=company)
     name = _poster_name(text)
-    if name is None:
+    if name is None or fingerprint != _salt_fingerprint(salt):
+        # no name to compare, or the lookup was keyed with another salt: never a false NO
         return OwnerResult(kind=OwnerKind.PERSON)
     owned = set(entry.get("name_words") or [])
-    first, last = (_token_hash(n, salt) for n in name)
-    matches = OwnerMatch.YES if first in owned and last in owned else OwnerMatch.NO
+    first, last = (_token_hash(n, salt) in owned for n in name)
+    if first and last:
+        matches = OwnerMatch.YES
+    elif first or last:
+        matches = OwnerMatch.NOT_CHECKED  # a nickname, or a shared last name: not a NO
+    else:
+        matches = OwnerMatch.NO
     return OwnerResult(kind=OwnerKind.PERSON, poster_matches=matches)
 
 

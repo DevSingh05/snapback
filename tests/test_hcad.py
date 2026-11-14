@@ -5,6 +5,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from snapback.adapters.hcad import build_subset, owner, probe_columns
 from snapback.contracts import OwnerKind, OwnerMatch
 
@@ -143,3 +145,92 @@ def test_kit_lookups_owner_reads_the_hcad_lookup(tmp_path, monkeypatch):
         assert lookups.owner("5 Nowhere Road") is None
     finally:
         get_settings.cache_clear()
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "FXDOE FXJON TRUST",
+        "FXDOE FXJON REV TRUST",
+        "FXDOE FXJON & FXMARY CO-TRUSTEES",
+        "FXDOE FXJON TESTAMENTARY TRUST",
+        "FXDOE 2015 TRUST",
+        "FXDOE CHILDRENS TRUST",
+        "FXDOE SEPARATE PROPERTY TRUST",
+        "FXDOE FXJON DECLARATION OF TRUST",
+        "FXDOE FXJON TR",
+        "CHURCH FXJON",
+        "STATE FXJON",
+        "CITY FXJON Q",
+    ],
+)
+def test_a_name_that_carries_a_person_is_a_private_owner(name):
+    from snapback.adapters.hcad import classify
+
+    assert classify(name) is OwnerKind.PERSON
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "FXAMPLE TRUST COMPANY",
+        "FXBANK NATIONAL ASSOCIATION TRUSTEE",
+        "FXBANK N.A. TR",
+        "FXAMPLE HOMES LLC",
+        "FXAMPLE RENTAL TRUST LLC",
+        "CITY OF FXTOWN",
+        "STATE OF TEXAS",
+        "FIRST FXAMPLE CHURCH",
+    ],
+)
+def test_institutions_are_companies(name):
+    from snapback.adapters.hcad import classify
+
+    assert classify(name) is OwnerKind.COMPANY
+
+
+def test_two_accounts_on_one_site_address_give_no_owner(tmp_path):
+    folder = tmp_path / "hcad"
+    folder.mkdir()
+    (folder / "owners.txt").write_text(
+        "acct\tln_num\tname\nfx1\t1\tFXAMPLE HOMES LLC\nfx2\t1\tFXOTHER HOMES LLC\n",
+        encoding="utf-8",
+    )
+    (folder / "real_acct.txt").write_text(
+        "acct\tsite_addr_1\tsite_addr_2\n"
+        "fx1\t100 FIXTURE LN\tHOUSTON\n"
+        "fx2\t100 FIXTURE LN\tHOUSTON\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "data" / "hcad" / "owner_subset.jsonl"
+    build_subset(folder, ["100 Fixture Lane"], out, salt="fx-salt")
+    assert owner("100 Fixture Ln", out, salt="fx-salt") is None
+
+
+def test_two_kit_streets_in_one_listing_give_no_owner(tmp_path):
+    subset = _subset(tmp_path)
+    assert owner("100 Fixture Ln or 200 Sample St, your pick", subset, salt="fx-salt") is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "200 Sample St. This is Spacious Home for families.",
+        "200 Sample St. I'm Relocating For Work.",
+        "200 Sample St, call today - Move In",
+    ],
+)
+def test_phrases_are_not_read_as_the_posters_name(tmp_path, text):
+    result = owner(text, _subset(tmp_path), salt="fx-salt")
+    assert result is not None and result.poster_matches is OwnerMatch.NOT_CHECKED
+
+
+def test_a_nickname_with_the_right_last_name_is_not_checked_not_no(tmp_path):
+    result = owner("200 Sample St. My name is Johnny Fxperson.", _subset(tmp_path), salt="fx-salt")
+    assert result.poster_matches is OwnerMatch.NOT_CHECKED
+
+
+def test_a_different_salt_gives_not_checked_never_no(tmp_path):
+    subset = _subset(tmp_path)
+    result = owner("200 Sample St. My name is Fxbob Fxsmith.", subset, salt="fx-other-salt")
+    assert result is not None and result.poster_matches is OwnerMatch.NOT_CHECKED
