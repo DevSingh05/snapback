@@ -118,13 +118,19 @@ def _date(value: Any) -> date | None:
         return None
 
 
+def _looks_like_unit(word: str) -> bool:
+    """A unit number has a digit in it ('2', '4b', '305') or is a single letter ('B'). 'for' in
+    'apartment for rent' is prose, not a unit."""
+    return any(ch.isdigit() for ch in word) or (len(word) == 1 and word.isalpha())
+
+
 def _unit_after(text: str, street: str) -> str | None:
     """The unit the text names right after the street, if any."""
     i = f" {text} ".find(f" {street} ")
     if i < 0:
         return None
     rest = f" {text} "[i + len(street) + 2 :].split()
-    if len(rest) >= 2 and rest[0] == "unit":
+    if len(rest) >= 2 and rest[0] == "unit" and _looks_like_unit(rest[1]):
         return rest[1]
     return None
 
@@ -190,18 +196,19 @@ def _offices(rec: dict[str, Any]) -> list[str]:
 
 
 def _zip_after(text: str, street: str) -> str | None:
-    """The last 5-digit number after the street: a zip, never the house number in front of it."""
+    """The first 5-digit number after the street: a zip, never the house number in front of it,
+    and never a later number such as a deposit amount."""
     i = f" {text} ".find(f" {street} ")
     tail = f" {text} "[i + len(street) + 2 :] if i >= 0 else ""
     found = ZIP_TOKEN.findall(tail)
-    return found[-1] if found else None
+    return found[0] if found else None
 
 
 def _any_unit(text: str) -> str | None:
     """The first unit the text names anywhere ('unit 7'), for a match made on coordinates."""
     words = text.split()
     for w, nxt in zip(words, words[1:], strict=False):
-        if w == "unit":
+        if w == "unit" and _looks_like_unit(nxt):
             return nxt
     return None
 
