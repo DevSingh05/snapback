@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from snapback.api.main import app, create_app
 from snapback.card import strings
+from snapback.card.render import render_card_png
 from snapback.contracts import (
     Card,
     CreateCaseRequest,
@@ -616,6 +617,38 @@ def test_an_upload_must_say_how_long_it_is(client):
     assert response.status_code == 411
 
 
+# --- the card as a picture, and in Spanish -------------------------------------------------
+
+
+def test_card_png_route_returns_a_png_of_the_card(client):
+    response = client.get("/cases/7Q2M/card.png")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+    assert response.content == render_card_png(FIXTURE_CARD)
+
+
+def test_card_and_png_can_be_asked_for_in_spanish(client):
+    card = Card.model_validate(client.get("/cases/7Q2M/card", params={"lang": "es"}).json())
+    assert card.lang == "es"
+    assert card.state is FIXTURE_CARD.state
+    assert card.checked_at == FIXTURE_CARD.checked_at
+    assert card.rows[2].lines[0].text == "Zelle antes de una visita. Señal de alerta."
+
+    spanish = client.get("/cases/7Q2M/card.png", params={"lang": "es"})
+    assert spanish.status_code == 200
+    assert spanish.content != client.get("/cases/7Q2M/card.png").content
+
+    new_case = create(client)["case_id"]
+    live = Card.model_validate(client.get(f"/cases/{new_case}/card", params={"lang": "es"}).json())
+    assert live.lang == "es"
+
+
+def test_a_language_we_do_not_have_is_refused(client):
+    assert client.get("/cases/7Q2M/card", params={"lang": "fr"}).status_code == 422
+    assert client.get("/cases/ZZZZ/card.png").status_code == 404
+
+
 # --- errors --------------------------------------------------------------------------------
 
 
@@ -666,6 +699,7 @@ def test_the_route_list_is_what_the_other_lanes_were_told():
         ("POST", "/cases"),
         ("GET", "/cases/{case_id}"),
         ("GET", "/cases/{case_id}/card"),
+        ("GET", "/cases/{case_id}/card.png"),
         ("GET", "/cases/{case_id}/trace"),
         ("POST", "/cases/{case_id}/challenge/approve"),
         ("GET", "/healthz"),
