@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from snapback.api.main import app, create_app
+from snapback.card import strings
 from snapback.card.render import render_card_png
 from snapback.contracts import (
     Card,
@@ -202,9 +203,10 @@ def test_a_new_case_pauses_for_the_renters_approval(client):
 
     bearer = {"Authorization": f"Bearer {case['token']}"}
     again = client.get(f"/cases/{case['case_id']}", headers=bearer).json()
-    assert "token" not in again  # the secret is handed out once, at create
+    # Both secrets are handed out once, at create.
+    assert "token" not in again and "read_token" not in again
     for key, value in case.items():
-        if key != "token":
+        if key not in ("token", "read_token"):
             assert again[key] == value
     # With the secret, the status read also gives the drafted challenge in parts.
     challenge = again["challenge"]
@@ -230,7 +232,7 @@ def test_approving_sends_the_challenge_and_finishes_the_case(client):
     assert card.source is DataSource.FIXTURE
     assert card.verify_url == f"http://localhost:5173/c/{case_id}"
 
-    stream = stream_trace(client, case_id, token=case["token"])
+    stream = stream_trace(client, case_id, token=case["read_token"])
     events = [TraceEvent.model_validate_json(e["data"]) for e in stream]
     assert [e.seq for e in events] == list(range(len(events)))
     assert events[-1].kind is TraceKind.VERDICT
@@ -271,7 +273,7 @@ def test_a_short_term_or_commercial_listing_is_not_checked(client, text):
     assert case["status"] == "done"
     assert case["state"] == "unverified"
     assert case["challenge_text"] is None
-    stream = stream_trace(client, case["case_id"], token=case["token"])
+    stream = stream_trace(client, case["case_id"], token=case["read_token"])
     kinds = [json.loads(e["data"])["kind"] for e in stream]
     assert kinds == ["choice", "verdict"]
 
@@ -309,6 +311,21 @@ def test_text_written_for_an_ai_system_is_noticed_and_changes_nothing(client):
     assert injected_card.rows == plain_card.rows
 
 
+def test_a_megabyte_of_text_is_answered_quickly_and_the_trace_says_it_was_cut(client):
+    import time
+
+    started = time.perf_counter()
+    made = client.post("/cases", data={"text": "a" * 1_000_000})
+    took = time.perf_counter() - started
+    assert made.status_code == 201
+    assert took < 2.0, f"creating a case from 1 MB of text took {took:.2f} s"
+
+    first = client.app.state.store.get(made.json()["case_id"]).events()[0]
+    assert first.kind is TraceKind.STATUS
+    assert first.reason == strings.text("trace.intake.truncated")
+    assert "20,000" in first.reason  # the number in the wording is the cap
+
+
 def test_a_screenshot_is_read_as_part_of_the_listing(client):
     pytest.importorskip("rapidocr_onnxruntime")
     shot = (FIXTURES.parent / "intake" / "listing_zelle.png").read_bytes()
@@ -335,6 +352,13 @@ def test_create_hands_out_a_long_random_secret_for_the_case(client):
     assert len(first["token"]) >= 32  # 24 random bytes, url-safe: 192 bits
 
 
+def test_create_also_hands_out_a_separate_read_only_secret(client):
+    first, second = create(client), create(client)
+    assert len(first["read_token"]) >= 32
+    assert first["read_token"] != first["token"]
+    assert first["read_token"] != second["read_token"]
+
+
 def test_approve_needs_the_secret_for_that_case(client):
     case, other = create(client), create(client)
     url = f"/cases/{case['case_id']}/challenge/approve"
@@ -350,6 +374,32 @@ def test_approve_needs_the_secret_for_that_case(client):
     assert client.get(f"/cases/{case['case_id']}").json()["status"] == "waiting_for_approval"
 
     assert approve(client, case).status_code == 200
+
+
+def test_the_read_only_secret_cannot_approve(client):
+    case = create(client)
+    url = f"/cases/{case['case_id']}/challenge/approve"
+    send = {"decision": "send"}
+    read_only = case["read_token"]
+    for headers in ({"Authorization": f"Bearer {read_only}"}, {"X-Case-Token": read_only}):
+        assert client.post(url, json=send, headers=headers).status_code == 403
+    # A write is never accepted from the query string, whichever secret is in it.
+    for secret in (case["token"], read_only):
+        assert client.post(url, json=send, params={"token": secret}).status_code == 401
+    assert client.get(f"/cases/{case['case_id']}").json()["status"] == "waiting_for_approval"
+
+    assert approve(client, case).status_code == 200
+
+
+def test_the_write_secret_is_refused_in_a_query_string(client):
+    # Servers log the path and query of every request. The secret that approves a challenge
+    # must never be put there, so reads from the query take the read-only secret and no other.
+    case = create(client)
+    approve(client, case)
+    url = f"/cases/{case['case_id']}"
+    assert client.get(f"{url}/trace", params={"token": case["token"]}).status_code == 403
+    assert client.get(url, params={"token": case["token"]}).status_code == 403
+    assert client.get(f"{url}/trace", params={"token": case["read_token"]}).status_code == 200
 
 
 def test_the_secret_can_also_travel_in_its_own_header(client):
@@ -378,14 +428,17 @@ def test_the_card_and_a_summary_need_only_the_short_id(client):
     assert case["challenge_text"] not in summary.text
 
 
-def test_the_challenge_text_needs_the_case_secret(client):
+def test_the_challenge_text_needs_a_case_secret(client):
     case, other = create(client), create(client)
     url = f"/cases/{case['case_id']}"
-    with_header = client.get(url, headers={"Authorization": f"Bearer {case['token']}"}).json()
-    with_query = client.get(url, params={"token": case["token"]}).json()
-    assert with_header["challenge_text"] == with_query["challenge_text"] == case["challenge_text"]
+    # Whoever may write may also read, as long as the secret travels in a header.
+    with_write = client.get(url, headers={"Authorization": f"Bearer {case['token']}"}).json()
+    with_read = client.get(url, headers={"X-Case-Token": case["read_token"]}).json()
+    with_query = client.get(url, params={"token": case["read_token"]}).json()
+    for body in (with_write, with_read, with_query):
+        assert body["challenge_text"] == case["challenge_text"]
     assert client.get(url, headers={"Authorization": "Bearer nope"}).status_code == 403
-    assert client.get(url, params={"token": other["token"]}).status_code == 403
+    assert client.get(url, params={"token": other["read_token"]}).status_code == 403
 
 
 def test_the_trace_stream_needs_the_case_secret(client):
@@ -394,10 +447,10 @@ def test_the_trace_stream_needs_the_case_secret(client):
     url = f"/cases/{case['case_id']}/trace"
     assert client.get(url).status_code == 401
     assert client.get(url, params={"token": "nope"}).status_code == 403
-    assert client.get(url, params={"token": other["token"]}).status_code == 403
+    assert client.get(url, params={"token": other["read_token"]}).status_code == 403
 
-    # A browser's EventSource cannot set headers, so the secret may ride in the query.
-    by_query = stream_trace(client, case["case_id"], token=case["token"])
+    # A browser's EventSource cannot set headers, so the read-only secret may ride in the query.
+    by_query = stream_trace(client, case["case_id"], token=case["read_token"])
     with client.stream("GET", url, headers={"X-Case-Token": case["token"]}) as response:
         by_header = read_sse(response)
     assert by_query == by_header

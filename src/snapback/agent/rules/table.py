@@ -7,7 +7,9 @@ lives in `snapback.card.strings` under `rule.<rule_id>`, never here.
 How to read a rule:
 
 - `patterns`: regular expressions, matched without regard to case against one sentence of the
-  renter's own text. Any one of them is enough.
+  renter's own text. Any one of them is enough. Every quantifier needs an upper bound
+  (`{0,40}`, never `*` or `+`): the text is written by the person being checked, and an
+  unbounded pattern lets them stall the check. A test refuses a pattern without one.
 - `excused_after_viewing`: the ask is ordinary once the renter has toured the unit or signed the
   lease, so a sentence that puts it after one of those does not fire. Rules without this fire
   whenever they match: nobody legitimate takes gift cards at any stage.
@@ -127,7 +129,7 @@ RULES: tuple[Rule, ...] = (
             r"[^.!?]{0,40}\b(?:deposit|first month)\b",
             r"\b(?:deposit|first month(?:'s)?(?: rent)?)\b[^.!?]{0,40}\b(?:to hold|to secure|"
             r"to reserve|up ?front|in advance|right away|today|tonight|now)\b",
-            r"(?:\b(?:fee|payment|money)|\$\d[\d,]*)\b[^.!?]{0,30}\b(?:to|will) "
+            r"(?:\b(?:fee|payment|money)|\$\d[\d,]{0,12})\b[^.!?]{0,30}\b(?:to|will) "
             r"(?:hold|secure|reserve)\b",
         ),
         excused_after_viewing=True,

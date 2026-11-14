@@ -13,13 +13,14 @@ import re
 
 from snapback.agent.rules.apply import normalise
 
-_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
+# `normalise` leaves no run of spaces longer than one, so the small bounds lose nothing.
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s{1,3}|\n{1,3}")
 
 _ADDRESSED_TO_AN_AI = re.compile(
     r"\b(?:ignore|disregard|forget)\b[^.!?\n]{0,20}"
     r"\b(?:previous|prior|above|earlier|your|all)\b[^.!?\n]{0,15}"
     r"\b(?:instructions?|prompts?|rules?|messages?|guidelines?)\b"
-    r"|^\W{0,3}(?:system|assistant|developer)(?:\s+(?:prompt|message|note))?\s*:"
+    r"|^\W{0,3}(?:system|assistant|developer)(?:\s{1,3}(?:prompt|message|note))?\s{0,3}:"
     r"|</?(?:system|instructions?|prompt|assistant)>"
     r"|\byou are (?:now )?(?:an? |the )?[^.!?\n]{0,30}\b(?:assistant|ai|model|agent|chatbot|bot)\b"
     r"|\bnew instructions?\b"
@@ -29,7 +30,7 @@ _ADDRESSED_TO_AN_AI = re.compile(
     r"\b(?:verified|safe|legit|legitimate|approved|trusted|clean|real)\b"
     r"|\bset (?:the )?(?:state|status|verdict|result|card)\b[^.!?\n]{0,20}\bto\b"
     r"|\b(?:do not|don't|never) (?:flag|warn about|report)\b"
-    r"|(?:^|[.!?]\s+)(?:agent|assistant|ai|bot|snapback)\s*[:,]\s*"
+    r"|(?:^|[.!?]\s{1,3})(?:agent|assistant|ai|bot|snapback)\s{0,3}[:,]\s{0,3}"
     r"(?:choose|pick|select|skip|approve|return|output|say|respond|mark|set)\b",
     re.IGNORECASE,
 )

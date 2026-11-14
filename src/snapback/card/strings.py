@@ -154,6 +154,10 @@ EN: dict[str, str] = {
     "trace.intake.injection": (
         "The listing has text written for an AI system. It was ignored, and the checks go on."
     ),
+    "trace.intake.truncated": (
+        "The text you sent was very long. Only the first 20,000 characters were read. "
+        "The rest was not checked."
+    ),
     # --- reasons a verdict gives (Verdict.reasons, Evidence.forgery_reason) ----------------
     "reason.forged": "The proof-of-presence reply was not a fresh photo taken in the unit.",
     "reason.forged_copy": "The reply is a copy of listing photo {n}.",
@@ -370,6 +374,10 @@ ES: dict[str, str] = {
     "trace.intake.injection": (
         "El anuncio tiene texto escrito para un sistema de IA. Se ignoró y las revisiones "
         "continúan."
+    ),
+    "trace.intake.truncated": (
+        "El texto que enviaste era muy largo. Solo se leyeron los primeros 20,000 caracteres. "
+        "El resto no se revisó."
     ),
     "reason.forged": (
         "La respuesta a la prueba de presencia no era una foto nueva tomada en la unidad."

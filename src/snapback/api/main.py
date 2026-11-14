@@ -13,8 +13,9 @@ Routes the web app and the iMessage sidecar call:
 
 A case's short id is accepted with or without the fixture prefix and in either case: `7Q2M`,
 `7q2m` and `fx-7Q2M` are the same case. Short ids can be guessed, so the id alone opens only
-the card and a summary. The trace, the drafted challenge and every write need the secret that
-`POST /cases` returned for the case.
+the card and a summary. `POST /cases` returns two secrets for the case. `token` is needed for
+every write and is accepted in a header only. `read_token` opens the trace and the drafted
+challenge and is the only one accepted as `?token=`, because servers log addresses.
 """
 
 import asyncio
@@ -140,14 +141,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Decide a verdict from evidence the caller already gathered. No model is involved."""
         return decide(evidence)
 
-    def check_secret(case: RecordedCase | SessionCase, offered: str | None) -> None:
-        """Refuse unless `offered` is this case's secret. A recorded case has none to check."""
+    def same(offered: str, secret: str | None) -> bool:
+        return secret is not None and secrets.compare_digest(offered.encode(), secret.encode())
+
+    def check_write(case: RecordedCase | SessionCase, in_header: str | None) -> None:
+        """Refuse unless the write secret came in a header. A recorded case has none to check."""
         if case.token is None:
             return
-        if offered is None:
-            raise HTTPException(status_code=401, detail="This needs the case's token.")
-        if not secrets.compare_digest(offered.encode(), case.token.encode()):
+        if in_header is None:
+            raise HTTPException(
+                status_code=401, detail="This needs the case's token in the Authorization header."
+            )
+        if not same(in_header, case.token):
+            raise HTTPException(status_code=403, detail="That token cannot write to this case.")
+
+    def check_read(
+        case: RecordedCase | SessionCase, in_header: str | None, in_query: str | None
+    ) -> None:
+        """Refuse unless the request may read this case's trace and challenge.
+
+        A header may carry either secret, since whoever may write may read. The address may
+        carry only the read-only one: servers log addresses, so the write secret is refused
+        there.
+        """
+        if case.token is None:
+            return
+        if in_header is not None:
+            if same(in_header, case.token) or same(in_header, case.read_token):
+                return
             raise HTTPException(status_code=403, detail="That token is not for this case.")
+        if in_query is not None:
+            if same(in_query, case.read_token):
+                return
+            raise HTTPException(
+                status_code=403,
+                detail="Only this case's read token is accepted in the address.",
+            )
+        raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
     def start_case(text: str, link: str, photos: list[UploadFile]) -> SessionCase:
         images = read_images(photos, settings.snapback_max_photos, max_photo_bytes)
@@ -232,7 +262,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 CLIENT_COOKIE, new_cookie, max_age=30 * 24 * 3600, httponly=True, samesite="lax"
             )
         status = case.status(with_challenge=True)
-        return CreateCaseResponse(token=case.token, **status.model_dump(exclude={"challenge"}))
+        return CreateCaseResponse(
+            token=case.token,
+            read_token=case.read_token,
+            **status.model_dump(exclude={"challenge"}),
+        )
 
     @app.get("/cases/{case_id}")
     def get_case(
@@ -247,10 +281,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         someone answer the challenge.
         """
         case = find(case_id)
-        offered = _bearer(authorization, x_case_token) or token
-        if offered is None:
+        in_header = _bearer(authorization, x_case_token)
+        if in_header is None and token is None:
             return case.status(with_challenge=False)
-        check_secret(case, offered)
+        check_read(case, in_header, token)
         return case.status(with_challenge=True)
 
     @app.get("/cases/{case_id}/card")
@@ -274,13 +308,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> StreamingResponse:
         """Server-sent events: `event: trace`, `id` is the seq, `data` is a TraceEvent.
 
-        Needs the case's secret, because the trace names the spot that was drawn. A browser's
-        EventSource cannot set headers, so it may be sent as `?token=`; other clients can use
+        Needs a case secret, because the trace names the spot that was drawn. A browser's
+        EventSource cannot set headers, so the read-only `read_token` may be sent as
+        `?token=`; the write token is refused there. Other clients can send either secret as
         `Authorization: Bearer` or `X-Case-Token`. Send `Last-Event-ID` to resume after that
         seq. The stream ends after the verdict event.
         """
         case = find(case_id)
-        check_secret(case, _bearer(authorization, x_case_token) or token)
+        check_read(case, _bearer(authorization, x_case_token), token)
         return StreamingResponse(
             _trace_stream(case, _after(last_event_id), settings.snapback_trace_pace_ms / 1000),
             media_type="text/event-stream",
@@ -300,7 +335,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         short id is for reading and display; on its own it lets nobody act for the renter.
         """
         case = find(case_id)
-        check_secret(case, _bearer(authorization, x_case_token))
+        check_write(case, _bearer(authorization, x_case_token))
         try:
             case.approve(approval.decision, approval.text)
         except NothingWaiting:

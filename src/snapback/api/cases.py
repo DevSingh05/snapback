@@ -88,6 +88,7 @@ def _now() -> datetime:
 class RecordedCase:
     done = True
     token = None  # a recorded case can never be written to, so it has no secret
+    read_token = None
 
     def __init__(
         self, case_id: str, card: Card, events: list[TraceEvent], evidence: ModuleEvidence
@@ -135,6 +136,9 @@ class SessionCase:
     ) -> None:
         self.case_id = case_id  # short, shown to people, enough to read the case
         self.token = secrets.token_urlsafe(24)  # 192 bits, needed for every write
+        # A second secret that can only read. It is the one a browser may put in an address,
+        # where servers log it, so it must never be able to approve anything.
+        self.read_token = secrets.token_urlsafe(24)
         self.session = session
         self._listing = listing
         self._runner = runner
@@ -267,6 +271,8 @@ class CaseStore:
                 listed_rent=listing.listed_rent,
             )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
+            if listing.truncated:
+                session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner)

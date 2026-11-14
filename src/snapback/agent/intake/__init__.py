@@ -7,6 +7,10 @@ intake never fetches it.
 
 Everything read from the listing is data. The rules run on all of it, an instruction hidden in
 it is logged and obeyed by nothing, and nothing is removed.
+
+One limit: only the first `MAX_TEXT_CHARS` characters are read, so that nobody can stall the
+check with a huge paste. A listing longer than that is marked `truncated`, and the renter is
+told in the trace that the rest was not checked.
 """
 
 import logging
@@ -18,7 +22,7 @@ from snapback.agent.intake.fields import ContactClaims, extract_contacts, extrac
 from snapback.agent.intake.injection import find_injections
 from snapback.agent.intake.ocr import OcrUnavailable, read_image
 from snapback.agent.rules import apply_rules
-from snapback.agent.rules.apply import normalise
+from snapback.agent.rules.apply import MAX_TEXT_CHARS, exceeds_cap, normalise
 from snapback.agent.scope import ListingScope, detect_scope
 from snapback.contracts import RuleHit
 
@@ -40,6 +44,8 @@ class Listing(BaseModel):
     screenshots: int = 0
     injection_spans: list[str] = Field(default_factory=list)
     ocr_available: bool = True
+    # There was more text than is read (`MAX_TEXT_CHARS`). What came after it was not checked.
+    truncated: bool = False
 
 
 def read_listing(
@@ -68,7 +74,12 @@ def read_listing(
         else:
             photos += 1
 
-    full_text = normalise("\n".join(parts))
+    # Cut and folded before any pattern runs: the text is written by the person being checked.
+    sent = "\n".join(parts)
+    full_text = normalise(sent)
+    truncated = exceeds_cap(sent)
+    if truncated:
+        log.warning("listing text was cut to %d characters", MAX_TEXT_CHARS)
     injections = find_injections(full_text)
     if injections:
         log.warning("listing carries %d sentence(s) addressed to an AI system", len(injections))
@@ -83,6 +94,7 @@ def read_listing(
         screenshots=screenshots,
         injection_spans=injections,
         ocr_available=ocr_available,
+        truncated=truncated,
     )
 
 
