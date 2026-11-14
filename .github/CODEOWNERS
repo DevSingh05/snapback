@@ -19,3 +19,7 @@
 # Data + intake lane
 /src/snapback/adapters/     @RishitRai
 /apps/sidecar/              @RishitRai
+
+# Matterport twin access is on the vision lane's critical path, so that one adapter is theirs.
+# Keep this after the directory rule above: the last matching line wins.
+/src/snapback/adapters/matterport.py  @DevSingh05
