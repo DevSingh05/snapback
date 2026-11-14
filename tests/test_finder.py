@@ -375,3 +375,32 @@ def test_contracts_are_additive():
         block = re.search(rf"export interface {name} \{{(.*?)\n\}}", ts, re.S).group(1)
         for field in fields:
             assert field in getattr(py, name).model_fields and re.search(rf"\b{field}\??:", block)
+
+
+def _place(kind: str, **facts) -> FinderSignal:
+    return FinderSignal(kind=kind, place_kind="apartment", **facts)
+
+
+def test_walkups_the_renter_picked_count_against_skipping_walkups(tmp_path):
+    s = new_session(tmp_path)
+    picked = [_place("pick", walkup=True) for _ in range(4)]
+    passed = [_place("pass", walkup=True) for _ in range(2)]
+    reply = run_turn(s, [*picked, *passed])
+    assert s.learned()["passed_walkups"] == "2 of 6"
+    assert "propose_no_walkup" not in {p.key for p in reply.proposals}
+
+
+def test_places_without_parking_the_renter_picked_count_too(tmp_path):
+    s = new_session(tmp_path)
+    picked = [_place("pick", parking=False) for _ in range(4)]
+    passed = [_place("pass", parking=False) for _ in range(2)]
+    reply = run_turn(s, [*picked, *passed])
+    assert s.learned()["passed_no_parking"] == "2 of 6"
+    assert "propose_parking" not in {p.key for p in reply.proposals}
+
+
+def test_passing_on_places_that_have_parking_is_not_a_parking_signal(tmp_path):
+    s = new_session(tmp_path)
+    reply = run_turn(s, [_place("pass", parking=True, walkup=False) for _ in range(3)])
+    assert "passed_no_parking" not in s.learned() and "passed_walkups" not in s.learned()
+    assert reply.proposals == []
