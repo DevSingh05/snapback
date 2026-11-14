@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 
 import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
+import { OneBox } from "./home/OneBox";
 import { CardPage } from "./pages/CardPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
 import { ReplayPage } from "./replay/ReplayPage";
@@ -9,12 +10,10 @@ import { AppShell, type Section } from "./shell/AppShell";
 import { FinderPage } from "./shell/FinderPage";
 import { ListingsPage } from "./shell/ListingsPage";
 import { loadPrefs, tabOf } from "./shell/prefs";
-import { YourChecks } from "./shell/YourChecks";
 import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
-import { UploadPage } from "./upload/UploadPage";
 
 // The city map loads on its own route only: its chunk (and MapLibre) never reaches the home page.
 const MapPage = lazy(() => import("./map/MapPage"));
@@ -112,12 +111,9 @@ export default function App() {
   }
   return (
     <AppShell section={section} context={context}>
-      <main className="shell">
+      <main className={route.name === "home" ? "shell shell-home" : "shell"}>
         {route.name === "home" ? (
-          <div className="home">
-            <YourChecks />
-            <UploadPage />
-          </div>
+          <OneBox />
         ) : route.name === "listings" ? (
           <ListingsPage />
         ) : route.name === "finder" ? (

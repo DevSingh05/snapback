@@ -182,6 +182,21 @@
   --pick-chosen: #0d6672;
   --on-pick-chosen: #ffffff;
   --pick-glow: 0 0 0 3px rgb(31 182 193 / 0.28);
+
+  /* Home: the one box sits on a real photograph under a matte scrim, then on a tinted ground.
+     Surfaces by depth: ground, surface (cards and the box), raised (controls in a card). */
+  --home-ground: #e4ebee;
+  --home-surface: #ffffff;
+  --home-raised: #eef3f5;
+  --home-line: rgb(20 36 45 / 0.12);
+  --hero-scrim-top: rgb(9 13 16 / 0.42);
+  --hero-scrim-bottom: rgb(9 13 16 / 0.82);
+  --on-hero: #f6f3ec;
+  --on-hero-muted: rgb(246 243 236 / 0.8);
+  --hero-line: rgb(246 243 236 / 0.26);
+  --photo-stamp: rgb(9 13 16 / 0.72);
+  --on-photo-stamp: #f6f3ec;
+  --bar-bg: var(--surface);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -275,6 +290,14 @@
     --pick-glow: 0 0 0 3px rgb(95 212 220 / 0.3);
     --match-stage: #0c0d10;
     --match-stage-2: #17191e;
+
+    --home-ground: #0d0e10;
+    --home-surface: #16181b;
+    --home-raised: #1f2226;
+    --home-line: rgb(255 255 255 / 0.09);
+    --hero-scrim-top: rgb(6 7 9 / 0.5);
+    --hero-scrim-bottom: rgb(6 7 9 / 0.9);
+    --bar-bg: #111215;
   }
 }
 
@@ -368,4 +391,12 @@
   --pick-glow: 0 0 0 3px rgb(95 212 220 / 0.3);
   --match-stage: #0c0d10;
   --match-stage-2: #17191e;
+
+  --home-ground: #0d0e10;
+  --home-surface: #16181b;
+  --home-raised: #1f2226;
+  --home-line: rgb(255 255 255 / 0.09);
+  --hero-scrim-top: rgb(6 7 9 / 0.5);
+  --hero-scrim-bottom: rgb(6 7 9 / 0.9);
+  --bar-bg: #111215;
 }
