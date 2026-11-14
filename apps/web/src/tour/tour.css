@@ -4,26 +4,26 @@
    in ink and slate with a mark and words, never in alarm colours. */
 .tour-page {
   width: 100%;
-  max-width: 1320px;
+  max-width: var(--page-max);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--layer-1);
   box-shadow: var(--shadow);
 }
 .tour-page.notice {
   padding: clamp(18px, 4vw, 36px);
-  gap: 10px;
+  gap: var(--sp-3);
 }
 
 .tour-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 14px;
-  padding: 16px clamp(16px, 2.4vw, 28px);
+  gap: var(--sp-2) var(--sp-4);
+  padding: 16px var(--page-pad);
 }
 .tour-head > .mono {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -36,21 +36,21 @@
 .tour-scan,
 .tour-render {
   margin: 0;
-  padding: 0 clamp(16px, 2.4vw, 28px) 12px;
+  padding: 0 var(--page-pad) 12px;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: var(--fs-sm);
 }
 .tour-render {
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.04em;
   margin-top: -8px;
 }
 .tour-mismatch {
   margin: 0;
-  padding: 12px clamp(16px, 2.4vw, 28px);
+  padding: 12px var(--page-pad);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   background: var(--v-slate);
   color: var(--on-v);
   font-weight: 700;
@@ -95,7 +95,7 @@
   min-height: clamp(360px, 31vw, 450px);
   overflow: hidden;
   display: flex;
-  background: linear-gradient(180deg, var(--sky), var(--paper));
+  background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
 }
 .tour-stage[data-drawer="open"] {
   position: static;
@@ -114,7 +114,7 @@
   right: 168px;
   top: 12px;
   min-height: 48px;
-  padding: 12px 22px;
+  padding: var(--sp-3) var(--sp-5);
   box-shadow: 5px 5px 0 var(--ink);
 }
 .tour-stage:has(.ma) {
@@ -123,7 +123,7 @@
 .tour-stage:has(.ma) .tour-how {
   position: static;
   align-self: flex-end;
-  margin: 0 clamp(16px, 2.4vw, 28px) 24px;
+  margin: 0 var(--page-pad) 24px;
 }
 .tour-how:active:not(:disabled) {
   transform: translate(5px, 5px);
@@ -140,7 +140,7 @@
    RoomStop) on the right. */
 .tour-panel {
   grid-area: panel;
-  padding: clamp(16px, 2vw, 24px) clamp(18px, 2.4vw, 28px);
+  padding: var(--pad) var(--page-pad);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
   grid-template-rows: auto auto 1fr auto;
@@ -152,7 +152,7 @@
   margin: 0;
 }
 .tour-count {
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--act);
@@ -168,7 +168,7 @@
 .tour-photo-note {
   margin: 0;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
 }
 .tour-src::before {
   content: "· ";
@@ -183,17 +183,17 @@
   align-self: end;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .tour-controls button {
   min-height: 48px;
-  background: var(--sky);
+  background: var(--layer-3);
   color: var(--ink);
 }
 .tour-controls button:nth-child(2) {
   background: var(--act);
   color: var(--on-act);
-  padding-inline: 30px;
+  padding-inline: var(--sp-6);
 }
 .tour-controls button:disabled {
   opacity: 0.45;
@@ -213,22 +213,22 @@
   grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-3);
   min-width: 0;
 }
 .tour-stop[data-dwell="true"] {
-  padding-left: 14px;
+  padding-left: var(--sp-4);
   border-left: 4px solid var(--act);
 }
 .tour-photo-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--sp-2) var(--sp-3);
 }
 .tour-photo-row button {
   min-height: 44px;
-  background: var(--sky);
+  background: var(--layer-3);
   color: var(--ink);
 }
 .tour-photo-label {
@@ -237,8 +237,8 @@
 }
 .tour-empty-frame {
   margin: 0;
-  padding: 10px 14px;
-  background: var(--paper);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--layer-2);
   font-weight: 700;
 }
 /* The stage already says a room was never shown, in the same words. */
@@ -252,21 +252,21 @@
 }
 .tour-facts,
 .tour-claims {
-  margin: 6px 0 0;
+  margin: var(--sp-2) 0 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-2);
 }
 .tour-facts li,
 .tour-claims li {
-  padding-top: 6px;
+  padding-top: var(--sp-2);
   border-top: 1px solid var(--line);
 }
 .tour-claims::before {
   content: "The ad says";
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -274,12 +274,12 @@
 }
 .tour-tip {
   margin: 0;
-  padding: 12px 16px;
-  background: var(--paper);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--layer-2);
 }
 .tour-tip strong {
   display: block;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -292,14 +292,14 @@
 .tour-mode,
 .tour-banner {
   margin: 0;
-  padding: 12px clamp(16px, 2.4vw, 28px);
+  padding: 12px var(--page-pad);
   background: var(--v-slate);
   color: var(--on-v);
   font-weight: 700;
 }
 .tour-mode-line {
   margin: 0;
-  padding: 8px clamp(16px, 2.4vw, 28px);
+  padding: 8px var(--page-pad);
   color: var(--muted);
 }
 /* In the walk through the pictured building, rooms are not counted against the named home. */
@@ -309,9 +309,9 @@
 }
 .tour-coverage {
   margin: 0;
-  padding: 0 clamp(16px, 2.4vw, 28px) 12px;
+  padding: 0 var(--page-pad) 12px;
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
 }
 
 /* The stops, as a strip. A filled square: an ad photo was placed in that room. A dashed top
@@ -320,27 +320,27 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 20px;
-  padding: 16px clamp(16px, 2.4vw, 28px) 0;
-  background: var(--paper);
+  gap: var(--sp-2) var(--sp-5);
+  padding: 16px var(--page-pad) 0;
+  background: var(--layer-2);
 }
 .tour-cover-line {
   margin: 0;
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
 }
 .tour-cover-key {
   margin: 0 0 0 auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 18px;
-  font-size: 0.82rem;
+  gap: var(--sp-1) var(--sp-4);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .tour-key {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .tour-key::before {
   content: "";
@@ -356,12 +356,12 @@
 .tour-rail {
   flex: 1 0 100%;
   list-style: none;
-  margin: 10px calc(-1 * clamp(16px, 2.4vw, 28px)) 0;
+  margin: 10px calc(-1 * var(--page-pad)) 0;
   padding: 0;
   display: flex;
   gap: 2px;
   overflow-x: auto;
-  background: var(--paper);
+  background: var(--layer-2);
 }
 .tour-rail li {
   flex: 1 0 auto;
@@ -371,15 +371,15 @@
   flex: 1;
   position: relative;
   min-height: 56px;
-  padding: 14px 16px 12px;
-  background: var(--surface);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  background: var(--layer-1);
   color: var(--ink);
   font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .tour-rail li[data-ad-view="placed"] button::before {
   content: "";
@@ -410,7 +410,7 @@
 }
 @media (hover: hover) {
   .tour-rail button:hover:not([aria-current="step"]) {
-    background: var(--sky);
+    background: var(--layer-3);
   }
 }
 
@@ -425,7 +425,7 @@
 @media (max-width: 760px) {
   .tour-page[data-rail="on"] {
     --rail-w: 0px;
-    margin-bottom: 76px;
+    margin-bottom: var(--sp-8);
   }
   .tour-page[data-rail="on"] .tour-body,
   .tour-body {
@@ -440,7 +440,7 @@
   .tour-panel {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--sp-3);
   }
   .tour-stop {
     order: 1;
@@ -460,11 +460,11 @@
   .tour-how {
     position: static;
     align-self: stretch;
-    margin: 12px 16px 16px;
+    margin: var(--sp-3) var(--sp-4) var(--sp-4);
   }
   .tour-stage:has(.ma) .tour-how {
     align-self: stretch;
-    margin: 0 16px 16px;
+    margin: 0 var(--sp-4) var(--sp-4);
   }
   .tour-cover-key {
     margin-left: 0;
@@ -485,11 +485,102 @@
 .tour-photo-note {
   margin: 0;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
 }
 .tour-wrong-model {
   margin: 0;
-  padding: 10px 14px;
+  padding: var(--sp-3) var(--sp-4);
   background: var(--amber-soft);
   color: var(--amber);
+}
+
+/* ---------- Finding your way: out of the walk, where you are, how far along ---------- */
+/* The app bar carries the mark; the walk's own header keeps only what the walk needs. */
+.tour-head .wordmark {
+  display: none;
+}
+.tour-ways {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-5);
+  padding: var(--sp-3) var(--page-pad) 0;
+  font-size: var(--fs-sm);
+}
+.tour-way {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  color: var(--act);
+  font-weight: 700;
+  text-decoration: none;
+}
+.tour-way-back::before {
+  content: "";
+  width: 14px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(100% 35%, 45% 35%, 45% 0, 0 50%, 45% 100%, 45% 65%, 100% 65%);
+}
+.tour-way:last-child {
+  margin-left: auto;
+}
+.tour-seeing {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  max-width: 46ch;
+}
+.tour-progress {
+  align-self: end;
+  display: flex;
+  margin-top: var(--sp-3);
+}
+.tour-progress-bar {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+}
+.tour-progress-seg {
+  flex: 1;
+  height: 6px;
+  background: var(--layer-3);
+}
+.tour-progress-seg[data-state="done"] {
+  background: color-mix(in srgb, var(--act) 45%, var(--layer-3));
+}
+.tour-progress-seg[data-state="here"] {
+  background: var(--act);
+}
+.tour-controls button {
+  flex: 1 0 auto;
+}
+@media (hover: hover) {
+  .tour-way:hover {
+    text-decoration: underline;
+  }
+}
+@media (max-width: 760px) {
+  .tour-way:last-child {
+    margin-left: 0;
+  }
+}
+/* Plain labels: the bar already says Walk, so the header only says which data this is. */
+.tour-head {
+  padding-block: var(--sp-2);
+}
+.tour-head > .mono:first-of-type {
+  display: none;
+}
+.tour-head::before {
+  content: "Record";
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tour-head > .mono {
+  margin-left: var(--sp-3);
 }

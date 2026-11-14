@@ -13,6 +13,7 @@ import { MismatchAerials } from "../walk/MismatchAerials";
 import { RealStill, StageViews } from "../walk/StageViews";
 import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
+import { seeingLine, waysOut } from "../walk/seeing";
 import { WalkMap } from "../walk/WalkMap";
 import { useWalkLive } from "../walk/useWalkLive";
 import { photoAt, walkLook } from "../walk/walkLook";
@@ -214,6 +215,14 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
       onKeyDownCapture={pause}
       onWheelCapture={pause}
     >
+      <nav className="tour-ways" aria-label="Leave the walk">
+        <a className="tour-way tour-way-back" href={waysOut(plan, caseId).back.href}>
+          {waysOut(plan, caseId).back.label}
+        </a>
+        <a className="tour-way" href={waysOut(plan, caseId).check.href}>
+          {waysOut(plan, caseId).check.label}
+        </a>
+      </nav>
       <header className="tour-head">
         <span className="wordmark">SNAPBACK</span>
         <span className="mono">Walk it first</span>
@@ -351,6 +360,9 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             Step {Math.min(index, last) + 1} of {plan.stops.length}
           </p>
           <h1 className="tour-title">{stop.title}</h1>
+          <p className="tour-seeing" data-testid="tour-seeing">
+            {seeingLine(stop, plan, liveScan && !wrongModel)}
+          </p>
           <WalkMap stops={plan.stops} current={Math.min(index, last)} onPick={setIndex} />
           <RoomStop
             stop={stop}
@@ -373,6 +385,17 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
           <p className="tour-status" role="status">
             {status}
           </p>
+          <div className="tour-progress" data-testid="tour-progress">
+            <span className="tour-progress-bar" aria-hidden="true">
+              {plan.stops.map((st, i) => (
+                <span
+                  key={st.key}
+                  className="tour-progress-seg"
+                  data-state={i < index ? "done" : i === Math.min(index, last) ? "here" : "ahead"}
+                />
+              ))}
+            </span>
+          </div>
           <div className="tour-controls">
             <button type="button" onClick={back} disabled={index === 0}>
               Back
