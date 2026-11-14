@@ -24,7 +24,7 @@ the trace, after `clean_reason`, and never reaches a card.
 """
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal
@@ -308,7 +308,7 @@ class Plan:
 # Search planning (council 4): the model chooses among options code wrote, from derived facts.
 #
 # Two choices follow a search, each with 2+ code-written options or none is asked:
-#   1. which of the top matches get the deep check (record, for-sale, licence, owner);
+#   1. which top matches get the deep check (office on record; for-sale status for houses);
 #   2. which trade-off question to put to the renter ("$140 a month less with a walk-up. OK?").
 # The chooser sees option labels and counts and yes/no facts only: never a kit row, an id, an
 # office name or an address. Whatever it answers, code applies only a pick that is on the list;
@@ -395,7 +395,7 @@ class TradeOff:
 
 
 def _place_key(place: PlaceMatch) -> tuple[str, str]:
-    return place.property_id, place.floor_plan or ""
+    return place.property_id, place.plan_key or place.floor_plan or ""
 
 
 def deep_check_offer(matches: list[PlaceMatch]) -> SearchOffer | None:
@@ -532,7 +532,7 @@ def tour_gate_offer(question: str | None, places_with_office: int) -> SearchOffe
 
 @dataclass(frozen=True)
 class SearchPlan:
-    deep_check: list[tuple[str, str]]  # (property_id, floor plan) of the places to check deeply
+    deep_check: list[tuple[str, str]]  # (property_id, plan_key) of the places to check deeply
     question: str | None  # the one trade-off question to put to the renter, or None
     steps: list[SearchStep]
     ask_first: bool = False  # put the question before any tour request draft
@@ -546,6 +546,29 @@ def _remember(offer: SearchOffer, memory: dict[str, bool | int] | None) -> Searc
     return replace(offer, facts={**offer.facts, **memory})
 
 
+class _StopAfterFailure:
+    """One search's view of a chooser: after its first failure (an error or a timeout) it is
+    not asked again in this search, so the code policy decides the rest, each stamped `policy`.
+    A new search gets a fresh wrapper."""
+
+    def __init__(self, chooser: Any) -> None:
+        self._chooser = chooser
+        self._down = False
+
+    @property
+    def chosen_by(self) -> Any:
+        return self._chooser.chosen_by
+
+    def choose(self, offer: Any) -> tuple[str, str]:
+        if self._down:
+            raise RuntimeError("chooser failed earlier in this search")
+        try:
+            return self._chooser.choose(offer)
+        except Exception:
+            self._down = True
+            raise
+
+
 def plan_search(
     matches: list[PlaceMatch],
     tradeoffs: list[TradeOff],
@@ -557,7 +580,7 @@ def plan_search(
     keys as yes/no and counts (never an id)."""
     from snapback.agent.runner import PolicyChooser
 
-    chooser = chooser or PolicyChooser()
+    chooser = _StopAfterFailure(chooser or PolicyChooser())
     steps: list[SearchStep] = []
     targets: list[tuple[str, str]] = []
     offer = deep_check_offer(matches)
@@ -578,14 +601,18 @@ def plan_search(
 
 
 def tradeoffs_for(
-    brief: RenterBrief, lookups: Any, matches: list[PlaceMatch] | None = None
+    brief: RenterBrief,
+    lookups: Any,
+    matches: list[PlaceMatch] | None = None,
+    exclude: Collection[str] = (),
 ) -> list[TradeOff]:
     """Questions code can ask, each computed from a second search with one need relaxed.
 
     The base list is computed here from the whole kit, never from a caller's cut-down list, and
     "places" are distinct buildings (a building has many floor plans). Only a question that
     would change the list (a lower price or more places) is offered. A parking need never
-    removes a place (an unknown stays in), so there is no parking question."""
+    removes a place (an unknown stays in), so there is no parking question. Buildings in
+    `exclude` (places the renter rejected) count for nothing: they cannot be the saving."""
     from snapback.search import _all_matches
 
     def cheapest(items: list[PlaceMatch]) -> int | None:
@@ -595,11 +622,14 @@ def tradeoffs_for(
     def buildings(items: list[PlaceMatch]) -> set[str]:
         return {m.property_id for m in items}
 
-    _, base_all = _all_matches(brief, lookups)
+    def run(b: RenterBrief) -> list[PlaceMatch]:
+        return [m for m in _all_matches(b, lookups)[1] if m.property_id not in exclude]
+
+    base_all = run(brief)
     base = cheapest(base_all)
     out: list[TradeOff] = []
     if brief.needs_no_walkup:
-        _, relaxed = _all_matches(brief.model_copy(update={"needs_no_walkup": False}), lookups)
+        relaxed = run(brief.model_copy(update={"needs_no_walkup": False}))
         walkups = [
             m
             for m in relaxed
@@ -620,9 +650,7 @@ def tradeoffs_for(
             )
     if brief.max_rent_month:
         step = max(50, round(brief.max_rent_month * 0.1 / 50) * 50)
-        _, higher = _all_matches(
-            brief.model_copy(update={"max_rent_month": brief.max_rent_month + step}), lookups
-        )
+        higher = run(brief.model_copy(update={"max_rent_month": brief.max_rent_month + step}))
         more = len(buildings(higher)) - len(buildings(base_all))
         if more > 0:
             out.append(

@@ -365,6 +365,14 @@ def _all_matches(brief: RenterBrief, lookups: Any) -> tuple[int, list[PlaceMatch
     source = _source_of(lookups)
     supply = _supply(lookups)
     matches = [m for raw in supply if (m := _match(raw, brief, source)) is not None]
+    seen: set[tuple[str, str]] = set()
+    unique: list[PlaceMatch] = []
+    for m in matches:  # the record may repeat a floor plan row: one place, shown once
+        key = (m.property_id, m.plan_key or "")
+        if key not in seen:
+            seen.add(key)
+            unique.append(m)
+    matches = unique
     matches.sort(key=order_key)
     return len(supply), matches
 
@@ -556,20 +564,35 @@ def deep_check(place: PlaceMatch, lookups: Any) -> PlaceMatch:
             except Exception as error:  # a lookup that broke did not happen
                 log.warning("for-sale check failed (%s)", type(error).__name__)
     rent = f"listed for rent by {office}" if office else "listed for rent (no office on record)"
+    # "Checked" only when a record lookup actually ran (today: the for-sale lookup for a house
+    # with a position). Anything else is "On record": what the data says, not a check.
+    checked = sale is not None
     if place.kind == "apartment":
-        tail = "for-sale records cover homes, not apartment buildings"
-        line = f"Checked: {rent}; {tail}, {_AS_OF}."
+        line = (
+            f"On record: {rent}; for-sale records cover homes, not apartment buildings, {_AS_OF}."
+        )
     elif sale is None:
-        line = f"Checked: {rent}; no for-sale lookup was possible for this home, {_AS_OF}."
+        line = f"On record: {rent}; no for-sale lookup was possible for this home, {_AS_OF}."
     elif sale.status is ForSaleStatus.ACTIVE:
-        by = f" by {sale.offices[0]}" if sale.offices else ""
-        line = f"Checked: this home is also listed for sale{by} on {sale.site}, {_AS_OF}."
+        from snapback.verdict import for_sale_record
+
+        record, brokerage = for_sale_record(sale, "en")
+        ask = "that brokerage" if brokerage else "the listing brokerage"
+        line = (
+            f"Checked: {record} Homes for sale are sometimes also offered for lease, so "
+            f"confirm with {ask} before you pay, {_AS_OF}."
+        )
     elif sale.status is ForSaleStatus.RECENTLY_RENTED:
         line = f"Checked: {rent}; the record shows it was rented out recently, {_AS_OF}."
     else:
         line = f"Checked: {rent}; not listed for sale, {_AS_OF}."
-    checked = office is not None or sale is not None
-    return place.model_copy(update={"checked": checked, "check_line": line if checked else None})
+    has_line = checked or office is not None
+    return place.model_copy(update={"checked": checked, "check_line": line if has_line else None})
+
+
+def place_key(place: PlaceMatch) -> tuple[str, str]:
+    """A place is one floor plan of one building (a house is its own plan)."""
+    return place.property_id, place.plan_key or place.floor_plan or ""
 
 
 def apply_deep_checks(
@@ -577,7 +600,4 @@ def apply_deep_checks(
 ) -> list[PlaceMatch]:
     """`matches` with the chosen places deep-checked; every other place stays "researched"."""
     wanted = set(targets)
-    return [
-        deep_check(m, lookups) if (m.property_id, m.floor_plan or "") in wanted else m
-        for m in matches
-    ]
+    return [deep_check(m, lookups) if place_key(m) in wanted else m for m in matches]

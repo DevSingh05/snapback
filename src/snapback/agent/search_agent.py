@@ -38,6 +38,10 @@ from snapback.search import (
 
 log = logging.getLogger("snapback.search_agent")
 
+# A search waits on the model three times at most; a slow or failing model must not stall it.
+MODEL_TIMEOUT_SECONDS = 6.0
+MODEL_MAX_RETRIES = 1
+
 SYSTEM = (
     "You help a renter search for a home. You are shown ONE decision with its options and a few "
     "yes/no or count facts. Pick exactly one option and give one plain sentence of reason that "
@@ -84,7 +88,14 @@ def search_chooser_for(agent_setting: str) -> Any:
 
         from snapback.agent.graph import DEFAULT_MODEL
 
-        return ModelSearchChooser(ChatAnthropic(model=DEFAULT_MODEL, max_tokens=300))
+        return ModelSearchChooser(
+            ChatAnthropic(
+                model=DEFAULT_MODEL,
+                max_tokens=300,
+                timeout=MODEL_TIMEOUT_SECONDS,
+                max_retries=MODEL_MAX_RETRIES,
+            )
+        )
     except Exception:
         log.warning("search model unavailable; the code policy chooses")
         return PolicyChooser()
@@ -115,7 +126,9 @@ def agentic_search(
     considered, found = _all_matches(effective, lookups)
     found = [m for m in found if m.property_id not in avoided]
     matches = found[: effective.max_results]
-    tradeoffs = _without_rejected(tradeoffs_for(effective, lookups, matches), prefs)
+    tradeoffs = _without_rejected(
+        tradeoffs_for(effective, lookups, matches, exclude=avoided), prefs
+    )
     plan = plan_search(matches, tradeoffs, chooser, facts_of(prefs))
     return SearchResponse(
         source=_source_of(lookups),
@@ -142,7 +155,11 @@ def agentic_alternatives(
     avoided = list(prefs.avoid_property_ids) if prefs else []
     matches: list[PlaceMatch] = alternatives_for(case, brief, lookups, n, exclude=avoided)
     anchor = alternatives_brief(case, brief)
-    tradeoffs = _without_rejected(tradeoffs_for(anchor, lookups, matches), prefs) if anchor else []
+    tradeoffs = (
+        _without_rejected(tradeoffs_for(anchor, lookups, matches, exclude=avoided), prefs)
+        if anchor
+        else []
+    )
     plan = plan_search(matches, tradeoffs, chooser, facts_of(prefs))
     return AlternativesResponse(
         case_id=case.case_id,

@@ -682,8 +682,9 @@ def create_app(
         if case.token is None:
             raise HTTPException(status_code=403, detail="A recorded case cannot be changed.")
         check_write(case, _bearer(authorization, x_case_token))
-        case.preferences = merge_preferences(case.preferences, body)
-        return case.preferences
+        with case._lock:  # two writes at once must both land
+            case.preferences = merge_preferences(case.preferences, body)
+            return case.preferences
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(

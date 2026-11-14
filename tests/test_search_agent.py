@@ -73,25 +73,27 @@ def test_search_reports_decisions_with_stamps_and_reasons(tmp_path):
         assert d["reason"]
 
 
-def test_default_chooser_is_the_policy_and_checks_at_most_three(tmp_path):
+def test_default_chooser_is_the_policy_and_looks_at_most_three_places_up(tmp_path):
     body = make_client(tmp_path).post("/search", json={"max_rent_month": 2500}).json()
     assert {d["chosen_by"] for d in body["decisions"]} == {"policy"}
-    checked = [m for m in body["matches"] if m["checked"]]
-    assert 1 <= len(checked) <= 3
-    assert all(m["check_line"].startswith("Checked:") for m in checked)
-    assert all(m["check_line"] is None for m in body["matches"] if not m["checked"])
+    looked = [m for m in body["matches"] if m["check_line"]]
+    assert 1 <= len(looked) <= 3
+    # an apartment is never "Checked": no record lookup ran for it
+    assert all(
+        m["check_line"].startswith("Checked:" if m["checked"] else "On record:") for m in looked
+    )
 
 
 def test_model_on_and_off_may_check_different_places_but_each_place_reads_the_same(kit):
     brief = RenterBrief(max_rent_month=2500, max_results=6)
     off = agentic_search(brief, six_buildings(), plan_policy())
     on = agentic_search(brief, six_buildings(), Scripted(1))
-    off_set = {m.property_id for m in off.matches if m.checked}
-    on_set = {m.property_id for m in on.matches if m.checked}
+    off_set = {m.property_id for m in off.matches if m.check_line}
+    on_set = {m.property_id for m in on.matches if m.check_line}
     assert off_set != on_set  # the model chose a different set
     by_off = {m.property_id: m for m in off.matches}
     for m in on.matches:
-        if m.checked and by_off[m.property_id].checked:
+        if m.check_line and by_off[m.property_id].check_line:
             assert m.check_line == by_off[m.property_id].check_line
     # the same place deep-checked under a different chooser is identical, field for field
     both = off_set & on_set
@@ -175,7 +177,9 @@ def test_a_house_is_checked_against_the_for_sale_records_and_an_apartment_by_its
     apartment = agentic_search(RenterBrief(max_rent_month=2500), kit_, plan_policy()).matches[0]
     line = deep_check(apartment, kit_).check_line
     assert "Fixture Office Co" in line and "as of CoStar's last research" in line
-    assert "apartment" in line
+    assert "apartment" in line and line.startswith("On record:")
+    done = deep_check(apartment, kit_)
+    assert done.checked is False  # an office on record is not a lookup
     unknown = deep_check(apartment.model_copy(update={"office_on_record": None}), kit_)
     assert unknown.checked is False and unknown.check_line is None
 
@@ -302,10 +306,153 @@ def test_a_house_line_is_set_by_the_for_sale_record_status():
     for status in ForSaleStatus:
         kit_.status = status
         done = deep_check(place, kit_)
-        assert done.checked
+        assert done.checked  # the for-sale lookup ran
+        assert done.check_line.startswith("Checked:")
         lines[status] = done.check_line
     assert "not listed for sale" in lines[ForSaleStatus.NONE]
     assert "Rent Office Co" in lines[ForSaleStatus.NONE]
-    assert "also listed for sale by Sale Office Co" in lines[ForSaleStatus.ACTIVE]
+    sale_line = lines[ForSaleStatus.ACTIVE]
+    assert "Listed for sale on" in sale_line and "Sale Office Co" in sale_line
+    assert (
+        "Homes for sale are sometimes also offered for lease, so confirm with that brokerage "
+        "before you pay" in sale_line
+    )
+    assert "not for rent" not in sale_line.lower()
     assert "rented out recently" in lines[ForSaleStatus.RECENTLY_RENTED]
     assert all(line.endswith("as of CoStar's last research.") for line in lines.values())
+
+
+def test_a_house_with_no_position_is_not_checked_and_reads_on_record():
+    from snapback.contracts import PropertyRecord, RentalHouse
+    from snapback.search import deep_check, search_places
+
+    class NoPosition(Fake):
+        def record(self, pid):
+            return PropertyRecord(property_id=pid, source=DataSource.FIXTURE)
+
+    house = RentalHouse(
+        property_id="h-2", source=DataSource.FIXTURE, rent_min=1500, rent_max=1500,
+        office="Rent Office Co",
+    )  # fmt: skip
+    kit_ = NoPosition(rentals=[house])
+    (place,) = search_places(RenterBrief(), kit_)
+    done = deep_check(place, kit_)
+    assert done.checked is False and done.check_line.startswith("On record:")
+
+
+def test_duplicate_floor_plan_rows_are_one_place_and_the_menu_has_three_places():
+    from snapback.search import _all_matches, apply_deep_checks
+
+    rows = [plan(lo=1000, hi=1100), plan(lo=1000, hi=1100), plan(lo=1000, hi=1100)]
+    kit_ = Fake(
+        [
+            building("fx-a", rows),
+            building("fx-b", [plan(lo=1200, hi=1300)] * 2),
+            building("fx-c", [plan(lo=1400, hi=1500)]),
+            building("fx-d", [plan(lo=1600, hi=1700)]),
+        ]
+    )
+    _, matches = _all_matches(RenterBrief(max_rent_month=3000), kit_)
+    keys = [(m.property_id, m.plan_key) for m in matches]
+    assert len(keys) == len(set(keys)) == 4
+    out = agentic_search(RenterBrief(max_rent_month=3000), kit_, plan_policy())
+    assert len({(m.property_id, m.plan_key) for m in out.matches}) == len(out.matches)
+    assert sum(1 for m in out.matches if m.check_line) == 3
+    assert len({m.property_id for m in out.matches if m.check_line}) == 3
+    # targets are keyed by plan_key: another plan of the same building is not looked up
+    two = Fake(
+        [building("fx-a", [plan(lo=1000, hi=1100), plan(name="2 bed", beds=2, lo=1500, hi=1600)])]
+    )
+    _, pair = _all_matches(RenterBrief(max_rent_month=3000), two)
+    first = pair[0]
+    done = apply_deep_checks(pair, [(first.property_id, first.plan_key)], two)
+    assert [bool(m.check_line) for m in done].count(True) == 1  # fmt: skip
+
+
+def test_a_model_that_fails_decides_nothing_more_in_that_search():
+    class Down:
+        chosen_by = "model"
+        calls = 0
+
+        def choose(self, offer):
+            Down.calls += 1
+            raise TimeoutError("slow")
+
+    brief = RenterBrief(max_rent_month=2500, max_results=6)
+    out = agentic_search(brief, six_buildings(), Down())
+    assert Down.calls == 1  # asked once, then the policy decides the rest
+    assert {d.chosen_by for d in out.decisions} == {"policy"}
+    assert out.matches  # the search still answered
+    Down.calls = 0
+    agentic_search(brief, six_buildings(), Down())
+    assert Down.calls == 1  # a new search tries the model again
+    # with a trade-off question on offer there are three choices; the model gets one try
+    from snapback.agent.planner import TradeOff
+
+    Down.calls = 0
+    q = [TradeOff("walkup", "$140 a month less with a walk-up building. OK with stairs?", 140, 3)]
+    planned = plan_search(out.matches, q, Down())
+    assert Down.calls == 1
+    assert [s.chosen_by for s in planned.steps] == ["policy"] * 3
+
+
+def test_the_search_model_has_a_short_timeout_and_one_retry(monkeypatch):
+    import sys
+    import types
+
+    from snapback.agent import search_agent
+
+    seen = {}
+
+    class Chat:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+    monkeypatch.setitem(
+        sys.modules, "langchain_anthropic", types.SimpleNamespace(ChatAnthropic=Chat)
+    )
+    monkeypatch.setitem(
+        sys.modules, "snapback.agent.graph", types.SimpleNamespace(DEFAULT_MODEL="m")
+    )
+    chooser = search_agent.search_chooser_for("deepagents")
+    assert isinstance(chooser, ModelSearchChooser)
+    assert 0 < seen["timeout"] <= 10 and seen["max_retries"] <= 1
+
+
+def test_trade_off_questions_leave_out_places_the_renter_rejected():
+    from snapback.agent.planner import tradeoffs_for
+
+    kit_ = Fake(
+        [
+            building("fx-0", [plan(lo=1000, hi=1100)]),
+            building("fx-1", [plan(lo=1250, hi=1250)]),
+            building("fx-2", [plan(lo=1300, hi=1300)]),
+        ]
+    )
+    brief = RenterBrief(max_rent_month=1200)
+    # raising the budget shows fx-1 and fx-2; reject both and the question is gone
+    assert any(t.key == "budget" for t in tradeoffs_for(brief, kit_))
+    gone = tradeoffs_for(brief, kit_, exclude={"fx-1", "fx-2"})
+    assert not any(t.key == "budget" for t in gone)
+
+
+def test_concurrent_preference_writes_both_land(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = make_client(tmp_path)
+    made = client.post("/cases", data={"text": "Nice 1 bed, $1,500 a month, pets ok"}).json()
+    headers = {"Authorization": f"Bearer {made['token']}"}
+    ids = [f"fx-{i}" for i in range(8)]
+    with ThreadPoolExecutor(8) as pool:
+        list(
+            pool.map(
+                lambda i: client.post(
+                    f"/cases/{made['case_id']}/preferences",
+                    json={"avoid_property_id": i},
+                    headers=headers,
+                ),
+                ids,
+            )
+        )
+    got = client.post(f"/cases/{made['case_id']}/preferences", json={}, headers=headers).json()
+    assert set(got["avoid_property_ids"]) == set(ids)
