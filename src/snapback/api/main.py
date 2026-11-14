@@ -57,6 +57,7 @@ from snapback.api.cases import (
     UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.finder import make_router as finder_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
@@ -241,6 +242,7 @@ def create_app(
     registry: CaseRegistry | None | object = _DEFAULT,
     office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
+    finder_model: object | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
     started each case; the default is lane D's safety store. `search_chooser` replaces the
@@ -267,6 +269,14 @@ def create_app(
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
     app.state.events = events
+    # M9: the finder. A chat model (tests pass a scripted one) runs deepagents mode; with the
+    # runner setting on and a key present it is Claude; otherwise the code policy runs.
+    model = finder_model
+    if model is None and settings.snapback_agent == "deepagents" and settings.anthropic_api_key:
+        from snapback.agent.finder import build_model
+
+        model = build_model(settings.anthropic_api_key.get_secret_value())
+    app.include_router(finder_router(events, model))
 
     app.add_middleware(
         UploadSizeGuard,
