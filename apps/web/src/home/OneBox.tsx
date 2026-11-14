@@ -107,7 +107,7 @@ const OPEN_LINE: Record<View, string> = {
   finder: "What the Finder has learned about you, and why it picked what it did.",
 };
 
-type Item =
+export type Item =
   | { id: number; type: "you"; text: string; files: string[] }
   | { id: number; type: "route"; intent: Intent; sub: { text: string; files: File[] } | null }
   | {
@@ -855,7 +855,7 @@ function Glyph({ name }: { name: "attach" | "send" | "x" }) {
   );
 }
 
-function Composer({
+export function Composer({
   text,
   setText,
   files,
@@ -1036,7 +1036,7 @@ function Composer({
 // ---------------------------------------------------------------------------------------------
 // The thread.
 
-function ThreadItem({
+export function ThreadItem({
   it,
   mode,
   props,
@@ -1303,76 +1303,23 @@ function CheckRun({
         <p className="ob-card-kicker">Checking the ad</p>
         <SourceChip source={source} />
       </header>
-      <ol className="ob-steps" aria-label="Progress">
-        {STEPS.map((s, i) => {
-          const status = i < active ? "done" : i === active ? "active" : "todo";
-          return (
-            <li
-              key={s.key}
-              data-status={status}
-              aria-current={status === "active" ? "step" : undefined}
-            >
-              {s.label}
-              <span className="sr-only">
-                {status === "done" ? " (done)" : status === "active" ? " (now)" : " (next)"}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <CheckSteps active={active} />
       {state.step === "approval" && (
-        <section className="ob-approve" aria-labelledby="ob-approve-title">
-          <h2 id="ob-approve-title" className="ob-card-title">
-            Ask the poster for proof
-          </h2>
-          <p className="ob-card-text">
-            A real landlord can send a fresh photo from inside the unit. Copy this and send it
-            yourself. Nothing is sent for you.
-          </p>
-          <label htmlFor="challenge" className="sr-only">
-            Message to send
-          </label>
-          <textarea
-            id="challenge"
-            className="ob-message"
-            rows={4}
-            readOnly
-            value={state.challengeText}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div className="ob-acts">
-            <button
-              type="button"
-              className="ob-primary"
-              disabled={busy}
-              onClick={() => void choose("send")}
-            >
-              I approve it and I will send it
-            </button>
-            <button
-              type="button"
-              className="ob-secondary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(state.challengeText);
-                  setCopied(true);
-                } catch {
-                  setCopied(false);
-                }
-              }}
-            >
-              {copied ? "Copied" : "Copy message"}
-            </button>
-            <button
-              type="button"
-              className="ob-quiet"
-              disabled={busy}
-              onClick={() => void choose("cancel")}
-            >
-              Skip this, show the result
-            </button>
-          </div>
-        </section>
+        <ChallengeDraft
+          text={state.challengeText}
+          busy={busy}
+          copied={copied}
+          onSend={() => void choose("send")}
+          onCopy={async () => {
+            try {
+              await navigator.clipboard.writeText(state.challengeText);
+              setCopied(true);
+            } catch {
+              setCopied(false);
+            }
+          }}
+          onSkip={() => void choose("cancel")}
+        />
       )}
       {state.step === "waiting" && (
         <div className="ob-wait">
@@ -1386,6 +1333,80 @@ function CheckRun({
         </div>
       )}
     </article>
+  );
+}
+
+/** The check's four steps, the one at `active` lit. */
+export function CheckSteps({ active }: { active: number }) {
+  return (
+    <ol className="ob-steps" aria-label="Progress">
+      {STEPS.map((s, i) => {
+        const status = i < active ? "done" : i === active ? "active" : "todo";
+        return (
+          <li
+            key={s.key}
+            data-status={status}
+            aria-current={status === "active" ? "step" : undefined}
+          >
+            {s.label}
+            <span className="sr-only">
+              {status === "done" ? " (done)" : status === "active" ? " (now)" : " (next)"}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The photo challenge, drafted for the renter to send themselves. Nothing is sent for them. */
+export function ChallengeDraft({
+  text,
+  busy,
+  copied,
+  onSend,
+  onCopy,
+  onSkip,
+}: {
+  text: string;
+  busy: boolean;
+  copied: boolean;
+  onSend: () => void;
+  onCopy: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <section className="ob-approve" aria-labelledby="ob-approve-title">
+      <h2 id="ob-approve-title" className="ob-card-title">
+        Ask the poster for proof
+      </h2>
+      <p className="ob-card-text">
+        A real landlord can send a fresh photo from inside the unit. Copy this and send it yourself.
+        Nothing is sent for you.
+      </p>
+      <label htmlFor="challenge" className="sr-only">
+        Message to send
+      </label>
+      <textarea
+        id="challenge"
+        className="ob-message"
+        rows={4}
+        readOnly
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <div className="ob-acts">
+        <button type="button" className="ob-primary" disabled={busy} onClick={onSend}>
+          I approve it and I will send it
+        </button>
+        <button type="button" className="ob-secondary" onClick={onCopy}>
+          {copied ? "Copied" : "Copy message"}
+        </button>
+        <button type="button" className="ob-quiet" disabled={busy} onClick={onSkip}>
+          Skip this, show the result
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1425,7 +1446,6 @@ export function VerdictCard({
       .catch(() => !ctrl.signal.aborted && setCard("error"));
     return () => ctrl.abort();
   }, [caseId]);
-  const [all, setAll] = useState(false);
   const id = encodeURIComponent(caseId);
   if (card === null)
     return (
@@ -1442,6 +1462,24 @@ export function VerdictCard({
         </a>
       </article>
     );
+  return <VerdictView card={card} source={source} onFollow={onFollow} />;
+}
+
+/** The verdict card itself, from a Card already in hand. `actions` replaces the two links (the
+ *  Stories page shows them as they look, without leaving the story). */
+export function VerdictView({
+  card,
+  source,
+  onFollow,
+  actions,
+}: {
+  card: Card;
+  source: DataSource;
+  onFollow?: (words: string) => void;
+  actions?: React.ReactNode;
+}) {
+  const [all, setAll] = useState(false);
+  const id = encodeURIComponent(card.case_id);
   const allLines = card.rows.flatMap((row) =>
     row.lines.map((line, i) => ({ kind: row.kind, line, first: i === 0, key: `${row.kind}-${i}` })),
   );
@@ -1493,14 +1531,18 @@ export function VerdictCard({
       )}
       <p className="ob-muted">Not checked: {card.not_checked.join(", ")}.</p>
       <div className="ob-acts">
-        <a className="ob-primary" href={`/case/${id}`}>
-          Open the full result
-        </a>
-        <a className="ob-quiet" href={`/case/${id}/prep`}>
-          Get ready to visit
-        </a>
+        {actions ?? (
+          <>
+            <a className="ob-primary" href={`/case/${id}`}>
+              Open the full result
+            </a>
+            <a className="ob-quiet" href={`/case/${id}/prep`}>
+              Get ready to visit
+            </a>
+          </>
+        )}
       </div>
-      <WalkCard caseId={caseId} />
+      {!actions && <WalkCard caseId={card.case_id} />}
       {onFollow && (
         <ul className="ob-replies ob-follow" aria-label="Next">
           {["Find me safer places like this", "Show me on the map", "Replay a real case"].map(
@@ -1642,7 +1684,16 @@ function PlacesCard({
   );
 }
 
-function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource }) {
+export function PicksCard({
+  picks,
+  source,
+  act,
+}: {
+  picks: FinderPick[];
+  source: DataSource;
+  /** Replaces each pick's one next step (the Stories page shows "Walk it first" on a sample). */
+  act?: (p: FinderPick) => React.ReactNode;
+}) {
   const sample = source === "fixture";
   return (
     <article className="ob-card ob-places" data-testid="ob-finder-picks">
@@ -1662,7 +1713,9 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
                 {sample ? " · Sample place by the team" : ""}
               </span>
             </div>
-            {sample ? (
+            {act ? (
+              act(p)
+            ) : sample ? (
               <a className="ob-pick-go" href="/listings" title="A sample place made by the team">
                 Browse similar
               </a>
@@ -1685,7 +1738,7 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
   );
 }
 
-function OfferCard({
+export function OfferCard({
   proposal,
   source,
   onDecided,
