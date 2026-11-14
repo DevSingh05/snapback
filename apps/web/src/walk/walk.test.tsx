@@ -302,7 +302,7 @@ describe("MismatchAerials: the section 7 copy guards", () => {
     );
     expect(copy).not.toMatch(/the real one|for rent|available/i);
     expect(copy).not.toMatch(/\d+\s+\w+\s+(st|street|ave|avenue|rd|road|blvd|dr|drive)\b/i);
-    expect(copy).not.toMatch(/[–—]/);
+    expect(copy).not.toMatch(/[\u2013\u2014]/);
   });
 
   it("shows the real tiles when our server gives them", () => {
