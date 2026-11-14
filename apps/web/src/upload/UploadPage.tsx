@@ -219,11 +219,12 @@ export function UploadPage({
           <SourceChip source={shownMode} />
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
+          <p className="upload-eyebrow">Trust the home, not the ad.</p>
           <h1 ref={heading} tabIndex={-1}>
             Found a place online? Paste the ad.
           </h1>
           <p className="upload-lead">
-            See the real listing, the real office and a fair price, plus checked places that fit
+            See the real listing, the real office and a fair price, plus researched places that fit
             your budget.
           </p>
 

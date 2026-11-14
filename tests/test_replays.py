@@ -163,3 +163,25 @@ def test_the_guard_catches_every_phone_number_format(phone):
 
 def test_the_guard_does_not_flag_ordinary_amounts_or_dates():
     assert not NEVER.search("A $2,500 deposit and a $75 fee in 2026.")
+
+
+def test_the_owner_replay_holds_on_the_owner_line_and_quotes_the_owner_s_rule():
+    """#11 (14:11): the owner-not-poster replay stops at HOLD, never DON'T PAY, on the line
+    'Owner of record: <company>, not the poster' with that company's own quoted rule."""
+    from snapback.agent.demo import run_demo_case
+    from snapback.agent.rules.published import PUBLISHED_RULES
+    from snapback.card import strings
+
+    verdict, card = run_demo_case("replay-owner-not-poster-door-code")
+    assert verdict.state.value == "hold"
+    assert strings.text("reason.owner_not_poster") in verdict.reasons
+    owner = [
+        line.text
+        for row in card.rows
+        for line in row.lines
+        if line.label == strings.text("label.owner")
+    ]
+    row = PUBLISHED_RULES[0]
+    assert len(owner) == 1
+    assert owner[0].startswith(f"Not confirmed. Owner of record: {row.company}, not the poster.")
+    assert f'"{row.rule}"' in owner[0]
