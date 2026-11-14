@@ -37,8 +37,8 @@ _FOLDS: list[tuple[re.Pattern[str], str]] = [
 ]
 _TOKEN = re.compile(r"[A-Za-z']+")
 _STOP = frozenset(
-    "a an the to of and or is are be it in on for you your i me my will with at by as that this "
-    "then once until so we our".split()  # noqa: SIM905
+    "a an the to of and or is are be it in on for you your i me my will with at by as that this "  # noqa: SIM905
+    "then once until so we our".split()
 )
 
 
