@@ -298,13 +298,48 @@ def test_a_home_listed_for_sale_is_a_red_flag_on_the_place_row_and_holds_the_cas
     assert text == "This home is listed for sale on Homes.com, not for rent. Red flag."
 
 
-def test_for_sale_alone_is_never_dont_pay_whatever_else_is_true():
-    # DON'T PAY needs proof: a forged reply or a photo taken elsewhere. This is neither.
+def test_for_sale_holds_a_case_even_when_no_photo_could_be_placed():
+    # Conductor ruling, Sat 02:00: for sale outranks "could not place". A home that is for
+    # sale usually has no 3D scan, and "we could not check" is the wrong headline for it.
     nothing_placed = ModuleEvidence(case_id="fx-1", source="fixture", for_sale={"status": "active"})
     verdict = decide(to_evidence(nothing_placed))
-    assert verdict.state is VerdictState.UNVERIFIED
-    assert strings.text("reason.for_sale") in verdict.reasons
+    assert verdict.state is VerdictState.HOLD
+    assert verdict.reasons[0] == strings.text("reason.for_sale")
+    assert strings.text("reason.not_indexed") in verdict.reasons  # and why nothing was placed
+
+    unplaced = evidence(
+        for_sale={"status": "active"},
+        locate={
+            "case_id": "fx-7Q2M",
+            "photos": [{"photo_id": "l1", "status": "not_located"}],
+            "thresholds_version": "none",
+        },
+    )
+    assert state(unplaced) is VerdictState.HOLD
+
+
+def test_for_sale_is_never_dont_pay_and_nothing_else_outranks_could_not_place():
+    # DON'T PAY needs proof: a forged reply or a photo taken elsewhere. For sale is neither.
     assert state(evidence(for_sale={"status": "active"}, challenge=None)) is VerdictState.HOLD
+    nothing = {"case_id": "fx-1", "source": "fixture"}
+    for other in (
+        {"for_sale": {"status": "recently_rented"}},
+        {"authority": {"status": "unknown", "office_phone_match": "no"}},
+        {"authority": {"status": "unknown", "link_domain": "lookalike"}},
+        {"price": {"status": "not_checked", "unit": "not_on_record"}},
+    ):
+        verdict = decide(to_evidence(ModuleEvidence.model_validate(nothing | other)))
+        assert verdict.state is VerdictState.UNVERIFIED, other
+    # A photo taken in another building still outranks everything.
+    elsewhere = evidence(
+        for_sale={"status": "active"},
+        locate={
+            "case_id": "fx-7Q2M",
+            "photos": [{"photo_id": "l1", "status": "located_elsewhere"}],
+            "thresholds_version": "none",
+        },
+    )
+    assert state(elsewhere) is VerdictState.DONT_PAY
 
 
 def verified_but_for(**sections) -> ModuleEvidence:

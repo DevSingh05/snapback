@@ -156,13 +156,14 @@ def test_cases_a_and_b_are_the_same_listing():
 # --- (c) a house for sale, posted as a rental ----------------------------------------------
 
 
-def test_case_c_cannot_be_placed_and_says_the_house_is_for_sale():
+def test_case_c_is_held_because_the_house_is_for_sale():
     verdict, card = run_demo_case("c")
-    # For sale is a red flag, not proof, and there is no 3D scan to place the photos in.
-    assert verdict.state is VerdictState.UNVERIFIED
+    # For sale is a red flag, not proof, so this is never "don't pay". It outranks "could not
+    # place" (conductor ruling, Sat 02:00): there is no 3D scan of the house to place photos in.
+    assert verdict.state is VerdictState.HOLD
     assert verdict.reasons == [
-        strings.text("reason.not_indexed"),
         strings.text("reason.for_sale"),
+        strings.text("reason.not_indexed"),
     ]
     place = lines(card, CardRowKind.PLACE)
     assert place["Real"] == (CardTone.NOT_CHECKED, strings.text("place.not_indexed"))
@@ -274,7 +275,7 @@ def test_with_the_flag_a_post_with_no_text_runs_the_staged_listing(tmp_path):
 def test_with_the_flag_the_for_sale_house_finishes_without_a_challenge(tmp_path):
     client = client_for(tmp_path, "c")
     case = client.post("/cases", data={}).json()
-    assert case["status"] == "done" and case["state"] == "unverified"
+    assert case["status"] == "done" and case["state"] == "hold"
     card = client.get(f"/cases/{case['case_id']}/card").json()
     assert "For sale" in [line["label"] for line in card["rows"][0]["lines"]]
 
