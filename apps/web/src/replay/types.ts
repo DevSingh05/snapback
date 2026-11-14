@@ -5,6 +5,10 @@ export type ReplayStepKind = "listing" | "chat" | "hold_request" | "payment" | "
 
 // The two verdict states a replay may stop at. Card words come from code (REPLAY_VERDICT_WORDS),
 // never from the JSON, so the locked wording cannot drift.
+// Locked row words (decisions.md 22:40).
+export type FindingStatus =
+  "matches" | "doesnt_match" | "not_confirmed" | "warning" | "not_checked";
+
 export type ReplayVerdict = "dont_pay" | "hold";
 
 export interface ReplayStep {
@@ -27,16 +31,17 @@ export interface Replay {
   pattern: "place" | "person" | "price";
   /** True for a team-made example modelled on a public pattern, not on one named report. */
   fictional: boolean;
-  source: { name: string; url: string; published_on: string };
+  /** Required when fictional is false. A fictional replay carries no source and no date. */
+  source?: { name: string; url: string; published_on: string };
   /** Amount in dollars as reported by the source, rounded as reported. */
   amount_usd: number;
   /** Steps in the order they happened. Exactly one has kind "payment". */
   steps: ReplayStep[];
   snapback: {
     verdict: ReplayVerdict;
-    /** Id of the payment step SNAPBACK stops before. */
-    stop_before: string;
-    /** What SNAPBACK's run found at each step it saw, keyed by step id. */
-    findings: { step_id: string; text: string }[];
+    /** Optional cross-check: id of the payment step. The stop is always the first payment step. */
+    stop_before?: string;
+    /** What SNAPBACK's run found at each step it saw, in the locked row words. */
+    findings: { step_id: string; status: FindingStatus; text: string }[];
   };
 }

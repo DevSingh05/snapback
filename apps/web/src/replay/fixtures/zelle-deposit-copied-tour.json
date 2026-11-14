@@ -4,11 +4,6 @@
   "title": "A Zelle deposit for a copied video tour",
   "pattern": "place",
   "fictional": true,
-  "source": {
-    "name": "FTC Consumer Advice, rental listing scams (pattern source; this example is fictional)",
-    "url": "https://consumer.ftc.gov/articles/rental-listing-scams",
-    "published_on": "2024-01-01"
-  },
   "amount_usd": 2500,
   "steps": [
     {
@@ -53,13 +48,19 @@
     "findings": [
       {
         "step_id": "listing",
-        "text": "The video tour was checked against the building's own scan."
+        "status": "doesnt_match",
+        "text": "This video tour was filmed in a different home."
       },
       {
         "step_id": "chat",
-        "text": "Person not shown. The poster could not be matched to the building."
+        "status": "not_confirmed",
+        "text": "The poster could not be confirmed as someone who may rent this place."
       },
-      { "step_id": "hold", "text": "Zelle before a viewing. Red flag." }
+      {
+        "step_id": "hold",
+        "status": "warning",
+        "text": "Asked to pay by Zelle before a viewing."
+      }
     ]
   }
 }

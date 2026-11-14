@@ -162,7 +162,9 @@ export function CardView({
       {replayForCase(card.case_id) ? (
         <p className="replay-link">
           <a href={`/replay/${replayForCase(card.case_id)?.slug}`}>
-            See a case like this, re-created from a public report
+            {replayForCase(card.case_id)?.fictional
+              ? "See a fictional example"
+              : "See a case like this, re-created from a public report"}
           </a>
         </p>
       ) : null}

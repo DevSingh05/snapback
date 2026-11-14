@@ -1,5 +1,5 @@
 import zelleCopiedTour from "./fixtures/zelle-deposit-copied-tour.json";
-import type { Replay, ReplayVerdict } from "./types";
+import type { FindingStatus, Replay, ReplayVerdict } from "./types";
 
 // Fixtures only until D8 (#71) lands demo/replays/*.json; then this list reads those files.
 const REPLAYS: Replay[] = [zelleCopiedTour as Replay];
@@ -19,3 +19,11 @@ export const REPLAY_VERDICT_WORDS: Record<ReplayVerdict, string> = {
 };
 
 export type { Replay } from "./types";
+
+export const FINDING_WORDS: Record<FindingStatus, string> = {
+  matches: "Matches",
+  doesnt_match: "Doesn't match",
+  not_confirmed: "Not confirmed",
+  warning: "Warning",
+  not_checked: "Not checked",
+};

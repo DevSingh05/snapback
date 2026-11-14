@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 
 import { SourceChip } from "../components/SourceChip";
-import { getReplay, REPLAY_VERDICT_WORDS } from "./index";
+import { FINDING_WORDS, getReplay, REPLAY_VERDICT_WORDS } from "./index";
 import type { Replay } from "./types";
 import "./replay.css";
 
@@ -31,10 +31,26 @@ function NotFound() {
   );
 }
 
+function FindingLine({ finding }: { finding?: Replay["snapback"]["findings"][number] }) {
+  if (!finding) return <p>Nothing flagged yet.</p>;
+  return (
+    <p className={`finding finding-${finding.status}`} data-status={finding.status}>
+      <strong>{FINDING_WORDS[finding.status]}.</strong> {finding.text}
+    </p>
+  );
+}
+
 export function ReplayView({ replay }: { replay: Replay }) {
   const { steps, snapback } = replay;
-  const stopIndex = steps.findIndex((s) => s.id === snapback.stop_before);
-  const findings = new Map(snapback.findings.map((f) => [f.step_id, f.text]));
+  // The stop is the first payment step; stop_before, when given, must agree.
+  const stopIndex = steps.findIndex((s) => s.kind === "payment");
+  const stopProblem =
+    stopIndex < 0
+      ? "This replay has no payment step, so the stop cannot be placed."
+      : snapback.stop_before && snapback.stop_before !== steps[stopIndex]?.id
+        ? "This replay's stop_before does not name its first payment step."
+        : null;
+  const findings = new Map(snapback.findings.map((f) => [f.step_id, f]));
 
   return (
     <article className="replay-page">
@@ -43,66 +59,79 @@ export function ReplayView({ replay }: { replay: Replay }) {
           <span className="wordmark">SNAPBACK</span>
           <SourceChip source="fixture" />
         </div>
-        <p className="replay-label">Re-created from a public report</p>
-        <h1>{replay.title}</h1>
-        <p className="replay-source">
-          Source:{" "}
-          <a href={replay.source.url} rel="noopener noreferrer" target="_blank">
-            {replay.source.name}
-          </a>
-          {", "}
-          <span data-testid="source-date">{reportedDate(replay.source.published_on)}</span>
+        <p className="replay-label">
+          {replay.fictional ? "Fictional example" : "Re-created from a public report"}
         </p>
+        <h1>{replay.title}</h1>
+        {replay.source && !replay.fictional ? (
+          <p className="replay-source">
+            Source:{" "}
+            <a href={replay.source.url} rel="noopener noreferrer" target="_blank">
+              {replay.source.name}
+            </a>
+            {", "}
+            <span data-testid="source-date">{reportedDate(replay.source.published_on)}</span>
+          </p>
+        ) : null}
         {replay.fictional ? (
           <p className="replay-note">
-            Fictional example modelled on a public pattern. No real person, address or listing.
+            Modelled on a public pattern and made up by the team: no real person, address, listing,
+            source or date.
           </p>
         ) : null}
       </header>
 
-      <div className="replay-legend" aria-hidden="true">
-        <span>What was reported</span>
-        <span>What SNAPBACK would have shown</span>
-      </div>
+      {stopProblem ? (
+        <p className="replay-error" role="alert">
+          {stopProblem}
+        </p>
+      ) : (
+        <>
+          <div className="replay-legend" aria-hidden="true">
+            <span>What was reported</span>
+            <span>What SNAPBACK would have shown</span>
+          </div>
 
-      <ol className="timeline" data-testid="timeline">
-        {steps.map((step, i) => (
-          <Fragment key={step.id}>
-            {i === stopIndex ? (
-              <li
-                key="stop"
-                className={`tl-stop tl-stop-${snapback.verdict}`}
-                data-step-id="stop"
-                data-testid="stop-marker"
-              >
-                <span className="stop-tag">SNAPBACK stops here</span>
-                <strong className="stop-words">{REPLAY_VERDICT_WORDS[snapback.verdict]}</strong>
-                <span className="stop-amount" data-testid="amount-line">
-                  {dollars(replay.amount_usd)} was still in their account here
-                </span>
-              </li>
-            ) : null}
-            <li
-              className={`tl-step${stopIndex >= 0 && i >= stopIndex ? " tl-after" : ""}`}
-              data-step-id={step.id}
-              data-testid={`step-${step.id}`}
-            >
-              <div className="tl-real">
-                <time dateTime={step.reported_on}>{reportedDate(step.reported_on)}</time>
-                <h2>{step.label}</h2>
-                <p>{step.detail}</p>
-              </div>
-              <div className="tl-snap">
-                {i >= stopIndex && stopIndex >= 0 ? (
-                  <p className="muted">Not sent. Stopped before this.</p>
-                ) : (
-                  <p>{findings.get(step.id) ?? "Nothing flagged yet."}</p>
-                )}
-              </div>
-            </li>
-          </Fragment>
-        ))}
-      </ol>
+          <ol className="timeline" data-testid="timeline">
+            {steps.map((step, i) => (
+              <Fragment key={step.id}>
+                {i === stopIndex ? (
+                  <li
+                    key="stop"
+                    className={`tl-stop tl-stop-${snapback.verdict}`}
+                    data-step-id="stop"
+                    data-testid="stop-marker"
+                  >
+                    <span className="stop-tag">SNAPBACK stops here</span>
+                    <strong className="stop-words">{REPLAY_VERDICT_WORDS[snapback.verdict]}</strong>
+                    <span className="stop-amount" data-testid="amount-line">
+                      {dollars(replay.amount_usd)} was still in their account here
+                    </span>
+                  </li>
+                ) : null}
+                <li
+                  className={`tl-step${stopIndex >= 0 && i >= stopIndex ? " tl-after" : ""}`}
+                  data-step-id={step.id}
+                  data-testid={`step-${step.id}`}
+                >
+                  <div className="tl-real">
+                    <time dateTime={step.reported_on}>{reportedDate(step.reported_on)}</time>
+                    <h2>{step.label}</h2>
+                    <p>{step.detail}</p>
+                  </div>
+                  <div className="tl-snap">
+                    {i >= stopIndex && stopIndex >= 0 ? (
+                      <p className="muted">Not sent. Stopped before this.</p>
+                    ) : (
+                      <FindingLine finding={findings.get(step.id)} />
+                    )}
+                  </div>
+                </li>
+              </Fragment>
+            ))}
+          </ol>
+        </>
+      )}
 
       <footer className="replay-foot">
         <p>SNAPBACK never texts first and never asks for money.</p>

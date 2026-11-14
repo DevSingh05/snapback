@@ -198,3 +198,23 @@
     animation: none;
   }
 }
+
+.replay-error {
+  margin: 0;
+  padding: 16px;
+  background: var(--coral-soft);
+  font-weight: 700;
+}
+
+.tl-snap:has(.finding-doesnt_match) {
+  background: var(--coral-soft);
+}
+
+.tl-snap:has(.finding-warning),
+.tl-snap:has(.finding-not_confirmed) {
+  background: var(--amber-soft);
+}
+
+.tl-snap:has(.finding-not_checked) {
+  background: var(--paper);
+}

@@ -55,14 +55,66 @@ describe("ReplayPage", () => {
     );
   });
 
-  it("labels the header and links the source with its date", () => {
+  it("labels a fictional replay as fictional, with no source link and no date", () => {
     render(<ReplayPage slug={SLUG} />);
-    expect(screen.getByText("Re-created from a public report")).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: /FTC Consumer Advice/ });
-    expect(link).toHaveAttribute("href", "https://consumer.ftc.gov/articles/rental-listing-scams");
-    expect(screen.getByTestId("source-date")).toHaveTextContent("Jan 1, 2024");
+    expect(screen.getByText("Fictional example")).toBeInTheDocument();
+    expect(screen.queryByText("Re-created from a public report")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByTestId("source-date")).toBeNull();
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
-    expect(screen.getByText(/Fictional example/)).toBeInTheDocument();
+    expect("source" in fixture).toBe(false);
+  });
+
+  it("labels a real replay as re-created from a public report, with source link and date", () => {
+    const real: Replay = {
+      ...(fixture as Replay),
+      slug: "real-case",
+      fictional: false,
+      source: {
+        name: "Example Gazette",
+        url: "https://example.org/story",
+        published_on: "2025-02-03",
+      },
+    };
+    render(<ReplayPage slug="real-case" replay={real} />);
+    expect(screen.getByText("Re-created from a public report")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Example Gazette" })).toHaveAttribute(
+      "href",
+      "https://example.org/story",
+    );
+    expect(screen.getByTestId("source-date")).toHaveTextContent("Feb 3, 2025");
+  });
+
+  it("uses locked row words for findings and colours them by state", () => {
+    render(<ReplayPage slug={SLUG} />);
+    const listing = within(screen.getByTestId("step-listing"));
+    expect(listing.getByText("Doesn't match.")).toBeInTheDocument();
+    expect(listing.getByText(/filmed in a different home/)).toBeInTheDocument();
+    const states = Array.from(document.querySelectorAll<HTMLElement>("[data-status]")).map(
+      (el) => el.dataset.status,
+    );
+    expect(states).toEqual(["doesnt_match", "not_confirmed", "warning"]);
+    expect(document.body.textContent).not.toMatch(/Red flag|Person not shown/);
+  });
+
+  it("stops before the first payment step even if stop_before is missing", () => {
+    const r = JSON.parse(JSON.stringify(fixture)) as Replay;
+    delete r.snapback.stop_before;
+    render(<ReplayPage slug={SLUG} replay={r} />);
+    const ids = Array.from(steps()).map((el) => el.dataset.stepId);
+    expect(ids.indexOf("stop")).toBe(ids.indexOf("payment") - 1);
+  });
+
+  it("shows a visible error when there is no payment step or stop_before disagrees", () => {
+    const base = fixture as Replay;
+    const none: Replay = { ...base, steps: base.steps.filter((s) => s.kind !== "payment") };
+    const { unmount } = render(<ReplayPage slug={SLUG} replay={none} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/no payment step/);
+    expect(screen.queryByTestId("stop-marker")).toBeNull();
+    unmount();
+    const wrong: Replay = { ...base, snapback: { ...base.snapback, stop_before: "chat" } };
+    render(<ReplayPage slug={SLUG} replay={wrong} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/stop_before/);
   });
 
   it("shows no victim name and no street address", () => {
@@ -83,7 +135,7 @@ describe("ReplayPage", () => {
 
   it("opens from the card page for its case", () => {
     render(<CardView card={cardHold as Card} variant="result" />);
-    const link = screen.getByRole("link", { name: /re-created from a public report/i });
+    const link = screen.getByRole("link", { name: "See a fictional example" });
     expect(link).toHaveAttribute("href", `/replay/${SLUG}`);
     expect(getReplay(SLUG)).toBeDefined();
   });
