@@ -418,7 +418,14 @@ EN: dict[str, str] = {
     "trace.unsure.ambiguity": (
         "Another building matched far more strongly, so {photo} was not placed."
     ),
-    "trace.place.searched": "{photo}: searched with {option} in {seconds} s, {result}.",
+    "trace.place.searched": "{photo}: searched {option} ({seconds} s). {result}",
+    "place.option.focus_scan": "one scan more closely",
+    "place.option.wider_index": "more of the index",
+    "place.option.deeper_claimed": "more views of this home",
+    "place.result.placed": "Placed.",
+    "place.result.not_placed": "Still could not place it.",
+    "place.result.elsewhere": "It matched a different building.",
+    "place.result.skipped": "Skipped.",
     "trace.intake.injection": (
         "The listing has text written for an AI system. It was ignored, and the checks go on."
     ),
@@ -928,7 +935,14 @@ ES: dict[str, str] = {
     "trace.unsure.ratio": "{photo} no llegó: pocos puntos coincidieron, el mínimo es {bar}.",
     "trace.unsure.spread": "{photo} no llegó: sus puntos cubren muy poco de la foto.",
     "trace.unsure.ambiguity": ("Otro edificio coincidió mucho más, así que {photo} no se ubicó."),
-    "trace.place.searched": "{photo}: búsqueda con {option} en {seconds} s, {result}.",
+    "trace.place.searched": "{photo}: búsqueda de {option} ({seconds} s). {result}",
+    "place.option.focus_scan": "un escaneo más de cerca",
+    "place.option.wider_index": "más del índice",
+    "place.option.deeper_claimed": "más vistas de este hogar",
+    "place.result.placed": "Ubicada.",
+    "place.result.not_placed": "Aún no se pudo ubicar.",
+    "place.result.elsewhere": "Coincidió con otro edificio.",
+    "place.result.skipped": "Omitida.",
     "trace.intake.injection": (
         "El anuncio tiene texto escrito para un sistema de IA. Se ignoró y las revisiones "
         "continúan."

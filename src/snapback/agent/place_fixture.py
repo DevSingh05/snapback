@@ -13,6 +13,7 @@ from pathlib import Path
 
 from snapback.agent.place import SearchOption, SearchOutcome
 from snapback.contracts import LocateResult, LocateStatus, PhotoLocation
+from snapback.vision.locate.thresholds import Thresholds
 
 FILE_NAME = "place_retry.json"
 
@@ -46,7 +47,11 @@ class FixturePlaceSearcher:
         return located.model_copy(update={"photos": [*located.photos, *extra]})
 
     def search(
-        self, photo_id: str, option: SearchOption, claimed_property_id: str | None
+        self,
+        photo_id: str,
+        option: SearchOption,
+        claimed_property_id: str | None,
+        thresholds: Thresholds,
     ) -> SearchOutcome:
         self.calls.append((photo_id, option.label))
         scripted = self._outcomes.get(photo_id, {}).get(option.label)

@@ -70,7 +70,12 @@ def located(**over) -> LocateResult:
 def placed(photo_id: str, model_id: str = "m2") -> SearchOutcome:
     return SearchOutcome(
         PhotoLocation(
-            photo_id=photo_id, status=LOC.LOCATED_IN_CLAIMED, model_id=model_id, inliers=88
+            photo_id=photo_id,
+            status=LOC.LOCATED_IN_CLAIMED,
+            model_id=model_id,
+            inliers=88,
+            inlier_ratio=0.41,
+            spread=0.31,
         ),
         points=EvidencePoints(n_total=88, sampled=[(0.1, 0.2, 0.1, 0.2)]),
         seconds=2.0,
@@ -89,10 +94,12 @@ class StubSearcher:
 
     def __init__(self, seconds: float = 2.0) -> None:
         self.calls: list[tuple[str, str]] = []
+        self.thresholds_seen: list = []
         self.seconds = seconds
 
-    def search(self, photo_id, option, claimed_property_id):
+    def search(self, photo_id, option, claimed_property_id, thresholds):
         self.calls.append((photo_id, option.label))
+        self.thresholds_seen.append(thresholds)
         if photo_id == "l2" and option.label == "focus_scan:S2":
             return dataclasses.replace(
                 placed(photo_id, option.scan_model_id or "m2"), seconds=self.seconds
@@ -166,17 +173,27 @@ def test_a_mutant_that_lowers_a_bar_is_caught():
 
 
 def test_a_retry_never_touches_a_placed_photo():
-    searcher = StubSearcher()
-    d = desk(searcher, max_searches=10, max_seconds=100)
+    class Claims:
+        """A searcher that insists l1 is in another scan, or in another building."""
+
+        def search(self, photo_id, option, claimed_property_id, thresholds):
+            loc = PhotoLocation(
+                photo_id=photo_id,
+                status=LOC.LOCATED_ELSEWHERE,
+                model_id="m9",
+                inliers=200,
+                inlier_ratio=0.6,
+                spread=0.5,
+            )
+            return SearchOutcome(loc, seconds=1.0)
+
+    d = desk(Claims(), max_searches=10, max_seconds=100)
     before = d.base.photos[0]
-    drive(d, PolicyChooser_for_desk())
-    assert all(photo_id != "l1" for photo_id, _ in searcher.calls)
+    d._search("P1", SearchOption("wider_index"), "policy")  # forced, past the desk's own menu
     assert d.located().photos[0] == before
-    # even a searcher that claims a different place for it cannot move it
-    d2 = desk(max_searches=10, max_seconds=100)
-    d2.rows["l1"].location = d2.base.photos[0]
-    d2._search("P1", SearchOption("wider_index"), "policy")
-    assert d2.located().photos[0] == before
+    assert d.rows["l1"].steps[-1].result == "not_placed"
+    drive(d, PolicyChooser_for_desk())
+    assert d.located().photos[0] == before
 
 
 class PolicyChooser_for_desk(Scripted):
@@ -358,4 +375,138 @@ def test_the_result_is_decide_on_the_final_evidence_whatever_the_pick(pick):
     when = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
     assert build_card(case.evidence, checked_at=when) == build_card(
         case.evidence.model_copy(deep=True), checked_at=when
+    )
+
+
+# --- review of #222: the desk re-checks every retry result against the bars ---------------------
+
+
+def one_result(location: PhotoLocation):
+    class Fixed:
+        def search(self, photo_id, option, claimed_property_id, thresholds):
+            return SearchOutcome(location.model_copy(update={"photo_id": photo_id}), seconds=1.0)
+
+    return Fixed()
+
+
+def strict_elsewhere(**over) -> PhotoLocation:
+    fields = dict(
+        photo_id="x",
+        status=LOC.LOCATED_ELSEWHERE,
+        model_id="m9",
+        inliers=60,
+        inlier_ratio=0.3,
+        spread=0.2,
+    )
+    return PhotoLocation(**{**fields, **over})
+
+
+def run_state(searcher, **kw):
+    case = make_case(searcher)
+    verdict = run_case(case, PolicyChooser(), lambda d: "send")
+    return verdict.state.value, case
+
+
+def test_a_retry_that_only_looks_elsewhere_stays_hold_and_a_strict_one_is_dont_pay():
+    baseline, _ = run_state(None)
+    assert baseline == "hold"
+    weak = strict_elsewhere(
+        inliers=31, spread=0.06
+    )  # the base search would not call this elsewhere
+    assert run_state(one_result(weak))[0] == "hold"
+    assert run_state(one_result(strict_elsewhere()))[0] == "dont_pay"
+
+
+def test_each_strict_bar_is_checked_on_its_own():
+    for weak in (
+        strict_elsewhere(inliers=49),
+        strict_elsewhere(spread=0.14),
+        strict_elsewhere(inlier_ratio=0.2),
+        strict_elsewhere(inliers=None),
+        strict_elsewhere(spread=None),
+    ):
+        assert run_state(one_result(weak))[0] == "hold", weak
+
+
+def test_a_retry_cannot_place_a_photo_below_the_claimed_bars():
+    d = desk(
+        one_result(
+            PhotoLocation(
+                photo_id="x",
+                status=LOC.LOCATED_IN_CLAIMED,
+                model_id="m2",
+                inliers=29,
+                inlier_ratio=0.5,
+                spread=0.3,
+            )
+        ),
+        max_searches=10,
+        max_seconds=100,
+    )
+    drive(d, Scripted(lambda o: next(x for x in o.options if x != "stop")))
+    assert all(p.status is not LOC.LOCATED_IN_CLAIMED for p in d.located().photos[1:])
+
+
+def test_with_retry_can_find_elsewhere_off_a_strict_result_stays_not_placed():
+    d = desk(one_result(strict_elsewhere()), retry_can_find_elsewhere=False)
+    drive(d, Scripted(lambda o: o.options[0]))
+    assert [p.status for p in d.located().photos[1:]] == [LOC.NOT_LOCATED, LOC.NOT_LOCATED]
+
+
+# --- the searcher gets the base bars with retrieval changed only ----------------------------------
+
+
+def test_the_searcher_receives_the_base_bars_with_only_retrieval_changed():
+    searcher = StubSearcher()
+    d = desk(searcher, max_searches=10, max_seconds=100)
+    drive(d, Scripted(lambda o: next(x for x in o.options if x != "stop")))
+    assert searcher.thresholds_seen
+    for got in searcher.thresholds_seen:
+        for f in dataclasses.fields(BASE):
+            if f.name not in ("top_k", "top_k_claimed"):
+                assert getattr(got, f.name) == getattr(BASE, f.name), f.name
+    assert any(
+        t.top_k != BASE.top_k or t.top_k_claimed != BASE.top_k_claimed
+        for t in searcher.thresholds_seen
+    )
+
+
+# --- the budget -----------------------------------------------------------------------------------
+
+
+def test_the_wall_clock_is_charged_when_the_searcher_under_reports():
+    ticks = iter([0.0, 6.0, 6.0, 12.0, 12.0, 18.0, 18.0, 24.0])
+
+    class Sneaky:
+        def search(self, photo_id, option, claimed_property_id, thresholds):
+            return dataclasses.replace(missed(photo_id), seconds=0.1)  # says 0.1 s, takes 6 s
+
+    d = PlaceDesk(
+        located(),
+        Sneaky(),
+        scans=SCANS,
+        thresholds=BASE,
+        clock=lambda: next(ticks),
+        max_searches=10,
+    )
+    drive(d, Scripted(lambda o: o.options[0]))
+    assert d.searches_used == 2 and d.seconds_spent >= 10  # the second 6 s search closed the desk
+
+
+def test_the_case_clock_caps_the_retry_budget():
+    d = PlaceDesk(
+        located(),
+        StubSearcher(seconds=4.0),
+        scans=SCANS,
+        thresholds=BASE,
+        case_seconds_left=5.0,
+        max_searches=10,
+    )
+    drive(d, Scripted(lambda o: o.options[0]))
+    assert d.searches_used == 2 and d.max_seconds == 5.0  # 4 s + 4 s passes 5 s: stop after two
+    assert (
+        PlaceDesk(
+            located(), StubSearcher(), scans=SCANS, thresholds=BASE, case_seconds_left=0
+        ).offer()
+        is None
     )

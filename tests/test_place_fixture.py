@@ -2,7 +2,6 @@
 a near miss and an honest stop. Opt-in, so the default demo cases are unchanged."""
 
 import json
-from datetime import UTC, datetime
 
 import pytest
 
@@ -25,11 +24,23 @@ def test_only_the_cases_with_a_script_have_a_searcher():
     assert demo_place_searcher(load_demo_case("b")) is None
 
 
-def test_case_a_without_the_opt_in_is_unchanged():
-    when = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
-    verdict, card = run_demo_case("a", checked_at=when)
-    again, card_again = run_demo_case("a", with_retry=False, checked_at=when)
-    assert verdict == again and card == card_again
+def test_case_a_without_the_opt_in_has_no_place_step_at_all():
+    from snapback.agent.demo import demo_modules, read_listing
+    from snapback.agent.session import CaseSession
+    from snapback.agent.trace import Trace
+    from snapback.contracts import ChoiceKind, DataSource
+
+    case = load_demo_case("a")
+    session = CaseSession(
+        "fx-demo-a",
+        demo_modules(case, read_listing(case.listing_text)),
+        Trace("fx-demo-a", DataSource.FIXTURE),
+    )
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    assert session.place_desk is None and session.place_searcher is None
+    assert not [e for e in session.trace.events if e.choice == ChoiceKind.NEXT_SEARCH]
+    assert not [e for e in session.trace.events if e.kind is TraceKind.UNSURE]
+    assert [p.photo_id for p in session.evidence.locate.photos] == ["l1", "l2", "l3"]
 
 
 def test_case_a_with_retry_places_the_near_miss_and_stops_honestly():

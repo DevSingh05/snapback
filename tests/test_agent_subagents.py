@@ -187,7 +187,7 @@ def test_one_sub_agent_per_check_family_each_with_only_its_own_tool():
         "record": ["read_record_facts"],
         "office-and-licence": ["read_office_facts"],
         "owner": ["read_owner_facts"],
-        "place": ["read_place_facts", "place_open_choice", "place_choose_option"],
+        "place": ["read_place_facts"],
         "search": ["search_places"],
     }
     # nobody but the main agent has the choice tools, including the built-in general agent
@@ -482,3 +482,16 @@ def test_the_main_agent_cannot_make_the_place_decision():
     session.choose(session.offer().default)  # which checks
     assert session.step.value == "place"
     assert "place sub-agent" in describe(session)
+
+
+def test_the_place_retry_prompt_and_tools_exist_only_when_the_case_can_retry():
+    from test_place_agent import StubSearcher
+
+    plain = next(x for x in build_subagents(make_case()) if x["name"] == "place")
+    assert "could not be placed" not in plain["system_prompt"]
+    assert [t.name for t in plain["tools"]] == ["read_place_facts"]
+    case = make_case()
+    case.place_searcher = StubSearcher()
+    live = next(x for x in build_subagents(case) if x["name"] == "place")
+    assert "could not be placed" in live["system_prompt"]
+    assert [t.name for t in live["tools"]][1:] == ["place_open_choice", "place_choose_option"]

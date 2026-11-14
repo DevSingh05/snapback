@@ -108,9 +108,14 @@ class SearchOutcome:
 
 class PlaceSearcher(Protocol):
     def search(
-        self, photo_id: str, option: SearchOption, claimed_property_id: str | None
+        self,
+        photo_id: str,
+        option: SearchOption,
+        claimed_property_id: str | None,
+        thresholds: Thresholds,
     ) -> SearchOutcome:
-        """Retry one photo with `option`, using `search_thresholds(base, option)`."""
+        """Retry one photo with `option`. `thresholds` is `search_thresholds(base, option)`:
+        the base bars with only retrieval breadth changed."""
         ...
 
 
@@ -160,6 +165,7 @@ class PlaceDesk:
         clock: Callable[[], float] = time.monotonic,
         max_searches: int = MAX_SEARCHES,
         max_seconds: float = MAX_SECONDS,
+        case_seconds_left: float | None = None,
         est_seconds: Mapping[str, float] | None = None,
         covers_unshown: Mapping[str, bool] | None = None,
         retry_can_find_elsewhere: bool = True,
@@ -169,7 +175,10 @@ class PlaceDesk:
         self.thresholds = thresholds or load_thresholds()
         self._clock = clock
         self.max_searches = max_searches
-        self.max_seconds = max_seconds
+        # the 10 s retry budget can never exceed what is left of the case's own time budget
+        self.max_seconds = (
+            max_seconds if case_seconds_left is None else min(max_seconds, case_seconds_left)
+        )
         self.est_seconds = dict(est_seconds or {})
         self.covers_unshown = dict(covers_unshown or {})
         self.retry_can_find_elsewhere = retry_can_find_elsewhere
@@ -357,21 +366,32 @@ class PlaceDesk:
         row.tried.add(option.label)
         started = self._clock()
         try:
-            outcome = self.searcher.search(pid, option, self.base.claimed_property_id)
+            outcome = self.searcher.search(
+                pid,
+                option,
+                self.base.claimed_property_id,
+                search_thresholds(self.thresholds, option),
+            )
         except Exception:
             outcome = None
-        seconds = (
-            outcome.seconds if outcome and outcome.seconds is not None else self._clock() - started
-        )
+        wall = max(0.0, self._clock() - started)
+        reported = outcome.seconds if outcome and outcome.seconds is not None else 0.0
+        seconds = max(wall, reported)  # a searcher cannot under-report its way past the budget
         self.searches_used += 1
-        self.seconds_spent += max(0.0, seconds)
+        self.seconds_spent += seconds
         self._focus = None
         result: Literal["placed", "not_placed", "elsewhere", "skipped"] = "not_placed"
         if outcome is not None and row.location.status is LocateStatus.NOT_LOCATED:
             new = outcome.location
-            if new.status is LocateStatus.LOCATED_IN_CLAIMED:
+            # The searcher's word is not taken: a retry result must clear the same bars the base
+            # search is held to, or it counts as not placed.
+            if new.status is LocateStatus.LOCATED_IN_CLAIMED and self._clears_claimed(new):
                 result = "placed"
-            elif new.status is LocateStatus.LOCATED_ELSEWHERE and self.retry_can_find_elsewhere:
+            elif (
+                new.status is LocateStatus.LOCATED_ELSEWHERE
+                and self.retry_can_find_elsewhere
+                and self._clears_elsewhere(new)
+            ):
                 result = "elsewhere"
             if result != "not_placed":
                 row.location, row.points, row.pose = new, outcome.points, outcome.pose
@@ -381,6 +401,29 @@ class PlaceDesk:
                 row.location, row.points = new, outcome.points  # a nearer miss, still unplaced
         row.steps.append(
             PlaceStep(option=option.label, chosen_by=by, seconds=round(seconds, 2), result=result)
+        )
+
+    def _clears_claimed(self, loc: PhotoLocation) -> bool:
+        t = self.thresholds
+        return (
+            loc.inliers is not None
+            and loc.inliers >= t.min_inliers
+            and loc.inlier_ratio is not None
+            and loc.inlier_ratio >= t.min_inlier_ratio
+            and loc.spread is not None
+            and loc.spread >= t.claimed_min_spread
+        )
+
+    def _clears_elsewhere(self, loc: PhotoLocation) -> bool:
+        """The strict bar for "taken in a different building", which can lead to DON'T PAY."""
+        t = self.thresholds
+        return (
+            loc.inliers is not None
+            and loc.inliers >= t.elsewhere_min_inliers
+            and loc.inlier_ratio is not None
+            and loc.inlier_ratio >= t.min_inlier_ratio
+            and loc.spread is not None
+            and loc.spread >= t.elsewhere_min_spread
         )
 
     # --- what it leaves behind -----------------------------------------------------------------

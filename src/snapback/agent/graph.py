@@ -322,10 +322,14 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
                 "description": description,
                 "system_prompt": (
                     PLACE_PROMPT.format(path=path)
-                    if stem == casework.PLACE
+                    if stem == casework.PLACE and case.place_searcher is not None
                     else SUBAGENT_PROMPT.format(name=name, tool=family_tool.name, path=path)
                 ),
-                "tools": [family_tool, *place_tools()] if stem == casework.PLACE else [family_tool],
+                "tools": (
+                    [family_tool, *place_tools()]
+                    if stem == casework.PLACE and case.place_searcher is not None
+                    else [family_tool]
+                ),
                 "permissions": [
                     FilesystemPermission(operations=["write"], paths=[path], mode="allow"),
                     FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),

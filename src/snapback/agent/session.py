@@ -150,6 +150,7 @@ class CaseSession:
         self.place_searcher: PlaceSearcher | None = None
         self.place_scans: Mapping[str, str] | None = None
         self.place_covers_unshown: Mapping[str, bool] | None = None
+        self.place_case_seconds_left: float | None = None  # what is left of the case's 25 s
         self.place_desk: PlaceDesk | None = None
         # E5: the walk. `walk_plan()` returns the case's TourPlan (set by whoever builds the
         # tour); `walk_desk` and `walk_director` are filled by the walk sub-agent or the policy.
@@ -290,6 +291,7 @@ class CaseSession:
             self.place_searcher,
             scans=self.place_scans,
             covers_unshown=self.place_covers_unshown,
+            case_seconds_left=self.place_case_seconds_left,
         )
         for alias, bar in desk.unsure_lines():
             self.trace.emit(
@@ -337,9 +339,9 @@ class CaseSession:
                         self._say(
                             "trace.place.searched",
                             photo=desk.alias_of[pid],
-                            option=step.option,
+                            option=self._say(f"place.option.{step.option.split(':')[0]}"),
                             seconds=step.seconds or 0,
-                            result=step.result.replace("_", " "),
+                            result=self._say(f"place.result.{step.result}"),
                         ),
                         pick=f"search: {step.option}",
                         chosen_by=by,
