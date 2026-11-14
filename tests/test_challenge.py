@@ -178,3 +178,26 @@ def test_ranking_with_no_eligible_spot_is_refused(clock):
     )
     with pytest.raises(ValueError):
         Challenge.start("fx-7Q2M", empty, clock=clock)
+
+
+def test_a_failed_reply_after_the_last_retry_closes_the_challenge(clock):
+    ch = start(clock)
+    for i in range(3):  # two retries, then a third failure closes it
+        ch.reply(Reply(photo_id=f"fx-miss-{i}", ocr_text=ch.code, located=False))
+    ch.reply(good(ch, "fx-late-good"))
+    result = ch.result()
+    assert result.presence is PresenceStatus.WAITING
+    assert len(ch.visible_spots()) == 1
+    assert ch.closed is True
+    assert ch.log[-1].kind == "ignored"
+
+
+def test_challenge_ocr_uses_the_shared_intake_reader(tmp_path, monkeypatch):
+    from snapback.challenge import ocr
+
+    seen: list[bytes] = []
+    monkeypatch.setattr(ocr, "read_image", lambda data: seen.append(data) or "ABCD")
+    photo = tmp_path / "fx-reply.jpg"
+    photo.write_bytes(b"\xff\xd8fx")
+    assert ocr.read_text(photo) == "ABCD"
+    assert seen == [b"\xff\xd8fx"]

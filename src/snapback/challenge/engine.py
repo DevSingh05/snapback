@@ -81,6 +81,7 @@ class Challenge:
     presence: PresenceStatus = PresenceStatus.WAITING
     retries: int = 0
     injection_text_seen: bool = False
+    closed: bool = False  # retries used up: later replies are ignored, presence stays WAITING
     log: list[LogEvent] = field(default_factory=list)
 
     @classmethod
@@ -125,7 +126,7 @@ class Challenge:
         self.log.append(LogEvent(kind, self.clock(), self.spots[-1].spot_id, photo_id))
 
     def reply(self, reply: Reply) -> PresenceStatus:
-        if self.presence is not PresenceStatus.WAITING:
+        if self.closed or self.presence is not PresenceStatus.WAITING:
             self._event("ignored", reply.photo_id)
             return self.presence
 
@@ -167,9 +168,14 @@ class Challenge:
         return self.presence
 
     def _retry(self, kind: str, photo_id: str) -> None:
+        """Count a failed attempt. Past the cap the challenge closes, so a poster cannot keep
+        trying fakes against it until one passes."""
         self._event(kind, photo_id)
         if self.retries < MAX_RETRIES:
             self.retries += 1
+        else:
+            self.closed = True
+            self._event("closed", photo_id)
 
     def _record(
         self, spot: SpotResult, reply: Reply, now: datetime, code_read: bool | None
