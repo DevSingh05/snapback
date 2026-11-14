@@ -181,7 +181,6 @@ describe("link to where the photos were taken", () => {
   });
 });
 
-
 const withScanDate = (): typeof FIXTURE_TOUR => ({
   ...FIXTURE_TOUR,
   scan_date_line: "Scanned Mar 2026 (Matterport)",
