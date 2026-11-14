@@ -21,6 +21,7 @@ from snapback.agent.locate_live import LiveLocate, LiveOutcome
 from snapback.agent.modules import ChallengeOutcome, FixtureModules
 from snapback.agent.rules import check_price
 from snapback.agent.rules.contact import check_authority
+from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
@@ -31,6 +32,7 @@ from snapback.contracts import (
     LicenseResult,
     LocateResult,
     LocateStatus,
+    OwnerResult,
     PhotoLocation,
     PriceResult,
     PropertyRecord,
@@ -67,6 +69,10 @@ class Lookups(Protocol):
         """Does a poster who claims a real estate licence hold one? None means not looked up."""
         ...
 
+    def owner(self, listing_text: str) -> OwnerResult | None:
+        """Who owns the home in the listing, by the county roll? None means no owner data."""
+        ...
+
 
 def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
     """Lane D's licence answer for this listing, or None when nothing was looked up.
@@ -82,6 +88,18 @@ def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
         return lookup(listing_text)
     except Exception as error:
         log.warning("licence lookup failed (%s); treated as not looked up", type(error).__name__)
+        return None
+
+
+def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
+    """Lane D's owner of record for the home in this listing (D12), or None when there is none."""
+    lookup = getattr(lookups, "owner", None)
+    if lookup is None or not listing_text:
+        return None
+    try:
+        return lookup(listing_text)
+    except Exception as error:
+        log.warning("owner lookup failed (%s); treated as not looked up", type(error).__name__)
         return None
 
 
@@ -147,6 +165,11 @@ class KitLookups:
             return None  # lane D's lookup (D10) is not here: nothing was looked up
         return trec.check_license(listing_text)
 
+    def owner(self, listing_text: str) -> OwnerResult | None:
+        # D12 (#130) plugs in here: the county owner roll, filtered to the kit's houses. Until
+        # it lands there is no owner data, and the card says ownership was not checked.
+        return None
+
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""
         try:
@@ -185,6 +208,7 @@ class JoinedModules:
         salt: str,
         record_source: DataSource | None,
         license: LicenseResult | None = None,
+        owner: OwnerResult | None = None,
         live_locate: LiveLocate | None = None,
         photo_bytes: list[bytes] | None = None,
         lookups: Lookups | None = None,
@@ -195,6 +219,7 @@ class JoinedModules:
         self._record = record
         self._for_sale = for_sale
         self._license = license
+        self._owner = owner
         self._salt = salt
         self._record_source = record_source
         # A22: a live case places the renter's photos in the indexed twins (never a stand-in).
@@ -233,6 +258,10 @@ class JoinedModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
+
+    def owner(self, case_id: str) -> OwnerResult | None:
+        # Lane D says who owns the home. What the poster says about owning it is added here.
+        return check_owner(self._listing.contacts, self._owner)
 
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
