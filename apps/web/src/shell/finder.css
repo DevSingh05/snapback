@@ -2,14 +2,22 @@
    under it; what it learned, what leads and how it decided in a narrow column on the right.
    Tokens only, sharp corners, no outline boxes. */
 
+/* The page is exactly one screen tall: the bar, then the Finder filling what is left. */
+.app:has(> .shell > .fd-view) {
+  height: 100dvh;
+  min-height: 600px;
+}
 .app > .shell:has(> .fd-view) {
+  flex: 1;
   min-height: 0;
+  align-items: stretch;
   padding-top: var(--sp-4);
   padding-bottom: var(--sp-4);
 }
 .fd-view {
-  height: calc(100dvh - var(--bar-h) - 2 * var(--sp-4));
-  min-height: 560px;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -41,6 +49,9 @@
 }
 .fd-status .chip {
   flex: none;
+}
+.fd-status-short {
+  display: none;
 }
 .fd-off-chip {
   flex: none;
@@ -368,6 +379,9 @@
   max-width: 34rem;
   color: var(--muted);
 }
+.fd-examples li {
+  display: flex;
+}
 .fd-examples {
   list-style: none;
   margin: 0;
@@ -377,6 +391,7 @@
   gap: var(--sp-2);
 }
 .fd-example {
+  align-self: stretch;
   width: 100%;
   min-height: 88px;
   display: flex;
@@ -413,6 +428,39 @@
   width: 64px;
   height: 64px;
   flex: none;
+}
+.fd-invite .fd-mic:not([data-on]) {
+  background: var(--act);
+  color: var(--on-act);
+}
+.fd-how-works {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: fd-step;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.fd-how-works li {
+  counter-increment: fd-step;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.fd-how-works li::before {
+  content: counter(fd-step, decimal-leading-zero);
+  grid-row: span 2;
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  color: var(--act);
+}
+.fd-how-works strong {
+  color: var(--ink);
 }
 
 /* ---------- The composer ---------- */
@@ -753,6 +801,7 @@
   color: var(--on-scan);
 }
 .fd-tags .fd-tag-by {
+  padding-inline: 0;
   font-family: var(--font-mono);
   color: var(--muted);
   background: transparent;
@@ -978,13 +1027,20 @@
   }
 }
 @media (max-width: 760px) {
+  .app:has(> .shell > .fd-view) {
+    min-height: 560px;
+  }
   .app > .shell:has(> .fd-view) {
     padding: 0;
   }
   .fd-view {
-    height: calc(100dvh - var(--bar-h));
-    min-height: 480px;
     box-shadow: none;
+  }
+  .fd-status-long {
+    display: none;
+  }
+  .fd-status-short {
+    display: inline;
   }
   .fd-head {
     gap: var(--sp-1) var(--sp-3);
@@ -995,7 +1051,6 @@
   }
   .fd-status {
     flex-basis: 100%;
-    align-items: flex-start;
     font-size: var(--fs-xs);
   }
   .fd-head-acts {
@@ -1044,6 +1099,9 @@
   }
   .fd-empty-title {
     font-size: var(--fs-xl);
+  }
+  .fd-empty-lead {
+    font-size: var(--fs-sm);
   }
   .fd-send span {
     position: absolute;

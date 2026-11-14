@@ -438,11 +438,12 @@ function EmptyThread({
   );
 }
 
-function useAutoScroll(dep: unknown) {
+/** Keeps the newest message in view. `dep` null: nothing to follow (the first-visit screen). */
+function useAutoScroll(dep: string | null) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && dep !== null) el.scrollTop = el.scrollHeight;
   }, [dep]);
   return ref;
 }
@@ -729,8 +730,8 @@ function LiveFinder({
   const open = fs.proposals.filter((p) => p.status === "proposed");
   const kept = fs.proposals.filter((p) => p.status === "accepted");
   const lines = learnedLines(fs.learned);
-  const scroller = useAutoScroll(`${items.length}:${open.length}:${busy ? 1 : 0}`);
   const empty = items.length === 0 && !busy;
+  const scroller = useAutoScroll(empty ? null : `${items.length}:${open.length}:${busy ? 1 : 0}`);
 
   const startTalk = () => {
     hush();
@@ -824,11 +825,15 @@ function LiveFinder({
       >
         <p className="fd-status" data-testid="finder-status">
           <SourceChip source={fs.source} />
-          <span>
+          <span className="fd-status-long">
             {fs.mode === "deepagents"
-              ? "Connected. Claude reads what you say and do; code checks every place and number."
-              : "Connected, running on our rules: this server has no model key, so code writes every reply."}{" "}
-            Nothing it learns applies until you say yes.
+              ? "Claude reads what you say and do; code checks every place and number."
+              : "Running on our rules: no model key here, so code writes every reply."}{" "}
+            Nothing applies until you say yes.
+          </span>
+          <span className="fd-status-short">
+            {fs.mode === "deepagents" ? "Claude reads, code checks." : "Code rules only."} Nothing
+            applies until you say yes.
           </span>
         </p>
       </FinderHead>
@@ -959,7 +964,7 @@ function LiveFinder({
             busy={busy !== null}
             voice={voice}
             maxLength={500}
-            placeholder="Under $1,500, no walk-ups, near downtown…"
+            placeholder="Under $1,500, no walk-ups…"
             onMicOpen={hush}
             tools={tools}
             note={voiceNote(voice)}
@@ -1006,6 +1011,26 @@ function LiveFinder({
               </>
             )}
           </section>
+
+          {kept.length === 0 && lines.length === 0 && fs.picks.length === 0 && (
+            <section className="fd-block" aria-label="How it works">
+              <h2 className="fd-h">How it works</h2>
+              <ol className="fd-how-works">
+                <li>
+                  <strong>Say what matters.</strong>
+                  <span>Type it, tap an example, or hold the mic and talk.</span>
+                </li>
+                <li>
+                  <strong>It offers, you decide.</strong>
+                  <span>It notices what you pass on. Nothing applies until you say yes.</span>
+                </li>
+                <li>
+                  <strong>It leads your list.</strong>
+                  <span>Code checks every place; the Finder says why each one leads.</span>
+                </li>
+              </ol>
+            </section>
+          )}
 
           <section className="fd-block" aria-label="Leading your list">
             <div className="fd-block-head">
@@ -1230,7 +1255,7 @@ function OfflineFinder({ why, onRetry }: { why: "none" | "down"; onRetry: () => 
   const [pane, setPane] = useState<"chat" | "list">("chat");
   const offer = nextOffer(events, learned.chips, learned.declined);
   const thread = [...events].reverse(); // oldest first, like a conversation
-  const scroller = useAutoScroll(`${thread.length}:${offer?.id ?? ""}`);
+  const scroller = useAutoScroll(thread.length ? `${thread.length}:${offer?.id ?? ""}` : null);
 
   const keep = (next: { chips: Chip[]; declined: string[] }) => {
     setLearned(next);
