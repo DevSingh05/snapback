@@ -149,3 +149,25 @@ def test_the_a10_join_fields_are_optional():
     request = contracts.CreateCaseRequest.model_validate_json(load("create_case_request.json"))
     assert request.property_id is None
     assert contracts.CreateCaseRequest(property_id="fx-prop-3").property_id == "fx-prop-3"
+
+
+def test_the_a14_reply_shapes_parse_and_waiting_for_a_reply_is_a_progress_value():
+    import snapback.contracts as contracts
+
+    reply = contracts.ReplyResponse.model_validate_json(load("reply_response.json"))
+    assert reply.check is contracts.ReplyCheck.COPY_OF_LISTING_PHOTO
+    assert (reply.presence, reply.state, reply.status) == ("forged", "dont_pay", "done")
+
+    waiting = contracts.ReplyResponse(
+        case_id="7Q2M",
+        source="fixture",
+        status=contracts.CaseProgress.WAITING_FOR_REPLY,
+        check=contracts.ReplyCheck.CODE_READ_SPOT_NOT_CHECKED,
+        presence=contracts.PresenceStatus.WAITING,
+    )
+    assert waiting.state is None and waiting.challenge_text is None
+    # The honest middle: a right code that is not a copy is never called proven.
+    assert contracts.ReplyCheck.CODE_READ_SPOT_NOT_CHECKED != contracts.ReplyCheck.PROVEN
+    # Cases made before this still report the three values they knew.
+    created = contracts.CreateCaseResponse.model_validate_json(load("create_case_response.json"))
+    assert created.status in set(contracts.CaseProgress)

@@ -18,7 +18,13 @@ from collections.abc import Callable, Iterable
 
 from pydantic import BaseModel, Field
 
-from snapback.agent.intake.fields import ContactClaims, extract_contacts, extract_rent
+from snapback.agent.intake.fields import (
+    ContactClaims,
+    extract_beds,
+    extract_contacts,
+    extract_rent,
+    extract_unit,
+)
 from snapback.agent.intake.injection import find_injections
 from snapback.agent.intake.ocr import OcrUnavailable, read_image
 from snapback.agent.rules import apply_rules
@@ -37,11 +43,16 @@ class Listing(BaseModel):
 
     text: str = ""
     listed_rent: int | None = None
+    unit: str | None = None  # "204", "4B": the unit the listing names
+    beds: int | None = None  # 0 for a studio
     rule_hits: list[RuleHit] = Field(default_factory=list)
     contacts: ContactClaims = Field(default_factory=ContactClaims)
     scope: ListingScope = ListingScope.RENTAL
     photos: int = 0
     screenshots: int = 0
+    # Which of the images given were counted as photos, by position. The bytes are not kept
+    # here; whoever holds them uses this to know which ones are listing photos.
+    photo_indexes: list[int] = Field(default_factory=list)
     injection_spans: list[str] = Field(default_factory=list)
     ocr_available: bool = True
     # There was more text than is read (`MAX_TEXT_CHARS`). What came after it was not checked.
@@ -59,7 +70,8 @@ def read_listing(
     photos = screenshots = 0
     ocr_available = True
 
-    for image in images:
+    photo_indexes: list[int] = []
+    for position, image in enumerate(images):
         try:
             seen = ocr(image).strip()
         except OcrUnavailable:
@@ -73,6 +85,7 @@ def read_listing(
             parts.append(seen)
         else:
             photos += 1
+            photo_indexes.append(position)
 
     # Cut and folded before any pattern runs: the text is written by the person being checked.
     sent = "\n".join(parts)
@@ -87,11 +100,14 @@ def read_listing(
     return Listing(
         text=full_text,
         listed_rent=extract_rent(full_text),
+        unit=extract_unit(full_text),
+        beds=extract_beds(full_text),
         rule_hits=apply_rules(full_text),
         contacts=extract_contacts(full_text),
         scope=detect_scope(full_text),
         photos=photos,
         screenshots=screenshots,
+        photo_indexes=photo_indexes,
         injection_spans=injections,
         ocr_available=ocr_available,
         truncated=truncated,

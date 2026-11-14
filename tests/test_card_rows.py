@@ -67,7 +67,11 @@ VARIANTS = {
     ),
     "rent_in_range": modules(price={"status": "within_range", "listed_rent": 1900}),
     "clean": modules(
-        authority={"status": "matches_record", "manager_on_record": "Fixture Living LLC"},
+        authority={
+            "status": "matches_record",
+            "manager_on_record": "Fixture Living LLC",
+            "office_phone_match": "yes",  # H1: a pass needs the ad's phone to be the office's
+        },
         price={"status": "within_range", "listed_rent": 1900},
         rules=[],
     ),
@@ -188,7 +192,22 @@ def test_card_never_repeats_what_the_poster_called_themselves():
     card = card_for(VARIANTS["forged"])
     assert "John" not in all_text(card)
     allowed = line(card, CardRowKind.PERSON, "Allowed to rent it")
-    assert allowed.tone is CardTone.RED_FLAG
+    # Ruling, Sat 01:20: a name that is not the one on record is never a red flag by itself.
+    # The manager, the leasing office and a listing brokerage may all market a home.
+    assert allowed.tone is CardTone.NOT_SHOWN
+    assert allowed.text == "Not confirmed. Call the office on record yourself."
+
+
+def test_a_name_that_is_not_the_one_on_record_reads_like_a_name_we_could_not_check():
+    differs = modules(authority={"status": "mismatch", "manager_on_record": "Fixture Living LLC"})
+    unknown = modules(authority={"status": "unknown"})
+    for evidence in (differs, unknown):
+        verdict = decide(to_evidence(evidence))
+        assert verdict.state is VerdictState.HOLD
+        assert strings.text("reason.authority_unknown") in verdict.reasons
+        assert not any("does not match" in reason for reason in verdict.reasons)
+    tones = [item.tone for item in lines(card_for(differs), CardRowKind.PERSON)]
+    assert CardTone.RED_FLAG not in tones
 
 
 def test_recapture_block_asks_for_a_new_photo_without_a_red_flag():

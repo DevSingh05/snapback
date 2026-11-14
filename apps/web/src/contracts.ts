@@ -29,6 +29,7 @@ export interface ForSaleMatch {
   site: string;
   listed_on?: string | null; // ISO date
   changed_on?: string | null;
+  offices?: string[]; // listing offices on record: brokerage companies, never a person
 }
 
 export interface FloorPlanRent {
@@ -56,14 +57,6 @@ export interface AuthorityResult {
   poster_said?: string | null;
   office_phone_match: PhoneMatch;
   link_domain: LinkDomain;
-}
-
-// Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
-// Used when the card API has not already put these lines in `rows`.
-export interface CardProofs {
-  price?: PriceResult | null;
-  authority?: AuthorityResult | null;
-  unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
 }
 
 export interface Card {
@@ -105,18 +98,43 @@ export interface Pose {
   fov_deg?: number | null;
 }
 
+// Mirrors LocateStatus (contracts.py).
+export type LocateStatus =
+  "located_in_claimed" | "located_elsewhere" | "not_located" | "not_indexed";
+
+// Mirrors PhotoLocation.
 export interface LocatedPhoto {
   photo_id: string;
-  status: string;
+  status: LocateStatus;
   model_id?: string | null;
   pano_id?: string | null;
   inliers?: number | null;
+  inlier_ratio?: number | null;
+  // The twin the photo was placed in, claimed or not; for located_elsewhere these name the OTHER building.
+  matched_model_id?: string | null;
+  matched_property_id?: string | null;
+  room_label?: string | null; // Matterport's room classification, e.g. "Kitchen"
+}
+
+// Mirrors FloorPlanCandidate.
+export interface FloorPlanCandidate {
+  property_id: string;
+  model_id: string;
+  floor_plan?: string | null;
+  photos_located: number;
+  total_inliers: number;
 }
 
 export interface LocateResult {
   case_id: string;
   photos: LocatedPhoto[];
-  poses: Record<string, Pose>;
+  claimed_property_id?: string | null;
+  identified_by_scan?: boolean;
+  identified_photos?: number;
+  chosen?: FloorPlanCandidate | null;
+  alternatives?: FloorPlanCandidate[];
+  poses: Record<string, Pose>; // photo_id -> pose, located photos only
+  thresholds_version: string;
 }
 
 // Mirrors PropertyRecord and AerialTile in src/snapback/contracts.py.
@@ -143,4 +161,19 @@ export interface AerialTile {
   direction: string; // "north", "east", "south", "west" or "nadir"
   captured_on?: string | null;
   path: string;
+}
+
+// Mirrors AerialSideOut and AerialProofResponse in src/snapback/contracts.py (GET /cases/{id}/aerial).
+export interface AerialSideOut {
+  tile: AerialTile | null;
+  record: PropertyRecord | null;
+  image_url?: string | null;
+}
+
+export interface AerialProofResponse {
+  case_id: string;
+  source: DataSource;
+  claimed: AerialSideOut;
+  matched: AerialSideOut | null;
+  distance_m: number | null;
 }

@@ -386,3 +386,14 @@ def test_hard_copies_are_mostly_caught_by_hashes_alone(tmp_path, clock, attack):
         result = memory.check(f"fx-case-{seed}", "fx-reply", attack(room(seed)), PhotoRole.REPLY)
         caught += result.hit is MemoryHitKind.SAME_CASE_LISTING
     assert caught >= 8
+
+
+def test_deleted_hashes_are_overwritten_on_disk(tmp_path, clock):
+    """secure_delete: a deleted case's hashes do not linger in free pages of the file."""
+    path = tmp_path / "memory.sqlite"
+    memory = PhotoMemory(path, clock=clock)
+    memory.record("fx-case-a", "fx-p1", room(1), PhotoRole.LISTING)
+    stored = sqlite3.connect(path).execute("select phash from hashes limit 1").fetchone()[0]
+    assert stored.encode() in path.read_bytes()
+    memory.delete_case("fx-case-a")
+    assert stored.encode() not in path.read_bytes()

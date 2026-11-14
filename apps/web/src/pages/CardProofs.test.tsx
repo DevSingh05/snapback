@@ -2,24 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
-import { proofLines, toneWord } from "../cardStrings";
-import type { Card, CardProofs, ForSaleMatch } from "../contracts";
+import { toneWord } from "../cardStrings";
+import type { Card, CardLine, CardRowKind } from "../contracts";
 import { CardView } from "./CardPage";
 
 const card = cardHold as Card;
 const text = () => document.body.textContent ?? "";
-
-const price = (over: Partial<NonNullable<CardProofs["price"]>>): CardProofs => ({
-  price: { status: "within_range", unit: "not_checked", per_bed: false, ...over },
-});
-const authority = (over: Partial<NonNullable<CardProofs["authority"]>>): CardProofs => ({
-  authority: {
-    status: "unknown",
-    office_phone_match: "not_checked",
-    link_domain: "not_checked",
-    ...over,
-  },
-});
 
 describe("locked wording", () => {
   it("uses the locked tone words, with the row exceptions", () => {
@@ -58,89 +46,79 @@ describe("locked wording", () => {
   });
 });
 
-describe("place, person and price proof lines", () => {
-  const cases: [string, CardProofs, string, (ForSaleMatch | null)?][] = [
-    [
-      "for sale",
-      {},
-      "This home is listed for sale on Homes.com, not for rent.",
-      { status: "active", site: "Homes.com", listed_on: "2026-09-02" },
-    ],
-    [
-      "recently rented",
-      {},
-      "This home was rented on Oct 4.",
-      { status: "recently_rented", site: "Homes.com", changed_on: "2026-10-04" },
-    ],
-    ["for sale none", {}, "Not listed for sale", { status: "none", site: "Homes.com" }],
-    ["for sale unchecked", {}, "Not checked (no for-sale lookup", null],
-    [
-      "unit missing",
-      { ...price({ unit: "not_on_record" }), unit_label: "4B" },
-      "Unit 4B is not on this building's list",
-    ],
-    [
-      "unit missing, unnamed",
-      price({ unit: "not_on_record" }),
-      "This unit is not on this building's list",
-    ],
-    ["beds mismatch", price({ unit: "beds_mismatch" }), "bedrooms in the listing do not match"],
-    ["unit on record", price({ unit: "on_record" }), "is on this building's list"],
-    ["unit unchecked", price({ unit: "not_checked" }), "Not checked (the listing names no unit"],
-    [
-      "phone differs",
-      authority({ office_phone_match: "no" }),
-      "The phone in the listing is not the leasing office on record",
-    ],
-    [
-      "phone matches",
-      authority({ office_phone_match: "yes" }),
-      "The phone in the listing is the leasing office on record",
-    ],
-    [
-      "phone unchecked",
-      authority({}),
-      "Not checked (the listing or the record has no phone number)",
-    ],
-    [
-      "lookalike link",
-      authority({ link_domain: "lookalike" }),
-      "This link looks like the building's site but is a different address",
-    ],
-    ["own link", authority({ link_domain: "matches" }), "This link is the building's own site"],
-    ["other link", authority({ link_domain: "other" }), "says nothing either way"],
-    ["link unchecked", authority({}), "Not checked (the listing has no link"],
-    [
-      "call the manager",
-      authority({ manager_on_record: "Oak Court Management" }),
-      "Call Oak Court Management yourself.",
-    ],
-    [
-      "per bed guard",
-      price({ status: "not_checked", per_bed: true }),
-      "Priced per bed here, so the rent was not compared.",
-    ],
-    [
-      "band within",
-      price({ listed_rent: 1850, record_min: 1700, record_max: 2100 }),
-      "In line with the rents on record for this building. Listed $1,850; the record shows $1,700 to $2,100.",
-    ],
-    [
-      "band below",
-      price({ status: "below_range", listed_rent: 900, record_min: 1700, record_max: 2100 }),
-      "Below the rents on record for this building. Ask why; discounts happen. Listed $900; the record shows $1,700 to $2,100.",
-    ],
-    [
-      "band unchecked",
-      price({ status: "not_checked" }),
-      "Not checked (our data has no rent for this building)",
-    ],
-  ];
+const withLine = (kind: CardRowKind, line: CardLine): Card => ({
+  ...card,
+  rows: card.rows.map((r) => (r.kind === kind ? { ...r, lines: [...r.lines, line] } : r)),
+});
 
-  it.each(cases)("renders %s", (_name, proofs, words, forSale) => {
-    render(<CardView card={{ ...card, for_sale: forSale }} variant="result" proofs={proofs} />);
-    expect(text()).toContain(words);
+describe("API lines render as given", () => {
+  it("a recently_rented info line keeps its API tone and text, never Doesn't match", () => {
+    const text = "Rented on Oct 4 per Homes.com, the lease may have been taken.";
+    const c = withLine("place", { label: "Rental history", text, tone: "not_shown" });
+    render(<CardView card={c} variant="result" />);
+    const tr = screen.getByText(text).closest("tr");
+    expect(tr).toHaveTextContent("Rental history");
+    expect(tr).toHaveTextContent("Not confirmed");
+    expect(tr).not.toHaveTextContent("Doesn't match");
   });
+
+  it("a for-sale line renders Warning with the API words", () => {
+    const text =
+      "Listed for sale on Homes.com. Homes for sale are sometimes also offered for lease.";
+    const c = withLine("place", { label: "For sale", text, tone: "hold" });
+    render(<CardView card={c} variant="result" />);
+    const tr = screen.getByText(text).closest("tr");
+    expect(tr).toHaveTextContent("Warning");
+    expect(tr).not.toHaveTextContent("Matches");
+  });
+
+  it("a Not listed for sale line is not turned into a green Matches", () => {
+    const text = "Not listed for sale on Homes.com.";
+    const c = withLine("place", { label: "For sale", text, tone: "not_shown" });
+    render(
+      <CardView
+        card={{ ...c, for_sale: { status: "none", site: "Homes.com" } }}
+        variant="result"
+      />,
+    );
+    const tr = screen.getByText(text).closest("tr");
+    expect(tr).toHaveTextContent("Not confirmed");
+    expect(tr).not.toHaveTextContent("Matches");
+  });
+
+  it("adds no line the API did not send, even with card.for_sale set", () => {
+    const base = render(<CardView card={card} variant="result" />).container.querySelectorAll("tr");
+    document.body.innerHTML = "";
+    const withSale = render(
+      <CardView
+        card={{
+          ...card,
+          for_sale: { status: "recently_rented", site: "Homes.com", changed_on: "2026-10-04" },
+        }}
+        variant="result"
+      />,
+    ).container.querySelectorAll("tr");
+    expect(withSale).toHaveLength(base.length);
+    expect(text()).not.toContain("This home was rented");
+  });
+
+  it.each(["ok", "red_flag", "not_shown", "hold", "not_checked"] as const)(
+    "tone %s shows exactly the locked row-state word and the API text",
+    (tone) => {
+      const words = {
+        ok: "Matches",
+        red_flag: "Doesn't match",
+        not_shown: "Not confirmed",
+        hold: "Warning",
+        not_checked: "Not checked",
+      };
+      const line = `API sentence for ${tone}.`;
+      render(
+        <CardView card={withLine("place", { label: "X", text: line, tone })} variant="result" />,
+      );
+      expect(screen.getByText(line).closest("tr")).toHaveTextContent(words[tone]);
+    },
+  );
 
   it("shows the history strip with dates, read from card.for_sale", () => {
     render(
@@ -162,7 +140,6 @@ describe("place, person and price proof lines", () => {
     expect(strip).toHaveTextContent("Sep 2");
     expect(strip).toHaveTextContent("Rented");
     expect(strip).toHaveTextContent("Oct 4");
-    expect(screen.getByText("Rental history")).toBeInTheDocument();
   });
 
   it("no history strip without dates", () => {
@@ -173,97 +150,5 @@ describe("place, person and price proof lines", () => {
       />,
     );
     expect(screen.queryByTestId("history-strip")).toBeNull();
-  });
-
-  it("proof mismatches read Doesn't match, and a rent proof replaces the API line", () => {
-    render(
-      <CardView
-        card={{ ...card, for_sale: { status: "active", site: "Homes.com" } }}
-        variant="result"
-        proofs={{
-          ...authority({ office_phone_match: "no", link_domain: "lookalike" }),
-          price: { status: "within_range", per_bed: false, unit: "not_checked" },
-        }}
-      />,
-    );
-    for (const re of [
-      /listed for sale on Homes\.com/,
-      /phone in the listing is not/,
-      /looks like the building/,
-    ]) {
-      expect(screen.getByText(re).closest("tr")).toHaveTextContent("Doesn't match");
-    }
-    expect(screen.getAllByText("Rent vs record")).toHaveLength(1);
-  });
-
-  it("skips Call X yourself when the API row already names the manager", () => {
-    const withCall: Card = {
-      ...card,
-      rows: card.rows.map((r) =>
-        r.kind === "person"
-          ? {
-              ...r,
-              lines: [
-                ...r.lines,
-                {
-                  label: "Next step",
-                  text: "Not confirmed. Call Oak Court Management on a number you look up yourself before you pay.",
-                  tone: "not_shown" as const,
-                },
-              ],
-            }
-          : r,
-      ),
-    };
-    render(
-      <CardView
-        card={withCall}
-        variant="result"
-        proofs={authority({ manager_on_record: "Oak Court Management" })}
-      />,
-    );
-    expect(screen.queryByText("Call Oak Court Management yourself.")).toBeNull();
-  });
-
-  it("every proof line avoids safe, verified and scam", () => {
-    const all: CardProofs = {
-      price: {
-        status: "below_range",
-        listed_rent: 900,
-        record_min: 1700,
-        record_max: 2100,
-        per_bed: false,
-        unit: "beds_mismatch",
-      },
-      authority: {
-        status: "mismatch",
-        manager_on_record: "Oak Court Management",
-        office_phone_match: "no",
-        link_domain: "lookalike",
-      },
-      unit_label: "4B",
-    };
-    const lines = proofLines(all, { status: "active", site: "Homes.com" }).flatMap((r) =>
-      r.lines.map((l) => l.text),
-    );
-    expect(lines.length).toBeGreaterThan(5);
-    for (const l of lines) expect(l.toLowerCase()).not.toMatch(/safe|verified|scam/);
-  });
-
-  it("never renders digits of a phone, even if one is passed in by mistake", () => {
-    const sneaky = {
-      authority: {
-        status: "unknown",
-        manager_on_record: "Oak Court Management",
-        office_phone_match: "no",
-        link_domain: "not_checked",
-        phone: "(713) 555-0142",
-        site_phone_hash: "5557140142",
-      },
-    } as unknown as CardProofs;
-    render(<CardView card={card} variant="result" proofs={sneaky} />);
-    expect(text()).not.toMatch(/\d{3}[\s().-]*\d{3,4}/);
-    expect(text()).not.toContain("0142");
-    expect(text()).toContain("Call Oak Court Management yourself.");
   });
 });

@@ -30,6 +30,10 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+      # V6 eval gate (#62): fixture case bank only, headless, no network. Writes to the runner's
+      # temp dir so the tracked eval/results.csv is never changed by CI. Exit 1 = gate failed.
+      - name: Eval gate (python -m snapback.eval)
+        run: uv run python -m snapback.eval --baseline eval/baseline.csv --out "$RUNNER_TEMP/results.csv"
 
   node:
     runs-on: ubuntu-latest
@@ -44,4 +48,5 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm test -w apps/web
+      - run: npm test -w apps/sidecar
       - run: npm run build

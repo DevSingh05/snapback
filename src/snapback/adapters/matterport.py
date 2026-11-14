@@ -37,6 +37,7 @@ from snapback.contracts import DataSource
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LIVE_CACHE = REPO_ROOT / "data" / "matterport"
+INDEX_CACHE = REPO_ROOT / "data" / "index"  # embeddings derived from the faces (terms 2.3)
 FIXTURE_CACHE = REPO_ROOT / "data" / "fixture-matterport"
 GRAPH_URL = "https://api.matterport.com/api/models/graph"
 FACES = 6
@@ -46,6 +47,12 @@ _QUERY_WITH_POSE = """
 query($id: ID!) { model(id: $id) { locations {
   id position { x y z }
   panos { rotation { x y z w } skybox(resolution: "high") { children } }
+} } }"""
+# Each sweep's room and Matterport's classifications of it (issue #68: rooms carry no custom
+# labels, but most are classified).
+_QUERY_ROOMS = """
+query($id: ID!) { model(id: $id) { locations {
+  id room { classifications { label confidence } }
 } } }"""
 # The field set the kit probe has confirmed on our keys. Used if the pose fields are refused.
 _QUERY_BARE = """
@@ -79,6 +86,10 @@ class Sweep:
 
 class Matterport(Protocol):
     def sweeps(self, model_id: str) -> list[Sweep]: ...
+
+    def room_labels(self, model_id: str) -> dict[str, str | None]:
+        """Sweep id -> Matterport's most confident room classification ("Kitchen"), or None."""
+        ...
 
 
 def get_matterport(
@@ -160,9 +171,9 @@ def synthetic_face(seed: int, size: int = 256) -> Image.Image:
         a, b, c = rng.uniform(-1, 1, 3)
         channels.append(120 + 60 * np.sin(3 * a * x + 2 * b * y + c))
     pixels = np.stack(channels, axis=-1)
-    for _ in range(10):
+    for _ in range(30):  # enough fixed structure for a crop to keep a few dozen corners
         x0, y0 = rng.integers(0, size - 24, 2)
-        w, h = rng.integers(16, size // 3, 2)
+        w, h = rng.integers(12, size // 4, 2)
         pixels[y0 : y0 + h, x0 : x0 + w] = rng.uniform(0, 255, 3)
     return Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), "RGB")
 
@@ -204,6 +215,9 @@ class FixtureMatterport:
             )
         _write_manifest(folder, sweeps)
         return sweeps
+
+    def room_labels(self, model_id: str) -> dict[str, str | None]:
+        return {}
 
 
 # --- live backend ------------------------------------------------------------------------------
@@ -253,8 +267,29 @@ class LiveMatterport:
                 position = (p["x"], p["y"], p["z"]) if p else None
                 rotation = (r["x"], r["y"], r["z"], r["w"]) if r else None
             sweeps.append(Sweep(model_id, sweep_id, tuple(faces), position, rotation))
+        if not sweeps:
+            # Never cache an empty model: a later call should ask the API again.
+            raise RuntimeError(
+                f"model has no skybox sweeps ({len(locations)} locations, none with faces)"
+            )
         _write_manifest(folder, sweeps)
         return sweeps
+
+    def room_labels(self, model_id: str) -> dict[str, str | None]:
+        cache = self.cache_dir / _safe(model_id) / "rooms.json"
+        if cache.is_file():
+            return json.loads(cache.read_text())
+        payload = self._post({"query": _QUERY_ROOMS, "variables": {"id": model_id}}).json()
+        if payload.get("errors"):
+            return {}
+        labels: dict[str, str | None] = {}
+        for location in ((payload.get("data") or {}).get("model") or {}).get("locations") or []:
+            kinds = ((location.get("room") or {}).get("classifications")) or []
+            best = max(kinds, key=lambda k: k.get("confidence") or 0, default=None)
+            labels[_safe(str(location.get("id")))] = (best or {}).get("label")
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(labels))
+        return labels
 
     def _locations(self, model_id: str) -> tuple[list[dict], bool]:
         for query, with_pose in ((_QUERY_WITH_POSE, True), (_QUERY_BARE, False)):
@@ -285,9 +320,11 @@ class LiveMatterport:
         return response
 
 
-def purge(cache_dir: Path = LIVE_CACHE) -> None:
-    """Delete every cached face (sponsor terms: all copies deleted after the event)."""
+def purge(cache_dir: Path = LIVE_CACHE, *, index_dir: Path = INDEX_CACHE) -> None:
+    """Delete every cached face and every index built from them (sponsor terms: all copies
+    and derivatives deleted after the event)."""
     shutil.rmtree(cache_dir, ignore_errors=True)
+    shutil.rmtree(index_dir, ignore_errors=True)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -295,12 +332,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     fetch = sub.add_parser("fetch", help="fetch skybox faces into data/ (counts printed only)")
     fetch.add_argument("model_ids", nargs="*", help="defaults to DEMO_MODEL_IDS from .env")
-    sub.add_parser("purge", help="delete the live face cache")
+    sub.add_parser("purge", help="delete the live face cache and the locate index")
     args = parser.parse_args(argv)
 
     if args.command == "purge":
         purge()
-        print("purged the live Matterport cache")
+        print("purged the live Matterport cache and the locate index")
         return 0
 
     settings = MatterportSettings()

@@ -38,7 +38,15 @@ from functools import cache, cached_property
 from typing import NamedTuple
 
 from snapback.agent.rules.table import BELOW_RANGE_RATIO, RULES, Rule
-from snapback.contracts import PriceResult, PriceStatus, PropertyRecord, RuleHit
+from snapback.contracts import (
+    FloorPlanRent,
+    PriceResult,
+    PriceStatus,
+    PropertyRecord,
+    RuleHit,
+    UnitOnRecord,
+    UnitStatus,
+)
 
 MAX_SPAN = 200
 # A long listing is a few thousand characters. Anything past this is not read, and intake
@@ -105,6 +113,34 @@ _AFTER_VIEWING = re.compile(
     r"view(?:ed|ing)?(?! (?:the |my |these |those )?"
     r"(?:photos?|pictures?|pics?|videos?|listing|ad)\b)"
     r")\b",
+    re.IGNORECASE,
+)
+# "After approval", "once approved", "upon approval": the application came first.
+_AFTER_APPROVAL = re.compile(
+    r"\b(?:after|once|upon|when|if)\b[^,;.!?]{0,40}?\b(?:approval|approved)\b"
+    r"|\b(?:of|following)\s{1,3}(?:your\s{1,3}|the\s{1,3})?approval\b"
+    r"|\bapproved applicants?\b",
+    re.IGNORECASE,
+)
+# A sentence that skips or postpones the viewing: no ordinary step excuses the money in it.
+_SKIPS_VIEWING = re.compile(
+    r"\bbefore (?:you |we |they )?(?:to )?(?:the |a |any |your )?(?:tour|see|view|show)\w{0,6}"
+    r"|\bno need to (?:see|tour|view)\b"
+    r"|\bsight unseen\b|\bno (?:viewing|showing|tour)s?\b",
+    re.IGNORECASE,
+)
+# The company's own portal, website or office, or simply "online": where a fee is ordinarily
+# paid or handed in.
+_THROUGH_PORTAL = re.compile(
+    r"\b(?:through|via|on|at|in|using)\s{1,3}(?:our|the|their)\s{1,3}(?:[\w-]{1,20}\s{1,3}){0,2}"
+    r"(?:portal|website|site|web ?page|app)\b|\bonline\b|\bwhen you apply\b"
+    r"|\b(?:to|at)\s{1,3}(?:our|the|my)\s{1,3}(?:[\w-]{1,20}\s{1,3})?(?:office|company|portal)\b",
+    re.IGNORECASE,
+)
+# Money that cannot be taken back, or that goes to a person. No ordinary step excuses these.
+_CANNOT_COME_BACK = re.compile(
+    r"\b(?:zelle|venmo|cash ?app|paypal|wire|western union|moneygram|gift ?cards?|crypto|"
+    r"bitcoin|cash)\b|\bto (?:me|my(?!\s{1,3}(?:office|company|portal)\b))\b|\b(?:send|pay) me\b",
     re.IGNORECASE,
 )
 _AT_SIGNING = re.compile(r"\bat (?:the |your )?(?:lease )?signing\b|\bat move-?in\b", re.IGNORECASE)
@@ -213,6 +249,18 @@ class _Clause:
         return _AT_SIGNING.search(self.text) is not None
 
     @cached_property
+    def is_after_approval(self) -> bool:
+        return _AFTER_APPROVAL.search(self.text) is not None
+
+    @cached_property
+    def is_through_portal(self) -> bool:
+        return _THROUGH_PORTAL.search(self.text) is not None
+
+    @cached_property
+    def cannot_come_back(self) -> bool:
+        return _CANNOT_COME_BACK.search(self.text) is not None
+
+    @cached_property
     def viewing_phrases(self) -> list[_Phrase]:
         phrases: list[_Phrase] = []
         for found in _AFTER_VIEWING.finditer(self.text):
@@ -276,7 +324,25 @@ def _excused(rule: Rule, clauses: list[_Clause], index: int, match: re.Match[str
         return True
     if rule.excused_as_rent_terms and clause.is_rent_terms:
         return True
+    if _is_an_ordinary_step(rule, clauses, index):
+        return True
     return rule.excused_after_viewing and _comes_after_a_viewing(clauses, index, match)
+
+
+def _is_an_ordinary_step(rule: Rule, clauses: list[_Clause], index: int) -> bool:
+    """A fee or deposit asked for the way agents ordinarily ask (red team, H8).
+
+    Due after approval, or paid through the company's own portal. Neither covers a sentence
+    that wants the money today or names money that cannot be taken back: "once approved,
+    Zelle the deposit today" is still an ask.
+    """
+    if clauses[index].is_urgent or any(clause.cannot_come_back for clause in clauses):
+        return False
+    if any(_SKIPS_VIEWING.search(clause.text) for clause in clauses):
+        return False
+    if rule.excused_after_approval and any(clause.is_after_approval for clause in clauses):
+        return True
+    return rule.excused_through_portal and any(clause.is_through_portal for clause in clauses)
 
 
 def _fires(rule: Rule, clauses: list[_Clause]) -> bool:
@@ -317,17 +383,113 @@ def apply_rules(text: str, lang: str = "en") -> list[RuleHit]:
     return hits
 
 
-def check_price(listed_rent: int | None, record: PropertyRecord | None) -> PriceResult:
+def _unit_key(unit: str) -> str:
+    return "".join(ch for ch in unit[:32].upper() if ch.isalnum())
+
+
+def _unit_on_record(unit: str | None, record: PropertyRecord) -> UnitOnRecord | None:
+    if not unit:
+        return None
+    key = _unit_key(unit)
+    return next((found for found in record.units if _unit_key(found.unit) == key), None)
+
+
+def check_unit(unit: str | None, beds: int | None, record: PropertyRecord | None) -> UnitStatus:
+    """Is the unit the listing names on the record, with that many bedrooms?
+
+    Says something only when the record has what it takes: a unit list to look the unit up
+    in, or bedroom counts to compare with. Otherwise it is not checked.
+    """
+    if record is None:
+        return UnitStatus.NOT_CHECKED
+    if unit and record.units:
+        found = _unit_on_record(unit, record)
+        if found is None:
+            return UnitStatus.NOT_ON_RECORD
+        if beds is not None and found.beds is not None and found.beds != beds:
+            return UnitStatus.BEDS_MISMATCH
+        return UnitStatus.ON_RECORD
+    if beds is not None:
+        known = {plan.beds for plan in record.floor_plan_rents} | {u.beds for u in record.units}
+        known.discard(None)
+        if known and beds not in known:
+            return UnitStatus.BEDS_MISMATCH
+    return UnitStatus.NOT_CHECKED
+
+
+def _plans_to_compare(
+    plans: list[FloorPlanRent], unit: str | None, beds: int | None, record: PropertyRecord
+) -> list[FloorPlanRent]:
+    """The floor plans the listing could be: the unit's own, else those with its bedrooms."""
+    found = _unit_on_record(unit, record)
+    if found is not None:
+        own = [plan for plan in plans if found.floor_plan and plan.name == found.floor_plan]
+        if not own and found.beds is not None:
+            own = [plan for plan in plans if plan.beds == found.beds]
+        if own:
+            return own
+    if beds is not None:
+        return [plan for plan in plans if plan.beds == beds]
+    return plans
+
+
+def check_price(
+    listed_rent: int | None,
+    record: PropertyRecord | None,
+    *,
+    beds: int | None = None,
+    unit: str | None = None,
+) -> PriceResult:
     """Compare the rent in the listing with the rents on the property record.
 
     Not checked unless both numbers exist. Below range means well under the lowest rent on
     record (see `BELOW_RANGE_RATIO`); it is a reason to ask, never a verdict on its own.
+
+    When the record has a rent band per floor plan, the listing is compared with the band for
+    its own floor plan (found by unit, else by bedrooms). A floor plan priced by the bed is
+    never compared with a whole-unit rent: the result says so (`per_bed`) and is not checked.
     """
-    reference = None
-    if record is not None:
-        reference = record.rent_min if record.rent_min is not None else record.rent_median
-    if listed_rent is None or record is None or reference is None:
-        return PriceResult(status=PriceStatus.NOT_CHECKED, listed_rent=listed_rent)
+    unit_status = check_unit(unit, beds, record)
+    if listed_rent is None or record is None:
+        return PriceResult(
+            status=PriceStatus.NOT_CHECKED, listed_rent=listed_rent, unit=unit_status
+        )
+
+    plans = [
+        plan
+        for plan in record.floor_plan_rents
+        if plan.rent_min is not None or plan.rent_max is not None
+    ]
+    if plans:
+        ours = _plans_to_compare(plans, unit, beds, record)
+        whole = [plan for plan in ours if not plan.per_bed]
+        if not whole:
+            return PriceResult(
+                status=PriceStatus.NOT_CHECKED,
+                listed_rent=listed_rent,
+                unit=unit_status,
+                per_bed=bool(ours),
+            )
+        low = min(p.rent_min if p.rent_min is not None else p.rent_max for p in whole)
+        high = max(p.rent_max if p.rent_max is not None else p.rent_min for p in whole)
+        below = listed_rent < BELOW_RANGE_RATIO * low
+        sizes = {plan.beds for plan in whole}
+        return PriceResult(
+            status=PriceStatus.BELOW_RANGE if below else PriceStatus.WITHIN_RANGE,
+            listed_rent=listed_rent,
+            record_min=low,
+            record_max=high,
+            n_floor_plans=len(whole),
+            unit=unit_status,
+            # Named on the card only when every plan compared has the same bedroom count.
+            compared_beds=sizes.pop() if len(sizes) == 1 else None,
+        )
+
+    reference = record.rent_min if record.rent_min is not None else record.rent_median
+    if reference is None:
+        return PriceResult(
+            status=PriceStatus.NOT_CHECKED, listed_rent=listed_rent, unit=unit_status
+        )
 
     below = listed_rent < BELOW_RANGE_RATIO * reference
     return PriceResult(
@@ -337,4 +499,5 @@ def check_price(listed_rent: int | None, record: PropertyRecord | None) -> Price
         record_min=record.rent_min,
         record_max=record.rent_max,
         n_floor_plans=len(record.floor_plans) or None,
+        unit=unit_status,
     )

@@ -2,7 +2,8 @@
 
 - `Dinov2Embedder`: DINOv2 ViT-S/14 CLS token (Apache 2.0 code and weights). Needs the
   `vision` extra. The first use downloads the model through torch.hub (code from the
-  facebookresearch/dinov2 GitHub repo, weights from Meta's CDN) into ~/.cache/torch.
+  facebookresearch/dinov2 GitHub repo at the commit pinned in `DINOV2_REPO`, weights from
+  Meta's CDN) into ~/.cache/torch.
 - `TinyEmbedder`: a few hundred numbers from colour and edge statistics, numpy only. Not a
   product model: it lets tests and CI exercise the index without torch.
 """
@@ -11,6 +12,12 @@ from typing import Protocol
 
 import numpy as np
 from PIL import Image, ImageOps
+
+# Pinned so the code torch.hub runs never changes under us (main as of 2026-06-03, Apache-2.0).
+DINOV2_REPO = "facebookresearch/dinov2:7764ea0f912e53c92e82eb78a2a1631e92725fc8"
+# Preferred: the same ViT-S/14 DINOv2 weights through timm (CLS token, Apache-2.0).
+TIMM_DINOV2 = "vit_small_patch14_dinov2.lvd142m"
+TIMM_NAME = "dinov2_vits14_timm"
 
 
 class Embedder(Protocol):
@@ -61,7 +68,24 @@ class Dinov2Embedder:  # pragma: no cover - needs torch and a one-time download
         if device is None:
             device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.device = device
-        model = torch.hub.load("facebookresearch/dinov2", self.name, trust_repo=True)
+        try:
+            # timm builds the network from its own (version-locked) code and fetches only the
+            # weights (Apache-2.0) from Hugging Face; no repository code is downloaded or run.
+            import timm
+
+            self.name = TIMM_NAME  # never mixed with an index built through torch.hub
+
+            from snapback.vision.locate.weights import dinov2_file
+
+            model = timm.create_model(
+                TIMM_DINOV2,
+                pretrained=True,
+                num_classes=0,
+                img_size=self.SIZE,
+                pretrained_cfg_overlay={"file": str(dinov2_file())},  # pinned revision, checked
+            )
+        except ImportError:
+            model = torch.hub.load(DINOV2_REPO, self.name, trust_repo=True)
         self._model = model.eval().to(device)
 
     def _tensor(self, image: Image.Image):

@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar purge eval-locate-real
+.PHONY: setup lint format test hygiene check api web sidecar purge eval eval-baseline prefetch-weights eval-locate-real
 
 setup: ## install python and node dependencies
 	uv sync
@@ -38,5 +38,15 @@ sidecar: ## run the intake sidecar stub
 purge: ## delete everything under data/ (sponsor caches, memory DB); sponsor terms: by Sun 16:00
 	uv run python -m snapback.safety purge
 
+eval: ## eval harness: writes eval/results.csv (aggregate numbers only) and runs the gate
+	uv run python -m snapback.eval --baseline eval/baseline.csv
+
+eval-baseline: ## rescore without the regression gate, then freeze it as the baseline (deliberate)
+	uv run python -m snapback.eval
+	cp eval/results.csv eval/baseline.csv
+
 eval-locate-real: ## A8: locate accuracy on the kit's own photos; writes totals to eval/locate_real.csv
 	uv run python -m snapback.agent.locate_eval
+
+prefetch-weights: ## download and sha256-check the DISK, LightGlue and DINOv2 weights (vision extra)
+	uv run python -m snapback.vision.locate.weights

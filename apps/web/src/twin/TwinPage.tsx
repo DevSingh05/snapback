@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import aerialFixture from "../../../../fixtures/contracts/aerial_tile.json";
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
-import recordFixture from "../../../../fixtures/contracts/property_record.json";
 import { SourceChip } from "../components/SourceChip";
-import type { AerialTile as AerialTileData, LocateResult, PropertyRecord } from "../contracts";
+import type { LocateResult } from "../contracts";
 import { TracePanel } from "../trace";
-import { AerialTile } from "./AerialTile";
+import { AerialProof, type AerialSide } from "./AerialProof";
 import { PhotoLanding, type FlyFrom, type LandingPhase } from "./PhotoLanding";
 import { TraceStrip } from "./TraceStrip";
-import { FIXTURE_ROOM_LABELS, chooseLocate, landingFromLocate, type LandingState } from "./landing";
+import {
+  FIXTURE_ROOM_LABELS,
+  chooseLocate,
+  hasDifferentHome,
+  landingFromLocate,
+  type LandingState,
+} from "./landing";
 import { poseToSdkCall } from "./pose";
+import { COPIED_LOCATE, FIXTURE_CLAIMED, FIXTURE_MATCHED } from "./proofFixtures";
 import { connectShowcase, embedUrl, flyToPose, watchSweeps, type ShowcaseSdk } from "./showcase";
 import { usePrefersReducedMotion } from "./useReducedMotion";
 
@@ -26,8 +31,6 @@ const FLIGHT_MS = 900;
 const LANDED_OPACITY = 0.6;
 
 const fixtureLocate = hold.locate as unknown as LocateResult;
-const fixtureAerial = aerialFixture as AerialTileData;
-const fixtureRecord = recordFixture as PropertyRecord;
 
 interface ViewProps {
   caseId: string;
@@ -37,9 +40,11 @@ interface ViewProps {
   locate?: LocateResult;
   liveLocate?: boolean;
   roomLabels?: Record<string, string>;
-  aerial?: AerialTileData;
-  record?: PropertyRecord;
-  aerialImageUrl?: string;
+  /** The building the photo was matched to, and the building the listing claims. */
+  matchedAerial?: AerialSide;
+  claimedAerial?: AerialSide;
+  /** Fixture scenario: "copied" runs a fixture photo that was taken in a different building. */
+  demo?: "copied";
 }
 
 function TwinViewInner({
@@ -49,12 +54,15 @@ function TwinViewInner({
   locate: liveResult,
   liveLocate = false,
   roomLabels: roomLabelsProp,
-  aerial = fixtureAerial,
-  record = fixtureRecord,
-  aerialImageUrl,
+  matchedAerial = FIXTURE_MATCHED,
+  claimedAerial = FIXTURE_CLAIMED,
+  demo,
 }: ViewProps) {
-  const locate = chooseLocate(liveLocate, liveResult, fixtureLocate);
-  const poseIsLive = locate !== fixtureLocate;
+  const fixtureBase = demo === "copied" ? COPIED_LOCATE : fixtureLocate;
+  const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
+  // A photo placed in a different building than the claimed one: show both buildings.
+  const mismatch = hasDifferentHome(locate);
+  const poseIsLive = locate !== fixtureBase;
   // Fixture room names belong to the fixture pose only; a live result without labels shows none.
   const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
   const live = Boolean(sdkKey && modelId);
@@ -258,7 +266,12 @@ function TwinViewInner({
             </label>
             <p className="twin-status">{status}</p>
           </div>
-          <AerialTile tile={aerial} record={record} imageUrl={aerialImageUrl} />
+          <AerialProof
+            caseId={demo ? undefined : caseId}
+            matched={matchedAerial}
+            claimed={claimedAerial}
+            mismatch={mismatch}
+          />
         </aside>
       </div>
       <TraceStrip>
@@ -278,8 +291,14 @@ function locateKey(l: LocateResult): number {
 }
 
 export function TwinView(props: ViewProps) {
-  const locate = chooseLocate(props.liveLocate ?? false, props.locate, fixtureLocate);
+  const base = props.demo === "copied" ? COPIED_LOCATE : fixtureLocate;
+  const locate = chooseLocate(props.liveLocate ?? false, props.locate, base);
   return <TwinViewInner key={locateKey(locate)} {...props} />;
+}
+
+/** /case/:id/twin?demo=copied shows the two-building mismatch from fixtures. */
+export function demoFromSearch(search: string): "copied" | undefined {
+  return new URLSearchParams(search).get("demo") === "copied" ? "copied" : undefined;
 }
 
 export function TwinPage({ caseId }: { caseId: string }) {
@@ -289,6 +308,7 @@ export function TwinPage({ caseId }: { caseId: string }) {
       sdkKey={import.meta.env.VITE_MATTERPORT_SDK_KEY}
       modelId={import.meta.env.VITE_DEMO_MODEL_ID}
       liveLocate={import.meta.env.VITE_LIVE_LOCATE === "1"}
+      demo={demoFromSearch(window.location.search)}
     />
   );
 }
