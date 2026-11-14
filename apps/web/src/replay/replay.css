@@ -27,7 +27,7 @@
 
 .replay-head h1 {
   margin: 0 0 10px;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: clamp(1.8rem, 4vw, 3rem);
   line-height: 1.05;
 }
@@ -49,7 +49,8 @@
 
 .replay-legend {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--muted);
@@ -57,27 +58,117 @@
   letter-spacing: 0.06em;
 }
 
-.replay-legend span:last-child {
-  display: none;
-}
-
-/* Desktop: one row of columns. Each column is a reported step over what SNAPBACK showed. */
+/* Desktop: two columns. Left is what happened, right is what SNAPBACK showed at that step. */
 .timeline {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
-  align-items: stretch;
 }
 
 .tl-step {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 4px;
   animation: tl-in 480ms ease-out both;
+}
+
+.tl-label {
+  display: none;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The nav takes the first row of the shell; the page wraps under it. */
+.shell {
+  flex-wrap: wrap;
+}
+
+.site-nav {
+  flex: 0 0 100%;
+  display: flex;
+  justify-content: flex-end;
+  width: min(1320px, 100%);
+  margin-inline: auto;
+  padding-block: 12px 0;
+  white-space: nowrap;
+}
+
+.site-nav {
+  align-items: center;
+  gap: 16px;
+}
+
+.site-nav a {
+  font-weight: 700;
+}
+
+.site-nav .site-nav-case {
+  padding: 8px 14px;
+  background: var(--blue);
+  color: var(--on-act);
+  text-decoration: none;
+}
+
+.replay-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.replay-list li {
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.replay-list h2 {
+  margin: 4px 0;
+  font-size: 1.2rem;
+}
+
+.replay-pattern {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.replay-cant {
+  padding: 16px;
+  background: var(--amber-soft);
+}
+
+.replay-cant h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.replay-cant p {
+  margin: 0;
+}
+
+.replay-run-btn {
+  padding: 12px 20px;
+  background: var(--blue);
+  color: var(--on-act);
+  font: inherit;
+  font-weight: 700;
+  border: 0;
+  cursor: pointer;
+}
+
+.replay-run-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tl-real,
@@ -127,7 +218,7 @@
   gap: 8px;
   padding: 16px;
   background: var(--coral);
-  color: #fff;
+  color: var(--on-act);
   animation:
     tl-in 480ms ease-out both,
     stop-pulse 2.4s ease-in-out 600ms 3;
@@ -145,7 +236,7 @@
 }
 
 .stop-words {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 1.15rem;
   line-height: 1.2;
 }
@@ -182,13 +273,19 @@
 /* Phone and narrow: stack vertically, the stop marker stays between the steps. */
 @media (max-width: 800px) {
   .timeline {
-    grid-auto-flow: row;
-    grid-auto-columns: auto;
     gap: 12px;
   }
 
   .tl-step {
-    grid-template-rows: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replay-legend {
+    display: none;
+  }
+
+  .tl-label {
+    display: block;
   }
 }
 
