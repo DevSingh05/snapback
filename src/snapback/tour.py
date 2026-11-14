@@ -129,6 +129,7 @@ class WalkCoverage(BaseModel):
     placed: int = 0
     elsewhere: int = 0
     unplaced: int = 0
+    other_scan: int = 0  # placed in this home, but in another scan of the building: not mapped
     plan_mismatch: bool = False  # the scan's floor plan differs from the ad's: no room counts
     line: str | None = None
 
@@ -683,7 +684,7 @@ def _plural_photos(n: int) -> str:
 
 
 def coverage_line(
-    *, counted: str, total: int, with_photo: int, unplaced: int, elsewhere: int
+    *, counted: str, total: int, with_photo: int, unplaced: int, elsewhere: int, other_scan: int = 0
 ) -> str:
     base = (
         f"The ad showed {with_photo} of the {total} rooms in this scan."
@@ -695,6 +696,12 @@ def coverage_line(
     if elsewhere:
         was = "was" if elsewhere == 1 else "were"
         base += f" {_plural_photos(elsewhere)} {was} taken in a different building and not counted."
+    if other_scan:
+        was = "was" if other_scan == 1 else "were"
+        base += (
+            f" {_plural_photos(other_scan)} {was} placed in this home, in another scan of this "
+            "building, and not shown in a room here."
+        )
     return base
 
 
@@ -765,6 +772,7 @@ def map_locate(
     scan_plan: str | None = None,
     ad_plan: str | None = None,
     alias_order: dict[str, int] | None = None,
+    model_id: str | None = None,
 ) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
     """Put the ad's placed photos on the stops that hold their sweep, set each stop's `ad_view`,
     and count coverage. Only `located_in_claimed` photos ever enter a room: a photo taken in
@@ -773,11 +781,21 @@ def map_locate(
     `ad_view` is "placed" for a stop with a photo; "none_placed" for one without only when every
     ad photo was placed in this home (so "the ad showed no photo of this room" is true); else
     "unknown". When an apartment scan's floor plan differs from the ad's, rooms are not counted.
+
+    `model_id` is the scan this walk shows. A building can have several scans, each in its own
+    coordinate frame, so with it set only photos whose own scan (`matched_model_id`, else
+    `model_id`) is that scan are put on stops. A photo placed in a sibling scan, or whose scan is
+    not named, is counted as "placed in this home, in another scan" and never mapped by position.
     """
     status = {p.photo_id: p.status for p in locate.photos}
-    placed_ids = [p.photo_id for p in locate.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
+    claimed = [p for p in locate.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
+    on_this_scan = [
+        p for p in claimed if model_id is None or (p.matched_model_id or p.model_id) == model_id
+    ]
+    placed_ids = [p.photo_id for p in on_this_scan]
+    other_scan = len(claimed) - len(placed_ids)
     elsewhere = sum(s is LocateStatus.LOCATED_ELSEWHERE for s in status.values())
-    unplaced = len(status) - len(placed_ids) - elsewhere
+    unplaced = len(status) - len(claimed) - elsewhere
 
     order_of = alias_order or {p.photo_id: i for i, p in enumerate(locate.photos, start=1)}
     by_stop: dict[str, list[TourPhoto]] = {}
@@ -832,6 +850,12 @@ def map_locate(
             f"This scan is a {_bed_word(scan_plan)} floor plan and the ad is for a "
             f"{_bed_word(ad_plan)}, so we show the scan without counting rooms."
         )
+    elif not placed_ids and other_scan:
+        counted = "none"
+        line = (
+            "The ad's photos were placed in another scan of this building, "
+            "so we show this scan without counting rooms."
+        )
     elif not placed_ids:
         counted = "none"
         line = (
@@ -845,6 +869,7 @@ def map_locate(
             with_photo=with_photo,
             unplaced=unplaced,
             elsewhere=elsewhere,
+            other_scan=other_scan,
         )
     coverage = WalkCoverage(
         counted=counted,  # type: ignore[arg-type]
@@ -853,6 +878,7 @@ def map_locate(
         placed=len(placed_ids),
         elsewhere=elsewhere,
         unplaced=unplaced,
+        other_scan=other_scan,
         plan_mismatch=mismatch,
         line=line,
     )
