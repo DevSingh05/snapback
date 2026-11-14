@@ -570,7 +570,7 @@
 .tour-head {
   padding-block: var(--sp-2);
 }
-.tour-head > .mono:first-of-type {
+.tour-head > .wordmark + .mono {
   display: none;
 }
 .tour-head::before {
