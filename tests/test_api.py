@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from snapback.api.main import app, create_app
+from snapback.card import strings
 from snapback.contracts import (
     Card,
     CreateCaseRequest,
@@ -307,6 +308,21 @@ def test_text_written_for_an_ai_system_is_noticed_and_changes_nothing(client):
     injected_card = finish(client, injected)
     assert injected_card.state is plain_card.state
     assert injected_card.rows == plain_card.rows
+
+
+def test_a_megabyte_of_text_is_answered_quickly_and_the_trace_says_it_was_cut(client):
+    import time
+
+    started = time.perf_counter()
+    made = client.post("/cases", data={"text": "a" * 1_000_000})
+    took = time.perf_counter() - started
+    assert made.status_code == 201
+    assert took < 2.0, f"creating a case from 1 MB of text took {took:.2f} s"
+
+    first = client.app.state.store.get(made.json()["case_id"]).events()[0]
+    assert first.kind is TraceKind.STATUS
+    assert first.reason == strings.text("trace.intake.truncated")
+    assert "20,000" in first.reason  # the number in the wording is the cap
 
 
 def test_a_screenshot_is_read_as_part_of_the_listing(client):

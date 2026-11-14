@@ -261,6 +261,8 @@ class CaseStore:
                 listed_rent=listing.listed_rent,
             )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
+            if listing.truncated:
+                session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner)
