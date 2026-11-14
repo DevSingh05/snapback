@@ -468,7 +468,7 @@ export interface FinderSignal {
 }
 
 export interface FinderMessageRequest {
-  text?: string | null; // read by code into signals; a model never sees it
+  text?: string | null; // up to 500; code reads it into signals, the model sees it cleaned
   signals?: FinderSignal[];
 }
 
@@ -493,6 +493,10 @@ export interface FinderPick {
   why: string; // one sentence from the search sub-agent
   chosen_by: ChosenBy;
   as_of: string;
+  // The record's facts behind the line, so a pass or pick can go back as a signal.
+  rent_from?: number | null;
+  walkup?: boolean | null;
+  parking?: boolean | null;
 }
 
 export interface FinderNote {

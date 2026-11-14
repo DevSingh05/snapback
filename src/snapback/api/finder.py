@@ -97,8 +97,9 @@ def make_router(
         authorization: Annotated[str | None, Header()] = None,
         x_finder_token: Annotated[str | None, Header()] = None,
     ) -> FinderReply:
-        """The renter acted or said something. Their text is read by code into signals; a model
-        never sees it. Returns the reply, the new proposals (nothing applied) and the picks."""
+        """The renter acted or said something. Code reads their text into signals; the main agent
+        sees only the cleaned words (`clean_words`). Returns the reply, the new proposals (nothing
+        applied) and the picks."""
         session = find(request, session_id, authorization, x_finder_token)
         address = request.client.host if request.client else "unknown"
         if not limit.allow(f"msg:{address}"):
@@ -110,7 +111,7 @@ def make_router(
                 "Try again tomorrow.",
             )
         try:
-            return run_turn(session, [*body.signals, *read_text(body.text)])
+            return run_turn(session, [*body.signals, *read_text(body.text)], body.text)
         except FinderBusy as busy:
             if session.model is not None:
                 model_turns.release(address)  # no model ran, so it costs nothing

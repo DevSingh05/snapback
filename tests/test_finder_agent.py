@@ -246,3 +246,40 @@ def test_model_turns_have_a_daily_cap_per_address(tmp_path):
     assert c.post(url, headers=auth, json={}).status_code == 200
     capped = c.post(url, headers=auth, json={})
     assert capped.status_code == 429 and "today" in capped.json()["detail"]
+
+
+def test_the_renters_cleaned_words_reach_the_model_as_words_and_no_contact_does(tmp_path):
+    """The model reads what the renter wrote, fenced, but never a phone, email, link or street
+    address. A mutant `clean_words` that lets one through fails here."""
+    m = crew(prefs=ALL_FOUR)
+    s = new_session(tmp_path, m)
+    text = (
+        f"no walk-ups, I want big windows near the park. Text {BAIT_PHONE}, write "
+        f"landlord.fixture@example.com, apply at https://fixture-rentals.example.net/a, "
+        f"I liked {BAIT_ADDRESS}"
+    )
+    reply = run_turn(s, [*SCRIPT, *finder.read_text(text)], text)
+    blob = "\n".join(m.seen)
+    assert "big windows near the park" in blob and "<renter_words>\n" in blob
+    for bait in (
+        BAIT_PHONE,
+        "landlord.fixture@example.com",
+        "fixture-rentals.example.net",
+        BAIT_ADDRESS,
+        "Fixture Boulevard",
+        "1450",
+        "fx-fnd",
+    ):
+        assert bait not in blob
+    assert reply.reply_by == "model"
+    # the words change nothing by themselves: code still decides what applies
+    assert s.applied == CasePreferences()
+    log = (tmp_path / "log.jsonl").read_text()
+    assert "big windows" not in log and BAIT_PHONE not in log
+
+
+def test_without_words_the_model_gets_only_the_plan_order(tmp_path):
+    m = crew(prefs=ALL_FOUR)
+    s = new_session(tmp_path, m)
+    run_turn(s, SCRIPT)
+    assert "<renter_words>\n" not in "\n".join(m.seen)
