@@ -15,8 +15,8 @@ import bedroomBright from "../assets/stories/bedroom-bright.webp";
 import citySidewalk from "../assets/stories/city-sidewalk.webp";
 import citySkyline from "../assets/stories/city-skyline.webp";
 import cityStreet from "../assets/stories/city-street.webp";
-import kitchenIsland from "../assets/stories/kitchen-island.webp";
-import kitchenWhite from "../assets/stories/kitchen-white.webp";
+import kitchenIsland from "../assets/stories/counter-island.webp";
+import kitchenWhite from "../assets/stories/counter-white.webp";
 import livingBalcony from "../assets/stories/living-balcony.webp";
 import livingRoom from "../assets/stories/living-room.webp";
 import livingSectional from "../assets/stories/living-sectional.webp";
@@ -253,6 +253,39 @@ export const STUDENT_PICKS: FinderPick[] = [
   },
 ];
 
+export const SASCHA_PICKS: FinderPick[] = [
+  {
+    pid: "sa-pick-1",
+    rank: 1,
+    kind: "apartment",
+    has_scan: true,
+    line: "1 bed / 1 bath, from $1,240/mo, Midtown, leasing office on record",
+    why: "Closest to what the ad promised, and you can walk it and call its office.",
+    chosen_by: "model",
+    as_of: AS_OF,
+  },
+  {
+    pid: "sa-pick-2",
+    rank: 2,
+    kind: "apartment",
+    has_scan: true,
+    line: "1 bed / 1 bath, from $1,195/mo, 0.8 mi from Midtown",
+    why: "Nearest in price, with a 3D scan and an office on record.",
+    chosen_by: "model",
+    as_of: AS_OF,
+  },
+  {
+    pid: "sa-pick-3",
+    rank: 3,
+    kind: "apartment",
+    has_scan: false,
+    line: "1 bed / 1 bath, from $1,280/mo, Midtown",
+    why: "Fits the area; no scan yet, so visit before you sign.",
+    chosen_by: "policy",
+    as_of: AS_OF,
+  },
+];
+
 // --- Browsing: the Finder keeps a preference ----------------------------------------------------
 
 export const BROWSE_WORDS = "A 1 bed under $1,400 near Montrose. No walk-ups please.";
@@ -306,26 +339,32 @@ export const BROWSE_PICKS: FinderPick[] = [
 ];
 
 /** Built the way search.py draft_tour_request builds it, to a sample office. */
-export const BROWSE_DRAFT: TourDraft = {
-  property_id: "br-pick-1",
-  addressee: "Sample Leasing Office (made by the team)",
-  text: [
-    "To: Sample Leasing Office (made by the team)",
-    "",
-    "Hello,",
-    "",
-    "I am a renter interested in the 1 bed / 1 bath floor plan, listed at from $1,365/mo. I would like to arrange a tour.",
-    "",
-    "Before I apply, could you tell me:",
-    "1. The application fee, and any other amount due when I apply.",
-    "2. Whether a place like this is available.",
-    "",
-    "Please reply with times that work for a tour. I have not paid anything, and I will not pay before I have seen the place.",
-  ].join("\n"),
-  status: "draft",
-  sent: false,
-  source: "fixture",
-};
+function tourDraft(pid: string, plan: string, price: string): TourDraft {
+  return {
+    property_id: pid,
+    addressee: "Sample Leasing Office (made by the team)",
+    text: [
+      "To: Sample Leasing Office (made by the team)",
+      "",
+      "Hello,",
+      "",
+      `I am a renter interested in the ${plan} floor plan, listed at from ${price}. I would like to arrange a tour.`,
+      "",
+      "Before I apply, could you tell me:",
+      "1. The application fee, and any other amount due when I apply.",
+      "2. Whether a place like this is available.",
+      "",
+      "Please reply with times that work for a tour. I have not paid anything, and I will not pay before I have seen the place.",
+    ].join("\n"),
+    status: "draft",
+    sent: false,
+    source: "fixture",
+  };
+}
+
+export const BROWSE_DRAFT = tourDraft("br-pick-1", "1 bed / 1 bath", "$1,365/mo");
+export const STUDENT_DRAFT = tourDraft("st-pick-1", "studio", "$1,020/mo");
+export const SASCHA_DRAFT = tourDraft("sa-pick-1", "1 bed / 1 bath", "$1,240/mo");
 
 // --- The walks ---------------------------------------------------------------------------------
 

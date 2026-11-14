@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { matchRoute } from "../App";
 import { OneBox } from "../home/OneBox";
-import { playsFor, STORIES } from "./stories";
+import { PATH_STEPS } from "../ui";
+import { chaptersOf, playsFor, STORIES } from "./stories";
 import { StoriesPage } from "./StoriesPage";
 
 const beatOn = () => document.querySelector(".st-stage")!.getAttribute("data-beat");
@@ -11,6 +12,12 @@ const play = () => screen.getByTestId("st-play");
 const forward = () => screen.getByRole("button", { name: "Forward one step" });
 const back = () => screen.getByRole("button", { name: "Back one step" });
 const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+const chapter = (name: string) => screen.getByRole("button", { name });
+/** Steps forward to the beat with this key. */
+function goTo(key: string) {
+  for (let i = 0; i < 12 && beatOn() !== key; i++) fireEvent.click(forward());
+  expect(beatOn()).toBe(key);
+}
 
 function open(slug: string, reduced: boolean) {
   window.history.replaceState(null, "", `/stories?story=${slug}`);
@@ -81,8 +88,13 @@ describe("the Stories page", () => {
     expect(play()).toHaveAccessibleName("Pause");
     fireEvent.keyDown(window, { key: " " });
     expect(play()).toHaveAccessibleName("Play");
-    fireEvent.click(screen.getByRole("button", { name: "Beat 4: Verdict" }));
-    expect(beatOn()).toBe("verdict");
+    fireEvent.click(chapter("Safer places"));
+    expect(beatOn()).toBe("places");
+    expect(chapter("Safer places")).toHaveAttribute("aria-current", "step");
+    fireEvent.click(chapter("Check"));
+    expect(beatOn()).toBe("ad");
+    fireEvent.click(chapter("Tour request"));
+    expect(beatOn()).toBe("draft");
     fireEvent.keyDown(window, { key: "r" });
     expect(beatOn()).toBe("ad");
     expect(play()).toHaveAccessibleName("Pause");
@@ -133,33 +145,92 @@ describe("the Stories page", () => {
 
   it("shows the app's own screens: the verdict, the voice box, the walk and the drafts", () => {
     open("sascha", true);
-    fireEvent.click(screen.getByRole("button", { name: "Beat 4: Verdict" }));
+    goTo("verdict");
     expect(screen.getByTestId("ob-verdict")).toHaveTextContent("Hold off for now");
     expect(screen.getByTestId("ob-verdict")).toHaveTextContent("Zelle before a viewing. Red flag.");
-    fireEvent.click(screen.getByRole("button", { name: "Beat 5: Walk it" }));
-    expect(screen.getByTestId("walk-player")).toBeInTheDocument();
-    expect(screen.getAllByText(/Sample photo/).length).toBeGreaterThan(1);
-    fireEvent.click(screen.getByRole("button", { name: "Beat 6: Proof" }));
+    goTo("proof");
     expect((screen.getByLabelText("Message to send") as HTMLTextAreaElement).value).toContain(
       "code K7P4",
     );
+    goTo("walk");
+    expect(screen.getByTestId("walk-player")).toBeInTheDocument();
+    expect(screen.getByTestId("st-walk")).toHaveTextContent("SAMPLE PHOTO");
+    goTo("places");
+    expect(screen.getAllByRole("link", { name: "Walk it first" }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: /master's student/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Beat 2: Ask" }));
+    goTo("voice");
     expect(screen.getByTestId("voice-listening")).toHaveTextContent("Is this landlord real?");
-    fireEvent.click(screen.getByRole("button", { name: "Beat 5: Safer places" }));
+    goTo("places");
     expect(screen.getAllByRole("link", { name: "Walk it first" }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: /just looking/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Beat 5: Tour request" }));
+    goTo("draft");
     expect((screen.getByLabelText("Tour request draft") as HTMLTextAreaElement).value).toContain(
       "I will not pay before I have seen the place",
     );
+  });
+
+  it("shows the path as chapters, timed from the beats in the script", () => {
+    for (const story of STORIES) {
+      const chapters = chaptersOf(story);
+      for (const c of chapters) expect(PATH_STEPS).toContain(c.label);
+      expect(new Set(chapters.map((c) => c.id)).size).toBe(chapters.length);
+      expect(Math.round(chapters.reduce((t, c) => t + c.seconds, 0))).toBe(playsFor(story));
+    }
+    // Sascha and the student go through all four steps.
+    expect(chaptersOf(STORIES[0]!).map((c) => c.label)).toEqual([...PATH_STEPS]);
+    expect(
+      chaptersOf(STORIES[1]!)
+        .map((c) => c.label)
+        .sort(),
+    ).toEqual([...PATH_STEPS].sort());
+    open("sascha", true);
+    expect(
+      within(screen.getByRole("list", { name: /the path/i })).getAllByRole("button"),
+    ).toHaveLength(4);
+    // On the end card every step is done: no chapter is the current one.
+    goTo("end");
+    expect(document.querySelector(".st-chapters [aria-current]")).toBeNull();
+  });
+
+  it("every photo is stamped, and the page has one accent button at the end", () => {
+    open("sascha", true);
+    for (const photo of document.querySelectorAll(".ui-photo"))
+      expect(photo).toHaveAttribute("data-stamp", "sample");
+    expect(document.querySelectorAll(".st-pick .ui-photo")).toHaveLength(3);
+    // The shell lays its bar over the hero photograph when the page marks it.
+    expect(document.querySelector(".st-hero")).toHaveAttribute("data-bar", "photo");
+    goTo("end");
+    expect(document.querySelectorAll(".st-btn-primary")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Check your own ad" })).toHaveAttribute("href", "/");
+    expect(document.querySelector(".st-end .ui-photo")).toHaveAttribute("data-stamp", "sample");
+  });
+
+  it("says only what the voice box does: hold the mic and talk in the browser", () => {
+    open("student", true);
+    goTo("voice");
+    expect(screen.getByTestId("st-voice")).toHaveTextContent(
+      "Hold the mic and talk, right in the browser.",
+    );
+    expect(document.body.textContent).not.toMatch(/any phone|time zone/i);
+  });
+
+  it("the walk's own Play and Pause follows the story's", () => {
+    open("sascha", false);
+    goTo("walk");
+    const walkPlay = () => screen.getByTestId("wp-play");
+    expect(walkPlay()).toHaveAccessibleName("Pause");
+    fireEvent.click(play());
+    expect(play()).toHaveAccessibleName("Play");
+    expect(walkPlay()).toHaveAccessibleName("Play");
+    fireEvent.click(play());
+    expect(walkPlay()).toHaveAccessibleName("Pause");
   });
 
   it("says how long each story plays, read from its script", () => {
     expect(STORIES.map(playsFor)).toEqual(
       STORIES.map((s) => Math.round(s.beats.slice(0, -1).reduce((t, b) => t + b.ms, 0) / 1000)),
     );
-    expect(playsFor(STORIES[0]!)).toBe(39);
+    expect(playsFor(STORIES[0]!)).toBe(48);
   });
 
   it("uses only 555 phone numbers and never calls anyone a scammer", () => {

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { SourceChip } from "../components/SourceChip";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
+import { ChapterStrip, Photo } from "../ui";
 import { PHOTOS } from "./data";
 import { useStoryPlayer } from "./player";
 import { EndScene } from "./scenes";
-import { playsFor, STORIES, storyOf, type Story } from "./stories";
+import { chapterAt, chaptersOf, playsFor, STORIES, storyOf, type Story } from "./stories";
 import "./stories.css";
 
 // /stories: three renters' stories, each played out on the real app with sample data. Made for
@@ -15,6 +16,8 @@ import "./stories.css";
 const typing = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   Boolean(el.closest("input, textarea, select, button, a, [role=tab]") || el.isContentEditable);
+
+const two = (n: number) => String(n).padStart(2, "0");
 
 export function StoriesPage({ reduced: forced }: { reduced?: boolean } = {}) {
   const prefers = usePrefersReducedMotion();
@@ -39,14 +42,17 @@ export function StoriesPage({ reduced: forced }: { reduced?: boolean } = {}) {
 
   return (
     <div className="st" data-testid="stories">
-      <section className="st-hero" aria-labelledby="st-title">
-        <img
-          className="st-hero-img"
+      {/* data-bar="photo": the shell lays its bar over this photograph (design ticket 1). */}
+      <section className="st-hero" data-bar="photo" aria-labelledby="st-title">
+        <Photo
+          className="st-hero-photo"
           src={PHOTOS.cityStreet}
           alt="A street between tall buildings"
+          stamp="sample"
+          hero
+          eager
         />
-        <span className="st-stamp">Sample photo</span>
-        <div className="st-hero-text">
+        <div className="st-hero-in ui-on-matte">
           <h1 id="st-title" className="st-title">
             Three ways this goes.
           </h1>
@@ -72,10 +78,14 @@ export function StoriesPage({ reduced: forced }: { reduced?: boolean } = {}) {
             className="st-pick"
             onClick={() => pick(s, true)}
           >
-            <span className="st-pick-n mono">{String(i + 1).padStart(2, "0")}</span>
-            <span className="st-pick-photo">
-              <img src={s.backdrop} alt="" />
-            </span>
+            <span className="st-pick-n ui-mono">{two(i + 1)}</span>
+            <Photo
+              className="st-pick-photo"
+              src={s.tile.src}
+              alt={s.tile.alt}
+              stamp="sample"
+              eager
+            />
             <span className="st-pick-text">
               <span className="st-pick-name">{s.name}</span>
               <span className="st-pick-line">{s.imagine}</span>
@@ -89,14 +99,15 @@ export function StoriesPage({ reduced: forced }: { reduced?: boolean } = {}) {
         <StoryStage
           key={story.slug}
           story={story}
+          number={at + 1}
           reduced={reduced}
           next={after ? { label: after.name, onGo: () => pick(after) } : null}
         />
       </div>
 
       <p className="st-credit">
-        Photos: Unsplash, under the Unsplash License, credited in docs/CREDITS.md. Each one stands
-        in for a listing photo or a scan, and says so.
+        Photos: Unsplash, under the Unsplash License, credited in docs/CREDITS.md. Each one is a
+        sample, and says so.
       </p>
     </div>
   );
@@ -104,14 +115,17 @@ export function StoriesPage({ reduced: forced }: { reduced?: boolean } = {}) {
 
 function StoryStage({
   story,
+  number,
   reduced,
   next,
 }: {
   story: Story;
+  number: number;
   reduced: boolean;
   next: { label: string; onGo: () => void } | null;
 }) {
   const durations = useMemo(() => story.beats.map((b) => b.ms), [story]);
+  const chapters = useMemo(() => chaptersOf(story), [story]);
   const player = useStoryPlayer(durations, reduced);
   const beat = story.beats[player.index]!;
   const total = story.beats.length;
@@ -134,6 +148,7 @@ function StoryStage({
 
   const ctx = { playing: player.playing, reduced, ms: beat.ms };
   const isEnd = beat.key === "end";
+  const isWalk = beat.key === "walk";
   const playLabel = player.ended ? "Play again" : player.playing ? "Pause" : "Play";
 
   return (
@@ -147,31 +162,34 @@ function StoryStage({
       data-playing={player.playing || undefined}
       data-motion={reduced ? "reduced" : "full"}
     >
-      <div className="st-frame" data-walk={beat.key === "walk" || undefined}>
-        <img className="st-backdrop" src={story.backdrop} alt="" />
-        <div className="st-scrim" aria-hidden="true" />
-        <span className="st-stamp">Sample photo</span>
-        {isEnd ? (
-          <EndScene line={story.did} onAgain={player.restart} next={next} />
-        ) : (
-          <div
-            className="st-app"
-            key={`${beat.key}-${player.epoch}`}
-            data-testid={`st-beat-${beat.key}`}
-            data-wide={beat.key === "walk" || undefined}
-          >
-            {beat.view(ctx)}
-          </div>
-        )}
-      </div>
+      <div className="st-stage-in">
+        <header className="st-open ui-on-matte">
+          <p className="st-open-n ui-mono">Story {two(number)}</p>
+          <h2 className="st-imagine">{story.imagine}</h2>
+        </header>
 
-      <div className="st-caption">
-        <p className="st-count mono" aria-hidden="true">
-          {String(player.index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")} ·{" "}
-          {beat.label}
-        </p>
-        <div className="st-words">
-          <p className="st-imagine">{story.imagine}</p>
+        <div className="st-frame" data-testid="st-frame">
+          {isEnd ? (
+            <EndScene line={story.did} photo={story.tile} onAgain={player.restart} next={next} />
+          ) : isWalk ? (
+            <div
+              className="st-app st-app-wide"
+              key={`${beat.key}-${player.epoch}`}
+              data-testid={`st-beat-${beat.key}`}
+            >
+              {beat.view(ctx)}
+            </div>
+          ) : (
+            <Fit key={`${beat.key}-${player.epoch}`} testId={`st-beat-${beat.key}`}>
+              {beat.view(ctx)}
+            </Fit>
+          )}
+        </div>
+
+        <div className="st-caption ui-on-matte">
+          <p className="st-count ui-mono" aria-hidden="true">
+            {two(player.index + 1)} / {two(total)} · {beat.label}
+          </p>
           <p
             className="st-line"
             key={`${beat.key}-${player.epoch}`}
@@ -181,71 +199,110 @@ function StoryStage({
             {beat.say}
           </p>
         </div>
-      </div>
 
-      <div className="st-bar" role="group" aria-label="Story player">
-        <div className="st-ctrls">
-          <button
-            type="button"
-            className="st-ctl st-play"
-            onClick={player.toggle}
-            aria-label={playLabel}
-            data-testid="st-play"
-          >
-            <Icon name={player.playing ? "pause" : "play"} />
-          </button>
-          <button
-            type="button"
-            className="st-ctl"
-            onClick={player.previous}
-            disabled={player.index === 0}
-            aria-label="Back one step"
-          >
-            <Icon name="back" />
-          </button>
-          <button
-            type="button"
-            className="st-ctl"
-            onClick={player.next}
-            disabled={player.ended}
-            aria-label="Forward one step"
-          >
-            <Icon name="next" />
-          </button>
-          <button type="button" className="st-ctl" onClick={player.restart} aria-label="Restart">
-            <Icon name="restart" />
-          </button>
-        </div>
-        <div className="st-segs">
-          {story.beats.map((b, i) => (
+        <div className="st-bar ui-on-matte" role="group" aria-label="Story player">
+          <div className="st-ctrls">
             <button
-              key={b.key}
               type="button"
-              className="st-seg"
-              data-state={i < player.index ? "done" : i === player.index ? "now" : "next"}
-              aria-current={i === player.index ? "step" : undefined}
-              aria-label={`Beat ${i + 1}: ${b.label}`}
-              onClick={() => player.go(i)}
+              className="st-ctl st-play"
+              onClick={player.toggle}
+              aria-label={playLabel}
+              data-testid="st-play"
             >
-              <span className="st-seg-track">
-                <span
-                  className="st-seg-fill"
-                  key={`${i}-${player.index}-${player.epoch}`}
-                  style={i === player.index ? { animationDuration: `${b.ms}ms` } : undefined}
-                />
-              </span>
-              <span className="st-seg-name">
-                <span className="mono">{String(i + 1).padStart(2, "0")}</span> {b.label}
-              </span>
+              <Icon name={player.playing ? "pause" : "play"} />
             </button>
-          ))}
+            <button
+              type="button"
+              className="st-ctl"
+              onClick={player.previous}
+              disabled={player.index === 0}
+              aria-label="Back one step"
+            >
+              <Icon name="back" />
+            </button>
+            <button
+              type="button"
+              className="st-ctl"
+              onClick={player.next}
+              disabled={player.ended}
+              aria-label="Forward one step"
+            >
+              <Icon name="next" />
+            </button>
+            <button type="button" className="st-ctl" onClick={player.restart} aria-label="Restart">
+              <Icon name="restart" />
+            </button>
+          </div>
+          <ChapterStrip
+            className="st-chapters"
+            chapters={chapters}
+            current={chapterAt(story, player.index)}
+            onSelect={(id) => player.go(chapters.find((c) => c.id === id)?.first ?? 0)}
+            onMatte
+            label="The path, step by step"
+          />
+          <p className="st-keys ui-mono">
+            {reduced ? "Reduced motion: press play or step. " : ""}Space play or pause · arrows step
+            · R restart
+          </p>
         </div>
-        <p className="st-keys mono">
-          {reduced ? "Reduced motion: press play or step. " : ""}Space play or pause · arrows step ·
-          R restart
-        </p>
       </div>
     </section>
+  );
+}
+
+// The app's own screen, laid out at a width it is at home in and then scaled as a whole until
+// all of it sits inside the frame. Nothing is cropped and nothing scrolls. Of the widths tried,
+// the one that ends up largest on screen wins, so a long card is laid out wider and a short one
+// narrower.
+const WIDE = [560, 680, 800, 920, 1040];
+const TALL = [340, 380, 430, 480];
+const MAX_SCALE = 1.15;
+
+function Fit({ children, testId }: { children: ReactNode; testId: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const page = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const b = box.current;
+    const el = page.current;
+    if (!b || !el) return;
+    const fit = () => {
+      const w = b.clientWidth;
+      const h = b.clientHeight;
+      if (!w || !h) return;
+      let best = { width: 0, scale: 0 };
+      const drafts = el.querySelectorAll("textarea");
+      for (const width of w < h ? TALL : WIDE) {
+        el.style.width = `${width}px`;
+        // A drafted message shows whole, not through a scrolling box.
+        for (const t of drafts) {
+          t.style.height = "auto";
+          if (t.scrollHeight > t.clientHeight) t.style.height = `${t.scrollHeight + 2}px`;
+        }
+        const scale = Math.min(w / width, h / Math.max(1, el.offsetHeight), MAX_SCALE);
+        if (scale > best.scale) best = { width, scale };
+      }
+      el.style.width = `${best.width}px`;
+      for (const t of drafts) {
+        t.style.height = "auto";
+        if (t.scrollHeight > t.clientHeight) t.style.height = `${t.scrollHeight + 2}px`;
+      }
+      el.style.transform = `translate(-50%, -50%) scale(${best.scale})`;
+    };
+    fit();
+    if (typeof ResizeObserver !== "function") return;
+    // The frame resizes with the window; the screen grows as a beat types or counts up.
+    const seen = new ResizeObserver(fit);
+    seen.observe(b);
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, []);
+  return (
+    <div ref={box} className="st-fit">
+      <div ref={page} className="st-app" data-testid={testId}>
+        {children}
+      </div>
+    </div>
   );
 }
 

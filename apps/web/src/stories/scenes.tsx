@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { SourceChip } from "../components/SourceChip";
 import type { TraceEvent } from "../contracts";
 import { ChallengeDraft, CheckSteps, Composer, ThreadItem } from "../home/OneBox";
 import { TourDraftView } from "../search/PlacesStrip";
 import { TraceLine } from "../trace";
+import { Photo } from "../ui";
 import { frameClock, WalkPlayer, type Clock } from "../walk/player";
 import type { Ad, WalkSet } from "./data";
 import { useCount, useTyped } from "./player";
@@ -22,23 +23,16 @@ export interface SceneCtx {
 const noop = () => undefined;
 const asyncNoop = async () => undefined;
 
-/** A real photo standing in for a listing photo: always says so. */
-export function Stamp({ children = "Sample photo" }: { children?: ReactNode }) {
-  return <span className="st-stamp mono">{children}</span>;
-}
-
 // --- The ad, as the renter saw it. A plain listing layout, no platform's branding. -----------------
 
 export function AdScene({ ad }: { ad: Ad }) {
   return (
     <article className="st-ad" data-testid="st-ad" aria-label={`The ad: ${ad.title}`}>
-      <figure className="st-ad-photo">
-        <img src={ad.photo} alt={ad.photoAlt} />
-        <Stamp />
-        <span className="st-ad-count mono">1 / {ad.photos}</span>
-      </figure>
+      <Photo className="st-ad-photo" src={ad.photo} alt={ad.photoAlt} stamp="sample" eager>
+        <span className="st-ad-count ui-mono">1 / {ad.photos}</span>
+      </Photo>
       <div className="st-ad-body">
-        <p className="st-ad-where mono">{ad.where}</p>
+        <p className="st-ad-where ui-mono">{ad.where}</p>
         <p className="st-ad-price">{ad.price}</p>
         <h3 className="st-ad-title">{ad.title}</h3>
         <p className="st-ad-place">{ad.place}</p>
@@ -136,7 +130,7 @@ export function VoiceScene({ heard, ctx }: { heard: string; ctx: SceneCtx }) {
       />
       <p className="st-voice-note">
         <span className="st-mic-dot" aria-hidden="true" />
-        Hold the mic and talk. It works from any phone, in any time zone.
+        Hold the mic and talk, right in the browser.
       </p>
     </div>
   );
@@ -154,12 +148,6 @@ export function ThreadScene({
   testId: string;
 }) {
   const [items] = useState(() => entries.map(withId));
-  const end = useRef<HTMLDivElement>(null);
-  // Like the app: the newest message sits at the bottom of the view.
-  useLayoutEffect(() => {
-    const box = end.current?.closest(".st-app");
-    if (box) box.scrollTop = box.scrollHeight;
-  });
   return (
     <div className="ob st-ob" data-testid={testId}>
       <ol className="ob-thread" aria-label="Conversation">
@@ -178,7 +166,6 @@ export function ThreadScene({
         ))}
         {children}
       </ol>
-      <div ref={end} />
     </div>
   );
 }
@@ -284,10 +271,26 @@ export function WalkScene({ set, ctx }: { set: WalkSet; ctx: SceneCtx }) {
     playing.current = ctx.playing;
   }, [ctx.playing]);
   const [clock] = useState(() => storyClock(playing));
+  // Fixed on arrival: the walk player tears its timeline down when this changes.
+  const [autoStart] = useState(ctx.playing && !ctx.reduced);
+  // The walk's own Play and Pause follows the story's: one press of its button, never on arrival
+  // (it starts itself then).
+  const wrap = useRef<HTMLDivElement>(null);
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (!arrived.current) {
+      arrived.current = true;
+      return;
+    }
+    const button = wrap.current?.querySelector<HTMLButtonElement>('[data-testid="wp-play"]');
+    const shows = button?.getAttribute("aria-label");
+    if ((!ctx.playing && shows === "Pause") || (ctx.playing && !ctx.reduced && shows === "Play"))
+      button?.click();
+  }, [ctx.playing, ctx.reduced]);
   const stop = set.stops[index]!;
   const view = set.views[stop.key] ?? set.views.arrive!;
   return (
-    <div className="st-walk-wrap" data-testid="st-walk">
+    <div ref={wrap} className="st-walk-wrap" data-testid="st-walk">
       <div className="tour-stage st-walk">
         <div className="sv" data-main="real">
           <div className="sv-pane" data-role="main">
@@ -299,13 +302,15 @@ export function WalkScene({ set, ctx }: { set: WalkSet; ctx: SceneCtx }) {
             />
           </div>
         </div>
-        <Stamp>Sample photo · the real scan plays here on a live check</Stamp>
+        <span className="ui-stamp ui-stamp-top ui-mono st-walk-stamp">
+          SAMPLE PHOTO · the real scan plays here on a live check
+        </span>
         <WalkPlayer
           stops={set.stops}
           index={index}
           onIndex={setIndex}
           reduced={ctx.reduced}
-          autoStart={ctx.playing && !ctx.reduced}
+          autoStart={autoStart}
           clock={clock}
           photos={set.photos}
           verdict={set.verdict}
@@ -319,29 +324,34 @@ export function WalkScene({ set, ctx }: { set: WalkSet; ctx: SceneCtx }) {
 
 export function EndScene({
   line,
+  photo,
   onAgain,
   next,
 }: {
   line: string;
+  photo: { src: string; alt: string };
   onAgain: () => void;
   next: { label: string; onGo: () => void } | null;
 }) {
   return (
     <div className="st-end" data-testid="st-end">
-      <p className="st-end-kicker mono">What SNAPBACK did</p>
-      <p className="st-end-line">{line}</p>
-      <div className="st-end-acts">
-        <a className="st-btn st-btn-primary" href="/">
-          Check your own ad
-        </a>
-        {next && (
-          <button type="button" className="st-btn" onClick={next.onGo}>
-            Next: {next.label}
+      <Photo className="st-end-photo" src={photo.src} alt={photo.alt} stamp="sample" hero />
+      <div className="st-end-card ui-on-matte">
+        <p className="st-end-kicker ui-mono">What SNAPBACK did</p>
+        <p className="st-end-line">{line}</p>
+        <div className="st-end-acts">
+          <a className="st-btn st-btn-primary" href="/">
+            Check your own ad
+          </a>
+          {next && (
+            <button type="button" className="st-btn st-btn-quiet" onClick={next.onGo}>
+              Next: {next.label}
+            </button>
+          )}
+          <button type="button" className="st-btn st-btn-quiet" onClick={onAgain}>
+            Watch again
           </button>
-        )}
-        <button type="button" className="st-btn st-btn-quiet" onClick={onAgain}>
-          Watch again
-        </button>
+        </div>
       </div>
     </div>
   );
