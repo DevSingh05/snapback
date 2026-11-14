@@ -5,7 +5,11 @@ honest test of "these photos were taken in this building": run locate over them,
 decoys (photos of other buildings, claimed to be this one), and count.
 
     photos   k of n placed in the right building, and k of n in the right floor plan
-    decoys   k of m placed anywhere at all; the target is 0
+             k of n placed in ANOTHER building (target 0: that is what would turn an honest
+             listing into "Don't pay")
+    decoys   k of m placed in the claimed building (target 0: that is a false "taken here")
+             k of m placed in another building (for a decoy that is the right answer, when
+             its own building is indexed; counted beside, not against)
 
 What is written is totals only, with a Wilson 95% interval, in the same columns as
 `eval/results.csv`, so the Lab panel reads it as it is. No photo, file name, building or
@@ -21,21 +25,31 @@ The manifest is one JSON object per line, written by whoever has the kit:
 `photo` is relative to the manifest's folder. `floor_plan` is optional. A decoy is a photo of
 some other building, tested as if it were claimed to be `claimed_property_id`.
 
-The locator is lane V's (V2, issue #28). It is named on the command line as `module:function`
-and called as `function(photo_path, claimed_property_id) -> Placement`.
+The locator is the product's own: what a live case runs (A22, `agent/locate_live.py`), which
+is lane V's `Locator` over the index on this machine. So the run scores what main ships. The
+bars a match has to clear are read by that locator from lane V's own config file; this
+module names none of them. Two things differ from a live case, on purpose: each photo is
+placed alone, and the product's saved answers are neither read nor written, so the run
+measures the locator and not what an earlier run stored. The product's time budget applies
+as it does in a case: a photo that is not placed in time counts as not placed.
+
+Another locator can be named on the command line as `module:function`, called as
+`function(photo_path, claimed_property_id) -> Placement`.
 """
 
 import argparse
 import importlib
 import math
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
-from snapback.contracts import LocateStatus
+from snapback.agent.locate_live import LiveLocate, LiveOutcome
+from snapback.contracts import DataSource, LocateStatus, PropertyRecord
+from snapback.settings import Settings
 
 # The Lab panel's columns (fixtures/contracts/results_sample.csv). A test holds these equal to
 # the ones the API checks before it serves a file.
@@ -45,10 +59,7 @@ Z_95 = 1.959963984540054
 
 DEFAULT_MANIFEST = Path("data/eval/locate_real_manifest.jsonl")
 DEFAULT_OUT = Path("eval/locate_real.csv")
-# Where lane V's locator is expected once V2 lands. Until then, pass --locator.
-DEFAULT_LOCATOR = "snapback.vision.locate.verify:locate_photo"
-
-_PLACED = frozenset({LocateStatus.LOCATED_IN_CLAIMED, LocateStatus.LOCATED_ELSEWHERE})
+MAX_VERSIONS = 5  # thresholds versions named in the file's heading; one is the normal case
 
 
 class ManifestRow(BaseModel):
@@ -63,6 +74,7 @@ class Placement(BaseModel):
 
     status: LocateStatus
     floor_plan: str | None = None
+    thresholds_version: str | None = None  # which thresholds the locator used, when it says
 
 
 Locator = Callable[[Path, str], Placement]
@@ -77,8 +89,10 @@ class LocateRealResult(BaseModel):
     photos_with_floor_plan: int = 0
     right_floor_plan: int = 0  # right building and right floor plan
     decoys: int = 0
-    decoy_false_placements: int = 0  # a decoy placed anywhere
+    decoy_false_placements: int = 0  # a decoy placed in the claimed building: "taken here"
+    decoys_placed_elsewhere: int = 0  # a decoy placed in some other building
     failed: int = 0  # photos the locator raised on; counted as not placed
+    thresholds_versions: list[str] = Field(default_factory=list)  # as the locator named them
 
 
 def wilson(k: int, n: int) -> tuple[float, float]:
@@ -116,15 +130,23 @@ def score(rows: Sequence[tuple[Path, ManifestRow]], locate: Locator) -> LocateRe
             placement = Placement(status=LocateStatus.NOT_LOCATED)
             result.failed += 1
 
+        version = placement.thresholds_version
+        if version and version not in result.thresholds_versions:
+            result.thresholds_versions.append(version)
+
+        in_claimed = placement.status is LocateStatus.LOCATED_IN_CLAIMED
+        elsewhere = placement.status is LocateStatus.LOCATED_ELSEWHERE
         if row.decoy:
+            # A decoy read as "taken here" is the false placement. Placed in another
+            # building is what locate should say about a photo of another building.
             result.decoys += 1
-            result.decoy_false_placements += placement.status in _PLACED
+            result.decoy_false_placements += in_claimed
+            result.decoys_placed_elsewhere += elsewhere
             continue
 
         result.photos += 1
-        in_claimed = placement.status is LocateStatus.LOCATED_IN_CLAIMED
         result.right_building += in_claimed
-        result.wrong_building += placement.status is LocateStatus.LOCATED_ELSEWHERE
+        result.wrong_building += elsewhere
         if row.floor_plan is not None:
             result.photos_with_floor_plan += 1
             result.right_floor_plan += in_claimed and placement.floor_plan == row.floor_plan
@@ -138,6 +160,7 @@ def _counts(result: LocateRealResult) -> list[tuple[str, int, int]]:
         ("right_floor_plan", result.right_floor_plan, result.photos_with_floor_plan),
         ("wrong_building", result.wrong_building, result.photos),
         ("decoy_false_placement", result.decoy_false_placements, result.decoys),
+        ("decoy_placed_elsewhere", result.decoys_placed_elsewhere, result.decoys),
     ]
     return [count for count in counts if count[2] > 0]
 
@@ -150,9 +173,14 @@ def write_csv(result: LocateRealResult, path: Path, *, source: str, frozen_at: s
     """
     lines = [
         f"# {source.upper()}: locate over the buildings' own listing photos, and decoys.",
-        "# k of n photos placed; for decoy_false_placement, k of n decoys placed (target 0).",
-        ",".join(COLUMNS),
+        "# k of n photos placed. decoy_false_placement: k of n decoys read as taken in the "
+        "claimed building (target 0).",
     ]
+    if result.thresholds_versions:
+        # Which bars the matches had to clear, by lane V's own name for them. Not a number.
+        named = ", ".join(result.thresholds_versions[:MAX_VERSIONS])
+        lines.append(f"# thresholds: {named}")
+    lines.append(",".join(COLUMNS))
     for metric, k, n in _counts(result):
         low, high = wilson(k, n)
         lines.append(f"{CONDITION},{metric},{k},{n},{k / n:.4f},{low:.4f},{high:.4f},{frozen_at}")
@@ -161,6 +189,80 @@ def write_csv(result: LocateRealResult, path: Path, *, source: str, frozen_at: s
     beside = path.with_name(path.name + ".tmp")
     beside.write_text("\n".join(lines) + "\n")
     beside.replace(path)
+
+
+# --- the product's own locator -------------------------------------------------------------
+
+
+class _FreshLiveLocate(LiveLocate):
+    """The product's live locate (A22) with its saved answers switched off.
+
+    A live case reads an answer saved for the same photos before it runs the model. An
+    accuracy run must not: it would score what an earlier run stored. Nothing is saved
+    either, so an eval never plants answers a later case would pick up.
+    """
+
+    def _read_cache(self, path: Path) -> LiveOutcome | None:
+        return None
+
+    def _write_cache(self, path: Path, outcome: LiveOutcome) -> None:
+        return None
+
+
+def live_for_eval(
+    settings: Settings,
+    *,
+    records: Callable[[], Iterable[PropertyRecord]],
+    **options: object,
+) -> LiveLocate:
+    """The locator a live case uses, from the same settings: the same index and the same time
+    budget. No thresholds are passed, so lane V's `Locator` loads its own config file. The
+    options are for tests (fixture faces, the numpy matcher)."""
+    return _FreshLiveLocate(
+        data_dir=settings.snapback_data_dir,
+        records=records,
+        index_name=settings.snapback_locate_index,
+        budget_s=settings.snapback_locate_budget_s,
+        **options,  # type: ignore[arg-type]
+    )
+
+
+def product_locator(live: LiveLocate) -> Locator:
+    """`live`, asked about one photo at a time, as the harness's `Locator`.
+
+    A claimed building with no twin in the index comes back "not indexed" from lane V's
+    locator itself, without the model being run, exactly as in a live case.
+    """
+
+    def locate(photo: Path, claimed_property_id: str) -> Placement:
+        outcome = live.locate("eval", [photo.read_bytes()], claimed_property_id)
+        if outcome is None or not outcome.result.photos:
+            return Placement(status=LocateStatus.NOT_INDEXED)
+        placed = outcome.result.photos[0]
+        chosen = outcome.result.chosen
+        in_claimed = placed.status is LocateStatus.LOCATED_IN_CLAIMED
+        return Placement(
+            status=placed.status,
+            floor_plan=chosen.floor_plan if in_claimed and chosen is not None else None,
+            thresholds_version=outcome.result.thresholds_version,
+        )
+
+    return locate
+
+
+def _product(settings: Settings) -> Locator | str:
+    """The product's locator on this machine, or one line saying what is missing."""
+    from snapback.agent.join import KitLookups
+
+    lookups = KitLookups(settings.snapback_data_source)
+    live = live_for_eval(settings, records=lambda: lookups.records().values())
+    if not live.available(None, []):
+        index = Path(settings.snapback_data_dir) / "index" / settings.snapback_locate_index
+        return (
+            f"The locator is not available here. It needs an index at {index}, the kit's "
+            "records and, for a live run, the vision extra (uv sync --extra vision)."
+        )
+    return product_locator(live)
 
 
 def _load_locator(name: str) -> Locator:
@@ -176,7 +278,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--locator", default=DEFAULT_LOCATOR, help="module:function")
+    parser.add_argument(
+        "--locator",
+        help="module:function to score in place of the product's own locator",
+    )
     parser.add_argument("--source", choices=("live", "fixture"), default="live")
     args = parser.parse_args(argv)
 
@@ -185,15 +290,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"No manifest at {args.manifest}. It is written from the kit; see #72.", file=sys.stderr
         )
         return 2
-    try:
-        locate = _load_locator(args.locator)
-    except (ImportError, AttributeError, ValueError):
-        print(
-            f"No locator at {args.locator}. Lane V's locate (V2, #28) has to land first, "
-            "or pass --locator module:function.",
-            file=sys.stderr,
-        )
-        return 2
+    if args.locator:
+        try:
+            locate = _load_locator(args.locator)
+        except (ImportError, AttributeError, ValueError):
+            print(f"No locator at {args.locator}. Pass module:function.", file=sys.stderr)
+            return 2
+    else:
+        settings = Settings().model_copy(update={"snapback_data_source": DataSource(args.source)})
+        found = _product(settings)
+        if isinstance(found, str):
+            print(found, file=sys.stderr)
+            return 2
+        locate = found
 
     result = score(read_manifest(args.manifest), locate)
     frozen_at = (
