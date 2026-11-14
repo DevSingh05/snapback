@@ -3,6 +3,7 @@ import { useState } from "react";
 import { SourceChip } from "../components/SourceChip";
 import type { AerialTile, PropertyRecord } from "../contracts";
 import { distanceAway } from "./distance";
+import { canGoLive, useLiveAerial } from "./useLiveAerial";
 
 export interface AerialSide {
   tile: AerialTile | null;
@@ -32,7 +33,26 @@ function srcFor(side: AerialSide): string | null {
   return fixtureTileSrc(tile.property_id);
 }
 
-function Tile({ side, caption }: { side: AerialSide; caption?: string }) {
+function facts(record: PropertyRecord | null): string {
+  if (!record) return "";
+  return [
+    record.manager_company,
+    record.floors ? `${record.floors} floors` : null,
+    record.year_built ? `built ${record.year_built}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function Tile({
+  side,
+  caption,
+  showFacts,
+}: {
+  side: AerialSide;
+  caption?: string;
+  showFacts?: boolean;
+}) {
   const [broken, setBroken] = useState(false);
   const src = srcFor(side);
   return (
@@ -45,9 +65,12 @@ function Tile({ side, caption }: { side: AerialSide; caption?: string }) {
           onError={() => setBroken(true)}
         />
       ) : (
-        <div className="aerial-missing">Tile unavailable</div>
+        <div className="aerial-missing">No aerial image for this building yet</div>
       )}
       {caption ? <figcaption className="aerial-caption">{caption}</figcaption> : null}
+      {showFacts && facts(side.record) ? (
+        <p className="aerial-facts">{facts(side.record)}</p>
+      ) : null}
     </figure>
   );
 }
@@ -57,22 +80,39 @@ interface Props {
   claimed: AerialSide;
   /** The photo was taken in a different building than the one the listing claims. */
   mismatch: boolean;
+  /** With a read token for this case in the browser, the proof comes from the live route instead. */
+  caseId?: string;
 }
 
-export function AerialProof({ matched, claimed, mismatch }: Props) {
+interface ViewProps {
+  matched: AerialSide;
+  claimed: AerialSide;
+  mismatch: boolean;
+  live?: boolean;
+  /** Chip override for the live path (follows the response). */
+  chip?: "live" | "fixture";
+}
+
+function ProofView({ matched, claimed, mismatch, live = false, chip }: ViewProps) {
   const shown = mismatch ? [claimed, matched] : [matched];
-  // LIVE only when every tile and record on show (the distance comes from the records) is live; anything else reads FIXTURE.
+  // Fixture path: LIVE only when every tile and record on show is live; anything else reads FIXTURE.
   const allLive = shown.every((s) => s.tile?.source === "live" && s.record?.source === "live");
   const away = mismatch ? distanceAway(claimed.record ?? {}, matched.record ?? {}) : null;
   return (
     <section className="aerial-proof" aria-label="Aerial view">
       <div className="aerial-head">
         <span className="mono">Aerial</span>
-        <SourceChip source={allLive ? "live" : "fixture"} />
+        <SourceChip source={chip ?? (allLive ? "live" : "fixture")} />
       </div>
       <div className={mismatch ? "aerial-pair" : "aerial-single"}>
-        {mismatch ? <Tile side={claimed} caption="The listing says here." /> : null}
-        <Tile side={matched} caption={mismatch ? "This photo was taken here." : undefined} />
+        {mismatch ? (
+          <Tile side={claimed} caption="The listing says here." showFacts={live} />
+        ) : null}
+        <Tile
+          side={matched}
+          caption={mismatch ? "This photo was taken here." : undefined}
+          showFacts={live}
+        />
       </div>
       {away ? (
         <p className="aerial-distance" data-testid="aerial-distance">
@@ -81,4 +121,48 @@ export function AerialProof({ matched, claimed, mismatch }: Props) {
       ) : null}
     </section>
   );
+}
+
+function LiveAerialProof({ caseId }: { caseId: string }) {
+  const aerial = useLiveAerial(caseId, true);
+  if (aerial.status === "loading") {
+    return (
+      <section className="aerial-proof" aria-label="Aerial view" aria-busy="true">
+        <div className="aerial-head">
+          <span className="mono">Aerial</span>
+        </div>
+        <div className="aerial-skeleton" data-testid="aerial-skeleton" />
+      </section>
+    );
+  }
+  if (aerial.status === "error") {
+    return (
+      <section className="aerial-proof" aria-label="Aerial view">
+        <div className="aerial-head">
+          <span className="mono">Aerial</span>
+        </div>
+        <p className="aerial-distance">The aerial view could not load. Try again in a moment.</p>
+      </section>
+    );
+  }
+  const { claimed, matched, source } = aerial;
+  const parts = [claimed, matched].filter((s): s is AerialSide => s !== null);
+  // The response decides, and a fixture tile or record anywhere on show pulls it to FIXTURE.
+  const anyFixture = parts.some(
+    (s) => s.tile?.source === "fixture" || s.record?.source === "fixture",
+  );
+  return (
+    <ProofView
+      live
+      mismatch={matched !== null}
+      claimed={claimed}
+      matched={matched ?? claimed}
+      chip={source === "live" && !anyFixture ? "live" : "fixture"}
+    />
+  );
+}
+
+export function AerialProof({ caseId, ...rest }: Props) {
+  if (canGoLive(caseId)) return <LiveAerialProof caseId={caseId} />;
+  return <ProofView {...rest} />;
 }
