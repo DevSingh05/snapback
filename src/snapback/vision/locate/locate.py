@@ -135,7 +135,6 @@ def seam_neighbours(hits: list, top: int = 2) -> list:
 SEARCH_OPTIONS = ("focus_scan", "wider_index", "deeper_claimed", "stop")
 # The only thresholds a retry may change: how many candidates are verified, never a bar.
 RETRIEVAL_FIELDS = frozenset({"top_k", "top_k_claimed"})
-FOCUS_SWEEPS = 2  # focus_scan: every face of the sweeps the best this many hits came from
 
 
 def retrieve_only(thresholds: Thresholds, **changes) -> Thresholds:
@@ -164,17 +163,34 @@ def search_thresholds(base: Thresholds, option: str) -> Thresholds:
 
 @dataclass(frozen=True)
 class SearchResult:
-    """What one retry found. No pixels and no ids beyond the twin and sweep it landed in."""
+    """One retry for one photo, as locate() would report it. `location` is a full PhotoLocation
+    (status, inliers, ratio, spread, rival_ratio, bar_failed, matched ids, room); `pose` and
+    `points` are set when the photo is placed. No pixels."""
 
     option: str
-    status: LocateStatus | None  # None for "stop": nothing was searched
-    model_id: str | None = None
-    sweep_id: str | None = None
-    face: int | None = None
-    inliers: int | None = None
-    spread: float | None = None
+    location: PhotoLocation | None = None  # None for "stop": nothing was searched
+    pose: Pose | None = None
+    points: EvidencePoints | None = None
+    identified_property_id: str | None = None  # no claimed home: the home the photo names
     verified: int = 0  # how many faces were verified
     seconds: float = 0.0
+    timed_out: bool = False  # the deadline passed before every candidate was verified
+
+    @property
+    def status(self) -> LocateStatus | None:
+        return self.location.status if self.location else None
+
+    @property
+    def model_id(self) -> str | None:
+        return self.location.matched_model_id if self.location else None
+
+    @property
+    def sweep_id(self) -> str | None:
+        return self.location.pano_id if self.location else None
+
+    @property
+    def inliers(self) -> int | None:
+        return self.location.inliers if self.location else None
 
 
 @dataclass(frozen=True)
@@ -221,6 +237,10 @@ def evidence_points(placed: "_Placement", photo_size, face_size) -> EvidencePoin
     )
 
 
+class _DeadlineExceeded(Exception):
+    """A search ran out of its time budget before verifying every candidate."""
+
+
 class Locator:
     def __init__(
         self,
@@ -243,6 +263,9 @@ class Locator:
         self._face = lru_cache(maxsize=512)(self._load_face)
 
     def _verify(self, photo: Image.Image, face: Image.Image, t: Thresholds) -> Verification:
+        deadline = getattr(self._counter, "deadline", None)
+        if deadline is not None and time.monotonic() >= deadline:
+            raise _DeadlineExceeded
         self._counter.calls = getattr(self._counter, "calls", 0) + 1
         return verify(self.matcher, photo, face, t.ransac_px)
 
@@ -260,7 +283,10 @@ class Locator:
         claimed_models: set[str],
         t: Thresholds | None = None,
         extra: list | None = None,
+        claimed_search: set[str] | None = None,
     ) -> list:
+        """Candidates to verify: the top_k over every building, plus the claimed building's
+        side faces (top_k_claimed of them), or only those of `claimed_search` when given."""
         t = t or self.thresholds
         embedder = self.index.embedder
         vector = unit(embedder.embed(photo)) if embedder is not None else None
@@ -268,7 +294,10 @@ class Locator:
         if claimed_models:
             # The claimed building's side faces (where listing photos look), best first.
             claimed = self.index.search(
-                photo, k=4 * t.top_k_claimed, model_ids=claimed_models, vector=vector
+                photo,
+                k=4 * t.top_k_claimed,
+                model_ids=claimed_search or claimed_models,
+                vector=vector,
             )
             hits += [h for h in claimed if h.entry.face in SIDE_FACES][: t.top_k_claimed]
         hits += extra or []
@@ -352,6 +381,7 @@ class Locator:
         claimed_models: set[str],
         t: Thresholds | None = None,
         extra: list | None = None,
+        claimed_search: set[str] | None = None,
     ) -> "_PlaceOutcome":
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
@@ -359,7 +389,7 @@ class Locator:
         the claimed match passes but another building clears the strict bar with ambiguity_ratio
         times its inliers, the photo is not placed at all."""
         t = t or self.thresholds
-        hits = self._candidates(photo, claimed_models, t, extra)
+        hits = self._candidates(photo, claimed_models, t, extra, claimed_search)
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
         other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
         seen = {(h.entry.model_id, h.entry.sweep_id, h.entry.face) for h in other_hits}
@@ -449,79 +479,86 @@ class Locator:
 
     # --- E2a: retry with more candidates of one kind, same bars ---------------------------
 
-    def _option_thresholds(self, option: str) -> Thresholds:
-        return search_thresholds(self.thresholds, option)
+    def _focus_models(
+        self, option: str, claimed_property_id: str | None, scan_model_id: str | None
+    ) -> set[str] | None:
+        """focus_scan names one scan of the claimed building: only its side faces are verified
+        on the claimed side (up to top_k_claimed, never faces 0 and 5)."""
+        if option != "focus_scan":
+            return None
+        claimed = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
+        if scan_model_id is None or scan_model_id not in claimed:
+            raise ValueError("focus_scan needs scan_model_id: an indexed scan of the claimed home")
+        return {scan_model_id}
 
-    def _focus(self, photo: Image.Image, claimed_models: set[str]) -> list:
-        """Every face of the sweeps the best hits came from: a photo looking across a seam or
-        up at a ceiling line splits its matches between faces of one sweep."""
-        from snapback.vision.locate.index import Entry, Hit
-
-        base = self._candidates(photo, claimed_models)
-        floor = min((h.score for h in base), default=0.0) - 1e-3
-        sweeps = []
-        for hit in base:
-            key = (hit.entry.model_id, hit.entry.sweep_id)
-            if key not in sweeps:
-                sweeps.append(key)
-            if len(sweeps) == FOCUS_SWEEPS:
-                break
-        return [
-            Hit(Entry(model_id, sweep_id, face, "face"), floor)
-            for model_id, sweep_id in sweeps
-            for face in range(len(self._sweeps[(model_id, sweep_id)].faces))
-        ]
-
-    def candidates_for(self, photo: Image.Image, claimed_models: set[str], option: str) -> list:
+    def candidates_for(
+        self,
+        photo: Image.Image,
+        claimed_property_id: str | None,
+        option: str,
+        scan_model_id: str | None = None,
+    ) -> list:
         """The candidates an option would verify ("base" for the ordinary run)."""
-        if option == "focus_scan":
-            return self._candidates(photo, claimed_models, extra=self._focus(photo, claimed_models))
-        if option in ("base", "wider_index", "deeper_claimed"):
-            return self._candidates(photo, claimed_models, self._option_thresholds(option))
-        raise ValueError(f"unknown search option {option!r}; use one of {SEARCH_OPTIONS}")
+        t = search_thresholds(self.thresholds, option)
+        claimed = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
+        focus = self._focus_models(option, claimed_property_id, scan_model_id)
+        return self._candidates(photo.convert("RGB"), claimed, t, None, focus)
 
     def search(
-        self, photo: Image.Image, option: str, claimed_property_id: str | None
+        self,
+        photo: Image.Image,
+        option: str,
+        claimed_property_id: str | None,
+        *,
+        scan_model_id: str | None = None,
+        deadline_s: float | None = None,
+        photo_id: str = "p",
     ) -> SearchResult:
-        """Re-run placement for one photo with more candidates of the kind `option` names:
-        focus_scan (every face of the best sweeps), wider_index (twice the candidates over every
-        building), deeper_claimed (twice the claimed building's faces), or stop (no work). The
-        bars are the locator's own; only retrieval changes, so a retry finds more, never accepts
-        less. The result is placed, elsewhere, or not, as locate() would say."""
+        """Re-run placement for one photo with more candidates of the kind `option` names, through
+        the very routine locate() runs, so every guard holds (claimed first, the bars, the
+        ambiguity rule, catalog-unknown buildings, a claimed home with no scan, identify when no
+        home is claimed). Options: focus_scan (the side faces of one named scan of the claimed
+        home), wider_index (top_k 6 -> 12), deeper_claimed (top_k_claimed 48 -> 96), stop.
+        Only retrieval changes; a retry finds more, never accepts less. Past `deadline_s` it stops
+        verifying and reports not_located (timed_out), never a guess."""
         if option not in SEARCH_OPTIONS:
             raise ValueError(f"unknown search option {option!r}; use one of {SEARCH_OPTIONS}")
         if option == "stop":
-            return SearchResult(option="stop", status=None)
-        photo = photo.convert("RGB")
+            return SearchResult(option="stop")
+        t = search_thresholds(self.thresholds, option)
+        focus = self._focus_models(option, claimed_property_id, scan_model_id)
+        image = photo.convert("RGB")
         started = time.monotonic()
         self._counter.calls = 0
-        claimed_models = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
-        t = self._option_thresholds(option)
-        extra = self._focus(photo, claimed_models) if option == "focus_scan" else None
-        if claimed_property_id is None:
-            placed, ambiguous = self._identify(photo, t, extra)
-            if ambiguous:
-                placed = None
-        else:
-            placed = self._place(photo, claimed_models, t, extra)
-        if placed is None:
-            status = (
-                LocateStatus.NOT_LOCATED
-                if claimed_models or claimed_property_id is None
-                else LocateStatus.NOT_INDEXED
+        self._counter.deadline = None if deadline_s is None else started + deadline_s
+        try:
+            result, points = self.locate_with_points(
+                f"search-{option}",
+                {photo_id: image},
+                claimed_property_id,
+                t=t,
+                claimed_search=focus,
             )
-        elif placed.model_id in claimed_models:
-            status = LocateStatus.LOCATED_IN_CLAIMED
-        else:
-            status = LocateStatus.LOCATED_ELSEWHERE
+        except _DeadlineExceeded:
+            return SearchResult(
+                option=option,
+                location=PhotoLocation(
+                    photo_id=photo_id, status=LocateStatus.NOT_LOCATED, bar_failed="inliers"
+                ),
+                verified=self._counter.calls,
+                seconds=round(time.monotonic() - started, 3),
+                timed_out=True,
+            )
+        finally:
+            self._counter.deadline = None
         return SearchResult(
             option=option,
-            status=status,
-            model_id=placed.model_id if placed else None,
-            sweep_id=placed.sweep.sweep_id if placed else None,
-            face=placed.face if placed else None,
-            inliers=placed.check.inliers if placed else None,
-            spread=round(placed.check.spread, 4) if placed else None,
+            location=result.photos[0],
+            pose=result.poses.get(photo_id),
+            points=points.get(photo_id),
+            identified_property_id=(
+                result.claimed_property_id if result.identified_by_scan else None
+            ),
             verified=self._counter.calls,
             seconds=round(time.monotonic() - started, 3),
         )
@@ -564,10 +601,15 @@ class Locator:
         case_id: str,
         photos: Mapping[str, Image.Image],
         claimed_property_id: str | None,
+        *,
+        t: Thresholds | None = None,
+        claimed_search: set[str] | None = None,
     ) -> tuple[LocateResult, dict[str, EvidencePoints]]:
         """locate(), plus up to 48 normalised matched pairs per placed photo for the evidence
         file (E2b). The pairs come back beside the result, never inside it, so they never reach
-        the agent's chooser, the trace or a log."""
+        the agent's chooser, the trace or a log. `t` and `claimed_search` are for search(): a
+        retrieval-only thresholds copy and the one scan focus_scan names; every guard below
+        applies to a search exactly as to a locate."""
         claimed_models = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
         # Where a photo may be placed:
         #   claimed home set and indexed -> claimed first, strict bar elsewhere (can say elsewhere)
@@ -589,11 +631,11 @@ class Locator:
                 continue
             photo = image.convert("RGB")
             if identify:
-                placed, ambiguous = self._identify(photo)
+                placed, ambiguous = self._identify(photo, t)
                 tangled = tangled or ambiguous
                 bars[photo_id] = "ambiguity" if ambiguous else (None if placed else "inliers")
             else:
-                outcome = self._place_detail(photo, claimed_models)
+                outcome = self._place_detail(photo, claimed_models, t, None, claimed_search)
                 placed = outcome.placed
                 bars[photo_id], rivals[photo_id] = outcome.bar_failed, outcome.rival_ratio
             if (
@@ -602,8 +644,9 @@ class Locator:
                 and self.catalog.property_of(placed.model_id) is None
             ):
                 # Never "somewhere else" without a known other building: the catalog may just be
-                # missing the claimed property's own twin.
+                # missing the claimed property's own twin. Not trustworthy enough to place.
                 placed = None
+                bars[photo_id] = "ambiguity"
             placements[photo_id] = placed
 
         identified_by_scan = conflict = False
