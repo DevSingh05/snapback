@@ -24,6 +24,7 @@ with the distance between them.
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import re
@@ -342,6 +343,18 @@ PUBLIC_RECORD_FIELDS = {
 }
 
 
+@functools.lru_cache(maxsize=4)
+def kit_records(source: DataSource) -> dict[str, PropertyRecord]:
+    """The kit's records, parsed once per process and source (a few thousand on the real kit),
+    so a route does not re-read the JSONL on every request. Empty when the kit is not here."""
+    from snapback.adapters import costar_jsonl
+
+    try:
+        return costar_jsonl.load_records(source)
+    except costar_jsonl.KitNotFoundError:
+        return {}
+
+
 def public_record(record: PropertyRecord) -> PropertyRecord:
     """The record trimmed to what the card shows: building facts and the company name. The phone
     hash, website host, units and rent bands never leave the server through this route."""
@@ -365,12 +378,7 @@ def aerial_proof(
     it was not the claimed one (None otherwise). `image_url(side)` builds our own image route for
     a live tile; fixture tiles get no URL (lane T draws its stand-in)."""
     if records is None:
-        from snapback.adapters.costar_jsonl import KitNotFoundError, load_records
-
-        try:
-            records = load_records(source)
-        except KitNotFoundError:
-            records = {}
+        records = kit_records(source)
     claimed_rec = records.get(claimed_id) if claimed_id else None
     matched_rec = records.get(matched_id) if matched_id and matched_id != claimed_id else None
 

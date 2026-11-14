@@ -196,3 +196,86 @@ def test_a_bad_side_or_direction_is_refused(tmp_path):
 def test_module_budget_is_still_twenty_seconds():
     assert vexcel.TOTAL_BUDGET_S == 20.0
     assert Path(vexcel.__file__).name == "vexcel.py"
+
+
+def test_the_recorded_fixture_case_needs_no_token(tmp_path):
+    client = _client(tmp_path)
+    assert client.get("/cases/7Q2M/aerial").status_code == 200
+
+
+def test_a_tile_purged_between_calls_is_a_404_not_a_500(tmp_path, monkeypatch):
+    tile = AerialTile(
+        property_id="fx-prop-1",
+        source=DataSource.LIVE,
+        direction="north",
+        path=str(tmp_path / "vexcel" / "gone.jpg"),
+    )
+
+    def fake_proof(case_id, source, claimed_id, matched_id, **kwargs):
+        return AerialProofResponse(
+            case_id=case_id, source=DataSource.LIVE, claimed=AerialSideOut(tile=tile)
+        )
+
+    monkeypatch.setattr("snapback.api.main.aerial_proof", fake_proof)
+    client = _client(tmp_path)
+    case = _case(client)
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial/claimed.jpg", params={"token": case["read_token"]}
+    )
+    assert got.status_code == 404
+
+
+def test_a_tile_path_outside_the_data_dir_is_never_served(tmp_path, monkeypatch):
+    outside = tmp_path.parent / "outside-secret.jpg"
+    outside.write_bytes(JPEG)
+    tile = AerialTile(
+        property_id="fx-prop-1", source=DataSource.LIVE, direction="north", path=str(outside)
+    )
+
+    def fake_proof(case_id, source, claimed_id, matched_id, **kwargs):
+        return AerialProofResponse(
+            case_id=case_id, source=DataSource.LIVE, claimed=AerialSideOut(tile=tile)
+        )
+
+    monkeypatch.setattr("snapback.api.main.aerial_proof", fake_proof)
+    client = _client(tmp_path / "data")
+    case = _case(client)
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial/claimed.jpg", params={"token": case["read_token"]}
+    )
+    assert got.status_code == 404
+
+
+def test_the_json_route_does_not_change_the_builders_object(tmp_path, monkeypatch):
+    tile = AerialTile(
+        property_id="fx-prop-1",
+        source=DataSource.LIVE,
+        direction="north",
+        path=str(tmp_path / "vexcel" / "fx-prop-1-north.jpg"),
+    )
+    proof = AerialProofResponse(
+        case_id="x", source=DataSource.LIVE, claimed=AerialSideOut(tile=tile)
+    )
+    monkeypatch.setattr("snapback.api.main.aerial_proof", lambda *a, **k: proof)
+    client = _client(tmp_path)
+    case = _case(client)
+    client.get(f"/cases/{case['case_id']}/aerial", headers={"X-Case-Token": case["read_token"]})
+    assert proof.claimed.tile.path == str(tmp_path / "vexcel" / "fx-prop-1-north.jpg")
+
+
+def test_the_kit_is_parsed_once_per_process(monkeypatch, tmp_path):
+    from snapback.adapters import costar_jsonl
+
+    calls = []
+    real = costar_jsonl.load_records
+
+    def counting(source=None, kit_dir=None):
+        calls.append(source)
+        return real(source, kit_dir)
+
+    monkeypatch.setattr(costar_jsonl, "load_records", counting)
+    vexcel.kit_records.cache_clear()
+    for _ in range(3):
+        aerial_proof("fx-7Q2M", DataSource.FIXTURE, "fx-prop-1", None, data_dir=tmp_path)
+    assert len(calls) == 1
+    vexcel.kit_records.cache_clear()

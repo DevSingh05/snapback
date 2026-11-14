@@ -51,6 +51,7 @@ from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form,
 from snapback.card.render import render_card_png
 from snapback.contracts import (
     AerialProofResponse,
+    AerialSideOut,
     Card,
     CreateCaseResponse,
     DataSource,
@@ -58,6 +59,7 @@ from snapback.contracts import (
     LocateStatus,
     Verdict,
 )
+from snapback.safety.paths import resolve_data_dir
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -84,6 +86,7 @@ def _after(last_event_id: str | None) -> int:
         return -1
 
 
+NO_TILE = "No aerial tile for this building."
 AerialDirection = Literal["north", "east", "south", "west", "nadir"]
 
 
@@ -328,21 +331,18 @@ def create_app(settings: Settings | None = None, lookups: Lookups | None = None)
     def aerial_for(case: RecordedCase | SessionCase, case_id: str, direction: str):
         """The two buildings for this case. The claimed one is the case's property id (A10); the
         matched one is a photo located in another building (V2). Either may be missing."""
-        evidence = getattr(getattr(case, "session", None), "evidence", None) or getattr(
-            case, "_evidence", None
-        )
+        evidence = case.evidence
         matched_id = None
-        if evidence is not None and evidence.locate is not None:
+        if evidence.locate is not None:
             for photo in evidence.locate.photos:
                 if photo.status == LocateStatus.LOCATED_ELSEWHERE:
                     matched_id = getattr(photo, "matched_property_id", None)
                     if matched_id:
                         break
-        source = evidence.source if evidence is not None else settings.snapback_data_source
         return aerial_proof(
             case_id,
-            source,
-            getattr(case, "property_id", None),
+            evidence.source,
+            case.property_id,
             matched_id,
             direction=direction,
             data_dir=settings.snapback_data_dir,
@@ -361,16 +361,22 @@ def create_app(settings: Settings | None = None, lookups: Lookups | None = None)
         Cases are private: this needs the case's read token in a header. Each tile is bounded at
         20 s and cached for 7 days under data/vexcel/ (`make purge` deletes it)."""
         case = find(case_id)
-        token = _bearer(authorization, x_case_token)
-        if token is None:
-            raise HTTPException(status_code=401, detail="This needs the case's read token.")
-        check_read(case, token, None)
+        # check_read answers 401 for a case that has a secret and got none; the recorded fixture
+        # case has no secret, so it is readable without one, as for the trace.
+        check_read(case, _bearer(authorization, x_case_token), None)
         proof = aerial_for(case, case_id, direction)
+
         # The image is served by our own route; the client never sees where it sits on disk.
-        for side in (proof.claimed, proof.matched):
-            if side is not None and side.tile is not None:
-                side.tile = side.tile.model_copy(update={"path": Path(side.tile.path).name})
-        return proof
+        # A trimmed copy, so the builder's own object is never changed.
+        def trimmed(side: AerialSideOut | None) -> AerialSideOut | None:
+            if side is None or side.tile is None:
+                return side
+            name = Path(side.tile.path).name
+            return side.model_copy(update={"tile": side.tile.model_copy(update={"path": name})})
+
+        return proof.model_copy(
+            update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
+        )
 
     @app.get("/cases/{case_id}/aerial/{side}.jpg")
     def get_aerial_image(
@@ -388,9 +394,19 @@ def create_app(settings: Settings | None = None, lookups: Lookups | None = None)
         proof = aerial_for(case, case_id, direction)
         chosen = proof.claimed if side == "claimed" else proof.matched
         if chosen is None or chosen.tile is None or chosen.tile.source != DataSource.LIVE:
-            raise HTTPException(status_code=404, detail="No aerial tile for this building.")
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        tile_path = Path(chosen.tile.path).resolve()
+        data_root = resolve_data_dir(settings.snapback_data_dir).resolve()
+        if not tile_path.is_relative_to(data_root):
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        try:
+            content = tile_path.read_bytes()
+        except FileNotFoundError:  # purged between the JSON call and this one
+            raise HTTPException(
+                status_code=404, detail="No aerial tile for this building."
+            ) from None
         return Response(
-            content=Path(chosen.tile.path).read_bytes(),
+            content=content,
             media_type="image/jpeg",
             headers={"Cache-Control": "private, max-age=600"},
         )
