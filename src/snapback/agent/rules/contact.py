@@ -274,16 +274,18 @@ def check_authority(
     brokerage or office (ruling, Sat 01:20). Naming any of them matches, as naming the
     manager does.
 
+    A home that is for sale usually has no property record at all (A15, #132). The listing
+    brokerages are still on record, from the for-sale lookup, so they are compared even when
+    `record` is None. With neither a record nor a marketer there is nothing to compare with.
+
     The status says whether the poster matches the contact on record, and only the company
     they named decides it. A phone match alone never does (XO ruling on #87): anyone can copy
     the office's public number into a listing. The phone and link results travel beside the
-    status as supporting yes/no lines.
+    status as supporting yes/no lines. With no record there is no office phone and no
+    website to compare with, so those two stay "not checked".
     """
-    if record is None:
-        return AuthorityResult(status=AuthorityStatus.UNKNOWN, poster_said=claims.company)
-
-    phone = check_phone(claims.phones, record, salt)
-    on_record = [name for name in (record.manager_company, *marketers[:MAX_MARKETERS]) if name]
+    manager = record.manager_company if record is not None else None
+    on_record = [name for name in (manager, *marketers[:MAX_MARKETERS]) if name and name.strip()]
     answers = [same_company(claims.company, name) for name in on_record]
     company = True if any(answers) else (False if False in answers else None)
     if company is None:
@@ -291,10 +293,20 @@ def check_authority(
     else:
         status = AuthorityStatus.MATCHES_RECORD if company else AuthorityStatus.MISMATCH
 
+    if record is None:
+        # Who to call when the poster named a brokerage on record: that brokerage. A company,
+        # from the record, never what the poster typed. Nobody is named when they named none.
+        matched = next((name for name, same in zip(on_record, answers, strict=True) if same), None)
+        return AuthorityResult(
+            status=status,
+            manager_on_record=matched,
+            poster_said=claims.company,
+        )
+
     return AuthorityResult(
         status=status,
         manager_on_record=record.manager_company,
         poster_said=claims.company,
-        office_phone_match=phone,
+        office_phone_match=check_phone(claims.phones, record, salt),
         link_domain=check_link(claims.links, record.website_host),
     )
