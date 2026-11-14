@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 
 import { SourceChip } from "../components/SourceChip";
 import { Wordmark } from "../components/HouseGlyph";
+import { KitArt } from "../components/KitArt";
 import { findingWord, getReplay, REPLAY_VERDICT_WORDS, startsWithToneWord } from "./index";
 import { openCase, runReplayCase, type RunCase } from "./runCase";
 import { replayLang, shortDate, words, type Lang } from "./text";
@@ -24,9 +25,14 @@ export function dollars(amount: number): string {
   return `$${amount.toLocaleString("en-US")}`;
 }
 
+// The drawing for what a case turned on: the place, the person or the price.
+export const PATTERN_ART = { place: "scan", person: "person", price: "price" } as const;
+
 function NotFound() {
   return (
     <article className="replay-page replay-missing" role="status">
+      <Wordmark />
+      <KitArt kind="house" className="replay-missing-house" lit={false} />
       <h1>Replay not found</h1>
       <p>There is no replay at this address.</p>
       <p>
@@ -139,6 +145,7 @@ export function ReplayView({
           <Wordmark />
           <SourceChip source="fixture" />
         </div>
+        <KitArt kind={PATTERN_ART[replay.pattern]} className="replay-art" detail="low" />
         <p className="replay-label">{replay.fictional ? t.fictional : t.reportedLabel}</p>
         <h1>{replay.title}</h1>
         {replay.source && !replay.fictional ? (
@@ -180,10 +187,14 @@ export function ReplayView({
                     data-step-id="stop"
                     data-testid="stop-marker"
                   >
+                    <span className="stop-mark" aria-hidden="true">
+                      {snapback.verdict === "hold" ? "!" : "✕"}
+                    </span>
                     <span className="stop-tag">SNAPBACK stops here</span>
                     <strong className="stop-words">{REPLAY_VERDICT_WORDS[snapback.verdict]}</strong>
                     <span className="stop-amount" data-testid="amount-line">
-                      {dollars(replay.amount_usd)} was still in their account here
+                      <span className="stop-figure">{dollars(replay.amount_usd)}</span> was still in
+                      their account here
                     </span>
                   </li>
                 ) : null}

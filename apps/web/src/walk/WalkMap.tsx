@@ -90,11 +90,12 @@ export function WalkMap({ stops, current, onPick }: Props) {
         })}
       </svg>
       <figcaption className="wm-caption">
-        <strong>{here ? here.stop.title : "Outside"}</strong>
-        <span>
-          Stop {Math.max(1, cells.findIndex((c) => c.index === current) + 1)} of {cells.length}{" "}
-          inside. Walking order, not a floor plan.
-        </span>
+        <strong>
+          {here
+            ? `Stop ${cells.findIndex((c) => c.index === current) + 1} of ${cells.length} inside`
+            : `${cells.length} stops inside`}
+        </strong>
+        <span>{here ? "You are at the lit one. " : ""}Walking order, not a floor plan.</span>
       </figcaption>
     </figure>
   );

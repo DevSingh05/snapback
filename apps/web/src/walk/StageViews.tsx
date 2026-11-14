@@ -12,6 +12,9 @@ interface Props {
   /** The real view is there but must not be shown (the loaded scan is not this home's). It
    *  stays mounted and hidden, and the drawing fills the stage. */
   realHidden?: boolean;
+  /** False while the real view is still loading (the live scan not yet connected): the drawing
+   *  fills the stage and the real view waits in the corner, then takes over once ready. */
+  realReady?: boolean;
 }
 
 export const REAL_LABEL = "Real view";
@@ -20,10 +23,17 @@ export const DRAWING_LABEL = "3D drawing";
 // Two views of one stop, like a video call: one fills the stage and the other sits as a small
 // window in the corner. Tap the window, or use the 3D | Real switch, to swap them. Real fills
 // the stage whenever a real view exists. Both stay mounted, so the live scan keeps its place.
-export function StageViews({ real, drawing, reduced, realHidden = false }: Props) {
+export function StageViews({
+  real,
+  drawing,
+  reduced,
+  realHidden = false,
+  realReady = true,
+}: Props) {
   const hasReal = real !== null && !realHidden;
-  const [choice, setChoice] = useState<ViewChoice>("real");
-  const main: ViewChoice = hasReal ? choice : "drawing";
+  // null until the person picks: then Real when it is ready, the drawing while it loads.
+  const [choice, setChoice] = useState<ViewChoice | null>(null);
+  const main: ViewChoice = hasReal ? (choice ?? (realReady ? "real" : "drawing")) : "drawing";
   const swap = () => setChoice(main === "real" ? "drawing" : "real");
 
   const pane = (which: ViewChoice, content: ReactNode) => {
