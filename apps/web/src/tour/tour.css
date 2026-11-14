@@ -513,9 +513,8 @@
 /* The real scan, offered under a walk that stays on the drawing. */
 .scan-offer {
   margin: var(--sp-5) var(--page-pad) 0;
-  border: 2px solid var(--ink);
   background: var(--surface);
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: var(--shadow-lift);
 }
 .scan-offer-head {
   display: flex;
@@ -541,7 +540,6 @@
   box-shadow: 4px 4px 0 var(--ink);
 }
 .scan-offer-frame {
-  border-top: 2px solid var(--ink);
   aspect-ratio: 16 / 9;
   max-height: 70vh;
   background: var(--stage-bottom);

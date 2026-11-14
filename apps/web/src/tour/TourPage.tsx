@@ -315,6 +315,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             onStatus={setStatus}
             onPhoto={setShowPhoto}
             endAction={{ label: "Tour prep: what to ask", href: plan.links.tour_prep }}
+            summary={plan.coverage?.line}
           />
           <StageCaption
             stop={stop}

@@ -29,6 +29,7 @@ function Host({
           reduced={reduced}
           clock={clock}
           endAction={{ label: "Tour prep: what to ask", href: "/prep/place/x" }}
+          summary="The ad showed 1 of the 5 rooms in this scan."
         />
       </section>
       <h1>{STOPS[index]!.title}</h1>
@@ -144,7 +145,9 @@ describe("WalkPlayer", () => {
   it("ends on a card with one thing to do next", () => {
     const { tick } = mount();
     tick(120_000);
-    expect(screen.getByTestId("wp-end")).toBeInTheDocument();
+    expect(screen.getByTestId("wp-end")).toHaveTextContent(
+      "The ad showed 1 of the 5 rooms in this scan.",
+    );
     expect(screen.getByRole("link", { name: "Tour prep: what to ask" })).toHaveAttribute(
       "href",
       "/prep/place/x",

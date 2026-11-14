@@ -48,6 +48,8 @@ export interface WalkPlayerProps {
   onPhoto?: (shown: boolean) => void;
   /** The one thing to do when the tour ends, shown on its end card. */
   endAction?: { label: string; href: string };
+  /** What the walk found, in one line: it is the end card's headline when there is one. */
+  summary?: string | null;
   /** Start playing on arrival, like a video. Never with reduced motion. */
   autoStart?: boolean;
   clock?: Clock;
@@ -92,6 +94,7 @@ export function WalkPlayer({
   onStatus,
   onPhoto,
   endAction,
+  summary,
   autoStart = true,
   clock = frameClock,
 }: WalkPlayerProps) {
@@ -363,7 +366,7 @@ export function WalkPlayer({
 
       {state.ended && !exploring && (
         <div className="wp-end" data-testid="wp-end">
-          <p className="wp-end-title">That is the whole walk.</p>
+          <p className="wp-end-title">{summary || "That is the whole walk."}</p>
           <p className="wp-end-line">Now see it in person, before you pay anything.</p>
           <div className="wp-end-acts">
             {endAction && (
