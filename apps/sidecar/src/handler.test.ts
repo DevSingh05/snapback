@@ -1,27 +1,47 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { handleMessage, renterId, type InboundMessage, type MessageClient } from "./handler";
+import {
+  COULD_NOT_CHECK,
+  HEADLINES,
+  handleMessage,
+  renterId,
+  type InboundMessage,
+  type MessageClient,
+} from "./handler";
 
 const card = JSON.parse(
   readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
 );
 
+const SALT = "fx-sidecar-salt";
+const WRITE_TOKEN = "fx-secret-write-token";
+const READ_TOKEN = "fx-secret-read-token";
+
 type Call = { url: string; method: string; body?: FormData };
 
-function mockApi(calls: Call[], createStatus = 201) {
+function mockApi(calls: Call[], opts: { status?: number; state?: string; throws?: boolean } = {}) {
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     calls.push({ url, method: init?.method ?? "GET", body: init?.body as FormData | undefined });
+    if (opts.throws && url.startsWith("http://api.test")) throw new TypeError("fetch failed");
     if (url.startsWith("https://photos.example/")) return new Response(new Blob(["jpeg"]));
     if (url.endsWith("/cases") && init?.method === "POST") {
       return Response.json(
-        { case_id: card.case_id, token: "fx-secret", challenge_text: "Hold up the code 7Q2M." },
-        { status: createStatus },
+        {
+          case_id: card.case_id,
+          token: WRITE_TOKEN,
+          read_token: READ_TOKEN,
+          challenge_text: "Hold up the code 7Q2M.",
+        },
+        { status: opts.status ?? 201 },
       );
     }
-    if (url.endsWith(`/cases/${card.case_id}/card`)) return Response.json(card);
+    if (url.endsWith(`/cases/${card.case_id}/card`)) {
+      return Response.json({ ...card, state: opts.state ?? card.state });
+    }
     return new Response("not found", { status: 404 });
   }) as typeof fetch;
 }
@@ -44,11 +64,12 @@ const msg: InboundMessage = {
   receivedAt: "2026-11-14T03:00:00Z",
 };
 
-const config = (calls: Call[], status = 201) => ({
+const config = (calls: Call[], opts: Parameters<typeof mockApi>[1] = {}) => ({
   apiUrl: "http://api.test",
   webUrl: "http://web.test",
   allowedThreads: new Set(["fx-thread-renter"]),
-  fetch: mockApi(calls, status),
+  renterSalt: SALT,
+  fetch: mockApi(calls, opts),
 });
 
 test("inbound message -> one API call -> one reply containing the case link", async () => {
@@ -59,7 +80,7 @@ test("inbound message -> one API call -> one reply containing the case link", as
   const posts = calls.filter((c) => c.method === "POST");
   assert.equal(posts.length, 1);
   assert.equal(first(posts).url, "http://api.test/cases");
-  assert.equal(first(posts).body?.get("renter_id"), renterId("fx-thread-renter"));
+  assert.equal(first(posts).body?.get("renter_id"), renterId("fx-thread-renter", SALT));
   assert.equal(first(posts).body?.getAll("photos").length, 1);
 
   assert.equal(photon.sent.length, 1);
@@ -67,6 +88,43 @@ test("inbound message -> one API call -> one reply containing the case link", as
   assert.match(first(photon.sent).text, new RegExp(`http://web\\.test/case/${card.case_id}`));
   assert.match(first(photon.sent).text, /FIXTURE/);
   assert.match(first(photon.sent).text, /Hold up the code 7Q2M\./);
+});
+
+for (const [state, headline] of [
+  ["hold", "Hold off for now."],
+  ["dont_pay", "Don't pay. Something here doesn't match."],
+  ["verified", "Checks passed. Still follow the two rules."],
+] as const) {
+  test(`the first line is the locked headline for ${state}`, async () => {
+    const photon = mockPhoton();
+    await handleMessage(msg, photon, config([], { state }));
+    assert.equal(first(photon.sent).text.split("\n")[0], headline);
+    assert.equal(HEADLINES[state], headline);
+  });
+}
+
+test("no case token ever appears in the reply", async () => {
+  for (const state of ["hold", "dont_pay", "verified"]) {
+    const photon = mockPhoton();
+    await handleMessage(msg, photon, config([], { state }));
+    const text = first(photon.sent).text;
+    assert.ok(!text.includes(WRITE_TOKEN), "write token leaked");
+    assert.ok(!text.includes(READ_TOKEN), "read token leaked");
+  }
+});
+
+test("if the API call throws, the renter still gets a safe reply", async () => {
+  const photon = mockPhoton();
+  assert.equal(await handleMessage(msg, photon, config([], { throws: true })), true);
+  assert.deepEqual(photon.sent, [{ threadId: "fx-thread-renter", text: COULD_NOT_CHECK }]);
+});
+
+test("the renter id is a keyed hash: not plain sha256, and it changes with the salt", () => {
+  const plain = createHash("sha256").update("fx-thread-renter").digest("hex");
+  const id = renterId("fx-thread-renter", SALT);
+  assert.ok(!plain.includes(id.replace("imsg-", "")));
+  assert.notEqual(id, renterId("fx-thread-renter", "fx-other-salt"));
+  assert.equal(id, renterId("fx-thread-renter", SALT));
 });
 
 test("a thread not on the allowlist gets nothing and starts nothing", async () => {
@@ -89,7 +147,7 @@ test("the API never sees the thread id or handle", async () => {
 
 test("a used-up daily limit is said plainly, in the renter's thread only", async () => {
   const photon = mockPhoton();
-  await handleMessage(msg, photon, config([], 429));
+  await handleMessage(msg, photon, config([], { status: 429 }));
   assert.deepEqual(
     photon.sent.map((s) => s.threadId),
     ["fx-thread-renter"],

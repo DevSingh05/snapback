@@ -7,8 +7,11 @@
  * person who posted a listing, and SNAPBACK never texts first.
  *
  * Env: API_URL, WEB_URL, SIDECAR_ALLOWED_THREADS (comma-separated thread ids; empty answers
- * nobody).
+ * nobody), SIDECAR_RENTER_SALT (keys the renter id hash; set it so ids, and daily limits, survive
+ * a restart).
  */
+
+import { randomBytes } from "node:crypto";
 
 import { type MessageClient } from "./handler";
 
@@ -19,6 +22,12 @@ const allowed = (process.env.SIDECAR_ALLOWED_THREADS ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+/** Keys the renter id hash. Without the env value, a per-process salt (ids change on restart). */
+export const renterSalt = process.env.SIDECAR_RENTER_SALT || randomBytes(32).toString("hex");
+if (!process.env.SIDECAR_RENTER_SALT) {
+  console.warn("[sidecar] SIDECAR_RENTER_SALT is not set; renter ids will change on restart.");
+}
 
 export async function apiIsUp(): Promise<boolean> {
   try {
