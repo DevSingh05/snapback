@@ -399,3 +399,26 @@ test("[L] the Watching reply says a restart ends the watch", async () => {
   const { renter } = await linked();
   assert.match(renter.sent[0] ?? "", /restart/i);
 });
+
+// --- round 3 (XO 21:55) ---------------------------------------------------------------------
+
+test("[M] after a restart, a code issued before the restart never links, even inside the hour", async () => {
+  const start = Date.parse("2026-11-14T15:00:00Z");
+  // A linked K7P4QX at 14:50; the sidecar restarts at 15:00 and the API replays watch_added.
+  const book = new WatchBook(() => start);
+  const thief = space(RENTER);
+  await pushEvents(events(watchAdded(CODE, SESSION, new Date(start - 10 * 60 * 1000))), book, WEB);
+  await runPhoton(app([[thief, said(`watch ${CODE.toLowerCase()}`)]]), config(book));
+  assert.equal(book.size(), 0);
+  assert.match(thief.sent[0] ?? "", /did not match a watch/);
+});
+
+test("[L] a watch_added with no time is never offered", async () => {
+  const book = new WatchBook();
+  const renter = space(RENTER);
+  const timeless = watchAdded(CODE);
+  delete timeless.at;
+  await pushEvents(events(timeless), book, WEB);
+  await runPhoton(app([[renter, said(`watch ${CODE}`)]]), config(book));
+  assert.equal(book.size(), 0);
+});

@@ -2,9 +2,11 @@
  * iMessage watch alerts (M10, Vidyut's ruling R-M1): the one case where SNAPBACK texts first.
  *
  * - The renter taps "Watch on iMessage" in the web Finder (`POST /finder/{sid}/watch`). The API
- *   publishes `watch_added` for that Finder session with a one-time 4-digit code, and the web
- *   shows "Text WATCH 4821 to SNAPBACK". Texting exactly that, from an allowlisted thread,
- *   links the thread to the Finder session. A code links once and expires after CODE_TTL_MS.
+ *   publishes `watch_added` for that Finder session with a one-time code (6+ characters, no
+ *   look-alikes), and the web shows "Text WATCH K7P4QX to SNAPBACK". Texting exactly that, from
+ *   an allowlisted thread, links the thread to the Finder session. A code links once, expires
+ *   CODE_TTL_MS after the event's own time, and only codes issued since this sidecar started
+ *   are offered.
  * - When `match_found` for that session arrives on the events stream, the thread gets one
  *   code-written message: "Simulated" when the event is, the record line, and the place's
  *   Walk it first link. At most MAX_PUSHES_A_DAY in any 24 hours per thread, and the count
@@ -71,7 +73,14 @@ export class WatchBook {
   private sent = new Map<string, number[]>(); // per thread, kept across stop and re-link
   private seen = new Set<string>(); // event ids already acted on
 
-  constructor(private now: () => number = Date.now) {}
+  private readonly started: number;
+
+  constructor(private now: () => number = Date.now) {
+    // A code issued before this sidecar started is never offered: the API replays its whole
+    // log to a fresh sidecar, and a replayed code may already have been used ("If SNAPBACK
+    // restarts, the watch ends; link it again").
+    this.started = now();
+  }
 
   size(): number {
     return this.byThread.size;
@@ -87,6 +96,7 @@ export class WatchBook {
     if (!CODE.test(key) || this.used.has(key)) return;
     const at = event.at ? Date.parse(event.at) : Number.NaN;
     if (Number.isNaN(at)) return; // no time to expire it by: never offered
+    if (at < this.started) return; // issued before this sidecar started: may be used already
     const other = this.codes.get(key);
     if ((other && other.session !== session) || this.refused.has(key)) {
       this.codes.delete(key);
