@@ -678,3 +678,14 @@
     display: none;
   }
 }
+
+/* Open outside on the real scan: the building's aerial over the scan's dollhouse. */
+.tour-aerial-over {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+}
+.tour-aerial-over .sv-still {
+  flex: 1;
+}

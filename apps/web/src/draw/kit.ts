@@ -44,7 +44,8 @@ export type Tone =
 
 export type Prim =
   | { k: "poly"; pts: string; c: string }
-  | { k: "line"; x1: number; y1: number; x2: number; y2: number; c: string };
+  | { k: "line"; x1: number; y1: number; x2: number; y2: number; c: string }
+  | { k: "dot"; cx: number; cy: number; r: number; c: string };
 
 /** One named thing in a scene. `fine` parts are small detail, dropped at small sizes. */
 export interface Part {
@@ -79,6 +80,12 @@ export function makeScene(o: Origin) {
     const [x1, y1] = project(a, o);
     const [x2, y2] = project(b, o);
     return { k: "line", x1, y1, x2, y2, c };
+  };
+
+  /** A round thing (a head, a knob) at a point, `r` in screen units. */
+  const dot = (c: string, at: P3, r: number): Prim => {
+    const [cx, cy] = project(at, o);
+    return { k: "dot", cx, cy, r, c };
   };
 
   /** A rectangle on the plane y = const (it faces +y, the mid-lit side). */
@@ -353,6 +360,7 @@ export function makeScene(o: Origin) {
   return {
     poly,
     line,
+    dot,
     onX,
     onY,
     onZ,

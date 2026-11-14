@@ -60,7 +60,7 @@ describe("TourView in fixture mode (no SDK)", () => {
   it("reads top to bottom for a first visit, and the rail follows the stop on screen", async () => {
     render(<TourView plan={FIXTURE_TOUR} />);
     expect(screen.getByTestId("tour-intro")).toHaveTextContent(
-      `Walk it first.Press play to walk all ${FIXTURE_TOUR.stops.length} stops in 39 seconds, or pick Explore to look around yourself.`,
+      `Walk it first.Press play to walk all ${FIXTURE_TOUR.stops.length} stops in 37 seconds, or pick Explore to look around yourself.`,
     );
     expect(screen.getByTestId("tour-next")).toHaveAttribute("href", FIXTURE_TOUR.links.tour_prep);
     expect(screen.getByText(`Step 1 of ${FIXTURE_TOUR.stops.length}`)).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe("TourView in fixture mode (no SDK)", () => {
   it("plays by itself like a video, pauses on any interaction with the page, and stops at the end", () => {
     vi.useFakeTimers();
     render(<TourView plan={FIXTURE_TOUR} />);
-    act(() => void vi.advanceTimersByTime(5000));
+    act(() => void vi.advanceTimersByTime(2000));
     expect(title()).toBe("Arrive outside");
     act(() => void vi.advanceTimersByTime(1000));
     expect(title()).toBe("Front door");

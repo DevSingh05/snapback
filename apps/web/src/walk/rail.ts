@@ -18,13 +18,20 @@ export interface RailItem {
 
 const kindOf = (e: TraceEvent): string => e.kind;
 const ALIAS = /\bP\d+\b/;
+/** A live run names its agents as hand-offs: "sub-agent: place", "sub-agent done: place". */
+const SUB_AGENT = /^sub-agent(?: done)?:\s*(.+)$/i;
+
+/** The agent an "agent" event hands to, in the rail's own short names. */
+export function agentName(pick: string): string {
+  return (SUB_AGENT.exec(pick.trim())?.[1] ?? pick).trim();
+}
 
 export function railItems(events: TraceEvent[]): RailItem[] {
   let agent = MAIN_AGENT;
   return [...events]
     .sort((a, b) => a.seq - b.seq)
     .map((event) => {
-      if (kindOf(event) === "agent" && event.pick) agent = event.pick;
+      if (kindOf(event) === "agent" && event.pick) agent = agentName(event.pick);
       const alias = ALIAS.exec(`${event.pick ?? ""} ${event.reason}`)?.[0] ?? null;
       return { event, agent, alias };
     });
@@ -94,9 +101,13 @@ const lower = (s?: string | null) => (s ?? "").trim().toLowerCase();
 
 /**
  * The agent step behind a walk stop, as the step's seq. Outside is the record agent's first step,
- * a stop with an ad photo is the place agent's search that placed that photo, and every other
- * stop is the walk agent's step (the one that names this room, else its first). Read only from
- * the trace, the stop and the photo's evidence row. Null when the trace is empty.
+ * a stop with an ad photo is the step that placed that photo, and every other stop is the step
+ * that names its room. Recorded and live traces differ: a recorded run names agents and photos
+ * (P1, P2) and room picks, a live run hands to sub-agents and names photos only in counts. So
+ * each stop matches by the photo's alias or id, then the room's label, and falls back on the
+ * step of the same kind of work (locating photos, picking the floor plan whose rooms are walked,
+ * the verdict at the end). Read only from the trace, the stop and the photo's evidence row. Null
+ * when the trace is empty.
  */
 export function stepForStop(
   items: RailItem[],
@@ -104,15 +115,32 @@ export function stepForStop(
   photo: EvidencePhoto | null = null,
 ): number | null {
   if (items.length === 0) return null;
-  const lane = (name: string) => {
-    const own = items.filter((i) => i.agent === name);
-    return own.length > 0 ? own : items;
-  };
+  const own = (name: string) => items.filter((i) => i.agent === name);
   const kindIs = (i: RailItem, kind: string) => (i.event.kind as string) === kind;
-  if (stop.kind === "arrive") return lane("record")[0]!.event.seq;
-  if (stop.kind === "outro") return items.at(-1)!.event.seq;
+  const words = (i: RailItem) => `${i.event.pick ?? ""} ${i.event.reason}`;
+  const says = (i: RailItem, token: string) =>
+    new RegExp(`(^|[^\\w])${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w]|$)`, "i").test(
+      words(i),
+    );
+  const locating = (i: RailItem) => kindIs(i, "tool") && /locat|plac/i.test(words(i));
+  const floorPlan = (i: RailItem) =>
+    kindIs(i, "choice") && (i.event.choice === "which_floor_plan" || /floor plan/i.test(words(i)));
+  const seq = (i: RailItem | undefined) => i?.event.seq ?? null;
+
+  if (stop.kind === "arrive") {
+    const record = own("record");
+    return (
+      seq(record[0]) ??
+      seq(items.find((i) => kindIs(i, "choice") && /record/i.test(words(i)))) ??
+      items[0]!.event.seq
+    );
+  }
+  if (stop.kind === "outro")
+    return seq([...items].reverse().find((i) => kindIs(i, "verdict"))) ?? items.at(-1)!.event.seq;
+
   if (stop.photos.length > 0) {
-    const pool = lane("place");
+    const place = own("place");
+    const pool = place.length > 0 ? place : items;
     const won = [...(photo?.searches ?? [])]
       .reverse()
       .find((s) => s.result === "placed" || s.result === "elsewhere");
@@ -120,15 +148,35 @@ export function stepForStop(
       photo && won
         ? pool.find((i) => kindIs(i, "choice") && i.event.pick === won.option)
         : undefined;
-    const named = photo ? pool.find((i) => i.alias === photo.alias) : undefined;
-    const base = pool.find((i) => kindIs(i, "tool"));
-    return (picked ?? (won?.option === "base" ? base : named) ?? named ?? base ?? pool[0]!).event
-      .seq;
+    const tokens = [photo?.alias, ...stop.photos.flatMap((p) => [p.alias, p.photo_id])].filter(
+      (t): t is string => Boolean(t),
+    );
+    const named =
+      pool.find((i) => tokens.some((t) => i.alias === t || says(i, t))) ??
+      items.find((i) => tokens.some((t) => i.alias === t || says(i, t)));
+    const base = pool.find(locating) ?? items.find(locating);
+    const exact = picked ?? (won?.option === "base" ? base : undefined) ?? named;
+    if (exact) return exact.event.seq;
+    // Nothing names this photo (a live run counts photos, it does not name them): spread the
+    // photo stops over the steps that placed photos, in the photo's own order (P1, P2, ...), so
+    // the lit step moves with the walk and is always one about placing the ad's photos.
+    const placing = [
+      ...new Set([base, items.find(floorPlan), ...place].filter((i): i is RailItem => Boolean(i))),
+    ];
+    const n = Number(/\d+/.exec(photo?.alias ?? stop.photos[0]?.alias ?? "")?.[0] ?? 1);
+    return seq(placing[(Math.max(n, 1) - 1) % Math.max(placing.length, 1)] ?? pool[0]);
   }
-  const pool = lane("walk");
+
+  const walk = own("walk");
+  const pool = walk.length > 0 ? walk : items;
   const names = [lower(stop.room_label), lower(stop.title)].filter(Boolean);
-  const named = pool.find((i) => kindIs(i, "choice") && names.includes(lower(i.event.pick)));
-  return (named ?? pool[0]!).event.seq;
+  const named =
+    pool.find((i) => kindIs(i, "choice") && names.includes(lower(i.event.pick))) ??
+    items.find((i) => names.some((n) => n.length > 3 && says(i, n)));
+  if (named) return named.event.seq;
+  if (walk.length > 0) return walk[0]!.event.seq;
+  // A live run has no walk agent: the rooms walked are the floor plan the agent picked.
+  return seq(items.find(floorPlan)) ?? seq(items.find(locating)) ?? items[0]!.event.seq;
 }
 
 export const NO_PHOTO_LINE = "The ad showed no photo of this room.";

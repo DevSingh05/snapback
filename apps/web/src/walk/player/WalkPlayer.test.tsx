@@ -3,7 +3,7 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { FIXTURE_TOUR } from "../../tour/fixtureTour";
-import { ARRIVE_MS, PAN_MS } from "./timeline";
+import { ARRIVE_MS, LAND_MS, PAN_MS } from "./timeline";
 import { fakeClock } from "./transport";
 import { REDUCED_NOTE, WalkPlayer } from "./WalkPlayer";
 
@@ -110,7 +110,7 @@ describe("WalkPlayer", () => {
     expect(player()).toHaveAttribute("data-mode", "exploring");
     fireEvent.click(screen.getByTestId("wp-resume"));
     expect(player()).toHaveAttribute("data-mode", "playing");
-    expect(screen.getByTestId("wp-time")).toHaveTextContent("0:28");
+    expect(screen.getByTestId("wp-time")).toHaveTextContent("0:26");
     tick(1000);
     expect(title()).toBe("Bedroom");
   });
@@ -128,7 +128,7 @@ describe("WalkPlayer", () => {
     const { tick, title } = mount();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(title()).toBe("Front door");
-    expect(screen.getByTestId("wp-time")).toHaveTextContent("0:05");
+    expect(screen.getByTestId("wp-time")).toHaveTextContent("0:02");
     tick(PLAIN);
     expect(title()).toBe("Living room");
   });
@@ -138,7 +138,7 @@ describe("WalkPlayer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Chapter 4: Kitchen" }));
     tick(ARRIVE_MS + 200);
     expect(screen.getByTestId("wp-pin")).toHaveTextContent("The ad photo lands here");
-    tick(1200);
+    tick(LAND_MS);
     expect(screen.queryByTestId("wp-pin")).toBeNull();
   });
 

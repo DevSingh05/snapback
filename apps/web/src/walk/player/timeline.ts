@@ -1,11 +1,15 @@
 import type { TourStop } from "../../contracts";
 
 // The walk as a video timeline. Every stop is one chapter: the camera arrives, an ad photo placed
-// here lands and holds for a second, then the camera pans across the room and the tour moves on.
+// here fades over the view at its own pose and holds, then the camera pans across the room and the
+// tour moves on. The walk opens outside: a short beat on the building before the fly-in.
 // All times are milliseconds of tour time at 1x.
 
 export const ARRIVE_MS = 2000;
-export const LAND_MS = 1000;
+/** The ad photo over the view, at the pose it was taken from (fade in, hold, fade out). */
+export const LAND_MS = 1500;
+/** The opening beat outside the building, before the camera flies in to the first stop. */
+export const OUTSIDE_MS = 2600;
 export const PAN_MS = 3500;
 /** How far the real camera turns during one stop's pan, in degrees: a slow drift, never a spin. */
 export const PAN_DEG = 24;
@@ -20,6 +24,8 @@ export interface Chapter {
   duration: number;
   /** An ad photo was placed at this stop, so the chapter holds while it lands. */
   land: boolean;
+  /** The opening beat outside: no pan, no photo, then the fly-in. */
+  outside?: boolean;
 }
 
 export function hasLanding(stop: TourStop): boolean {
@@ -30,8 +36,10 @@ export function buildChapters(stops: TourStop[]): Chapter[] {
   let start = 0;
   return stops.map((stop, index) => {
     const land = hasLanding(stop);
-    const duration = ARRIVE_MS + (land ? LAND_MS : 0) + PAN_MS;
-    const chapter = { index, key: stop.key, title: stop.title, start, duration, land };
+    const outside = stop.kind === "arrive";
+    const duration = outside ? OUTSIDE_MS : ARRIVE_MS + (land ? LAND_MS : 0) + PAN_MS;
+    const chapter: Chapter = { index, key: stop.key, title: stop.title, start, duration, land };
+    if (outside) chapter.outside = true;
     start += duration;
     return chapter;
   });
@@ -62,7 +70,10 @@ export interface Moment {
   sweep: number;
 }
 
-export function momentAt(chapter: Pick<Chapter, "land">, t: number): Moment {
+export function momentAt(chapter: Pick<Chapter, "land" | "outside">, t: number): Moment {
+  // Outside, the whole beat is one slow push toward the door: no pan, no photo.
+  if (chapter.outside)
+    return { phase: "arrive", panMs: 0, sweep: Math.max(0, Math.min(t / OUTSIDE_MS, 1)) };
   const landEnd = ARRIVE_MS + (chapter.land ? LAND_MS : 0);
   const phase: Phase = t < ARRIVE_MS ? "arrive" : t < landEnd ? "land" : "pan";
   const panMs = Math.max(0, Math.min(t - landEnd, PAN_MS));
@@ -82,6 +93,12 @@ export interface DrawnPose {
 export const REST_POSE: DrawnPose = { x: 0, y: 0, zoom: 1, yaw: 0 };
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
+
+/** Outside: hold on the building, then push in toward its door for the fly-in. */
+export function outsidePose(sweep: number): DrawnPose {
+  const u = smooth(Math.max(0, Math.min((sweep - 0.35) / 0.65, 1)));
+  return { x: 0, y: -0.04 * u, zoom: 1 + 0.55 * u * u, yaw: 0 };
+}
 
 /** The drawn stage's camera: a slow push in while it glides and turns across the room. */
 export function drawnPose(sweep: number): DrawnPose {
