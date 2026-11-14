@@ -76,7 +76,7 @@ const AD_SIGNS: RegExp[] = [
 const WISH =
   /^\s*(please\s+)?(find|search|look(ing)? for|i('m| am) looking|i want|i need|we need|we want|need a|want a|help me find|get me|any|show me (places|homes|apartments|something))\b/i;
 const WISH_WORDS =
-  /\b(under|below|max|budget|up to)\s*\$?\s*\d|\$\s?\d|\bbeds?\b|\bbedroom|\bstudio\b|\b\d\s*br\b|\bparking\b|walk-?ups?|\bpets?\b|\bdogs?\b|\bcats?\b|\bnear\b|\bdowntown\b|\bapartments?\b|\bplaces?\b|\bhomes?\b/i;
+  /\bbudget(?: is| of)?\s*\$?\s*\d|\b(under|below|max|budget|up to)\s*\$?\s*\d|\$\s?\d|\bbeds?\b|\bbedroom|\bstudio\b|\b\d\s*br\b|\bparking\b|walk-?ups?|\bpets?\b|\bdogs?\b|\bcats?\b|\bnear\b|\bdowntown\b|\bapartments?\b|\bplaces?\b|\bhomes?\b/i;
 const CHECK_WORDS =
   /\bpaste\b.*\b(ad|listing)\b|\b(check|verify|scan)\b.*\b(ad|listing|post|this)\b|\b(scam|legit|fake|real)\b.*\??|\bis (this|it|the) (landlord|ad|listing|place) (real|legit|a scam|fake)\b/i;
 const PAYING =
@@ -102,13 +102,14 @@ export function viewFrom(text: string): View | null {
 
 /** A facebook.com (or fb.com) address. Its page is never fetched. */
 export function isFacebook(text: string): boolean {
-  return /(^|[/.@\s])(facebook\.com|fb\.com|fb\.me|m\.facebook\.com)\b/i.test(text);
+  // Any subdomain (www., m., l.) and fb.com / fb.me, with or without a scheme.
+  return /(^|[\s/@(<"'])(?:[a-z0-9-]+\.)*(facebook\.com|fb\.com|fb\.me)\b/i.test(text);
 }
 
 /** Removes Facebook addresses from pasted text, so only the renter's own words are sent. */
 export function withoutFacebookLinks(text: string): string {
   return text
-    .replace(/\S*(facebook\.com|fb\.com|fb\.me)\S*/gi, "")
+    .replace(/\S*\b(facebook\.com|fb\.com|fb\.me)\b\S*/gi, "")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
@@ -122,9 +123,14 @@ export function route(s: Submission): Intent {
   const text = s.text.trim();
   if (s.files > 0) return { kind: "check" };
   if (!text) return { kind: "check-ask" };
+  // Facebook keeps listings behind a login and its terms forbid scraping: its address is never
+  // fetched or sent. With the address removed, ad text is checked; anything else asks for it.
+  if (isFacebook(text)) {
+    const rest = withoutFacebookLinks(text);
+    const isAd = adSigns(rest) > 0 || STRONG_SIGNS.some((r) => r.test(rest)) || rest.length >= 120;
+    return { kind: isAd ? "check" : "check-fb" };
+  }
   const kind = classifyListingText(text).kind;
-  // Facebook keeps listings behind a login and its terms forbid scraping: never fetch it.
-  if (kind === "link" && isFacebook(text)) return { kind: "check-fb" };
   if (kind === "link") return { kind: "check" };
   // A link inside longer text is an ad pasted with its address.
   if (/https?:\/\/\S+/i.test(text)) return { kind: "check" };
@@ -140,6 +146,8 @@ export function route(s: Submission): Intent {
   // or a short question ("Is $600 by Zelle normal?" is a question, not an ad).
   if (!wish && !question && (strong || signs >= 2 || long)) return { kind: "check" };
   if (!wish && (signs >= 3 || text.length >= 400)) return { kind: "check" };
+  // "Looking for a responsible tenant... deposit by Zelle": a wish opener does not hide an ad.
+  if (wish && strong && (signs >= 2 || text.length >= 80)) return { kind: "check" };
   if (view && text.length < 120) return { kind: "open", view };
   if (wish) return { kind: "find" };
   if (CHECK_WORDS.test(text) && text.length < 120)
@@ -176,18 +184,22 @@ export const SWITCH_LABEL: Record<Intent["kind"], string> = {
 /** The max rent in the renter's words, or null. "1500", "$1,500", "1.5k". */
 export function rentFrom(text: string): number | null {
   const t = text.toLowerCase();
-  const m =
-    /(?:under|below|max|up to|at most|less than|budget(?: is| of)?|around|about)\s*\$?\s*([\d,.]+)\s*(k)?\b/.exec(
-      t,
-    ) ??
-    /\$\s*([\d,.]+)\s*(k)?\b/.exec(t) ??
-    /^\s*([\d,.]+)\s*(k)?\s*(?:a month|\/mo|per month)?\s*$/.exec(t); // a bare amount
-  if (!m) return null;
-  let n = Number(m[1]!.replace(/,/g, ""));
-  if (m[2]) n *= 1000;
-  if (!Number.isFinite(n)) return null;
-  n = Math.round(n);
-  return n >= 300 && n <= 20000 ? n : null;
+  const patterns = [
+    /(?:under|below|max|up to|at most|less than|budget(?: is| of)?|around|about)\s*\$?\s*([\d,.]+)\s*(k)?\b/g,
+    /\$\s*([\d,.]+)\s*(k)?\b/g,
+    /^\s*([\d,.]+)\s*(k)?\s*(?:a month|\/mo|per month)?\s*$/g, // a bare amount
+  ];
+  // Every candidate in order; the first that reads as a monthly rent wins ("about 2 beds $1200").
+  for (const re of patterns) {
+    for (const m of t.matchAll(re)) {
+      let n = Number(m[1]!.replace(/,/g, ""));
+      if (m[2]) n *= 1000;
+      if (!Number.isFinite(n)) continue;
+      n = Math.round(n);
+      if (n >= 300 && n <= 20000) return n;
+    }
+  }
+  return null;
 }
 
 export function briefFromWords(text: string): RenterBrief {
@@ -195,13 +207,17 @@ export function briefFromWords(text: string): RenterBrief {
   const brief: RenterBrief = {};
   const rent = rentFrom(t);
   if (rent) brief.max_rent_month = rent;
-  const beds = /(\d)\s*(?:\+\s*)?(?:-\s*)?(?:bed|br|bd|bedroom)s?\b/.exec(t);
+  // A range ("2-3 bedroom", "2 to 3 beds") keeps its lower end.
+  const beds =
+    /(\d)\s*(?:-|to)\s*\d\s*(?:bed|br|bd|bedroom)s?\b/.exec(t) ??
+    /(\d)\s*(?:\+\s*)?(?:bed|br|bd|bedroom)s?\b/.exec(t);
   if (beds) brief.beds_min = Number(beds[1]);
   else if (/\bstudio\b/.test(t)) brief.beds_min = 0;
   if (/\bno walk-?ups?\b|\belevator\b|\bground floor\b|\bno stairs\b/.test(t))
     brief.needs_no_walkup = true;
   if (/\bparking\b|\bgarage\b/.test(t)) brief.needs_parking = true;
-  if (/\bpets?\b|\bdogs?\b|\bcats?\b/.test(t)) brief.pets = true;
+  if (/\bpets?\b|\bdogs?\b|\bcats?\b/.test(t) && !/\bno (pets?|dogs?|cats?)\b/.test(t))
+    brief.pets = true;
   return brief;
 }
 

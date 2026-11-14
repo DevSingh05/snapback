@@ -986,3 +986,18 @@
     display: none;
   }
 }
+
+.ob-card-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.ob-over-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ob-over-kicker .chip {
+  padding: 1px var(--sp-1);
+  font-size: 0.65rem;
+}

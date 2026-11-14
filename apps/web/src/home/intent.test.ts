@@ -44,11 +44,51 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(withoutFacebookLinks(`https://www.facebook.com/marketplace/item/1 ${AD}`)).toBe(AD);
   });
 
+  it("an ad that opens like a wish is still an ad", () => {
+    expect(
+      at(
+        "Looking for a responsible tenant. 2 bed 1 bath, $1,200 per month, deposit by Zelle, text me 713-555-0101",
+      ),
+    ).toBe("check");
+    expect(
+      at(
+        "I need someone to take over my lease asap. 1br $950/month utilities included, contact me",
+      ),
+    ).toBe("check");
+    expect(at("Any interested renters? Studio downtown $800 a month, Zelle deposit only")).toBe(
+      "check",
+    );
+  });
+
+  it("finds a Facebook address with or without a scheme and never routes it anywhere else", () => {
+    for (const u of [
+      "facebook.com/marketplace/item/1",
+      "www.facebook.com/marketplace/item/1",
+      "https://m.facebook.com/marketplace/item/1",
+      "https://l.facebook.com/l.php?u=x",
+      "fb.com/marketplace/item/1",
+      "https://fb.me/abc",
+    ])
+      expect(isFacebook(u), u).toBe(true);
+    expect(isFacebook("notfacebook.company.com")).toBe(false);
+    // With the address removed, ad text is checked; anything else asks for the text.
+    expect(at("facebook.com/marketplace/item/123\n2 bed 1 bath $1500")).toBe("check");
+    expect(at("is facebook.com/marketplace/item/1 legit?")).toBe("check-fb");
+    expect(at("Is https://www.facebook.com/marketplace/item/1 legit?")).toBe("check-fb");
+    expect(at("is facebook.com/marketplace/item/1 legit?", { caseOnScreen: true })).toBe(
+      "check-fb",
+    );
+    expect(withoutFacebookLinks("facebook.com/marketplace/item/123\n2 bed 1 bath $1500")).toBe(
+      "2 bed 1 bath $1500",
+    );
+  });
+
   it("a wish or a budget goes to the Finder", () => {
     expect(at("find me a 1 bed under 1500")).toBe("find");
     expect(at("Find me a 1 bed under $1,500 near downtown")).toBe("find");
     expect(at("looking for a studio with parking")).toBe("find");
     expect(at("2 bed under $2,000, pets ok")).toBe("find");
+    expect(at("My budget is 1.5k")).toBe("find");
   });
 
   it("a question while a case is on screen is answered about it", () => {
@@ -99,6 +139,15 @@ describe("reading a wish", () => {
       needs_no_walkup: true,
       pets: true,
     });
+  });
+
+  it("reads no-pets, ranges and amounts after other numbers correctly", () => {
+    expect(briefFromWords("no pets please").pets).toBeUndefined();
+    expect(briefFromWords("no dogs please").pets).toBeUndefined();
+    expect(briefFromWords("2-3 bedroom near downtown").beds_min).toBe(2);
+    expect(briefFromWords("2 to 3 beds").beds_min).toBe(2);
+    expect(rentFrom("about 2 beds $1200")).toBe(1200);
+    expect(rentFrom("My budget is 1.5k")).toBe(1500);
   });
 
   it("asks for the max rent only when no amount is known", () => {

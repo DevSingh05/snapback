@@ -161,7 +161,7 @@ function FinderHead({ children, actions }: { children?: ReactNode; actions?: Rea
 // ---------------------------------------------------------------------------------------------
 // Small pieces shared by both modes.
 
-export function Icon({ name }: { name: "mic" | "send" | "speaker" | "stop" | "talk" | "close" }) {
+function Icon({ name }: { name: "mic" | "send" | "speaker" | "stop" | "talk" | "close" }) {
   const paths: Record<typeof name, ReactNode> = {
     mic: (
       <>
@@ -217,7 +217,7 @@ export function LevelMeter({ level }: { level: number }) {
   );
 }
 
-export type Voice = ReturnType<typeof useVoiceInput>;
+type Voice = ReturnType<typeof useVoiceInput>;
 
 /**
  * One mic, like a dictation key: hold it and talk, let go to send; or tap once to start and tap

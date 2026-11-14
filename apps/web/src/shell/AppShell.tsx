@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { loadPrefs, savePrefs, TABS, type Prefs, type Section } from "./prefs";
 import { applyTheme, defaultTheme, initialChoice, saveTheme, type ThemeChoice } from "./theme";
@@ -48,6 +48,16 @@ export function AppShell({ section, context, children }: Props) {
   const [open, setOpen] = useState(false);
   // Phones: one row (mark and Menu); the tabs and tools open below it.
   const [menu, setMenu] = useState(false);
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  const menuPanel = useRef<HTMLDivElement>(null);
+  // Opening moves focus to the first tab in the panel.
+  useEffect(() => {
+    if (menu) menuPanel.current?.querySelector<HTMLElement>("a, button")?.focus();
+  }, [menu]);
+  const closeMenu = (refocus: boolean) => {
+    setMenu(false);
+    if (refocus) menuBtn.current?.focus();
+  };
 
   const pick = (t: ThemeChoice) => {
     setPicked(t);
@@ -66,6 +76,7 @@ export function AppShell({ section, context, children }: Props) {
           <span className="wordmark app-wordmark">SNAPBACK</span>
         </a>
         <button
+          ref={menuBtn}
           type="button"
           className="app-menu-btn"
           aria-expanded={menu}
@@ -74,7 +85,20 @@ export function AppShell({ section, context, children }: Props) {
         >
           {menu ? "Close" : "Menu"}
         </button>
-        <div id="app-menu" className="app-menu" data-open={menu || undefined}>
+        <div
+          id="app-menu"
+          ref={menuPanel}
+          className="app-menu"
+          data-open={menu || undefined}
+          onKeyDown={(e) => {
+            if (menu && e.key === "Escape") closeMenu(true);
+          }}
+          onBlur={(e) => {
+            const next = e.relatedTarget as Node | null;
+            if (!menu || !next) return;
+            if (!e.currentTarget.contains(next) && next !== menuBtn.current) closeMenu(false);
+          }}
+        >
           <nav className="app-tabs" aria-label="Main">
             {shown.map((t) => (
               <a

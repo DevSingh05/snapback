@@ -78,7 +78,7 @@ export const RULES_REPLY =
   "Two rules: never pay before a signed lease and a viewing, and never pay by Zelle, wire or gift card. If you have the ad, paste it here and I'll check it.";
 
 export const FB_ASK =
-  "Facebook keeps listings behind a login. Paste the listing text here and add its photos, and we'll check it.";
+  "Facebook keeps listings behind a login. Paste the listing text here and add its photos, and I'll check it.";
 
 const UNSURE_CHECK = "Check it as an ad";
 const UNSURE_FIND = "Find places like this";
@@ -110,7 +110,7 @@ type Item =
     }
   | { id: number; type: "places"; brief: RenterBrief; scansOnly: boolean; note: string }
   | { id: number; type: "picks"; picks: FinderPick[]; source: DataSource }
-  | { id: number; type: "offer"; proposal: FinderProposal }
+  | { id: number; type: "offer"; proposal: FinderProposal; source: DataSource }
   | { id: number; type: "open"; view: View }
   | { id: number; type: "error"; text: string };
 
@@ -165,7 +165,8 @@ export function OneBox(props: Props) {
   }, []);
 
   useEffect(() => {
-    end.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    end.current?.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "end" });
   }, [items.length, busy]);
 
   // --- The Finder: one session for this tab, opened the first time it is needed.
@@ -191,7 +192,9 @@ export function OneBox(props: Props) {
 
   /** Words for the Finder. Offline, code reads the words and lists places, and says so. */
   const askFinder = useCallback(
-    async (words: string, asWish: boolean) => {
+    async (raw: string, asWish: boolean) => {
+      // A Facebook address is never sent to the Finder: only the renter's own words go.
+      const words = withoutFacebookLinks(raw);
       setBusy(asWish ? "Finding places that fit" : "Thinking about your question");
       try {
         const a = await finder();
@@ -208,7 +211,9 @@ export function OneBox(props: Props) {
           ...(asWish && picks.length
             ? [{ type: "picks" as const, picks, source: reply.source }]
             : []),
-          ...offers.slice(0, 1).map((proposal) => ({ type: "offer" as const, proposal })),
+          ...offers
+            .slice(0, 1)
+            .map((proposal) => ({ type: "offer" as const, proposal, source: reply.source })),
         );
       } catch (err) {
         if (err instanceof FinderOffline || err instanceof FinderGone) {
@@ -583,7 +588,9 @@ function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
           <button type="button" className="ob-can-item" onClick={() => onAsk(SAMPLE_AD)}>
             <SamplePhoto src={sampleBuilding} alt="An apartment building, from below">
               <span className="ob-over ob-over-verdict">
-                <span className="ob-over-kicker">Case 7Q2M</span>
+                <span className="ob-over-kicker">
+                  Case 7Q2M <SourceChip source="fixture" />
+                </span>
                 <span className="ob-over-word">Hold off for now</span>
               </span>
             </SamplePhoto>
@@ -595,7 +602,7 @@ function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
           <button
             type="button"
             className="ob-can-item"
-            onClick={() => onAsk("Find me a 1 bed near downtown")}
+            onClick={() => onAsk("Find me a 1 bed under $1,500 near downtown")}
           >
             <SamplePhoto src={sampleLounge} alt="A bright living room with a pale green sofa">
               <span className="ob-over">
@@ -690,7 +697,8 @@ function useScanPhoto(caseId: string): string | null {
         });
         if (!ev?.ok) return;
         const body = (await ev.json()) as { photos?: { alias: string; status: string }[] };
-        const photo = body.photos?.find((p) => p.status !== "not_placed") ?? null;
+        // Only a photo placed in the claimed home: another home's scan would mislead.
+        const photo = body.photos?.find((p) => p.status === "located_in_claimed") ?? null;
         if (!photo) return;
         const img = await apiFetchRead(
           `/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(photo.alias)}/scan.jpg`,
@@ -1058,7 +1066,7 @@ function ThreadItem({
     case "offer":
       return (
         <li className="ob-card-row">
-          <OfferCard proposal={it.proposal} onDecided={onDecided} />
+          <OfferCard proposal={it.proposal} source={it.source} onDecided={onDecided} />
         </li>
       );
     case "open":
@@ -1500,7 +1508,8 @@ function PlacesCard({
         <p className="ob-card-kicker">
           {scansOnly ? "Places you can walk first" : `Places for ${briefWords(brief)}`}
         </p>
-        {load.s === "ready" && <SourceChip source={load.source} />}
+        {/* Until the server says what it served, claim only FIXTURE, never LIVE. */}
+        <SourceChip source={load.s === "ready" ? load.source : "fixture"} />
       </header>
       <p className="ob-muted">{note}</p>
       {load.s === "loading" && <p className="ob-muted">Looking up researched places…</p>}
@@ -1601,9 +1610,11 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
 
 function OfferCard({
   proposal,
+  source,
   onDecided,
 }: {
   proposal: FinderProposal;
+  source: DataSource;
   onDecided: (p: FinderProposal, yes: boolean) => Promise<void>;
 }) {
   const [done, setDone] = useState<null | boolean>(null);
@@ -1618,8 +1629,11 @@ function OfferCard({
     <article className="ob-card ob-offer" data-testid="ob-offer">
       <header className="ob-card-head">
         <p className="ob-card-kicker">Keep this?</p>
-        <span className="ob-stamp" data-by={proposal.chosen_by}>
-          {STAMP[proposal.chosen_by]}
+        <span className="ob-card-tags">
+          <span className="ob-stamp" data-by={proposal.chosen_by}>
+            {STAMP[proposal.chosen_by]}
+          </span>
+          <SourceChip source={source} />
         </span>
       </header>
       <p className="ob-card-text">{proposal.text}</p>
