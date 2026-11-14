@@ -93,3 +93,24 @@ describe("pickSweep fixture fallback", () => {
     expect(pickSweep("fx-sweep-03", [])).toBeNull();
   });
 });
+
+describe("poseToSdkCall with the locator's viewer angles (#244)", () => {
+  it("uses yaw_deg and pitch_deg over the quaternion when the pose carries them", () => {
+    const call = poseToSdkCall({
+      sweep_id: "s9",
+      position: [1, 2, 3],
+      rotation_quat: [0.5, 0.5, 0.5, 0.5], // would read as a steep pitch
+      fov_deg: 62,
+      yaw_deg: -175.3,
+      pitch_deg: -13.2,
+    });
+    expect(call.options.rotation).toEqual({ x: -13.2, y: -175.3 });
+    expect(call.fovDeg).toBe(62);
+  });
+
+  it("reads the quaternion when the pose has no angles", () => {
+    const q: [number, number, number, number] = [0, Math.SQRT1_2, 0, Math.SQRT1_2];
+    const call = poseToSdkCall({ sweep_id: "s9", position: [0, 0, 0], rotation_quat: q });
+    expect(call.options.rotation.y).toBeCloseTo(quatToYawPitch(q).yaw);
+  });
+});

@@ -160,11 +160,14 @@ function TwinViewInner({
       });
       let moved: Promise<unknown> = Promise.resolve();
       if (sdk) {
+        const pose = locate.poses[id]!;
         const call = poseToSdkCall({
           sweep_id: target.sweepId,
           position: target.position,
-          rotation_quat: locate.poses[id]!.rotation_quat,
+          rotation_quat: pose.rotation_quat,
           fov_deg: target.fovDeg,
+          yaw_deg: pose.yaw_deg,
+          pitch_deg: pose.pitch_deg,
         });
         if (reduced)
           call.options = { ...call.options, transition: "transition.instant", transitionTime: 0 };
