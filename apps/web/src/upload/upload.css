@@ -122,3 +122,14 @@
     align-self: flex-start;
   }
 }
+
+.upload-submit {
+  border: 0;
+  background: var(--act, var(--blue));
+  color: var(--on-act, var(--surface));
+}
+.upload-secondary:disabled,
+.upload-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
