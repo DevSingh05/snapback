@@ -77,11 +77,13 @@ MODEL_FIELDS: dict[str, list[str]] = {
     "rent_max": ["maxRent"],
     "rent_pricing": ["rentPricingType"],
     "units_available": ["numUnitsAvailable"],  # 0 is a real answer: none reported available
+    "availability_url": ["availabilityUrl"],  # the plan's own availability page, LIVE local only
 }
 UNIT_FIELDS: dict[str, list[str]] = {
     "unit": ["unitNumber", "unit", "name"],
     "beds": ["numBeds"],
     "floor_plan": ["floorPlanName", "floorPlan", "modelName"],
+    "availability_url": ["availabilityUrl"],
 }
 ENUMS_FILE = "enums.json"
 
@@ -250,6 +252,38 @@ def _host(url: Any) -> str | None:
     if not host:
         return None
     return host.lower().removeprefix("www.")
+
+
+def _web_url(value: Any) -> str | None:
+    """A kit link kept only when it is a plain http(s) URL; anything else is unknown."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return None
+    return text[:500]
+
+
+def _availability_urls(record: dict[str, Any]) -> tuple[dict[int, str], str | None]:
+    """Availability links on the commercial record's models (and units). Returns the first link
+    per bed count, and one link for the building: a model's first, else a unit's."""
+    by_beds: dict[int, str] = {}
+    building: str | None = None
+    unit_link: str | None = None
+    for model in _get(record, "propertyApartment.models") or []:
+        if not isinstance(model, dict):
+            continue
+        link = _web_url(_first(model, MODEL_FIELDS["availability_url"]))
+        beds = _as_float(_get_any(model, MODEL_FIELDS["beds"]))
+        if link:
+            building = building or link
+            if beds is not None:
+                by_beds.setdefault(int(beds), link)
+        for unit in model.get("units") or []:
+            if isinstance(unit, dict) and unit_link is None:
+                unit_link = _web_url(_first(unit, UNIT_FIELDS["availability_url"]))
+    return by_beds, building or unit_link
 
 
 def _floor_plan_rents(
@@ -476,6 +510,7 @@ def parse_record(
     }
     fields.update(_building_facts(record))
     fields["manager_since"] = _manager_since(record)
+    by_beds, fields["availability_url"] = _availability_urls(record)
     if sales is not None:
         fields["sale_history_known"] = True
         fields["last_sale"] = sales.get(str(pid))
@@ -484,6 +519,9 @@ def parse_record(
     fields["site_phone_hash"] = phone_hash(str(phone), phone_salt()) if phone else None
     if listing is not None:
         _apply_listing(fields, listing, enums)
+        for band in fields.get("floor_plan_rents") or []:
+            if band.beds is not None and band.availability_url is None:
+                band.availability_url = by_beds.get(band.beds)
     return PropertyRecord(**fields)
 
 
@@ -523,13 +561,14 @@ def coverage(kit_dir: Path) -> dict[str, Any]:
     if path is None:
         raise KitNotFoundError(f"{PROPERTY_FILE} is not under {kit_dir}")
     fields = {name: dict.fromkeys(paths, 0) for name, paths in FIELDS.items()}
-    records = with_models = year_events = 0
-    model_fields = dict.fromkeys(["numBeds", "numBaths", "units"], 0)
-    unit_fields = dict.fromkeys(["unitNumber", "numBeds"], 0)
+    records = with_models = year_events = with_url = 0
+    model_fields = dict.fromkeys(["numBeds", "numBaths", "units", "availabilityUrl"], 0)
+    unit_fields = dict.fromkeys(["unitNumber", "numBeds", "availabilityUrl"], 0)
     for obj in _iter_jsonl(path):
         records += 1
         with_models += bool(_model_ids(obj))
         year_events += _year_built(obj) is not None
+        with_url += _availability_urls(obj)[1] is not None
         for model in _get(obj, "propertyApartment.models") or []:
             if not isinstance(model, dict):
                 continue
@@ -569,6 +608,7 @@ def coverage(kit_dir: Path) -> dict[str, Any]:
         "fields": fields,
         "listings": listings,
         "listing_fields": listing_fields,
+        "records_with_availability_url": with_url,  # a count only, never a link
     }
 
 

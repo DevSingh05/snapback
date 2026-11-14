@@ -112,3 +112,27 @@ def test_coverage_counts_model_and_unit_fields():
     report = coverage(costar_jsonl.FIXTURE_KIT)
     assert report["model_fields"]["numBeds"] > 0 and report["model_fields"]["numBaths"] > 0
     assert report["unit_fields"]["unitNumber"] > 0 and report["unit_fields"]["numBeds"] > 0
+
+
+def test_availability_url_is_read_per_floor_plan_and_none_when_absent():
+    rents = load_records(DataSource.FIXTURE)["fx-prop-3"].floor_plan_rents
+    by_beds = {r.beds: r for r in rents}
+    assert by_beds[1].availability_url == "https://fixture-living.example/floorplans/1-bed"
+    assert by_beds[0].availability_url is None
+    assert load_records(DataSource.FIXTURE)["fx-prop-3"].availability_url == (
+        "https://fixture-living.example/floorplans/1-bed"
+    )
+
+
+def test_availability_url_rejects_non_web_values():
+    assert costar_jsonl._web_url("javascript:alert(1)") is None
+    assert costar_jsonl._web_url("") is None
+    assert costar_jsonl._web_url("example.com/x") is None
+    assert costar_jsonl._web_url(" https://a.example/x ") == "https://a.example/x"
+
+
+def test_coverage_counts_availability_urls_without_values():
+    report = coverage(costar_jsonl.FIXTURE_KIT)
+    assert report["records_with_availability_url"] == 1
+    assert report["model_fields"]["availabilityUrl"] == 1
+    assert "fixture-living" not in json.dumps(report)

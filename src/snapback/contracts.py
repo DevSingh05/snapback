@@ -574,6 +574,9 @@ class FloorPlanRent(BaseModel):
     per_bed: bool = False  # priced per bed: never compare with a whole-unit rent
     baths: float | None = None  # search (council 4): bathrooms on the floor plan
     units_available: int | None = None  # units CoStar reported available at its last research
+    # The plan's availability page on the record. LIVE local only: never in a fixture contract
+    # file, card.png, the report pack, the MCP output or the iMessage text.
+    availability_url: str | None = None
 
 
 class UnitOnRecord(BaseModel):
@@ -606,6 +609,8 @@ class PropertyRecord(BaseModel):
     # snapback.agent.rules.contact.phone_hash(number, phone_salt()), a keyed hash.
     site_phone_hash: str | None = None
     website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
+    # One availability page on the record (a model's, else a unit's). LIVE local only.
+    availability_url: str | None = None
     # Shown only to the office, in the confirm email and page, so it can tell which ad this is.
     building_name: str | None = None
     street_address: str | None = None
