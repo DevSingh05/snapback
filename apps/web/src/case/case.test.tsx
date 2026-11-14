@@ -16,6 +16,7 @@ import {
   PriceBar,
   ProofPair,
   RealListing,
+  SaferTiles,
   flaggedLines,
   hostLink,
   markRuns,
@@ -157,6 +158,47 @@ describe("what to do now", () => {
   });
 });
 
+describe("beside the ledger", () => {
+  it("the real listing, else the pasted ad, sits in the side column; else the ledger is alone", () => {
+    const alone = render(<CaseResult card={card} />);
+    expect(document.querySelector(".case-side")).toBeNull();
+    expect(document.querySelector(".case-body-with-side")).toBeNull();
+    alone.unmount();
+    const ad = render(<CaseResult card={card} adText="2 bed near downtown." />);
+    expect(document.querySelector(".case-side")).toHaveAttribute("data-side", "ad");
+    expect(document.querySelector(".case-side")).toContainElement(screen.getByTestId("case-ad"));
+    ad.unmount();
+    render(
+      <CaseResult
+        card={card}
+        adText="2 bed near downtown."
+        realListing={{ case_id: "7Q2M", source: "fixture", building_name: "Fixture Court" }}
+      />,
+    );
+    const side = document.querySelector(".case-body-with-side > .case-side")!;
+    expect(side).toHaveAttribute("data-side", "real");
+    expect(side.firstElementChild).toBe(screen.getByTestId("case-real"));
+  });
+
+  it("keeps every character of a NOT SHOWN line and leaves the state to the state word", () => {
+    render(<Ledger card={card} />);
+    const row = screen.getByText(/Being inside does not mean/).closest("tr")!;
+    expect(row).toHaveTextContent("NOT SHOWN. Being inside does not mean they may rent it.");
+    expect(row.querySelector(".case-line-tone")).toHaveTextContent("NOT SHOWN.");
+    expect(row.querySelector(".ui-state")).toHaveTextContent("Not confirmed");
+    expect(css).toMatch(/\.case-line-tone\s*\{[^}]*text-transform:\s*lowercase/);
+  });
+
+  it("the case page mounts no chart block and no old places strip", async () => {
+    render(<CardPage caseId="7Q2M" variant="result" />);
+    await waitFor(() => expect(screen.getByTestId("case-band")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByTestId("case-tile").length).toBeGreaterThan(0));
+    expect(screen.getAllByTestId("case-tile").length).toBeLessThanOrEqual(3);
+    expect(document.querySelector("[data-testid='place-row'], .pf-row")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Every number comes from eval/);
+  });
+});
+
 describe("the ledger", () => {
   it("puts every check on the table: what fails first, then what passes, then what was not checked", () => {
     render(<Ledger card={card} />);
@@ -199,7 +241,7 @@ describe("the ledger", () => {
     expect(row).toHaveTextContent("Zelle before a viewing. Red flag.");
     expect(row).toHaveTextContent("Warning");
     // A line with no ad words runs across both columns.
-    const other = screen.getByText(/NOT SHOWN\. Being inside/).closest("td");
+    const other = screen.getByText(/Being inside does not mean/).closest("td");
     expect(other).toHaveAttribute("colspan", "2");
   });
 
@@ -464,31 +506,61 @@ describe("safer places to go to", () => {
     place(6, "https://www.apartments.com/fx-6/"),
   ];
 
-  it("shows at most three tiles, only for places with a plain https hand-off", () => {
-    expect(saferTiles(places).map((t) => t.place.property_id)).toEqual(["fx-1", "fx-4", "fx-5"]);
+  it("shows at most three tiles, each led by a stamped photo, with one link", () => {
     render(<CaseResult card={card} saferPlaces={places} />);
     const tiles = screen.getAllByTestId("case-tile");
     expect(tiles).toHaveLength(3);
+    for (const tile of tiles) {
+      expect(tile.querySelectorAll("img")).toHaveLength(1);
+      expect(tile).toHaveTextContent("SAMPLE PHOTO");
+      expect(tile).toHaveTextContent("COSTAR RECORD · FIXTURE");
+      expect(tile.querySelectorAll("a, button")).toHaveLength(0);
+    }
     expect(tiles[0]).toHaveAttribute("href", "https://www.apartments.com/fx-1/");
+    expect(tiles[0]).toHaveAttribute("target", "_blank");
     expect(tiles[0]).toHaveTextContent("SAFER: LISTED ON APARTMENTS.COM");
     expect(tiles[0]).toHaveTextContent("Its listing on Apartments.com");
-    expect(tiles[0]).toHaveTextContent("COSTAR RECORD · FIXTURE");
-    // A place on the building's own site is not labelled as an Apartments.com listing.
-    expect(tiles[2]).not.toHaveTextContent("APARTMENTS.COM");
+    // The step and the rail point at the tiles on this page.
+    expect(document.getElementById("safer")).toBe(screen.getByTestId("case-tiles"));
+    for (const link of screen.getAllByRole("link", { name: "Find me safer places like this" }))
+      expect(link).toHaveAttribute("href", "#safer");
   });
 
-  it("only at the end of a result that did not pass", () => {
+  it("uses a hand-off only when it is a plain https link; otherwise the walk or the prep", () => {
+    const tiles = saferTiles([
+      place(1, "javascript:alert(1)"),
+      { ...place(2, null), has_3d_scan: true, plan_key: "2b/2b" },
+      place(3, "https://fixtureliving.example/"),
+      place(4, "https://www.apartments.com/fx-4/"),
+    ]);
+    expect(tiles.map((t) => [t.href, t.label, t.out])).toEqual([
+      ["/prep/place/fx-1", "Tour prep", false],
+      ["/tour/fx-2?plan_key=2b%2F2b", "Walk it first", false],
+      ["https://fixtureliving.example/", "Its listing on Apartments.com", true],
+    ]);
+    render(<SaferTiles places={[place(1, null), place(3, "https://fixtureliving.example/")]} />);
+    const shown = screen.getAllByTestId("case-tile");
+    // Only a link to Apartments.com is labelled as an Apartments.com listing.
+    expect(shown[0]).toHaveTextContent("RESEARCHED PLACE");
+    expect(shown[0]).not.toHaveAttribute("target");
+    expect(shown[1]).toHaveTextContent("SAFER: ON COSTAR'S RECORD");
+    expect(shown[1]).not.toHaveTextContent("LISTED ON APARTMENTS.COM");
+  });
+
+  it("only at the end of a result that did not pass; else the step goes to the Finder", () => {
     const { unmount } = render(
       <CaseResult card={{ ...card, state: "verified" }} saferPlaces={places} />,
     );
     expect(screen.queryByTestId("case-tiles")).toBeNull();
+    for (const link of screen.getAllByRole("link", { name: "Find me safer places like this" }))
+      expect(link).toHaveAttribute("href", "/finder");
     unmount();
     const failed = render(
       <CaseResult card={{ ...card, state: "dont_pay" }} saferPlaces={places} />,
     );
     expect(screen.getByTestId("case-tiles")).toBeInTheDocument();
     failed.unmount();
-    render(<CaseResult card={card} saferPlaces={[place(2, null)]} />);
+    render(<CaseResult card={card} saferPlaces={[]} />);
     expect(screen.queryByTestId("case-tiles")).toBeNull();
   });
 

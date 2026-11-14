@@ -51,6 +51,26 @@ export function groupLines(card: Card): Record<LedgerGroup, Entry[]> {
   return groups;
 }
 
+// A line that opens with the API's capitals for "not shown" keeps every character, but the
+// capitals are set in sentence case by CSS: the state word beside the line already says it.
+const SHOUTED = /^(NOT SHOWN\.)([\s\S]*)$/;
+
+function LineText({ text }: { text: string }) {
+  const parts = SHOUTED.exec(text);
+  return (
+    <span className="case-line-text">
+      {parts ? (
+        <>
+          <span className="case-line-tone">{parts[1]}</span>
+          {parts[2]}
+        </>
+      ) : (
+        text
+      )}
+    </span>
+  );
+}
+
 interface LedgerProps {
   card: Card;
   // The words of the pasted ad that a line is about, when the caller has them.
@@ -97,7 +117,7 @@ function LedgerRow({
         colSpan={hasAd && !ad ? 2 : 1}
         data-label={ad ? "The record says" : ""}
       >
-        <span className="case-line-text">{line.text}</span>
+        <LineText text={line.text} />
         {record ? <RecordLine source={record} live={source} /> : null}
         {price ? <PriceBar price={price} /> : null}
       </td>

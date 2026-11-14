@@ -59,9 +59,11 @@ describe("CardView with card_hold.json", () => {
 });
 
 describe("Lab placement", () => {
-  it("is on the result page and hidden on the verify page", async () => {
+  it("is on neither the result page nor the verify page", async () => {
+    // Conductor ruling, Sat 18:2x: the Lab chart block leaves the case result entirely.
     const result = render(<CardPage caseId={card.case_id} variant="result" />);
-    expect(await result.findByTestId("lab-panel")).toBeInTheDocument();
+    await result.findByTestId("case-id");
+    expect(result.queryByTestId("lab-panel")).toBeNull();
     result.unmount();
     const verify = render(<CardPage caseId={card.case_id} variant="verify" />);
     await verify.findByTestId("case-id");

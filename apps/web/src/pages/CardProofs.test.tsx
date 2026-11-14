@@ -26,7 +26,9 @@ describe("locked wording", () => {
     render(<CardView card={card} variant="result" />);
     const zelle = screen.getByText("Zelle before a viewing. Red flag.").closest("tr");
     expect(zelle).toHaveTextContent("Warning");
-    const waiting = screen.getByText(/NOT SHOWN\. Being inside/).closest("tr");
+    // The line keeps every character the API sent; only the capitals are set calmer by CSS.
+    const waiting = screen.getByText(/Being inside does not mean/).closest("tr");
+    expect(waiting).toHaveTextContent("NOT SHOWN. Being inside does not mean they may rent it.");
     expect(waiting).toHaveTextContent("Not confirmed");
   });
 

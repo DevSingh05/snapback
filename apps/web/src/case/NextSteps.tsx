@@ -26,7 +26,7 @@ export const APARTMENTS_SEARCH = {
 export function caseSteps(
   caseId: string,
   walk: boolean,
-  saferHref = "#safer",
+  saferHref = "/finder",
   passed = false,
 ): NextStep[] {
   const id = encodeURIComponent(caseId);

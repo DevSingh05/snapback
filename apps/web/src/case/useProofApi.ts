@@ -1,6 +1,7 @@
-// The two proof reads for the case page: the real listing and the places that can be handed
-// off. Both need the API and the case's read token (in a header, never in an address). With no
-// API, no token, or a route that is not there yet, they give nothing and the page stands.
+// The two proof reads for the case page: the real listing and the researched places to go to
+// instead. On a live run both use the case's read token (in a header, never in an address);
+// in fixture mode the places are the team's synthetic ones and there is no real listing. With
+// no token, or a route that is not there yet, they give nothing and the page stands.
 import { useEffect, useState } from "react";
 
 import { apiBase, apiFetchRead } from "../api";
@@ -36,7 +37,7 @@ export function useRealListing(caseId: string): RealListing | null {
 export function useSaferPlaces(caseId: string, wanted: boolean): SaferPlace[] {
   const [places, setPlaces] = useState<SaferPlace[]>([]);
   useEffect(() => {
-    if (!wanted || !apiBase()) return;
+    if (!wanted) return;
     const ctrl = new AbortController();
     fetchAlternatives(caseId, ctrl.signal)
       .then((found) => {

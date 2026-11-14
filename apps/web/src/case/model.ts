@@ -163,7 +163,7 @@ export interface RealListing {
   as_of?: string | null;
 }
 
-/** A PlaceMatch from /alternatives that carries a way out to its own listing. */
+/** A PlaceMatch from /alternatives, with the hand-off to its own listing when the API has one. */
 export interface SaferPlace {
   property_id: string;
   floor_plan?: string | null;
@@ -171,6 +171,8 @@ export interface SaferPlace {
   availability_text?: string | null;
   scan_text?: string | null;
   office_on_record?: string | null;
+  plan_key?: string | null;
+  has_3d_scan?: boolean;
   source: DataSource;
   handoff_url?: string | null;
   handoff_label?: string | null;

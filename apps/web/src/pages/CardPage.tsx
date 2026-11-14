@@ -10,10 +10,7 @@ import {
   useSaferPlaces,
 } from "../case";
 import "../case/case.css";
-import { LabSection } from "../lab";
-import { loadBrief } from "../search/api";
 import { OfficeConfirm } from "../office/OfficeConfirm";
-import { PlacesStrip } from "../search/PlacesStrip";
 import { replayForCase } from "../replay";
 import { Loading, Problem } from "../ui";
 import type { Card } from "../contracts";
@@ -36,21 +33,12 @@ function ReplayLink({ caseId }: { caseId: string }) {
 }
 
 // The card as a case result (design v4 ticket 3). The pieces live in ../case; this file only
-// loads the card and hangs the page's own extras under the ledger.
-export function CardView({
-  card,
-  variant,
-  withLab = false,
-}: {
-  card: Card;
-  variant: "result" | "verify";
-  withLab?: boolean;
-}) {
+// loads the card and hangs the page's own extras under the next steps.
+export function CardView({ card, variant }: { card: Card; variant: "result" | "verify" }) {
   const proof = useProof(card);
   return (
     <CaseResult card={card} variant={variant} proof={proof}>
       <ReplayLink caseId={card.case_id} />
-      {withLab ? <LabSection /> : null}
     </CaseResult>
   );
 }
@@ -70,12 +58,8 @@ function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) 
       realListing={realListing}
       saferPlaces={saferPlaces}
     >
-      <div id="safer" className="case-safer">
-        <PlacesStrip caseId={card.case_id} brief={loadBrief(card.case_id)} />
-      </div>
       <OfficeConfirm caseId={card.case_id} onChanged={onChanged} />
       <ReplayLink caseId={card.case_id} />
-      <LabSection />
     </CaseResult>
   );
 }

@@ -47,7 +47,7 @@ export interface CaseResultProps {
   realListing?: RealListingData | null;
   // Places from /alternatives; the ones with a hand-off link become tiles on a failed result.
   saferPlaces?: SaferPlace[];
-  // Where "Find me safer places like this" goes.
+  // Where "Find me safer places like this" goes. Left out: the tiles below, else the Finder.
   saferHref?: string;
   // Anything the page adds under the next steps (the safer places, the office check).
   children?: ReactNode;
@@ -65,7 +65,7 @@ export function CaseResult({
   price,
   realListing = null,
   saferPlaces: safer_places = [],
-  saferHref = "#safer",
+  saferHref: saferTo,
   children,
 }: CaseResultProps) {
   const id = encodeURIComponent(card.case_id);
@@ -75,6 +75,11 @@ export function CaseResult({
   const history = historySteps(card.for_sale);
   // A result that did not pass: it gets the reasons heading and the places to go to instead.
   const failed = card.state === "hold" || card.state === "dont_pay";
+  const tiles = own && failed && safer_places.length > 0;
+  // "Safer places" goes to the tiles on this page when they are there, else to the Finder.
+  const saferHref = saferTo ?? (tiles ? `#safer${key}` : "/finder");
+  // Beside the ledger: the real listing when the API has it, and the pasted ad when we have it.
+  const side = Boolean(realListing || adText);
   const caseTag = (
     <>
       <span>
@@ -128,11 +133,16 @@ export function CaseResult({
         {proof ? <ProofPair {...proof} handoff={own && !inline} /> : null}
       </VerdictBand>
 
-      {realListing ? <RealListing listing={realListing} titleId={`case-real-title${key}`} /> : null}
-
-      <div className={`case-body${adText ? " case-body-with-ad" : ""}`}>
+      <div className={`case-body${side ? " case-body-with-side" : ""}`}>
         <Ledger card={card} adSays={adSays} price={price} titleId={`case-ledger-title${key}`} />
-        {adText ? <AnnotatedAd text={adText} marks={adMarks} origin={adOrigin} /> : null}
+        {side ? (
+          <div className="case-side" data-side={realListing ? "real" : "ad"}>
+            {realListing ? (
+              <RealListing listing={realListing} titleId={`case-real-title${key}`} />
+            ) : null}
+            {adText ? <AnnotatedAd text={adText} marks={adMarks} origin={adOrigin} /> : null}
+          </div>
+        ) : null}
       </div>
 
       {history.length > 0 ? (
@@ -155,8 +165,8 @@ export function CaseResult({
         />
       ) : null}
 
-      {own && failed && safer_places.length > 0 ? (
-        <SaferTiles places={safer_places} titleId={`case-safer-title${key}`} />
+      {tiles ? (
+        <SaferTiles places={safer_places} id={`safer${key}`} titleId={`case-safer-title${key}`} />
       ) : null}
 
       {children}

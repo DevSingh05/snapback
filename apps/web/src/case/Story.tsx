@@ -94,7 +94,7 @@ export function Story() {
           </section>
         ) : null}
 
-        <div className="case-body case-body-with-ad" data-story="ad">
+        <div className="case-body case-body-with-side" data-story="ad">
           <Ledger
             card={card}
             adSays={(_row, line) => (line.label === "Rent vs record" ? rentWords : null)}
@@ -104,14 +104,16 @@ export function Story() {
                 : null
             }
           />
-          <AnnotatedAd
-            text={listing.trim()}
-            origin="STAGED LISTING"
-            marks={[
-              ...(rentWords ? [{ phrase: rentWords, kind: "mismatch" as const }] : []),
-              ...(link ? [{ phrase: link, kind: "warn" as const }] : []),
-            ]}
-          />
+          <div className="case-side" data-side="ad">
+            <AnnotatedAd
+              text={listing.trim()}
+              origin="STAGED LISTING"
+              marks={[
+                ...(rentWords ? [{ phrase: rentWords, kind: "mismatch" as const }] : []),
+                ...(link ? [{ phrase: link, kind: "warn" as const }] : []),
+              ]}
+            />
+          </div>
         </div>
 
         <RealListing
