@@ -362,3 +362,70 @@ def test_thresholds_reject_an_elsewhere_bar_below_the_placement_bar(tmp_path):
     )
     with pytest.raises(ValueError, match="elsewhere_min_inliers"):
         load_thresholds(copy)
+
+
+# --- locate semantics (red team H2/H3): elsewhere needs a named, indexed home ------------------
+
+
+def _sister_locator(twins, tmp_path):
+    """Only a same-plan neighbour (prop-9) is indexed; the claimed prop-3 is on record only."""
+    sweeps, _, catalog = twins
+    sister = sister_sweeps(sweeps, tmp_path)
+    index = LocateIndex.build("fx-h3", list(sister), TinyEmbedder())
+    models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
+    return Locator(index, {"fx-model-sister": sister}, Catalog(models), PatchMatcher(), THRESHOLDS)
+
+
+def test_no_claimed_home_identifies_the_home_never_elsewhere(twins, locator):
+    sweeps, _, _ = twins
+    photos = {"p1": listing_photo(sweeps, "fx-model-a", 2, 1)}
+    result = locator.locate("fx-id", photos, None)
+
+    photo = result.photos[0]
+    assert photo.status is LocateStatus.LOCATED_IN_CLAIMED
+    assert photo.matched_property_id == "fx-prop-1"
+    assert result.identified_by_scan is True
+    assert result.claimed_property_id == "fx-prop-1"
+    assert result.chosen.model_id == "fx-model-a"
+    assert "p1" in result.poses
+
+
+def test_claimed_home_set_keeps_identified_by_scan_false(twins, locator):
+    sweeps, _, _ = twins
+    result = locator.locate("fx-id2", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1")
+    assert result.identified_by_scan is False and result.claimed_property_id == "fx-prop-1"
+
+
+def test_unindexed_claimed_home_is_not_indexed_never_elsewhere(twins, tmp_path):
+    sweeps, _, _ = twins
+    locator = _sister_locator(twins, tmp_path)
+    photo = locator.locate(
+        "fx-h3", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-3"
+    ).photos[0]
+    assert photo.status is LocateStatus.NOT_INDEXED
+    assert photo.matched_property_id is None
+
+
+def test_photos_of_different_homes_with_no_claim_are_not_located(twins, locator):
+    sweeps, _, _ = twins
+    photos = {
+        "a": listing_photo(sweeps, "fx-model-a", 2, 1),
+        "b": listing_photo(sweeps, "fx-model-b", 0, 1),
+    }
+    result = locator.locate("fx-mixed", photos, None)
+    assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * 2
+    assert result.identified_by_scan is False and result.claimed_property_id is None
+    assert result.chosen is None
+
+
+def test_verdicts_on_identified_and_unindexed_results_are_never_dont_pay(twins, locator, tmp_path):
+    from snapback.contracts import DataSource, Evidence
+    from snapback.verdict import VerdictState, decide
+
+    sweeps, _, _ = twins
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    identified = locator.locate("v1", {"p": photo}, None)
+    unindexed = _sister_locator(twins, tmp_path).locate("v2", {"p": photo}, "fx-prop-3")
+    for result in (identified, unindexed):
+        evidence = Evidence(case_id=result.case_id, source=DataSource.FIXTURE, photos=result.photos)
+        assert decide(evidence).state in {VerdictState.HOLD, VerdictState.UNVERIFIED}

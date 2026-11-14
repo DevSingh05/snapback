@@ -117,6 +117,8 @@ export interface LocateResult {
   case_id: string;
   photos: LocatedPhoto[];
   poses: Record<string, Pose>;
+  claimed_property_id?: string | null;
+  identified_by_scan?: boolean;
 }
 
 // Mirrors PropertyRecord and AerialTile in src/snapback/contracts.py.
