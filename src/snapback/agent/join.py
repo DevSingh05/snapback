@@ -185,10 +185,17 @@ class JoinedModules:
         sent = self._listing.photos
         if not sent:
             return None
+        # Naming the building's model says its scan exists and is not in our index, which
+        # the card puts differently from "there is no scan". The id itself is never shown.
+        models = self._record.model_ids if self._record else []
         return LocateResult(
             case_id=case_id,
             photos=[
-                PhotoLocation(photo_id=f"l{number}", status=LocateStatus.NOT_INDEXED)
+                PhotoLocation(
+                    photo_id=f"l{number}",
+                    status=LocateStatus.NOT_INDEXED,
+                    model_id=models[0] if models else None,
+                )
                 for number in range(1, sent + 1)
             ],
             claimed_property_id=self._record.property_id if self._record else None,
