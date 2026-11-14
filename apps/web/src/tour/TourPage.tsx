@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SourceChip } from "../components/SourceChip";
+import { EvidenceDrawer, RENDER_NOTE } from "../evidence/EvidenceDrawer";
 import type { TourPlan, TourStop } from "../contracts";
 import { poseToSdkCall } from "../twin/pose";
 import { connectShowcase, embedUrl, watchSweeps, type ShowcaseSdk } from "../twin/showcase";
 import { useLiveAerial, canGoLive } from "../twin/useLiveAerial";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
+import { AgentRail } from "../walk/AgentRail";
+import { MismatchAerials } from "../walk/MismatchAerials";
+import { StageCaption, StopStage } from "../walk/StopStage";
+import { useNarrow } from "../walk/useNarrow";
+import { adViewOf, photoAt, walkLook } from "../walk/walkLook";
 import { fetchTour, type TourTarget } from "./api";
 import "./tour.css";
 
@@ -38,23 +44,6 @@ export function evenStops(ids: string[]): TourStop[] {
     { ...mk("door", "door", "Front door", ids[0]!), note: "Start of the 3D scan" },
     ...picks.map((id, i) => mk("stop", `stop-${i + 1}`, `Stop ${i + 1}`, id)),
   ];
-}
-
-function Placeholder({ stop, plan }: { stop: TourStop; plan: TourPlan }) {
-  return (
-    <div
-      className="tour-placeholder"
-      data-testid="tour-placeholder"
-      role="img"
-      aria-label={stop.title}
-    >
-      <span className="mono">Placeholder visual (fixture)</span>
-      <strong>{stop.title}</strong>
-      {stop.kind === "arrive" && plan.aerial?.captured_on && (
-        <span>Aerial photo captured {plan.aerial.captured_on}</span>
-      )}
-    </div>
-  );
 }
 
 interface ViewProps {
@@ -166,10 +155,19 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
   }, [autoplay, index, last, next]);
   const pause = () => setAutoplay(false);
 
+  // The look layer: evidence, trace events, coverage and the two-buildings case (walk/walkLook).
+  const narrow = useNarrow();
+  const look = useMemo(() => walkLook(plan, window.location.search), [plan]);
+  const [drawer, setDrawer] = useState<string | null>(null);
+  const placedPhoto = photoAt(stop, look.evidence);
+  const unshown = adViewOf(stop, look.evidence, Boolean(look.mismatch)) === "none_placed";
+  const firstAlias = placedPhoto?.alias ?? look.evidence?.photos[0]?.alias ?? null;
+
   const showAerial = stop.kind === "arrive" && aerial.status === "ready" && aerial.claimed.imageUrl;
   return (
     <div
       className="tour-page"
+      data-rail={look.events.length > 0 ? "on" : "off"}
       onPointerDownCapture={pause}
       onKeyDownCapture={pause}
       onWheelCapture={pause}
@@ -182,8 +180,24 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
         {live && !sdkFailed ? <SourceChip source="live" /> : <SourceChip source="fixture" />}
       </header>
       {plan.scan_label && <p className="tour-scan">This tour uses {plan.scan_label}.</p>}
+      {look.evidence && (
+        <p className="tour-render mono" data-testid="tour-render-note">
+          {RENDER_NOTE}
+        </p>
+      )}
+      {look.mismatch && (
+        <p className="tour-mismatch" role="note" data-testid="tour-mismatch">
+          <span className="tour-mismatch-mark" aria-hidden="true" />
+          {look.mismatch.banner}
+        </p>
+      )}
       <div className="tour-body">
-        <section className="tour-stage" aria-label="3D view">
+        <section
+          className="tour-stage"
+          aria-label="3D view"
+          data-drawer={drawer ? "open" : undefined}
+          data-unshown={unshown ? "true" : undefined}
+        >
           {live && modelId && sdkKey ? (
             <iframe
               ref={iframeRef}
@@ -194,8 +208,43 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
             />
           ) : showAerial ? (
             <img className="tour-aerial" src={showAerial} alt="Aerial view of the building" />
+          ) : look.mismatch && stop.kind === "arrive" ? (
+            <MismatchAerials
+              named={{ capturedOn: look.mismatch.namedCapturedOn }}
+              pictured={{ capturedOn: look.mismatch.picturedCapturedOn }}
+              source={plan.source}
+              officeLine={look.mismatch.officeLine}
+              officeName={look.mismatch.officeName}
+            />
           ) : (
-            <Placeholder stop={stop} plan={plan} />
+            <StopStage
+              key={stop.key}
+              stop={stop}
+              plan={plan}
+              reduced={reduced}
+              photoAlias={placedPhoto?.alias}
+              unshown={unshown}
+            />
+          )}
+          <StageCaption stop={stop} photoAlias={placedPhoto?.alias} unshown={unshown} />
+          {look.evidence && firstAlias && !drawer && (
+            <button
+              type="button"
+              className="tour-how"
+              data-testid="how-we-know"
+              onClick={() => setDrawer(firstAlias)}
+            >
+              How we know
+            </button>
+          )}
+          {look.evidence && drawer && (
+            <EvidenceDrawer
+              file={look.evidence}
+              alias={drawer}
+              onClose={() => setDrawer(null)}
+              reduced={reduced}
+              stacked={narrow}
+            />
           )}
         </section>
         <aside className="tour-panel" aria-live="polite">
@@ -261,11 +310,35 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
             </button>
           </div>
         </aside>
+        {look.events.length > 0 && (
+          <AgentRail
+            events={look.events}
+            source={plan.source}
+            evidence={look.evidence}
+            reduced={reduced}
+            onOpenPhoto={setDrawer}
+          />
+        )}
       </div>
-      <nav aria-label="Tour progress">
+      <nav className="tour-cover" aria-label="Tour progress">
+        {look.coverage?.line && (
+          <p className="tour-cover-line" data-testid="coverage-line">
+            {look.coverage.line}
+          </p>
+        )}
+        {look.coverage?.line && (
+          <p className="tour-cover-key" aria-hidden="true">
+            <span className="tour-key tour-key-placed">an ad photo was placed here</span>
+            <span className="tour-key tour-key-none">the ad showed no photo</span>
+          </p>
+        )}
         <ol className="tour-rail">
           {plan.stops.map((s, i) => (
-            <li key={s.key}>
+            <li
+              key={s.key}
+              data-kind={s.kind}
+              data-ad-view={adViewOf(s, look.evidence, Boolean(look.mismatch))}
+            >
               <button
                 type="button"
                 aria-current={i === Math.min(index, last) ? "step" : undefined}
