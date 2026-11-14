@@ -22,6 +22,7 @@ from PIL import Image
 from snapback.vision.locate.geometry import ransac_homography
 
 MATCH_SIDE = 1024  # images are matched at most this large on the long side
+FEATURE_KEY = "snapback_feature_key"  # Image.info key: where to keep this image's features
 
 
 class Matcher(Protocol):
@@ -143,10 +144,18 @@ class PatchMatcher:
 # --- DISK + LightGlue (the product matcher) ----------------------------------------------------
 
 
+@dataclass(frozen=True)
+class _Features:
+    keypoints: object  # torch tensor (n, 2)
+    descriptors: object  # torch tensor (n, 128)
+
+
 class DiskLightGlue:  # pragma: no cover - needs torch, kornia and a one-time weight download
     name = "disk+lightglue"
 
-    def __init__(self, max_keypoints: int = 2048, device: str | None = None) -> None:
+    def __init__(
+        self, max_keypoints: int = 2048, device: str | None = None, feature_dir=None
+    ) -> None:
         import kornia.feature as kf
         import torch
 
@@ -160,17 +169,46 @@ class DiskLightGlue:  # pragma: no cover - needs torch, kornia and a one-time we
         # cached; faces come back as the same objects from the locator's face cache.
         self._cache: OrderedDict[int, tuple] = OrderedDict()
         self.cache_size = 512
+        # Faces carry a key in Image.info; their DISK features are kept on disk under
+        # feature_dir (data/index/features, derived from sponsor imagery, deleted by purge).
+        self.feature_dir = feature_dir
 
     def _features(self, image: Image.Image):
         key = id(image)
         if key in self._cache and self._cache[key][0] is image:
             self._cache.move_to_end(key)
             return self._cache[key][1]
-        found = self._extract(image)
+        found = self._stored(image)
         self._cache[key] = (image, found)
         while len(self._cache) > self.cache_size:
             self._cache.popitem(last=False)
         return found
+
+    def _stored(self, image: Image.Image):
+        from pathlib import Path
+
+        name = image.info.get(FEATURE_KEY)
+        if self.feature_dir is None or not name:
+            return self._extract(image)
+        path = Path(self.feature_dir) / f"{name}.npz"
+        torch = self._torch
+        if path.is_file():
+            data = np.load(path)
+            feats = _Features(
+                torch.from_numpy(data["keypoints"].astype(np.float32)).to(self.device),
+                torch.from_numpy(data["descriptors"].astype(np.float32)).to(self.device),
+            )
+            return feats, float(data["scale"]), tuple(int(v) for v in data["size"])
+        feats, scale, size = self._extract(image)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            path,
+            keypoints=feats.keypoints.cpu().numpy().astype(np.float32),
+            descriptors=feats.descriptors.cpu().numpy().astype(np.float16),
+            scale=scale,
+            size=np.array(size),
+        )
+        return feats, scale, size
 
     def _extract(self, image: Image.Image):
         small, scale = _shrink(image)
