@@ -709,3 +709,27 @@ button {
     min-height: 45vh;
   }
 }
+
+.history {
+  margin: 12px clamp(18px, 4vw, 36px) 0;
+}
+.history ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-what {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
