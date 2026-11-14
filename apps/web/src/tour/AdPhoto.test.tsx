@@ -27,13 +27,16 @@ vi.mock("../twin/useReducedMotion", () => ({ usePrefersReducedMotion: () => fals
 import { FIXTURE_TOUR } from "./fixtureTour";
 import { TourView } from "./TourPage";
 
+// A plain response-shaped object, not `new Response(new Blob(...))`: jsdom's Blob has no
+// `stream()`, which the Node in CI (undici) needs to wrap one. The code under test only reads
+// `ok`, `headers` and `blob()`.
 const jpeg = () =>
-  Promise.resolve(
-    new Response(new Blob([new Uint8Array([0xff, 0xd8, 0xff])]), {
-      status: 200,
-      headers: { "content-type": "image/jpeg" },
-    }),
-  );
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "image/jpeg" }),
+    blob: () => Promise.resolve(new Blob([new Uint8Array([0xff, 0xd8, 0xff])])),
+  } as unknown as Response);
 
 beforeEach(() => {
   fetchRead.mockReset();
