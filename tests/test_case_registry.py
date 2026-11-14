@@ -108,6 +108,8 @@ def test_the_default_registry_makes_no_file_until_a_case_is_made(tmp_path):
 
 def test_delete_renter_finds_the_cases_the_api_registered(tmp_path):
     safety = pytest.importorskip("snapback.safety")
+    if not hasattr(safety, "SafetyStore"):
+        pytest.skip("lane D's safety store (D5, #84) is not on this branch")
     made = Settings(_env_file=None, snapback_data_dir=tmp_path)
     client = TestClient(create_app(made))  # the default registry: lane D's store
     mine = [
