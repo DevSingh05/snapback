@@ -610,3 +610,36 @@ def test_a_phone_next_to_a_street_is_removed_whole():
 
     out = clean_words("Text me at 713-555-0142 or 12 Main Street")
     assert "713" not in out and "555" not in out and "Main Street" not in out
+
+
+# --- the brief carries across turns (budget said without a dollar sign) --------------------------
+
+
+def _say(s, text):
+    return run_turn(s, finder.read_text(text), text)
+
+
+def test_a_budget_said_without_a_dollar_sign_is_read():
+    for text, budget in (
+        ("1 bed under 1500, no walk-ups", 1500),
+        ("budget 1,400", 1400),
+        ("max 1700 a month", 1700),
+        ("up to 950", 950),
+    ):
+        read = [s.rent_max for s in finder.read_text(text) if s.brief_field == "budget"]
+        assert read == [budget], text
+    # Numbers that are not a rent cap stay unread.
+    assert not [s for s in finder.read_text("1 bed 1 bath, call 713 555 0142") if s.brief_field]
+
+
+def test_the_budget_holds_on_later_turns_and_a_new_one_replaces_it(tmp_path):
+    s = new_session(tmp_path)
+    first = _say(s, "1 bed under 1700, no walk-ups")
+    walkup = next(p for p in first.proposals if p.key == "propose_no_walkup")
+    s.decide(walkup.id, accept=True)
+    again = _say(s, "show me again")  # no amount in this message
+    assert again.picks and all(p.rent_from <= 1700 for p in again.picks)
+    assert s.budget() == 1700
+    wider = _say(s, "actually up to 2000")
+    assert s.budget() == 2000
+    assert any(p.rent_from > 1700 for p in wider.picks)

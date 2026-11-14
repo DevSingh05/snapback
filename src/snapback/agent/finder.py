@@ -325,7 +325,13 @@ class SearchDesk:
 
 # --- the renter's words, read by code ------------------------------------------------------------
 
-_BUDGET = re.compile(r"\$\s?(\d{1,2},\d{3}|\d{3,5})\b")
+# "$1,500", "under 1500", "budget 1,400", "up to 950": a dollar sign, or a bare number right after
+# a cap word. A bare number elsewhere ("713 555 0142", "1 bed") is not a budget.
+_BUDGET = re.compile(
+    r"\$\s?(\d{1,2},\d{3}|\d{3,5})\b"
+    r"|\b(?:budget|under|max|maximum|up to|at most|below|less than|within)\s*(?:of\s+|is\s+)?"
+    r"(\d{1,2},\d{3}|\d{3,5})\b(?![-\s]\d{3,4}\b)"
+)
 
 # What `clean_words` takes out before the model sees a renter's words.
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
@@ -413,7 +419,7 @@ def read_text(text: str | None) -> list[FinderSignal]:
         out.append(FinderSignal(kind="brief", brief_field="pets"))
     m = _BUDGET.search(text)
     if m and re.search(r"budget|under|max|up to|at most|below|less than", low):
-        rent = int(m.group(1).replace(",", ""))
+        rent = int((m.group(1) or m.group(2)).replace(",", ""))
         out.append(FinderSignal(kind="brief", brief_field="budget", rent_max=rent))
     return out
 
