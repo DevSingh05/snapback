@@ -6,6 +6,9 @@
   --wp-bar: 104px;
   min-height: clamp(430px, 37vw, 560px);
 }
+.tour-stage:has(.wp[data-motion="reduced"]) {
+  --wp-bar: 136px;
+}
 .tour-stage:has(.wp) .rs-caption,
 .tour-stage:has(.wp) .sv-pane[data-role="corner"] {
   bottom: calc(var(--wp-bar) + 14px);
@@ -19,12 +22,11 @@
   transform: perspective(1600px) translate(var(--wp-x, 0), var(--wp-y, 0)) scale(var(--wp-zoom, 1))
     rotateY(var(--wp-yaw, 0deg));
   transform-origin: 50% 58%;
-  will-change: transform;
 }
 
 .wp {
   --wp-ink: var(--on-v-band);
-  --wp-plate: color-mix(in srgb, var(--v-band) 74%, transparent);
+  --wp-plate: color-mix(in srgb, var(--v-band) 82%, transparent);
   --wp-soft: color-mix(in srgb, var(--on-v-band) 16%, transparent);
   position: absolute;
   inset: 0;
@@ -121,6 +123,10 @@
   height: 9px;
   background: var(--zing);
   box-shadow: var(--glow-line);
+}
+
+.wp[data-ended] .wp-over {
+  display: none;
 }
 
 /* ---------- The big play mark while paused ---------- */
@@ -459,25 +465,77 @@
   display: none;
 }
 
+/* Phone: the stage is a column (the view, then its captions), so the bar sits right under the
+   view instead of over it, and the overlays keep to the view's own 4:3 box. */
 @media (max-width: 760px) {
-  .tour-stage:has(.wp) {
-    --wp-bar: 78px;
-    min-height: 400px;
+  .tour-stage:has(.wp),
+  .tour-stage:has(.wp[data-motion="reduced"]) {
+    --wp-bar: 0px;
+    min-height: 0;
+    container-type: inline-size;
   }
-  .tour-stage:has(.wp[data-mode="exploring"]) {
-    --wp-bar: 128px;
+  .tour-stage:has(.wp) .sv-pane[data-role="corner"] {
+    bottom: 10px;
   }
-  .wp-chapters {
+  .wp,
+  .wp-bar {
+    position: static;
+  }
+  .wp-bar {
+    min-height: 0;
+    padding: 6px 10px 8px;
+    background: var(--v-band);
+  }
+  .wp-shield,
+  .wp-ghost {
+    inset: 0 0 auto;
+    height: 75cqw;
+  }
+  .wp-big,
+  .wp-end {
+    top: 37.5cqw;
+  }
+  .wp-end {
+    padding: 14px 16px 16px;
+  }
+  .wp-end-title {
+    font-size: 1.2rem;
+  }
+  .wp-end-line {
     display: none;
   }
-  .wp-now {
-    visibility: visible;
+  .wp-over {
+    left: 10px;
+    top: 46px;
+  }
+  .wp-room {
+    font-size: 1.1rem;
+    padding: 6px 10px 7px;
+  }
+  .wp-caption {
+    display: none;
+  }
+  .wp-pin {
+    font-size: 0.86rem;
+    padding: 5px 10px;
+  }
+  .wp-chapters,
+  .wp-now,
+  .wp-dim,
+  .wp-go .wp-icon {
+    display: none;
   }
   .wp-row {
-    justify-content: space-between;
+    gap: 2px;
   }
-  .wp-over {
-    top: 46px;
+  .wp-time {
+    margin: 0 auto 0 6px;
+  }
+  .wp-speed {
+    min-width: 44px;
+  }
+  .wp-go {
+    padding: 0 14px;
   }
   .wp-hint {
     flex: 1;

@@ -307,6 +307,7 @@ export function WalkPlayer({
       data-testid="walk-player"
       data-mode={state.mode}
       data-surface={surface}
+      data-ended={state.ended && !exploring ? "true" : undefined}
       data-motion={reduced ? "reduced" : "full"}
     >
       <Crossfade index={index} off={reduced} />
