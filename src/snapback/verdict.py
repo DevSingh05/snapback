@@ -140,11 +140,16 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules
         ),
         rule_flag=any(hit.red_flag for hit in modules.rules),
-        for_sale_flag=_for_sale(modules) is ForSaleStatus.ACTIVE,
+        # For sale holds a case, unless the ad's phone is the office's on record: then the
+        # brokerage itself is offering the home, and it is information (ruling, Sat 03:36).
+        for_sale_flag=(
+            _for_sale(modules) is ForSaleStatus.ACTIVE and not _the_ad_is_the_office_s(modules)
+        ),
         recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
         phone_flag=(
             modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
         ),
+        phone_confirmed=_the_ad_is_the_office_s(modules),
         lookalike_link_flag=(
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
@@ -167,6 +172,7 @@ REASON_ORDER = (
     # (Owner of record goes here.)
     "reason.authority_matches",
     "reason.authority_unknown",
+    "reason.phone_not_confirmed",
     "reason.phone_flag",
     "reason.lookalike_link",
     "reason.license_not_found",
@@ -198,6 +204,12 @@ def _license(modules: ModuleEvidence) -> LicenseStatus | None:
     return modules.license.status if modules.license else None
 
 
+def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
+    """The phone in the listing is the leasing office's on record."""
+    authority = modules.authority
+    return authority is not None and authority.office_phone_match is PhoneMatch.YES
+
+
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """Turn the evidence for one case into a verdict with plain-language reasons.
 
@@ -205,16 +217,18 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     1. Only proof gives DONT_PAY: a forged reply, or a photo taken in another property. A record
        mismatch is not proof (owners live elsewhere, agents act for them), with or without a
        red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
-       leasing office's, a unit that does not fit the record and a claimed licence we could
-       not find are not proof either.
+       leasing office's, a unit that does not fit the record and a licence number in the ad that is
+       not active are not proof either.
     2. No photo placed in the claimed property gives UNVERIFIED, with what the record
        flagged listed among the reasons. One thing outranks it: a home listed for sale is
        HOLD, with that reason first, whether or not any photo could be placed.
-    3. Presence proven, authority matching the record and no red flag of any kind gives
-       VERIFIED.
+    3. Presence proven, authority matching the record, the ad's phone being the leasing
+       office's on record, and no red flag of any kind gives VERIFIED. The phone is needed
+       (red team H1, Sat 03:25): anyone can type the manager's public name, and a door code
+       or a former tenant gets a photo taken inside. A name match alone never verifies.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
        (price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike
-       link, unit, a claimed licence with no active one under that name), or a phone that
+       link, unit, a licence number in the ad that is not active), or a phone that
        is not the leasing office's (not a red flag by itself, but not confirmed either).
 
     Two things hold nothing by themselves (ruling, Sat 01:20): a name that is not the one on
@@ -253,7 +267,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             ("reason.for_sale", evidence.for_sale_flag),
             ("reason.lookalike_link", evidence.lookalike_link_flag),
             ("reason.unit_flag", evidence.unit_flag),
-            # A18 (#124): the poster claims a licence and no active one holds that name.
+            # A18 (#124): the ad gives a licence number that is not an active Texas licence.
             ("reason.license_not_found", evidence.license_flag),
         )
         if raised
@@ -262,14 +276,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # a licensed locator or listing agent posting with their own number is normal. It still
     # holds a case, because the card cannot say "Checks passed" while the contact is
     # unconfirmed, and it is still said whatever the state turns out to be.
-    phone = ["reason.phone_flag"] if evidence.phone_flag else []
-    if evidence.license_flag:
-        # D10 (A18, #124): a poster who claims a licence they do not hold has no agent's
-        # reason for a number that is not the office's, so the mismatch is a red flag again.
-        on_record.extend(phone)
-        unconfirmed = []
-    else:
-        unconfirmed = phone
+    # D10: a licence we could not confirm is no reason to call the number a red flag, so a
+    # phone that is not the office's stays "not confirmed" whatever the licence list says.
+    unconfirmed = ["reason.phone_flag"] if evidence.phone_flag else []
 
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
         unplaced = (
@@ -293,6 +302,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     if (
         evidence.presence is PresenceStatus.PROVEN
         and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and evidence.phone_confirmed
         and not red_flags
         and not unconfirmed
     ):
@@ -307,10 +317,16 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # the leasing office and a listing brokerage may all market a home.
     matches = evidence.authority is AuthorityStatus.MATCHES_RECORD
     proven = evidence.presence is PresenceStatus.PROVEN
+    # H1: the name matches and the ad's contact was not shown to be the office. Said so the
+    # hold has a reason. (A phone that is NOT the office's already has its own.)
+    contact = []
+    if matches and not evidence.phone_confirmed and not evidence.phone_flag:
+        contact = ["reason.phone_not_confirmed"]
     return verdict(
         VerdictState.HOLD,
         "reason.located",
         "reason.authority_matches" if matches else "reason.authority_unknown",
+        *contact,
         "reason.presence_proven_not_authority" if proven else "reason.presence_missing",
         *red_flags,
         *unconfirmed,
@@ -422,11 +438,35 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
     return [line.model_copy(update={"source": source}) for line in lines]
 
 
+MAX_BROKERAGE_CHARS = 80
+
+
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     status = _for_sale(modules)
     if status is ForSaleStatus.ACTIVE:
-        site = modules.for_sale.site if modules.for_sale else ""
-        return [_line(lang, "label.for_sale", CardTone.RED_FLAG, "place.for_sale", site=site)]
+        # A warning, not a red flag, and never "not for rent" (red team H5, Sat 03:25): homes
+        # for sale are sometimes also offered for lease, and whether this one is leased is
+        # something we do not know. The line says what the record says and who to ask.
+        found = modules.for_sale
+        offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
+        brokerage = next((name for name in offices if name), None)
+        since = found.listed_on.isoformat() if found.listed_on else None
+        record_key = {
+            (True, True): "place.for_sale_record",
+            (True, False): "place.for_sale_record_no_date",
+            (False, True): "place.for_sale_record_no_brokerage",
+            (False, False): "place.for_sale_record_bare",
+        }[(brokerage is not None, since is not None)]
+        record = strings.text(
+            record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
+        )
+        if _the_ad_is_the_office_s(modules):
+            # The brokerage itself is offering the home (ruling, Sat 03:36). Information
+            # only: it holds nothing, and the renter is told who to ask.
+            key = "place.for_sale_office"
+            return [_line(lang, "label.for_sale", CardTone.NOT_SHOWN, key, record=record)]
+        key = "place.for_sale" if brokerage is not None else "place.for_sale_ask_listing"
+        return [_line(lang, "label.for_sale", CardTone.HOLD, key, record=record)]
     if status is ForSaleStatus.RECENTLY_RENTED:
         rented_on = modules.for_sale.changed_on if modules.for_sale else None
         # Information, not a flag: we do not know whether it is rented now.
@@ -531,16 +571,6 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     if authority.office_phone_match is PhoneMatch.YES:
         # Supporting only: the number is public, so this is not who the poster is.
         lines.append(_line(lang, "label.contact", CardTone.OK, "contact.phone_match"))
-    elif authority.office_phone_match is PhoneMatch.NO and (
-        _license(modules) is LicenseStatus.NOT_FOUND
-    ):
-        # D10 (A18, #124): the poster claims a licence and holds none we could find, so
-        # "agents often use their own number" does not apply. A red flag again. The named
-        # variant leaves the call to the "Allowed to rent it" line, which names the manager.
-        key = "contact.phone_mismatch_unlicensed"
-        if not authority.manager_on_record:
-            key = "contact.phone_mismatch_unlicensed_unnamed"
-        lines.append(_line(lang, "label.contact", CardTone.RED_FLAG, key))
     elif authority.office_phone_match is PhoneMatch.NO:
         # Not confirmed, never a red flag by itself (ruling, Sat 02:10, #121): agents and
         # locators often post with their own number.
@@ -558,50 +588,42 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             lines.append(
                 _line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.phone_mismatch_unnamed")
             )
+    elif authority.status is AuthorityStatus.MATCHES_RECORD:
+        # H1: the name matches and there was no phone to compare. "Checks passed" needs the
+        # ad's contact to be the office's, so the card says this was not checked.
+        lines.append(_line(lang, "label.contact", CardTone.NOT_CHECKED, "contact.phone_unchecked"))
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
     return lines
 
 
-_LICENSE_ROLES = ("agent", "broker", "locator")
-_COMPANY_CLAIM = "company"  # the poster says a brokerage lists the home (D10, amendment 2)
 MAX_SPONSOR_CHARS = 80
 
 
 def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     """The licence the poster claims, as the Texas list answers it (A18, #124; lookup: D10).
 
-    A role, a yes/no and at most a sponsoring company. Never a person's name, never a
-    licence number, and never the poster's own words: the role is one of ours or left out.
-
-    A licence found is a supporting line. It does not answer "allowed to rent it", so it
-    never lifts that line and never verifies a case. A claimed licence that was not found is
-    a red flag and holds the case; it is not proof, so it never gives DONT_PAY. A lookup that
-    did not happen, for any reason, says nothing about the poster.
+    Never a person's name, never a licence number, never the poster's own words. A licence
+    found is a supporting line: it does not answer "allowed to rent it", so it never lifts
+    that line and never verifies a case. NOT_FOUND happens only for a licence number the ad
+    itself gives (D10), and it is a warning that holds the case; it is not proof, so it never
+    gives DONT_PAY. A claim we could not check says to ask for the number and look it up.
+    A lookup that did not happen, or an ad with no claim, says nothing.
     """
     found = modules.license
     if found is None:
         return []  # never looked up for this case: no line, as with any module that is absent
     label = "label.license"
-    role = found.claimed_role
     if found.status is LicenseStatus.NOT_FOUND:
-        if role == _COMPANY_CLAIM:
-            return [_line(lang, label, CardTone.RED_FLAG, "license.not_found_company")]
-        if role in _LICENSE_ROLES:
-            said = strings.text(f"license.role.{role}", lang)
-            return [_line(lang, label, CardTone.RED_FLAG, "license.not_found", role=said)]
-        return [_line(lang, label, CardTone.RED_FLAG, "license.not_found_unspecified")]
+        return [_line(lang, label, CardTone.HOLD, "license.not_found")]
     if found.status is LicenseStatus.LICENSED:
-        if role == _COMPANY_CLAIM:
-            return [_line(lang, label, CardTone.OK, "license.licensed_company")]
         sponsor = " ".join((found.sponsor_broker or "").split())[:MAX_SPONSOR_CHARS]
         if sponsor:
             return [_line(lang, label, CardTone.OK, "license.licensed_sponsored", broker=sponsor)]
         return [_line(lang, label, CardTone.OK, "license.licensed")]
-    # Not checked. With no claim there was nothing to look up; with one, the lookup failed,
-    # timed out, was ambiguous or had no name to go on.
-    key = "license.not_checked_failed" if role else "license.not_checked_no_claim"
-    return [_line(lang, label, CardTone.NOT_CHECKED, key)]
+    if found.claimed_role:
+        return [_line(lang, label, CardTone.NOT_CHECKED, "license.not_checked_claimed")]
+    return []  # no claim, so nothing to say
 
 
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
