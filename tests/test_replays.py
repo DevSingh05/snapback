@@ -15,7 +15,8 @@ STATUSES = {"matches", "doesnt_match", "not_confirmed", "warning", "not_checked"
 # smuggled into free text either)
 NEVER = re.compile(
     r"Yeager|Reiling|Patricia|\bPam\b|Leonard|Fullerton|Conroe|\d+\s+\w+\s+(St|Ave|Rd|Ln|Dr)\b"
-    r"|\d{3}[-.\s]?\d{3}[-.\s]?\d{4}"  # a phone number
+    r"|\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"  # a phone number, with or without (area code)
+    r"|\b\d{3}-\d{4}\b"  # a 7-digit number
 )
 
 
@@ -108,3 +109,14 @@ def test_every_finding_is_a_line_the_real_card_shows(path):
     }
     for finding in r["snapback"]["findings"]:
         assert (finding["text"], finding["status"]) in shown, finding["text"]
+
+
+@pytest.mark.parametrize(
+    "phone", ["713-555-0199", "(713) 555-0199", "713.555.0199", "713 555 0199", "555-0142"]
+)
+def test_the_guard_catches_every_phone_number_format(phone):
+    assert NEVER.search(f"Text the poster at {phone} today.")
+
+
+def test_the_guard_does_not_flag_ordinary_amounts_or_dates():
+    assert not NEVER.search("A $2,500 deposit and a $75 fee in 2026.")
