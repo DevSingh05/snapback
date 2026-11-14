@@ -23,7 +23,7 @@ export interface SdkMoveTo {
   sweepId: string;
   /** Second argument of sdk.Sweep.moveTo(sweepId, options). */
   options: {
-    transition: "transition.fly";
+    transition: "transition.fly" | "transition.instant";
     transitionTime: number;
     rotation: { x: number; y: number };
   };

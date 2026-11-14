@@ -66,6 +66,12 @@ class Evidence(BaseModel):
     price_flag: bool = False  # listed rent is far below comparable units
     payment_flag: bool = False  # asked for a deposit before viewing, or an irreversible payment
     rule_flag: bool = False  # any red-flag rule fired, including pressure and links
+    # A7 (#67). Each of these holds a case at HOLD; none of them is proof, so none gives DONT_PAY.
+    for_sale_flag: bool = False  # the home is listed for sale, not for rent
+    recently_rented_flag: bool = False  # the record shows it was rented out recently
+    phone_flag: bool = False  # the phone in the listing is not the leasing office on record
+    lookalike_link_flag: bool = False  # a link imitates the building's own website
+    unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
 
 
 class VerdictState(StrEnum):
@@ -208,6 +214,15 @@ class PriceStatus(StrEnum):
     NOT_CHECKED = "not_checked"  # no rent in our data for this building
 
 
+class UnitStatus(StrEnum):
+    """Is the unit the listing names on the building's record, with those bedrooms? (A7)"""
+
+    ON_RECORD = "on_record"
+    NOT_ON_RECORD = "not_on_record"  # the record lists units, and this one is not among them
+    BEDS_MISMATCH = "beds_mismatch"  # the unit or its floor plan has a different bedroom count
+    NOT_CHECKED = "not_checked"  # the listing names no unit or beds, or the record has neither
+
+
 class PriceResult(BaseModel):
     """Rent vs record (lane A rules, from lane D's record), plus refund-the-difference input."""
 
@@ -217,6 +232,26 @@ class PriceResult(BaseModel):
     record_min: int | None = None
     record_max: int | None = None
     n_floor_plans: int | None = None
+    # A7 (#67): the unit on the record, and the per-bed guard.
+    unit: UnitStatus = UnitStatus.NOT_CHECKED
+    per_bed: bool = False  # the record prices by the bed, so the rent was not compared
+
+
+class PhoneMatch(StrEnum):
+    """Is the phone number in the listing the leasing office on the record? (A7)"""
+
+    YES = "yes"
+    NO = "no"  # both sides have a number and they differ
+    NOT_CHECKED = "not_checked"  # the listing or the record has no number
+
+
+class LinkDomain(StrEnum):
+    """How a link in the listing compares with the building's own website. (A7)"""
+
+    MATCHES = "matches"  # the building's own site, or a page under it
+    LOOKALIKE = "lookalike"  # close to it but not it: a typo, punycode, extra words
+    OTHER = "other"  # some other site; says nothing either way
+    NOT_CHECKED = "not_checked"  # the listing has no link, or the record has no website
 
 
 class AuthorityResult(BaseModel):
@@ -225,6 +260,24 @@ class AuthorityResult(BaseModel):
     status: AuthorityStatus
     manager_on_record: str | None = None  # company name, or None when the record has none
     poster_said: str | None = None  # what the renter typed the poster claimed
+    # A7 (#67). Yes/no only: no phone number, hash or web address is ever kept here.
+    office_phone_match: PhoneMatch = PhoneMatch.NOT_CHECKED
+    link_domain: LinkDomain = LinkDomain.NOT_CHECKED
+
+
+class ForSaleStatus(StrEnum):
+    ACTIVE = "active"  # listed for sale right now
+    RECENTLY_RENTED = "recently_rented"  # the record shows it was rented out recently
+    NONE = "none"  # looked up, and neither
+
+
+class ForSaleMatch(BaseModel):
+    """D7 (lane D): the home posted as a rental, looked up in the for-sale listings we hold."""
+
+    status: ForSaleStatus
+    site: str = "Homes.com"  # where it is listed; shown on the card
+    listed_on: date | None = None
+    changed_on: date | None = None  # when it reached its current status
 
 
 class ModuleEvidence(BaseModel):
@@ -239,6 +292,10 @@ class ModuleEvidence(BaseModel):
     rules: list[RuleHit] = Field(default_factory=list)
     price: PriceResult | None = None
     authority: AuthorityResult | None = None
+    for_sale: ForSaleMatch | None = None  # D7; None means not looked up
+    # A10: where price, authority and for_sale came from, when the record is real and the
+    # rest of the case is not. None means "the same as `source`".
+    record_source: DataSource | None = None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -266,6 +323,10 @@ class CardLine(BaseModel):
     label: str  # "Here now", "Allowed to rent it", "Payment ask", "Rent vs record"
     text: str  # code-owned string from the string table, never model output
     tone: CardTone
+    # A10: where this line's facts came from, when that differs from the card as a whole. A
+    # card can hold lines from a real record beside stand-ins for the twin and the challenge.
+    # None means "the same as the card".
+    source: DataSource | None = None
 
 
 class CardRow(BaseModel):
@@ -284,6 +345,9 @@ class Card(BaseModel):
     footer: list[str]
     verify_url: str | None = None
     lang: str = "en"
+    # A7 (#67): set when the home is listed for sale or was rented recently, so the web can
+    # draw the dates as a history strip. The sentence about it is a PLACE line like any other.
+    for_sale: ForSaleMatch | None = None
 
 
 class ChoiceKind(StrEnum):
@@ -344,6 +408,24 @@ class SpotRanking(BaseModel):
     spots: list[SpotCandidate]  # ranked best first
 
 
+class FloorPlanRent(BaseModel):
+    """One floor plan on the record with its rent band (D7)."""
+
+    name: str | None = None  # "2 bed / 2 bath"
+    beds: int | None = None  # 0 for a studio
+    rent_min: int | None = None  # whole dollars per month
+    rent_max: int | None = None
+    per_bed: bool = False  # priced per bed: never compare with a whole-unit rent
+
+
+class UnitOnRecord(BaseModel):
+    """One unit the record lists for the building (D7)."""
+
+    unit: str  # as the record writes it: "4B", "305"
+    beds: int | None = None
+    floor_plan: str | None = None
+
+
 class PropertyRecord(BaseModel):
     """CoStar adapter (lane D) output. Our own id, never an address in fixtures or tests."""
 
@@ -361,6 +443,13 @@ class PropertyRecord(BaseModel):
     rent_min: int | None = None
     rent_median: int | None = None
     rent_max: int | None = None
+    # D7 fields, stubbed by A7 (#67). All optional; an empty list means the record has none.
+    # The leasing office's phone is never stored as digits. This is
+    # snapback.agent.rules.contact.phone_hash(number, phone_salt()), a keyed hash.
+    site_phone_hash: str | None = None
+    website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
+    floor_plan_rents: list[FloorPlanRent] = Field(default_factory=list)
+    units: list[UnitOnRecord] = Field(default_factory=list)
 
 
 class AerialTile(BaseModel):
@@ -390,6 +479,9 @@ class CreateCaseRequest(BaseModel):
     link: str | None = None  # the listing's link; read as text, never fetched
     text: str | None = None  # the listing text or the poster's messages, as the renter has them
     renter_id: str | None = None  # set by the iMessage sidecar; the web app sends none
+    # A10: our id for the building the listing claims to be in. With none, there is no record
+    # to compare the listing with.
+    property_id: str | None = None
 
 
 class CreateCaseResponse(BaseModel):
