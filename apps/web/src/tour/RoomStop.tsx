@@ -58,7 +58,10 @@ export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, photoNote,
         <ul className="tour-facts" aria-label="What the record says">
           {stop.facts.map((f) => (
             <li key={f.text}>
-              {f.text} <span className="tour-src">{f.source}</span>
+              {f.text}{" "}
+              <span className="tour-src">
+                {f.source}, {plan.as_of}
+              </span>
             </li>
           ))}
         </ul>
@@ -67,7 +70,10 @@ export function RoomStop({ stop, plan, dwell, showingPhoto, onToggle, photoNote,
         <ul className="tour-claims" aria-label="What the ad claimed">
           {stop.claims.map((c) => (
             <li key={c.text}>
-              {c.text} <span className="tour-src">{c.source}</span>
+              {c.text}{" "}
+              <span className="tour-src">
+                {c.source}, {plan.as_of}
+              </span>
             </li>
           ))}
         </ul>

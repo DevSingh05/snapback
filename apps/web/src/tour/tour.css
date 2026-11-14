@@ -178,3 +178,9 @@
   color: var(--muted);
   font-size: 0.9rem;
 }
+.tour-wrong-model {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--amber-soft);
+  color: var(--amber);
+}

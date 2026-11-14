@@ -368,6 +368,7 @@ export interface TourDirector {
 // GET /cases/{id}/walk: the plan with the case's placed photos, and its locate result.
 export interface WalkResponse {
   plan: TourPlan;
+  model_id?: string | null; // the scan the walk was built from
   locate?: LocateResult | null;
 }
 

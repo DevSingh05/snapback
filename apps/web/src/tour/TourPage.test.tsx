@@ -25,7 +25,7 @@ vi.mock("../twin/useReducedMotion", () => ({ usePrefersReducedMotion: () => redu
 
 import { TwinView } from "../twin/TwinPage";
 import { FIXTURE_TOUR } from "./fixtureTour";
-import { AUTOPLAY_MS, TourView, evenStops } from "./TourPage";
+import { AUTOPLAY_MS, TourView } from "./TourPage";
 
 beforeEach(() => {
   fakeSdk.Sweep.moveTo.mockClear();
@@ -146,26 +146,19 @@ describe("TourView with a mocked Showcase SDK", () => {
     expect(fakeSdk.Sweep.moveTo).not.toHaveBeenCalledWith("fx-sweep-03", expect.anything());
   });
 
-  it("walks the model's own sweeps, unlabelled, when none of the plan's sweeps are in it", async () => {
+  it("shows the placeholder and says so when the loaded model holds none of the plan's sweeps", async () => {
     sweepIds.current = ["real-1", "real-2", "real-3", "real-4"];
     render(<TourView plan={FIXTURE_TOUR} sdkKey="k" modelId="m" />);
-    await screen.findByRole("button", { name: "Stop 1" });
-    expect(screen.queryByRole("button", { name: "Kitchen" })).toBeNull();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Front door" }));
-    expect(screen.getByText("Start of the 3D scan")).toBeInTheDocument();
-    expect(screen.getByText(/Rooms are not labelled/)).toBeInTheDocument();
-  });
-});
-
-describe("evenStops", () => {
-  it("starts at the scan start and spaces the rest evenly, capped at 8", () => {
-    const ids = Array.from({ length: 30 }, (_, i) => `s${i}`);
-    const stops = evenStops(ids);
-    expect(stops).toHaveLength(9);
-    expect(stops[0]).toMatchObject({ kind: "door", sweep_id: "s0" });
-    expect(stops[1]!.sweep_id).toBe("s1");
-    expect(stops.at(-1)!.sweep_id).toBe("s29");
-    expect(evenStops([])).toEqual([]);
+    expect(await screen.findByTestId("wrong-model")).toHaveTextContent(
+      "The 3D view here is not this home's scan",
+    );
+    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
+    expect(screen.getByTitle("Matterport 3D view")).not.toBeVisible();
+    // Never another home's sweeps in its place: no numbered stops, no flights.
+    expect(screen.queryByRole("button", { name: "Stop 1" })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
+    expect(fakeSdk.Sweep.moveTo).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("photo-overlay")).toBeNull();
   });
 });
 
