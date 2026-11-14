@@ -52,6 +52,7 @@ class FixturePlaceSearcher:
         option: SearchOption,
         claimed_property_id: str | None,
         thresholds: Thresholds,
+        deadline_s: float,
     ) -> SearchOutcome:
         self.calls.append((photo_id, option.label))
         scripted = self._outcomes.get(photo_id, {}).get(option.label)

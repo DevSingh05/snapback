@@ -113,14 +113,19 @@ class PlaceSearcher(Protocol):
         option: SearchOption,
         claimed_property_id: str | None,
         thresholds: Thresholds,
+        deadline_s: float,
     ) -> SearchOutcome:
         """Retry one photo with `option`. `thresholds` is `search_thresholds(base, option)`:
-        the base bars with only retrieval breadth changed."""
+        the base bars with only retrieval breadth changed. `deadline_s` is the most this search
+        may take: min(what is left of the 10 s retry budget, what is left of the case's time)."""
         ...
 
 
 def search_thresholds(base: Thresholds, option: SearchOption) -> Thresholds:
-    """The thresholds a retry runs with: the base, with retrieval breadth changed and every
+    """(Lane V owns the real one, `locate.search_thresholds`, in #223. This copy matches it,
+    wider_index top_k 12 and deeper_claimed top_k_claimed 96, and goes when #223 lands.)
+
+    The thresholds a retry runs with: the base, with retrieval breadth changed and every
     verification bar left exactly as it is."""
     if option.kind == "wider_index":
         return replace(base, top_k=max(base.top_k, WIDER_TOP_K))
@@ -371,6 +376,7 @@ class PlaceDesk:
                 option,
                 self.base.claimed_property_id,
                 search_thresholds(self.thresholds, option),
+                self.seconds_left,
             )
         except Exception:
             outcome = None

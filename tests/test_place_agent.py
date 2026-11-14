@@ -97,7 +97,7 @@ class StubSearcher:
         self.thresholds_seen: list = []
         self.seconds = seconds
 
-    def search(self, photo_id, option, claimed_property_id, thresholds):
+    def search(self, photo_id, option, claimed_property_id, thresholds, deadline_s=None):
         self.calls.append((photo_id, option.label))
         self.thresholds_seen.append(thresholds)
         if photo_id == "l2" and option.label == "focus_scan:S2":
@@ -176,7 +176,7 @@ def test_a_retry_never_touches_a_placed_photo():
     class Claims:
         """A searcher that insists l1 is in another scan, or in another building."""
 
-        def search(self, photo_id, option, claimed_property_id, thresholds):
+        def search(self, photo_id, option, claimed_property_id, thresholds, deadline_s=None):
             loc = PhotoLocation(
                 photo_id=photo_id,
                 status=LOC.LOCATED_ELSEWHERE,
@@ -383,7 +383,7 @@ def test_the_result_is_decide_on_the_final_evidence_whatever_the_pick(pick):
 
 def one_result(location: PhotoLocation):
     class Fixed:
-        def search(self, photo_id, option, claimed_property_id, thresholds):
+        def search(self, photo_id, option, claimed_property_id, thresholds, deadline_s=None):
             return SearchOutcome(location.model_copy(update={"photo_id": photo_id}), seconds=1.0)
 
     return Fixed()
@@ -478,7 +478,7 @@ def test_the_wall_clock_is_charged_when_the_searcher_under_reports():
     ticks = iter([0.0, 6.0, 6.0, 12.0, 12.0, 18.0, 18.0, 24.0])
 
     class Sneaky:
-        def search(self, photo_id, option, claimed_property_id, thresholds):
+        def search(self, photo_id, option, claimed_property_id, thresholds, deadline_s=None):
             return dataclasses.replace(missed(photo_id), seconds=0.1)  # says 0.1 s, takes 6 s
 
     d = PlaceDesk(
