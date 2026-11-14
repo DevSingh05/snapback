@@ -15,8 +15,9 @@ Rules this module keeps:
 - The cache under `data/locate/` is keyed on the photo hashes and the claimed id. An entry is
   read only if it says it came from live data, and is written only by a live run.
 - The matched pairs (`LiveOutcome.points`, up to 48 normalised pairs per placed photo, E2b) are
-  for the evidence-file writer only. They are never in the cache key, the cache file, a log or
-  anything the agent's chooser sees; a cached answer carries none.
+  for the evidence file only. They are kept in the cache file's body, so a second run of the same
+  ad still has lines to draw, but never in the cache key, a log or anything the agent's chooser
+  sees.
 
 Nothing here logs an id, a hash or a value from a record.
 """
@@ -55,7 +56,8 @@ CACHE_LABEL = DataSource.LIVE.value
 class LiveOutcome:
     """The placed photos, the building they identify when no home was claimed, and whether
     this came from the cache. `points` are the matched pairs per placed photo, for the evidence
-    file only (empty on a cached answer); they are kept out of repr and equality."""
+    file only (a cached answer carries the pairs it was saved with); they are kept out of repr and
+    equality."""
 
     result: LocateResult
     identified_property_id: str | None = None
@@ -194,10 +196,15 @@ class LiveLocate:
             raw = json.loads(path.read_text())
             if raw.get("source") != CACHE_LABEL:  # only live entries are used in a live case
                 return None
+            points = {
+                str(pid): EvidencePoints.model_validate(value)
+                for pid, value in (raw.get("points") or {}).items()
+            }
             return LiveOutcome(
                 LocateResult.model_validate(raw["result"]),
                 raw.get("identified_property_id"),
                 from_cache=True,
+                points=points,
             )
         except Exception:  # noqa: BLE001 - missing, torn or old file: just run live
             return None
@@ -209,6 +216,8 @@ class LiveLocate:
                 "source": CACHE_LABEL,
                 "identified_property_id": outcome.identified_property_id,
                 "result": outcome.result.model_dump(mode="json"),
+                # the body only: the key (`_cache_path`) never depends on the pairs
+                "points": {pid: p.model_dump(mode="json") for pid, p in outcome.points.items()},
             }
             temp = path.with_suffix(".tmp")
             temp.write_text(json.dumps(body))
@@ -232,6 +241,7 @@ class LiveLocate:
                 cached.result.model_copy(update={"case_id": case_id}),
                 cached.identified_property_id,
                 from_cache=True,
+                points=cached.points,
             )
 
         deadline = time.monotonic() + self.budget_s
@@ -245,9 +255,10 @@ class LiveLocate:
                 found = result.claimed_property_id if result.identified_by_scan else None
                 return LiveOutcome(result, found, points=dict(points or {}))
 
-            def late(result: LocateResult) -> None:
-                # Too late for this case, but a COMPLETE answer: keep it for the next one.
-                self._write_cache(path, finished(result))
+            def late(result: LocateResult, points: Mapping[str, EvidencePoints]) -> None:
+                # Too late for this case, but a COMPLETE answer: keep it (and its pairs) for the
+                # next one.
+                self._write_cache(path, finished(result, points))
 
             whole = self._run(
                 ready, case_id, blobs, None, deadline - time.monotonic(), on_late=late
@@ -309,12 +320,12 @@ class LiveLocate:
         blobs: dict[str, bytes],
         claimed: str | None,
         remaining: float,
-        on_late: Callable[[LocateResult], None] | None = None,
+        on_late: Callable[[LocateResult, Mapping[str, EvidencePoints]], None] | None = None,
     ) -> tuple[LocateResult, dict[str, EvidencePoints]] | None:
         """The locator on the shared worker, with the matched pairs per placed photo, or None if
         it ran out of time, a photo could not be read, or it broke. A run still going at the
-        deadline is left to finish; if it completes, `on_late` gets the answer without its
-        pairs (it is never used for the case that timed out)."""
+        deadline is left to finish; if it completes, `on_late` gets the answer and its pairs (it
+        is never used for the case that timed out)."""
         if remaining <= 0:
             return None
 
@@ -343,11 +354,13 @@ class LiveLocate:
             return None
 
     @staticmethod
-    def _late(done: Future, on_late: Callable[[LocateResult], None]) -> None:
+    def _late(
+        done: Future, on_late: Callable[[LocateResult, Mapping[str, EvidencePoints]], None]
+    ) -> None:
         if done.cancelled() or done.exception() is not None:
             return
         try:
-            on_late(done.result()[0])
+            on_late(*done.result())
         except Exception as error:  # noqa: BLE001 - a cache write must never break the worker
             log.warning("late locate result not kept (%s)", type(error).__name__)
 

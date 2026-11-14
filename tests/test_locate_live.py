@@ -649,7 +649,10 @@ def test_a_live_case_with_no_claimed_home_carries_points_too(world, tmp_path):
     assert set(outcome.points) == placed
 
 
-def test_points_never_enter_the_cache_key_or_the_cache_file(world, tmp_path):
+def test_points_are_kept_in_the_cache_body_but_never_in_its_key(world, tmp_path):
+    """#231 review: a second run of the same ad must still have lines to draw, so the pairs ride
+    in the cache file's body. The key stays the photo hashes, the claimed id and the
+    index/thresholds/matcher, with no pairs in it."""
     data, sweeps, adapter = fresh_data(world, tmp_path)
     blobs = [photo(sweeps, "fx-model-a", 2, 1)]
     live = make_live(data, adapter)
@@ -657,15 +660,32 @@ def test_points_never_enter_the_cache_key_or_the_cache_file(world, tmp_path):
     assert outcome.points
     files = list((data / "locate").glob("*.json"))
     assert len(files) == 1
-    # the key is the photo hashes, the claimed id and the index/thresholds/matcher: no pairs
-    assert files[0] == live._cache_path(live._load(), blobs, "fx-prop-1")
-    text = files[0].read_text()
-    assert "sampled" not in text and "n_total" not in text and "points" not in text
-    stored = json.loads(text)
-    assert set(stored) == {"source", "identified_property_id", "result"}
-    # a cached answer carries no pairs; the matcher does not run
-    again = make_live(data, adapter, matcher=ExplodingMatcher).locate("c", blobs, "fx-prop-1")
-    assert again.from_cache and again.points == {}
+    ready = live._load()
+    assert files[0] == live._cache_path(ready, blobs, "fx-prop-1")
+    # the key does not move whatever the pairs are
+    outcome.points.clear()
+    assert live._cache_path(ready, blobs, "fx-prop-1") == files[0]
+    stored = json.loads(files[0].read_text())
+    assert set(stored) == {"source", "identified_property_id", "result", "points"}
+    assert "points" not in json.dumps(stored["result"])  # never inside the result
+    for value in stored["points"].values():
+        assert len(value["sampled"]) <= 48
+        assert all(0.0 <= v <= 1.0 for pair in value["sampled"] for v in pair)
+
+
+def test_a_cached_run_still_carries_its_points(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    first = make_live(data, adapter).locate("c1", blobs, "fx-prop-1")
+    assert first.points and not first.from_cache
+    # the matcher must not run: the answer and its pairs come from the cache
+    again = make_live(data, adapter, matcher=ExplodingMatcher).locate("c2", blobs, "fx-prop-1")
+    assert again.from_cache and again.result.case_id == "c2"
+    assert again.points == first.points
+    # same on the no-claimed-home path
+    whole = make_live(data, adapter).locate("c3", blobs, None)
+    cached = make_live(data, adapter, matcher=ExplodingMatcher).locate("c4", blobs, None)
+    assert cached.from_cache and cached.points == whole.points
 
 
 def test_points_never_reach_a_log_the_trace_or_the_chooser(world, tmp_path, caplog):
@@ -708,3 +728,71 @@ def test_points_never_reach_a_log_the_trace_or_the_chooser(world, tmp_path, capl
         assert "sampled" not in text and "n_total" not in text, where
         hits = sum(value in text for value in values)
         assert hits <= len(values) // 10, where  # no run of pair values leaked
+
+
+# --- the live evidence file: pairs reach EvidencePhoto.points and nowhere else (#231) ----------
+
+
+def live_session(world, tmp_path, claimed="fx-prop-1", source=DataSource.LIVE):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    modules = joined(make_live(data, adapter), blobs, claimed)
+    return CaseSession("LIVE-E", modules, Trace("LIVE-E", source)), modules
+
+
+def test_a_live_case_writes_an_evidence_file_with_each_placed_photos_points(world, tmp_path):
+    session, modules = live_session(world, tmp_path)
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    evidence = session.evidence_file()
+    assert evidence is not None and evidence.source is DataSource.LIVE
+    assert [p.alias for p in evidence.photos] == ["P1", "P2"]
+    pairs = modules.live_points("LIVE-E")
+    for photo_id, row in zip(["l1", "l2"], evidence.photos, strict=True):
+        assert row.status is LocateStatus.LOCATED_IN_CLAIMED and row.scan_alias == "S1"
+        assert row.points == pairs[photo_id] and 0 < len(row.points.sampled) <= 48
+        assert all(0.0 <= v <= 1.0 for pair in row.points.sampled for v in pair)
+    assert {"min_inliers", "claimed_min_spread", "ambiguity_ratio"} <= set(evidence.bars)
+    # the case's own evidence (what decide() and the card read) still carries no pairs
+    assert "sampled" not in session.evidence.model_dump_json()
+
+
+def test_a_cached_live_case_still_has_points_in_its_evidence_file(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    make_live(data, adapter).locate("warm", blobs, "fx-prop-1")  # fills the cache
+    modules = joined(make_live(data, adapter, matcher=ExplodingMatcher), blobs, "fx-prop-1")
+    session = CaseSession("LIVE-C", modules, Trace("LIVE-C", DataSource.LIVE))
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    evidence = session.evidence_file()
+    assert evidence.photos[0].points is not None and evidence.photos[0].points.sampled
+
+
+def test_a_case_with_no_live_pairs_writes_no_points(world, tmp_path):
+    from snapback.agent.place import write_evidence_file
+    from snapback.contracts import LocateResult, PhotoLocation
+
+    located = LocateResult(
+        case_id="x",
+        photos=[PhotoLocation(photo_id="l1", status=LocateStatus.NOT_LOCATED)],
+        thresholds_version="t",
+    )
+    evidence = write_evidence_file("x", DataSource.FIXTURE, located)
+    assert evidence.photos[0].points is None and evidence.photos[0].alias == "P1"
+
+
+def test_the_api_case_attaches_the_evidence_file_only_when_live(world, tmp_path):
+    from snapback.api.cases import SessionCase
+
+    def runner(session):
+        return run_case(session, PolicyChooser(), lambda draft: "send")
+
+    live, modules = live_session(world, tmp_path / "live")
+    case = SessionCase("LV1", live, modules._listing, runner)
+    case.advance()
+    assert case.files is not None and case.files.evidence is not None
+    assert all(p.points is not None for p in case.files.evidence.photos)
+
+    fixture, modules = live_session(world, tmp_path / "fx", source=DataSource.FIXTURE)
+    staged = SessionCase("FX1", fixture, modules._listing, runner)
+    staged.advance()
+    assert staged.files is None  # the routes keep serving the team-made fixture
