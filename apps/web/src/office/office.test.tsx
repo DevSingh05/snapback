@@ -11,12 +11,14 @@ import type { OfficeStatus } from "./api";
 const offered: OfficeStatus = {
   case_id: "AB12",
   source: "fixture",
-  domain: "camdenliving.com",
+  domain: "oakcourt.example",
   offered: true,
   confirmed: false,
   confirmed_domain: null,
+  declined: false,
+  declined_domain: null,
   delivery: "outbox",
-  guidance: "Ask the poster for an email address at camdenliving.com.",
+  guidance: "Ask the poster for an email address at oakcourt.example.",
 };
 
 function json(body: unknown, status = 200) {
@@ -53,11 +55,11 @@ describe("OfficeConfirm", () => {
     );
     const user = userEvent.setup();
     render(<OfficeConfirm caseId="AB12" />);
-    expect(await screen.findByTestId("office-domain")).toHaveTextContent("camdenliving.com");
+    expect(await screen.findByTestId("office-domain")).toHaveTextContent("oakcourt.example");
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     await user.click(screen.getByRole("button", { name: /ask the office to confirm/i }));
     expect(screen.getByText(/lands in a local outbox file/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/@camdenliving\.com/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/@oakcourt\.example/i)).toBeInTheDocument();
   });
 
   it("posts the address with the write token in a header, never in the address", async () => {
@@ -67,7 +69,7 @@ describe("OfficeConfirm", () => {
             {
               case_id: "AB12",
               source: "fixture",
-              domain: "camdenliving.com",
+              domain: "oakcourt.example",
               sent: false,
               delivery: "outbox",
               expires_in_minutes: 30,
@@ -81,7 +83,7 @@ describe("OfficeConfirm", () => {
     const user = userEvent.setup();
     render(<OfficeConfirm caseId="AB12" />);
     await user.click(await screen.findByRole("button", { name: /ask the office to confirm/i }));
-    await user.type(screen.getByLabelText(/@camdenliving\.com/i), "leasing@camdenliving.com");
+    await user.type(screen.getByLabelText(/@oakcourt\.example/i), "leasing@oakcourt.example");
     await user.click(screen.getByRole("button", { name: /make the link/i }));
     expect(await screen.findByTestId("office-sent")).toHaveTextContent(/nothing is sent/i);
     const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
@@ -89,22 +91,22 @@ describe("OfficeConfirm", () => {
     expect(post[0]).toBe("/api/cases/AB12/confirm-office");
     expect(post[0]).not.toContain("secret");
     expect(new Headers(post[1].headers).get("Authorization")).toBe("Bearer write-secret");
-    expect(JSON.parse(String(post[1].body))).toEqual({ address: "leasing@camdenliving.com" });
+    expect(JSON.parse(String(post[1].body))).toEqual({ address: "leasing@oakcourt.example" });
   });
 
   it("shows the API's refusal when the address is not at the domain", async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
       init?.method === "POST"
-        ? json({ detail: "That address is not at camdenliving.com." }, 422)
+        ? json({ detail: "That address is not at oakcourt.example." }, 422)
         : json(offered),
     );
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<OfficeConfirm caseId="AB12" />);
     await user.click(await screen.findByRole("button", { name: /ask the office to confirm/i }));
-    await user.type(screen.getByLabelText(/@camdenliving\.com/i), "a@gmail.com");
+    await user.type(screen.getByLabelText(/@oakcourt\.example/i), "a@gmail.com");
     await user.click(screen.getByRole("button", { name: /make the link/i }));
-    expect(await screen.findByTestId("office-error")).toHaveTextContent(/not at camdenliving/i);
+    expect(await screen.findByTestId("office-error")).toHaveTextContent(/not at oakcourt/i);
   });
 
   it("with no domain on record, says to call the office on a number you look up", async () => {
@@ -129,21 +131,21 @@ describe("OfficeConfirm", () => {
   it("shows the confirmed line", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => json({ ...offered, confirmed: true, confirmed_domain: "camdenliving.com" })),
+      vi.fn(() => json({ ...offered, confirmed: true, confirmed_domain: "oakcourt.example" })),
     );
     render(<OfficeConfirm caseId="AB12" />);
     expect(await screen.findByTestId("office-confirmed")).toHaveTextContent(
-      "Confirmed through camdenliving.com, the website CoStar has on record for this office.",
+      "Confirmed through oakcourt.example, the website CoStar has on record for this office.",
     );
   });
 });
 
 describe("ConfirmPage", () => {
   const peeked = {
-    domain: "camdenliving.com",
+    domain: "oakcourt.example",
     source: "fixture",
     listing: {
-      building: "Camden Lofts",
+      building: "Fixture Lofts",
       address: "100 Fixture Way, Fixture City, TX 00000",
       unit: "204",
       rent: 1500,
@@ -164,14 +166,14 @@ describe("ConfirmPage", () => {
   it("reads the token from the fragment, shows the ad and sends the token only in a body", async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
       JSON.parse(String(init?.body)).decision
-        ? json({ decision: "yes", domain: "camdenliving.com", message: "Thank you. Confirmed." })
+        ? json({ decision: "yes", domain: "oakcourt.example", message: "Thank you. Confirmed." })
         : json(peeked),
     );
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<ConfirmPage />);
     const ad = await screen.findByTestId("confirm-ad");
-    expect(ad).toHaveTextContent("Camden Lofts, 100 Fixture Way");
+    expect(ad).toHaveTextContent("Fixture Lofts, 100 Fixture Way");
     expect(ad).toHaveTextContent("204");
     expect(ad).toHaveTextContent("$1,500 a month");
     expect(ad).toHaveTextContent("Fixture Living LLC");
@@ -192,7 +194,7 @@ describe("ConfirmPage", () => {
   it("'Not ours' sends the no decision", async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
       JSON.parse(String(init?.body)).decision
-        ? json({ decision: "no", domain: "camdenliving.com", message: "Recorded: not yours." })
+        ? json({ decision: "no", domain: "oakcourt.example", message: "Recorded: not yours." })
         : json(peeked),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -216,5 +218,23 @@ describe("ConfirmPage", () => {
   it("is reached by the /confirm route", () => {
     expect(matchRoute("/confirm")).toEqual({ name: "confirm" });
     expect(matchRoute("/confirm/")).toEqual({ name: "confirm" });
+  });
+});
+
+describe("OfficeConfirm declined", () => {
+  it("tells the renter the office did not recognise the ad", async () => {
+    window.sessionStorage.clear();
+    vi.stubEnv("VITE_API_URL", "/api");
+    saveCaseReadToken("AB12", "read-secret");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json({ ...offered, declined: true, declined_domain: "oakcourt.example" })),
+    );
+    render(<OfficeConfirm caseId="AB12" />);
+    expect(await screen.findByTestId("office-declined")).toHaveTextContent(
+      /does not recognise this ad/i,
+    );
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 });

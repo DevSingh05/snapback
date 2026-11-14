@@ -155,7 +155,14 @@ EN: dict[str, str] = {
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
     "contact.office_confirmed": (
-        "Confirmed through {domain}, the website CoStar has on record for this office."
+        "Confirmed by the office: someone at {domain}, the website CoStar has on record for "
+        "this office, said this ad is theirs."
+    ),
+    # Vidyut, Sat 11:06: the office said yes but the phone in the ad is not the office's, so the
+    # card still reads Hold off. Said plainly, right under the confirmation.
+    "contact.office_still_hold": (
+        "Still hold off: the phone in the ad is not the office's number on record. Call the "
+        "office on a number you look up yourself before you pay."
     ),
     "contact.office_declined": (
         "Not confirmed. Someone at {domain}, the website CoStar has on record for this "
@@ -618,8 +625,12 @@ ES: dict[str, str] = {
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
     "contact.office_confirmed": (
-        "Confirmado a través de {domain}, el sitio web que CoStar tiene registrado para esta "
-        "oficina."
+        "Confirmado por la oficina: alguien en {domain}, el sitio web que CoStar tiene "
+        "registrado para esta oficina, dijo que este anuncio es suyo."
+    ),
+    "contact.office_still_hold": (
+        "Aún en espera: el teléfono del anuncio no es el número de la oficina en el registro. "
+        "Llame a la oficina a un número que usted mismo busque antes de pagar."
     ),
     "contact.office_declined": (
         "No confirmado. Alguien en {domain}, el sitio web que CoStar tiene registrado para "

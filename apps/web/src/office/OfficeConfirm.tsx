@@ -44,6 +44,12 @@ export function OfficeConfirm({ caseId, onChanged }: { caseId: string; onChanged
         <h2 id="of-title">Ask the office to confirm</h2>
         <SourceChip source={status.source} />
       </div>
+      {status.declined ? (
+        <p data-testid="office-declined">
+          Someone at {status.declined_domain}, the website CoStar has on record for this office,
+          said the office does not recognise this ad. A later confirmation does not undo that.
+        </p>
+      ) : null}
       {status.confirmed ? (
         <p data-testid="office-confirmed">
           Confirmed through {status.confirmed_domain}, the website CoStar has on record for this

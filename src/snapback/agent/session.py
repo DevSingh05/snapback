@@ -658,14 +658,17 @@ class CaseSession:
     def confirm_office(self, domain: str) -> None:
         """Record that someone at the office's own website domain on record confirmed this case.
 
-        The last answer wins: a confirmation clears an earlier "not ours". A finished case is
+        A "not ours" is sticky: a confirmation never clears it (a poster could say "email jane@
+        instead"), so the case stays on HOLD with both lines on the card. A finished case is
         decided again on the evidence it now has, by `decide` and nowhere else, and the trace
         gets a new verdict event so it matches the card. A case still running carries the
         answer into its eventual decision."""
-        self._office_answer({"office_confirmed_domain": domain, "office_declined_domain": None})
+        self._office_answer({"office_confirmed_domain": domain})
 
     def decline_office(self, domain: str) -> None:
-        """The office at the domain on record said the ad is not theirs (holds the case)."""
+        """The office at the domain on record said the ad is not theirs (holds the case).
+
+        It may clear an earlier confirmation; nothing clears it."""
         self._office_answer({"office_confirmed_domain": None, "office_declined_domain": domain})
 
     def _office_answer(self, update: dict[str, str | None]) -> None:

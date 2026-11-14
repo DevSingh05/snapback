@@ -9,6 +9,8 @@ export interface OfficeStatus {
   offered: boolean;
   confirmed: boolean;
   confirmed_domain: string | null;
+  declined: boolean;
+  declined_domain: string | null;
   delivery: "outbox";
   guidance: string;
 }

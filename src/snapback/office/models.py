@@ -34,6 +34,8 @@ class OfficeStatus(BaseModel):
     offered: bool  # a link can be asked for (there is a domain on record)
     confirmed: bool
     confirmed_domain: str | None = None
+    declined: bool = False  # the office said the ad is not theirs; nothing clears it
+    declined_domain: str | None = None
     delivery: Literal["outbox"] = "outbox"  # nothing is ever sent by this server
     guidance: str  # what to do next, in words
 

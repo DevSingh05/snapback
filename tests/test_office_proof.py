@@ -298,11 +298,11 @@ def test_confirming_adds_the_card_line_and_leaves_the_verdict_alone(client, tmp_
     answer(client, token_in(outbox_files(tmp_path)[0]))
     card_after = client.get(f"/cases/{cid}/card").json()
     texts = [line["text"] for row in card_after["rows"] for line in row["lines"]]
-    assert f"Confirmed through {DOMAIN}, the website CoStar has on record for this office." in texts
+    assert any(t.startswith("Confirmed by the office") and DOMAIN in t for t in texts)
     assert card_after["state"] == card_before["state"]  # this case lacks the other proofs
     spanish = client.get(f"/cases/{cid}/card", params={"lang": "es"}).json()
     assert any(
-        "Confirmado a través de" in line["text"] for r in spanish["rows"] for line in r["lines"]
+        "Confirmado por la oficina" in line["text"] for r in spanish["rows"] for line in r["lines"]
     )
     assert card_before["source"] == card_after["source"] == "fixture"
 
@@ -423,7 +423,7 @@ def test_not_ours_never_confirms_and_the_card_says_the_office_did_not_recognise_
     card = client.get(f"/cases/{cid}/card").json()
     texts = [line["text"] for row in card["rows"] for line in row["lines"]]
     assert any("does not recognise this ad" in t for t in texts)
-    assert not any("Confirmed through" in t for t in texts)
+    assert not any(t.startswith("Confirmed by the office") for t in texts)
     assert card["state"] != "verified"
     assert answer(client, token, "yes").status_code == 410  # the token is spent
     assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is False
@@ -477,3 +477,33 @@ def test_an_answer_adds_a_verdict_event_to_the_trace(client, tmp_path):
     # The trace ends with a verdict event for the new answer, so it matches the card.
     last = stream.strip().split("event: trace")[-1]
     assert '"kind":"verdict"' in last.replace(" ", "")
+
+
+def test_a_not_ours_is_sticky_a_later_yes_never_clears_it(client, tmp_path):
+    case = new_case(client)
+    cid = case["case_id"]
+    read = {"Authorization": f"Bearer {case['read_token']}"}
+    url = f"/cases/{cid}/confirm-office"
+    client.post(url, json={"address": "a@" + DOMAIN}, headers=write(case))
+    first = token_in(outbox_files(tmp_path)[0])
+    assert answer(client, first, "no").status_code == 200
+    # "Email jane@ instead": a second link, and this time the answer is yes.
+    assert (
+        client.post(url, json={"address": "jane@" + DOMAIN}, headers=write(case)).status_code == 202
+    )
+    second = token_in(outbox_files(tmp_path)[-1])
+    assert answer(client, second, "yes").status_code == 200
+
+    status = client.get(f"/cases/{cid}/office", headers=read).json()
+    assert status["declined"] is True and status["declined_domain"] == DOMAIN
+    assert status["confirmed"] is True  # the yes is recorded too; the card shows both
+    card = client.get(f"/cases/{cid}/card").json()
+    texts = [line["text"] for row in card["rows"] for line in row["lines"]]
+    assert any("does not recognise this ad" in t for t in texts)
+    assert any(t.startswith("Confirmed by the office") for t in texts)
+    assert card["state"] != "verified"
+    # And a "no" after a "yes" does clear the confirmation (declining may clear it).
+    client.post(url, json={"address": "b@" + DOMAIN}, headers=write(case))
+    answer(client, token_in(outbox_files(tmp_path)[-1]), "no")
+    status = client.get(f"/cases/{cid}/office", headers=read).json()
+    assert status["declined"] is True and status["confirmed"] is False

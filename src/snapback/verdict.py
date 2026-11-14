@@ -873,7 +873,16 @@ def _office_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     domain = modules.office_confirmed_domain
     if not domain:
         return []
-    return [_line(lang, "label.office", CardTone.OK, "contact.office_confirmed", domain=domain)]
+    lines = [_line(lang, "label.office", CardTone.OK, "contact.office_confirmed", domain=domain)]
+    authority = modules.authority
+    if (
+        authority is not None
+        and authority.office_phone_match is PhoneMatch.NO
+        and not modules.office_declined_domain
+    ):
+        # The office said yes, the headline stays Hold off, and the card says why in plain words.
+        lines.append(_line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.office_still_hold"))
+    return lines
 
 
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
@@ -885,9 +894,9 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
                 modules,
                 [
                     _allowed_line(modules, lang),
-                    *_contact_lines(modules, lang),
                     *_office_lines(modules, lang),
                     *_office_declined_lines(modules, lang),
+                    *_contact_lines(modules, lang),
                 ],
             ),
             # Not from the record: the licence list is the state's, and public.

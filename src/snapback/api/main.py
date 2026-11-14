@@ -702,6 +702,7 @@ def create_app(
     def office_state(case_id: str, case: RecordedCase | SessionCase) -> OfficeStatus:
         domain = official_domain(getattr(case, "office_record", None))
         confirmed = getattr(case, "office_confirmed_domain", None)
+        declined = getattr(case, "office_declined_domain", None)
         return OfficeStatus(
             case_id=case_id,
             source=case.evidence.source,
@@ -709,6 +710,8 @@ def create_app(
             offered=domain is not None and isinstance(case, SessionCase),
             confirmed=bool(confirmed),
             confirmed_domain=confirmed,
+            declined=bool(declined),
+            declined_domain=declined,
             guidance=(
                 strings.text("office.call_yourself")
                 if domain is None

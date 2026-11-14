@@ -22,11 +22,20 @@ CHECKED_AT = datetime.fromisoformat("2026-11-13T21:42:00-05:00")
 DOMAIN = "fixtureliving.example"
 
 CONFIRMED_EN = (
-    "Confirmed through fixtureliving.example, the website CoStar has on record for this office."
+    "Confirmed by the office: someone at fixtureliving.example, the website CoStar has on "
+    "record for this office, said this ad is theirs."
 )
 CONFIRMED_ES = (
-    "Confirmado a través de fixtureliving.example, el sitio web que CoStar tiene registrado "
-    "para esta oficina."
+    "Confirmado por la oficina: alguien en fixtureliving.example, el sitio web que CoStar "
+    "tiene registrado para esta oficina, dijo que este anuncio es suyo."
+)
+STILL_HOLD_EN = (
+    "Still hold off: the phone in the ad is not the office's number on record. Call the "
+    "office on a number you look up yourself before you pay."
+)
+STILL_HOLD_ES = (
+    "Aún en espera: el teléfono del anuncio no es el número de la oficina en el registro. "
+    "Llame a la oficina a un número que usted mismo busque antes de pagar."
 )
 REASON_EN = (
     "Confirmed through fixtureliving.example, the website CoStar has on record for this "
@@ -169,7 +178,7 @@ def test_the_card_line_is_an_info_line_on_the_person_row_in_both_languages():
 
 def test_no_line_and_no_reason_without_the_confirmation():
     card = build_card(base(), checked_at=CHECKED_AT)
-    assert "Confirmed through" not in card.model_dump_json()
+    assert "Confirmed by the office" not in card.model_dump_json()
     assert not any("Confirmed through" in r for r in decide(to_evidence(base())).reasons)
 
 
@@ -211,7 +220,7 @@ def test_no_phone_digits_or_names_in_the_new_lines():
     modules = base(office_confirmed_domain=DOMAIN)
     card = build_card(modules, checked_at=CHECKED_AT)
     person = next(row for row in card.rows if row.kind is CardRowKind.PERSON)
-    new = " ".join(line.text for line in person.lines if "Confirmed through" in line.text)
+    new = " ".join(line.text for line in person.lines if "Confirmed by the office" in line.text)
     assert not re.search(r"\d{3}", new)
 
 
@@ -248,10 +257,64 @@ def test_the_declined_card_line_is_not_confirmed_in_both_languages():
     assert [line.text for line in lines] == [DECLINED_EN] and lines[0].tone is CardTone.NOT_SHOWN
     es = build_card(modules, checked_at=CHECKED_AT, lang="es")
     assert "no reconoce este anuncio" in es.model_dump_json()
-    assert "Confirmed through" not in card.model_dump_json()
+    assert "Confirmed by the office" not in card.model_dump_json()
 
 
 def test_the_declined_reason_has_a_place_and_both_languages():
     assert "reason.office_declined" in REASON_ORDER
     for key in ("contact.office_declined", "reason.office_declined"):
         assert strings.has(key, "en") and strings.has(key, "es")
+
+
+def test_both_lines_show_and_the_case_stays_hold_when_confirmed_after_a_decline():
+    both = base(office_confirmed_domain=DOMAIN, office_declined_domain=DOMAIN)
+    assert state(both) is VerdictState.HOLD
+    card = build_card(both, checked_at=CHECKED_AT)
+    shown = card.model_dump_json()
+    assert CONFIRMED_EN in shown and "does not recognise this ad" in shown
+
+
+def phone_mismatch(**sections) -> ModuleEvidence:
+    return base(
+        authority={
+            "status": "matches_record",
+            "manager_on_record": "Fixture Living LLC",
+            "office_phone_match": "no",
+        },
+        **sections,
+    )
+
+
+def test_confirmed_by_the_office_but_the_phone_is_not_the_offices_says_so_plainly():
+    # Vidyut, Sat 11:06: still Hold off, but the card leads with the positive line and says
+    # right under it why it still holds.
+    modules = phone_mismatch(office_confirmed_domain=DOMAIN)
+    assert state(modules) is VerdictState.HOLD
+    for lang, confirmed, hold in (
+        ("en", CONFIRMED_EN, STILL_HOLD_EN),
+        ("es", CONFIRMED_ES, STILL_HOLD_ES),
+    ):
+        card = build_card(modules, checked_at=CHECKED_AT, lang=lang)
+        assert card.state is VerdictState.HOLD
+        person = next(row for row in card.rows if row.kind is CardRowKind.PERSON)
+        texts = [line.text for line in person.lines]
+        first = texts.index(confirmed)
+        assert texts[first + 1] == hold  # right under the confirmation
+        by_text = {line.text: line.tone for line in person.lines}
+        assert by_text[confirmed] is CardTone.OK  # positive tone
+        assert by_text[hold] is CardTone.NOT_SHOWN
+
+
+def test_no_still_hold_line_when_the_phone_matches_or_the_office_declined():
+    verified = base(
+        office_confirmed_domain=DOMAIN,
+        authority={
+            "status": "matches_record",
+            "manager_on_record": "Fixture Living LLC",
+            "office_phone_match": "yes",
+        },
+    )
+    assert STILL_HOLD_EN not in build_card(verified, checked_at=CHECKED_AT).model_dump_json()
+    declined = phone_mismatch(office_confirmed_domain=DOMAIN, office_declined_domain=DOMAIN)
+    assert STILL_HOLD_EN not in build_card(declined, checked_at=CHECKED_AT).model_dump_json()
+    assert STILL_HOLD_EN not in build_card(base(), checked_at=CHECKED_AT).model_dump_json()

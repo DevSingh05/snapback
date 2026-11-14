@@ -23,8 +23,8 @@ def record(**changes) -> PropertyRecord:
 
 def test_the_official_domain_is_the_registrable_domain_of_the_records_website():
     assert official_domain(record(website_host="fixtureliving.example")) == "fixtureliving.example"
-    assert official_domain(record(website_host="leasing.camdenliving.com")) == "camdenliving.com"
-    assert official_domain(record(website_host="WWW.Camdenliving.COM")) == "camdenliving.com"
+    assert official_domain(record(website_host="leasing.oakcourt.example")) == "oakcourt.example"
+    assert official_domain(record(website_host="WWW.Oakcourt.EXAMPLE")) == "oakcourt.example"
     assert official_domain(record(website_host="oakcourt.co.uk")) == "oakcourt.co.uk"
     assert official_domain(record(website_host="www.oakcourt.co.uk")) == "oakcourt.co.uk"
 
@@ -40,7 +40,7 @@ def test_the_domain_never_comes_from_the_ad():
     import inspect
 
     assert list(inspect.signature(official_domain).parameters) == ["record"]
-    assert official_domain(record(website_host=None, manager_company="camdenliving.com")) is None
+    assert official_domain(record(website_host=None, manager_company="oakcourt.example")) is None
 
 
 @pytest.mark.parametrize(
@@ -95,16 +95,16 @@ def test_free_mail_and_platform_hosts_are_never_an_official_domain(host):
         "xn--camdnliving-9db.com",  # punycode
         "camdénliving.com",  # homoglyph (non-ASCII)
         "саmdenliving.com",  # Cyrillic a
-        "camden living.com",
-        "camdenliving.com/path",
-        "user@camdenliving.com",
+        "oakcourt living.com",
+        "oakcourt.example/path",
+        "user@oakcourt.example",
         "localhost",
         "com",
         "co.uk",
         "10.0.0.1",
-        "camden..com",
-        "-camden.com",
-        "camden-.com",
+        "oakcourt..com",
+        "-oakcourt.com",
+        "oakcourt-.com",
         "a" * 64 + ".com",
         "oakcourt.co.xx",  # an ending we do not know that starts with a generic label
         "oakcourt.com.xx",
@@ -120,33 +120,33 @@ def test_lookalike_and_malformed_hosts_are_rejected(host):
 @pytest.mark.parametrize(
     ("address", "ok"),
     [
-        ("leasing@camdenliving.com", True),
-        ("Anyone@CAMDENLIVING.com", True),
-        ("a.b+c@camdenliving.com", True),
-        ("agent@mail.camdenliving.com", False),  # exact domain only (decision 183)
-        ("agent@camdenliving.com.evil.com", False),
-        ("agent@evilcamdenliving.com", False),
-        ("agent@camdenliving.co", False),
+        ("leasing@oakcourt.example", True),
+        ("Anyone@OAKCOURT.EXAMPLE", True),
+        ("a.b+c@oakcourt.example", True),
+        ("agent@mail.oakcourt.example", False),  # exact domain only (decision 183)
+        ("agent@oakcourt.example.evil.com", False),
+        ("agent@evil-oakcourt.com", False),
+        ("agent@oakcourt.co", False),
         ("agent@example.com", False),  # the kit's own addresses are never the answer
         ("agent@gmail.com", False),
         ("agent@xn--camdnliving-9db.com", False),
         ("agent@camdénliving.com", False),
-        ("camdenliving.com", False),
-        ("@camdenliving.com", False),
-        ("a@b@camdenliving.com", False),
-        ("agent@camdenliving.com\r\nBcc: x@evil.com", False),
-        ("agent @camdenliving.com", False),
-        ("agent@camdenliving.com.", False),
-        ("a" * 65 + "@camdenliving.com", False),
+        ("oakcourt.example", False),
+        ("@oakcourt.example", False),
+        ("a@b@oakcourt.example", False),
+        ("agent@oakcourt.example\r\nBcc: x@evil.com", False),
+        ("agent @oakcourt.example", False),
+        ("agent@oakcourt.example.", False),
+        ("a" * 65 + "@oakcourt.example", False),
         ("", False),
     ],
 )
 def test_the_address_must_be_at_the_official_domain_exactly(address, ok):
-    assert accepts_address(address, "camdenliving.com") is ok
+    assert accepts_address(address, "oakcourt.example") is ok
 
 
 def test_an_address_is_never_accepted_without_an_official_domain():
-    assert accepts_address("agent@camdenliving.com", None) is False
+    assert accepts_address("agent@oakcourt.example", None) is False
 
 
 def test_no_network_client_is_imported_by_the_domain_code():

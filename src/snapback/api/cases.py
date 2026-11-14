@@ -279,6 +279,10 @@ class SessionCase:
     def office_confirmed_domain(self) -> str | None:
         return self.session.evidence.office_confirmed_domain
 
+    @property
+    def office_declined_domain(self) -> str | None:
+        return self.session.evidence.office_declined_domain
+
     def confirm_office(self, domain: str) -> None:
         """Someone at the office's own domain on record answered "Yes, ours"."""
         with self._lock:

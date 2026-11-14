@@ -176,7 +176,7 @@ MAX_HOST = 253
 
 
 def registrable_domain(host: str | None) -> str | None:
-    """The domain a person registers ("camdenliving.com") from a host, or None if the host is
+    """The domain a person registers ("oakcourt.example") from a host, or None if the host is
     malformed, punycode, non-ASCII, an address of numbers, or only a public ending."""
     if not isinstance(host, str):
         return None
