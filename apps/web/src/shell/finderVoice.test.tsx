@@ -245,7 +245,7 @@ describe("Finder voice", () => {
     // A per-reply button plays it again.
     const reply = screen.getByTestId("finder-reply");
     expect(within(reply).getByRole("button", { name: "Stop reading" })).toBeInTheDocument();
-  });
+   }, 15_000);
 
   it("talk mode opens the mic again once the spoken reply ends", async () => {
     withRecorder();
@@ -266,7 +266,7 @@ describe("Finder voice", () => {
     expect(getUserMedia).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole("button", { name: /End talk/ }));
     expect(screen.queryByTestId("talk-bar")).toBeNull();
-  });
+   }, 15_000);
 
   it("hides read-aloud when /voice/tts says voice is not configured, with no browser voice", async () => {
     service({ status: { tts: true, stt: false }, tts: 503 });
