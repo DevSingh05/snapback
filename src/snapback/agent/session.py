@@ -21,7 +21,7 @@ from enum import StrEnum
 from typing import Literal
 
 from snapback.agent.modules import ChallengeOutcome, Modules
-from snapback.agent.planner import PICK_KEY, Plan, PlanKind
+from snapback.agent.planner import ASK_FIELDS, PICK_KEY, Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -59,6 +59,7 @@ DECISIONS = (SEND, EDIT, CANCEL)
 class Step(StrEnum):
     CHECKS = "checks"
     PLAN = "plan"  # A24: which evidence-gated check runs next (order only)
+    ASK = "ask"  # A24 stretch: the renter was asked for the license number; waiting for them
     FLOOR_PLAN = "floor_plan"
     SPOT = "spot"
     APPROVAL = "approval"
@@ -106,8 +107,10 @@ class CaseSession:
         *,
         rng: random.Random | None = None,
         lang: str = strings.DEFAULT_LANG,
+        ask_enabled: bool = True,
     ) -> None:
         self.case_id = case_id
+        self.ask_enabled = ask_enabled  # may the agent ask the renter for the license number?
         self.modules = modules
         self.trace = trace
         self.lang = lang
@@ -132,6 +135,7 @@ class CaseSession:
         self._skipped_spot: str | None = None
         self._plan: Plan | None = None
         self._after_plan: Step | None = None  # where the case goes when the plan is done
+        self.question: str | None = None  # the code-written question the renter is asked
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -147,6 +151,11 @@ class CaseSession:
     def waiting_for_reply(self) -> bool:
         """The challenge was sent and the poster's reply photo has not been checked yet."""
         return self.step is Step.REPLY
+
+    @property
+    def waiting_for_answer(self) -> bool:
+        """The renter was asked for the license number and has not answered yet."""
+        return self.step is Step.ASK
 
     @property
     def recorded_decision(self) -> str | None:
@@ -246,7 +255,7 @@ class CaseSession:
     # --- choice 1b: which check next (A24) -------------------------------------------------
 
     def _begin_plan(self) -> None:
-        self._plan = Plan(self.modules, self.case_id)
+        self._plan = Plan(self.modules, self.case_id, ask_enabled=self.ask_enabled)
         self.evidence = self.evidence.model_copy(update=self._plan.unclaimed_evidence())
         for skipped in self._plan.skipped():
             self.trace.emit(
@@ -284,8 +293,32 @@ class CaseSession:
 
     def _apply_plan(self, pick: str) -> None:
         assert self._plan is not None
+        if PlanKind(pick) is PlanKind.ASK:
+            # The question is a code string. The case now waits for the renter, like REPLY.
+            self.question = self._say("plan.ask.question")
+            self.trace.emit(TraceKind.STATUS, self.question)
+            self.step = Step.ASK
+            return
         update = self._plan.run(PlanKind(pick))
         self.evidence = self.evidence.model_copy(update=update)
+        self._advance_plan()
+
+    def answer(self, text: str | None) -> None:
+        """Take the renter's answer to the license question (blank or no number: no change).
+
+        Only the checks `UNLOCKS` names for the field re-run. The raw text is read for a
+        number by code and goes nowhere else: not to a model, not to the trace.
+        """
+        if self.step is not Step.ASK or self._plan is None:
+            raise RuntimeError("no question is waiting for an answer")
+        update = self._plan.answer(ASK_FIELDS[0], text)
+        self.question = None
+        if self._plan.number_given:
+            self.trace.emit(TraceKind.TOOL, self._say("plan.ask.looked_up"), pick="license")
+        else:
+            self.trace.emit(TraceKind.STATUS, self._say("plan.ask.no_number"))
+        self.evidence = self.evidence.model_copy(update=update)
+        self.step = Step.PLAN
         self._advance_plan()
 
     # --- choice 2: which floor plan --------------------------------------------------------

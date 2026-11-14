@@ -483,9 +483,10 @@ def check_license(
     number = _license_number(text)
     if number is not None:
         if not number:
-            return _result(_NOT_CHECKED, claim)  # all zeros: not a license number
+            return _result(_NOT_CHECKED, claim, number_in_ad=True)  # all zeros: not a number
         # the number decides; never cached; a mismatch is final, with no name lookup after it
-        return _result(_lookup_number(number, claim, http or _client(), deadline), claim)
+        answer = _lookup_number(number, claim, http or _client(), deadline)
+        return _result(answer, claim, number_in_ad=True)
     if claim is None:
         return LicenseResult(status=LicenseStatus.NOT_CHECKED)
     if claim.company is None and (not claim.first or not claim.last):
@@ -509,9 +510,10 @@ def check_license(
     return _result(answer, claim)
 
 
-def _result(answer: Answer, claim: Claim | None) -> LicenseResult:
+def _result(answer: Answer, claim: Claim | None, *, number_in_ad: bool = False) -> LicenseResult:
     status, sponsor = answer
     return LicenseResult(
+        number_in_ad=number_in_ad,
         status=status,
         claimed_role=claim.role if claim else None,
         sponsor_broker=sponsor if status is LicenseStatus.LICENSED else None,

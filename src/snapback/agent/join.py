@@ -259,6 +259,17 @@ class JoinedModules:
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
 
+    def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
+        """D10 again, with the number the renter gave (A24 stretch): the ad's own words and the
+        number, through the same lookup. None when nothing was looked up. The number is kept
+        nowhere; the result holds only whether the state found it."""
+        if self._lookups is None:
+            return None
+        found = license_of(self._lookups, f"{self._listing.text}\nTREC license {number}")
+        if found is None:
+            return None
+        return found.model_copy(update={"number_in_ad": True})
+
     def owner(self, case_id: str) -> OwnerResult | None:
         # Lane D says who owns the home. What the poster says about owning it is added here.
         return check_owner(self._listing.contacts, self._owner)

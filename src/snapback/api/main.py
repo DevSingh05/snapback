@@ -32,7 +32,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from snapback.adapters.vexcel import aerial_proof, aerial_side
@@ -97,6 +97,12 @@ Language = Literal["en", "es"]
 class Approval(BaseModel):
     decision: Literal["send", "edit", "cancel"]
     text: str | None = None  # the renter's wording, with "edit"
+
+
+class Answer(BaseModel):
+    """The renter's answer to the license question. Blank means they have no number."""
+
+    text: str | None = Field(default=None, max_length=500)
 
 
 def _after(last_event_id: str | None) -> int:
@@ -592,6 +598,29 @@ def create_app(
         except NothingWaiting:
             raise HTTPException(
                 status_code=409, detail="This case is not waiting for an approval."
+            ) from None
+        return case.status(with_challenge=True)
+
+    @app.post("/cases/{case_id}/answer")
+    def post_answer(
+        case_id: str,
+        answer: Answer,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseStatus:
+        """The renter's answer when the agent asked for the license number (A24 stretch).
+
+        Needs the case's write secret, as the approval does. The text is read for a number by
+        code and goes no further; a blank answer or one with no number changes nothing.
+        409 unless the renter was asked.
+        """
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        try:
+            case.answer(answer.text)
+        except NothingWaiting:
+            raise HTTPException(
+                status_code=409, detail="This case is not waiting for an answer."
             ) from None
         return case.status(with_challenge=True)
 

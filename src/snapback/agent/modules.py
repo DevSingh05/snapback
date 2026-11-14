@@ -21,6 +21,7 @@ from snapback.contracts import (
     FloorPlanCandidate,
     ForSaleMatch,
     LicenseResult,
+    LicenseStatus,
     LocateResult,
     MemoryResult,
     ModuleEvidence,
@@ -125,6 +126,7 @@ class FixtureModules:
         record_file: str = "property_record.json",
         for_sale: ForSaleMatch | None = None,
         license: LicenseResult | None = None,
+        trec_numbers: dict[str, LicenseResult] | None = None,
         owner: OwnerResult | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
@@ -148,6 +150,9 @@ class FixtureModules:
         self._beds = beds
         self._for_sale = for_sale
         self._license = license
+        # A24 stretch: the stand-in for the state's list, keyed by license number. A number it
+        # does not hold has no row, which is what the real list says (D10: NOT_FOUND).
+        self._trec_numbers = trec_numbers or {}
         self._owner = owner
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
@@ -206,6 +211,19 @@ class FixtureModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license if self._license is not None else self.evidence.license
+
+    def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
+        """The license lookup by a number the renter gave (A24 stretch)."""
+        found = self._trec_numbers.get(number)
+        claimed = self._license if self._license is not None else self.evidence.license
+        role = claimed.claimed_role if claimed else None
+        if found is None:
+            return LicenseResult(
+                status=LicenseStatus.NOT_FOUND, claimed_role=role, number_in_ad=True
+            )
+        return found.model_copy(
+            update={"number_in_ad": True, "claimed_role": found.claimed_role or role}
+        )
 
     def owner(self, case_id: str) -> OwnerResult | None:
         owner = self._owner if self._owner is not None else self.evidence.owner

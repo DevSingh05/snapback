@@ -7,6 +7,9 @@ in a fixed order and works out, from evidence it already holds, which of them ca
 - `listing brokerage`: the listing office behind an ACTIVE for-sale match;
 - `TREC license`: the license the ad names, looked up with the state (D10);
 - `owner of record`: the public owner file (D12) and how the poster compares (A19);
+- `ask renter for license number`: offered only when the ad claims a license or a role but gives
+  no number (A24 stretch). The renter is asked for it; their answer re-runs the license lookup
+  by number and nothing else;
 - `report pack`: the closing step, open once every other check has run or been skipped.
 
 An option whose evidence is missing is not offered; it is shown as skipped, with the reason.
@@ -18,6 +21,8 @@ same whoever picked. The reasons below are code-written; a model's own reason re
 the trace, after `clean_reason`, and never reaches a card.
 """
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -38,10 +43,37 @@ class PlanKind(StrEnum):
     BROKERAGE = "listing brokerage"
     LICENSE = "TREC license"
     OWNER = "owner of record"
+    ASK = "ask renter for license number"
     REPORT = "report pack"
 
 
-ORDER = (PlanKind.RECORD, PlanKind.BROKERAGE, PlanKind.LICENSE, PlanKind.OWNER, PlanKind.REPORT)
+ORDER = (
+    PlanKind.RECORD,
+    PlanKind.BROKERAGE,
+    PlanKind.LICENSE,
+    PlanKind.OWNER,
+    PlanKind.ASK,
+    PlanKind.REPORT,
+)
+
+# The only thing the agent can ask the renter for. Fixed in code: a model picks the option, it
+# never writes the question or names another field.
+ASK_FIELDS = ("license_number",)
+
+# What new evidence unlocks: the checks that re-run when a field arrives. Static, in code.
+# Everything else keeps the result it already has.
+UNLOCKS: dict[str, list[str]] = {"license_number": ["license"]}
+
+# A TREC license number as a renter writes it: 6 or 7 digits, leading zeros allowed ("0123456").
+_NUMBER = re.compile(r"(?<![0-9])0*([1-9][0-9]{5,6})(?![0-9])", re.ASCII)
+
+
+def extract_license_number(answer: str | None) -> str | None:
+    """The license number in a renter's answer: ASCII digits only, leading zeros and spaces
+    dropped (D10). None when the answer holds no number. The text itself goes nowhere else."""
+    match = _NUMBER.search((answer or "")[:500])
+    return match.group(1) if match else None
+
 
 # The words live in card/strings.py (`plan.pick.<key>`, `plan.skip.<key>`); here are the keys.
 PICK_KEY: dict[PlanKind, str] = {
@@ -49,6 +81,7 @@ PICK_KEY: dict[PlanKind, str] = {
     PlanKind.BROKERAGE: "plan.pick.brokerage",
     PlanKind.LICENSE: "plan.pick.license",
     PlanKind.OWNER: "plan.pick.owner",
+    PlanKind.ASK: "plan.pick.ask",
     PlanKind.REPORT: "plan.pick.report",
 }
 
@@ -66,7 +99,9 @@ class Plan:
     applied. They are made once, here, and kept; only the moment and the order changed.
     """
 
-    def __init__(self, modules: Any, case_id: str) -> None:
+    def __init__(self, modules: Any, case_id: str, *, ask_enabled: bool = True) -> None:
+        self._modules = modules
+        self._case_id = case_id
         self._price: PriceResult | None = modules.price(case_id)
         self._authority: AuthorityResult | None = modules.authority(case_id)
         self._for_sale: ForSaleMatch | None = modules.for_sale(case_id)
@@ -78,7 +113,22 @@ class Plan:
         self._owner_offered = callable(owner_fn)
         self._license: LicenseResult | None = license_fn(case_id) if callable(license_fn) else None
         self._owner: OwnerResult | None = owner_fn(case_id) if callable(owner_fn) else None
+        by_number = getattr(modules, "license_by_number", None)
+        self._ask_offered = ask_enabled and callable(by_number)
+        self.number_given = False  # the renter's answer held a license number (a yes/no fact)
         self.ran: list[PlanKind] = []
+
+    @property
+    def _can_ask(self) -> bool:
+        """The ad claims a license or a role and gives no number to look up: the one case where
+        asking the renter for the number is the move. A name alone never gives NOT_FOUND."""
+        result = self._license
+        return (
+            result is not None
+            and result.status is LicenseStatus.NOT_CHECKED
+            and result.claimed_role is not None
+            and not result.number_in_ad
+        )
 
     @property
     def _names_a_license(self) -> bool:
@@ -124,6 +174,10 @@ class Plan:
             if not self._owner_offered:
                 return "plan.skip.owner_off"
             return None if self._owner is not None else "plan.skip.owner_none"
+        if kind is PlanKind.ASK:
+            if not self._ask_offered:
+                return "plan.skip.ask_off"
+            return None if self._can_ask else "plan.skip.ask_none"
         # The report pack closes the plan: after everything else, and only if something ran.
         if any(self._pending(other) for other in ORDER if other is not PlanKind.REPORT):
             return "report_wait"
@@ -155,6 +209,7 @@ class Plan:
             "for_sale_listing_active": self._active_sale,
             "ad_names_a_license": self._names_a_license,
             "owner_on_public_record": self._owner is not None,
+            "license_number_given": self.number_given,
             "checks_run": len(self.ran),
             "checks_left": len(self.open_options()),
         }
@@ -177,4 +232,45 @@ class Plan:
             return {"license": self._license}
         if kind is PlanKind.OWNER:
             return {"owner": self._owner}
+        if kind is PlanKind.ASK:
+            raise ValueError("the question is asked by the session; the answer comes to answer()")
         return {}
+
+    # --- the renter's answer ---------------------------------------------------------------
+
+    def answer(self, field: str, text: str | None) -> dict[str, object]:
+        """Take the renter's answer to the one question. Re-run only the checks that field
+        unlocks, and return the evidence they give. The text is read for a number here and
+        kept nowhere; with no number nothing re-runs and the evidence stays as it was."""
+        if field not in ASK_FIELDS:
+            raise ValueError(f"{field!r} is not a field the agent can ask for")
+        if PlanKind.ASK in self.ran:
+            raise ValueError("the question was already answered")
+        self.ran.append(PlanKind.ASK)
+        number = extract_license_number(text)
+        self.number_given = number is not None
+        if number is None:
+            return {}
+        update: dict[str, object] = {}
+        for check in UNLOCKS[field]:
+            update.update(self._rerun[check](number))
+        return update
+
+    @property
+    def _rerun(self) -> dict[str, Callable[[str], dict[str, object]]]:
+        return {
+            "license": self._rerun_license,
+            "owner": lambda _n: {"owner": self._modules.owner(self._case_id)},
+            "record": lambda _n: {"price": self._modules.price(self._case_id)},
+            "brokerage": lambda _n: {"for_sale": self._modules.for_sale(self._case_id)},
+        }
+
+    def _rerun_license(self, number: str) -> dict[str, object]:
+        try:
+            found = self._modules.license_by_number(self._case_id, number)
+        except Exception:
+            return {}  # a lookup that broke is a lookup that did not happen
+        if found is None:
+            return {}
+        self._license = found
+        return {"license": found}

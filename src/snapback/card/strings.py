@@ -298,6 +298,17 @@ EN: dict[str, str] = {
     "plan.pick.brokerage": "The home is listed for sale right now. Check the listing office.",
     "plan.pick.license": "The ad names a license. Look it up with the state.",
     "plan.pick.owner": "An owner is on public record. Compare it with who is posting.",
+    "plan.pick.ask": (
+        "The ad says they're licensed but gives no number. Ask the renter for the license number."
+    ),
+    "plan.ask.question": (
+        "The ad says they're a licensed agent but gives no license number. Can you ask them "
+        "for it, or paste it here?"
+    ),
+    "plan.ask.looked_up": "Looked up the license number you gave with the state.",
+    "plan.ask.no_number": "No license number came back. The license stays not checked.",
+    "plan.skip.ask_off": "asking the renter is not available",
+    "plan.skip.ask_none": "the ad does not claim a license without giving its number",
     "plan.pick.report": "Every check that could run has run. Gather what they found for a report.",
     "plan.skip.record": "no property record to read",
     "plan.skip.brokerage": "the home is not listed for sale right now",
@@ -704,6 +715,17 @@ ES: dict[str, str] = {
     "plan.pick.brokerage": "La vivienda está en venta ahora. Revisar la oficina que la anuncia.",
     "plan.pick.license": "El anuncio menciona una licencia. Buscarla en el estado.",
     "plan.pick.owner": "Hay un propietario en el registro público. Compararlo con quien publica.",
+    "plan.pick.ask": (
+        "El anuncio dice que tienen licencia pero no da el número. Pedirle el número al inquilino."
+    ),
+    "plan.ask.question": (
+        "El anuncio dice que es agente con licencia pero no da el número de licencia. "
+        "¿Puede pedírselo, o pegarlo aquí?"
+    ),
+    "plan.ask.looked_up": "Se buscó en el estado el número de licencia que usted dio.",
+    "plan.ask.no_number": "No llegó ningún número de licencia. La licencia sigue sin comprobarse.",
+    "plan.skip.ask_off": "preguntar al inquilino no está disponible",
+    "plan.skip.ask_none": "el anuncio no dice tener licencia sin dar su número",
     "plan.pick.report": (
         "Se hicieron todas las comprobaciones posibles. Reunir lo encontrado para un informe."
     ),

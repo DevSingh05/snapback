@@ -316,6 +316,9 @@ class LicenseResult(BaseModel):
     claimed_role: str | None = None  # "agent", "broker" or "locator", from the poster's words
     sponsor_broker: str | None = None  # LICENSED only, and only when the sponsor is a company
     state: str = "TX"
+    # A24 stretch: the lookup was made from a license number (the ad's own, or one the renter
+    # gave). A fact about the ad, never the number: with no number and a claim, we may ask.
+    number_in_ad: bool = False
 
 
 class OwnerKind(StrEnum):
@@ -635,6 +638,8 @@ class CaseProgress(StrEnum):
     # A14: the challenge was sent and the poster's reply photo has not come, or another is
     # asked for. The card reads HOLD meanwhile: no reply is never a failure.
     WAITING_FOR_REPLY = "waiting_for_reply"
+    # A24 stretch: the agent asked the renter for the license number the ad did not give.
+    WAITING_FOR_ANSWER = "waiting_for_answer"
     DONE = "done"
 
 
