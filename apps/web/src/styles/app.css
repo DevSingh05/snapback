@@ -458,6 +458,8 @@ button {
 
 /* S2 twin: structure only, visual pass comes later. */
 .twin-page {
+  width: 100%;
+  max-width: 1200px;
   display: grid;
   gap: 12px;
   padding: var(--gutter);
