@@ -278,6 +278,9 @@ class ForSaleMatch(BaseModel):
     site: str = "Homes.com"  # where it is listed; shown on the card
     listed_on: date | None = None
     changed_on: date | None = None  # when it reached its current status
+    # Listing offices on record (brokerage company names, Homes.com `offices[].name`). These
+    # count as legitimate marketers. Companies only: an agent's personal name is never kept.
+    offices: list[str] = Field(default_factory=list)
 
 
 class ModuleEvidence(BaseModel):

@@ -45,7 +45,9 @@ RESIDENTIAL_FIELDS: dict[str, list[str]] = {
     "for_rent_status": ["forRentStatus"],
     "listed_on": ["listedDate", "listingDate", "listDate"],
     "history": ["listingHistory", "history", "listingUpdates"],
+    "offices": ["offices", "listingOffices"],
 }
+OFFICE_NAME = ["name", "officeName"]
 HISTORY_FIELDS: dict[str, list[str]] = {
     "date": ["date", "updateDate", "eventDate"],
     "type": ["listingUpdateType", "updateType", "type"],
@@ -140,6 +142,17 @@ def _status(
     return ForSaleStatus.NONE, listed_on, changed_on
 
 
+def _offices(rec: dict[str, Any]) -> list[str]:
+    """Brokerage company names on the listing. `agents[]` (people) are deliberately not read."""
+    names = []
+    for office in _first(rec, RESIDENTIAL_FIELDS["offices"]) or []:
+        if isinstance(office, dict):
+            name = _first(office, OFFICE_NAME)
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+    return list(dict.fromkeys(names))
+
+
 def for_sale_lookup(
     listing_text: str,
     source: DataSource | None = None,
@@ -170,7 +183,13 @@ def for_sale_lookup(
         if unit is not None and asked is not None and normalize_address(str(unit)) != asked:
             continue  # same building, a different unit
         status, listed_on, changed_on = _status(rec, enums, today)
-        match = ForSaleMatch(status=status, site=SITE, listed_on=listed_on, changed_on=changed_on)
+        match = ForSaleMatch(
+            status=status,
+            site=SITE,
+            listed_on=listed_on,
+            changed_on=changed_on,
+            offices=_offices(rec),
+        )
         if best is None or rank[status] > rank[best.status]:
             best = match
     return best or ForSaleMatch(status=ForSaleStatus.NONE, site=SITE)

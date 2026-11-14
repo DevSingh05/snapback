@@ -101,3 +101,15 @@ def test_coverage_counts_residential_paths_and_codes_without_values():
     assert report["rent_pricing_codes"] == {"1": 2, "2": 1}
     text = json.dumps(report)
     assert "Fixture" not in text and "fx-" not in text and "2026" not in text
+
+
+def test_listing_offices_on_record_are_companies_only():
+    match = for_sale_lookup("100 Fixture Lane Apt 2", DataSource.FIXTURE, today=TODAY)
+    assert match is not None
+    assert match.offices == ["Fixture Realty Group", "Sample Homes Brokerage"]
+    assert "Fx Agent Person" not in match.model_dump_json()  # agents are people: never exposed
+
+
+def test_no_match_lists_no_offices():
+    match = for_sale_lookup("somewhere else entirely", DataSource.FIXTURE, today=TODAY)
+    assert match is not None and match.offices == []
