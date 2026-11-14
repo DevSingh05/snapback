@@ -226,6 +226,20 @@ class SessionCase:
             self._runner(self.session)
             if self.session.done and self._checked_at is None:
                 self._checked_at = _now(self._zone)
+            self._write_evidence_file()
+
+    def _write_evidence_file(self) -> None:
+        """A live case's evidence file (with each photo's matched pairs), for the "How we know"
+        drawer. A fixture or staged case keeps the team-made file the routes fall back to."""
+        if self.session.trace.source is not DataSource.LIVE:
+            return
+        evidence = self.session.evidence_file()
+        if evidence is None:
+            return
+        if self.files is None:
+            self.files = CaseFiles(evidence=evidence)
+        else:
+            self.files.evidence = evidence
 
     @property
     def evidence(self) -> ModuleEvidence:

@@ -434,6 +434,14 @@ class JoinedModules:
             return []  # a live case has no floor-plan stand-in
         return self._stand_in.floor_plans(case_id)
 
+    def live_points(self, case_id: str) -> dict:
+        """The live run's matched pairs per photo id, for the evidence file only (E2b). Empty
+        for a fixture case or when no live run placed anything."""
+        if self._stand_in is not None or not self.has_twin(case_id):
+            return {}
+        outcome = self._live_outcome(case_id)
+        return dict(outcome.points) if outcome is not None else {}
+
     def locate(self, case_id: str) -> LocateResult | None:
         if self.has_twin(case_id):
             if self._stand_in is None:
