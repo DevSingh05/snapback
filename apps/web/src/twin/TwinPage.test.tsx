@@ -71,20 +71,20 @@ describe("TwinView photo landing", () => {
   it("a located photo with no pose is Taken here, with no cone and a no-angle note", async () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
     await userEvent.click(screen.getByRole("button", { name: /Fly to photo l2/ }));
-    expect(await screen.findByText("Taken here: this building")).toBeInTheDocument();
+    expect(await screen.findByText("Taken here: this home")).toBeInTheDocument();
     expect(screen.getByText("No camera angle for this photo")).toBeInTheDocument();
-    expect(screen.queryByText("Not found in this building")).toBeNull();
+    expect(screen.queryByText("Could not place this photo")).toBeNull();
     expect(screen.queryByTestId("view-cone")).toBeNull();
     expect(screen.queryByTestId("photo-overlay")).toBeNull();
   });
 
-  it("a photo the matcher did not place reads Not found in this building", async () => {
+  it("a photo the matcher did not place reads Could not place this photo", async () => {
     const l = {
       ...hold.locate,
       photos: [{ photo_id: "l1", status: "not_located" }],
     } as unknown as LocateResult;
     render(<TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={l} liveLocate />);
-    expect(await screen.findByText("Not found in this building")).toBeInTheDocument();
+    expect(await screen.findByText("Could not place this photo")).toBeInTheDocument();
   });
 
   it("shows no fixture room name for a live pose without labels", async () => {
@@ -99,6 +99,26 @@ describe("TwinView photo landing", () => {
     );
     expect(await screen.findByText("Taken here")).toBeInTheDocument();
     expect(screen.queryByText(/Living room/)).toBeNull();
+  });
+
+  it("a live photo in the claimed property's second twin reads Taken here with its own room", async () => {
+    const l = {
+      ...hold.locate,
+      case_id: "live",
+      photos: [
+        {
+          photo_id: "l1",
+          status: "located_in_claimed",
+          model_id: "fx-model-b",
+          matched_model_id: "fx-model-b",
+          matched_property_id: "fx-prop-1",
+          room_label: "Kitchen",
+        },
+      ],
+    } as unknown as LocateResult;
+    render(<TwinView caseId="x" sdkKey={undefined} modelId={undefined} locate={l} liveLocate />);
+    expect(await screen.findByText("Taken here: Kitchen")).toBeInTheDocument();
+    expect(screen.queryByText("The listing says here.")).toBeNull();
   });
 
   it("keeps the trace as a collapsed strip", () => {
@@ -131,7 +151,14 @@ describe("TwinView aerial proof", () => {
   it("shows both buildings and the distance when a photo is located elsewhere", () => {
     const elsewhere = {
       ...(hold.locate as unknown as LocateResult),
-      photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "fx-model-b" }],
+      photos: [
+        {
+          photo_id: "l1",
+          status: "located_elsewhere",
+          model_id: "fx-model-b",
+          matched_property_id: "fx-prop-2",
+        },
+      ],
     } as LocateResult;
     render(
       <TwinView

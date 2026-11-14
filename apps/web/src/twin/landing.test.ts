@@ -27,7 +27,7 @@ describe("landingFromLocate", () => {
   it("is placed (taken here, no camera angle) when located in the claimed building without a pose", () => {
     const s = landingFromLocate(locate, "l2", FIXTURE_ROOM_LABELS);
     expect(s).toEqual({ kind: "placed", photoId: "l2", roomLabel: null });
-    expect(landingLine(s)).toBe("Taken here: this building");
+    expect(landingLine(s)).toBe("Taken here: this home");
     expect(landingNote(s)).toBe("No camera angle for this photo");
   });
 
@@ -38,13 +38,21 @@ describe("landingFromLocate", () => {
   // All four LocateStatus values in src/snapback/contracts.py, each with a pose present.
   it.each([
     ["located_in_claimed", "match", "Taken here: Living room"],
-    ["located_elsewhere", "elsewhere", "Not taken here"],
-    ["not_located", "not_found", "Not found in this building"],
-    ["not_indexed", "not_found", "Not found in this building"],
+    ["located_elsewhere", "elsewhere", "Taken in a different home"],
+    ["not_located", "not_found", "Could not place this photo"],
+    ["not_indexed", "not_found", "Could not place this photo"],
   ])("status %s reads %s", (status, kind, line) => {
     const l: LocateResult = {
       ...locate,
-      photos: [{ photo_id: "l1", status, model_id: "fx-model-a" }],
+      photos: [
+        {
+          photo_id: "l1",
+          status,
+          model_id: "fx-model-a",
+          // only an elsewhere photo names the other home
+          matched_property_id: status === "located_elsewhere" ? "fx-prop-9" : null,
+        },
+      ],
     };
     const s = landingFromLocate(l, "l1", FIXTURE_ROOM_LABELS);
     expect(s.kind).toBe(kind);
@@ -54,17 +62,97 @@ describe("landingFromLocate", () => {
   it("located_elsewhere never says Taken here, even with a pose and a room label", () => {
     const l: LocateResult = {
       ...locate,
-      photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "other" }],
+      photos: [
+        {
+          photo_id: "l1",
+          status: "located_elsewhere",
+          model_id: "other",
+          matched_property_id: "p9",
+        },
+      ],
     };
     expect(landingLine(landingFromLocate(l, "l1", FIXTURE_ROOM_LABELS))).not.toMatch(/^Taken here/);
   });
 
-  it("a claimed-building photo in a model other than the chosen one is not taken here", () => {
+  it("a photo in the claimed property's second twin (not the chosen model) reads Taken here", () => {
     const l: LocateResult = {
       ...locate,
-      photos: [{ photo_id: "l1", status: "located_in_claimed", model_id: "fx-model-b" }],
+      photos: [
+        {
+          photo_id: "l1",
+          status: "located_in_claimed",
+          model_id: "fx-model-b",
+          matched_model_id: "fx-model-b",
+          matched_property_id: "fx-prop-1",
+        },
+      ],
     };
-    expect(landingFromLocate(l, "l1", FIXTURE_ROOM_LABELS).kind).toBe("elsewhere");
+    const s = landingFromLocate(l, "l1", {});
+    expect(s.kind).toBe("match");
+    expect(landingLine(s)).toMatch(/^Taken here/);
+  });
+
+  it("a located_elsewhere photo whose matched property is the claimed one is Taken here", () => {
+    const l: LocateResult = {
+      ...locate,
+      photos: [
+        {
+          photo_id: "l2",
+          status: "located_elsewhere",
+          matched_model_id: "fx-model-b",
+          matched_property_id: "fx-prop-1",
+        },
+      ],
+    };
+    expect(landingLine(landingFromLocate(l, "l2", {}))).toBe("Taken here: this home");
+  });
+
+  it("located_elsewhere with no matched_property_id never says different home", () => {
+    const l: LocateResult = {
+      ...locate,
+      photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "other" }],
+    };
+    const line = landingLine(landingFromLocate(l, "l1", FIXTURE_ROOM_LABELS));
+    expect(line).toBe("Could not place this photo");
+    expect(line).not.toMatch(/different home|elsewhere/i);
+  });
+
+  it("located_elsewhere with no claimed property id cannot say different home either", () => {
+    const l: LocateResult = {
+      ...locate,
+      claimed_property_id: null,
+      photos: [{ photo_id: "l1", status: "located_elsewhere", matched_property_id: "fx-prop-9" }],
+    };
+    expect(landingLine(landingFromLocate(l, "l1", {}))).toBe("Could not place this photo");
+  });
+
+  it("not_located and not_indexed never read elsewhere, even with a stray matched property", () => {
+    for (const status of ["not_located", "not_indexed"]) {
+      const l: LocateResult = {
+        ...locate,
+        photos: [{ photo_id: "l1", status, matched_property_id: "fx-prop-9" }],
+      };
+      expect(landingLine(landingFromLocate(l, "l1", {}))).toBe("Could not place this photo");
+    }
+  });
+
+  it("uses the photo's room_label, and it beats the fixture map", () => {
+    const l: LocateResult = {
+      ...locate,
+      photos: [{ photo_id: "l1", status: "located_in_claimed", room_label: "Kitchen" }],
+    };
+    const s = landingFromLocate(l, "l1", FIXTURE_ROOM_LABELS);
+    expect(s.kind === "match" && s.roomLabel).toBe("Kitchen");
+    expect(landingLine(s)).toBe("Taken here: Kitchen");
+  });
+
+  it("falls back to this home when the photo has no room_label and there is no pose", () => {
+    const l: LocateResult = {
+      ...locate,
+      poses: {},
+      photos: [{ photo_id: "l1", status: "located_in_claimed" }],
+    };
+    expect(landingLine(landingFromLocate(l, "l1", {}))).toBe("Taken here: this home");
   });
 
   it("leaves the room label null when the contract has none", () => {
@@ -81,8 +169,8 @@ describe("landingLine", () => {
   it("says only Taken here without a room", () => {
     expect(landingLine(landingFromLocate(locate, "l1", {}))).toBe("Taken here");
   });
-  it("says Not found in this building on a failed match", () => {
-    expect(landingLine({ kind: "not_found" })).toBe("Not found in this building");
+  it("says Could not place this photo on a failed match", () => {
+    expect(landingLine({ kind: "not_found" })).toBe("Could not place this photo");
   });
   it("never says in this unit", () => {
     const lines = [
