@@ -85,8 +85,10 @@ or sends anything for you.
 - **Locate gate, on renders of our scans (not phone photos):** of n = 20 claimed-building views and
   10 other-building views, from unseen directions, 20 of 20 were placed in the right building with
   0 false placements (held-out seed, #28).
-- **Photo accuracy on real ad photos:** **TODO** (A8; CoStar OK'd sharing totals). Give placed,
-  right room, wrong placements and could-not-place, with n and LIVE.
+- **Photo accuracy on real listing photos, LIVE (A8, #72; CoStar OK'd sharing totals):** of
+  n = 78 photos (48 from the indexed homes, 30 decoys from other homes), 43 of 48 were placed in
+  the right home, 0 were placed in a wrong one, and 5 could not be placed. Right room was not
+  measured. **TODO:** confirm the decoy outcome (30 not placed?) with Dev before submitting.
 - **Forensics, SYNTHETIC/FIXTURE corpus:** on n = 301 ads with 4 seeded rings (57 ring ads), it
   recovered 4 of 4 rings, found 57 of 57 ring ads and flagged 0 of 244 honest ads. A keyword
   baseline recovered 0 of 4 rings. On 10 held-out seeds (about 300 ads each) it averaged ring
@@ -100,7 +102,8 @@ or sends anything for you.
 
 - **Not overclaiming.** Real photos of a real home pass any photo check, so the product has to
   separate "the photos are real" from "this person may rent it". We kept "Don't pay" for proof
-  only. Our only measured numbers are on renders, and we say so everywhere.
+  only. We quoted no accuracy number until we had measured it on real listing photos, and we
+  still label each number with its n and with renders or photos.
 - **Privacy in public records.** The county owner roll names people. After several review rounds
   on name classifiers, we changed what the card shows instead. A private owner is "a private
   owner", and a company is named only when it matches one we already know. Each privacy gate is
