@@ -17,6 +17,7 @@ read off the real kit (#95 review), listed first; older candidates stay behind t
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from datetime import date, timedelta
@@ -31,6 +32,7 @@ from snapback.adapters.costar_jsonl import (
     _get_any,
     _iter_jsonl,
     _load_enums,
+    _model_ids,
     decode,
 )
 from snapback.contracts import DataSource, ForSaleMatch, ForSaleStatus
@@ -323,3 +325,59 @@ def coverage_residential(kit_dir: Path) -> dict[str, Any]:
                 code = str(_get_any(h, HISTORY_FIELDS["type"]))
                 codes["update"][code] = codes["update"].get(code, 0) + 1
     return {"residential_records": records, "residential_fields": fields, "status_codes": codes}
+
+
+# --- #74: the demo house (case c) -------------------------------------------------------------
+
+DEMO_HOUSE_FILE = Path("demo") / "house.json"
+
+
+def pick_demo_house(kit_dir: Path, today: date | None = None) -> dict[str, Any] | None:
+    """The house for demo case c: public on Homes.com, active for sale, with a Matterport model.
+    Deterministic: the most model references wins, then the smallest listing id."""
+    path = _find(kit_dir, RESIDENTIAL_FILE)
+    if path is None:
+        return None
+    today = today or date.today()
+    enums = _load_enums(kit_dir)
+    best: tuple[int, str] | None = None
+    pick: dict[str, Any] | None = None
+    for rec in _iter_jsonl(path):
+        if not _public(rec):
+            continue
+        status, _, _ = _status(rec, enums, today)
+        models = _model_ids(rec)
+        listing_id = rec.get("homeListingId")
+        if status is not ForSaleStatus.ACTIVE or not models or listing_id is None:
+            continue
+        key = (-len(models), str(listing_id))
+        if best is None or key < best:
+            best = key
+            pick = {"home_listing_id": str(listing_id), "model_ids": models}
+    return pick
+
+
+def write_demo_house(kit_dir: Path, data_dir: Path) -> Path | None:
+    """Save the pick under data/ (git-ignored) for lane V's indexer. Prints no ids: the sponsor
+    terms keep record ids out of logs, issues and PRs."""
+    house = pick_demo_house(kit_dir)
+    if house is None:
+        print("demo house: no public, active, for-sale home with a Matterport model")
+        return None
+    out = Path(data_dir) / DEMO_HOUSE_FILE
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(house, indent=2), encoding="utf-8")
+    print(f"demo house picked: {len(house['model_ids'])} Matterport model(s); written to {out}")
+    return out
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from snapback.safety.paths import resolve_data_dir
+
+    parser = argparse.ArgumentParser(description="Pick the demo house (#74) where the kit lives.")
+    parser.add_argument("--kit", type=Path, default=DEFAULT_KIT)
+    parser.add_argument("--data", type=Path, default=Path("data"))
+    args = parser.parse_args()
+    write_demo_house(args.kit, resolve_data_dir(args.data))
