@@ -62,9 +62,9 @@ class Injected:
         return self._for_sale
 
 
-def joined(text: str, record=None, for_sale=None, source=None) -> JoinedModules:
+def joined(text: str, record=None, for_sale=None, source=None, stand_in=True) -> JoinedModules:
     return JoinedModules(
-        stand_in=FixtureModules(),
+        stand_in=FixtureModules() if stand_in else None,
         listing=read_listing(text),
         record=record,
         for_sale=for_sale,
@@ -224,6 +224,29 @@ def test_the_twin_and_the_challenge_still_come_from_the_stand_in():
     assert modules.photo_count("fx-1") == stand_in.photo_count("fx-1")
 
 
+def test_with_no_stand_in_there_is_no_twin_and_no_challenge_to_run():
+    from snapback.agent.join import NoStandIn
+
+    modules = joined(
+        "2 bed, $1,700 a month. Managed by Fixture Living LLC.",
+        contact_record(),
+        source=DataSource.LIVE,
+        stand_in=False,
+    )
+    assert modules.has_twin("c") is False
+    assert modules.locate("c") is None  # no photos were sent
+    assert modules.floor_plans("c") == [] and modules.spot_ranking("c", None) is None
+    assert modules.sent_messages == []
+    with pytest.raises(NoStandIn):
+        modules.new_code("c")
+    # The record rules still run.
+    assert modules.authority("c").status is AuthorityStatus.MATCHES_RECORD
+
+    verdict, card, case = run(modules)
+    assert verdict.state is VerdictState.UNVERIFIED
+    assert case.evidence.challenge is None  # nobody was asked to prove presence
+
+
 def test_a_real_building_with_no_scan_is_never_given_placed_photos():
     # The stand-in twin would say "3 of 3 photos placed". For a record with no 3D model that
     # would be a claim about a real building that nothing checked.
@@ -237,7 +260,9 @@ def test_a_real_building_with_no_scan_is_never_given_placed_photos():
 # --- LIVE or FIXTURE, line by line ---------------------------------------------------------
 
 
-def test_lines_from_a_real_record_say_so_and_the_card_as_a_whole_does_not():
+def test_if_a_case_ever_mixes_a_real_record_with_stand_ins_each_record_line_says_so():
+    # The store never builds this mix now (a live record gets no stand-in). The marking stays
+    # for the day the twin is real and the challenge is not, or the other way round.
     text = (
         "Unit 999, 2 bed, $900 a month. Managed by Fixture Living LLC. "
         f"Text me at {OTHER}. Apply at https://fixtureliving-apply.example/now"
@@ -337,24 +362,91 @@ def test_a_refused_id_costs_none_of_the_days_checks(tmp_path):
     assert client.post("/cases", data={"text": "2 bed."}).status_code == 201
 
 
-def test_live_mode_starts_a_case_and_marks_only_the_record_lines_live(tmp_path):
-    lookups = Injected(contact_record(), ForSaleMatch(status="active"))
-    client = client_for(tmp_path, lookups, snapback_data_source="live")
-    assert client.get("/healthz").json()["data_source"] == "live"
+def live_card(tmp_path, record: PropertyRecord, form: dict, files=None, for_sale=None) -> dict:
+    client = client_for(tmp_path, Injected(record, for_sale), snapback_data_source="live")
+    made = client.post("/cases", data=form | {"property_id": record.property_id}, files=files)
+    assert made.status_code == 201, made.text
+    case = made.json()
+    # No stand-in, so no challenge is drafted and nothing waits for approval.
+    assert (case["status"], case["challenge_text"]) == ("done", None)
+    return client.get(f"/cases/{case['case_id']}/card").json()
+
+
+def said_on(card: dict) -> dict:
+    return {line["label"]: line for row in card["rows"] for line in row["lines"]}
+
+
+def test_a_live_case_is_never_verified_and_never_shows_its_photos_as_placed(tmp_path):
+    # XO review of #101. The record has 3D models, the company named is the manager on
+    # record, and nothing is flagged: with stand-ins this read VERIFIED, "3 of 3 photos
+    # placed" and "here now", from a text-only post with no photo in it.
+    record = contact_record()
+    assert record.model_ids and record.source is DataSource.LIVE
+    text = {"text": "Unit 204, 2 bed, $1,700 a month. Managed by Fixture Living LLC."}
+    card = live_card(tmp_path, record, text)
+    assert card["source"] == "live"
+    assert card["state"] != "verified"
+    said = said_on(card)
+    assert said["Real"]["tone"] == "not_checked"
+    assert said["Here now"]["tone"] == "not_checked"
+    assert not any("3 of 3" in line["text"] for line in said.values())
+
+
+@pytest.mark.parametrize("photos", [0, 1, 3])
+def test_a_live_case_reads_not_checked_whatever_photos_are_sent(tmp_path, photos):
+    jpeg = b"\xff\xd8\xff\xe0" + b"synthetic jpeg body" * 4
+    files = [("photos", (f"p{n}.jpg", jpeg, "image/jpeg")) for n in range(photos)]
+    text = {"text": "2 bed, $1,700 a month. Managed by Fixture Living LLC."}
+    card = live_card(tmp_path, contact_record(), text, files or None)
+    assert card["state"] == "unverified"
+    real = said_on(card)["Real"]
+    if photos:
+        # Photos were sent and there is nothing to place them in: say that, not "none sent".
+        assert real["text"] == "Not checked (we have no 3D scan of this building)."
+    else:
+        assert real["text"] == "Not checked (no listing photos were sent)."
+
+
+def test_a_live_case_still_runs_the_record_rules_and_the_whole_card_is_live(tmp_path):
+    record = contact_record()
+    form = {"text": f"Unit 999, 2 bed, $900 a month. Call {OTHER}. See fixtureliving.co"}
+    card = live_card(tmp_path, record, form, for_sale=ForSaleMatch(status="active"))
+    said = said_on(card)
+    assert said["For sale"]["tone"] == "red_flag"
+    assert said["Contact on record"]["tone"] == "red_flag"
+    assert said["Link"]["tone"] == "red_flag"
+    assert said["Unit on record"]["tone"] == "hold"
+    assert said["Rent vs record"]["tone"] == "hold"
+    # Nothing in it is a stand-in, so the card is LIVE and no line needs a label of its own.
+    assert card["source"] == "live"
+    assert all(line["source"] is None for line in said.values())
+    assert card["case_id"] and not card["case_id"].startswith("fx-")
+
+
+def test_a_fixture_case_with_a_fixture_record_keeps_its_stand_ins(tmp_path):
+    client = client_for(tmp_path)
     card = finish(
         client,
         {
-            "text": f"Unit 204, 2 bed, $1,700 a month. Call {OFFICE}.",
-            "property_id": "fx-prop-2",
+            "text": "2 bed, $1,900 a month. Managed by Fixture Property Management.",
+            "property_id": "fx-prop-3",
         },
     )
-    assert lookups.asked == ["fx-prop-2"]
-    assert card["source"] == "fixture"  # stand-ins are still in it
-    said = {line["label"]: line for row in card["rows"] for line in row["lines"]}
-    assert said["For sale"]["source"] == "live"
-    assert said["Contact on record"]["source"] == "live"
-    assert said["Rent vs record"]["source"] == "live"
-    assert said["Real"]["source"] is None and said["Here now"]["source"] is None
+    assert card["source"] == "fixture"
+    assert said_on(card)["Real"]["tone"] == "ok"  # the stand-in twin, labelled FIXTURE
+
+
+def test_a_fixture_record_with_no_model_says_there_is_no_scan_when_photos_were_sent(tmp_path):
+    # fx-prop-2 in lane D's synthetic kit has no 3D model.
+    client = client_for(tmp_path)
+    jpeg = b"\xff\xd8\xff\xe0" + b"synthetic jpeg body" * 4
+    made = client.post(
+        "/cases",
+        data={"text": "2 bed, $1,700 a month.", "property_id": "fx-prop-2"},
+        files=[("photos", ("p.jpg", jpeg, "image/jpeg"))],
+    ).json()
+    card = client.get(f"/cases/{made['case_id']}/card").json()
+    assert said_on(card)["Real"]["text"] == "Not checked (we have no 3D scan of this building)."
 
 
 def test_live_mode_without_the_kit_says_so_when_a_record_is_asked_for(tmp_path):

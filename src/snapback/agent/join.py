@@ -1,10 +1,12 @@
 """A10 (issue #97): join lane D's adapters to the agent.
 
 A check runs on the building's own record: the CoStar record (D1) and the for-sale lookup
-(D7) feed lane A's price, unit and contact rules. The twin (locate) and the challenge are
-still stand-ins until lanes V and D land them (V2, D3), so a joined case is honest about
-which is which: `record_source` says where the record parts came from, and the card as a
-whole stays FIXTURE while any stand-in is in it.
+(D7) feed lane A's price, unit and contact rules.
+
+The twin (locate) and the challenge are still stand-ins until lanes V and D land them (V2,
+D3), and a stand-in is fixture data. So they are used in a fixture case only. A live case, or
+any case on a live record, has no twin and no challenge: nothing from a fixture is ever put
+beside a real record.
 
 Nothing here logs or returns a value from a record. The rules turn it into statuses.
 """
@@ -25,6 +27,8 @@ from snapback.contracts import (
     FloorPlanCandidate,
     ForSaleMatch,
     LocateResult,
+    LocateStatus,
+    PhotoLocation,
     PriceResult,
     PropertyRecord,
     RuleHit,
@@ -93,13 +97,22 @@ class KitLookups:
             return None
 
 
+class NoStandIn(RuntimeError):
+    """Something asked for the twin or the challenge in a case that has no stand-in for them."""
+
+
 class JoinedModules:
-    """What the agent calls: the record parts from lane D, the rest from the stand-in."""
+    """What the agent calls: the record parts from lane D, the rest from the stand-in.
+
+    `stand_in` is None for a live case. Stand-ins are fixture data, so a live case has no
+    twin and no challenge until lanes V and D land the real ones: its photos read "not
+    checked", nobody is asked to prove presence, and it cannot come out VERIFIED.
+    """
 
     def __init__(
         self,
         *,
-        stand_in: FixtureModules,
+        stand_in: FixtureModules | None,
         listing: Listing,
         record: PropertyRecord | None,
         for_sale: ForSaleMatch | None,
@@ -140,37 +153,62 @@ class JoinedModules:
             return None
         return self._record_source
 
-    # --- the twin and the challenge: stand-ins until V2 and D3 land --------------------------
+    # --- the twin and the challenge: stand-ins, and only in a fixture case -----------------
 
     def has_twin(self, case_id: str) -> bool:
-        # The one thing the stand-in may not decide: a real building with no 3D model has no
-        # twin, and must not be handed the stand-in's placed photos.
+        if self._stand_in is None:
+            return False
+        # A building whose record has no 3D model has no twin, whatever the stand-in holds.
         if self._record is not None and not self._record.model_ids:
             return False
         return self._stand_in.has_twin(case_id)
 
     def photo_count(self, case_id: str) -> int:
-        return self._stand_in.photo_count(case_id)
+        if not self.has_twin(case_id):
+            return self._listing.photos  # the photos the renter actually sent
+        return self._stand_in.photo_count(case_id)  # type: ignore[union-attr]
 
     def floor_plans(self, case_id: str) -> list[FloorPlanCandidate]:
-        return self._stand_in.floor_plans(case_id)
+        if not self.has_twin(case_id):
+            return []
+        return self._stand_in.floor_plans(case_id)  # type: ignore[union-attr]
 
     def locate(self, case_id: str) -> LocateResult | None:
-        if not self.has_twin(case_id):
+        if self.has_twin(case_id):
+            return self._stand_in.locate(case_id)  # type: ignore[union-attr]
+        # No twin to place photos in. Each photo sent is recorded as not checked, so the
+        # card says there is no 3D scan to check against, not that no photos were sent.
+        sent = self._listing.photos
+        if not sent:
             return None
-        return self._stand_in.locate(case_id)
+        return LocateResult(
+            case_id=case_id,
+            photos=[
+                PhotoLocation(photo_id=f"l{number}", status=LocateStatus.NOT_INDEXED)
+                for number in range(1, sent + 1)
+            ],
+            claimed_property_id=self._record.property_id if self._record else None,
+            thresholds_version="none",
+        )
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None:
-        return self._stand_in.spot_ranking(case_id, model_id)
+        if not self.has_twin(case_id):
+            return None
+        return self._stand_in.spot_ranking(case_id, model_id)  # type: ignore[union-attr]
 
     def new_code(self, case_id: str) -> str:
-        return self._stand_in.new_code(case_id)
+        return self._need_stand_in().new_code(case_id)
 
     def challenge(
         self, case_id: str, spot: SpotCandidate, code: str, text: str, attempt: int
     ) -> ChallengeOutcome:
-        return self._stand_in.challenge(case_id, spot, code, text, attempt)
+        return self._need_stand_in().challenge(case_id, spot, code, text, attempt)
 
     @property
     def sent_messages(self) -> list[str]:
-        return self._stand_in.sent_messages
+        return self._stand_in.sent_messages if self._stand_in is not None else []
+
+    def _need_stand_in(self) -> FixtureModules:
+        if self._stand_in is None:
+            raise NoStandIn("a live case has no stand-in challenge")
+        return self._stand_in

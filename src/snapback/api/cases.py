@@ -26,7 +26,8 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.intake import Listing
+from snapback.agent.demo import demo_modules, load_demo_case, staged
+from snapback.agent.intake import Listing, read_listing
 from snapback.agent.join import JoinedModules, KitLookups, Lookups
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.rules.contact import phone_salt
@@ -144,6 +145,7 @@ class SessionCase:
         self.session = session
         self._listing = listing
         self._runner = runner
+        self.staged = False  # made from a staged demo case (fixtures/demo)
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 
@@ -162,12 +164,14 @@ class SessionCase:
         return list(self.session.trace.events)
 
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
-        return build_card(
+        card = build_card(
             self.session.evidence,
             checked_at=self._checked_at or _now(),
             verify_base_url=verify_base_url,
             lang=lang,
         )
+        # A card made from a staged demo case says so on the card itself.
+        return staged(card) if self.staged else card
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         """Where the case stands. The drafted challenge is left out unless asked for."""
@@ -262,8 +266,12 @@ class CaseStore:
         """Start a check. `property_id` is our id for the building the listing claims.
 
         The record and the for-sale lookup come from lane D's adapters and feed the price,
-        unit and contact rules. The twin and the challenge are stand-ins until lanes V and D
-        land them, so the case is labelled FIXTURE as a whole whatever the record's source.
+        unit and contact rules.
+
+        The twin and the challenge are still stand-ins, and stand-ins are fixture data. They
+        are used only in a fixture case. A live case, or any case on a live record, gets
+        none: its photos are "not checked" and nobody is asked to prove presence, so it can
+        never read VERIFIED on the strength of a stand-in.
 
         Raises `UnknownProperty` for an id we hold no record for, and `KitMissing` when the
         record is asked for and the kit is not on this machine.
@@ -273,29 +281,44 @@ class CaseStore:
             record = self._lookups.record(property_id)
             if record is None:
                 raise UnknownProperty
+
+        demo = load_demo_case(self._settings.demo_case) if self._settings.demo_case else None
+        if demo is not None and not listing.text:
+            # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
+            own = read_listing(demo.listing_text)
+            listing = own.model_copy(
+                update={"photos": listing.photos, "screenshots": listing.screenshots}
+            )
         for_sale = self._lookups.for_sale(listing.text) if listing.text else None
-        # What the record says is as real as the record. A lookup with no record behind it
-        # is as real as the data it searched.
-        record_source = record.source if record else self._settings.snapback_data_source
+
+        live = self._settings.snapback_data_source is DataSource.LIVE or (
+            record is not None and record.source is DataSource.LIVE
+        )
+        source = DataSource.LIVE if live else DataSource.FIXTURE
 
         with self._lock:
             short_id = self._new_id()
-            full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
-            stand_in = FixtureModules(listing_scope=listing.scope)
-            modules = JoinedModules(
-                stand_in=stand_in,
-                listing=listing,
-                record=record,
-                for_sale=for_sale,
-                salt=phone_salt(self._settings),
-                record_source=record_source,
-            )
-            session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
+            # Fixture ids are marked as such. A live case carries no stand-in and no mark.
+            full_id = short_id if live else f"{FIXTURE_ID_PREFIX}{short_id}"
+            if demo is not None and not live and record is None:
+                # The demo pack brings its own stand-ins, record included.
+                modules = demo_modules(demo, listing)
+            else:
+                modules = JoinedModules(
+                    stand_in=None if live else FixtureModules(listing_scope=listing.scope),
+                    listing=listing,
+                    record=record,
+                    for_sale=for_sale,
+                    salt=phone_salt(self._settings),
+                    record_source=record.source if record else source,
+                )
+            session = CaseSession(full_id, modules, Trace(full_id, source))
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner)
+            case.staged = demo is not None
             self._cases[short_id] = case
         case.advance()
         return case

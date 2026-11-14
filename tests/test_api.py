@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from snapback.agent.join import KitLookups
 from snapback.api.main import app, create_app
 from snapback.card import strings
 from snapback.card.render import render_card_png
@@ -31,9 +32,14 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"synthetic png body" * 4
 HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00" + b"synthetic heic body" * 4
 
 
-def make_client(tmp_path, **overrides) -> TestClient:
+def make_client(tmp_path, lookups=None, **overrides) -> TestClient:
     settings = Settings(_env_file=None, snapback_data_dir=tmp_path, **overrides)
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, lookups=lookups))
+
+
+def no_kit(tmp_path) -> KitLookups:
+    """Lane D's adapters pointed at an empty folder, so no test reads a real kit."""
+    return KitLookups(DataSource.LIVE, kit_dir=tmp_path / "no-kit")
 
 
 @pytest.fixture
@@ -488,7 +494,9 @@ def test_one_address_cannot_start_checks_without_end(tmp_path):
 
 def test_a_check_that_could_not_start_is_not_counted(tmp_path):
     # Live mode with no kit on the machine: asking for a record cannot work, and costs nothing.
-    live = make_client(tmp_path, snapback_data_source="live", snapback_daily_limit=2)
+    live = make_client(
+        tmp_path, no_kit(tmp_path), snapback_data_source="live", snapback_daily_limit=2
+    )
     asks = {"text": "x", "property_id": "any-id"}
     assert [live.post("/cases", data=asks).status_code for _ in range(5)] == [503] * 5
     assert live.post("/cases", data={"text": "x"}).status_code == 201
@@ -685,15 +693,22 @@ def test_only_send_edit_or_cancel_are_accepted(client, decision):
     assert client.get(f"/cases/{case['case_id']}").json()["status"] == "waiting_for_approval"
 
 
-def test_live_mode_runs_a_check_and_does_not_call_its_stand_ins_live(tmp_path):
+def test_live_mode_runs_a_check_with_no_stand_in_in_it(tmp_path):
     # A10: the record side is joined, so live mode starts a check. The twin and the challenge
-    # are still stand-ins, so the card is labelled FIXTURE, not LIVE.
-    live = make_client(tmp_path, snapback_data_source="live")
+    # are still stand-ins, which are fixture data, so a live case gets neither: nothing is
+    # placed, nobody is asked to prove presence, and the card cannot read VERIFIED.
+    live = make_client(tmp_path, no_kit(tmp_path), snapback_data_source="live")
     assert live.get("/healthz").json()["data_source"] == "live"
     made = live.post("/cases", data={"text": "x"})
     assert made.status_code == 201
-    assert made.json()["source"] == "fixture"
-    assert live.get(f"/cases/{made.json()['case_id']}/card").json()["source"] == "fixture"
+    assert (made.json()["source"], made.json()["status"]) == ("live", "done")
+    assert made.json()["challenge_text"] is None
+
+    card = live.get(f"/cases/{made.json()['case_id']}/card").json()
+    assert card["source"] == "live" and card["state"] == "unverified"
+    tones = {line["label"]: line["tone"] for row in card["rows"] for line in row["lines"]}
+    assert tones["Real"] == "not_checked" and tones["Here now"] == "not_checked"
+
     # Without the kit there is no record to read, and that is said plainly.
     asked = live.post("/cases", data={"text": "x", "property_id": "any-id"})
     assert asked.status_code == 503 and "kit" in asked.json()["detail"].lower()
