@@ -144,17 +144,66 @@ def test_every_finding_is_a_line_the_real_card_shows(path):
         for line in row.lines
     ]
     # The owner's rule beside the payment step is the card's own beside-payment wording for
-    # the same published rule; the staged ad asks for no risky payment, so the card omits it.
-    beside_payment = _quoted_rule(PUBLISHED_RULES[0], "en", "owner.rule_beside_payment")
+    # the owner of record on THIS card; the staged ad asks for no risky payment, so the card
+    # omits that line.
+    owners = [rule for rule in PUBLISHED_RULES if any(rule.company in text for text, _ in lines)]
+    beside_payment = (
+        {_quoted_rule(owners[0], "en", "owner.rule_beside_payment")} if len(owners) == 1 else set()
+    )
     for finding in r["snapback"]["findings"]:
-        text, status = finding["text"], finding["status"]
-        if (text, status) in lines:
-            continue
-        # a part of one card line (the owner line is shown split over two steps)
-        if any(text in line for line, _ in lines):
-            continue
-        assert finding["step_id"] == "hold" and status == "warning", text
-        assert text == beside_payment, text
+        assert finding_is_on_card(finding, lines, beside_payment), finding["text"]
+
+
+def finding_is_on_card(
+    finding: dict, lines: list[tuple[str, str]], beside_payment: set[str]
+) -> bool:
+    """A finding is a whole card line, or the start of one (the owner line is shown split
+    over two steps), with the status that line has. The only other thing allowed is the
+    owner's rule beside the payment step, as a warning on the hold step."""
+    text, status = finding["text"], finding["status"]
+    if any(line.startswith(text) and st == status for line, st in lines):
+        return True
+    return finding["step_id"] == "hold" and status == "warning" and text in beside_payment
+
+
+_OWNER = (
+    "Not confirmed. Owner of record: Invitation Homes, not the poster. "
+    'Invitation Homes says: "a rule" (example.org, read 2026-11-14).'
+)
+_CARD = [(_OWNER, "not_confirmed"), ("NOT SHOWN. Inside is not allowed.", "not_confirmed")]
+
+
+def test_the_finding_check_accepts_a_whole_line_and_the_start_of_one():
+    start = _OWNER.split(" Invitation Homes says")[0]
+    for text in (_OWNER, start):
+        assert finding_is_on_card(
+            {"step_id": "chat", "status": "not_confirmed", "text": text}, _CARD, set()
+        )
+
+
+@pytest.mark.parametrize(
+    "finding",
+    [
+        {"step_id": "chat", "status": "matches", "text": "Not confirmed. Owner of record"},
+        {"step_id": "chat", "status": "matches", "text": "NOT SHOWN. Inside is not allowed."},
+        # a fragment from the middle of a line
+        {"step_id": "chat", "status": "not_confirmed", "text": "Invitation Homes"},
+        {"step_id": "chat", "status": "not_confirmed", "text": "Owner of record: Invitation Homes"},
+        # a line that is not on the card at all
+        {"step_id": "chat", "status": "not_confirmed", "text": "Something the card never says."},
+        # the owner's rule on any step but the hold step, or with any status but warning
+        {"step_id": "chat", "status": "warning", "text": "RULE"},
+        {"step_id": "hold", "status": "matches", "text": "RULE"},
+    ],
+)
+def test_the_finding_check_refuses_a_wrong_status_a_mid_line_fragment_or_an_invented_line(finding):
+    assert finding_is_on_card(finding, _CARD, {"RULE"}) is False
+
+
+def test_the_finding_check_allows_only_the_owners_rule_as_a_hold_step_warning():
+    rule = {"step_id": "hold", "status": "warning", "text": "RULE"}
+    assert finding_is_on_card(rule, _CARD, {"RULE"}) is True
+    assert finding_is_on_card(rule, _CARD, set()) is False
 
 
 @pytest.mark.parametrize(
