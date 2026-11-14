@@ -165,64 +165,141 @@
 .ml-scrim-real {
   fill: var(--match-scrim-real);
 }
-.ml-sweep {
-  fill: var(--match-sweep);
-  opacity: 0;
+/* The ad photo laid over the scan view: as bright as it is on its own side, with one seam. */
+.ml-under {
+  fill: var(--match-stage);
 }
-.ml-lines {
-  filter: var(--match-glow);
+.ml-scrim-ad {
+  fill: var(--match-scrim-ad);
 }
-.ml-case {
+.ml-seam-line {
+  fill: var(--match-strong);
+  pointer-events: none;
+}
+.ml-grip {
+  cursor: ew-resize;
+  touch-action: none;
+}
+.ml-grip-tab {
+  fill: var(--match-strong);
+  stroke: var(--match-stage);
+  stroke-width: 2;
+}
+.ml-grip-mark {
+  fill: var(--match-stage);
+  pointer-events: none;
+}
+.ml-link {
+  stroke: var(--match-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 6;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.ml-hit {
+  fill: var(--match-stage);
+  fill-opacity: 0;
+}
+.ml-spot,
+.ml-pair {
+  cursor: pointer;
+}
+.ml-mini .ml-spot {
+  cursor: inherit;
+}
+/* A numbered spot: a ring round the feature, its number on a square flag. */
+.ml-ring-case {
+  fill: none;
   stroke: var(--match-case);
-  stroke-width: 4;
+  stroke-width: 6;
 }
-.ml-line {
+.ml-ring {
+  fill: var(--match-strong);
+  fill-opacity: 0;
+  stroke: var(--match-strong);
+  stroke-width: 2.5;
   stroke-dasharray: 1;
 }
+.ml-flag {
+  fill: var(--match-strong);
+  stroke: var(--match-stage);
+  stroke-width: 1.5;
+}
+.ml-num {
+  fill: var(--match-stage);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.ml-pin {
+  fill: var(--match-strong);
+  stroke: var(--match-stage);
+  stroke-width: 5;
+}
+/* One pair lit: it brightens and fills, the rest step back. */
+.ml-marks[data-lit] .ml-spot,
+.ml-marks[data-lit] .ml-pair {
+  opacity: 0.32;
+}
+.ml-marks[data-lit] [data-on] {
+  opacity: 1;
+}
+.ml-spot[data-on] .ml-ring {
+  stroke-width: 4;
+  fill-opacity: 0.22;
+  filter: var(--match-glow);
+}
+.ml-spot[data-on] .ml-flag {
+  fill: var(--meter-tick);
+}
+/* A photo that fell short: the same spots, drawn as open dashes in the meter's "short" grey. */
+.ml[data-weak] .ml-ring {
+  stroke: var(--on-match-stage);
+  stroke-width: 2;
+  stroke-dasharray: 0.06 0.05;
+}
+.ml[data-weak] .ml-ring-case {
+  stroke-width: 5;
+}
+.ml[data-weak] .ml-flag,
+.ml[data-weak] .ml-pin {
+  fill: var(--meter-short);
+}
+.ml[data-weak] .ml-link {
+  stroke: var(--meter-short);
+}
+/* Every drawn point, shaded by how closely it agrees with the rest. */
 .ml-dot {
   stroke: var(--match-stage);
   stroke-width: 1;
 }
-.ml-strong {
-  stroke: var(--match-strong);
+.ml-strong .ml-dot {
   fill: var(--match-strong);
 }
-.ml-strong .ml-line {
-  stroke-width: 2.2;
-}
-.ml-mid {
-  stroke: var(--match-mid);
+.ml-mid .ml-dot {
   fill: var(--match-mid);
 }
-.ml-mid .ml-line {
-  stroke-width: 1.7;
-}
-.ml-faint {
-  stroke: var(--match-faint);
+.ml-faint .ml-dot {
   fill: var(--match-faint);
 }
-.ml-faint .ml-line {
-  stroke-width: 1.3;
-}
-.ml-pair .ml-case {
-  stroke: var(--match-case);
-}
-.ml-pair .ml-dot {
-  stroke: var(--match-stage);
-}
-.ml[data-weak] .ml-lines {
-  filter: none;
-  opacity: 0.82;
+.ml-pair[data-on] .ml-dot {
+  fill: var(--meter-tick);
+  filter: var(--match-glow);
 }
 .ml-tag {
   position: absolute;
   top: 0;
   left: 0;
-  padding: 5px 10px;
-  background: var(--match-stage);
+  height: var(--band, auto);
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
   color: var(--on-match-stage);
   font-size: 0.8rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 .ml-tag-b {
   top: var(--b-top, 0);
@@ -234,19 +311,107 @@
 }
 .ml-caption {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
+  flex-direction: column;
+  gap: 10px;
   font-size: 0.8rem;
   color: var(--match-stage-muted);
+}
+.ml-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-height: 40px;
+}
+.ml-strip {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.ml-chip {
+  flex: 0 0 40px;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  background: var(--meter-track);
+  color: var(--on-match-stage);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.ml-chip[data-on],
+.ml-chip[aria-pressed="true"] {
+  background: var(--match-strong);
+  color: var(--match-stage);
+}
+.ml[data-weak] .ml-chip[data-on],
+.ml[data-weak] .ml-chip[aria-pressed="true"] {
+  background: var(--meter-short);
+}
+.ml-hint {
+  margin: 0;
+  flex: 1 1 260px;
+  font-size: 0.85rem;
+  color: var(--on-match-stage);
+}
+.ml-lay {
+  flex: 1 1 320px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-height: 40px;
+  color: var(--on-match-stage);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.ml-lay-range {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: ew-resize;
+}
+.ml-lay-range::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--meter-track);
+}
+.ml-lay-range::-moz-range-track {
+  height: 6px;
+  background: var(--meter-track);
+}
+.ml-lay-range::-moz-range-progress {
+  height: 6px;
+  background: var(--meter-fill);
+}
+.ml-lay-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 28px;
+  margin-top: -11px;
+  background: var(--match-strong);
+}
+.ml-lay-range::-moz-range-thumb {
+  width: 16px;
+  height: 28px;
+  border-width: 0;
+  border-radius: 0;
+  background: var(--match-strong);
+}
+.ml-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
 .ml-legend {
   display: inline-flex;
   gap: 3px;
 }
 .ml-key {
-  width: 18px;
-  height: 4px;
+  width: 12px;
+  height: 12px;
 }
 .ml-key-strong {
   background: var(--match-strong);
@@ -258,25 +423,14 @@
   background: var(--match-faint);
 }
 .ml-count {
-  margin-left: auto;
   font-size: 0.75rem;
 }
-.ml-replay {
-  align-self: center;
+.ml-more {
   min-height: 32px;
   padding: 4px 12px;
   background: var(--meter-track);
   color: var(--on-match-stage);
   font-size: 0.8rem;
-}
-.ml-mini .ml-line {
-  stroke-width: 3;
-}
-.ml-mini .ml-case {
-  stroke-width: 6;
-}
-.ml-mini .ml-dot {
-  stroke: none;
 }
 
 /* The meter: the count, the fill, the bar's tick and one sentence. */
@@ -803,6 +957,20 @@
   .ml-svg {
     max-height: none;
   }
+  .ml-strip {
+    flex: 1 1 100%;
+  }
+  .ml-chip {
+    flex: 1 1 0;
+    max-width: 44px;
+    height: 44px;
+  }
+  .ml-more {
+    min-height: 44px;
+  }
+  .ml-lay-range {
+    height: 44px;
+  }
   .pm {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
@@ -825,13 +993,14 @@
       transform: translateY(18px);
     }
   }
-  .ml[data-motion="full"]:not(.ml-mini) .ml-line {
-    animation: ml-draw 0.5s var(--ease-out) backwards;
+  /* Each spot is circled like a pen going round it, both pictures in step, then its flag. */
+  .ml[data-motion="full"][data-mode="spots"]:not([data-weak]) .ml-ring {
+    animation: ml-circle 0.5s var(--ease-out) backwards;
   }
-  .ml[data-motion="full"]:not(.ml-mini) .ml-pair {
-    animation: ml-pop 0.22s ease-out backwards;
+  .ml[data-motion="full"][data-mode="spots"] .ml-spot {
+    animation: ml-pop 0.3s ease-out backwards;
   }
-  @keyframes ml-draw {
+  @keyframes ml-circle {
     from {
       stroke-dashoffset: 1;
     }
@@ -841,40 +1010,14 @@
       opacity: 0;
     }
   }
-  .ml[data-motion="full"] .ml-sweep {
-    animation: ml-sweep-x var(--draw-ms, 0ms) linear both;
-  }
-  .ml[data-motion="full"][data-layout="stacked"] .ml-sweep {
-    animation-name: ml-sweep-y;
-  }
-  @keyframes ml-sweep-x {
-    0% {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    90% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(437px);
-    }
-  }
-  @keyframes ml-sweep-y {
-    0% {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    90% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-      transform: translateY(327px);
-    }
-  }
+  .ml-spot,
   .ml-pair {
     transition: opacity 0.15s linear;
+  }
+  .ml-ring {
+    transition:
+      stroke-width 0.15s linear,
+      fill-opacity 0.15s linear;
   }
   .mt[data-motion="full"] .pm-sentence {
     animation: pm-say 0.45s var(--ease-out) var(--draw-ms, 0ms) backwards;
@@ -909,13 +1052,7 @@
 }
 
 @media (hover: hover) {
-  .ml:not(.ml-mini) .ml-lines:hover .ml-pair {
-    opacity: 0.22;
-  }
-  .ml:not(.ml-mini) .ml-lines .ml-pair:hover {
-    opacity: 1;
-  }
-  .ml-replay:hover {
+  .ml-more:hover {
     background: var(--meter-short);
   }
 }

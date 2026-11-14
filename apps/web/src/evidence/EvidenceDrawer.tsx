@@ -4,8 +4,8 @@ import { SourceChip } from "../components/SourceChip";
 import { BarGauges, PointsMeter } from "./BarGauges";
 import { ConfidenceChip } from "./ConfidenceChip";
 import "./evidence.css";
-import { drawMs, useCountUp } from "./match";
-import { MatchLines } from "./MatchLines";
+import { drawMs, pickSpots, useCountUp } from "./match";
+import { MatchSpots } from "./MatchSpots";
 import { SearchSteps } from "./PickCard";
 import { CHIP_LABEL, chipState, placeLine } from "./read";
 import type { Calibration, EvidenceFile, EvidencePhoto } from "./types";
@@ -35,8 +35,8 @@ interface TableProps {
   stacked: boolean;
 }
 
-// The match on one dark table: the two pictures with their points, and under them the meter
-// whose count rises as the lines draw in. Remounted per photo, so the draw-in replays.
+// The match on one dark table: the two pictures with their numbered spots, and under them the
+// meter whose count rises as the spots are circled. Remounted per photo, so the draw-in replays.
 function MatchTable(props: TableProps) {
   const [run, setRun] = useState(0);
   return <MatchRun key={run} {...props} onReplay={() => setRun((r) => r + 1)} />;
@@ -51,16 +51,16 @@ function MatchRun({
   stacked,
   onReplay,
 }: TableProps & { onReplay: () => void }) {
-  const drawn = photo.points?.sampled.length ?? 0;
-  const count = useCountUp(photo.inliers ?? 0, drawMs(drawn), reduced);
+  const ms = drawMs(pickSpots(photo.points?.sampled ?? []).length);
+  const count = useCountUp(photo.inliers ?? 0, ms, reduced);
   return (
     <div
       className="mt"
       data-testid="match-table"
       data-motion={reduced ? "reduced" : "full"}
-      style={{ "--draw-ms": `${drawMs(drawn)}ms` } as CSSProperties}
+      style={{ "--draw-ms": `${ms}ms` } as CSSProperties}
     >
-      <MatchLines
+      <MatchSpots
         photo={photo}
         adSrc={adSrc}
         scanSrc={scanSrc}
@@ -74,7 +74,7 @@ function MatchRun({
 }
 
 // "How we know": slides over the scan. One photo at a time: the ad photo and the scan view with
-// their matched points, the three gauges, the room label and the chip.
+// their matched spots, the three gauges, the room label and the chip.
 export function EvidenceDrawer({
   file,
   alias,
