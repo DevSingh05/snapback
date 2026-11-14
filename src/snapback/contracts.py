@@ -43,6 +43,11 @@ class PhotoLocation(BaseModel):
     matched_model_id: str | None = None
     matched_property_id: str | None = None
     room_label: str | None = None  # Matterport's room classification, e.g. "Kitchen"
+    # E0 (plan/ml-agent-plan.md 3b): what the verification measured, kept so the evidence file
+    # can show it. All optional: None means "not recorded", never "zero".
+    spread: float | None = None  # how widely the matched points cover the photo (0 to 1)
+    rival_ratio: float | None = None  # best rival building's inliers over this one's
+    bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
 
 
 class AuthorityStatus(StrEnum):
@@ -489,6 +494,11 @@ class TraceKind(StrEnum):
     HITL = "hitl"  # waiting for the renter to approve
     VERDICT = "verdict"  # decide() ran; payload carries the state
     ERROR = "error"
+    # E0: the deep agent's own steps, bridged from its stream (never invented by the trace)
+    TODO = "todo"  # the agent's todo list was written or changed
+    AGENT = "agent"  # a hand-off to a sub-agent started or returned (name in `pick`)
+    FILE = "file"  # a file was written in the agent's file system (path in `pick`)
+    UNSURE = "unsure"  # code-raised: a measured thing is close to or past a line
 
 
 class TraceEvent(BaseModel):
@@ -920,3 +930,54 @@ class TourDraft(BaseModel):
     status: Literal["draft"] = "draft"
     sent: Literal[False] = False
     source: DataSource
+
+
+# ---------------------------------------------------------------------------------------------
+# E0: the evidence file (plan/ml-agent-plan.md 3b). Written by code only, read by the card, the
+# "How we know" drawer and the walk. A model never sees `points`; it is stripped before any
+# chooser payload (allow-list test in E6).
+# ---------------------------------------------------------------------------------------------
+
+
+class PlaceStep(BaseModel):
+    """One search spent on one photo: the base search, or a retry the place sub-agent picked."""
+
+    option: str  # "base", "focus_scan:S2", "wider_index", "deeper_claimed" or "stop"
+    chosen_by: Literal["model", "policy"]  # "base" is always policy; a menu of one is policy
+    seconds: float | None = None
+    result: Literal["placed", "not_placed", "elsewhere", "skipped"]
+
+
+class EvidencePoints(BaseModel):
+    """Matched points for the drawing. A sample: `n_total` says how many matched in all."""
+
+    n_total: int = Field(ge=0)
+    # Pairs (ad x, ad y, scan x, scan y), each normalised to 0..1. At most 48.
+    sampled: list[tuple[float, float, float, float]] = Field(default_factory=list, max_length=48)
+
+
+class EvidencePhoto(BaseModel):
+    alias: str  # "P1", "P2", ...: what a model and the drawer call the photo
+    status: LocateStatus
+    inliers: int | None = None
+    inlier_ratio: float | None = None
+    spread: float | None = None
+    rival_ratio: float | None = None
+    bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
+    room_label: str | None = None
+    scan_alias: str | None = None  # "S1", "S2": the scan it was placed in
+    stop_alias: str | None = None  # the walk stop it belongs to (W1), if any
+    searches: list[PlaceStep] = Field(default_factory=list)
+    points: EvidencePoints | None = None
+
+
+class EvidenceFile(BaseModel):
+    """`/evidence/photos.json`: every photo's measurements, the bars they were held to and
+    which thresholds file those bars came from. Numbers shown on screen are read from here."""
+
+    case_id: str
+    source: DataSource
+    thresholds_version: str
+    bars: dict[str, float]  # e.g. {"min_inliers": 30, "min_inlier_ratio": 0.25, ...}
+    photos: list[EvidencePhoto]
+    written_by: Literal["code"] = "code"

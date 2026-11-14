@@ -360,4 +360,6 @@ def test_photos_of_a_building_with_no_scan_are_not_reported_as_no_photos():
 
 def test_the_demo_folder_holds_only_the_pack():
     names = {path.name for path in Path(DEMO_DIR).iterdir()}
-    assert {n for n in names if not n.startswith("replay-")} == {"README.md", "a", "b", "c"}
+    # evidence.fixture.json is the E0 contract fixture (plan/ml-agent-plan.md 3b), not a case
+    pack = {"README.md", "a", "b", "c", "evidence.fixture.json"}
+    assert {n for n in names if not n.startswith("replay-")} == pack
