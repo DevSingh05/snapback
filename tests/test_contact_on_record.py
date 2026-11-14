@@ -89,7 +89,9 @@ def test_the_new_fixtures_parse_and_old_records_still_do():
     ("phones", "expected"),
     [
         ([OFFICE], PhoneMatch.YES),
-        ([OTHER, OFFICE], PhoneMatch.YES),
+        ([OTHER, OFFICE], PhoneMatch.NO),
+        ([OFFICE, OTHER], PhoneMatch.NO),
+        ([OFFICE, "(555) 010-0142"], PhoneMatch.YES),
         ([OTHER], PhoneMatch.NO),
         ([], PhoneMatch.NOT_CHECKED),
     ],
@@ -436,6 +438,23 @@ def test_for_sale_holds_a_case_unless_the_ad_s_contact_is_the_office_on_record()
     by_the_office = verified_but_for(for_sale={"status": "active"})
     assert to_evidence(by_the_office).for_sale_flag is False
     assert state(by_the_office) is VerdictState.VERIFIED
+
+
+def test_one_matching_number_among_several_is_not_the_office_calling():
+    # Review round 1, H: [OFFICE, OTHER] must not read as "the contact is the office".
+    claims = ContactClaims(phones=[OFFICE, OTHER], company="Fixture Living LLC")
+    authority = check_authority(claims, record(), SALT)
+    assert authority.office_phone_match is PhoneMatch.NO
+    mixed = evidence(
+        authority=authority.model_dump(mode="json"),
+        rules=[],
+        price=None,
+        for_sale={"status": "active"},
+    )
+    verdict = decide(to_evidence(mixed))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.for_sale") in verdict.reasons
+    assert strings.text("reason.phone_flag") in verdict.reasons
 
 
 def test_naming_a_listing_brokerage_on_record_matches_as_naming_the_manager_does():
