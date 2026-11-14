@@ -1,10 +1,10 @@
-import type { LocateResult } from "../contracts";
+import type { LocatedPhoto, LocateResult } from "../contracts";
 import { quatToYawPitch } from "./pose";
 
 export type LandingState =
   | { kind: "loading" }
-  | { kind: "not_found" }
-  | { kind: "elsewhere" } // placed in a different building than the one claimed
+  | { kind: "not_found" } // could not place the photo (not located, not indexed, or no proof of where)
+  | { kind: "elsewhere" } // verified in a different home than the one claimed
   | { kind: "placed"; photoId: string; roomLabel: string | null } // in the building, no camera angle
   | {
       kind: "match";
@@ -18,17 +18,36 @@ export type LandingState =
     };
 
 /**
- * Adapter gap (posted on issue #28 for lane V): LocateResult.poses carries sweep id, rotation,
- * position and fov, but no room label. Until it does, room labels come from this fixture-side map
- * (photo id to label). A live result with no entry here simply reads "Taken here".
+ * Fixture-only room names (photo id to label). A live photo carries its own `room_label`, which
+ * always wins; this map only fills in for the fixture pose.
  */
 export const FIXTURE_ROOM_LABELS: Record<string, string> = { l1: "Living room" };
 
+type Placement = "here" | "different_home" | "unplaced";
+
 /**
- * Only "located_in_claimed" in the chosen model counts as taken here. "located_elsewhere" is a
- * different building ("Not taken here"); "not_located" and "not_indexed" are "Not found in this
- * building". A located photo with no pose is still taken here, just without a camera angle.
+ * Where a listing photo was placed, from the claimed property's point of view.
+ * - here: "located_in_claimed", or placed in a twin of the claimed property (a property can have two
+ *   floor-plan twins, and an honest photo may sit in the one that was not chosen).
+ * - different_home: "located_elsewhere" AND both property ids are known AND they differ.
+ * - unplaced: everything else, including "located_elsewhere" with no matched property to name,
+ *   "not_located" and "not_indexed". We never say "elsewhere" on a guess.
  */
+function placementOf(locate: LocateResult, photo: LocatedPhoto): Placement {
+  const claimed = locate.claimed_property_id;
+  const matched = photo.matched_property_id;
+  if (photo.status === "located_in_claimed") return "here";
+  if (claimed && matched && matched === claimed) return "here";
+  if (photo.status === "located_elsewhere" && claimed && matched) return "different_home";
+  return "unplaced";
+}
+
+/** True when any photo is verified inside a different property than the claimed one. */
+export function hasDifferentHome(locate: LocateResult): boolean {
+  return locate.photos.some((p) => placementOf(locate, p) === "different_home");
+}
+
+/** A located photo with no pose is still taken here, just without a camera angle. */
 export function landingFromLocate(
   locate: LocateResult,
   photoId: string,
@@ -36,13 +55,10 @@ export function landingFromLocate(
 ): LandingState {
   const photo = locate.photos.find((p) => p.photo_id === photoId);
   if (!photo) return { kind: "not_found" };
-  if (photo.status === "located_elsewhere") return { kind: "elsewhere" };
-  if (photo.status !== "located_in_claimed") return { kind: "not_found" };
-  // The web contract type omits `chosen` (it is in contracts.py); read it without editing the contract.
-  const chosenModel = (locate as LocateResult & { chosen?: { model_id?: string } | null }).chosen
-    ?.model_id;
-  if (chosenModel && photo.model_id && photo.model_id !== chosenModel) return { kind: "elsewhere" };
-  const roomLabel = roomLabels[photoId] ?? null;
+  const placement = placementOf(locate, photo);
+  if (placement === "different_home") return { kind: "elsewhere" };
+  if (placement === "unplaced") return { kind: "not_found" };
+  const roomLabel = photo.room_label || roomLabels[photoId] || null;
   const pose = locate.poses[photoId];
   if (!pose) return { kind: "placed", photoId, roomLabel };
   const { yaw, pitch } = quatToYawPitch(pose.rotation_quat);
@@ -63,11 +79,11 @@ export function landingLine(s: LandingState): string {
     case "loading":
       return "Placing the photo in the building";
     case "not_found":
-      return "Not found in this building";
+      return "Could not place this photo";
     case "elsewhere":
-      return "Not taken here";
+      return "Taken in a different home";
     case "placed":
-      return `Taken here: ${s.roomLabel ?? "this building"}`;
+      return `Taken here: ${s.roomLabel ?? "this home"}`;
     case "match":
       return s.roomLabel ? `Taken here: ${s.roomLabel}` : "Taken here";
   }
