@@ -1,6 +1,8 @@
 """Runtime settings, read from the environment and an optional .env file."""
 
 from functools import lru_cache
+from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +15,22 @@ class Settings(BaseSettings):
 
     # One switch for every adapter: fixture data by default, live sponsor data on request.
     snapback_data_source: DataSource = DataSource.FIXTURE
+
+    # Where the web app lives. Verify links on cards point here.
+    snapback_public_base_url: str = "http://localhost:5173"
+    # Sponsor data, caches and uploads. Git-ignored, and purged after the event.
+    snapback_data_dir: Path = Path("data")
+    # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
+    snapback_trace_pace_ms: int = 0
+    # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
+    snapback_agent: Literal["policy", "deepagents"] = "policy"
+    # Checks one renter (or one browser) may start per day, and a ceiling per network address
+    # so that clearing cookies is not a way around it.
+    snapback_daily_limit: int = 3
+    snapback_daily_limit_per_address: int = 100
+    # Upload caps, enforced before the body is parsed and again per file.
+    snapback_max_photos: int = 10
+    snapback_max_photo_mb: int = 10
 
     # Sponsor credentials. SecretStr keeps them out of logs and reprs.
     matterport_api_key: SecretStr | None = None

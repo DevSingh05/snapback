@@ -1,0 +1,12 @@
+{
+  "case_id": "7Q2M",
+  "source": "fixture",
+  "token": "fx-token-not-a-real-secret-0123456789abcdef",
+  "read_token": "fx-read-token-not-a-real-secret-0123456789",
+  "status": "waiting_for_approval",
+  "state": null,
+  "challenge_text": "Before you pay, ask them to send a photo of the north window frame in the living room with the code K7P4 written on paper.",
+  "photos": 3,
+  "screenshots": 0,
+  "injection_noticed": false
+}

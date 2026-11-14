@@ -1,0 +1,15 @@
+{
+  "id": "fx-listing-zelle",
+  "screenshot": "listing_zelle.png",
+  "expect": {
+    "listed_rent": 900,
+    "company_claim": null,
+    "phones": 1,
+    "emails": 0,
+    "red_flag_rules": [
+      "payment.zelle_before_viewing",
+      "fee.holding_deposit_before_viewing",
+      "pressure.cannot_show"
+    ]
+  }
+}

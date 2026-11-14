@@ -80,3 +80,17 @@ def test_data_fixtures_parse(name, model):
 
     parsed = getattr(contracts, model).model_validate_json(load(name))
     assert parsed.property_id.startswith("fx-")
+
+
+def test_create_case_fixtures_parse_and_keep_the_secret_out_of_the_request():
+    import snapback.contracts as contracts
+
+    request = contracts.CreateCaseRequest.model_validate_json(load("create_case_request.json"))
+    response = contracts.CreateCaseResponse.model_validate_json(load("create_case_response.json"))
+    assert request.link and request.text
+    assert "token" not in contracts.CreateCaseRequest.model_fields
+    assert response.source == "fixture"
+    assert response.token.startswith("fx-")  # a fixture value, never a real secret
+    assert response.read_token and response.read_token.startswith("fx-")
+    assert response.read_token != response.token
+    assert response.challenge_text

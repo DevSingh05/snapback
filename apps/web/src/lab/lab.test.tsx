@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import sample from "../../../../fixtures/contracts/results_sample.csv?raw";
-import { LabPanel } from "./LabPanel";
+import { LabPanel, LabSection } from "./LabPanel";
 import {
   ResultsError,
   calibrationPoints,
@@ -40,6 +40,23 @@ describe("parseResults", () => {
 
 describe("chart data and scales", () => {
   const rows = parseResults(sample);
+
+  it("accepts any rules_plus_model_vN_memory condition and puts it last", () => {
+    const line = (c: string) => `${c},forged_false_accept,3,40,0.075,0.02,0.2,2026-11-13`;
+    const parsed = parseResults(
+      [
+        HEADER,
+        line("rules_plus_model_v1_memory"),
+        line("rules_only"),
+        line("rules_plus_model_v0_memory"),
+      ].join("\n"),
+    );
+    expect(curveBars(parsed).map((b) => b.condition)).toEqual([
+      "rules_only",
+      "rules_plus_model_v0_memory",
+      "rules_plus_model_v1_memory",
+    ]);
+  });
 
   it("orders the curve bars rules only first, memory last, and keeps n", () => {
     const bars = curveBars(rows);
@@ -152,5 +169,20 @@ a_after,calibration_bin:0.80-0.90,9,10,0.9,0.5958,0.9821,FIXTURE
   it("uses round axis ticks", () => {
     expect(niceTicks(0.375)).toEqual([0, 0.1, 0.2, 0.3, 0.4]);
     expect(niceTicks(1)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1]);
+  });
+});
+
+describe("LabSection against an API without results", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to the fixture sample with a FIXTURE chip on 404", async () => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    vi.stubGlobal("fetch", async () => new Response("nope", { status: 404 }));
+    render(<LabSection />);
+    expect(await screen.findByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
   });
 });
