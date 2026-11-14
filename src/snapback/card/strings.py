@@ -45,22 +45,25 @@ EN: dict[str, str] = {
     "place.seen_before": "A listing photo also appeared in another check.",
     # For sale is a red flag, never proof: it holds a case and cannot set DON'T PAY by itself.
     # A warning, never a red flag, and never "not for rent" (red team H5, Sat 03:25). We do
-    # not know whether a home is leased; the record says it is for sale, and so do we.
+    # not know whether a home is leased; the record says it is for sale, and so do we. The
+    # line is what the record says ({record}, one of the four below) and then who to ask.
+    "place.for_sale_record": "Listed for sale on {site} by {brokerage} since {date}.",
+    "place.for_sale_record_no_date": "Listed for sale on {site} by {brokerage}.",
+    "place.for_sale_record_no_brokerage": "Listed for sale on {site} since {date}.",
+    "place.for_sale_record_bare": "Listed for sale on {site}.",
     "place.for_sale": (
-        "Listed for sale on {site} by {brokerage} since {date}. Homes for sale are sometimes "
-        "also offered for lease, so confirm with that brokerage before you pay."
+        "{record} Homes for sale are sometimes also offered for lease, so confirm with that "
+        "brokerage before you pay."
     ),
-    "place.for_sale_no_date": (
-        "Listed for sale on {site} by {brokerage}. Homes for sale are sometimes also offered "
-        "for lease, so confirm with that brokerage before you pay."
+    "place.for_sale_ask_listing": (
+        "{record} Homes for sale are sometimes also offered for lease, so confirm with the "
+        "listing brokerage before you pay."
     ),
-    "place.for_sale_no_brokerage": (
-        "Listed for sale on {site} since {date}. Homes for sale are sometimes also offered "
-        "for lease, so confirm with the listing brokerage before you pay."
-    ),
-    "place.for_sale_bare": (
-        "Listed for sale on {site}. Homes for sale are sometimes also offered for lease, so "
-        "confirm with the listing brokerage before you pay."
+    # The ad's phone is the office's on record: the brokerage itself is offering the home.
+    # Information only; it holds nothing (ruling, Sat 03:36).
+    "place.for_sale_office": (
+        "Not confirmed. {record} The contact in this listing is the office on record, so ask "
+        "them whether it is also offered for lease."
     ),
     # Lease status is something we do not know and never claim (ruling, Sat 01:20). This is
     # an information line: it carries no flag and holds no case by itself.
@@ -350,21 +353,21 @@ ES: dict[str, str] = {
     "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
+    "place.for_sale_record": "En venta en {site} por {brokerage} desde el {date}.",
+    "place.for_sale_record_no_date": "En venta en {site} por {brokerage}.",
+    "place.for_sale_record_no_brokerage": "En venta en {site} desde el {date}.",
+    "place.for_sale_record_bare": "En venta en {site}.",
     "place.for_sale": (
-        "En venta en {site} por {brokerage} desde el {date}. Las viviendas en venta a veces "
-        "también se ofrecen en alquiler, así que confírmelo con esa agencia antes de pagar."
+        "{record} Las viviendas en venta a veces también se ofrecen en alquiler, así que "
+        "confírmelo con esa agencia antes de pagar."
     ),
-    "place.for_sale_no_date": (
-        "En venta en {site} por {brokerage}. Las viviendas en venta a veces también se "
-        "ofrecen en alquiler, así que confírmelo con esa agencia antes de pagar."
+    "place.for_sale_ask_listing": (
+        "{record} Las viviendas en venta a veces también se ofrecen en alquiler, así que "
+        "confírmelo con la agencia que la anuncia antes de pagar."
     ),
-    "place.for_sale_no_brokerage": (
-        "En venta en {site} desde el {date}. Las viviendas en venta a veces también se "
-        "ofrecen en alquiler, así que confírmelo con la agencia que la anuncia antes de pagar."
-    ),
-    "place.for_sale_bare": (
-        "En venta en {site}. Las viviendas en venta a veces también se ofrecen en alquiler, "
-        "así que confírmelo con la agencia que la anuncia antes de pagar."
+    "place.for_sale_office": (
+        "Sin confirmar. {record} El contacto de este anuncio es la oficina que figura en el "
+        "registro, así que pregúnteles si también se ofrece en alquiler."
     ),
     "place.recently_rented": (
         "Sin confirmar. El registro muestra que se alquiló hace poco. "

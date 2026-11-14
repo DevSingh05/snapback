@@ -170,6 +170,54 @@ def test_nothing_about_a_home_for_sale_says_it_is_not_for_rent(lang):
     assert strings.text("reason.for_sale", lang) in verdict.reasons
 
 
+def test_for_sale_by_the_office_on_record_is_information_and_holds_nothing():
+    # Ruling, Sat 03:36: the record shows the home for sale AND the ad's phone is the office's
+    # on record. That is the brokerage itself offering it, so for sale is an information
+    # line and no hold comes from it.
+    for_sale = {
+        "status": "active",
+        "site": "Homes.com",
+        "listed_on": "2026-10-02",
+        "offices": ["Fixture Realty Group"],
+    }
+    office = case(ContactClaims(company="Fixture Living LLC", phones=[OFFICE]), for_sale=for_sale)
+    assert office.authority.office_phone_match is PhoneMatch.YES
+    assert to_evidence(office).for_sale_flag is False
+    verdict = decide(to_evidence(office))
+    assert verdict.state is VerdictState.VERIFIED
+    assert strings.text("reason.for_sale") not in verdict.reasons
+    assert lines(office, CardRowKind.PLACE)["For sale"] == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. Listed for sale on Homes.com by Fixture Realty Group since "
+        "2026-10-02. The contact in this listing is the office on record, so ask them "
+        "whether it is also offered for lease.",
+    )
+
+    # Any other contact, or none, and the same record still holds the case with a warning.
+    for claims in (
+        ContactClaims(company="Fixture Living LLC", phones=[OTHER]),
+        ContactClaims(company="Fixture Living LLC"),
+        ContactClaims(),
+    ):
+        other = case(claims, for_sale=for_sale)
+        assert to_evidence(other).for_sale_flag is True
+        assert decide(to_evidence(other)).state is VerdictState.HOLD
+        assert lines(other, CardRowKind.PLACE)["For sale"][0] is CardTone.HOLD
+
+    # With nothing placed, the office's own ad is not held for being for sale either.
+    unplaced = ModuleEvidence.model_validate(
+        {
+            "case_id": "fx-1",
+            "source": "fixture",
+            "authority": office.authority.model_dump(mode="json"),
+            "for_sale": for_sale,
+        }
+    )
+    assert decide(to_evidence(unplaced)).state is VerdictState.UNVERIFIED
+    spanish = lines(office, CardRowKind.PLACE, "es")[strings.text("label.for_sale", "es")]
+    assert spanish[0] is CardTone.NOT_SHOWN and spanish[1].startswith("Sin confirmar.")
+
+
 def test_the_brokerage_on_the_line_is_one_line_and_never_long():
     odd = {"status": "active", "site": "Homes.com", "offices": ["Fx  Realty\n" * 40]}
     _, text = lines(evidence(for_sale=odd), CardRowKind.PLACE)["For sale"]

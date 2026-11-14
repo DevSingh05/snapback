@@ -47,7 +47,7 @@ function dollars(n: number): string {
 
 const line = (label: string, text: string, tone: CardTone): CardLine => ({ label, text, tone });
 
-function forSaleLines(fs: ForSaleMatch | null | undefined): CardLine[] {
+function forSaleLines(fs: ForSaleMatch | null | undefined, officeIsTheContact = false): CardLine[] {
   if (fs === undefined) return [];
   if (fs === null)
     return [line("For sale", "Not checked (no for-sale lookup for this home).", "not_checked")];
@@ -59,11 +59,22 @@ function forSaleLines(fs: ForSaleMatch | null | undefined): CardLine[] {
       .find((name) => name.length > 0);
     const by = brokerage ? ` by ${brokerage}` : "";
     const since = fs.listed_on ? ` since ${fs.listed_on.slice(0, 10)}` : "";
+    const record = `Listed for sale on ${fs.site}${by}${since}.`;
+    // The ad's phone is the office's on record: the brokerage itself is offering the home.
+    // Information only, and it holds nothing (ruling, Sat 03:36).
+    if (officeIsTheContact)
+      return [
+        line(
+          "For sale",
+          `${record} The contact in this listing is the office on record, so ask them whether it is also offered for lease.`,
+          "not_shown",
+        ),
+      ];
     const ask = brokerage ? "that brokerage" : "the listing brokerage";
     return [
       line(
         "For sale",
-        `Listed for sale on ${fs.site}${by}${since}. Homes for sale are sometimes also offered for lease, so confirm with ${ask} before you pay.`,
+        `${record} Homes for sale are sometimes also offered for lease, so confirm with ${ask} before you pay.`,
         "hold",
       ),
     ];
@@ -182,7 +193,10 @@ function priceLines(p: CardProofs): CardLine[] {
 /** The proof lines to add under each row. Rows with no lines are left out. */
 export function proofLines(p: CardProofs, forSale?: ForSaleMatch | null): CardRow[] {
   const rows: [CardRowKind, CardLine[]][] = [
-    ["place", [...forSaleLines(forSale), ...unitLine(p)]],
+    [
+      "place",
+      [...forSaleLines(forSale, p.authority?.office_phone_match === "yes"), ...unitLine(p)],
+    ],
     ["person", personLines(p)],
     ["price", priceLines(p)],
   ];

@@ -139,14 +139,16 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules
         ),
         rule_flag=any(hit.red_flag for hit in modules.rules),
-        for_sale_flag=_for_sale(modules) is ForSaleStatus.ACTIVE,
+        # For sale holds a case, unless the ad's phone is the office's on record: then the
+        # brokerage itself is offering the home, and it is information (ruling, Sat 03:36).
+        for_sale_flag=(
+            _for_sale(modules) is ForSaleStatus.ACTIVE and not _the_ad_is_the_office_s(modules)
+        ),
         recently_rented_flag=_for_sale(modules) is ForSaleStatus.RECENTLY_RENTED,
         phone_flag=(
             modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
         ),
-        phone_confirmed=(
-            modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.YES
-        ),
+        phone_confirmed=_the_ad_is_the_office_s(modules),
         lookalike_link_flag=(
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
@@ -191,6 +193,12 @@ _REASON_RANK = {key: rank for rank, key in enumerate(REASON_ORDER)}
 
 def _for_sale(modules: ModuleEvidence) -> ForSaleStatus:
     return modules.for_sale.status if modules.for_sale else ForSaleStatus.NONE
+
+
+def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
+    """The phone in the listing is the leasing office's on record."""
+    authority = modules.authority
+    return authority is not None and authority.office_phone_match is PhoneMatch.YES
 
 
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
@@ -431,23 +439,22 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
         brokerage = next((name for name in offices if name), None)
         since = found.listed_on.isoformat() if found.listed_on else None
-        key = {
-            (True, True): "place.for_sale",
-            (True, False): "place.for_sale_no_date",
-            (False, True): "place.for_sale_no_brokerage",
-            (False, False): "place.for_sale_bare",
+        record_key = {
+            (True, True): "place.for_sale_record",
+            (True, False): "place.for_sale_record_no_date",
+            (False, True): "place.for_sale_record_no_brokerage",
+            (False, False): "place.for_sale_record_bare",
         }[(brokerage is not None, since is not None)]
-        return [
-            _line(
-                lang,
-                "label.for_sale",
-                CardTone.HOLD,
-                key,
-                site=found.site,
-                brokerage=brokerage or "",
-                date=since or "",
-            )
-        ]
+        record = strings.text(
+            record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
+        )
+        if _the_ad_is_the_office_s(modules):
+            # The brokerage itself is offering the home (ruling, Sat 03:36). Information
+            # only: it holds nothing, and the renter is told who to ask.
+            key = "place.for_sale_office"
+            return [_line(lang, "label.for_sale", CardTone.NOT_SHOWN, key, record=record)]
+        key = "place.for_sale" if brokerage is not None else "place.for_sale_ask_listing"
+        return [_line(lang, "label.for_sale", CardTone.HOLD, key, record=record)]
     if status is ForSaleStatus.RECENTLY_RENTED:
         rented_on = modules.for_sale.changed_on if modules.for_sale else None
         # Information, not a flag: we do not know whether it is rented now.

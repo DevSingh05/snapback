@@ -72,6 +72,12 @@ describe("place, person and price proof lines", () => {
       },
     ],
     [
+      "for sale, and the ad's phone is the office's on record",
+      authority({ office_phone_match: "yes" }),
+      "Listed for sale on Homes.com by Fixture Realty Group. The contact in this listing is the office on record, so ask them whether it is also offered for lease.",
+      { status: "active", site: "Homes.com", offices: ["Fixture Realty Group"] },
+    ],
+    [
       "for sale, no brokerage or date on record",
       {},
       "Listed for sale on Homes.com. Homes for sale are sometimes also offered for lease, so confirm with the listing brokerage before you pay.",

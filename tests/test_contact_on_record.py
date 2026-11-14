@@ -423,8 +423,19 @@ def test_recently_rented_is_information_and_holds_nothing_by_itself():
     assert "Red flag" not in text
 
 
-def test_for_sale_still_holds_a_case_that_would_otherwise_pass():
-    assert state(verified_but_for(for_sale={"status": "active"})) is VerdictState.HOLD
+def test_for_sale_holds_a_case_unless_the_ad_s_contact_is_the_office_on_record():
+    # A named manager, presence proven, and the record shows the home for sale: held, and
+    # the for-sale reason is given.
+    by_name = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+    held = evidence(authority=by_name, rules=[], price=None, for_sale={"status": "active"})
+    verdict = decide(to_evidence(held))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.for_sale") in verdict.reasons
+    # Ruling, Sat 03:36: when the ad's phone is the office's on record, the brokerage itself
+    # is offering the home. For sale is then information and holds nothing.
+    by_the_office = verified_but_for(for_sale={"status": "active"})
+    assert to_evidence(by_the_office).for_sale_flag is False
+    assert state(by_the_office) is VerdictState.VERIFIED
 
 
 def test_naming_a_listing_brokerage_on_record_matches_as_naming_the_manager_does():
