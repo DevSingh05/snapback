@@ -5,7 +5,9 @@ import { apiBase, apiFetch } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
 import {
+  calibrationLabel,
   conditionLabel,
+  heldOutFrozenAt,
   type CalibrationPoint,
   ResultsError,
   calibrationSeries,
@@ -135,7 +137,7 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
         data-testid="calibration-chart"
       >
         <title id="cal-title">
-          Reliability diagram: stated confidence against how often the place check was right
+          Reliability diagram: locate score against how often the place check was right
         </title>
         {[0, 0.25, 0.5, 0.75, 1].map((t) => (
           <g key={t}>
@@ -150,7 +152,7 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
         ))}
         <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} className="lab-diagonal" />
         <text x={(m.left + S - m.right) / 2} y={S - 6} className="lab-axis" textAnchor="middle">
-          Stated confidence
+          Locate score
         </text>
         <text
           transform={`translate(10 ${(m.top + S - m.bottom) / 2}) rotate(-90)`}
@@ -187,7 +189,10 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
         {entries.map(([cond], si) => (
           <li key={cond} className={SERIES_CLASS[si % SERIES_CLASS.length]}>
             <span className="lab-swatch" aria-hidden="true" />
-            {cond}
+            {calibrationLabel(cond)}
+            <span className="lab-n" data-testid="cal-legend-n">
+              {` (n per bin: ${(series.get(cond) ?? []).map((p) => p.n).join(", ")})`}
+            </span>
           </li>
         ))}
       </ul>
@@ -210,7 +215,8 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
   const bars = curveBars(parsed.rows);
   const cal = calibrationSeries(parsed.rows);
   const mem = memoryCatch(parsed.rows);
-  const frozen = parsed.rows.find((r) => r.frozen_at && r.frozen_at !== "FIXTURE")?.frozen_at;
+  const calN = [...cal.values()].flat().reduce((a, p) => a + p.n, 0);
+  const frozen = heldOutFrozenAt(parsed.rows);
 
   return (
     <section className="lab-panel" aria-labelledby="lab-title" data-testid="lab-panel">
@@ -251,9 +257,14 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
             </p>
           ) : null}
           <div className="lab-block">
-            <h3>Calibration: when we say 90%, how often are we right</h3>
+            <h3>Locate score calibration (renders of our scans)</h3>
             {cal.size > 0 ? (
-              <CalibrationChart series={cal} />
+              <>
+                <p className="lab-note" data-testid="cal-chip">
+                  {`Measured on renders of our scans, n=${calN}`}
+                </p>
+                <CalibrationChart series={cal} />
+              </>
             ) : (
               <p className="lab-note" data-testid="calibration-empty">
                 No calibration rows in this file.
