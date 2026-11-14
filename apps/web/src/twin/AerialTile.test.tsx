@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import tile from "../../../../fixtures/contracts/aerial_tile.json";
 import record from "../../../../fixtures/contracts/property_record.json";
-import type { AerialTileInfo, PropertyFacts } from "../contracts";
-import { AerialTile, aerialFact } from "./AerialTile";
+import type { AerialTile as AerialTileData, PropertyRecord } from "../contracts";
+import { AerialTile } from "./AerialTile";
+import { aerialFact } from "./aerialFact";
 
-const fixtureTile = tile as AerialTileInfo;
-const fixtureRecord = record as PropertyFacts;
+const fixtureTile = tile as AerialTileData;
+const fixtureRecord = record as PropertyRecord;
 
 describe("AerialTile", () => {
   it("renders the neutral fact: record floors and year built next to the capture date", () => {

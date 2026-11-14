@@ -4,7 +4,7 @@ import aerialFixture from "../../../../fixtures/contracts/aerial_tile.json";
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import recordFixture from "../../../../fixtures/contracts/property_record.json";
 import { SourceChip } from "../components/SourceChip";
-import type { AerialTileInfo, LocateResult, PropertyFacts } from "../contracts";
+import type { AerialTile as AerialTileData, LocateResult, PropertyRecord } from "../contracts";
 import { AerialTile } from "./AerialTile";
 import { PhotoOverlay } from "./PhotoOverlay";
 import { poseToSdkCall } from "./pose";
@@ -18,16 +18,16 @@ const PLACEHOLDER_PHOTO =
   );
 
 const fixtureLocate = hold.locate as unknown as LocateResult;
-const fixtureAerial = aerialFixture as AerialTileInfo;
-const fixtureRecord = recordFixture as PropertyFacts;
+const fixtureAerial = aerialFixture as AerialTileData;
+const fixtureRecord = recordFixture as PropertyRecord;
 
 interface ViewProps {
   caseId: string;
   sdkKey: string | undefined;
   modelId: string | undefined;
   locate?: LocateResult;
-  aerial?: AerialTileInfo;
-  record?: PropertyFacts;
+  aerial?: AerialTileData;
+  record?: PropertyRecord;
   aerialImageUrl?: string;
 }
 
