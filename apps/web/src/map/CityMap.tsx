@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { nearestPlace } from "./geometry";
+import { nearestPlace, pickPolygon } from "./geometry";
 import { loadMapLibre } from "./maplibre";
 import type { MapApi, MapClick, RenderedFeature } from "./maplibre";
 import {
@@ -36,7 +36,7 @@ const EMPTY = { type: "FeatureCollection", features: [] };
 
 async function vectorTilesAnswer(): Promise<boolean> {
   try {
-    const res = await fetch(TILEJSON, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(TILEJSON, { signal: AbortSignal.timeout(8000) });
     return res.ok;
   } catch {
     return false;
@@ -73,7 +73,7 @@ export function CityMap(props: Props) {
     };
 
     const hitLayers = () =>
-      [L.cluster, L.point, L.far, L.near].filter((id) => map?.getLayer(id) != null);
+      [L.cluster, L.point, L.far, L.mid, L.near].filter((id) => map?.getLayer(id) != null);
 
     const onClick = (e: MapClick) => {
       if (!map) return;
@@ -123,20 +123,34 @@ export function CityMap(props: Props) {
       const ring = f ? { type: "FeatureCollection", features: [f] } : EMPTY;
       map.getSource("picked-point")?.setData(ring);
       let found: RenderedFeature | undefined;
+      let shape: ReturnType<typeof pickPolygon> = null;
       const layer = [L.building, L.buildingFlat].find((id) => map!.getLayer(id) != null);
       if (f && layer) {
-        found = map.queryRenderedFeatures(map.project(f.geometry.coordinates), {
-          layers: [layer],
-        })[0];
+        // Look in a small box around the place's point, and keep the one building it sits in.
+        const at = map.project(f.geometry.coordinates);
+        const hits = map.queryRenderedFeatures(
+          [
+            { x: at.x - 24, y: at.y - 24 },
+            { x: at.x + 24, y: at.y + 24 },
+          ],
+          { layers: [layer] },
+        );
+        for (const hit of hits) {
+          shape = pickPolygon(hit.geometry, f.geometry.coordinates);
+          if (shape) {
+            found = hit;
+            break;
+          }
+        }
       }
       map.getSource("picked")?.setData(
-        found
+        found && shape
           ? {
               type: "FeatureCollection",
               features: [
                 {
                   type: "Feature",
-                  geometry: found.geometry,
+                  geometry: shape,
                   properties: { h: Number(found.properties.render_height ?? 8) },
                 },
               ],
@@ -166,7 +180,7 @@ export function CityMap(props: Props) {
           string,
           { data: unknown }
         >;
-        for (const id of ["places", "columns-far", "columns-near"]) {
+        for (const id of ["places", "columns-far", "columns-mid", "columns-near"]) {
           map.getSource(id)?.setData(sources[id]!.data);
         }
       },

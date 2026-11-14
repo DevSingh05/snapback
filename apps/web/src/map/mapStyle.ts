@@ -11,7 +11,8 @@ export type Look = "glass" | "paper";
 export const TILEJSON = "https://tiles.openfreemap.org/planet";
 const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 const OSM_RASTER = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-export const HOUSTON: [number, number] = [-95.393, 29.748];
+export const HOUSTON: [number, number] = [-95.3895, 29.7455]; // frames Midtown and Downtown beside the left panels
+const MIDTOWN: [number, number] = [-95.376, 29.747];
 
 const TOKENS = [
   "land",
@@ -21,6 +22,7 @@ const TOKENS = [
   "road-case",
   "bldg",
   "bldg-flat",
+  "roof",
   "label",
   "halo",
   "sky",
@@ -54,11 +56,13 @@ export const L = {
   cluster: "cluster",
   point: "place-point",
   far: "col-far",
+  mid: "col-mid",
   near: "col-near",
 } as const;
 
 type Layer = Record<string, unknown>;
-const FAR_SWITCH = 13.4; // below: wide, tall columns that read as a skyline; above: slim ones
+const FAR_SWITCH = 12.7; // below: wide, tall columns that read as a skyline
+const NEAR_SWITCH = 14.6; // above: slim beacons beside the real buildings
 
 export function placeSources(data: PlaceData): Record<string, unknown> {
   return {
@@ -75,8 +79,9 @@ export function placeSources(data: PlaceData): Record<string, unknown> {
       clusterMaxZoom: 10,
       clusterRadius: 48,
     },
-    "columns-far": { type: "geojson", data: columns(data.places, 95, 5.2, data.passed) },
-    "columns-near": { type: "geojson", data: columns(data.places, 15, 1.5, data.passed) },
+    "columns-far": { type: "geojson", data: columns(data.places, 90, 6, data.passed) },
+    "columns-mid": { type: "geojson", data: columns(data.places, 34, 2.3, data.passed) },
+    "columns-near": { type: "geojson", data: columns(data.places, 9, 0.5, data.passed) },
     picked: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     "picked-point": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   };
@@ -227,7 +232,8 @@ function placeLayers(p: Palette, look: Look, vector: boolean): Layer[] {
         paint: { "circle-opacity": 0, "circle-radius": 14, "circle-pitch-alignment": "map" },
       },
       ...column(L.far, "columns-far", { minzoom: 10, maxzoom: FAR_SWITCH }),
-      ...column(L.near, "columns-near", { minzoom: FAR_SWITCH }),
+      ...column(L.mid, "columns-mid", { minzoom: FAR_SWITCH, maxzoom: NEAR_SWITCH }),
+      ...column(L.near, "columns-near", { minzoom: NEAR_SWITCH }),
     );
   }
   out.push(
@@ -377,7 +383,7 @@ function baseLayers(p: Palette, look: Look): Layer[] {
           type: "fill-extrusion",
           ...src,
           "source-layer": "building",
-          minzoom: 12.5,
+          minzoom: 12,
           paint: {
             "fill-extrusion-color": p.bldg,
             "fill-extrusion-height": ["coalesce", ["get", "render_height"], 6],
@@ -395,9 +401,9 @@ function baseLayers(p: Palette, look: Look): Layer[] {
             type: "fill-extrusion",
             ...src,
             "source-layer": "building",
-            minzoom: 14,
+            minzoom: 13,
             paint: {
-              "fill-extrusion-color": p.halo,
+              "fill-extrusion-color": p.roof,
               "fill-extrusion-base": ["coalesce", ["get", "render_height"], 6],
               "fill-extrusion-height": ["+", ["coalesce", ["get", "render_height"], 6], 0.8],
               "fill-extrusion-opacity": 0.7,
@@ -441,7 +447,7 @@ export function buildStyle(p: Palette, look: Look, data: PlaceData): Record<stri
       ...placeSources(data),
     },
     // One light, from the north-west and fixed to the map, shades every wall the same way.
-    light: { anchor: "map", position: [1.4, 315, 42], intensity: 0.55, color: p.halo },
+    light: { anchor: "map", position: [1.3, 300, 38], intensity: 0.32, color: p["col-cap"] },
     sky:
       look === "glass"
         ? {
@@ -488,6 +494,6 @@ export function rasterStyle(p: Palette, data: PlaceData): Record<string, unknown
 
 export function camera(look: Look, narrow: boolean) {
   return look === "glass"
-    ? { center: HOUSTON, zoom: narrow ? 10.9 : 11.9, pitch: 58, bearing: -18 }
+    ? { center: narrow ? MIDTOWN : HOUSTON, zoom: narrow ? 12.85 : 13.15, pitch: 60, bearing: -24 }
     : { center: HOUSTON, zoom: narrow ? 10.6 : 11.6, pitch: 0, bearing: 0 };
 }

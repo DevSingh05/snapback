@@ -88,13 +88,14 @@
   --map-park: #d3e6da;
   --map-road: #ffffff;
   --map-road-case: #c6d6e0;
-  --map-bldg: #d3e4ee;
+  --map-bldg: #c6deeb;
   --map-bldg-flat: #d0dde6;
+  --map-roof: #ffffff;
   --map-label: #43555f;
   --map-halo: #ffffff;
   --map-sky: #bfdcec;
   --map-horizon: #f2f8fb;
-  --map-col: #12a3ae;
+  --map-col: #1fc3cf;
   --map-col-off: #9fb4c1;
   --map-col-cap: #ffffff;
   --map-glow: #1fb6c1;
@@ -159,8 +160,9 @@
     --map-park: #1a2b27;
     --map-road: #2c3440;
     --map-road-case: #1f252e;
-    --map-bldg: #2d3948;
+    --map-bldg: #3a4a5d;
     --map-bldg-flat: #262f3b;
+    --map-roof: #5b7088;
     --map-label: #b7c3cc;
     --map-halo: #0e0f12;
     --map-sky: #0d1823;
@@ -230,8 +232,9 @@
   --map-park: #1a2b27;
   --map-road: #2c3440;
   --map-road-case: #1f252e;
-  --map-bldg: #2d3948;
+  --map-bldg: #3a4a5d;
   --map-bldg-flat: #262f3b;
+  --map-roof: #5b7088;
   --map-label: #b7c3cc;
   --map-halo: #0e0f12;
   --map-sky: #0d1823;

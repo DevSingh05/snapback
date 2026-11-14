@@ -149,6 +149,13 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
           contributors.
         </p>
 
+        <ul className="legend mono" aria-label="Map key">
+          <li className="lg-fit">{S.legendFit}</li>
+          <li className="lg-other">{S.legendOther}</li>
+          <li className="lg-scan">{S.legendScan}</li>
+          <li className="lg-height">{S.legendHeight}</li>
+        </ul>
+
         <div className="col-left">
           <div className="hud">
             <div className="hud-top">
@@ -181,12 +188,6 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
                 <span className="hud-asof">{feed.as_of}</span>
               </p>
             ) : null}
-            <ul className="legend mono">
-              <li className="lg-fit">{S.legendFit}</li>
-              <li className="lg-other">{S.legendOther}</li>
-              <li className="lg-scan">{S.legendScan}</li>
-              <li className="lg-height">{S.legendHeight}</li>
-            </ul>
           </div>
 
           <CriteriaPanel

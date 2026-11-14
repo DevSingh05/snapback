@@ -88,3 +88,46 @@ export function nearestPlace(
   }
   return best;
 }
+
+type Ring = [number, number][];
+
+function inRing(at: [number, number], ring: Ring): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i]!;
+    const [xj, yj] = ring[j]!;
+    if (yi > at[1] !== yj > at[1] && at[0] < ((xj - xi) * (at[1] - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// One building out of what the tiles hand back. A tile feature can be a MultiPolygon that joins
+// many buildings, so this keeps only the polygon that holds the place's point, or failing that
+// the one with a corner nearest to it within `withinM` metres. Null when there is none.
+export function pickPolygon(
+  geometry: { type: string; coordinates: unknown },
+  at: [number, number],
+  withinM = 60,
+): { type: "Polygon"; coordinates: Ring[] } | null {
+  const polygons: Ring[][] =
+    geometry.type === "Polygon"
+      ? [geometry.coordinates as Ring[]]
+      : geometry.type === "MultiPolygon"
+        ? (geometry.coordinates as Ring[][])
+        : [];
+  let best: Ring[] | null = null;
+  let bestD = withinM;
+  for (const poly of polygons) {
+    const outer = poly[0];
+    if (!outer || outer.length < 4) continue;
+    if (inRing(at, outer)) return { type: "Polygon", coordinates: poly };
+    const d = Math.min(...outer.map((pt) => metresBetween(pt, at)));
+    if (d <= bestD) {
+      best = poly;
+      bestD = d;
+    }
+  }
+  return best ? { type: "Polygon", coordinates: best } : null;
+}

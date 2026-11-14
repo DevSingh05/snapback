@@ -20,8 +20,8 @@ export const S = {
   attribution: "OpenFreeMap © OpenMapTiles. Data from OpenStreetMap contributors.",
   legendFit: "Fits your brief",
   legendOther: "On record",
-  legendScan: "3D scan on record",
-  legendHeight: "Height: floor plans on record",
+  legendScan: "3D scan",
+  legendHeight: "Taller: more plans",
   mapLabel: "Map of the places CoStar has researched. The same places are in the list below.",
   // the brief
   criteria: "Your brief",
