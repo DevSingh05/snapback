@@ -47,6 +47,12 @@ class ChallengeOutcome:
     challenge: ChallengeResult
     recapture: list[RecaptureResult] = field(default_factory=list)
     memory: list[MemoryResult] = field(default_factory=list)
+    # A14: the message was handed over and the poster's reply has not come. The case waits
+    # (HOLD, never a failure) until `CaseSession.reply` is given the checked reply.
+    awaiting_reply: bool = False
+    # A14: the reply came after the deadline and is not a copy of a listing photo, so it was
+    # not counted. The session asks again once (decision 4, Sat 02:45).
+    late: bool = False
 
 
 class Modules(Protocol):
