@@ -120,6 +120,20 @@
   font-size: var(--fs-md);
 }
 
+/* One quiet link to the Stories page: three renters' stories, played on the real app. */
+.ob-stories {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.ob-stories a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--act);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
 /* ---------- What you can do: a piece of the real product, one tap to try ---------- */
 .ob-can {
   display: flex;
