@@ -11,11 +11,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-import type { TourStop } from "../../contracts";
+import type { TourStop, VerdictState } from "../../contracts";
 import type { ShowcaseSdk } from "../../twin/showcase";
 import { createSdkDriver, type CameraDriver, type PlayerSdk } from "./sdkDriver";
 import {
-  ARRIVE_MS,
   REST_POSE,
   captionOf,
   clockText,
@@ -26,6 +25,10 @@ import {
 } from "./timeline";
 import { Transport, frameClock, type Clock, type Cue } from "./transport";
 import { StandInPhoto } from "./StandInPhoto";
+import { STATE_WORD } from "../../cardStrings";
+import { chapterColumns, type Chapter } from "../../ui/ChapterStrip";
+import { STAMP_TEXT } from "../../ui/Photo";
+import { Problem } from "../../ui/Problem";
 import "./player.css";
 
 /** An ad photo for the strip and the photo beat: the real image, or null for the drawn stand-in. */
@@ -64,6 +67,8 @@ export interface WalkPlayerProps {
   verdict?: string | null;
   /** The real scan has not connected after the wait: the tour plays on the drawing meanwhile. */
   scanLate?: boolean;
+  /** The 3D view failed to load: the walk plays on stand-ins and says so (Problem). */
+  sdkFailed?: boolean;
   /** Start playing on arrival, like a video. Never with reduced motion. */
   autoStart?: boolean;
   clock?: Clock;
@@ -112,6 +117,7 @@ export function WalkPlayer({
   photos = {},
   verdict = null,
   scanLate = false,
+  sdkFailed = false,
   autoStart = true,
   clock = frameClock,
 }: WalkPlayerProps) {
@@ -358,6 +364,29 @@ export function WalkPlayer({
   const flashOn = Boolean(flash) && state.landing && !exploring;
   const position = transport.position();
   const playLabel = playing ? "Pause" : state.ended ? "Play again" : "Play";
+  // The ad photos in walk order: "2 of 6" in the dock is this stop's place among them.
+  const shotKeys = stops.filter((s) => photos[s.key]).map((s) => s.key);
+  const shotNo = flash ? shotKeys.indexOf(stop.key) + 1 : 0;
+  const chapters = transport.chapters.map((c) => ({
+    id: c.key,
+    label: c.title,
+    duration: c.duration,
+  }));
+  const verdictState = verdict
+    ? (Object.keys(STATE_WORD) as VerdictState[]).find((k) => STATE_WORD[k] === verdict)
+    : undefined;
+
+  // "Tap the floor to walk" shows for four seconds on entering Look around, then fades.
+  const [hint, setHint] = useState(false);
+  useEffect(() => {
+    if (!exploring) {
+      setHint(false);
+      return;
+    }
+    setHint(true);
+    const t = setTimeout(() => setHint(false), 4000);
+    return () => clearTimeout(t);
+  }, [exploring]);
 
   return (
     <div
@@ -395,11 +424,16 @@ export function WalkPlayer({
           </figcaption>
         </figure>
       )}
-      {scanLate && (
-        <p className="wp-late mono" data-testid="wp-scan-late" role="status">
-          <span className="wp-late-mark" aria-hidden="true" />
-          3D scan still loading
-        </p>
+      {(scanLate || sdkFailed) && (
+        <div className="wp-late" data-testid="wp-scan-late">
+          <Problem
+            message={
+              sdkFailed
+                ? "The 3D view did not load. Showing photos of each stop instead."
+                : "3D scan still loading. The walk plays on the drawn stand-in meanwhile."
+            }
+          />
+        </div>
       )}
       <div
         className="wp-shield"
@@ -418,11 +452,6 @@ export function WalkPlayer({
           </span>
           <strong>{stop.title}</strong>
         </p>
-        {(loading || captionOf(stop)) && (
-          <p className="wp-caption" data-testid="wp-caption">
-            {loading ? "Loading the 3D scan…" : captionOf(stop)}
-          </p>
-        )}
         {state.landing && (
           <p className="wp-pin" data-testid="wp-pin">
             <span className="wp-pin-mark" aria-hidden="true" />
@@ -430,13 +459,40 @@ export function WalkPlayer({
           </p>
         )}
       </div>
+      {(loading || captionOf(stop)) && (
+        <p className="wp-caption" data-testid="wp-caption">
+          {loading ? "Loading the 3D scan…" : captionOf(stop)}
+        </p>
+      )}
+
+      {flash && (
+        <figure
+          className="wp-dock"
+          data-testid="wp-dock"
+          data-away={flashOn ? "true" : undefined}
+          data-stand-in={flash.src ? undefined : "true"}
+        >
+          <span className="ui-photo wp-dock-photo" data-stamp={flash.src ? "ad" : "sample"}>
+            {flash.src ? (
+              <img src={flash.src} alt={`Ad photo ${flash.alias}, from the ad`} />
+            ) : (
+              <StandInPhoto label="" small />
+            )}
+            <span className="ui-stamp">{flash.src ? STAMP_TEXT.ad : STAMP_TEXT.sample}</span>
+          </span>
+          <figcaption className="mono">
+            Ad photo {flash.alias}, {shotNo} of {shotKeys.length}
+          </figcaption>
+        </figure>
+      )}
 
       {state.ended && !exploring && (
-        <div className="wp-end" data-testid="wp-end">
+        <div className="wp-end" data-testid="wp-end" data-verdict={verdictState}>
           {verdict && <p className="wp-end-kicker mono">The result</p>}
           <p className="wp-end-title" data-testid="wp-end-verdict">
             {verdict || summary || "That is the whole walk."}
           </p>
+          <span className="wp-end-bar" aria-hidden="true" />
           <p className="wp-end-line">
             {verdict && summary ? `${summary} ` : ""}See it in person before you pay anything.
           </p>
@@ -468,15 +524,19 @@ export function WalkPlayer({
       <div className="wp-bar" role="group" aria-label="Tour player">
         {exploring ? (
           <div className="wp-explore" data-testid="wp-explore">
-            <button type="button" className="wp-resume" data-testid="wp-resume" onClick={resume}>
+            <button type="button" className="wp-play" data-testid="wp-resume" onClick={resume}>
               <Icon name="play" />
-              Resume tour
+              Play the walk
             </button>
-            {surface === "scan" ? (
-              <p className="wp-hint">Tap the floor to walk. Drag to look around.</p>
-            ) : (
+            {hint && (
+              <p className="wp-hint" data-testid="wp-hint">
+                {surface === "scan"
+                  ? "Tap the floor to walk. Drag to look around."
+                  : "Drag to look around. Tap a room to go there."}
+              </p>
+            )}
+            {surface !== "scan" && (
               <>
-                <p className="wp-hint">Drag to look around. Tap a room to go there.</p>
                 <div className="wp-rooms" role="list" aria-label="Rooms">
                   {transport.chapters.map((c) => (
                     <span role="listitem" key={c.key}>
@@ -492,11 +552,13 @@ export function WalkPlayer({
                   ))}
                 </div>
                 <div className="wp-zoom">
-                  <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>
+                  <button type="button" onClick={() => zoomBy(1 / 1.25)}>
                     <Icon name="minus" />
+                    Zoom out
                   </button>
-                  <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>
+                  <button type="button" onClick={() => zoomBy(1.25)}>
                     <Icon name="plus" />
+                    Zoom in
                   </button>
                 </div>
               </>
@@ -521,103 +583,58 @@ export function WalkPlayer({
               onPointerCancel={onTrackUp}
               onKeyDown={onTrackKey}
             >
-              {transport.chapters.map((c) => {
-                const done = Math.max(0, Math.min((position - c.start) / c.duration, 1));
-                return (
-                  <span
-                    key={c.key}
-                    className="wp-seg"
-                    data-current={c.index === state.index ? "true" : undefined}
-                    data-photo={c.land ? "true" : undefined}
-                    style={
-                      {
-                        flexGrow: c.duration,
-                        "--wp-notch": ARRIVE_MS / c.duration,
-                      } as CSSProperties
-                    }
-                  >
-                    <span className="wp-fill" style={{ transform: `scaleX(${done})` }} />
-                  </span>
-                );
-              })}
               <span
-                className="wp-thumb"
-                style={{ left: `${(position / Math.max(transport.total, 1)) * 100}%` }}
+                className="wp-fill"
+                style={{ transform: `scaleX(${position / Math.max(transport.total, 1)})` }}
               />
-            </div>
-            <div className="wp-chapters" data-testid="wp-chapters">
-              {transport.chapters.map((c) => {
-                const shot = photos[c.key];
-                return (
-                  <button
-                    key={c.key}
-                    type="button"
-                    className="wp-chapter"
-                    data-photo={shot ? "true" : undefined}
-                    style={{ flexGrow: c.duration }}
-                    aria-current={c.index === state.index ? "true" : undefined}
-                    aria-label={`Chapter ${c.index + 1}: ${c.title}`}
-                    onClick={() => transport.jumpTo(c.index)}
-                  >
-                    {shot && (
-                      <span className="wp-shot" data-testid="wp-shot" aria-hidden="true">
-                        {shot.src ? <img src={shot.src} alt="" /> : <StandInPhoto label="" small />}
-                        <span className="wp-shot-tag mono">{shot.alias}</span>
-                      </span>
-                    )}
-                    <span className="wp-chapter-name">{c.title}</span>
-                  </button>
-                );
-              })}
             </div>
             <div className="wp-row">
               <button
                 type="button"
-                className="wp-btn"
-                aria-label="Previous chapter"
-                onClick={() => transport.previous()}
-              >
-                <Icon name="previous" />
-              </button>
-              <button
-                type="button"
-                className="wp-btn wp-play"
+                className="wp-play"
                 data-testid="wp-play"
-                aria-label={playLabel}
+                data-playing={playing ? "true" : undefined}
                 onClick={() => transport.toggle()}
               >
                 <Icon name={playing ? "pause" : "play"} />
+                {playLabel}
               </button>
-              <button
-                type="button"
-                className="wp-btn"
-                aria-label="Next chapter"
-                disabled={state.index >= stops.length - 1}
-                onClick={() => transport.next()}
-              >
-                <Icon name="next" />
-              </button>
+              <div className="wp-strip" data-testid="wp-chapters">
+                {/* One segment per room, sized by how long it plays. ChapterStrip's look and
+                    column maths; the buttons carry "Chapter n: room" and aria-current="true",
+                    which the page-sync test reads. */}
+                <ol
+                  className="ui-chapters ui-on-matte"
+                  style={{ "--ui-chapters": roomColumns(chapters) } as CSSProperties}
+                  aria-label="Rooms"
+                >
+                  {transport.chapters.map((c) => {
+                    const on = c.index === state.index;
+                    return (
+                      <li key={c.key} className={on ? "ui-chapter-on" : undefined}>
+                        <button
+                          type="button"
+                          aria-current={on ? "true" : undefined}
+                          aria-label={`Chapter ${c.index + 1}: ${c.title}`}
+                          onClick={() => transport.jumpTo(c.index)}
+                        >
+                          {c.title}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
               <span className="wp-time mono" data-testid="wp-time">
                 {clockText(position)} <span className="wp-dim">/ {clockText(transport.total)}</span>
               </span>
-              <span className="wp-now" aria-hidden="true" />
               <button
                 type="button"
-                className="wp-btn wp-speed mono"
-                data-testid="wp-speed"
-                aria-label={`Speed ${state.speed}x. Change speed`}
-                onClick={() => transport.setSpeed(state.speed === 1 ? 1.5 : 1)}
-              >
-                {state.speed}x
-              </button>
-              <button
-                type="button"
-                className="wp-btn wp-go"
+                className="wp-go"
                 data-testid="wp-explore-toggle"
                 onClick={startExplore}
               >
-                <Icon name="explore" />
-                Explore
+                Look around
               </button>
             </div>
           </>
@@ -632,14 +649,16 @@ export function WalkPlayer({
   );
 }
 
+// The strip's columns: sized by how long each room plays, but never too narrow to read its name
+// (the strip scrolls sideways inside its own box when the rooms do not fit).
+const roomColumns = (chapters: Chapter[]): string =>
+  chapterColumns(chapters).replaceAll("minmax(0,", "minmax(72px,");
+
 const ICONS = {
   play: "M7 4.5v15l12-7.5z",
   pause: "M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z",
-  previous: "M5 5h2.6v14H5zM19 5v14L8.6 12z",
-  next: "M16.4 5H19v14h-2.6zM5 5v14l10.4-7z",
   plus: "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z",
   minus: "M5 11h14v2H5z",
-  explore: "M12 2l2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6z",
 } as const;
 
 function Icon({ name }: { name: keyof typeof ICONS }) {

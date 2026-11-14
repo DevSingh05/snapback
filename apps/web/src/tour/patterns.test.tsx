@@ -83,21 +83,20 @@ describe("a scan that is slow to connect", () => {
 });
 
 describe("the highlight strip and the ad photo over the view", () => {
-  it("shows the ad photos in the bar, lights the current one, and a tap jumps to its stop", () => {
+  it("docks the stop's ad photo top right, stamped, and a room name in the strip jumps there", () => {
     render(<TourView plan={FIXTURE_TOUR} />);
-    const shots = screen.getAllByTestId("wp-shot");
-    expect(shots).toHaveLength(FIXTURE_TOUR.stops.filter((s) => s.photos.length > 0).length);
+    // No ad photo at the front door: nothing is docked (and nothing is made up).
+    expect(screen.queryByTestId("wp-dock")).toBeNull();
     const kitchen = screen.getByRole("button", { name: "Chapter 4: Kitchen" });
-    expect(within(kitchen).getByTestId("wp-shot")).toHaveTextContent("P2");
-    // Stops with no ad photo stay text-only chapters.
-    expect(
-      within(screen.getByRole("button", { name: "Chapter 2: Front door" })).queryByTestId(
-        "wp-shot",
-      ),
-    ).toBeNull();
     fireEvent.click(kitchen);
     expect(title()).toBe("Kitchen");
     expect(kitchen).toHaveAttribute("aria-current", "true");
+    const dock = screen.getByTestId("wp-dock");
+    expect(dock).toHaveTextContent("Ad photo P2");
+    // The drawn stand-in carries the SAMPLE PHOTO stamp, never an ad stamp.
+    expect(dock).toHaveTextContent("SAMPLE PHOTO");
+    expect(dock).not.toHaveTextContent("FROM THE AD");
+    expect(dock).toHaveAttribute("data-stand-in", "true");
   });
 
   it("fades the ad photo over the view after arrival, captioned and labelled a stand-in", () => {
