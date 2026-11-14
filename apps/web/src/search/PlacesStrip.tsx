@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { HouseGlyph } from "../components/HouseGlyph";
+import { KitArt } from "../components/KitArt";
 import { SourceChip } from "../components/SourceChip";
 import type { PlaceMatch, RenterBrief, TourDraft } from "../contracts";
 import {
@@ -83,46 +83,61 @@ function PlaceRow({
 
   return (
     <li className="pf-row" data-testid="place-row" data-fit={place.budget_fit}>
-      <div className="pf-row-head">
-        <h3 className="pf-row-title">{title}</h3>
-        <SourceChip source={place.source} />
+      <div className="pf-art">
+        <KitArt kind={place.kind === "house" ? "house" : "apartment"} detail="low" />
+        <span className="pf-art-label mono">Drawn stand-in</span>
       </div>
-      <p className="pf-price">{place.price_text}</p>
-      <p className="pf-avail">{place.availability_text}</p>
-      {place.must_haves.length > 0 && (
-        <ul className="pf-musts" aria-label="Your must-haves">
-          {place.must_haves.map((m) => (
-            <li key={m.key} data-met={m.met === true ? "yes" : m.met === false ? "no" : "unknown"}>
-              {m.text}
-            </li>
-          ))}
-        </ul>
-      )}
-      {place.has_3d_scan && <p className="pf-scan">{place.scan_text ?? SCAN_LABEL}</p>}
-      {place.has_3d_scan && (
-        <a className="pf-action" href={tourHref(place)} data-testid="walk-it-first-link">
-          Walk it first
-        </a>
-      )}
-      {place.office_on_record && (
-        <p className="pf-office">
-          Leasing office on record: <strong>{place.office_on_record}</strong>
-        </p>
-      )}
+      <div className="pf-body">
+        <div className="pf-row-head">
+          <h3 className="pf-row-title">{title}</h3>
+          <SourceChip source={place.source} />
+        </div>
+        <p className="pf-price">{place.price_text}</p>
+        <p className="pf-avail">{place.availability_text}</p>
+        {place.must_haves.length > 0 && (
+          <ul className="pf-musts" aria-label="Your must-haves">
+            {place.must_haves.map((m) => (
+              <li
+                key={m.key}
+                data-met={m.met === true ? "yes" : m.met === false ? "no" : "unknown"}
+              >
+                {m.text}
+              </li>
+            ))}
+          </ul>
+        )}
+        {place.has_3d_scan && <p className="pf-scan">{place.scan_text ?? SCAN_LABEL}</p>}
+        {place.office_on_record && (
+          <p className="pf-office">
+            Leasing office on record: <strong>{place.office_on_record}</strong>
+          </p>
+        )}
+      </div>
 
-      <a className="pf-action pf-link" href={prepHref(place)} data-testid="tour-prep-link">
-        Tour prep
-      </a>
-      {caseId && place.office_on_record && draft.status !== "ready" && (
-        <button
-          type="button"
-          className="pf-action"
-          disabled={draft.status === "loading"}
-          onClick={() => void ask()}
+      <div className="pf-actions">
+        {place.has_3d_scan && (
+          <a className="pf-action pf-walk" href={tourHref(place)} data-testid="walk-it-first-link">
+            Walk it first
+          </a>
+        )}
+        <a
+          className="pf-action pf-link pf-quiet"
+          href={prepHref(place)}
+          data-testid="tour-prep-link"
         >
-          {draft.status === "loading" ? "Drafting…" : "Draft a tour request"}
-        </button>
-      )}
+          Tour prep
+        </a>
+        {caseId && place.office_on_record && draft.status !== "ready" && (
+          <button
+            type="button"
+            className="pf-action pf-quiet"
+            disabled={draft.status === "loading"}
+            onClick={() => void ask()}
+          >
+            {draft.status === "loading" ? "Drafting…" : "Draft a tour request"}
+          </button>
+        )}
+      </div>
       {draft.status === "error" && (
         <p className="pf-error" role="alert">
           {draft.message}
@@ -199,9 +214,10 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
       </div>
       {load.status === "ready" && <p className="pf-asof">{load.places.as_of}</p>}
 
-      {load.status === "loading" && <p className="pf-note">Looking up researched places…</p>}
+      {load.status === "loading" && <p className="pf-note wait">Looking up researched places…</p>}
       {load.status === "error" && (
         <div className="pf-empty" role="alert">
+          <KitArt kind="house" className="pf-empty-house" lit={false} />
           <p>We could not load places right now.</p>
           <p className="pf-note">{load.message}</p>
           {load.retry && (
@@ -213,7 +229,7 @@ export function PlacesStrip({ caseId, brief, heading }: Props) {
       )}
       {load.status === "ready" && load.places.matches.length === 0 && (
         <div className="pf-empty" data-testid="places-empty">
-          <HouseGlyph className="pf-empty-house" lit={false} />
+          <KitArt kind="house" className="pf-empty-house" lit={false} />
           <p>No researched places fit this budget and these must-haves.</p>
           {load.places.tradeoff_question && (
             <p className="pf-tradeoff">{load.places.tradeoff_question}</p>

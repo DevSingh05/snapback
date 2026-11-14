@@ -903,6 +903,8 @@ class CasePreferences(BaseModel):
     needs_parking: bool = False
     max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
     avoid_property_ids: list[str] = Field(default_factory=list, max_length=50)
+    # M9: orders the list (3D-scan places first), never filters it.
+    prefer_scans: bool = False
 
 
 class PreferencesUpdate(BaseModel):
@@ -914,6 +916,7 @@ class PreferencesUpdate(BaseModel):
     needs_parking: bool | None = None
     max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
     avoid_property_id: str | None = Field(default=None, min_length=1, max_length=64)
+    prefer_scans: bool | None = None
 
 
 class SearchResponse(BaseModel):
@@ -938,6 +941,157 @@ class AlternativesResponse(BaseModel):
     question: str | None = None
     ask_first: bool = False
     remembered: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------------------------
+# M9: the finder, a deep agent that learns from what the renter picks and passes on and offers
+# what to remember. Nothing it learns applies until the renter accepts (plan/map-plan.md 4).
+# ---------------------------------------------------------------------------------------------
+
+FinderProposalKey = Literal[
+    "propose_no_walkup", "propose_parking", "propose_prefer_scans", "propose_lower_budget"
+]
+
+
+class FinderSessionStarted(BaseModel):
+    """`POST /finder/sessions`. The write token is shown once; later calls send it in a header."""
+
+    session_id: str
+    token: str
+    source: DataSource
+    mode: Literal["policy", "deepagents"]
+
+
+class FinderSignal(BaseModel):
+    """One thing the renter did. Attributes of the place only: which place never leaves."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["pick", "pass", "brief"]
+    place_kind: Literal["apartment", "house"] | None = None
+    has_scan: bool | None = None
+    rent_from: int | None = Field(default=None, ge=0, le=1_000_000)
+    walkup: bool | None = None
+    parking: bool | None = None
+    brief_field: Literal["budget", "beds", "parking", "no_walkup", "pets"] | None = None
+    rent_max: int | None = Field(default=None, ge=0, le=1_000_000)
+
+
+class FinderMessageRequest(BaseModel):
+    """`POST /finder/{session}/message`. Code reads the text into signals; the main agent sees
+    only the cleaned words (phones, emails, links and addresses removed, 500 characters)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str | None = Field(default=None, max_length=500)
+    signals: list[FinderSignal] = Field(default_factory=list, max_length=20)
+
+
+class FinderProposal(BaseModel):
+    """Something the agent offers to remember. `update` changes nothing until accepted."""
+
+    id: str
+    key: FinderProposalKey
+    update: PreferencesUpdate
+    text: str  # the question put to the renter, written by code
+    evidence: str  # the count it rests on, e.g. "you passed on 3 of 3 walk-ups"
+    reason: str  # one plain sentence from whoever chose it
+    chosen_by: Literal["model", "policy"]
+    status: Literal["proposed", "accepted", "declined"] = "proposed"
+    at: datetime
+
+
+class FinderPick(BaseModel):
+    """One lead pick. `line` is built by code from the record; `why` is one sentence from the
+    search sub-agent (`chosen_by`), kept only if it passes the same cleaning as every note."""
+
+    pid: str
+    rank: int = Field(ge=1)
+    kind: Literal["apartment", "house"]
+    has_scan: bool
+    line: str
+    why: str
+    chosen_by: Literal["model", "policy"]
+    as_of: str = AS_OF
+    # The record's facts behind the line, so the Finder tab can send a pass or a pick back as a
+    # signal (attributes only). Shown to the renter; never shown to a model.
+    rent_from: int | None = None
+    walkup: bool | None = None
+    parking: bool | None = None
+
+
+class FinderNote(BaseModel):
+    path: str  # /finder/<session>/prefs.md or picks.md
+    text: str
+    written_by: Literal["model", "policy"]
+
+
+class FinderTraceEvent(BaseModel):
+    """The finder's trace, in the same shape as a case's, for the same agent rail."""
+
+    session_id: str
+    seq: int = Field(ge=0)
+    at: datetime
+    kind: TraceKind
+    options: list[str] = Field(default_factory=list)
+    pick: str | None = None
+    reason: str
+    source: DataSource
+    chosen_by: Literal["model", "policy"] = "policy"
+
+
+class FinderReply(BaseModel):
+    session_id: str
+    source: DataSource
+    mode: Literal["policy", "deepagents"]
+    reply: str
+    reply_by: Literal["model", "policy"]
+    proposals: list[FinderProposal]  # the new ones this turn
+    picks: list[FinderPick]
+    as_of: str = AS_OF
+
+
+class FinderWatchRequest(BaseModel):
+    """`POST /finder/{session}/watch`. iMessage is the one channel (M10, ruling R-M1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channel: Literal["imessage"]
+
+
+class FinderWatchStatus(BaseModel):
+    """A watch on a finder session: recorded once, with the `watch_added` event it published."""
+
+    session_id: str
+    channel: Literal["imessage"]
+    kind: Literal["brief"] = "brief"  # it watches the session's brief, never one place
+    event_id: str
+    source: DataSource
+    at: datetime
+
+
+class FinderState(BaseModel):
+    """`GET /finder/{session}/state`: everything the Finder tab shows."""
+
+    session_id: str
+    source: DataSource
+    mode: Literal["policy", "deepagents"]
+    applied: CasePreferences
+    proposals: list[FinderProposal]  # all of them, with status
+    picks: list[FinderPick]
+    learned: dict[str, str | bool]  # "what I've learned about you": fact key to "3 of 3" or yes/no
+    notes: list[FinderNote]
+    trace: list[FinderTraceEvent]
+    as_of: str = AS_OF
+    watch: FinderWatchStatus | None = None  # set by `POST /finder/{session}/watch`
+
+
+class FinderDecision(BaseModel):
+    """`POST /finder/{session}/proposals/{id}`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["accept", "decline"]
 
 
 class TourDraftRequest(BaseModel):
