@@ -107,7 +107,6 @@ from snapback.search import (
     place_and_raw_for,
     place_for,
 )
-from snapback.search import search as run_search
 from snapback.settings import Settings, get_settings
 from snapback.tour import (
     TourPlan,
@@ -123,6 +122,7 @@ from snapback.tour import (
     map_elsewhere,
     map_locate,
     must_have_kinds_of,
+    office_on_record,
     scan_model_of,
 )
 from snapback.verdict import decide
@@ -1087,20 +1087,7 @@ def create_app(
             return []
 
     def office_of(property_id: str) -> str | None:
-        """The leasing office on CoStar's record for a building, from any of its floor plans (a
-        building with several plans is not "no office"), else the record's manager company. None
-        only when neither can be read."""
-        try:
-            for place in run_search(RenterBrief(max_results=50), lookups).matches:
-                if place.property_id == property_id and place.office_on_record:
-                    return place.office_on_record
-        except Exception:  # a lookup that broke did not happen
-            pass
-        try:
-            record = lookups.record(property_id)
-        except Exception:
-            return None
-        return (record.manager_company or None) if record is not None else None
+        return office_on_record(lookups, property_id)
 
     def case_tour(
         case_id: str, request: Request, authorization, x_case_token, mode: str = "claimed"

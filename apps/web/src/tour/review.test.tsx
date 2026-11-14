@@ -8,7 +8,7 @@ import { FIXTURE_TOUR } from "./fixtureTour";
 import { TourView } from "./TourPage";
 
 describe("as of CoStar's last research sits beside every fact and claim", () => {
-  it("shows plan.as_of with each source on every stop that has facts or claims", async () => {
+  it("shows plan.as_of with every CoStar source, and only with those", async () => {
     render(<TourView plan={FIXTURE_TOUR} />);
     const user = userEvent.setup();
     for (const stop of FIXTURE_TOUR.stops) {
@@ -16,7 +16,11 @@ describe("as of CoStar's last research sits beside every fact and claim", () => 
       await user.click(screen.getByRole("button", { name: stop.title }));
       const sources = document.querySelectorAll(".tour-src");
       expect(sources.length).toBe(stop.facts.length + stop.claims.length);
-      for (const el of sources) expect(el.textContent).toContain("as of CoStar's last research");
+      for (const el of sources) {
+        // Only CoStar's own lines carry it; a Vexcel or Matterport source must not.
+        const costar = (el.textContent ?? "").startsWith("CoStar");
+        expect(el.textContent?.includes("as of CoStar's last research")).toBe(costar);
+      }
     }
   });
 });

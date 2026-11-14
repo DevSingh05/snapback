@@ -188,6 +188,9 @@ class TourPlan(BaseModel):
     links: TourLinks
     # "claimed": the ad's own home. "elsewhere": the building the ad's photos were taken in (X1);
     # then `mode_line` says what that is, and no coverage is counted for the claimed home.
+    # Which model axis is vertical in the stops' positions ("y" for fixtures, "z" for Matterport's
+    # cache). Photo poses are in the same frame, so placement uses this axis too.
+    up_axis: Literal["y", "z"] = "y"
     mode: Literal["claimed", "elsewhere"] = "claimed"
     mode_line: str | None = None
     coverage: WalkCoverage | None = None
@@ -226,28 +229,51 @@ class TourSweep:
 # --- geometry ----------------------------------------------------------------------------------
 
 
-def _dist(a: TourSweep, b: TourSweep) -> float:
-    """Walking distance on the floor plane (x, z; y is up), inf when a position is unknown."""
+# Which coordinate is "up". Positions are in the scan's own model frame, and the two sources
+# differ: the synthetic fixtures are y-up (x, 1.4, z) while Matterport's cached sweeps (the LIVE
+# source) are z-up (x, y, height). Placed-photo poses are the same sweep positions from the same
+# cache, so they share the frame. The axis follows the data source, never a guess from the
+# numbers (a multi-floor scan fools a spread test), and is stored on the plan as `up_axis`.
+
+
+def up_axis_for(source: DataSource) -> Literal["y", "z"]:
+    return "z" if source is DataSource.LIVE else "y"
+
+
+def floor_xy(position: Sequence[float], up: str = "y") -> tuple[float, float]:
+    """The two horizontal coordinates of a position, given which axis is up."""
+    return (position[0], position[1] if up == "z" else position[2])
+
+
+def _dist(a: TourSweep, b: TourSweep, up: str = "y") -> float:
+    """Walking distance on the floor plane, inf when a position is unknown."""
     if a.position is None or b.position is None:
         return math.inf
-    return math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2])
+    ax, ay = floor_xy(a.position, up)
+    bx, by = floor_xy(b.position, up)
+    return math.hypot(ax - bx, ay - by)
 
 
 def _central(
-    group: Sequence[TourSweep], order: dict[str, int], avoid: str | None = None
+    group: Sequence[TourSweep],
+    order: dict[str, int],
+    avoid: str | None = None,
+    up: str = "y",
 ) -> TourSweep:
     """The sweep with the least total distance to the rest. Ties go to the one the scan lists
     first. `avoid` is skipped when another sweep is available."""
     pool = [s for s in group if s.sweep_id != avoid] or list(group)
 
     def cost(s: TourSweep) -> tuple[float, int]:
-        total = sum(_dist(s, o) for o in group if o is not s)
+        total = sum(_dist(s, o, up) for o in group if o is not s)
         return (0.0 if math.isinf(total) else total, order[s.sweep_id])
 
     return min(pool, key=cost)
 
 
-def _clusters(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[list[TourSweep]]:
+def _clusters(
+    sweeps: Sequence[TourSweep], order: dict[str, int], up: str = "y"
+) -> list[list[TourSweep]]:
     """Single-link groups of sweeps closer than ROOM_LINK_M; with no positions, one group."""
     parent = list(range(len(sweeps)))
 
@@ -259,7 +285,7 @@ def _clusters(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[list[T
 
     for i, a in enumerate(sweeps):
         for j in range(i + 1, len(sweeps)):
-            if _dist(a, sweeps[j]) <= ROOM_LINK_M:
+            if _dist(a, sweeps[j], up) <= ROOM_LINK_M:
                 parent[find(j)] = find(i)
     out: dict[int, list[TourSweep]] = {}
     for i, s in enumerate(sweeps):
@@ -270,14 +296,14 @@ def _clusters(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[list[T
 
 
 def _nearest_first(
-    start: TourSweep, reps: list[TourSweep], order: dict[str, int]
+    start: TourSweep, reps: list[TourSweep], order: dict[str, int], up: str = "y"
 ) -> list[TourSweep]:
     """Nearest neighbour from `start`; ties go to the sweep the scan lists first."""
     left = list(reps)
     here = start
     path: list[TourSweep] = []
     while left:
-        nxt = min(left, key=lambda s: (_dist(here, s), order[s.sweep_id]))
+        nxt = min(left, key=lambda s: (_dist(here, s, up), order[s.sweep_id]))
         path.append(nxt)
         left.remove(nxt)
         here = nxt
@@ -424,6 +450,7 @@ def walk(
     sweeps: Sequence[TourSweep],
     place: PlaceMatch | None = None,
     record: PropertyRecord | None = None,
+    up: str = "y",
 ) -> tuple[list[TourStop], bool]:
     """The door and the room (or numbered) stops in walking order, and if rooms are labelled."""
     if not sweeps:
@@ -431,12 +458,12 @@ def walk(
     order = {s.sweep_id: i for i, s in enumerate(sweeps)}
     labelled = [s for s in sweeps if (s.label or "").strip()]
     if not labelled:
-        return _numbered(sweeps, order), False
+        return _numbered(sweeps, order, up), False
 
     entry = [s for s in labelled if _is_entry(s.label)]
     used: set[str] = set()
     if entry:
-        door_sweep = _central(entry, order)
+        door_sweep = _central(entry, order, up=up)
         door = _stop_for(
             door_sweep,
             kind="door",
@@ -463,8 +490,8 @@ def walk(
     for label in sorted(groups, key=lambda lab: min(order[s.sweep_id] for s in groups[lab])):
         rooms.extend((label, c) for c in _clusters(groups[label], order))
 
-    reps = {id(g): _central(g, order, avoid=door_sweep.sweep_id) for _l, g in rooms}
-    path = _nearest_first(door_sweep, [reps[id(g)] for _l, g in rooms], order)
+    reps = {id(g): _central(g, order, avoid=door_sweep.sweep_id, up=up) for _l, g in rooms}
+    path = _nearest_first(door_sweep, [reps[id(g)] for _l, g in rooms], order, up)
     by_rep = {reps[id(g)].sweep_id: (lab, g) for lab, g in rooms}
     path = path[:MAX_ROOM_STOPS]
 
@@ -492,13 +519,13 @@ def walk(
     return stops, True
 
 
-def _numbered(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[TourStop]:
+def _numbered(sweeps: Sequence[TourSweep], order: dict[str, int], up: str = "y") -> list[TourStop]:
     """No labels: the door is the scan's start, then evenly spaced stops along the path."""
     start = sweeps[0]
     door = _stop_for(start, kind="door", key="door", title="Front door", count=1)
     door.note = START_NOTE
     door.tip = _START_TIP
-    path = _nearest_first(start, list(sweeps[1:]), order)
+    path = _nearest_first(start, list(sweeps[1:]), order, up)
     n = min(MAX_FALLBACK_STOPS, len(path))
     picks = [path[round(i * (len(path) - 1) / (n - 1))] for i in range(n)] if n > 1 else path[:n]
     stops = [door]
@@ -536,7 +563,8 @@ def build_tour(
         facts=outside_facts(place, record, aerial_on),
         tip="Look at the entrance, the lighting and the parking as you walk up.",
     )
-    inside, labelled = walk(sweeps, place, record) if has_scan else ([], False)
+    up = up_axis_for(source)
+    inside, labelled = walk(sweeps, place, record, up) if has_scan else ([], False)
     outro = TourStop(
         kind="outro",
         key="outro",
@@ -553,6 +581,7 @@ def build_tour(
         note = NO_ROOMS_NOTE
     prep = f"/prep/place/{property_id}" + (f"?plan_key={plan_key}" if plan_key else "")
     return TourPlan(
+        up_axis=up,  # type: ignore[arg-type]
         property_id=property_id,
         kind=kind,
         source=source,
@@ -710,8 +739,16 @@ def stop_for_photo(
     if rooms:
         return rooms[0]
     if position is not None:
+        px, py = floor_xy(position, plan.up_axis)
         near = [
-            (math.hypot(position[0] - s.position[0], position[2] - s.position[2]), i, s)
+            (
+                math.hypot(
+                    px - floor_xy(s.position, plan.up_axis)[0],
+                    py - floor_xy(s.position, plan.up_axis)[1],
+                ),
+                i,
+                s,
+            )
             for i, s in enumerate(walked)
             if s.position is not None and not _is_start_door(s)
         ]
@@ -1133,8 +1170,7 @@ def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> 
             if note.ad_value == "0" or not rooms:
                 continue
             if str(len(rooms)) != note.ad_value.replace(",", ""):
-                label = rooms[0].room_label or kind
-                line = count_line(label.split()[0].capitalize(), note.ad_value, len(rooms), word)
+                line = count_line(word.capitalize(), note.ad_value, len(rooms), word)
                 added.setdefault(rooms[0].key, []).append(TourFact(text=line, source=SRC_LABELS))
 
     stops = [
@@ -1262,3 +1298,22 @@ def ad_beds_of(case: object) -> int | None:
 
 def ad_plan_word(beds: int | None) -> str | None:
     return None if beds is None else ("studio" if beds == 0 else f"{beds} bed")
+
+
+def office_on_record(lookups: object, property_id: str) -> str | None:
+    """The leasing office on CoStar's record for a building or house, looked up BY ID in the
+    whole supply (every floor plan, every house), never in a cheapest-first page of a search.
+    Falls back to the record's manager company. None only when neither can be read."""
+    from snapback.search import _supply
+
+    try:
+        for raw in _supply(lookups):
+            if raw.property_id == property_id and raw.office:
+                return raw.office
+    except Exception:  # a lookup that broke did not happen
+        pass
+    try:
+        record = lookups.record(property_id)  # type: ignore[attr-defined]
+    except Exception:
+        return None
+    return (record.manager_company or None) if record is not None else None
