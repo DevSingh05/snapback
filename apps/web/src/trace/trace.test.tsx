@@ -363,3 +363,36 @@ describe("live stream", () => {
     expect(status.at(-1)).toBe("lost");
   });
 });
+
+describe("CaseNotes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows the notes the agent wrote once a file lands, and nothing before", async () => {
+    const { CaseNotes } = await import("./CaseNotes");
+    const body = {
+      case_id: "A",
+      source: "fixture",
+      footer: "",
+      notes: [
+        {
+          path: "/case/A/owner.md",
+          stem: "owner",
+          agent: "owner",
+          text: "Owner of record: a private owner",
+          written_by: "model",
+        },
+      ],
+    };
+    sessionStorage.setItem("snapback.case-read-token.A", "tok");
+    vi.stubEnv("VITE_API_URL", "http://api.test");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(body)));
+    vi.stubGlobal("fetch", fetchMock);
+    const { rerender } = render(<CaseNotes caseId="A" events={[at(0)]} />);
+    expect(screen.queryByTestId("case-notes")).toBeNull();
+    const written: TraceEvent = { ...at(1), kind: "tool", pick: "file: /case/A/owner.md", seq: 9 };
+    rerender(<CaseNotes caseId="A" events={[at(0), written]} />);
+    expect(await screen.findByText("Owner of record: a private owner")).toBeTruthy();
+    expect(screen.getByText("written by model")).toBeTruthy();
+    vi.unstubAllEnvs();
+  });
+});

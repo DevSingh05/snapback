@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { SourceChip } from "../components/SourceChip";
 import type { ChoiceKind, DataSource, TraceEvent } from "../contracts";
 import traceRaw from "../../../../fixtures/contracts/trace_events.jsonl?raw";
+import { CaseNotes } from "./CaseNotes";
 import { mergeEvent, parseFixtureLines } from "./parse";
 import { apiBase, loadCaseReadToken } from "../api";
 import { openLiveTrace, openReplayTrace, type StreamStatus } from "./stream";
@@ -156,6 +157,7 @@ export function TracePanel({
       <p className="trace-status mono" data-testid="trace-status">
         {STATUS_TEXT[status]}
       </p>
+      {resolved === "live" && <CaseNotes caseId={caseId} events={events} />}
     </section>
   );
 }

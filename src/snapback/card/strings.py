@@ -372,6 +372,12 @@ EN: dict[str, str] = {
         "The model answered with something that was not on the list, so the default was used."
     ),
     "trace.error.model_failed": "The model could not be used, so the default was used.",
+    "trace.agent.todos": "The agent wrote its plan: {count} steps, {done} done.",
+    "trace.agent.delegate": (
+        "Handed the {name} checks to a sub-agent that sees only its own tools and "
+        "writes its findings to a note."
+    ),
+    "trace.agent.note": "Note written: {path} ({chars} characters).",
     "trace.intake.injection": (
         "The listing has text written for an AI system. It was ignored, and the checks go on."
     ),
@@ -833,6 +839,12 @@ ES: dict[str, str] = {
         " defecto."
     ),
     "trace.error.model_failed": "No se pudo usar el modelo, así que se usó la opción por defecto.",
+    "trace.agent.todos": "El agente escribió su plan: {count} pasos, {done} hechos.",
+    "trace.agent.delegate": (
+        "Pasó las comprobaciones de {name} a un subagente que solo ve sus propias "
+        "herramientas y escribe lo que encuentra en una nota."
+    ),
+    "trace.agent.note": "Nota escrita: {path} ({chars} caracteres).",
     "trace.intake.injection": (
         "El anuncio tiene texto escrito para un sistema de IA. Se ignoró y las revisiones "
         "continúan."

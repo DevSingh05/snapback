@@ -1,0 +1,301 @@
+"""A case's working notes: derived text per check family, kept in the deepagents file system.
+
+The deep agent (`graph.py`) delegates each check family to its own sub-agent. A sub-agent reads
+only its family's facts (below), writes a short note to `/case/<id>/<stem>.md` in the agent's
+virtual file system, and the main agent reads the notes to write the plain-language explanation
+and the tour-prep questions.
+
+What a note may hold: statuses, counts and short facts with their source. Never an image, a
+raw kit row, a listing photo, a person's name, a phone number, a licence number or an address.
+The fact functions here build text from `ModuleEvidence`, which already carries only derived
+values, so a note written from them cannot hold more. A note a model writes is cleaned again
+(`clean_note`) before it is kept or served, and a note a model did not write is written by code
+(`refresh_policy_notes`), so every case has the same notes whoever drove it.
+
+Notes never set a state. `decide()` is the only place a state is chosen; nothing here is read
+by it, and the card is built from evidence alone.
+
+This module does not import deepagents, so the package works without the `agent` extra.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal
+
+from pydantic import BaseModel
+
+from snapback.agent.trace import _BANNED_IN_REASONS
+from snapback.contracts import DataSource, ModuleEvidence
+
+# stem -> (sub-agent name, what the note is about). The order is the order notes are shown.
+RECORD, OFFICE, OWNER, PLACE, PLACES = "record", "office", "owner", "place", "places"
+STEMS = (RECORD, OFFICE, OWNER, PLACE, PLACES)
+# The main agent's own notes, written after it has read the others.
+EXPLANATION, TOUR_PREP = "explanation", "tour_prep"
+MAIN_STEMS = (EXPLANATION, TOUR_PREP)
+
+AGENT_NAMES: dict[str, str] = {
+    RECORD: "record",
+    OFFICE: "office-and-licence",
+    OWNER: "owner",
+    PLACE: "place",
+    PLACES: "search",
+}
+MAX_NOTE_CHARS = 1500
+MAX_LINE_CHARS = 280
+
+# Words a note never uses, on top of the trace's list: a note describes what was found; it does
+# not announce a result or tell the renter to pay.
+_BANNED_IN_NOTES = (
+    *_BANNED_IN_REASONS,
+    "don't pay",
+    "do not pay",
+    "checks passed",
+    "safe to pay",
+    "data:image",
+    "base64",
+)
+
+By = Literal["model", "policy"]
+
+
+@dataclass(frozen=True)
+class Note:
+    path: str
+    stem: str
+    text: str
+    by: By
+
+
+class CaseNote(BaseModel):
+    path: str
+    stem: str
+    agent: str  # which sub-agent wrote it, or "main" for the explanation and tour prep
+    text: str
+    written_by: By
+
+
+class CaseNotes(BaseModel):
+    """`GET /cases/{id}/notes`: the notes the agent wrote, read-only."""
+
+    case_id: str
+    source: DataSource
+    notes: list[CaseNote]
+    footer: str = "Working notes. The result on the card is worked out by code from the evidence."
+
+
+def note_path(case_id: str, stem: str) -> str:
+    return f"/case/{case_id}/{stem}.md"
+
+
+def stem_of(case_id: str, path: str) -> str | None:
+    """`record` for `/case/<id>/record.md`; None for any other path."""
+    prefix = f"/case/{case_id}/"
+    if not path.startswith(prefix) or not path.endswith(".md"):
+        return None
+    stem = path[len(prefix) : -3]
+    return stem if stem in (*STEMS, *MAIN_STEMS) else None
+
+
+def clean_note(text: object) -> str:
+    """Keep a note short and plain: drop lines with banned words, long lines, and the rest past
+    the cap. A note that is empty after cleaning is empty."""
+    kept: list[str] = []
+    for raw in str(text or "").splitlines():
+        line = raw.rstrip()
+        if any(word in line.lower() for word in _BANNED_IN_NOTES):
+            continue
+        if len(line) > MAX_LINE_CHARS:
+            line = line[: MAX_LINE_CHARS - 1].rstrip() + "…"
+        kept.append(line)
+    body = "\n".join(kept).strip()
+    if len(body) > MAX_NOTE_CHARS:
+        body = body[: MAX_NOTE_CHARS - 1].rstrip() + "…"
+    return body
+
+
+# --- the facts each sub-agent may read ----------------------------------------------------------
+# One function per family. Each returns lines of "label: value". Values are statuses, counts and
+# company names that `ModuleEvidence` already holds; none of these reads a photo or a kit row.
+
+
+def _val(x: object) -> str:
+    return "not checked" if x is None else str(getattr(x, "value", x))
+
+
+def record_facts(ev: ModuleEvidence) -> str:
+    lines = ["Source: CoStar property record and the ad's own words (as of CoStar's last research)"]
+    p = ev.price
+    if p is None:
+        lines.append("Rent check: not checked (no rent on record for this building)")
+    else:
+        band = (
+            f"{p.record_min} to {p.record_max}, median {p.record_median}"
+            if p.record_median is not None
+            else "no band"
+        )
+        lines.append(f"Rent check: {_val(p.status)}; ad says {p.listed_rent}; record {band}")
+        lines.append(f"Floor plans on record: {p.n_floor_plans}; per-bed pricing: {p.per_bed}")
+        lines.append(f"Unit on record: {_val(p.unit)}")
+    fs = ev.for_sale
+    if fs is None:
+        lines.append("For-sale lookup: not looked up")
+    else:
+        lines.append(f"For-sale lookup: {_val(fs.status)} on {fs.site}")
+    hits = [f"{h.rule_id}{' (red flag)' if h.red_flag else ''}" for h in ev.rules]
+    lines.append("Rules that fired on the ad's wording: " + (", ".join(hits) if hits else "none"))
+    return "\n".join(lines)
+
+
+def office_facts(ev: ModuleEvidence) -> str:
+    lines = ["Source: CoStar office on record, TREC licence lookup, the building's website"]
+    a = ev.authority
+    if a is None:
+        lines.append("Office on record: not checked")
+    else:
+        lines.append(
+            f"Poster vs office on record: {_val(a.status)}; office: "
+            f"{a.manager_on_record or 'none on record'}; brokerage-only comparison: "
+            f"{a.brokerage_only}"
+        )
+        lines.append(f"Phone vs office phone: {_val(a.office_phone_match)}")
+        lines.append(f"Link vs the building's own website: {_val(a.link_domain)}")
+    lic = ev.license
+    if lic is None:
+        lines.append("Licence lookup (TREC): not looked up")
+    else:
+        lines.append(
+            f"Licence lookup (TREC): {_val(lic.status)}; role claimed: "
+            f"{lic.claimed_role or 'none'}; number from: {lic.number_from or 'none given'}; "
+            f"sponsor: {lic.sponsor_broker or 'none'}"
+        )
+    if ev.for_sale and ev.for_sale.offices:
+        lines.append("Listing offices on record: " + ", ".join(ev.for_sale.offices))
+    return "\n".join(lines)
+
+
+def owner_facts(ev: ModuleEvidence) -> str:
+    o = ev.owner
+    if o is None:
+        return "Source: county owner of record\nOwner of record: no owner data for this address"
+    name = o.company if (o.company_known and o.company) else None
+    who = (
+        f"a company ({name})"
+        if name
+        else ("a company" if o.kind.value == "company" else "a private owner")
+    )
+    lines = [
+        "Source: county owner of record (HCAD)",
+        f"Owner of record: {who}",
+        f"Poster matches the owner of record: {_val(o.poster_matches)}",
+        f"Poster says they are the owner: {o.poster_says_owner}",
+        "Owner has a published payment rule: "
+        + (f"yes ({o.published_rule.company})" if o.published_rule else "no"),
+    ]
+    return "\n".join(lines)
+
+
+def place_facts(ev: ModuleEvidence) -> str:
+    loc = ev.locate
+    if loc is None:
+        return "Source: 3D scan placement of the listing photos\nPlacement: not run"
+    by_status = Counter(p.status.value for p in loc.photos)
+    rooms = Counter(p.room_label for p in loc.photos if p.room_label)
+    lines = [
+        "Source: 3D scan placement of the listing photos (results only, no images)",
+        f"Photos: {len(loc.photos)}; "
+        + (", ".join(f"{n} {s}" for s, n in sorted(by_status.items())) or "none"),
+        "Rooms the placed photos fall in: "
+        + (", ".join(f"{label} x{n}" for label, n in sorted(rooms.items())) or "none"),
+        f"Home identified by the scan alone: {loc.identified_by_scan}",
+    ]
+    if loc.chosen is not None:
+        lines.append(f"Floor plan chosen: {loc.chosen.floor_plan}")
+    return "\n".join(lines)
+
+
+FACTS: dict[str, Callable[[ModuleEvidence], str]] = {
+    RECORD: record_facts,
+    OFFICE: office_facts,
+    OWNER: owner_facts,
+    PLACE: place_facts,
+}
+
+
+def places_text(response: Any) -> str:
+    """The search's findings as text, from an `AlternativesResponse` or `SearchResponse`.
+
+    No building id, address or company name: kind, size, price, how it fits the budget, whether
+    a 3D scan exists, and who made each choice."""
+    lines = [
+        f"Source: researched places (as of CoStar's last research); {len(response.matches)} found"
+    ]
+    for i, m in enumerate(response.matches, start=1):
+        size = f"{m.beds} bed" if m.beds is not None else m.kind
+        lines.append(
+            f"Place {i}: {m.kind}, {size}, {m.price_text}; budget: {_val(m.budget_fit)}; "
+            f"must-haves met: {m.musts_met}; 3D scan: {m.has_3d_scan}; deep check: {m.checked}"
+        )
+    for d in response.decisions:
+        lines.append(f"Decision {d.kind}: picked {d.pick} (chosen by {d.chosen_by}): {d.reason}")
+    if response.question:
+        lines.append(f"Trade-off question: {response.question}")
+    return "\n".join(lines)
+
+
+# --- keeping the notes on the session -------------------------------------------------------------
+
+
+def keep_note(case: Any, path: str, text: object, by: By) -> Note | None:
+    """Clean `text` and keep it as the case's note at `path`. None when the path is not one of
+    ours or nothing is left after cleaning. A model's note replaces a code note, never the
+    other way round."""
+    stem = stem_of(case.case_id, path)
+    body = clean_note(text)
+    if stem is None or not body:
+        return None
+    old = case.notes.get(stem)
+    if old is not None and old.by == "model" and by == "policy":
+        return None
+    if old is not None and old.text == body and old.by == by:
+        return None  # nothing new
+    note = Note(path=path, stem=stem, text=body, by=by)
+    case.notes[stem] = note
+    return note
+
+
+def refresh_policy_notes(case: Any) -> None:
+    """Write, from code, every family note a model has not written. Safe to call again as the
+    case moves on: a code note is rewritten from the evidence as it stands."""
+    for stem, build in FACTS.items():
+        keep_note(case, note_path(case.case_id, stem), build(case.evidence), "policy")
+    search = getattr(case, "search_places", None)
+    if search is not None:
+        try:
+            body = search()
+        except Exception:
+            body = ""
+        keep_note(case, note_path(case.case_id, PLACES), body, "policy")
+
+
+def notes_view(case: Any) -> CaseNotes:
+    """What the API serves: the notes in a fixed order, each with who wrote it."""
+    order = (*STEMS, *MAIN_STEMS)
+    kept = [case.notes[s] for s in order if s in case.notes]
+    return CaseNotes(
+        case_id=case.case_id,
+        source=case.trace.source,
+        notes=[
+            CaseNote(
+                path=n.path,
+                stem=n.stem,
+                agent=AGENT_NAMES.get(n.stem, "main"),
+                text=n.text,
+                written_by=n.by,
+            )
+            for n in kept
+        ],
+    )

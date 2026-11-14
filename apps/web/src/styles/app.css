@@ -451,6 +451,22 @@ button {
 .trace-reason {
   margin: 4px 0 0;
 }
+.case-notes {
+  margin-top: 20px;
+}
+.case-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.case-note-text {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
 .trace-waiting {
   padding: 10px 14px;
   border: 1.5px solid var(--amber);
