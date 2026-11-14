@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState, type ComponentProps } from "react";
+import { describe, expect, it, vi } from "vitest";
 
+import { STATE_WORD } from "../../cardStrings";
 import { FIXTURE_TOUR } from "../../tour/fixtureTour";
 import { ARRIVE_MS, LAND_MS, PAN_MS } from "./timeline";
 import { fakeClock } from "./transport";
@@ -14,9 +15,11 @@ const PLAIN = ARRIVE_MS + PAN_MS;
 function Host({
   reduced = false,
   clock,
+  extra = {},
 }: {
   reduced?: boolean;
   clock: ReturnType<typeof fakeClock>;
+  extra?: Partial<ComponentProps<typeof WalkPlayer>>;
 }) {
   const [index, setIndex] = useState(0);
   return (
@@ -30,6 +33,7 @@ function Host({
           clock={clock}
           endAction={{ label: "Tour prep: what to ask", href: "/prep/place/x" }}
           summary="The ad showed 1 of the 5 rooms in this scan."
+          {...extra}
         />
       </section>
       <h1>{STOPS[index]!.title}</h1>
@@ -89,12 +93,41 @@ describe("WalkPlayer", () => {
     expect(player()).toHaveAttribute("data-mode", "playing");
   });
 
-  it("the speed button switches between 1x and 1.5x", () => {
+  it("the transport is one line of controls that each carry a word", () => {
     const { tick } = mount();
-    fireEvent.click(screen.getByTestId("wp-speed"));
-    expect(screen.getByTestId("wp-speed")).toHaveTextContent("1.5x");
-    tick(2000);
-    expect(screen.getByTestId("wp-time")).toHaveTextContent("0:03");
+    const bar = screen.getByRole("group", { name: "Tour player" });
+    // Play or Pause in words, a strip with every room's name, the time from the timeline.
+    expect(screen.getByTestId("wp-play")).toHaveTextContent("Pause");
+    tick(1000);
+    expect(screen.getByTestId("wp-time")).toHaveTextContent("0:01");
+    for (const stop of STOPS)
+      expect(
+        within(screen.getByTestId("wp-chapters")).getByText(stop.title),
+        stop.title,
+      ).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("wp-play"));
+    expect(screen.getByTestId("wp-play")).toHaveTextContent("Play");
+    // Every button in the transport has visible text or a name that says what it does.
+    for (const button of within(bar).getAllByRole("button"))
+      expect(
+        button.textContent?.trim() || button.getAttribute("aria-label"),
+        "a word",
+      ).toBeTruthy();
+    expect(screen.getByTestId("wp-explore-toggle")).toHaveTextContent("Look around");
+  });
+
+  it("Look around swaps the button to Play the walk, and the how-to line fades after four seconds", () => {
+    vi.useFakeTimers();
+    try {
+      mount();
+      fireEvent.click(screen.getByTestId("wp-explore-toggle"));
+      expect(screen.getByTestId("wp-resume")).toHaveTextContent("Play the walk");
+      expect(screen.getByTestId("wp-hint")).toBeInTheDocument();
+      act(() => void vi.advanceTimersByTime(4100));
+      expect(screen.queryByTestId("wp-hint")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("any touch on the stage hands over to explore; Resume tour returns to the timeline", () => {
@@ -140,6 +173,46 @@ describe("WalkPlayer", () => {
     expect(screen.getByTestId("wp-pin")).toHaveTextContent("The ad photo lands here");
     tick(LAND_MS);
     expect(screen.queryByTestId("wp-pin")).toBeNull();
+  });
+
+  it("docks a real ad photo with its source stamp and place among the photos", () => {
+    const clock = fakeClock();
+    const kitchen = STOPS.find((s) => s.photos.length > 0)!;
+    render(
+      <Host
+        clock={clock}
+        extra={{ photos: { [kitchen.key]: { alias: "P2", src: "/photos/p2.jpg" } } }}
+      />,
+    );
+    // Not at the front door; at the kitchen it is docked and stamped with where it came from.
+    expect(screen.queryByTestId("wp-dock")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Chapter ${STOPS.indexOf(kitchen) + 1}: ${kitchen.title}`,
+      }),
+    );
+    const dock = screen.getByTestId("wp-dock");
+    expect(dock).toHaveTextContent("FROM THE AD");
+    expect(dock).toHaveTextContent("Ad photo P2, 1 of 1");
+    expect(dock.querySelector("img")).toHaveAttribute("src", "/photos/p2.jpg");
+  });
+
+  it("the end card shows the verdict with its state bar, and still one accent action", () => {
+    const clock = fakeClock();
+    render(<Host clock={clock} extra={{ verdict: STATE_WORD.dont_pay }} />);
+    act(() => clock.advance(120_000));
+    const end = screen.getByTestId("wp-end");
+    expect(end).toHaveAttribute("data-verdict", "dont_pay");
+    expect(screen.getByTestId("wp-end-verdict")).toHaveTextContent(STATE_WORD.dont_pay);
+    expect(within(end).getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("says so with Problem when the 3D view failed, and keeps playing", () => {
+    const clock = fakeClock();
+    render(<Host clock={clock} extra={{ sdkFailed: true }} />);
+    expect(screen.getByTestId("wp-scan-late")).toHaveTextContent("The 3D view did not load");
+    expect(screen.getByTestId("problem")).toBeInTheDocument();
+    expect(screen.getByTestId("walk-player")).toHaveAttribute("data-mode", "playing");
   });
 
   it("ends on a card with one thing to do next", () => {
