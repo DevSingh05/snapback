@@ -466,6 +466,24 @@ class AerialTile(BaseModel):
     path: str  # local file under data/ (or fixtures/ for the synthetic tile)
 
 
+class AerialSideOut(BaseModel):
+    """One building in the aerial proof (D9, approved on #41)."""
+
+    tile: AerialTile | None = None  # None: no tile (no coverage, rate limited, out of time)
+    record: PropertyRecord | None = None  # building facts and company names only
+    image_url: str | None = None  # our own route; never a Vexcel URL, the key stays server side
+
+
+class AerialProofResponse(BaseModel):
+    """`GET /cases/{case_id}/aerial`: the claimed building and the one the photos matched."""
+
+    case_id: str
+    source: DataSource
+    claimed: AerialSideOut
+    matched: AerialSideOut | None = None  # a photo located_elsewhere; None otherwise
+    distance_m: float | None = None  # None when either record lacks lat/lon
+
+
 # ---------------------------------------------------------------------------------------------
 # Starting a case over HTTP (lane A's API; the upload page and the iMessage sidecar call it).
 # ---------------------------------------------------------------------------------------------

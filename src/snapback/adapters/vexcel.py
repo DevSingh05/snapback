@@ -25,10 +25,14 @@ with the distance between them.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
+import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -36,8 +40,17 @@ from typing import Any
 
 import httpx
 
-from snapback.contracts import AerialTile, DataSource, PropertyRecord
+from snapback.contracts import (
+    AerialProofResponse,
+    AerialSideOut,
+    AerialTile,
+    DataSource,
+    PropertyRecord,
+)
+from snapback.safety.paths import resolve_data_dir
 from snapback.settings import get_settings
+
+log = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_TILE = REPO_ROOT / "fixtures" / "contracts" / "aerial_tile.json"
@@ -247,7 +260,7 @@ def get_tile(
         raise VexcelKeyMissingError("VEXCEL_API_KEY is not set in .env; live tiles need it.")
     key = str(api_key)
 
-    cache = Path(data_dir or settings.snapback_data_dir) / "vexcel"
+    cache = resolve_data_dir(data_dir or settings.snapback_data_dir) / "vexcel"
     path = cache / f"{_SAFE.sub('_', record.property_id)}-{_SAFE.sub('_', direction)}.jpg"
     meta = path.with_suffix(".json")
     if path.is_file() and time.time() - path.stat().st_mtime < CACHE_DAYS * 24 * 3600:
@@ -327,4 +340,135 @@ def two_building_proof(
         claimed=get_tile(claimed, direction, **kwargs),
         matched=get_tile(matched, direction, **kwargs),
         distance_m=distance_m(claimed, matched),
+    )
+
+
+# --- D9: the aerial proof a case shows (GET /cases/{id}/aerial) -------------------------------
+
+PUBLIC_RECORD_FIELDS = {
+    "property_id",
+    "source",
+    "market",
+    "property_type",
+    "floors",
+    "year_built",
+    "lat",
+    "lon",
+    "manager_company",
+}
+
+
+_kit_cache: dict[DataSource, dict[str, PropertyRecord]] = {}
+_kit_lock = threading.Lock()
+
+
+def kit_records(source: DataSource) -> dict[str, PropertyRecord]:
+    """The kit's records, parsed once per process and source (a few thousand on the real kit),
+    so a route does not re-read the JSONL on every request. A missing kit is not remembered: the
+    next call looks again, so a kit unzipped after start-up is picked up."""
+    from snapback.adapters import costar_jsonl
+
+    with _kit_lock:
+        if source in _kit_cache:
+            return _kit_cache[source]
+        try:
+            records = costar_jsonl.load_records(source)
+        except costar_jsonl.KitNotFoundError:
+            return {}
+        _kit_cache[source] = records
+        return records
+
+
+kit_records.cache_clear = _kit_cache.clear  # type: ignore[attr-defined]
+
+# One pool for the whole process. `with ThreadPoolExecutor()` would wait for its threads on exit,
+# so a timeout on the futures would bound nothing; this pool lets the route return on time.
+_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="aerial")
+
+
+def _safe_tile(rec: PropertyRecord | None, direction: str, source: DataSource, **kw: Any):
+    """get_tile, but a missing key or a disk error is no tile, never an error for the route."""
+    if rec is None:
+        return None
+    try:
+        return get_tile(rec, direction, source=source, **kw)
+    except (VexcelKeyMissingError, OSError) as err:
+        log.warning("aerial tile skipped: %s", type(err).__name__)
+        return None
+
+
+def _within(futures: list[Future], deadline: float) -> list[AerialTile | None]:
+    out: list[AerialTile | None] = []
+    for future in futures:
+        try:
+            out.append(future.result(timeout=max(0.0, deadline - _monotonic())))
+        except FuturesTimeout:
+            out.append(None)  # still running in the pool; this answer goes without it
+    return out
+
+
+def aerial_side(
+    source: DataSource,
+    property_id: str | None,
+    *,
+    direction: str = "north",
+    records: dict[str, PropertyRecord] | None = None,
+    **tile_kwargs: Any,
+) -> AerialTile | None:
+    """One building's tile, for the image route: only the side asked for, inside the budget."""
+    if property_id is None:
+        return None
+    rec = (records if records is not None else kit_records(source)).get(property_id)
+    deadline = _monotonic() + TOTAL_BUDGET_S
+    future = _POOL.submit(_safe_tile, rec, direction, source, **tile_kwargs)
+    return _within([future], deadline)[0]
+
+
+def public_record(record: PropertyRecord) -> PropertyRecord:
+    """The record trimmed to what the card shows: building facts and the company name. The phone
+    hash, website host, units and rent bands never leave the server through this route."""
+    return PropertyRecord.model_validate(record.model_dump(include=PUBLIC_RECORD_FIELDS))
+
+
+def aerial_proof(
+    case_id: str,
+    source: DataSource,
+    claimed_id: str | None,
+    matched_id: str | None,
+    *,
+    direction: str = "north",
+    records: dict[str, PropertyRecord] | None = None,
+    image_url: Callable[[str], str] | None = None,
+    **tile_kwargs: Any,
+) -> AerialProofResponse:
+    """Both buildings, fetched at the same time, each within the 20 s tile budget.
+
+    `claimed_id` is the case's property id; `matched_id` the building a photo was located in when
+    it was not the claimed one (None otherwise). `image_url(side)` builds our own image route for
+    a live tile; fixture tiles get no URL (lane T draws its stand-in)."""
+    if records is None:
+        records = kit_records(source)
+    claimed_rec = records.get(claimed_id) if claimed_id else None
+    matched_rec = records.get(matched_id) if matched_id and matched_id != claimed_id else None
+
+    deadline = _monotonic() + TOTAL_BUDGET_S  # one shared deadline for both tiles
+    futures = [
+        _POOL.submit(_safe_tile, rec, direction, source, **tile_kwargs)
+        for rec in (claimed_rec, matched_rec)
+    ]
+    claimed_tile, matched_tile = _within(futures, deadline)
+
+    def side(name: str, rec: PropertyRecord | None, t: AerialTile | None) -> AerialSideOut:
+        url = (
+            image_url(name) if image_url and t is not None and t.source == DataSource.LIVE else None
+        )
+        return AerialSideOut(tile=t, record=public_record(rec) if rec else None, image_url=url)
+
+    matched = side("matched", matched_rec, matched_tile) if matched_rec else None
+    return AerialProofResponse(
+        case_id=case_id,
+        source=source,
+        claimed=side("claimed", claimed_rec, claimed_tile),
+        matched=matched,
+        distance_m=distance_m(claimed_rec, matched_rec) if claimed_rec and matched_rec else None,
     )
