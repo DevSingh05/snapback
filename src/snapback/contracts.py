@@ -844,6 +844,9 @@ class RentalHouse(BaseModel):
     available_on: date | None = None
     office: str | None = None  # the listing office, company name only
     has_scan: bool = False
+    # M1: where the home is, for the map only. Never shown as an address.
+    lat: float | None = None
+    lon: float | None = None
 
 
 class BudgetFit(StrEnum):
