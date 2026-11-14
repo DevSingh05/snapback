@@ -175,9 +175,252 @@ EN: dict[str, str] = {
         "A fresh photo proved someone was inside the unit, which is not authority."
     ),
     "reason.presence_missing": "Nobody has proved they are inside the unit yet.",
+    # --- the card's own words: row titles, tone and state labels, the header -------------
+    "row.place": "PLACE",
+    "row.person": "PERSON",
+    "row.price": "PRICE",
+    "tone.ok": "Held up",
+    "tone.hold": "On hold",
+    "tone.red_flag": "Red flag",
+    "tone.not_shown": "Not shown",
+    "tone.not_checked": "Not checked",
+    "state.hold": "Hold",
+    "state.dont_pay": "Don't pay · could not verify",
+    "state.unverified": "Could not place these photos",
+    "state.verified": "Checks held up",
+    "card.case": "Case {case_id}",
+    "card.checked": "Checked {time}",
+    "card.expires": "Expires {time}",
+    "card.not_checked": "Not checked by SNAPBACK: {items}",
+    "card.verify": "Check this card yourself:",
+    "card.source.fixture": "FIXTURE",
+    "card.source.live": "LIVE",
 }
 
-TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN}
+# Spanish, for Houston. Same keys and the same blanks as EN; tests hold it to both.
+# Banned here: estafa, seguro, verificado. A red-flag line ends "Señal de alerta.", a
+# not-shown line starts "NO DEMOSTRADO." or "Sin confirmar.", a not-checked line starts
+# "No comprobado".
+ES: dict[str, str] = {
+    "label.real": "Real",
+    "label.here_now": "Aquí ahora",
+    "label.allowed": "Con permiso para alquilarlo",
+    "label.payment_ask": "Pago que piden",
+    "label.data_ask": "Datos que piden",
+    "label.pressure": "Presión",
+    "label.rent_vs_record": "Renta frente al registro",
+    "label.seen_before": "Visto antes",
+    "place.located_plan": (
+        "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
+    ),
+    "place.located": "Tomadas en este edificio ({located} de {total} fotos).",
+    "place.elsewhere": "Tomadas en otro edificio ({elsewhere} de {total} fotos). Señal de alerta.",
+    "place.not_located": (
+        "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
+    ),
+    "place.not_indexed": "No comprobado (no tenemos un escaneo 3D de este edificio).",
+    "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
+    "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
+    "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
+    "here_now.proven_plan": (
+        "Alguien con acceso a una unidad de {floor_plan} aquí las envió ahora mismo "
+        "({matched} de {total} puntos, código leído, {time})."
+    ),
+    "here_now.proven": (
+        "Alguien con acceso a una unidad aquí las envió ahora mismo ({matched} de {total} "
+        "puntos, código leído, {time})."
+    ),
+    "here_now.proven_bare": "Alguien con acceso a una unidad aquí lo demostró ahora mismo.",
+    "here_now.waiting": "Aún sin respuesta. Un arrendador honesto puede necesitar tiempo.",
+    "here_now.retry": "No se pudo aceptar la foto de respuesta. Pida una foto nueva en otro punto.",
+    "here_now.not_requested": (
+        "No comprobado (aún no se ha pedido a nadie que demuestre que está dentro)."
+    ),
+    "here_now.forged_copy": (
+        "La respuesta es una copia de la foto {n} del anuncio. Señal de alerta."
+    ),
+    "here_now.forged_copy_unknown": (
+        "La respuesta es una copia de una de las fotos del anuncio. Señal de alerta."
+    ),
+    "here_now.forged": "La respuesta no era una foto nueva tomada en la unidad. Señal de alerta.",
+    "here_now.seen_before_dated": (
+        "Una foto de respuesta también apareció en otra revisión el {date}."
+    ),
+    "here_now.seen_before": "Una foto de respuesta también apareció en otra revisión.",
+    "allowed.not_shown": "NO DEMOSTRADO. Estar dentro no significa que pueda alquilarlo.",
+    "allowed.call_manager": (
+        "Sin confirmar. Llame a {manager} a un número que usted mismo busque antes de pagar."
+    ),
+    "allowed.call_manager_unnamed": (
+        "Sin confirmar. Llame al administrador que figura en el registro, a un número que "
+        "usted mismo busque, antes de pagar."
+    ),
+    "allowed.mismatch": (
+        "El nombre que dieron no coincide con el administrador que figura en el registro de "
+        "este edificio. Señal de alerta."
+    ),
+    "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
+    "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
+    "rule.payment.wire_before_viewing": (
+        "Transferencia bancaria antes de una visita. Señal de alerta."
+    ),
+    "rule.payment.p2p_app_before_viewing": (
+        "Pago por aplicación antes de una visita. Señal de alerta."
+    ),
+    "rule.payment.gift_card": "Tarjetas de regalo como pago. Señal de alerta.",
+    "rule.payment.crypto": "Criptomonedas como pago. Señal de alerta.",
+    "rule.payment.overpayment_refund": (
+        "Más dinero del que se debe, con la diferencia por devolver. Señal de alerta."
+    ),
+    "rule.fee.holding_deposit_before_viewing": (
+        "Un depósito o cargo de reserva antes de una visita. Señal de alerta."
+    ),
+    "rule.fee.application_fee_before_viewing": (
+        "Un cargo de solicitud enviado a una persona antes de una visita. Señal de alerta."
+    ),
+    "rule.data.ssn_before_viewing": (
+        "Número de SSN (Social Security) antes de una visita. Señal de alerta."
+    ),
+    "rule.data.bank_login": "Datos de acceso al banco. Señal de alerta.",
+    "rule.data.id_before_viewing": (
+        "Una foto de su identificación antes de una visita. Señal de alerta."
+    ),
+    "rule.pressure.cannot_show": (
+        "Dicen que no pueden mostrar la unidad en persona. Señal de alerta."
+    ),
+    "rule.link.payment_link": (
+        "Un enlace de pago enviado por quien publicó el anuncio. Señal de alerta."
+    ),
+    "rule_category.payment_method": (
+        "Un pago que no se puede recuperar, pedido antes de una visita. Señal de alerta."
+    ),
+    "rule_category.fee_ask": "Un cargo a una persona antes de una visita. Señal de alerta.",
+    "rule_category.data_ask": (
+        "Datos personales o bancarios pedidos antes de una visita. Señal de alerta."
+    ),
+    "rule_category.pressure": "Presión para decidir rápido. Señal de alerta.",
+    "rule_category.link": (
+        "Un enlace de pago o de contrato enviado por quien publicó el anuncio. Señal de alerta."
+    ),
+    "rent.not_checked": "No comprobado (nuestros datos no tienen la renta de este edificio).",
+    "rent.within_range": "Acorde con las rentas que figuran en el registro de este edificio.",
+    "rent.below_range": (
+        "Por debajo de las rentas que figuran en el registro de este edificio. Pregunte por "
+        "qué; hay descuentos."
+    ),
+    "not_checked.id": "identificación",
+    "not_checked.lease": "contrato",
+    "not_checked.ownership": "propiedad",
+    "footer.two_rules": (
+        "Dos reglas: nunca pague antes de firmar el contrato y visitar la unidad; nunca pague"
+        " por Zelle, transferencia o tarjeta de regalo."
+    ),
+    "footer.only_trust": (
+        "Confíe solo en un resultado de SNAPBACK que usted mismo pidió. SNAPBACK nunca "
+        "escribe primero ni pide dinero."
+    ),
+    "challenge.text": (
+        "Antes de pagar, pídales que envíen una foto de {spot} con el código {code} escrito "
+        "en papel."
+    ),
+    "trace.checks.twin": "El edificio está en nuestra zona de datos y tiene un gemelo 3D.",
+    "trace.checks.no_twin": (
+        "No tenemos un escaneo 3D de este edificio, así que solo se puede revisar el texto."
+    ),
+    "trace.checks.short_term": "Este es un anuncio de estancia corta, que esta revisión no cubre.",
+    "trace.checks.commercial": "Este es un anuncio comercial, que esta revisión no cubre.",
+    "trace.tool.locate": "Ubicando {count} fotos del anuncio en el gemelo.",
+    "trace.floor_plan.best": "{alias}: {best} coincidencias frente a {next}.",
+    "trace.floor_plan.only": "Solo hay un plano posible.",
+    "trace.floor_plan.unranked": (
+        "No se ubicó ninguna foto, así que se usa el primer plano del registro."
+    ),
+    "trace.spot.draw": "Sorteo al azar entre los {count} mejores.",
+    "trace.spot.draw_skipped_one": (
+        "Sorteo al azar entre los {count} mejores; se omitió {skipped} porque coincide con "
+        "una foto del anuncio."
+    ),
+    "trace.spot.draw_skipped_many": (
+        "Sorteo al azar entre los {count} mejores; se omitieron {skipped} puntos porque "
+        "coinciden con fotos del anuncio."
+    ),
+    "trace.hitl.waiting": (
+        "Esperando a que el inquilino apruebe el mensaje. No se envía nada hasta entonces."
+    ),
+    "trace.hitl.send": "El inquilino aprobó el texto del reto.",
+    "trace.hitl.edit": "El inquilino editó el texto del reto y lo aprobó.",
+    "trace.hitl.cancel": "El inquilino decidió no enviar un reto.",
+    "trace.retry.accept_both": (
+        "Los dos puntos coincidieron, con el código leído y sin aviso de recaptura."
+    ),
+    "trace.retry.accept": (
+        "{matched} de {total} puntos coincidieron, con el código leído y sin aviso de recaptura."
+    ),
+    "trace.retry.forged": "La respuesta no pasó la revisión, así que no hay nada que reintentar.",
+    "trace.retry.again": "No se pudo aceptar la respuesta, así que pedimos otra en un punto nuevo.",
+    "trace.retry.stop": (
+        "No se pudo aceptar la respuesta y no quedan reintentos, así que el resultado queda "
+        "en espera."
+    ),
+    "trace.error.bad_pick": (
+        "El modelo respondió con algo que no estaba en la lista, así que se usó la opción por"
+        " defecto."
+    ),
+    "trace.error.model_failed": "No se pudo usar el modelo, así que se usó la opción por defecto.",
+    "trace.intake.injection": (
+        "El anuncio tiene texto escrito para un sistema de IA. Se ignoró y las revisiones "
+        "continúan."
+    ),
+    "reason.forged": (
+        "La respuesta a la prueba de presencia no era una foto nueva tomada en la unidad."
+    ),
+    "reason.forged_copy": "La respuesta es una copia de la foto {n} del anuncio.",
+    "reason.forged_copy_unknown": "La respuesta es una copia de una de las fotos del anuncio.",
+    "reason.photo_elsewhere": "Al menos una foto del anuncio se tomó en otra propiedad.",
+    "reason.authority_mismatch": (
+        "Quien publicó el anuncio no coincide con el contacto del registro de la propiedad."
+    ),
+    "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
+    "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
+    "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
+    "reason.not_indexed": (
+        "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
+        "revisar las fotos."
+    ),
+    "reason.not_located": "Las fotos no se pudieron ubicar en el gemelo 3D de esta propiedad.",
+    "reason.located": "Las fotos se ubicaron en esta propiedad.",
+    "reason.authority_matches": (
+        "Quien publicó el anuncio coincide con el contacto del registro de la propiedad."
+    ),
+    "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
+    "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",
+    "reason.presence_proven_not_authority": (
+        "Una foto nueva demostró que alguien estaba dentro de la unidad, lo cual no es "
+        "autorización."
+    ),
+    "reason.presence_missing": "Nadie ha demostrado todavía que está dentro de la unidad.",
+    "row.place": "LUGAR",
+    "row.person": "PERSONA",
+    "row.price": "PRECIO",
+    "tone.ok": "Se sostuvo",
+    "tone.hold": "En espera",
+    "tone.red_flag": "Señal de alerta",
+    "tone.not_shown": "No demostrado",
+    "tone.not_checked": "No comprobado",
+    "state.hold": "En espera",
+    "state.dont_pay": "No pague · no se pudo comprobar",
+    "state.unverified": "No se pudieron ubicar estas fotos",
+    "state.verified": "Las revisiones se sostuvieron",
+    "card.case": "Caso {case_id}",
+    "card.checked": "Revisado {time}",
+    "card.expires": "Vence {time}",
+    "card.not_checked": "SNAPBACK no revisó: {items}",
+    "card.verify": "Compruebe esta tarjeta usted mismo:",
+    "card.source.fixture": "DATOS DE PRUEBA",
+    "card.source.live": "EN VIVO",
+}
+
+TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
 
 
 def _table(lang: str) -> dict[str, str]:

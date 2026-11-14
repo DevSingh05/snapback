@@ -4,7 +4,8 @@ Routes the web app and the iMessage sidecar call:
 
     POST /cases                           start a check (form: listing_text, renter_id, photos)
     GET  /cases/{case_id}                 where the case stands
-    GET  /cases/{case_id}/card            the Card
+    GET  /cases/{case_id}/card            the Card (?lang=en|es)
+    GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     GET  /healthz                         liveness and the data source
@@ -20,7 +21,7 @@ from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from snapback.agent.intake import read_listing
@@ -34,6 +35,7 @@ from snapback.api.cases import (
     SessionCase,
 )
 from snapback.api.limits import DailyLimit
+from snapback.card.render import render_card_png
 from snapback.contracts import Card, Evidence, Verdict
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
@@ -41,6 +43,9 @@ from snapback.verdict import decide
 MAX_PHOTOS = 20
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
+
+
+Language = Literal["en", "es"]
 
 
 class Approval(BaseModel):
@@ -155,9 +160,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return find(case_id).status()
 
     @app.get("/cases/{case_id}/card")
-    def get_card(case_id: str) -> Card:
+    def get_card(case_id: str, lang: Language = "en") -> Card:
         """The card for what is known so far. Its state is decide() on the evidence gathered."""
-        return find(case_id).card(settings.snapback_public_base_url)
+        return find(case_id).card(settings.snapback_public_base_url, lang)
+
+    @app.get("/cases/{case_id}/card.png")
+    def get_card_png(case_id: str, lang: Language = "en") -> Response:
+        """The same card drawn as a PNG, with the verify link as a QR code."""
+        card = find(case_id).card(settings.snapback_public_base_url, lang)
+        return Response(content=render_card_png(card), media_type="image/png")
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(
