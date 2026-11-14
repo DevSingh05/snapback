@@ -1,0 +1,17 @@
+{
+  "RentPricingType": { "1": "Per Unit", "2": "Per Bed" },
+  "TransactionType": [
+    { "value": 1, "name": "For Sale" },
+    { "value": 2, "name": "For Rent" }
+  ],
+  "ForRentStatus": { "0": "Unknown", "1": "For Rent", "2": "Rented" },
+  "ListingUpdateType": {
+    "1": "New Listing",
+    "2": "Price Change",
+    "3": "Back On Market",
+    "4": "Pending",
+    "5": "Sold",
+    "6": "Rented",
+    "7": "Off Market"
+  }
+}
