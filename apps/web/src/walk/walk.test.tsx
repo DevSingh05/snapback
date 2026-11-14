@@ -1,4 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { TourStop, TraceEvent, TraceKind } from "../contracts";
@@ -167,10 +170,14 @@ describe("AgentRail: only what the stream delivered", () => {
 
   it("lists only files that a file event carried", () => {
     render(<AgentRail events={RAIL_STUB_A} source="fixture" reduced={false} />);
-    const toggle = screen.getByRole("button", { name: "Files (4)" });
+    const tab = screen.getByRole("tab", { name: "Files 4" });
     expect(railFiles(RAIL_STUB_A)).toHaveLength(4);
-    fireEvent.click(toggle);
+    fireEvent.click(tab);
+    expect(tab).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByTestId("files-file")).toHaveLength(4);
+    // The files take the steps' place in the same box, inside the rail.
+    expect(screen.getByTestId("rail-scroll")).toContainElement(screen.getByTestId("rail-files"));
+    expect(screen.queryAllByTestId("rail-line")).toHaveLength(0);
   });
 
   it("shows the matched points for a pick that names a photo, read from the evidence file", () => {
@@ -339,6 +346,114 @@ describe("the rail follows the walk", () => {
     spy.mockRestore();
   });
 });
+
+describe("the rail fits beside the player and scrolls in place", () => {
+  const css = (rel: string) =>
+    readFileSync(join(__dirname, rel), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rule = (src: string, selector: string, from = 0) => {
+    const at = src.indexOf(`${selector} {`, from);
+    expect(at, selector).toBeGreaterThanOrEqual(0);
+    return src.slice(at, src.indexOf("}", at));
+  };
+  const walkCss = css("walk.css");
+  const desktop = walkCss.indexOf("@media (min-width: 761px)");
+  const phone = walkCss.indexOf("@media (max-width: 760px)");
+  const follow = (key: string) => (
+    <AgentRail
+      events={RAIL_STUB_A}
+      source="fixture"
+      evidence={EVIDENCE_FIXTURE_A}
+      reduced
+      stop={stopOf(key)}
+      photo={photoAt(stopOf(key), EVIDENCE_FIXTURE_A)}
+    />
+  );
+  const tab = (name: string | RegExp) => screen.getByRole("tab", { name });
+  const shownSeqs = () => screen.getAllByTestId("rail-line").map((l) => l.dataset.agent);
+
+  it("the list scrolls in place: every step sits in one scroll box under a fixed head", () => {
+    render(follow("arrive"));
+    const rail = screen.getByTestId("agent-rail");
+    const box = screen.getByTestId("rail-scroll");
+    expect(screen.getAllByTestId("rail-line")).toHaveLength(RAIL_STUB_A.length);
+    for (const line of screen.getAllByTestId("rail-line")) expect(box).toContainElement(line);
+    // The title, explainer and tabs are outside the box, so they stay put while it scrolls.
+    expect(box).not.toContainElement(screen.getByRole("heading", { name: /How SNAPBACK/ }));
+    expect(box).not.toContainElement(screen.getByRole("tablist"));
+    expect(rail).toContainElement(tab("Files 4"));
+    const scroll = rule(walkCss, ".ar-scroll");
+    expect(scroll).toMatch(/overflow-y:\s*auto/);
+    expect(scroll).toMatch(/min-height:\s*0/);
+    expect(scroll).toMatch(/flex:\s*1/);
+    // Phone: the closed sheet opens to an inner scroll of about 60vh.
+    expect(rule(walkCss, ".ar-scroll", phone)).toMatch(/max-height:\s*60vh/);
+  });
+
+  it("the page height does not change when a step opens: the rail never sizes its row", () => {
+    render(follow("arrive"));
+    const box = screen.getByTestId("rail-scroll");
+    const row = screen.getByRole("button", { name: "Step 5: Picked: Look closer at scan S2" });
+    fireEvent.click(row);
+    // The opened step grows inside the scroll box only.
+    expect(box).toContainElement(row);
+    expect(within(box).getByText("Picked by the model")).toBeInTheDocument();
+    // Desktop: the rail's own height is 0 and it stretches to its grid row, clipping its content,
+    // so nothing inside it can push the page down.
+    const ar = rule(walkCss, ".ar", desktop);
+    expect(ar).toMatch(/height:\s*0;/);
+    expect(ar).toMatch(/min-height:\s*100%/);
+    expect(ar).toMatch(/overflow:\s*hidden/);
+  });
+
+  it("the rail bottom aligns with the player bottom at 1440x900: it shares only the stage row", () => {
+    const tour = css("../tour/tour.css");
+    const body = rule(tour, '.tour-page[data-rail="on"] .tour-body');
+    expect(body).toMatch(/grid-template-areas:\s*"stage rail"\s*"panel panel"/);
+    expect(rule(walkCss, ".ar")).toMatch(/grid-area:\s*rail/);
+  });
+
+  it("tabs filter the list to one agent's steps, with All first and chosen", () => {
+    render(<AgentRail events={RAIL_STUB_A} source="fixture" reduced />);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "All",
+      "record",
+      "place",
+      "walk",
+      "Files 4",
+    ]);
+    expect(tab("All")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(tab("place"));
+    expect(tab("place")).toHaveAttribute("aria-selected", "true");
+    expect(new Set(shownSeqs())).toEqual(new Set(["place"]));
+    fireEvent.click(tab("All"));
+    expect(screen.getAllByTestId("rail-line")).toHaveLength(RAIL_STUB_A.length);
+  });
+
+  it("switches the tab when the walk lights a step of another agent; a held follow stays", () => {
+    vi.useFakeTimers();
+    const { rerender } = render(follow("room-3"));
+    fireEvent.click(tab("place"));
+    // A step keeps its number in the whole run.
+    expect(
+      screen.getByRole("button", { name: "Step 5: Picked: Look closer at scan S2" }),
+    ).toBeVisible();
+    // Picking a tab holds the follow like a scroll; Follow the walk lets it go.
+    fireEvent.click(screen.getByRole("button", { name: "Follow the walk" }));
+    rerender(follow("room-4"));
+    expect(tab("walk")).toHaveAttribute("aria-selected", "true");
+    expect(lit()).toHaveLength(1);
+
+    fireEvent.click(tab("record"));
+    rerender(follow("room-3"));
+    expect(tab("record")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Follow the walk" }));
+    expect(tab("place")).toHaveAttribute("aria-selected", "true");
+    expect(lit()).toHaveLength(1);
+    vi.useRealTimers();
+  });
+});
+
+const lit = () => screen.getAllByTestId("rail-line").filter((l) => l.dataset.lit === "true");
 
 describe("StopStage and StageCaption", () => {
   it("lands the placed ad photo in its room and says Taken here", () => {
