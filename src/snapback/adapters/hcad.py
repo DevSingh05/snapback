@@ -52,7 +52,9 @@ _ALLOWED_CHARS = re.compile(r"[A-Za-z0-9 .\-']+")
 _PERSON_TOKENS = {
     "AND", "FBO", "CUSTODIAN", "ATTN", "TTEE", "TRSTE", "TRST", "TRUSTE", "ETAL", "ET", "EST",
     "ESTATE", "IRA", "AS", "AGENT", "JR", "SR", "II", "III", "IV", "UX", "FAMILY", "LIVING",
-    "TRUST", "TR", "TRS", "TRUSTEE", "TRUSTEES", "DBA", "FOR",
+    "TRUST", "TR", "TRS", "TRUSTEE", "TRUSTEES", "DBA", "FOR", "ETUX", "ETVIR", "AKA", "FKA",
+    "NKA", "OR", "CARE", "HEIRS", "EXECUTOR", "EXECUTRIX", "ADMINISTRATOR", "GUARDIAN",
+    "TENANT", "MGR",
 }  # fmt: skip
 _ENTITY_SUFFIXES = {"LLC", "INC", "LP", "LTD", "CORP", "CO", "REIT"}
 _COMPANY_LAST_WORDS = {
@@ -94,16 +96,25 @@ def classify(owner_name: str) -> OwnerKind:
     name = owner_name.strip().upper()
     if not name or not _ALLOWED_CHARS.fullmatch(name):
         return OwnerKind.PERSON  # '&', '/', '+', ',', '%' ... join or point at another party
+    if name.endswith("-") or {"-", "."} & set(name.split()):
+        return OwnerKind.PERSON  # a lone '-' or '.' between parts, or a cut-off name
+    # dotted single letters (A.N.D., E.T. A.L.) spell a joining word; only N.A. after BANK or
+    # ASSOCIATION is allowed, and only at the end
+    dotted = re.sub(r"\b(BANK|ASSOCIATION) N\.\s*A\.?$", r"\1", name)
+    if re.search(r"\b[A-Z]\.\s*[A-Z]\.", dotted):
+        return OwnerKind.PERSON
     tokens = re.findall(r"[A-Z0-9']+", name)  # spaces, dots and hyphens split words
     joined = " ".join(tokens)
-    # whole-name institution forms
-    if re.fullmatch(r"(CITY|STATE|COUNTY) OF( \w+)+", joined):
-        return OwnerKind.COMPANY
     trust_company = joined.endswith(" TRUST COMPANY")
     words = tokens[:-2] if trust_company else tokens  # TRUST in "... TRUST COMPANY" is not a trust
+    # person tokens outrank every institution form ("STATE OF TEXAS FBO ..." is a person)
     if set(words) & _PERSON_TOKENS:
         return OwnerKind.PERSON
-    if trust_company or re.fullmatch(r"\w+( \w+)* CHURCH( OF \w+)?", joined):
+    institution_of = re.fullmatch(r"(CITY|STATE|COUNTY) OF( \w+)+", joined)
+    church_of = re.fullmatch(r"\w+( \w+)* CHURCH( OF \w+)?", joined)
+    if "OF" in tokens and not (institution_of or church_of):
+        return OwnerKind.PERSON  # "... OF FXCO LLC": of-before-an-entity names a person
+    if institution_of or trust_company or church_of:
         return OwnerKind.COMPANY
     if len(tokens) < 2:
         return OwnerKind.PERSON  # no company word counts in position 0
