@@ -56,7 +56,7 @@ _RULE_LABEL_ORDER = ("label.payment_ask", "label.data_ask", "label.pressure")
 
 
 @dataclass(frozen=True)
-class _Presence:
+class Presence:
     """What the challenge, the photo memory and the recapture check say together."""
 
     status: PresenceStatus
@@ -74,12 +74,12 @@ def _photo_number(modules: ModuleEvidence, photo_id: str | None) -> int | None:
     return None
 
 
-def _presence(modules: ModuleEvidence) -> _Presence:
+def presence_of(modules: ModuleEvidence) -> Presence:
     status = modules.challenge.presence if modules.challenge else PresenceStatus.NOT_REQUESTED
 
     copies = [hit for hit in modules.memory if hit.hit is MemoryHitKind.SAME_CASE_LISTING]
     if copies:
-        return _Presence(
+        return Presence(
             PresenceStatus.FORGED,
             copies_listing_photo=True,
             copied_photo_number=_photo_number(modules, copies[0].matched_listing_photo_id),
@@ -87,14 +87,14 @@ def _presence(modules: ModuleEvidence) -> _Presence:
 
     # A recapture flag can only stop a pass. It never turns into a forgery on its own.
     if status is PresenceStatus.PROVEN and any(result.blocks_pass for result in modules.recapture):
-        return _Presence(PresenceStatus.WAITING, needs_new_photo=True)
+        return Presence(PresenceStatus.WAITING, needs_new_photo=True)
 
-    return _Presence(status)
+    return Presence(status)
 
 
 def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Evidence:
     """Flatten the module outputs into the evidence `decide` reads. Missing modules are unknowns."""
-    presence = _presence(modules)
+    presence = presence_of(modules)
 
     forgery_reason = None
     if presence.copies_listing_photo:
@@ -279,7 +279,7 @@ def _aware(moment: datetime, what: str) -> datetime:
 
 
 def _here_now_line(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardLine:
-    presence = _presence(modules)
+    presence = presence_of(modules)
     label = "label.here_now"
 
     if presence.status is PresenceStatus.FORGED:

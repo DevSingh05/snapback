@@ -110,6 +110,47 @@ EN: dict[str, str] = {
         "Only trust a SNAPBACK result you asked for yourself. "
         "SNAPBACK never texts first or asks for money."
     ),
+    # --- the challenge message the renter relays, and the agent's own trace lines ----------
+    "challenge.text": (
+        "Before you pay, ask them to send a photo of {spot} with the code {code} written on paper."
+    ),
+    "trace.checks.twin": "The building is in our data area and has a 3D twin.",
+    "trace.checks.no_twin": "We have no 3D scan of this building, so only the text can be checked.",
+    "trace.checks.short_term": (
+        "This is a short-term stay listing, which this check does not cover."
+    ),
+    "trace.checks.commercial": "This is a commercial listing, which this check does not cover.",
+    "trace.tool.locate": "Placing {count} listing photos in the twin.",
+    "trace.floor_plan.best": "{alias}: {best} inliers vs {next}.",
+    "trace.floor_plan.only": "Only one floor plan is in the running.",
+    "trace.floor_plan.unranked": "No photo was placed, so the first floor plan on record is used.",
+    "trace.spot.draw": "Random draw from the top {count}.",
+    "trace.spot.draw_skipped_one": (
+        "Random draw from the top {count}; {skipped} skipped because it overlaps a listing photo."
+    ),
+    "trace.spot.draw_skipped_many": (
+        "Random draw from the top {count}; {skipped} spots skipped because they overlap "
+        "listing photos."
+    ),
+    "trace.hitl.waiting": (
+        "Waiting for the renter to approve the message. Nothing is sent until then."
+    ),
+    "trace.hitl.send": "The renter approved the challenge text.",
+    "trace.hitl.edit": "The renter edited the challenge text and approved it.",
+    "trace.hitl.cancel": "The renter chose not to send a challenge.",
+    "trace.retry.accept_both": "Both spots matched with the code read and no recapture flag.",
+    "trace.retry.accept": (
+        "{matched} of {total} spots matched with the code read and no recapture flag."
+    ),
+    "trace.retry.forged": "The reply failed the check, so there is nothing to retry.",
+    "trace.retry.again": "The reply could not be accepted, so we ask again at a new spot.",
+    "trace.retry.stop": (
+        "The reply could not be accepted and no retry is left, so the result stays on hold."
+    ),
+    "trace.error.bad_pick": (
+        "The model answered with something that was not on the list, so the default was used."
+    ),
+    "trace.error.model_failed": "The model could not be used, so the default was used.",
     # --- reasons a verdict gives (Verdict.reasons, Evidence.forgery_reason) ----------------
     "reason.forged": "The proof-of-presence reply was not a fresh photo taken in the unit.",
     "reason.forged_copy": "The reply is a copy of listing photo {n}.",
