@@ -28,7 +28,11 @@ from snapback.verdict import REASON_ORDER, build_card, decide, to_evidence
 
 CONTRACTS = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 CHECKED_AT = datetime.fromisoformat("2026-11-13T21:42:00-05:00")
-MATCHES = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+MATCHES = {
+    "status": "matches_record",
+    "manager_on_record": "Fixture Living LLC",
+    "office_phone_match": "yes",
+}
 NOT_FOUND = {"status": "not_found", "claimed_role": "agent"}
 LICENSED = {"status": "licensed", "claimed_role": "agent", "sponsor_broker": "Fixture Realty Group"}
 NOT_FOUND_TEXT = (

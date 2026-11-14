@@ -31,7 +31,11 @@ from snapback.verdict import REASON_ORDER, build_card, decide, to_evidence
 
 CONTRACTS = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 CHECKED_AT = datetime.fromisoformat("2026-11-13T21:42:00-05:00")
-MATCHES = {"status": "matches_record", "manager_on_record": "Fixture Living LLC"}
+MATCHES = {
+    "status": "matches_record",
+    "manager_on_record": "Fixture Living LLC",
+    "office_phone_match": "yes",
+}
 COMPANY = OwnerResult(kind=OwnerKind.COMPANY, company="Fixture Homes LLC")
 PERSON = OwnerResult(kind=OwnerKind.PERSON)
 FX_RULES = (
@@ -408,6 +412,7 @@ def test_every_owner_line_follows_the_wording_rules_in_both_languages(claims, ow
         "Renting out my home while I work abroad.",
         "Owner here. Available now.",
         "I own this property.",
+        "I'm the property owner.",
     ],
 )
 def test_a_poster_who_says_they_own_it_is_heard(text):
@@ -427,6 +432,16 @@ def test_a_poster_who_says_they_own_it_is_heard(text):
         "Managed by Fixture Living LLC.",
         "Feels like home. Make it your home today.",
         "Owner financing available on the sale.",
+        "For Rent By Owner Realty",
+        "Managed by Owner Direct Properties",
+        "Sold by owner last year",
+        "The owner here pays all utilities",
+        "Pet owner here?",
+        "I'm the leasing agent. The owner here is Invitation Homes",
+        "We are the owners' agents",
+        "homeowners association",
+        "This is not my house",
+        "like it's my home",
     ],
 )
 def test_other_mentions_of_an_owner_are_not_a_claim(text):
