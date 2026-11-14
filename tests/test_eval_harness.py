@@ -154,7 +154,9 @@ def test_command_writes_results_and_passes(tmp_path, capsys):
     assert main(["--bank", str(BANK), "--out", str(out), "--models", "v0", "v1"]) == 0
     rows = read_results(out)
     assert {r.condition for r in rows} >= {"rules_only", "rules_plus_model_v1_memory"}
-    assert all(r.frozen_at == "FIXTURE" for r in rows)
+    # The bank's rows say FIXTURE; calibration rows (renders) carry their own version tag.
+    bank_rows = [r for r in rows if r.condition != "place_real_renders"]
+    assert bank_rows and all(r.frozen_at == "FIXTURE" for r in bank_rows)
     assert out.read_text().startswith("# FIXTURE")
     assert "gate: ok" in capsys.readouterr().out
 
@@ -367,7 +369,8 @@ def test_label_comes_from_the_scored_cases_not_the_whole_bank(tmp_path):
     out = tmp_path / "results.csv"
     assert main(["--bank", str(bank), "--out", str(out)]) == 0
     assert out.read_text().startswith("# FIXTURE")
-    assert all(row.frozen_at == "FIXTURE" for row in read_results(out))
+    bank_rows = [r for r in read_results(out) if r.condition != "place_real_renders"]
+    assert bank_rows and all(row.frozen_at == "FIXTURE" for row in bank_rows)
 
 
 def test_live_only_when_every_scored_case_is_real(tmp_path):
@@ -394,3 +397,55 @@ def test_bank_hash_covers_the_base_fixtures(tmp_path):
         (bases / "module_evidence_hold.json").read_text().replace('"proven"', '"waiting"', 1)
     )
     assert bank_digest(BANK, bases) != before
+
+
+# --- #93: calibration_bin rows from the locate calibration --------------------------------------
+
+
+def _calibration(tmp_path) -> Path:
+    path = tmp_path / "locate_calibration.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source": "renders: unseen directions from the indexed scan points, not photos",
+                "version": "cal-test",
+                "n_fit": 40,
+                "n_test": 40,
+                "bins": [
+                    {"low": 0.0, "high": 0.1, "k": 1, "n": 30},
+                    {"low": 0.9, "high": 1.0, "k": 9, "n": 10},
+                ],
+            }
+        )
+    )
+    return path
+
+
+def test_calibration_rows_use_the_lab_schema(tmp_path):
+    from snapback.eval.harness import calibration_rows
+
+    rows = calibration_rows(_calibration(tmp_path))
+    assert [r.metric for r in rows] == ["calibration_bin:0.00-0.10", "calibration_bin:0.90-1.00"]
+    assert all(r.condition == "place_real_renders" and r.frozen_at == "cal-test" for r in rows)
+    assert (rows[1].k, rows[1].n) == (9, 10)
+
+
+def test_command_appends_calibration_rows_and_says_where_they_came_from(tmp_path):
+    out = tmp_path / "results.csv"
+    assert (
+        main(["--bank", str(BANK), "--out", str(out), "--calibration", str(_calibration(tmp_path))])
+        == 0
+    )
+    text = out.read_text()
+    assert "# calibration rows: renders" in text
+    assert any(r.metric.startswith("calibration_bin:") for r in read_results(out))
+    assert text.startswith("# FIXTURE")  # the bank's own rows keep their label
+
+
+def test_no_calibration_file_means_no_calibration_rows(tmp_path):
+    out = tmp_path / "results.csv"
+    assert (
+        main(["--bank", str(BANK), "--out", str(out), "--calibration", str(tmp_path / "none.json")])
+        == 0
+    )
+    assert not any(r.metric.startswith("calibration_bin:") for r in read_results(out))

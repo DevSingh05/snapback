@@ -310,7 +310,17 @@ class LiveMatterport:
 
     def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
         for attempt in range(self.RETRIES + 1):
-            response = self._client.request(method, url, **kwargs)
+            try:
+                response = self._client.request(method, url, **kwargs)
+            except httpx.TransportError as error:
+                # A dropped or refused connection: back off and try again, like a 429.
+                if attempt == self.RETRIES:
+                    # The error type only: its message may echo a signed URL.
+                    raise RuntimeError(
+                        f"Matterport request failed: network ({type(error).__name__})"
+                    ) from None
+                time.sleep(2**attempt)
+                continue
             if response.status_code != 429 or attempt == self.RETRIES:
                 break
             time.sleep(float(response.headers.get("retry-after", 2**attempt)))
