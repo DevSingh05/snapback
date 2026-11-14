@@ -4,7 +4,8 @@
  * The message logic is in handler.ts; Photon (Spectrum, iMessage) is in photon.ts. Both are
  * tested with fakes, so CI needs no account.
  * Hard rule: outbound messages only go back to the renter's own thread. We never message the
- * person who posted a listing, and SNAPBACK never texts first.
+ * person who posted a listing. SNAPBACK texts first only in a thread that linked a Finder
+ * watch (ruling R-M1, M10, watch.ts): at most 3 a day, and a stop word ends it.
  *
  * Env (read from the shell, then the repo's local .env, which is git-ignored):
  * API_URL, WEB_URL, SIDECAR_ALLOWED_THREADS (comma-separated thread ids, or their keyed hashes
@@ -19,6 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import { type MessageClient } from "./handler";
 import { connectPhoton, publicWebUrl, runPhoton } from "./photon";
+import { WatchBook, pushEvents, readEvents } from "./watch";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -71,7 +73,32 @@ if (photon) {
   const stop = () => void app.stop?.().finally(() => process.exit(0));
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
+  const watches = new WatchBook();
+  const eventsToken = process.env.SNAPBACK_EVENTS_TOKEN;
+  if (eventsToken) {
+    // Watch alerts (M10): follow the API's events stream and reconnect when it ends, from
+    // the last event seen (Last-Event-ID), so a reconnect never texts the same match again.
+    void (async () => {
+      let lastId: string | undefined;
+      const seen = (id: string) => void (lastId = id);
+      for (;;) {
+        try {
+          const events = readEvents(API_URL, eventsToken, fetch, lastId);
+          await pushEvents(events, watches, webUrl, console.log, seen);
+        } catch {
+          console.log("[sidecar] events stream closed; reconnecting");
+        }
+        await new Promise((done) => setTimeout(done, 5000));
+      }
+    })();
+  } else {
+    console.log("[sidecar] SNAPBACK_EVENTS_TOKEN is not set: watch alerts will not be sent.");
+  }
+  // Voice replies (Best Voice Agent): the SDK's own builder sends a native voice memo bubble.
+  const { voice } = await import("spectrum-ts");
   await runPhoton(app, {
+    makeVoice: (bytes: Uint8Array, mimeType: string) => voice(Buffer.from(bytes), { mimeType }),
+    watches,
     apiUrl: API_URL,
     webUrl,
     allowedThreads: new Set(allowed),

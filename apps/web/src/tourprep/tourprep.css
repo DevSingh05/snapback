@@ -1,23 +1,29 @@
+/* Tour prep: one sheet in the shared look. A sky band with the clipboard drawing, the record's
+   facts as lit slabs with where each came from, questions with square numerals, and the
+   before-you-pay rules on the ink band. Tokens only, sharp corners, no outline boxes. */
 .tp-page {
-  max-width: 760px;
+  width: 100%;
+  max-width: var(--w-col, 880px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-block: 16px;
+  gap: var(--w-3);
 }
 .tp-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--w-3);
 }
 .tp-back {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  color: var(--blue);
+  gap: var(--w-2);
   font-weight: 700;
+}
+.tp-back::before {
+  content: "←" / "";
 }
 .tp-lang {
   display: inline-flex;
@@ -25,9 +31,9 @@
 }
 .tp-lang-btn {
   min-height: 44px;
-  padding: 8px 14px;
+  padding: var(--w-2) var(--w-4);
   border: 0;
-  background: var(--blue-soft);
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   cursor: pointer;
@@ -41,36 +47,72 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--w-2);
   margin-inline-start: auto;
+}
+.tp-tools .pf-action {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    inset 0 -2px 0 var(--act),
+    var(--shadow);
 }
 .tp-sheet {
   background: var(--surface);
-  box-shadow: var(--shadow);
-  padding: clamp(16px, 4vw, 28px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--w-5);
+  padding-bottom: clamp(18px, 4vw, var(--w-tile));
+  overflow: hidden;
 }
-.tp-head {
+.tp-sheet > * {
+  margin-inline: var(--w-pad);
+}
+.tp-sheet > .tp-mast,
+.tp-sheet > .tp-head {
+  margin-inline: 0;
+  padding-inline: var(--w-pad);
+}
+.tp-mast {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: var(--w-3);
+  padding-block: var(--w-4);
+}
+.tp-head {
+  margin-top: -24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--w-4);
+  padding-block: clamp(18px, 3vw, 28px);
+  background: linear-gradient(180deg, var(--w-sky-a), var(--w-sky-b));
 }
 .tp-head h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-size: var(--w-h1);
+  font-weight: 800;
+  line-height: 1.05;
 }
 .tp-sub {
-  margin: 4px 0 0;
+  margin: var(--w-3) 0 0;
+  max-width: 38ch;
   color: var(--muted);
 }
+.tp-art {
+  flex: none;
+  width: clamp(104px, 22vw, 176px);
+  margin-block: -6px;
+}
 .tp-sheet h2 {
-  margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-size: 1.15rem;
+  margin: 0 0 var(--w-3);
+  font-family: var(--font-mono);
+  font-size: var(--w-kicker);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .tp-list {
   margin: 0;
@@ -78,44 +120,97 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--w-1);
 }
-.tp-num {
-  list-style: decimal;
-  padding-inline-start: 1.4em;
-}
-.tp-list li {
-  padding-block: 2px;
-}
+/* What the record says: the strongest facts on the sheet, so each slab is lit. */
 .tp-list:not(.tp-num) li {
-  border-inline-start: 4px solid var(--teal);
-  padding-inline-start: 12px;
+  padding: var(--w-3) var(--w-4) var(--w-3) var(--w-4);
+  background: var(--w-slab);
+  box-shadow: inset 3px 0 0 var(--glow, var(--zing));
 }
 .tp-text {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.tp-src {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 0.875rem;
+.tp-list:not(.tp-num) .tp-text {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
+.tp-src {
+  margin: var(--w-2) 0 0;
+  color: var(--muted);
+  font-size: var(--w-small);
+}
+.tp-src .prov {
+  background: var(--w-raise, var(--surface));
+}
+.tp-num {
+  counter-reset: tp;
+  gap: var(--w-1);
+}
+.tp-num li {
+  counter-increment: tp;
+  display: grid;
+  grid-template-columns: var(--w-tile) minmax(0, 1fr);
+  gap: var(--w-4);
+  align-items: start;
+  padding: var(--w-3) var(--w-4) var(--w-3) var(--w-3);
+  background: var(--w-slab);
+}
+.tp-num li::before {
+  content: counter(tp);
+  display: grid;
+  place-items: center;
+  width: var(--w-tile);
+  height: var(--w-tile);
+  background: var(--w-raise, var(--surface));
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--w-small);
+}
+.tp-num .tp-text {
+  padding-top: 1px;
+}
+/* Before you pay: the same ink band the verdict sits on. */
 .tp-pay {
-  background: var(--amber-soft);
-  padding: 12px 16px;
+  padding: 18px clamp(14px, 3vw, 22px) 20px;
+  background: var(--v-band);
+  color: var(--on-v-band);
+}
+.tp-sheet .tp-pay h2 {
+  color: inherit;
+  opacity: 0.8;
+}
+.tp-pay .tp-num li {
+  background: color-mix(in srgb, var(--on-v-band) 9%, transparent);
+}
+.tp-pay .tp-num li::before {
+  background: color-mix(in srgb, var(--on-v-band) 18%, transparent);
+  color: inherit;
 }
 .tp-note {
-  margin: 0;
+  margin-block: 0;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--w-small);
 }
 .tp-link {
   align-self: flex-start;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  color: var(--blue);
   font-weight: 700;
+}
+.tp-page > .pf-empty {
+  background: linear-gradient(180deg, var(--w-sky-a), var(--surface) 9rem);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 560px) {
+  .tp-art {
+    width: 92px;
+    align-self: flex-end;
+  }
 }
 
 @media print {
@@ -123,13 +218,24 @@
     display: none !important;
   }
   .tp-sheet {
-    border: 0;
     box-shadow: none;
     padding: 0;
+  }
+  .tp-sheet::before {
+    display: none;
   }
   .tp-page {
     max-width: none;
     padding: 0;
+  }
+  .tp-pay {
+    background: none;
+    color: var(--ink);
+    box-shadow: inset 0 3px 0 var(--ink);
+    padding-inline: 0;
+  }
+  .tp-pay .tp-num li {
+    background: none;
   }
   body {
     background: var(--surface);

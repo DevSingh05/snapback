@@ -1,0 +1,507 @@
+/* The app frame: one bar on every page. Mark, tabs, light or dark. Sharp corners, tokens only. */
+.app {
+  --bar-h: 64px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--layer-0);
+}
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: var(--bar-h);
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-4);
+  padding-inline: var(--page-pad);
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--line);
+}
+.app-mark {
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+  text-decoration: none;
+}
+.app-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-1);
+  margin-right: auto;
+}
+.app-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--sp-4);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: var(--fs-md);
+  text-decoration: none;
+}
+.app-tab[data-in="true"],
+.app-tab[aria-current="page"] {
+  color: var(--ink);
+}
+.app-tab[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: var(--act);
+}
+.app-tab-context {
+  margin-left: var(--sp-2);
+  padding-left: var(--sp-5);
+}
+/* A small chevron: "Home > Walk". */
+.app-tab-context::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(50% - 5px);
+  width: 6px;
+  height: 10px;
+  background: var(--muted);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.app-theme {
+  align-self: center;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--layer-2);
+}
+.app-theme-opt {
+  min-height: 40px;
+  padding: var(--sp-1) var(--sp-3);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.app-theme-opt[aria-pressed="true"] {
+  background: var(--act);
+  color: var(--on-act);
+}
+@media (hover: hover) {
+  .app-tab:hover {
+    color: var(--ink);
+  }
+  .app-theme-opt:hover:not([aria-pressed="true"]) {
+    color: var(--ink);
+  }
+}
+
+/* Pages sit under the bar. The map fills what is left of the screen. */
+.app > .shell {
+  flex: 1;
+  min-height: 0;
+  padding-top: var(--sp-6);
+}
+.app > .shell-map {
+  flex: 1;
+  min-height: calc(100dvh - var(--bar-h));
+}
+.app .city {
+  height: calc(100dvh - var(--bar-h));
+}
+
+@media (max-width: 760px) {
+  .app {
+    --bar-h: 132px;
+  }
+  .app-bar {
+    flex-wrap: wrap;
+    gap: 0 var(--sp-3);
+    padding-inline: var(--sp-4);
+  }
+  .app-mark {
+    min-height: 48px;
+    margin-right: auto;
+  }
+  .app-theme {
+    order: 2;
+  }
+  .app-tabs {
+    order: 3;
+    flex: 1 0 100%;
+    margin: 0 calc(-1 * var(--sp-4));
+    padding-inline: var(--sp-2);
+    overflow-x: auto;
+    border-top: 1px solid var(--line);
+  }
+  .app-tab {
+    min-height: 46px;
+    padding-inline: var(--sp-3);
+    white-space: nowrap;
+  }
+  .app > .shell {
+    padding-top: var(--sp-4);
+  }
+  .app .city {
+    height: auto;
+    min-height: calc(100dvh - var(--bar-h));
+  }
+}
+
+/* ---------- Bar tools: light or dark, and Customize ---------- */
+.app-tools {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.app-custom-open {
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--layer-2);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+.app-custom {
+  position: absolute;
+  z-index: 60;
+  right: var(--page-pad);
+  top: calc(100% + var(--sp-2));
+  width: min(360px, calc(100vw - 2 * var(--sp-4)));
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  background: var(--layer-1);
+  box-shadow: var(--shadow-lift);
+}
+.app-custom-title {
+  font-size: var(--fs-lg);
+}
+.app-custom-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.app-custom-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-custom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 44px;
+  border-top: 1px solid var(--line);
+}
+.app-custom-show,
+.app-custom-first {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+}
+.app-custom-show {
+  font-weight: 700;
+}
+.app-custom-first {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.app-custom input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--act);
+}
+.app-custom-done {
+  align-self: flex-end;
+  min-height: 44px;
+}
+
+/* ---------- Home: your checks above the ad form ---------- */
+.home {
+  width: 100%;
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+.yc {
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  background: var(--layer-1);
+  box-shadow: var(--shadow);
+}
+.yc-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-4);
+}
+.yc-title {
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+}
+.yc-sub {
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.yc-new {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--act);
+  color: var(--on-act);
+  font-weight: 700;
+  text-decoration: none;
+}
+.yc-empty {
+  margin: 0;
+  padding: var(--sp-4);
+  background: var(--layer-2);
+  color: var(--muted);
+}
+.yc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.yc-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-4);
+  min-height: 64px;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--layer-2);
+  color: var(--ink);
+  text-decoration: none;
+  border-left: 6px solid var(--muted);
+}
+.yc-row[data-state="verified"] .yc-link {
+  border-left-color: var(--act);
+}
+.yc-verdict {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+.yc-id,
+.yc-date {
+  grid-column: 1;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.yc-link .chip {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+.yc-open {
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  font-weight: 700;
+  color: var(--act);
+}
+
+/* ---------- A view: Listings and Finder share one frame ---------- */
+.view {
+  width: 100%;
+  max-width: var(--page-max);
+  display: flex;
+  flex-direction: column;
+  background: var(--layer-1);
+  box-shadow: var(--shadow);
+}
+.view-head {
+  padding: var(--sp-6) var(--page-pad) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
+}
+.view-eyebrow {
+  margin: 0;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--act);
+}
+.view-title {
+  font-size: var(--fs-2xl);
+  line-height: var(--lh-tight);
+}
+.view-lead {
+  margin: 0;
+  max-width: 62ch;
+}
+.view-body {
+  padding: var(--sp-5) var(--page-pad) var(--sp-6);
+}
+.view-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-5);
+  align-items: start;
+}
+.view-split:has(.view-side) {
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+}
+.view-side,
+.view-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .app-custom-open {
+    padding-inline: var(--sp-2);
+  }
+  .app-tools {
+    order: 2;
+  }
+  .view-split,
+  .view-split:has(.view-side) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .yc-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .yc-new {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: center;
+  }
+  .yc-link {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .yc-open {
+    display: none;
+  }
+}
+
+/* One line under the bar: what this page is for. */
+.app-purpose {
+  margin: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: var(--sp-2) var(--page-pad);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  background: var(--layer-2);
+}
+.app-bar {
+  min-height: 56px;
+}
+.app-site {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--sp-2);
+  color: var(--act);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* The mark in the bar: the name, set flat. No drawing in the frame. */
+.app-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  letter-spacing: 0.16em;
+}
+.app-wordmark::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--act);
+}
+
+/* The tabs and tools sit in the bar on wide screens. On phones the bar is one row (the mark
+   and Menu) and they open as a panel under it. */
+.app-menu {
+  display: contents;
+}
+.app-menu-btn {
+  display: none;
+}
+@media (max-width: 760px) {
+  .app {
+    --bar-h: 56px;
+  }
+  .app-bar {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .app-mark {
+    margin-right: auto;
+  }
+  .app-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    min-height: 44px;
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--layer-2);
+    color: var(--ink);
+    font-size: var(--fs-sm);
+  }
+  .app-menu {
+    display: none;
+  }
+  .app-menu[data-open] {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4) var(--sp-4);
+    background: var(--bar-bg);
+    box-shadow: var(--shadow-lift);
+  }
+  .app-menu[data-open] .app-tabs {
+    order: 0;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border-top: 0;
+    overflow: visible;
+  }
+  .app-menu[data-open] .app-tab {
+    min-height: 48px;
+    padding-inline: 0;
+    font-size: var(--fs-lg);
+  }
+  .app-menu[data-open] .app-tab[aria-current="page"]::after {
+    left: -16px;
+    right: auto;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    height: auto;
+  }
+  .app-menu[data-open] .app-tools {
+    align-self: flex-start;
+    flex-wrap: wrap;
+  }
+}

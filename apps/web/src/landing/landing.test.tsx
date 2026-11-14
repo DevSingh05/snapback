@@ -49,7 +49,11 @@ describe("the walk map", () => {
     );
     expect(rooms[0]).toHaveAttribute("data-state", "seen");
     expect(rooms.at(-1)).toHaveAttribute("data-state", "ahead");
-    expect(screen.getByTestId("walk-map")).toHaveTextContent("Kitchen");
+    // The stop's name is on the view and in the chapter row; the map says how far in you are.
+    expect(screen.getByTestId("walk-map")).toHaveTextContent(
+      `Stop ${inside.findIndex((s) => s.title === "Kitchen") + 1} of ${inside.length} inside`,
+    );
+    expect(screen.getByTestId("walk-map")).not.toHaveTextContent("Kitchen");
     expect(screen.getByTestId("walk-map")).toHaveTextContent("Walking order, not a floor plan.");
   });
 

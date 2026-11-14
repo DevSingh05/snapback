@@ -2,21 +2,26 @@ import { Suspense, lazy, useEffect, useState } from "react";
 
 import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
+import { OneBox } from "./home/OneBox";
 import { CardPage } from "./pages/CardPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
-import { ReplayNav } from "./replay/ReplayNav";
 import { ReplayPage } from "./replay/ReplayPage";
+import { AppShell, type Section } from "./shell/AppShell";
+import { FinderPage } from "./shell/FinderPage";
+import { ListingsPage } from "./shell/ListingsPage";
+import { loadPrefs, tabOf } from "./shell/prefs";
 import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
-import { UploadPage } from "./upload/UploadPage";
 
 // The city map loads on its own route only: its chunk (and MapLibre) never reaches the home page.
 const MapPage = lazy(() => import("./map/MapPage"));
 
 type Route =
   | { name: "map" }
+  | { name: "listings" }
+  | { name: "finder" }
   | { name: "result"; id: string }
   | { name: "trace"; id: string }
   | { name: "twin"; id: string }
@@ -32,6 +37,8 @@ type Route =
 
 export function matchRoute(path: string): Route {
   if (/^\/map\/?$/.test(path)) return { name: "map" };
+  if (/^\/listings\/?$/.test(path)) return { name: "listings" };
+  if (/^\/finder\/?$/.test(path)) return { name: "finder" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
@@ -65,64 +72,97 @@ export default function App() {
   }, []);
 
   const route = matchRoute(path);
+  // The site's root opens on the view the renter chose to see first. /home is always Home.
+  useEffect(() => {
+    const first = loadPrefs().first;
+    if (window.location.pathname === "/" && first !== "home")
+      window.location.replace(tabOf(first).href);
+  }, []);
+  const section: Section | null =
+    route.name === "home"
+      ? "home"
+      : route.name === "map"
+        ? "map"
+        : route.name === "listings"
+          ? "listings"
+          : route.name === "finder"
+            ? "finder"
+            : route.name === "replays" || route.name === "replay"
+              ? "replays"
+              : null;
+  // Inside a place, the bar says where you are.
+  const here = window.location.pathname + window.location.search;
+  const context =
+    route.name === "tour"
+      ? { label: "Walk", href: here }
+      : route.name === "prep-case" || route.name === "prep-place"
+        ? { label: "Tour prep", href: here }
+        : null;
   if (route.name === "map") {
     return (
-      <main className="shell-map">
-        <Suspense fallback={<p className="map-wait">Opening the city...</p>}>
-          <MapPage />
-        </Suspense>
-      </main>
+      <AppShell section="map">
+        <main className="shell-map">
+          <Suspense fallback={<p className="map-wait">Opening the city...</p>}>
+            <MapPage />
+          </Suspense>
+        </main>
+      </AppShell>
     );
   }
   return (
-    <main className="shell">
-      <ReplayNav />
-      {route.name === "home" ? (
-        <UploadPage />
-      ) : route.name === "confirm" ? (
-        <ConfirmPage />
-      ) : route.name === "investigate" ? (
-        <InvestigatePage />
-      ) : route.name === "replays" ? (
-        <ReplayIndexPage />
-      ) : route.name === "replay" ? (
-        <ReplayPage key={route.slug} slug={route.slug} />
-      ) : route.name === "tour" ? (
-        <TourPage
-          key={`tour-${route.propertyId}-${window.location.search}`}
-          target={{
-            propertyId: route.propertyId,
-            planKey: new URLSearchParams(window.location.search).get("plan_key"),
-            caseId: new URLSearchParams(window.location.search).get("case"),
-            mode:
-              new URLSearchParams(window.location.search).get("where") === "photos"
-                ? "elsewhere"
-                : "claimed",
-          }}
-        />
-      ) : route.name === "prep-case" ? (
-        <TourPrepPage
-          key={`prep-${route.id}`}
-          target={{ kind: "case", caseId: route.id }}
-          back={`/case/${route.id}`}
-        />
-      ) : route.name === "prep-place" ? (
-        <TourPrepPage
-          key={`prep-place-${route.propertyId}-${window.location.search}`}
-          target={{
-            kind: "place",
-            propertyId: route.propertyId,
-            planKey: new URLSearchParams(window.location.search).get("plan_key"),
-          }}
-          back="/"
-        />
-      ) : route.name === "trace" ? (
-        <TracePage key={`trace-${route.id}`} caseId={route.id} />
-      ) : route.name === "twin" ? (
-        <TwinPage key={route.id} caseId={route.id} />
-      ) : (
-        <CardPage key={`${route.name}-${route.id}`} caseId={route.id} variant={route.name} />
-      )}
-    </main>
+    <AppShell section={section} context={context}>
+      <main className={route.name === "home" ? "shell shell-home" : "shell"}>
+        {route.name === "home" ? (
+          <OneBox />
+        ) : route.name === "listings" ? (
+          <ListingsPage />
+        ) : route.name === "finder" ? (
+          <FinderPage />
+        ) : route.name === "confirm" ? (
+          <ConfirmPage />
+        ) : route.name === "investigate" ? (
+          <InvestigatePage />
+        ) : route.name === "replays" ? (
+          <ReplayIndexPage />
+        ) : route.name === "replay" ? (
+          <ReplayPage key={route.slug} slug={route.slug} />
+        ) : route.name === "tour" ? (
+          <TourPage
+            key={`tour-${route.propertyId}-${window.location.search}`}
+            target={{
+              propertyId: route.propertyId,
+              planKey: new URLSearchParams(window.location.search).get("plan_key"),
+              caseId: new URLSearchParams(window.location.search).get("case"),
+              mode:
+                new URLSearchParams(window.location.search).get("where") === "photos"
+                  ? "elsewhere"
+                  : "claimed",
+            }}
+          />
+        ) : route.name === "prep-case" ? (
+          <TourPrepPage
+            key={`prep-${route.id}`}
+            target={{ kind: "case", caseId: route.id }}
+            back={`/case/${route.id}`}
+          />
+        ) : route.name === "prep-place" ? (
+          <TourPrepPage
+            key={`prep-place-${route.propertyId}-${window.location.search}`}
+            target={{
+              kind: "place",
+              propertyId: route.propertyId,
+              planKey: new URLSearchParams(window.location.search).get("plan_key"),
+            }}
+            back="/"
+          />
+        ) : route.name === "trace" ? (
+          <TracePage key={`trace-${route.id}`} caseId={route.id} />
+        ) : route.name === "twin" ? (
+          <TwinPage key={route.id} caseId={route.id} />
+        ) : (
+          <CardPage key={`${route.name}-${route.id}`} caseId={route.id} variant={route.name} />
+        )}
+      </main>
+    </AppShell>
   );
 }

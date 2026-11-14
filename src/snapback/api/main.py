@@ -14,6 +14,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
     GET  /healthz                         liveness and the data source
+    POST /voice/tts, POST /voice/stt      the Finder's voice (ElevenLabs; see api/voice.py)
     POST /verdict                         decide() on evidence the caller already has
 
 A case's short id is accepted with or without the fixture prefix and in either case: `7Q2M`,
@@ -33,6 +34,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,11 +59,14 @@ from snapback.api.cases import (
     UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.finder import make_router as finder_router
 from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
+from snapback.api.voice import STT_MAX_BODY, TTS_MAX_BODY
+from snapback.api.voice import make_router as voice_router
 from snapback.card import strings
 from snapback.contracts import (
     AerialProofResponse,
@@ -243,6 +248,8 @@ def create_app(
     registry: CaseRegistry | None | object = _DEFAULT,
     office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
+    finder_model: object | None = None,
+    voice_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
     started each case; the default is lane D's safety store. `search_chooser` replaces the
@@ -269,12 +276,27 @@ def create_app(
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
     app.state.events = events
+    # M9: the finder. A chat model (tests pass a scripted one) runs deepagents mode; with the
+    # runner setting on and a key present it is Claude; otherwise the code policy runs.
+    model = finder_model
+    if model is None and settings.snapback_agent == "deepagents" and settings.anthropic_api_key:
+        from snapback.agent.finder import build_model
+
+        model = build_model(settings.anthropic_api_key.get_secret_value())
+    app.include_router(finder_router(events, model))
     app.include_router(forensics_router)  # the investigator view: SYNTHETIC data only
+    # The Finder's voice (ElevenLabs, server-side key). Tests pass a mock transport.
+    app.include_router(voice_router(settings, voice_transport))
 
     app.add_middleware(
         UploadSizeGuard,
         max_body_bytes=settings.snapback_max_photos * max_photo_bytes + FORM_OVERHEAD,
-        small_posts={"/search": SEARCH_MAX_BODY, "/forensics/ask": FORENSICS_MAX_BODY},
+        small_posts={
+            "/search": SEARCH_MAX_BODY,
+            "/forensics/ask": FORENSICS_MAX_BODY,
+            "/voice/tts": TTS_MAX_BODY,
+            "/voice/stt": STT_MAX_BODY,
+        },
     )
     app.add_middleware(
         CORSMiddleware,
