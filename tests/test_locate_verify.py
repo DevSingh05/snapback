@@ -683,3 +683,47 @@ def test_thresholds_reject_an_ambiguity_ratio_of_one_or_less(tmp_path, ratio):
     copy.write_text(text)
     with pytest.raises(ValueError, match="ambiguity_ratio"):
         load_thresholds(copy)
+
+
+# --- claimed spread floor (#28, seed-6 replay: a 70-inlier claimed match spread over 0.018) ------
+
+
+def _scripted(per_model):
+    """verify() stand-in: model -> (inliers, spread) for every face of that model."""
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    def fake(matcher, photo, face, ransac_px):
+        n, spread = per_model.get(face.info[FEATURE_KEY].split("/")[0], (0, 0.0))
+        return Verification(max(n, 4), n, np.eye(3) if n else None, spread)
+
+    return fake
+
+
+@pytest.mark.parametrize(
+    ("claimed", "other", "expected"),
+    [
+        # One planar object in the claimed building, the real building clearly elsewhere.
+        ((70, 0.018), (119, 0.218), LocateStatus.LOCATED_ELSEWHERE),
+        # Same tight claimed match, nothing elsewhere: could not place (never DON'T PAY).
+        ((70, 0.018), (0, 0.0), LocateStatus.NOT_LOCATED),
+        # An ordinary claimed match spread over the photo still places it.
+        ((70, 0.30), (119, 0.218), LocateStatus.LOCATED_IN_CLAIMED),
+    ],
+)
+def test_a_claimed_match_on_one_small_patch_does_not_place_the_photo(
+    twins, locator, monkeypatch, claimed, other, expected
+):
+    sweeps, _, _ = twins
+    monkeypatch.setattr(
+        "snapback.vision.locate.locate.verify",
+        _scripted({"fx-model-a": claimed, "fx-model-b": other}),
+    )
+    result = locator.locate(
+        "fx-spread", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.photos[0].status is expected
+
+
+def test_claimed_spread_floor_is_below_the_elsewhere_floor():
+    t = load_thresholds()
+    assert 0.0 < t.claimed_min_spread <= t.elsewhere_min_spread

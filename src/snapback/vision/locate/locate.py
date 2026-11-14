@@ -233,7 +233,11 @@ class Locator:
             )
 
         def claimed_ok(c: Verification) -> bool:
-            return c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio
+            return (
+                c.inliers >= t.min_inliers
+                and c.ratio >= t.min_inlier_ratio
+                and c.spread >= t.claimed_min_spread
+            )
 
         placed = self._best(photo, claimed_hits, claimed_ok)
         if placed is None:
