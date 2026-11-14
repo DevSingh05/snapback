@@ -351,7 +351,8 @@ def clean_words(text: str | None) -> str:
     if not text:
         return ""
     out = _CONTROL.sub(" ", text)
-    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT):
+    # Phones before streets: "713-555-0142 or 12 Main St" must not leave "713-555-" behind.
+    for pattern in (_EMAIL, _URL, _PHONE, _STREET, _LONG_DIGITS, _UNIT):
         out = pattern.sub(REMOVED, out)
     out = " ".join(out.split())
     if len(out) > MAX_WORDS:

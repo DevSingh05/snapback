@@ -103,6 +103,15 @@ class Settings(BaseSettings):
 
     anthropic_api_key: SecretStr | None = None
 
+    # Voice for the Finder (ElevenLabs text to speech and Scribe speech to text). Unset, the voice
+    # routes answer 503 and the web app hides read-aloud. The key only ever goes in xi-api-key.
+    elevenlabs_api_key: SecretStr | None = None
+    # A warm, natural premade voice ("Sarah"); any voice id from the ElevenLabs library works.
+    elevenlabs_voice_id: str = "EXAVITQu4vr4xnSDxMaL"
+    elevenlabs_tts_model: str = "eleven_multilingual_v2"
+    # Voice requests one network address may make per day, per direction.
+    snapback_voice_daily_limit: int = 200
+
 
 @lru_cache
 def get_settings() -> Settings:

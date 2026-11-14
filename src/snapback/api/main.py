@@ -14,6 +14,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
     GET  /healthz                         liveness and the data source
+    POST /voice/tts, POST /voice/stt      the Finder's voice (ElevenLabs; see api/voice.py)
     POST /verdict                         decide() on evidence the caller already has
 
 A case's short id is accepted with or without the fixture prefix and in either case: `7Q2M`,
@@ -33,6 +34,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,6 +64,8 @@ from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
+from snapback.api.voice import STT_MAX_BODY, TTS_MAX_BODY
+from snapback.api.voice import make_router as voice_router
 from snapback.card import strings
 from snapback.contracts import (
     AerialProofResponse,
@@ -243,6 +247,7 @@ def create_app(
     office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
     finder_model: object | None = None,
+    voice_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
     started each case; the default is lane D's safety store. `search_chooser` replaces the
@@ -277,11 +282,17 @@ def create_app(
 
         model = build_model(settings.anthropic_api_key.get_secret_value())
     app.include_router(finder_router(events, model))
+    # The Finder's voice (ElevenLabs, server-side key). Tests pass a mock transport.
+    app.include_router(voice_router(settings, voice_transport))
 
     app.add_middleware(
         UploadSizeGuard,
         max_body_bytes=settings.snapback_max_photos * max_photo_bytes + FORM_OVERHEAD,
-        small_posts={"/search": SEARCH_MAX_BODY},
+        small_posts={
+            "/search": SEARCH_MAX_BODY,
+            "/voice/tts": TTS_MAX_BODY,
+            "/voice/stt": STT_MAX_BODY,
+        },
     )
     app.add_middleware(
         CORSMiddleware,
