@@ -412,6 +412,11 @@ EN: dict[str, str] = {
         "The ad names the listing brokerage on record. Anyone can type that name."
     ),
     "reason.authority_unknown": "We could not confirm who is allowed to rent this unit.",
+    "reason.licence_checked": (
+        "Checked: an active Texas license under the name in the ad, sponsored by {brokerage}, "
+        "the brokerage on record; the photos are of this home; a fresh photo with the code "
+        "came from inside. Call {brokerage} on a number you look up yourself to confirm."
+    ),
     "reason.presence_proven": "A fresh photo proved someone was inside the unit.",
     "reason.presence_proven_not_authority": (
         "A fresh photo proved someone was inside the unit, which is not authority."
@@ -882,6 +887,12 @@ ES: dict[str, str] = {
         "ese nombre."
     ),
     "reason.authority_unknown": "No pudimos confirmar quién puede alquilar esta unidad.",
+    "reason.licence_checked": (
+        "Comprobado: una licencia activa de Texas a nombre de quien firma el anuncio, "
+        "patrocinada por {brokerage}, la agencia que figura en el registro; las fotos son de "
+        "esta vivienda; una foto nueva con el código se tomó desde dentro. Llame a {brokerage} "
+        "a un número que usted mismo busque para confirmar."
+    ),
     "reason.presence_proven": "Una foto nueva demostró que alguien estaba dentro de la unidad.",
     "reason.presence_proven_not_authority": (
         "Una foto nueva demostró que alguien estaba dentro de la unidad, lo cual no es "
