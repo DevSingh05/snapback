@@ -352,3 +352,39 @@ def test_an_empty_image_is_not_cached(tmp_path):
     api = Api(oriented__collections=[_coverage("north")], oriented__extract=[empty])
     assert _live(tmp_path, api) is None
     assert not list(tmp_path.rglob("*.jpg"))
+
+
+# --- the capture date a card may show (ad vs record): read from what is already held ----------
+
+
+def test_known_capture_is_the_fixture_tiles_date_in_fixture_mode():
+    from snapback.adapters.vexcel import known_capture
+
+    assert known_capture(
+        PropertyRecord(property_id="fx-1", source=DataSource.FIXTURE), DataSource.FIXTURE
+    ) == date(2025, 6, 1)
+
+
+def test_known_capture_reads_the_cache_and_never_the_network(tmp_path):
+    from snapback.adapters.vexcel import known_capture
+
+    cache = tmp_path / "vexcel"
+    cache.mkdir()
+    (cache / "fx-1-north.jpg").write_bytes(b"jpg")
+    (cache / "fx-1-north.json").write_text(json.dumps({"captured_on": "2025-03-14"}))
+    rec = PropertyRecord(property_id="fx-1", source=DataSource.LIVE)
+    assert known_capture(rec, DataSource.LIVE, data_dir=tmp_path) == date(2025, 3, 14)
+    assert (
+        known_capture(
+            PropertyRecord(property_id="fx-2", source=DataSource.LIVE),
+            DataSource.LIVE,
+            data_dir=tmp_path,
+        )
+        is None
+    )  # nothing cached: no fetch
+    old = time.time() - 8 * 24 * 3600
+    os.utime(cache / "fx-1-north.jpg", (old, old))
+    assert known_capture(rec, DataSource.LIVE, data_dir=tmp_path) is None  # stale: not shown
+    (cache / "fx-1-north.json").write_text("{not json")
+    os.utime(cache / "fx-1-north.jpg")
+    assert known_capture(rec, DataSource.LIVE, data_dir=tmp_path) is None  # damaged: just no date

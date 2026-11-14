@@ -118,7 +118,9 @@ def test_case_a_is_dont_pay_on_the_copied_reply_and_shows_every_other_finding():
     assert verdict.state is VerdictState.DONT_PAY
     assert verdict.reasons == [strings.text("reason.forged_copy", n=2)]
 
-    place, person, price = (lines(card, kind) for kind in CardRowKind)
+    place, person, price = (
+        lines(card, kind) for kind in (CardRowKind.PLACE, CardRowKind.PERSON, CardRowKind.PRICE)
+    )
     assert place["Real"][0] is CardTone.OK  # the photos are of the real building
     assert place["Unit on record"][0] is CardTone.HOLD
     assert person["Here now"] == (
@@ -358,4 +360,6 @@ def test_photos_of_a_building_with_no_scan_are_not_reported_as_no_photos():
 
 def test_the_demo_folder_holds_only_the_pack():
     names = {path.name for path in Path(DEMO_DIR).iterdir()}
-    assert {n for n in names if not n.startswith("replay-")} == {"README.md", "a", "b", "c"}
+    # evidence.fixture.json is the E0 contract fixture (plan/ml-agent-plan.md 3b), not a case
+    pack = {"README.md", "a", "b", "c", "evidence.fixture.json"}
+    assert {n for n in names if not n.startswith("replay-")} == pack

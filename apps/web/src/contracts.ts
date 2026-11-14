@@ -2,7 +2,7 @@
 
 export type DataSource = "live" | "fixture";
 export type VerdictState = "verified" | "hold" | "dont_pay" | "unverified";
-export type CardRowKind = "place" | "person" | "price";
+export type CardRowKind = "place" | "person" | "price" | "claims"; // claims: ad vs record, only when it has lines
 export type CardTone = "ok" | "hold" | "red_flag" | "not_shown" | "not_checked";
 
 export interface CardLine {
@@ -75,7 +75,18 @@ export interface Card {
   lang: string;
 }
 
-export type TraceKind = "choice" | "tool" | "status" | "hitl" | "verdict" | "error";
+export type TraceKind =
+  | "choice"
+  | "tool"
+  | "status"
+  | "hitl"
+  | "verdict"
+  | "error"
+  // The deep agent's own steps (E0): todo list, sub-agent hand-off, file written, code-raised doubt.
+  | "todo"
+  | "agent"
+  | "file"
+  | "unsure";
 export type ChoiceKind =
   "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human" | "next_check";
 
