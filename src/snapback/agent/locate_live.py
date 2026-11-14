@@ -196,6 +196,9 @@ class LiveLocate:
             raw = json.loads(path.read_text())
             if raw.get("source") != CACHE_LABEL:  # only live entries are used in a live case
                 return None
+            if "points" not in raw:
+                # Written before the pairs were kept: running again draws the lines and rewrites it.
+                return None
             points = {
                 str(pid): EvidencePoints.model_validate(value)
                 for pid, value in (raw.get("points") or {}).items()

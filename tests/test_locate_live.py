@@ -796,3 +796,19 @@ def test_the_api_case_attaches_the_evidence_file_only_when_live(world, tmp_path)
     staged = SessionCase("FX1", fixture, modules._listing, runner)
     staged.advance()
     assert staged.files is None  # the routes keep serving the team-made fixture
+
+
+def test_a_cache_entry_from_before_the_pairs_were_kept_is_run_again(world, tmp_path):
+    """An entry written by older code has no "points" field: using it would show no lines for
+    that ad forever. It is run again, and the rewritten entry carries the pairs."""
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    live = make_live(data, adapter)
+    first = live.locate("c1", blobs, "fx-prop-1")
+    path = live._cache_path(live._load(), blobs, "fx-prop-1")
+    old = json.loads(path.read_text())
+    del old["points"]
+    path.write_text(json.dumps(old))
+    again = make_live(data, adapter).locate("c2", blobs, "fx-prop-1")
+    assert not again.from_cache and again.points == first.points
+    assert "points" in json.loads(path.read_text())
