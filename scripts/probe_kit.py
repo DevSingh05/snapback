@@ -46,6 +46,8 @@ def _ssl_context():
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()
+
+
 INTEREST = re.compile(
     r"rent|owner|contact|manag|leas|phone|email|photo|image|url|price|floor ?plan|unit", re.I
 )
