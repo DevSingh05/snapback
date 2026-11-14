@@ -329,6 +329,84 @@ export interface TourDraft {
   source: DataSource;
 }
 
+// Mirrors TourPlan in src/snapback/tour.py (GET /places/{id}/tour and /cases/{id}/tour): the
+// "Walk it first" tour, built by code. Every fact has a source line.
+export interface TourFact {
+  text: string;
+  source: string;
+}
+
+export interface TourPhoto {
+  photo_id: string;
+  alias?: string | null; // P1, P2...: the key of /cases/{id}/evidence/{alias}/photo.jpg
+  sweep_id?: string | null;
+  position?: [number, number, number] | null;
+  rotation_quat?: [number, number, number, number] | null;
+  fov_deg?: number | null;
+}
+
+export interface TourStop {
+  kind: "arrive" | "door" | "room" | "stop" | "outro";
+  key: string;
+  title: string;
+  room_label?: string | null;
+  sweep_id?: string | null;
+  sweep_count: number;
+  sweep_ids: string[];
+  photos: TourPhoto[]; // the renter's own ad photos placed in this room (case tour only)
+  ad_view: "placed" | "none_placed" | "unknown"; // whether an ad photo was placed in this room
+  claims: TourFact[]; // what the ad claimed for this room
+  position?: [number, number, number] | null;
+  rotation_quat?: [number, number, number, number] | null;
+  facts: TourFact[];
+  tip?: string | null; // "check this in person"
+  note?: string | null;
+}
+
+export interface WalkCoverage {
+  counted: "rooms" | "spots" | "none";
+  total: number;
+  with_photo: number;
+  placed: number;
+  elsewhere: number;
+  unplaced: number;
+  plan_mismatch?: boolean;
+  line?: string | null;
+}
+
+export interface TourDirector {
+  dwell: string[]; // stop keys
+  lead_checks: string[];
+  stamp: "model" | "policy";
+  reason?: string | null;
+}
+
+// GET /cases/{id}/walk: the plan with the case's placed photos, and its locate result.
+export interface WalkResponse {
+  plan: TourPlan;
+  model_id?: string | null; // the scan the walk was built from
+  locate?: LocateResult | null;
+}
+
+export interface TourPlan {
+  property_id: string;
+  kind: "apartment" | "house";
+  source: DataSource;
+  as_of: string;
+  has_scan: boolean;
+  scan_label?: string | null;
+  rooms_labelled: boolean;
+  rooms_note: string;
+  aerial?: { source: DataSource; captured_on?: string | null; has_image: boolean } | null;
+  stops: TourStop[];
+  links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
+  up_axis?: "y" | "z"; // which model axis is vertical in the stops' positions
+  mode?: "claimed" | "elsewhere"; // "elsewhere": the building the ad's photos were taken in
+  mode_line?: string | null;
+  coverage?: WalkCoverage | null;
+  director?: TourDirector | null;
+}
+
 // Mirrors PackLine and TourPrepPack in src/snapback/pack.py (GET /cases/{id}/tour-prep and
 // GET /places/{property_id}/tour-prep). Every word is the API's, written by code in the language
 // asked for; render it as given.

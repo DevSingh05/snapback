@@ -5,6 +5,7 @@ import { CardPage } from "./pages/CardPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
 import { ReplayNav } from "./replay/ReplayNav";
 import { ReplayPage } from "./replay/ReplayPage";
+import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
@@ -16,6 +17,7 @@ type Route =
   | { name: "twin"; id: string }
   | { name: "verify"; id: string }
   | { name: "replay"; slug: string }
+  | { name: "tour"; propertyId: string }
   | { name: "prep-case"; id: string }
   | { name: "prep-place"; propertyId: string }
   | { name: "confirm" }
@@ -27,6 +29,8 @@ export function matchRoute(path: string): Route {
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
+  const tour = /^\/tour\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
+  if (tour?.[1]) return { name: "tour", propertyId: tour[1] };
   const prepCase = /^\/case\/([A-Za-z0-9_-]+)\/prep\/?$/.exec(path);
   if (prepCase?.[1]) return { name: "prep-case", id: prepCase[1] };
   const prepPlace = /^\/prep\/place\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
@@ -64,6 +68,19 @@ export default function App() {
         <ReplayIndexPage />
       ) : route.name === "replay" ? (
         <ReplayPage key={route.slug} slug={route.slug} />
+      ) : route.name === "tour" ? (
+        <TourPage
+          key={`tour-${route.propertyId}-${window.location.search}`}
+          target={{
+            propertyId: route.propertyId,
+            planKey: new URLSearchParams(window.location.search).get("plan_key"),
+            caseId: new URLSearchParams(window.location.search).get("case"),
+            mode:
+              new URLSearchParams(window.location.search).get("where") === "photos"
+                ? "elsewhere"
+                : "claimed",
+          }}
+        />
       ) : route.name === "prep-case" ? (
         <TourPrepPage
           key={`prep-${route.id}`}
