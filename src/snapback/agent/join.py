@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Protocol
 
 from snapback.agent.intake import Listing
+from snapback.agent.locate_live import LiveLocate, LiveOutcome
 from snapback.agent.modules import ChallengeOutcome, FixtureModules
 from snapback.agent.rules import check_price
 from snapback.agent.rules.contact import check_authority
@@ -26,6 +27,7 @@ from snapback.contracts import (
     DataSource,
     FloorPlanCandidate,
     ForSaleMatch,
+    ForSaleStatus,
     LocateResult,
     LocateStatus,
     PhotoLocation,
@@ -77,9 +79,21 @@ class KitLookups:
         with self._lock:
             if self._records is None:
                 try:
-                    self._records = costar_jsonl.load_records(self.source, self._kit_dir)
+                    records = costar_jsonl.load_records(self.source, self._kit_dir)
                 except costar_jsonl.KitNotFoundError:
                     raise KitMissing from None
+                # Houses (residential listings with a Matterport model) join the buildings,
+                # so a house photo can be identified and a house id can be claimed.
+                try:
+                    from snapback.adapters import costar_residential
+
+                    houses = costar_residential.house_records(self.source, self._kit_dir)
+                except Exception as error:  # a broken residential file must not hide buildings
+                    log.warning("house records not read (%s)", type(error).__name__)
+                    houses = {}
+                for property_id, house in houses.items():
+                    records.setdefault(property_id, house)
+                self._records = records
             return self._records
 
     def record(self, property_id: str) -> PropertyRecord | None:
@@ -97,6 +111,21 @@ class KitLookups:
             # check, and it must not read as "looked up, nothing found". No value is logged.
             log.warning(
                 "for-sale lookup failed (%s); treated as not looked up", type(error).__name__
+            )
+            return None
+
+    def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
+        """The same lookup, also matching any home within 40 m of this point."""
+        try:
+            from snapback.adapters import costar_residential
+
+            return costar_residential.for_sale_lookup(
+                listing_text, self.source, self._kit_dir, lat=lat, lon=lon
+            )
+        except Exception as error:
+            log.warning(
+                "for-sale lookup by position failed (%s); treated as not looked up",
+                type(error).__name__,
             )
             return None
 
@@ -122,6 +151,10 @@ class JoinedModules:
         for_sale: ForSaleMatch | None,
         salt: str,
         record_source: DataSource | None,
+        live_locate: LiveLocate | None = None,
+        photo_bytes: list[bytes] | None = None,
+        lookups: Lookups | None = None,
+        case_id: str = "",
     ) -> None:
         self._stand_in = stand_in
         self._listing = listing
@@ -129,6 +162,15 @@ class JoinedModules:
         self._for_sale = for_sale
         self._salt = salt
         self._record_source = record_source
+        # A22: a live case places the renter's photos in the indexed twins (never a stand-in).
+        self._live_locate = live_locate if stand_in is None else None
+        self._photo_bytes = photo_bytes or []
+        self._lookups = lookups
+        self._case_id = case_id
+        self._twin: bool | None = None
+        self._outcome: LiveOutcome | None = None
+        self._located = False
+        self._adopt_lock = threading.Lock()
 
     # --- from the listing and the record ---------------------------------------------------
 
@@ -139,29 +181,93 @@ class JoinedModules:
         return list(self._listing.rule_hits)
 
     def price(self, case_id: str) -> PriceResult | None:
+        self._identify(case_id)
         listing = self._listing
         return check_price(listing.listed_rent, self._record, beds=listing.beds, unit=listing.unit)
 
     def authority(self, case_id: str) -> AuthorityResult | None:
         # The listing brokerage on record may market the home as the manager may (ruling,
         # Sat 01:20). Lane D's lookup carries those names once D7 (#95) is on main.
+        self._identify(case_id)
         offices = getattr(self._for_sale, "offices", None) or ()
         return check_authority(self._listing.contacts, self._record, self._salt, offices)
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
+        self._identify(case_id)
         return self._for_sale
 
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
+        self._identify(case_id)
         if self._record is None and self._for_sale is None:
             return None
         return self._record_source
 
     # --- the twin and the challenge: stand-ins, and only in a fixture case -----------------
 
+    def _live_twin(self) -> bool:
+        """A live case has a twin when its claimed home is indexed, or when no home is claimed
+        and the index is not empty. Decided once."""
+        if self._twin is None:
+            live, record = self._live_locate, self._record
+            if live is None or not self._photo_bytes:
+                self._twin = False
+            elif record is None:
+                self._twin = live.available(None, [])
+            else:
+                self._twin = bool(record.model_ids) and live.available(
+                    record.property_id, record.model_ids
+                )
+        return self._twin
+
+    def _live_outcome(self, case_id: str) -> LiveOutcome | None:
+        with self._adopt_lock:
+            if not self._located:
+                self._located = True
+                if self._live_twin() and self._live_locate is not None:
+                    claimed = self._record.property_id if self._record else None
+                    self._outcome = self._live_locate.locate(
+                        case_id or self._case_id, self._photo_bytes, claimed
+                    )
+                    self._adopt_identified()
+            return self._outcome
+
+    def _identify(self, case_id: str) -> None:
+        """With no claimed home, place the photos first: the home they identify gives the
+        record that price, authority and for-sale are read from."""
+        if self._record is None and self._live_locate is not None:
+            self._live_outcome(case_id)
+
+    def _adopt_identified(self) -> None:
+        outcome = self._outcome
+        if outcome is None or self._record is not None:
+            return
+        found = outcome.identified_property_id
+        if found is None and getattr(outcome.result, "identified_by_scan", False):
+            found = outcome.result.claimed_property_id
+        if not found or self._lookups is None:
+            return
+        record = self._lookups.record(found)
+        if record is None:
+            return
+        self._record = record
+        self._record_source = record.source
+        at = getattr(self._lookups, "for_sale_at", None)
+        if at is not None and record.lat is not None and record.lon is not None:
+            nearby = at(self._listing.text, record.lat, record.lon)
+            held = self._for_sale
+            downgrade = (
+                held is not None
+                and held.status is not ForSaleStatus.NONE
+                and nearby is not None
+                and nearby.status is ForSaleStatus.NONE
+            )
+            if nearby is not None and not downgrade:
+                self._for_sale = nearby
+
     def has_twin(self, case_id: str) -> bool:
         if self._stand_in is None:
-            return False
+            return self._live_twin()
         # A building whose record has no 3D model has no twin, whatever the stand-in holds.
         if self._record is not None and not self._record.model_ids:
             return False
@@ -170,16 +276,23 @@ class JoinedModules:
     def photo_count(self, case_id: str) -> int:
         if not self.has_twin(case_id):
             return self._listing.photos  # the photos the renter actually sent
-        return self._stand_in.photo_count(case_id)  # type: ignore[union-attr]
+        if self._stand_in is None:
+            return len(self._photo_bytes)
+        return self._stand_in.photo_count(case_id)
 
     def floor_plans(self, case_id: str) -> list[FloorPlanCandidate]:
-        if not self.has_twin(case_id):
-            return []
-        return self._stand_in.floor_plans(case_id)  # type: ignore[union-attr]
+        if not self.has_twin(case_id) or self._stand_in is None:
+            return []  # a live case has no floor-plan stand-in
+        return self._stand_in.floor_plans(case_id)
 
     def locate(self, case_id: str) -> LocateResult | None:
         if self.has_twin(case_id):
-            return self._stand_in.locate(case_id)  # type: ignore[union-attr]
+            if self._stand_in is None:
+                outcome = self._live_outcome(case_id)
+                if outcome is not None:
+                    return outcome.result
+            else:
+                return self._stand_in.locate(case_id)
         # No twin to place photos in. Each photo sent is recorded as not checked, so the
         # card says there is no 3D scan to check against, not that no photos were sent.
         sent = self._listing.photos
@@ -203,9 +316,9 @@ class JoinedModules:
         )
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None:
-        if not self.has_twin(case_id):
-            return None
-        return self._stand_in.spot_ranking(case_id, model_id)  # type: ignore[union-attr]
+        if self._stand_in is None or not self.has_twin(case_id):
+            return None  # a live case has no spot ranking yet: it ends after locate
+        return self._stand_in.spot_ranking(case_id, model_id)
 
     def new_code(self, case_id: str) -> str:
         return self._need_stand_in().new_code(case_id)

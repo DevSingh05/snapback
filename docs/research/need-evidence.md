@@ -8,7 +8,7 @@ Master Finder, need lane. Written Fri Nov 13 2026, 21:00 to 21:08 ET. Adds to `p
 2. **About 32 Americans a day report a rental scam to the FTC** (65,000 reports from Jan 2020 to Jun 2025, about $65M lost, median $1,000; FTC says this is an undercount). VERIFIED source, ESTIMATE per day.
 3. **FBI 2025: real estate fraud complaints hit a three-year high, about $275M lost by 12,368 victims** (up from about $173M in 2024). VERIFIED via LA Times and Florida Realtors; IC3 PDF itself could not be parsed (UNRESOLVED at primary).
 4. **43.1% of US renters have seen a listing they thought was fake; 6.4% (about 5.2 million renters) have lost money; 9.1% of renters aged 18 to 29.** Apartment List national survey (VERIFIED, but from 2018: say "a national survey", not "this year").
-5. **Story: Patricia Reiling, Conroe (Houston area), Feb 2025.** Found the house on Craigslist, got a door code, paid $2,200, moved in and unpacked; two days later (moved in Saturday Feb 8, called "the following Monday") the real owner (Invitation Homes) told her the "landlord" did not own it, and she was served notice to leave by Sunday: "I don't know where we'll live." VERIFIED (ABC13).
+5. **Story: Patricia Reiling, Conroe (Houston area), Feb 2025.** Found the house on Craigslist, got a door code, paid $2,200, moved in (Sat Feb 8) and unpacked; two days later, "the following Monday", the real owner (Invitation Homes) told her the "landlord" did not own it, and she was served notice to leave by Sunday: "I don't know where we'll live." VERIFIED (ABC13).
 
 ## 1. Scale numbers (newest first)
 
