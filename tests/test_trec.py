@@ -402,7 +402,10 @@ def test_every_part_of_a_surname_is_asked_with_contains(tmp_path):
 
 def test_a_hyphen_or_apostrophe_surname_is_never_strict(tmp_path):
     for i, text in enumerate(
-        ("I'm Fxname Fxper-Fxson, a licensed realtor.", "I'm Fxname Fxo'Fxperson, a licensed agent.")
+        (
+            "I'm Fxname Fxper-Fxson, a licensed realtor.",
+            "I'm Fxname Fxo'Fxperson, a licensed agent.",
+        )
     ):
         assert _check(text, _client([]), tmp_path / str(i)).status is LicenseStatus.NOT_CHECKED
 
