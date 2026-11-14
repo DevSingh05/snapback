@@ -57,6 +57,7 @@ from snapback.api.cases import (
     UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
@@ -267,6 +268,7 @@ def create_app(
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
     app.state.events = events
+    app.include_router(forensics_router)  # the investigator view: SYNTHETIC data only
 
     app.add_middleware(
         UploadSizeGuard,

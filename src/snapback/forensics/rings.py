@@ -34,7 +34,8 @@ BRIDGE_SHARE = 0.5
 
 class Evidence(BaseModel):
     ad_id: int
-    span: str | None = None  # the matched sentence
+    span: str | None = None  # the matched sentence, verbatim from the ad
+    note: str | None = None  # a pointer in words, never ad text
     photo_ids: list[str] = Field(default_factory=list)
     phone: str | None = None
     rule_id: str | None = None
@@ -290,7 +291,7 @@ def _describe(graph: LinkGraph, members: list[int], copiers: dict[int, int]) -> 
                 Evidence(
                     ad_id=a,
                     photo_ids=graph.ad_photos[a][node],
-                    span=f"photos first posted in ad {src} ({graph.ads[src].phone}), "
+                    note=f"photos first posted in ad {src} ({graph.ads[src].phone}), "
                     f"{graph.ads[src].posted_at}",
                 )
             )
@@ -320,7 +321,7 @@ def _describe(graph: LinkGraph, members: list[int], copiers: dict[int, int]) -> 
                 + ", ".join(f"{k.replace('_', ' ')} ({n})" for k, n in kinds.most_common()),
                 score=round(min(1.0, len({a for a, _ in pre}) / len(ads)), 2),
                 evidence=[
-                    Evidence(ad_id=a, span=f"claim: {k.replace('_', ' ')}") for a, k in pre[:40]
+                    Evidence(ad_id=a, note=f"claim: {k.replace('_', ' ')}") for a, k in pre[:40]
                 ],
             )
         )
