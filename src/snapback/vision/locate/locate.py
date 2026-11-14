@@ -104,6 +104,26 @@ def photo_hfov(image: Image.Image, default: float) -> float:
     return math.degrees(2 * math.atan(long_side / (2 * float(focal))))
 
 
+_RING = (1, 2, 3, 4)  # side faces, left to right: each meets its neighbours at a seam
+
+
+def seam_neighbours(hits: list, top: int = 2) -> list:
+    """For the `top` best hits on a side face, the side faces either side of it in the same
+    sweep: a photo looking across a seam splits its matches between two faces."""
+    from snapback.vision.locate.index import Entry, Hit
+
+    floor = min((h.score for h in hits), default=0.0)
+    out = []
+    for hit in hits[:top]:
+        entry = hit.entry
+        if entry.face not in _RING:
+            continue
+        at = _RING.index(entry.face)
+        for neighbour in (_RING[at - 1], _RING[(at + 1) % len(_RING)]):
+            out.append(Hit(Entry(entry.model_id, entry.sweep_id, neighbour, "face"), floor - 1e-3))
+    return out
+
+
 @dataclass(frozen=True)
 class _Placement:
     model_id: str
@@ -186,6 +206,13 @@ class Locator:
         hits = self._candidates(photo, claimed_models)
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
         other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
+        seen = {(h.entry.model_id, h.entry.sweep_id, h.entry.face) for h in other_hits}
+        other_hits += [
+            h
+            for h in seam_neighbours(other_hits)
+            if (h.entry.model_id, h.entry.sweep_id, h.entry.face) not in seen
+            and (h.entry.model_id, h.entry.sweep_id) in self._sweeps
+        ]
         placed = self._best(
             photo,
             claimed_hits,
