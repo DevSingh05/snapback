@@ -16,7 +16,7 @@ from snapback.contracts import (
     OwnerKind,
     OwnerResult,
 )
-from snapback.pack import LANGS, MAX_FACTS, MAX_QUESTIONS, T, build_tour_prep
+from snapback.pack import LANGS, MAX_FACTS, MAX_QUESTIONS, SRC_TREC, T, build_tour_prep
 from snapback.search import place_and_raw_for
 from snapback.settings import Settings
 
@@ -160,9 +160,70 @@ def test_confirm_question_needs_an_office_or_a_reported_count():
 
 def test_licence_status_line_only_when_checked():
     ok = pack_of(STUDIO, licence=LicenseResult(status=LicenseStatus.LICENSED))
-    assert "active Texas licence" in " ".join(f.text for f in ok.facts)
+    assert "active Texas license" in " ".join(f.text for f in ok.facts)
     nc = pack_of(STUDIO, licence=LicenseResult(status=LicenseStatus.NOT_CHECKED))
     assert "licence" not in keys(nc.facts)
+
+
+RENTER_PHRASE = {"en": "the license number you gave", "es": "el número de licencia que diste"}
+
+
+@pytest.mark.parametrize("lang", LANGS)
+def test_a_renter_typed_number_never_reads_as_a_fact_about_the_ad(lang):
+    for status in (LicenseStatus.LICENSED, LicenseStatus.NOT_FOUND):
+        renter = LicenseResult(status=status, number_from="renter")
+        ad = LicenseResult(status=status, number_from="ad")
+        line = next(f for f in pack_of(STUDIO, lang, licence=renter).facts if f.key == "licence")
+        ad_line = next(f for f in pack_of(STUDIO, lang, licence=ad).facts if f.key == "licence")
+        assert RENTER_PHRASE[lang] in line.text.lower()
+        assert RENTER_PHRASE[lang] not in ad_line.text.lower()
+        assert line.text != ad_line.text
+    # NOT_CHECKED says nothing, whoever typed the number
+    nc = LicenseResult(status=LicenseStatus.NOT_CHECKED, number_from="renter")
+    assert "licence" not in keys(pack_of(STUDIO, lang, licence=nc).facts)
+
+
+def test_english_table_spells_license_the_american_way():
+    for key, text in T["en"].items():
+        assert "licence" not in text.lower(), key
+    assert "licence" not in SRC_TREC["en"].lower()
+
+
+def test_home_line_starts_with_a_capital_and_pluralises_floors():
+    one = LOOKUPS.record("fx-prop-3").model_copy(update={"floors": 1})
+    two = LOOKUPS.record("fx-prop-3").model_copy(update={"floors": 2})
+    for lang, floors in (("en", ("1 floor", "2 floors")), ("es", ("1 piso", "2 pisos"))):
+        place, raw = place_and_raw_for(STUDIO[0], None, LOOKUPS, None, STUDIO[1])
+        for record, expect in ((one, floors[0]), (two, floors[1])):
+            pack = build_tour_prep(
+                source=place.source, lang=lang, place=place, raw=raw, record=record
+            )
+            home = next(f for f in pack.facts if f.key == "home").text
+            assert expect in home and f"1 {floors[0].split()[1]}s" not in home
+            assert home[0].isupper(), home
+    # no plan on record: the line must still start with a capital
+    pack = build_tour_prep(source=DataSource.FIXTURE, record=two)
+    assert next(f for f in pack.facts if f.key == "home").text[0].isupper()
+
+
+def test_case_route_lists_only_rooms_photographed_in_the_claimed_building(client):
+    from snapback.contracts import LocateResult, LocateStatus, PhotoLocation
+
+    made = client.post("/cases", data={"text": "Nice 1 bed, $1,500 a month, pets ok"}).json()
+    case = client.app.state.store.get(made["case_id"])
+    photos = [
+        PhotoLocation(photo_id="a", status=LocateStatus.LOCATED_IN_CLAIMED, room_label="Kitchen"),
+        PhotoLocation(photo_id="b", status=LocateStatus.LOCATED_ELSEWHERE, room_label="Garage"),
+        PhotoLocation(photo_id="c", status=LocateStatus.NOT_LOCATED, room_label="Pool"),
+    ]
+    case.property_id = "fx-prop-3"  # a building with a scan, so the rooms line can show
+    case.evidence.locate = LocateResult(
+        case_id=made["case_id"], photos=photos, thresholds_version="t"
+    )
+    url = f"/cases/{made['case_id']}/tour-prep"
+    body = client.get(url, headers={"Authorization": f"Bearer {made['read_token']}"}).json()
+    text = " ".join(f["text"] for f in body["facts"])
+    assert "Kitchen" in text and "Garage" not in text and "Pool" not in text
 
 
 def test_three_fixed_steps_before_paying():

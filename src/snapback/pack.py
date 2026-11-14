@@ -47,7 +47,7 @@ SRC_COSTAR = {"en": "CoStar record", "es": "Registro de CoStar"}
 SRC_MATTERPORT = {"en": "Matterport", "es": "Matterport"}
 SRC_VEXCEL = {"en": "Vexcel", "es": "Vexcel"}
 SRC_COUNTY = {"en": "County record", "es": "Registro del condado"}
-SRC_TREC = {"en": "Texas licence check", "es": "Verificación de licencia de Texas"}
+SRC_TREC = {"en": "Texas license check", "es": "Verificación de licencia de Texas"}
 
 _MONTHS = {
     "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
@@ -65,7 +65,7 @@ T: dict[str, dict[str, str]] = {
         "home.apt": "{plan}{built}{floors}",
         "home.house": "House, {lead}{built}",
         "built": ", built {year}",
-        "floors": ", {n} floors",
+        "floors": ", {n} floor{s}",
         "bed": "{n} bed",
         "bath": "{n} bath",
         "studio": "studio",
@@ -91,9 +91,11 @@ T: dict[str, dict[str, str]] = {
         "scan.house": "A 3D scan of this home exists",
         "rooms": "rooms labelled in the scan: {rooms}",
         "aerial": "aerial photo captured {date}",
-        "licence.ok": "The licence the ad names is an active Texas licence",
-        "licence.no": "The licence number in the ad is not an active Texas licence",
-        "q.licence": "Ask the agent for their Texas real estate licence number, then look it up "
+        "licence.ok": "The license the ad names is an active Texas license",
+        "licence.no": "The license number in the ad is not an active Texas license",
+        "licence.ok.given": "The license number you gave is an active Texas license",
+        "licence.no.given": "The license number you gave is not an active Texas license",
+        "q.licence": "Ask the agent for their Texas real estate license number, then look it up "
         "yourself at trec.texas.gov.",
         "q.landlord.company": "Check that the landlord named on the lease is {company}, "
         "the owner of record.",
@@ -128,7 +130,7 @@ T: dict[str, dict[str, str]] = {
         "home.apt": "{plan}{built}{floors}",
         "home.house": "Casa, {lead}{built}",
         "built": ", construido en {year}",
-        "floors": ", {n} pisos",
+        "floors": ", {n} piso{s}",
         "bed": "{n} recámara{s}",
         "bath": "{n} baño{s}",
         "studio": "estudio",
@@ -156,6 +158,8 @@ T: dict[str, dict[str, str]] = {
         "aerial": "foto aérea tomada el {date}",
         "licence.ok": "La licencia que menciona el anuncio es una licencia activa de Texas",
         "licence.no": "El número de licencia del anuncio no es una licencia activa de Texas",
+        "licence.ok.given": "El número de licencia que diste es una licencia activa de Texas",
+        "licence.no.given": "El número de licencia que diste no es una licencia activa de Texas",
         "q.licence": "Pide al agente su número de licencia de bienes raíces de Texas y búscalo "
         "tú mismo en trec.texas.gov.",
         "q.landlord.company": "Confirma que el arrendador que aparece en el contrato es "
@@ -256,11 +260,12 @@ def _home_line(lang: str, place: PlaceMatch | None, record: PropertyRecord | Non
             return None
         return _t(lang, "home.house", lead=_join([beds, baths]), built=built).replace(", ,", ",")
     plan = place.floor_plan if place is not None else None
-    stories = _t(lang, "floors", n=floors) if floors else ""
+    stories = _plural(lang, floors, "floors") if floors else ""
     if not plan and not year and not floors:
         return None
     text = _t(lang, "home.apt", plan=plan or "", built=built, floors=stories)
-    return text.lstrip(", ")
+    text = text.lstrip(", ")
+    return text[:1].upper() + text[1:]
 
 
 def _price_line(lang: str, raw: Any, place: PlaceMatch | None) -> str | None:
@@ -325,7 +330,11 @@ def _owner_line(lang: str, owner: OwnerResult | None) -> str | None:
 def _licence_line(lang: str, licence: LicenseResult | None) -> str | None:
     if licence is None or licence.status is LicenseStatus.NOT_CHECKED:
         return None
-    return _t(lang, "licence.ok" if licence.status is LicenseStatus.LICENSED else "licence.no")
+    key = "licence.ok" if licence.status is LicenseStatus.LICENSED else "licence.no"
+    if licence.number_from == "renter":
+        # the renter typed this number: it is their thread, never a fact about the ad
+        key += ".given"
+    return _t(lang, key)
 
 
 def _facts(

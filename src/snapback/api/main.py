@@ -767,7 +767,11 @@ def create_app(
             record=record,
             owner=evidence.owner,
             licence=evidence.license,
-            room_labels=[p.room_label for p in photos if p.room_label],
+            room_labels=[
+                p.room_label
+                for p in photos
+                if p.room_label and p.status is LocateStatus.LOCATED_IN_CLAIMED
+            ],
             aerial_on=capture_date_of(record),
         )
 
