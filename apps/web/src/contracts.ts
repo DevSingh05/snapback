@@ -144,3 +144,18 @@ export interface AerialTile {
   captured_on?: string | null;
   path: string;
 }
+
+// Mirrors AerialSideOut and AerialProofResponse in src/snapback/contracts.py (GET /cases/{id}/aerial).
+export interface AerialSideOut {
+  tile: AerialTile | null;
+  record: PropertyRecord | null;
+  image_url?: string | null;
+}
+
+export interface AerialProofResponse {
+  case_id: string;
+  source: DataSource;
+  claimed: AerialSideOut;
+  matched: AerialSideOut | null;
+  distance_m: number | null;
+}
