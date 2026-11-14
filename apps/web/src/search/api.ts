@@ -8,6 +8,8 @@ import type {
   TourDraft,
 } from "../contracts";
 
+export class NoReadToken extends Error {}
+
 // The strip's answer: the places, which data they came from, and (when the API sends one) the
 // budget trade-off question to show if nothing fits. All text is the API's, shown as given.
 export interface Places {
@@ -143,7 +145,8 @@ export async function fetchAlternatives(caseId: string, signal?: AbortSignal): P
   const pending = apiFetchRead(`/cases/${encodeURIComponent(caseId)}/alternatives`, caseId, {
     signal,
   });
-  if (!pending) throw new Error("This browser does not hold the key to read places for this case.");
+  if (!pending)
+    throw new NoReadToken("This browser does not hold the key to read places for this case.");
   const res = await pending;
   if (!res.ok) throw await failure(res);
   const body = (await res.json()) as AlternativesResponse & { tradeoff_question?: string | null };

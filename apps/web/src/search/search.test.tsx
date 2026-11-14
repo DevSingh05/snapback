@@ -9,6 +9,7 @@ import { saveCaseReadToken, saveCaseToken } from "../api";
 import { AS_OF } from "../contracts";
 import type { PlaceMatch, RenterBrief, SearchResponse, TourDraft } from "../contracts";
 import { UploadPage } from "../upload/UploadPage";
+import { EMPTY_BUDGET, budgetToBrief } from "./BudgetFields";
 import { PlacesStrip } from "./PlacesStrip";
 
 const place: PlaceMatch = {
@@ -119,7 +120,106 @@ describe("first screen", () => {
   });
 });
 
+describe("budget row", () => {
+  it("searches only when the button is pressed, never as the renter types", async () => {
+    const fetchMock = vi.fn(() => json(search([place])));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<UploadPage mode="live" />);
+    const searches = () =>
+      (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>).filter((c) =>
+        c[0].endsWith("/search"),
+      ).length;
+    await user.type(screen.getByLabelText(/max rent a month/i), "1900");
+    await user.click(screen.getByRole("button", { name: /just show places/i }));
+    await screen.findByText(place.price_text);
+    expect(searches()).toBe(1);
+    await user.type(screen.getByLabelText(/max rent a month/i), "5");
+    await user.click(screen.getByLabelText(/parking/i));
+    await user.click(screen.getByLabelText(/pets/i));
+    expect(searches()).toBe(1);
+    await user.click(screen.getByRole("button", { name: /just show places/i }));
+    await waitFor(() => expect(searches()).toBe(2));
+  });
+
+  it("the secondary button is disabled with a hint until a budget or must-have is given", async () => {
+    vi.stubEnv("VITE_API_URL", "");
+    const user = userEvent.setup();
+    render(<UploadPage mode="fixture" />);
+    const button = screen.getByRole("button", { name: /just show places/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByText("Add a max rent or a must-have first.")).toBeInTheDocument();
+    await user.click(screen.getByLabelText(/pets/i));
+    expect(button).toBeEnabled();
+    expect(screen.queryByText("Add a max rent or a must-have first.")).toBeNull();
+  });
+
+  it("reads the rent up to the first decimal point", () => {
+    expect(budgetToBrief({ ...EMPTY_BUDGET, maxRent: "1800.00" }).max_rent_month).toBe(1800);
+    expect(budgetToBrief({ ...EMPTY_BUDGET, maxRent: "$1,800" }).max_rent_month).toBe(1800);
+  });
+
+  it("offers Studio or more, not a bare Studio", () => {
+    vi.stubEnv("VITE_API_URL", "");
+    render(<UploadPage mode="fixture" />);
+    expect(screen.getByRole("option", { name: "Studio or more" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Studio" })).toBeNull();
+  });
+
+  it("stores exactly the brief for the case, and no token, in sessionStorage", async () => {
+    const user = userEvent.setup();
+    const createCase = vi.fn().mockResolvedValue({
+      case_id: "7Q2M",
+      source: "fixture" as const,
+      challenge_text: "Hi",
+    });
+    saveCaseToken("7Q2M", "write-secret");
+    render(<UploadPage mode="fixture" createCase={createCase} navigate={vi.fn()} />);
+    await user.type(screen.getByLabelText(/paste the ad you found/i), "zillow.com/x/1");
+    await user.type(screen.getByLabelText(/max rent a month/i), "1,900");
+    await user.selectOptions(screen.getByLabelText(/^beds$/i), "2");
+    await user.click(screen.getByLabelText(/no walk-up/i));
+    await user.click(screen.getByRole("button", { name: /check this listing/i }));
+    await screen.findByLabelText(/message to forward/i);
+    const raw = window.sessionStorage.getItem("snapback.brief.7Q2M");
+    expect(JSON.parse(raw ?? "null")).toEqual({
+      max_rent_month: 1900,
+      beds_min: 2,
+      needs_no_walkup: true,
+    });
+    expect(raw).not.toContain("secret");
+  });
+});
+
 describe("checked places strip", () => {
+  it("says 'near this price' when there is no stored brief, 'fit your budget' when there is", async () => {
+    saveCaseReadToken("7Q2M", "r");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json({ case_id: "7Q2M", source: "live", as_of: AS_OF, matches: [place] })),
+    );
+    const { unmount } = render(<PlacesStrip caseId="7Q2M" brief={null} />);
+    expect(
+      await screen.findByRole("heading", { name: "Checked places near this price" }),
+    ).toBeInTheDocument();
+    unmount();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(search([place]))),
+    );
+    render(<PlacesStrip caseId="7Q2M" brief={{ max_rent_month: 2000 }} />);
+    expect(
+      await screen.findByRole("heading", { name: "Checked places that fit your budget" }),
+    ).toBeInTheDocument();
+  });
+
+  it("with no read token on this device it says so and offers no Try again", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    render(<PlacesStrip caseId="NOKEY" brief={null} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/does not hold the key/i);
+    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+  });
+
   it("shows the API's text verbatim with the chip and the 3D scan label", async () => {
     saveCaseReadToken("7Q2M", "read-secret");
     const fetchMock = vi.fn(() =>

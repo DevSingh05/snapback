@@ -22,7 +22,7 @@ export const EMPTY_BUDGET: BudgetForm = {
 
 export function budgetToBrief(b: BudgetForm): RenterBrief {
   const brief: RenterBrief = {};
-  const rent = Number.parseInt(b.maxRent.replace(/[^0-9]/g, ""), 10);
+  const rent = Number.parseInt(b.maxRent.split(".")[0]!.replace(/[^0-9]/g, ""), 10);
   if (Number.isFinite(rent) && rent > 0 && rent <= 1_000_000) brief.max_rent_month = rent;
   if (b.beds !== "") brief.beds_min = Number(b.beds);
   if (b.noWalkup) brief.needs_no_walkup = true;
@@ -60,7 +60,7 @@ export function BudgetFields({
           Beds
           <select value={value.beds} onChange={(e) => set("beds", e.target.value)}>
             <option value="">Any</option>
-            <option value="0">Studio</option>
+            <option value="0">Studio or more</option>
             <option value="1">1 or more</option>
             <option value="2">2 or more</option>
             <option value="3">3 or more</option>

@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
-import type { DataSource } from "../contracts";
+import type { DataSource, RenterBrief } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
 import { TracePanel } from "../trace";
 import { BudgetFields, EMPTY_BUDGET, budgetToBrief, type BudgetForm } from "../search/BudgetFields";
@@ -67,7 +67,9 @@ export function UploadPage({
   const shownMode: DataSource = mode === "live" ? apiSource : mode;
   const [text, setText] = useState("");
   const [budget, setBudget] = useState<BudgetForm>(EMPTY_BUDGET);
-  const [budgetOnly, setBudgetOnly] = useState(false);
+  // The brief the places strip searched for: set only when the button is pressed, so typing in
+  // the budget row never fires a search.
+  const [shownBrief, setShownBrief] = useState<RenterBrief | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
@@ -331,15 +333,18 @@ export function UploadPage({
             type="button"
             className="upload-secondary"
             disabled={briefIsEmpty(budgetToBrief(budget))}
-            onClick={() => setBudgetOnly(true)}
+            onClick={() => setShownBrief(budgetToBrief(budget))}
           >
             Just show places that fit my budget
           </button>
+          {briefIsEmpty(budgetToBrief(budget)) && (
+            <p className="upload-hint">Add a max rent or a must-have first.</p>
+          )}
           <p className="upload-hint">
             SNAPBACK never texts anyone for you. You approve and send any message yourself.
           </p>
-          {budgetOnly && !briefIsEmpty(budgetToBrief(budget)) && (
-            <PlacesStrip caseId={null} brief={budgetToBrief(budget)} />
+          {shownBrief && !briefIsEmpty(shownBrief) && (
+            <PlacesStrip caseId={null} brief={shownBrief} />
           )}
         </form>
       </div>

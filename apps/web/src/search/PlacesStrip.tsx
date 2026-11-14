@@ -4,6 +4,7 @@ import { SourceChip } from "../components/SourceChip";
 import type { PlaceMatch, RenterBrief, TourDraft } from "../contracts";
 import {
   briefIsEmpty,
+  NoReadToken,
   fetchAlternatives,
   requestTourDraft,
   searchPlaces,
@@ -14,7 +15,7 @@ import "./search.css";
 type Load =
   | { status: "loading" }
   | { status: "ready"; places: Places }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; retry: boolean };
 
 type DraftState =
   | { status: "idle" }
@@ -137,11 +138,12 @@ function PlaceRow({
   );
 }
 
-export function PlacesStrip({
-  caseId,
-  brief,
-  heading = "Checked places that fit your budget",
-}: Props) {
+export function PlacesStrip({ caseId, brief, heading }: Props) {
+  const title =
+    heading ??
+    (briefIsEmpty(brief)
+      ? "Checked places near this price"
+      : "Checked places that fit your budget");
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const briefKey = JSON.stringify(brief);
@@ -160,6 +162,7 @@ export function PlacesStrip({
         setLoad({
           status: "error",
           message: err instanceof Error ? err.message : "Something went wrong. Try again.",
+          retry: !(err instanceof NoReadToken),
         });
       });
     return () => ctrl.abort();
@@ -170,7 +173,7 @@ export function PlacesStrip({
   return (
     <section className="pf-strip" aria-labelledby="pf-strip-title" data-testid="places-strip">
       <div className="pf-strip-head">
-        <h2 id="pf-strip-title">{heading}</h2>
+        <h2 id="pf-strip-title">{title}</h2>
         {load.status === "ready" && <SourceChip source={load.places.source} />}
       </div>
       {load.status === "ready" && <p className="pf-asof">{load.places.as_of}</p>}
@@ -180,9 +183,11 @@ export function PlacesStrip({
         <div className="pf-empty" role="alert">
           <p>We could not load places right now.</p>
           <p className="pf-note">{load.message}</p>
-          <button type="button" className="pf-action" onClick={() => setAttempt((n) => n + 1)}>
-            Try again
-          </button>
+          {load.retry && (
+            <button type="button" className="pf-action" onClick={() => setAttempt((n) => n + 1)}>
+              Try again
+            </button>
+          )}
         </div>
       )}
       {load.status === "ready" && load.places.matches.length === 0 && (

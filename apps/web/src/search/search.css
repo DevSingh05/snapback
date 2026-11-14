@@ -169,6 +169,11 @@
 .pf-budget legend {
   font-weight: 700;
   padding: 0;
+  float: left;
+  width: 100%;
+}
+.pf-budget legend + * {
+  clear: both;
 }
 .pf-budget-grid {
   display: grid;
