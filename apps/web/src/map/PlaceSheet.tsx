@@ -36,6 +36,7 @@ export function PlaceSheet({
   const p = place.properties;
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [tries, setTries] = useState(0);
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -55,7 +56,7 @@ export function PlaceSheet({
 
   const sheet = load.state === "ready" && load.pid === p.pid ? load.sheet : null;
   const first = sheet?.plans[0];
-  const photo = sheet ? aerialSrc(sheet) : null;
+  const photo = sheet && !photoFailed ? aerialSrc(sheet) : null;
   const age = sheet?.aerial?.captured_on ? monthsOld(sheet.aerial.captured_on) : null;
   const hasScan = sheet ? sheet.has_3d_scan : p.has_scan;
   const walk = sheet?.walk_path ?? `/tour/${encodeURIComponent(p.pid)}`;
@@ -64,7 +65,7 @@ export function PlaceSheet({
     <aside className="sheet" aria-label={S.kind(p.kind)} data-testid="place-sheet">
       <div className="sheet-aerial">
         {photo ? (
-          <img src={photo} alt={S.aerialAlt} />
+          <img src={photo} alt={S.aerialAlt} onError={() => setPhotoFailed(true)} />
         ) : (
           <PlaceSite kind={p.kind} plans={p.n_plans} scan={p.has_scan} />
         )}

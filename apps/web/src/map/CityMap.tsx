@@ -51,9 +51,10 @@ export function CityMap(props: Props) {
   const live = useRef(props);
   live.current = props;
   const vector = useRef(true);
+  const ready = useRef<() => void>(() => {});
 
   const api = useRef<{
-    flyToPlace: (f: PlaceFeature) => void;
+    flyToPlace: (f: PlaceFeature) => boolean;
     showPicked: () => void;
     setData: () => void;
     restyle: () => void;
@@ -161,7 +162,7 @@ export function CityMap(props: Props) {
 
     api.current = {
       flyToPlace: (f) => {
-        if (!map) return;
+        if (!map) return false;
         const flat = !vector.current || live.current.look === "paper";
         move({
           center: f.geometry.coordinates,
@@ -171,6 +172,7 @@ export function CityMap(props: Props) {
         });
         map.getSource("picked")?.setData(EMPTY);
         map.once("moveend", () => map?.once("idle", showPicked));
+        return true;
       },
       showPicked,
       setData: () => {
@@ -213,7 +215,7 @@ export function CityMap(props: Props) {
         map.on("load", () => {
           if (dead) return;
           live.current.onStatus(ok ? "ready" : "raster");
-          showPicked();
+          ready.current();
         });
         map.on("click", onClick);
         map.on("mousemove", (e: MapClick) => {
@@ -246,8 +248,25 @@ export function CityMap(props: Props) {
     // The map is made once; later prop changes go through the effects below.
   }, []);
 
+  // Fly to the picked place once, as soon as the map and the feed both know it. A place named in
+  // the address (?place=) is picked before either is ready, so this runs from all three.
+  const flown = useRef<string | null>(null);
+  const syncPick = () => {
+    const p = live.current;
+    const f = p.places.find((x) => x.properties.pid === p.selectedPid);
+    if (!api.current) return;
+    if (!f) {
+      flown.current = null;
+      api.current.showPicked();
+    } else if (flown.current !== f.properties.pid) {
+      if (api.current.flyToPlace(f)) flown.current = f.properties.pid;
+    }
+  };
+  ready.current = syncPick;
+
   useEffect(() => {
     api.current?.setData();
+    syncPick();
   }, [props.places, props.passed]);
 
   useEffect(() => {
@@ -255,11 +274,7 @@ export function CityMap(props: Props) {
   }, [props.look]);
 
   useEffect(() => {
-    const f = props.places.find((x) => x.properties.pid === props.selectedPid);
-    if (f) api.current?.flyToPlace(f);
-    else api.current?.showPicked();
-    // Fly only when the pick changes, not when the feed refreshes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    syncPick();
   }, [props.selectedPid]);
 
   return <div ref={box} className="city-map" role="region" aria-label={S.mapLabel} />;
