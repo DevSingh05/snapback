@@ -593,14 +593,6 @@
   object-fit: cover;
   display: block;
 }
-.sheet-standin {
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-.sheet-house {
-  width: 190px;
-}
 .sheet-tag,
 .sheet-age {
   position: absolute;
@@ -634,7 +626,7 @@
     var(--shadow),
     inset 0 -2px 0 var(--map-glow);
 }
-.sheet-inset .colmark {
+.sheet-inset .placemark {
   height: 54px;
 }
 .city .sheet-close {
@@ -873,8 +865,8 @@
   padding-bottom: 6px;
   background: linear-gradient(180deg, var(--map-sky), var(--map-horizon));
 }
-.lcard-art .colmark {
-  height: 66px;
+.lcard-art .placemark {
+  height: 80px;
 }
 .lcard-body {
   display: grid;
@@ -944,47 +936,23 @@
   opacity: 0.55;
 }
 
-/* The column mark. */
-.colmark {
+/* The place mark and the drawn site, both from the drawing kit. */
+.placemark {
   display: block;
   width: auto;
   overflow: visible;
 }
-.colmark-left {
-  fill: var(--map-col-off);
-}
-.colmark-right {
-  fill: var(--unchecked);
-  opacity: 0.55;
-}
-.colmark-top {
-  fill: var(--unchecked-soft);
-}
-.colmark-glow {
+.placemark-glow {
   fill: none;
 }
-.colmark-fit .colmark-left {
-  fill: var(--map-col);
-}
-.colmark-fit .colmark-right {
-  fill: var(--map-pick);
-  opacity: 1;
-}
-.colmark-fit .colmark-top {
-  fill: var(--zing);
-}
-.colmark-fit .colmark-glow {
+.placemark-fit .placemark-glow {
   fill: var(--map-glow);
-  opacity: 0.35;
+  opacity: 0.3;
 }
-.colmark-cap {
-  fill: var(--map-col-cap);
-}
-.colmark-cap-side {
-  fill: var(--h-wall);
-}
-.colmark-cap-side2 {
-  fill: var(--h-wall-shade);
+.place-site {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 @media (prefers-reduced-motion: no-preference) {

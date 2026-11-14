@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { HouseGlyph } from "../components/HouseGlyph";
 import { SourceChip } from "../components/SourceChip";
 import { aerialSrc, fetchPlaceSheet } from "./api";
-import { ColumnMark } from "./panels";
+import { PlaceMark, PlaceSite } from "./placeArt";
 import { S } from "./strings";
 import type { PlaceFeature, PlaceSheetData } from "./types";
 
@@ -66,9 +66,7 @@ export function PlaceSheet({
         {photo ? (
           <img src={photo} alt={S.aerialAlt} />
         ) : (
-          <div className="sheet-standin">
-            <HouseGlyph className="sheet-house" />
-          </div>
+          <PlaceSite kind={p.kind} plans={p.n_plans} scan={p.has_scan} />
         )}
         <span className="sheet-tag mono">
           {photo
@@ -79,7 +77,7 @@ export function PlaceSheet({
         </span>
         {age != null ? <span className="sheet-age mono">{S.aerialAge(age)}</span> : null}
         <span className="sheet-inset" aria-hidden="true">
-          <ColumnMark plans={p.n_plans} fits={p.fits_brief} scan={p.has_scan} />
+          <PlaceMark kind={p.kind} plans={p.n_plans} fits={p.fits_brief} scan={p.has_scan} />
         </span>
         <button type="button" className="sheet-close" aria-label={S.sheetClose} onClick={onClose}>
           <svg viewBox="0 0 12 12" aria-hidden="true">

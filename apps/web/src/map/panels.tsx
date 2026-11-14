@@ -2,43 +2,10 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { HouseGlyph } from "../components/HouseGlyph";
+import { PlaceMark } from "./placeArt";
 import { S } from "./strings";
 import { EMPTY_CRITERIA, criteriaCount } from "./types";
 import type { Criteria, PlaceFeature, RenterEvent } from "./types";
-
-// A small isometric column: the same mark the map draws for a place, shown inside cards and the
-// sheet so a card and its column read as one thing. Decoration only.
-export function ColumnMark({ plans, fits, scan }: { plans: number; fits: boolean; scan: boolean }) {
-  const h = 12 + Math.min(plans, 6) * 6;
-  const top = 58 - h;
-  const hex = (y: number) => `8,${y} 20,${y - 6} 32,${y} 32,${y} 20,${y + 6} 8,${y}`;
-  return (
-    <svg
-      className={`colmark${fits ? " colmark-fit" : ""}`}
-      viewBox="0 0 40 68"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <ellipse className="colmark-glow" cx="20" cy="59" rx="18" ry="6" />
-      <polygon className="colmark-left" points={`8,${top} 20,${top + 6} 20,64 8,58`} />
-      <polygon className="colmark-right" points={`20,${top + 6} 32,${top} 32,58 20,64`} />
-      <polygon className="colmark-top" points={hex(top)} />
-      {scan ? (
-        <>
-          <polygon
-            className="colmark-cap-side"
-            points={`8,${top - 5} 20,${top + 1} 20,${top + 6} 8,${top}`}
-          />
-          <polygon
-            className="colmark-cap-side2"
-            points={`20,${top + 1} 32,${top - 5} 32,${top} 20,${top + 6}`}
-          />
-          <polygon className="colmark-cap" points={hex(top - 5)} />
-        </>
-      ) : null}
-    </svg>
-  );
-}
 
 export function Pane({
   title,
@@ -339,7 +306,12 @@ export function PlaceLedger({
               onClick={() => onPick(p.pid)}
             >
               <span className="lcard-art">
-                <ColumnMark plans={p.n_plans} fits={p.fits_brief && !isPassed} scan={p.has_scan} />
+                <PlaceMark
+                  kind={p.kind}
+                  plans={p.n_plans}
+                  fits={p.fits_brief && !isPassed}
+                  scan={p.has_scan}
+                />
               </span>
               <span className="lcard-body">
                 <span className="lcard-kicker mono">
