@@ -5,8 +5,8 @@
  * fake app and CI never needs an account. The SDK is loaded only when a project is configured.
  *
  * Hard rules, on top of handler.ts:
- * - SNAPBACK texts first ONLY in a thread that sent "watch" (Vidyut's ruling R-M1, M10): at
- *   most 3 a day, and "stop" ends it for good (watch.ts). Every other send is `space.send`, on
+ * - SNAPBACK texts first ONLY in a thread that linked a Finder watch with "watch <code>"
+ *   (Vidyut's ruling R-M1, M10): at most 3 a day, and a stop word ends it for good (watch.ts). Every other send is `space.send`, on
  *   the space an inbound message came from, after that message: every other thread stays
  *   reply-only. Outbound messages (our own echoes) are skipped.
  * - Only allowlisted threads get anything back, and nothing is checked for any other thread.
@@ -147,12 +147,11 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
       );
       continue;
     }
-    const said = message.content.type === "text" && "text" in message.content;
-    if (config.watches && said) {
-      const text = (message.content as { text: string }).text;
-      const answer = answerCommand(text, space, config.watches, config.webUrl, log);
+    if (config.watches) {
+      const answer = answerCommand(message.content, space, config.watches, config.webUrl, log);
       if (answer !== null) {
-        // "watch" and "stop" are answered at once, in the same thread, and never checked
+        // "watch <code>" and a stop word are answered at once, in the same thread, and never
+        // checked; a swipe-reply "stop" counts too
         try {
           await space.send(answer);
         } catch {

@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { type MessageClient } from "./handler";
 import { connectPhoton, publicWebUrl, runPhoton } from "./photon";
-import { WatchBook, pushMatches, readEvents } from "./watch";
+import { WatchBook, pushEvents, readEvents } from "./watch";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -75,11 +75,15 @@ if (photon) {
   const watches = new WatchBook();
   const eventsToken = process.env.SNAPBACK_EVENTS_TOKEN;
   if (eventsToken) {
-    // Watch alerts (M10): follow the API's events stream and reconnect when it ends.
+    // Watch alerts (M10): follow the API's events stream and reconnect when it ends, from
+    // the last event seen (Last-Event-ID), so a reconnect never texts the same match again.
     void (async () => {
+      let lastId: string | undefined;
+      const seen = (id: string) => void (lastId = id);
       for (;;) {
         try {
-          await pushMatches(readEvents(API_URL, eventsToken), watches, webUrl, console.log);
+          const events = readEvents(API_URL, eventsToken, fetch, lastId);
+          await pushEvents(events, watches, webUrl, console.log, seen);
         } catch {
           console.log("[sidecar] events stream closed; reconnecting");
         }

@@ -1,80 +1,68 @@
 /**
  * iMessage watch alerts (M10, Vidyut's ruling R-M1): the one case where SNAPBACK texts first.
  *
- * - A renter texts "watch ..." in their own (allowlisted) thread. Code reads budget, beds,
- *   parking, pets and no walk-up from it; nothing else is read. A watch code cannot read gets
- *   the map link instead, and nothing is saved.
- * - When a `match_found` event for that watch arrives on the API's events stream, the thread
- *   gets one code-written message. At most MAX_PUSHES_A_DAY in any 24 hours, per thread.
- * - "stop" ends the watch for good: no message goes out for it again. A new "watch" starts a
- *   new one, and only the renter can send that.
- * - Every other thread stays reply-only. A watch lives in memory with the live thread it came
- *   from: no phone number, handle or thread id is written anywhere, and a restart forgets it.
+ * - The renter taps "Watch on iMessage" in the web Finder (`POST /finder/{sid}/watch`). The API
+ *   publishes `watch_added` for that Finder session with a one-time 4-digit code, and the web
+ *   shows "Text WATCH 4821 to SNAPBACK". Texting exactly that, from an allowlisted thread,
+ *   links the thread to the Finder session. A code links once and expires after CODE_TTL_MS.
+ * - When `match_found` for that session arrives on the events stream, the thread gets one
+ *   code-written message: "Simulated" when the event is, the record line, and the place's
+ *   Walk it first link. At most MAX_PUSHES_A_DAY in any 24 hours per thread, and the count
+ *   survives a stop and a new link.
+ * - A stop word (stop, unsubscribe, cancel, end, quit) as a short message ends it for good.
+ * - Every other thread stays reply-only. Links live in memory with the live thread: no phone
+ *   number, handle or thread id is written anywhere, and a restart forgets them.
+ * - Only the exact "watch" or "watch <code>" is a command. Anything else, "Watch out, is this
+ *   real?" included, goes to the ad check.
  */
 
-import { randomBytes } from "node:crypto";
-
-import type { PhotonSpace } from "./photon";
+import type { PhotonContent, PhotonSpace } from "./photon";
 
 export const MAX_PUSHES_A_DAY = 3;
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
+export const CODE_TTL_MS = 60 * 60 * 1000;
 
-/** The part of the API's `RenterBrief` a text can carry. Only what code read is set. */
-export type WatchBrief = {
-  max_rent_month?: number;
-  beds_min?: number;
-  needs_parking?: boolean;
-  pets?: boolean;
-  needs_no_walkup?: boolean;
-};
-
-/** The events-stream `match_found` event, as far as the sidecar reads it. */
-export type MatchEvent = {
+/** An event from the API's events stream, as far as the sidecar reads it. */
+export type StreamEvent = {
   id: string;
   kind: string;
-  subject: string;
-  payload: { session?: string; fits_brief?: boolean; rent_from?: number; has_scan?: boolean };
+  source?: string; // "renter" | "pipeline" | "simulated"
+  subject: string; // match_found: the place; watch_added: the Finder session
+  payload: {
+    session?: string;
+    code?: number; // watch_added: the one-time link code the web shows
+    fits_brief?: boolean;
+    rent_from?: number;
+    has_scan?: boolean;
+  };
 };
 
-const WATCH = /^\s*watch\b/i;
-const STOP = /^\s*stop\s*[.!]?\s*$/i;
+const LINK = /^\s*watch\s+(\d{4})\s*[.!]?\s*$/i;
+const BARE_WATCH = /^\s*watch\s*[.!]?\s*$/i;
+const STOP = /^\s*(stop|unsubscribe|cancel|end|quit)\b/i;
 
-/** The brief in a "watch ..." text, `{}` if code read nothing, or null if it is not a watch. */
-export function parseWatch(text: string): WatchBrief | null {
-  if (!WATCH.test(text)) return null;
-  const words = text.slice(0, 300);
-  const brief: WatchBrief = {};
-  const money =
-    /(?:\$|under|below|up to|max(?:imum)?|budget)\s*\$?\s*(\d{1,2},\d{3}|\d{3,5})\b/i.exec(words);
-  if (money?.[1]) brief.max_rent_month = Number(money[1].replace(",", ""));
-  const beds = /\b(\d{1,2})\s*\+?\s*(?:beds?|bedrooms?|br|bd)\b/i.exec(words);
-  if (beds?.[1]) brief.beds_min = Number(beds[1]);
-  else if (/\bstudio\b/i.test(words)) brief.beds_min = 0;
-  if (/\b(?:parking|garage)\b/i.test(words)) brief.needs_parking = true;
-  if (/\b(?:pets?|dogs?|cats?)\b/i.test(words) && !/\bno\s+pets?\b/i.test(words)) brief.pets = true;
-  if (/\bno\s*walk-?\s*ups?\b|\belevator\b/i.test(words)) brief.needs_no_walkup = true;
-  return brief;
+/** "stop", "Stop texting me", "unsubscribe": short, no digits, no link. An ad that happens to
+ * start with "End unit" has a price in it, so it still goes to the check. */
+function isStop(text: string): boolean {
+  return STOP.test(text) && text.length <= 60 && !/\d/.test(text) && !/https?:|www\./i.test(text);
 }
 
-function describe(brief: WatchBrief): string {
-  const parts: string[] = [];
-  if (brief.beds_min === 0) parts.push("a studio or larger");
-  else if (brief.beds_min !== undefined) parts.push(`${brief.beds_min}+ beds`);
-  if (brief.max_rent_month !== undefined) {
-    parts.push(`up to $${brief.max_rent_month.toLocaleString("en-US")}`);
-  }
-  if (brief.needs_parking) parts.push("parking");
-  if (brief.pets) parts.push("pets allowed");
-  if (brief.needs_no_walkup) parts.push("no walk-up");
-  return parts.join(", ");
+/** The text a command can be in: plain text, or a swipe-reply wrapping text. */
+export function commandText(content: PhotonContent): string | null {
+  if (content.type === "text" && "text" in content) return content.text;
+  if (content.type === "reply" && "content" in content) return commandText(content.content);
+  return null;
 }
 
-type Watch = { session: string; space: PhotonSpace; brief: WatchBrief; sent: number[] };
+type Link = { session: string; space: PhotonSpace };
 
-/** The watches this sidecar holds, by thread. In memory only. */
+/** The links this sidecar holds. In memory only. */
 export class WatchBook {
-  private byThread = new Map<string, Watch>();
+  private codes = new Map<string, { session: string; at: number }>();
+  private byThread = new Map<string, Link>();
   private bySession = new Map<string, string>();
+  private sent = new Map<string, number[]>(); // per thread, kept across stop and re-link
+  private seen = new Set<string>(); // event ids already acted on
 
   constructor(private now: () => number = Date.now) {}
 
@@ -82,86 +70,122 @@ export class WatchBook {
     return this.byThread.size;
   }
 
-  /** Save (or replace) the thread's watch. Returns its session id, which events carry. */
-  add(space: PhotonSpace, brief: WatchBrief): string {
+  /** A `watch_added` with a code: the code may link a thread for CODE_TTL_MS. */
+  offer(event: StreamEvent): void {
+    const { session, code } = event.payload;
+    if (typeof session !== "string" || typeof code !== "number") return;
+    this.codes.set(String(code).padStart(4, "0"), { session, at: this.now() });
+  }
+
+  /** Link the thread to the session the code was issued for. Null if unknown or expired. */
+  link(space: PhotonSpace, code: string): string | null {
+    const offered = this.codes.get(code);
+    if (!offered || this.now() - offered.at > CODE_TTL_MS) return null;
+    this.codes.delete(code); // a code links once
     this.stop(space.id);
-    const session = `w-${randomBytes(6).toString("hex")}`;
-    this.byThread.set(space.id, { session, space, brief, sent: [] });
-    this.bySession.set(session, space.id);
-    return session;
+    this.byThread.set(space.id, { session: offered.session, space });
+    this.bySession.set(offered.session, space.id);
+    return offered.session;
   }
 
   /** End the thread's watch for good. False if it had none. */
   stop(threadId: string): boolean {
-    const watch = this.byThread.get(threadId);
-    if (!watch) return false;
+    const link = this.byThread.get(threadId);
+    if (!link) return false;
     this.byThread.delete(threadId);
-    this.bySession.delete(watch.session);
+    this.bySession.delete(link.session);
+    return true;
+  }
+
+  /** True the first time an event id is seen: a replayed event is never acted on twice. */
+  firstTime(eventId: string): boolean {
+    if (!eventId || this.seen.has(eventId)) return !eventId;
+    this.seen.add(eventId);
     return true;
   }
 
   /** The thread to text for this session, if it may be texted now (and count the text). */
   claim(session: string): PhotonSpace | null {
     const threadId = this.bySession.get(session);
-    const watch = threadId ? this.byThread.get(threadId) : undefined;
-    if (!watch) return null;
+    const link = threadId ? this.byThread.get(threadId) : undefined;
+    if (!threadId || !link) return null;
     const now = this.now();
-    watch.sent = watch.sent.filter((at) => now - at < DAY_MS);
-    if (watch.sent.length >= MAX_PUSHES_A_DAY) return null;
-    watch.sent.push(now);
-    return watch.space;
+    const recent = (this.sent.get(threadId) ?? []).filter((at) => now - at < DAY_MS);
+    if (recent.length >= MAX_PUSHES_A_DAY) {
+      this.sent.set(threadId, recent);
+      return null;
+    }
+    this.sent.set(threadId, [...recent, now]);
+    return link.space;
   }
 }
 
-/** The reply to "watch" or "stop", or null when the text is neither (it is an ad to check). */
+/** The reply to a watch command or a stop word, or null when it is neither (an ad to check). */
 export function answerCommand(
-  text: string,
+  content: PhotonContent,
   space: PhotonSpace,
   book: WatchBook,
   webUrl: string,
   log: (line: string) => void = () => {},
 ): string | null {
-  const map = `${webUrl.replace(/\/$/, "")}/map`;
-  if (STOP.test(text)) {
+  const text = commandText(content);
+  if (text === null) return null;
+  const finder = `${webUrl.replace(/\/$/, "")}/map`;
+  if (isStop(text)) {
     return book.stop(space.id)
-      ? "Stopped. SNAPBACK will not text you again. Text watch to start a new one."
-      : "Nothing to stop. SNAPBACK only texts you first when you ask it to watch.";
+      ? "Stopped. SNAPBACK will not text you again. To watch again, start from the Finder."
+      : "Nothing to stop. SNAPBACK only texts you first when you link a watch.";
   }
-  const brief = parseWatch(text);
-  if (brief === null) return null;
-  if (Object.keys(brief).length === 0) {
+  const linked = LINK.exec(text);
+  if (linked?.[1]) {
+    if (book.link(space, linked[1]) === null) {
+      return `That code did not match a watch. Get a new one from the Finder: ${finder}`;
+    }
+    log("[sidecar] linked a thread to a Finder watch");
     return (
-      "Tell me what to watch for, like: watch 2 beds under $1,500 with parking. " +
-      `Or look around the map: ${map}`
+      "Watching. SNAPBACK will text you here when a researched place fits your brief, at most " +
+      `${MAX_PUSHES_A_DAY} times a day. Text stop to end it.`
     );
   }
-  const session = book.add(space, brief);
-  log(`[sidecar] watch added (${session})`);
-  return (
-    `Watching for: ${describe(brief)}. SNAPBACK will text you here when a researched place ` +
-    `fits, at most ${MAX_PUSHES_A_DAY} times a day. Text stop to end it.`
-  );
+  if (BARE_WATCH.test(text)) {
+    return `To watch, set your brief in the Finder and tap Watch on iMessage, then text the code it shows: ${finder}`;
+  }
+  return null;
 }
 
 /** The one message a match sends. Code-written: no model, no listing text, no address. */
-export function matchText(event: MatchEvent, webUrl: string): string {
+export function matchText(event: StreamEvent, webUrl: string): string {
+  const web = webUrl.replace(/\/$/, "");
+  const simulated = event.source === "simulated" ? "Simulated. " : "";
   const rent = event.payload.rent_from;
-  const from = typeof rent === "number" ? `, from $${rent.toLocaleString("en-US")} a month` : "";
-  const scan = event.payload.has_scan ? ", with a 3D tour" : "";
-  return (
-    `A place fits your watch${from}${scan}. As of CoStar's last research. ` +
-    `See it, and check it before you pay anyone: ${webUrl.replace(/\/$/, "")}/map`
-  );
+  const parts: string[] = [];
+  if (typeof rent === "number") parts.push(`from $${rent.toLocaleString("en-US")} a month`);
+  if (event.payload.has_scan) parts.push("a 3D scan on record");
+  const record = parts.length
+    ? ` On record: ${parts.join(", ")} (as of CoStar's last research).`
+    : " (As of CoStar's last research.)";
+  const link = event.payload.has_scan
+    ? `Walk it first: ${web}/tour/${encodeURIComponent(event.subject)}`
+    : `See it on the map: ${web}/map`;
+  return `${simulated}A place fits your watch.${record} ${link} Check it before you pay anyone.`;
 }
 
-/** Send each match to the thread that asked for it, within the cap. Nothing else is sent. */
-export async function pushMatches(
-  events: AsyncIterable<MatchEvent>,
+/** Act on the events stream: codes from watch_added, one text per match_found, within the
+ * cap. Nothing else is sent. Returns the last event id seen, for Last-Event-ID. */
+export async function pushEvents(
+  events: AsyncIterable<StreamEvent>,
   book: WatchBook,
   webUrl: string,
   log: (line: string) => void = () => {},
+  onId: (id: string) => void = () => {},
 ): Promise<void> {
   for await (const event of events) {
+    if (event.id) onId(event.id);
+    if (!book.firstTime(event.id)) continue;
+    if (event.kind === "watch_added") {
+      book.offer(event);
+      continue;
+    }
     if (event.kind !== "match_found" || event.payload.fits_brief === false) continue;
     const session = event.payload.session;
     const space = typeof session === "string" ? book.claim(session) : null;
@@ -175,14 +199,15 @@ export async function pushMatches(
   }
 }
 
-/** The API's events stream (`GET /events/stream`), match_found only. The token goes in a
- * header, never the address. Ends when the stream ends; the caller reconnects. */
+/** The API's events stream (`GET /events/stream`). The token goes in a header, never the
+ * address. Send the last id seen as `lastEventId` so a reconnect does not replay. Ends when
+ * the stream ends; the caller reconnects. */
 export async function* readEvents(
   apiUrl: string,
   token: string,
   get: typeof fetch = fetch,
   lastEventId?: string,
-): AsyncGenerator<MatchEvent> {
+): AsyncGenerator<StreamEvent> {
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   if (lastEventId) headers["Last-Event-ID"] = lastEventId;
   const res = await get(`${apiUrl.replace(/\/$/, "")}/events/stream`, { headers });
@@ -195,15 +220,20 @@ export async function* readEvents(
     while ((end = buffer.indexOf("\n\n")) !== -1) {
       const block = buffer.slice(0, end);
       buffer = buffer.slice(end + 2);
-      const data = block
-        .split("\n")
+      const lines = block.split("\n");
+      const id =
+        lines
+          .find((line) => line.startsWith("id:"))
+          ?.slice(3)
+          .trim() ?? "";
+      const data = lines
         .filter((line) => line.startsWith("data:"))
         .map((line) => line.slice(5).trim())
         .join("\n");
       if (!data) continue;
       try {
-        const event = JSON.parse(data) as MatchEvent;
-        if (event.kind === "match_found") yield event;
+        const event = JSON.parse(data) as StreamEvent;
+        yield { ...event, id: event.id || id };
       } catch {
         // a line we cannot read is skipped, never echoed
       }
