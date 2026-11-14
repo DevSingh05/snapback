@@ -25,8 +25,13 @@ from snapback.contracts import (  # noqa: E402
 )
 from snapback.verdict import decide, to_evidence  # noqa: E402
 
-# the retry choices exist only when a case has a place searcher (E1)
-RETRY_ONLY = {ChoiceKind.NEXT_SEARCH, ChoiceKind.WHICH_PHOTO}
+# these choices exist only when a case has a place searcher (E1) or a walk plan (E5)
+RETRY_ONLY = {
+    ChoiceKind.NEXT_SEARCH,
+    ChoiceKind.WHICH_PHOTO,
+    ChoiceKind.DWELL_ROOMS,
+    ChoiceKind.LEAD_CHECKS,
+}
 
 
 class ScriptedChat(BaseChatModel):

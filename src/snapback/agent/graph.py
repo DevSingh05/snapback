@@ -103,7 +103,7 @@ def describe(case: CaseSession) -> str:
     if case.step is Step.SPOT:
         missing = [
             casework.AGENT_NAMES[stem]
-            for stem in casework.STEMS
+            for stem in _stems_of(case)
             if stem not in case.notes or case.notes[stem].by != "model"
         ]
         hint: dict[str, Any] = {"next": "call draw_spot"}
@@ -117,6 +117,11 @@ def describe(case: CaseSession) -> str:
     if case.step is Step.ASK:
         return json.dumps({"waiting": "the renter was asked for the license number; nothing to do"})
     return json.dumps({"finished": True})
+
+
+def _stems_of(case: CaseSession) -> tuple[str, ...]:
+    """The families this case has: the five, plus the walk when the case has a walk plan."""
+    return (*casework.STEMS, casework.WALK) if case.walk_plan is not None else casework.STEMS
 
 
 def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = None) -> Any:
@@ -327,6 +332,8 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
                 ],
             }
         )
+    if case.walk_plan is not None:
+        specs.append(_walk_spec(case))
     # The built-in general-purpose sub-agent would inherit the choice tools. Replace it with one
     # that has none and no way to write anywhere.
     specs.append(
@@ -339,6 +346,68 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
         }
     )
     return specs
+
+
+WALK_PROMPT = """\
+You are the walk checker for one rental case inside SNAPBACK. Code has built a walk through \
+the home's 3D scan. Two decisions are yours, each from a short list code wrote: which rooms \
+to dwell on, and which checks lead. Do exactly this: while `walk_open_choice` shows an open \
+decision, call `walk_choose_option` with one of its options and one plain sentence of reason \
+that rests on the counts shown. Then call `write_file` with path `{path}` and a short note: one \
+line per decision with the option you chose and your reason, stop aliases (S1, S2) only. You \
+cannot change a fact, a stop or a result; code sets those. No names of people. Then reply with \
+one sentence."""
+
+
+def _walk_spec(case: CaseSession) -> dict[str, Any]:
+    from snapback.agent.walk_agent import WalkDesk
+
+    def desk() -> WalkDesk:
+        if case.walk_desk is None:
+            case.walk_desk = WalkDesk(case.walk_plan)  # type: ignore[arg-type]
+        return case.walk_desk
+
+    @tool
+    def walk_open_choice() -> str:
+        """The walk decision that is open now: its options and the counts shown."""
+        offer = desk().offer()
+        if offer is None:
+            return json.dumps({"open_choice": None, "note": "both walk decisions are made"})
+        return json.dumps(
+            {"open_choice": offer.kind, "options": list(offer.aliases), "facts": dict(offer.facts)}
+        )
+
+    @tool
+    def walk_choose_option(option: str, reason: str) -> str:
+        """Pick one option for the open walk decision, with one plain sentence of reason."""
+        offered = desk().offer()
+        done = desk().choose(option, reason)
+        if done is None:
+            return "That was not on the list, so code will decide it. " + walk_open_choice.invoke(
+                {}
+            )
+        kind, options, label = done
+        case.trace.emit(
+            TraceKind.CHOICE,
+            desk().picks[offered.kind][1],
+            choice=kind,
+            options=options,
+            pick=label,
+            chosen_by="model",
+        )
+        return walk_open_choice.invoke({})
+
+    path = casework.note_path(case.case_id, casework.WALK)
+    return {
+        "name": "walk",
+        "description": "The walk through the home's 3D scan: rooms to dwell on, checks that lead.",
+        "system_prompt": WALK_PROMPT.format(path=path),
+        "tools": [walk_open_choice, walk_choose_option],
+        "permissions": [
+            FilesystemPermission(operations=["write"], paths=[path], mode="allow"),
+            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+        ],
+    }
 
 
 def enable_langsmith(api_key: str | None, project: str = "snapback") -> bool:

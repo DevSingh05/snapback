@@ -36,6 +36,8 @@ from snapback.contracts import DataSource, ModuleEvidence
 RECORD, OFFICE, OWNER, PLACE, PLACES = "record", "office", "owner", "place", "places"
 STEMS = (RECORD, OFFICE, OWNER, PLACE, PLACES)
 # The main agent's own notes, written after it has read the others.
+# The walk note exists only for a case that has a walk plan (the T lane's tour).
+WALK = "walk"
 EXPLANATION, TOUR_PREP = "explanation", "tour_prep"
 MAIN_STEMS = (EXPLANATION, TOUR_PREP)
 
@@ -45,6 +47,7 @@ AGENT_NAMES: dict[str, str] = {
     OWNER: "owner",
     PLACE: "place",
     PLACES: "search",
+    WALK: "walk",
 }
 MAX_NOTE_CHARS = 1500
 MAX_LINE_CHARS = 280
@@ -129,7 +132,7 @@ def stem_of(case_id: str, path: str) -> str | None:
     if not path.startswith(prefix) or not path.endswith(".md"):
         return None
     stem = path[len(prefix) : -3]
-    return stem if stem in (*STEMS, *MAIN_STEMS) else None
+    return stem if stem in (*STEMS, WALK, *MAIN_STEMS) else None
 
 
 def clean_note(text: object) -> str:
@@ -304,6 +307,7 @@ def refresh_policy_notes(case: Any) -> None:
     case moves on: a code note is rewritten from the evidence as it stands."""
     for stem, build in FACTS.items():
         keep_note(case, note_path(case.case_id, stem), build(case.evidence), "policy")
+    refresh_walk_note(case)
     search = getattr(case, "search_places", None)
     held = case.notes.get(PLACES)
     if search is not None and not (held is not None and held.by == "model"):
@@ -316,9 +320,27 @@ def refresh_policy_notes(case: Any) -> None:
         keep_note(case, note_path(case.case_id, PLACES), body, "policy")
 
 
+def refresh_walk_note(case: Any) -> None:
+    """If the case has a walk plan, settle the director (a model's picks if it made them, the
+    code policy for the rest) and write the walk note from code unless a model wrote one."""
+    plan_fn = getattr(case, "walk_plan", None)
+    if plan_fn is None:
+        return
+    try:
+        from snapback.agent.walk_agent import WalkDesk
+
+        desk = getattr(case, "walk_desk", None) or WalkDesk(plan_fn)
+        case.walk_desk = desk
+        director = desk.director()
+        case.walk_director = director
+        keep_note(case, note_path(case.case_id, WALK), desk.text(director), "policy")
+    except Exception:  # no tour on this install, or the plan could not be built: no walk note
+        return
+
+
 def notes_view(case: Any) -> CaseNotes:
     """What the API serves: the notes in a fixed order, each with who wrote it."""
-    order = (*STEMS, *MAIN_STEMS)
+    order = (*STEMS, WALK, *MAIN_STEMS)
     kept = [case.notes[s] for s in order if s in case.notes]
     return CaseNotes(
         case_id=case.case_id,

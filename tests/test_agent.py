@@ -39,8 +39,13 @@ FIXTURE_TRACE = [
 ]
 BANNED = ("scam", "safe", "verified")
 
-# the retry choices exist only when a case has a place searcher (E1)
-RETRY_ONLY = {ChoiceKind.NEXT_SEARCH, ChoiceKind.WHICH_PHOTO}
+# these choices exist only when a case has a place searcher (E1) or a walk plan (E5)
+RETRY_ONLY = {
+    ChoiceKind.NEXT_SEARCH,
+    ChoiceKind.WHICH_PHOTO,
+    ChoiceKind.DWELL_ROOMS,
+    ChoiceKind.LEAD_CHECKS,
+}
 
 
 class ScriptedModel:

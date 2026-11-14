@@ -18,7 +18,7 @@ import random
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from snapback.agent.casework import Note
 from snapback.agent.modules import ChallengeOutcome, Modules
@@ -151,6 +151,11 @@ class CaseSession:
         self.place_scans: Mapping[str, str] | None = None
         self.place_covers_unshown: Mapping[str, bool] | None = None
         self.place_desk: PlaceDesk | None = None
+        # E5: the walk. `walk_plan()` returns the case's TourPlan (set by whoever builds the
+        # tour); `walk_desk` and `walk_director` are filled by the walk sub-agent or the policy.
+        self.walk_plan: Callable[[], Any] | None = None
+        self.walk_desk: Any = None
+        self.walk_director: Any = None
 
     # --- reading the state -----------------------------------------------------------------
 

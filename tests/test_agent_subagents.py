@@ -55,6 +55,7 @@ class FakeCrew(BaseChatModel):
 
     case: Any
     pick_last_for_plan: bool = False
+    agents: list = CHECK_AGENTS
     delegate: bool = True
 
     def bind_tools(self, tools, **kwargs):
@@ -128,7 +129,7 @@ class FakeCrew(BaseChatModel):
         if step == "spot":
             sent = [tc["args"].get("subagent_type") for tc in asked if tc["name"] == "task"]
             if self.delegate:
-                for name in CHECK_AGENTS:
+                for name in self.agents:
                     if name not in sent:
                         return _call(
                             "task", description=f"Write the {name} note.", subagent_type=name
