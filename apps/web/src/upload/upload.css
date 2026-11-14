@@ -1,0 +1,124 @@
+/* Structure only. Design pass runs separately; colours come from styles/tokens.css. */
+.upload-body {
+  padding: clamp(18px, 4vw, 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.upload-lead,
+.upload-hint {
+  margin: 0;
+  color: var(--muted);
+}
+.upload-hint {
+  font-size: 0.9rem;
+}
+.upload-label {
+  font-weight: 700;
+}
+.upload-input {
+  width: 100%;
+  font: inherit;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+}
+.upload-input[aria-invalid="true"] {
+  border-color: var(--coral);
+}
+.upload-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+.upload-drop.is-dragging {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+.upload-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.upload-files li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  word-break: break-all;
+}
+.upload-errors {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--coral);
+}
+.upload-error {
+  margin: 0;
+  color: var(--coral);
+  font-weight: 700;
+}
+.upload-submit,
+.upload-secondary,
+.upload-remove {
+  min-height: 44px;
+}
+.upload-submit {
+  align-self: stretch;
+}
+.upload-secondary,
+.upload-remove {
+  background: transparent;
+}
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.upload-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.upload-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.upload-steps li[data-status="active"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.upload-steps li[data-status="done"] {
+  color: var(--teal);
+}
+.upload-step-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  font-size: 0.85rem;
+}
+.upload h1:focus {
+  outline: none;
+}
+@media (min-width: 641px) {
+  .upload-submit {
+    align-self: flex-start;
+  }
+}
