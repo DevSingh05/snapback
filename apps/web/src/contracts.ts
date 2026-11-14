@@ -128,6 +128,8 @@ export interface LocateResult {
   case_id: string;
   photos: LocatedPhoto[];
   claimed_property_id?: string | null;
+  identified_by_scan?: boolean;
+  identified_photos?: number;
   chosen?: FloorPlanCandidate | null;
   alternatives?: FloorPlanCandidate[];
   poses: Record<string, Pose>; // photo_id -> pose, located photos only
