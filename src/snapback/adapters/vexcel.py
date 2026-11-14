@@ -53,6 +53,8 @@ MAX_WAIT_S = 30.0  # a longer Retry-After is over budget: give up, ship record f
 TIMEOUT_S = 60.0
 TOTAL_BUDGET_S = 20.0  # one tile, end to end, across every request, wait and byte read
 MAX_TILE_BYTES = 5 * 1024 * 1024  # a bigger reply is not a tile we want
+MAX_COVERAGE_BYTES = 1024 * 1024  # the coverage JSON is a few KB
+READ_SLICE_S = 2.0  # longest wait for any single read
 DIRECTIONS = ("north", "east", "south", "west", "nadir")
 _FROM_SETTINGS = object()
 _SAFE = re.compile(r"[^A-Za-z0-9_-]")
@@ -105,52 +107,44 @@ def _wait_s(response: httpx.Response, attempt: int) -> float | None:
     return max(0.0, wait)
 
 
-def _send(
+@dataclass(frozen=True)
+class _Reply:
+    status: int
+    content_type: str
+    body: bytes
+
+
+def _timeout(remaining: float) -> httpx.Timeout:
+    """httpx applies a timeout to each connect and each read, not to the whole request, so every
+    single read is also held to a short slice: one slow byte cannot overrun the tile budget."""
+    return httpx.Timeout(min(TIMEOUT_S, remaining), read=min(READ_SLICE_S, remaining))
+
+
+def _fetch(
     http: httpx.Client,
     method: str,
     path: str,
     key: str,
     sleep: Sleep,
     deadline: float,
+    cap: int,
     **kwargs: Any,
-) -> httpx.Response | None:
-    """One API call with the 429 policy and the tile's time budget. None means rate limited past
-    the budget or out of time."""
-    for attempt in range(MAX_RETRIES + 1):
-        remaining = deadline - _monotonic()
-        if remaining <= 0:
-            return None
-        response = http.request(
-            method,
-            f"{BASE_URL}/{path}",
-            headers={"X-API-KEY": key},
-            timeout=min(TIMEOUT_S, remaining),
-            **kwargs,
-        )
-        if response.status_code != 429:
-            return response
-        wait = _wait_s(response, attempt)
-        if wait is None or attempt == MAX_RETRIES or _monotonic() + wait >= deadline:
-            return None
-        sleep(wait)
-    return None
-
-
-def _fetch_image(
-    http: httpx.Client, path: str, key: str, sleep: Sleep, deadline: float, body: dict[str, Any]
-) -> bytes | None:
-    """POST an extract and stream the image back. None when rate limited past the budget, not
-    an image, over 5 MB, or not fully read before the deadline (a reply that trickles in)."""
+) -> _Reply | None:
+    """One API call, streamed, with the 429 policy, the tile deadline checked on every chunk and
+    a size cap checked against Content-Length before any byte is read. Compressed replies are
+    refused (decompression would get round the cap). None: rate limited past the budget, out of
+    time, too big, or compressed. Used for both the coverage and the extract call."""
+    headers = {"X-API-KEY": key, "Accept-Encoding": "identity"}
     for attempt in range(MAX_RETRIES + 1):
         remaining = deadline - _monotonic()
         if remaining <= 0:
             return None
         with http.stream(
-            "POST",
+            method,
             f"{BASE_URL}/{path}",
-            headers={"X-API-KEY": key},
-            json=body,
-            timeout=min(TIMEOUT_S, remaining),
+            headers=headers,
+            timeout=_timeout(remaining),
+            **kwargs,
         ) as response:
             if response.status_code == 429:
                 wait = _wait_s(response, attempt)
@@ -158,19 +152,34 @@ def _fetch_image(
                     return None
                 sleep(wait)
                 continue
-            if response.status_code != 200:
+            if response.headers.get("content-encoding", "identity").lower() != "identity":
                 return None
-            if not response.headers.get("content-type", "").startswith("image/"):
-                return None
+            try:
+                if int(response.headers.get("content-length", "")) > cap:
+                    return None
+            except ValueError:
+                pass  # no Content-Length: the running count below still applies
             chunks: list[bytes] = []
             size = 0
-            for chunk in response.iter_bytes():
+            for chunk in response.iter_bytes():  # identity only (checked above): no inflation
                 size += len(chunk)
-                if size > MAX_TILE_BYTES or _monotonic() > deadline:
+                if size > cap or _monotonic() > deadline:
                     return None
                 chunks.append(chunk)
-            return b"".join(chunks)
+            return _Reply(
+                response.status_code, response.headers.get("content-type", ""), b"".join(chunks)
+            )
     return None
+
+
+def _fetch_image(
+    http: httpx.Client, path: str, key: str, sleep: Sleep, deadline: float, body: dict[str, Any]
+) -> bytes | None:
+    """POST an extract. The image bytes, or None (not a 200 image, empty, too big, too slow)."""
+    reply = _fetch(http, "POST", path, key, sleep, deadline, MAX_TILE_BYTES, json=body)
+    if reply is None or reply.status != 200 or not reply.content_type.startswith("image/"):
+        return None
+    return reply.body or None  # an empty 200 image is not a tile
 
 
 def _capture_date(value: Any) -> date | None:
@@ -184,13 +193,14 @@ def _oblique_capture(
     http: httpx.Client, wkt: str, key: str, direction: str, sleep: Sleep, deadline: float
 ) -> tuple[bool, date | None]:
     """(this direction exists here, its newest capture date). A malformed reply is (False, None)."""
-    r = _send(
+    r = _fetch(
         http,
         "GET",
         "oriented/collections",
         key,
         sleep,
         deadline,
+        MAX_COVERAGE_BYTES,
         params={
             "wkt": wkt,
             "srid": 4326,
@@ -199,13 +209,13 @@ def _oblique_capture(
             "include": "product-type,collection,last-capture-date",
         },
     )
-    if r is None or r.status_code != 200:
+    if r is None or r.status != 200:
         return False, None  # 404: no oblique coverage at this location
     wanted = f"oblique-{direction}"
     try:
         dates = [
             _capture_date((f.get("properties") or {}).get("last-capture-date"))
-            for f in r.json().get("features", [])
+            for f in json.loads(r.body).get("features", [])
             if (f.get("properties") or {}).get("product-type") == wanted
         ]
     except _BAD_REPLY:
