@@ -142,12 +142,7 @@ def test_trace_for_the_hold_fixture_has_the_shape_of_the_fixture_trace():
     for built, expected in zip(events, FIXTURE_TRACE, strict=True):
         assert built.case_id == expected.case_id
         assert built.source == expected.source
-        if expected.choice is ChoiceKind.WHICH_CHECKS:
-            # The recorded trace lists "state only" for this case. It is now offered only for a
-            # short-term or commercial listing, so an ordinary rental has the other two.
-            assert built.options == [o for o in expected.options if o != "state only"]
-        else:
-            assert built.options == expected.options
+        assert built.options == expected.options
         assert built.reason
         if expected.choice is ChoiceKind.WHICH_SPOT:
             assert built.pick in expected.options  # a random draw

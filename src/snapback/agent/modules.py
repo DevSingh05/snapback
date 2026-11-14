@@ -11,11 +11,13 @@ from pathlib import Path
 from typing import Protocol
 
 from snapback.agent.rules import check_price
+from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, Claims, check_authority
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
     ChallengeResult,
     FloorPlanCandidate,
+    ForSaleMatch,
     LocateResult,
     MemoryResult,
     ModuleEvidence,
@@ -67,6 +69,10 @@ class Modules(Protocol):
 
     def authority(self, case_id: str) -> AuthorityResult | None: ...
 
+    def for_sale(self, case_id: str) -> ForSaleMatch | None:
+        """Is the home listed for sale, or just rented? None when it was not looked up."""
+        ...
+
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None: ...
 
     def new_code(self, case_id: str) -> str: ...
@@ -90,6 +96,11 @@ class FixtureModules:
         listing_scope: ListingScope = ListingScope.RENTAL,
         rules: list[RuleHit] | None = None,
         listed_rent: int | None = None,
+        contacts: Claims | None = None,
+        unit: str | None = None,
+        beds: int | None = None,
+        record_file: str = "property_record.json",
+        for_sale: ForSaleMatch | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
@@ -97,9 +108,7 @@ class FixtureModules:
         self.evidence = ModuleEvidence.model_validate_json(
             (fixtures_dir / evidence_file).read_text()
         )
-        self.record = PropertyRecord.model_validate_json(
-            (fixtures_dir / "property_record.json").read_text()
-        )
+        self.record = PropertyRecord.model_validate_json((fixtures_dir / record_file).read_text())
         self.ranking = SpotRanking.model_validate_json(
             (fixtures_dir / "spot_ranking.json").read_text()
         )
@@ -109,6 +118,10 @@ class FixtureModules:
         # and its rent replace the fixture's.
         self._rules = rules
         self._listed_rent = listed_rent
+        self._contacts = contacts
+        self._unit = unit
+        self._beds = beds
+        self._for_sale = for_sale
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
             None
@@ -148,12 +161,21 @@ class FixtureModules:
         return list(self.evidence.rules if self._rules is None else self._rules)
 
     def price(self, case_id: str) -> PriceResult | None:
-        if self._listed_rent is None:
+        if self._listed_rent is None and self._unit is None and self._beds is None:
             return self.evidence.price
-        return check_price(self._listed_rent, self.record)
+        return check_price(self._listed_rent, self.record, beds=self._beds, unit=self._unit)
 
     def authority(self, case_id: str) -> AuthorityResult | None:
-        return self.evidence.authority
+        # The listing's own claims are compared only when the record has something to compare
+        # them with. The shared fixture record has none, so it keeps the fixture's answer.
+        record = self.record
+        comparable = record.manager_company or record.site_phone_hash or record.website_host
+        if self._contacts is None or not comparable:
+            return self.evidence.authority
+        return check_authority(self._contacts, record, FIXTURE_PHONE_SALT)
+
+    def for_sale(self, case_id: str) -> ForSaleMatch | None:
+        return self._for_sale if self._for_sale is not None else self.evidence.for_sale
 
     def spot_ranking(self, case_id: str, model_id: str | None) -> SpotRanking | None:
         if self._spots_available is None:

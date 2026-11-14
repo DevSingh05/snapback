@@ -38,7 +38,15 @@ from functools import cache, cached_property
 from typing import NamedTuple
 
 from snapback.agent.rules.table import BELOW_RANGE_RATIO, RULES, Rule
-from snapback.contracts import PriceResult, PriceStatus, PropertyRecord, RuleHit
+from snapback.contracts import (
+    FloorPlanRent,
+    PriceResult,
+    PriceStatus,
+    PropertyRecord,
+    RuleHit,
+    UnitOnRecord,
+    UnitStatus,
+)
 
 MAX_SPAN = 200
 # A long listing is a few thousand characters. Anything past this is not read, and intake
@@ -317,17 +325,113 @@ def apply_rules(text: str, lang: str = "en") -> list[RuleHit]:
     return hits
 
 
-def check_price(listed_rent: int | None, record: PropertyRecord | None) -> PriceResult:
+def _unit_key(unit: str) -> str:
+    return "".join(ch for ch in unit[:32].upper() if ch.isalnum())
+
+
+def _unit_on_record(unit: str | None, record: PropertyRecord) -> UnitOnRecord | None:
+    if not unit:
+        return None
+    key = _unit_key(unit)
+    return next((found for found in record.units if _unit_key(found.unit) == key), None)
+
+
+def check_unit(unit: str | None, beds: int | None, record: PropertyRecord | None) -> UnitStatus:
+    """Is the unit the listing names on the record, with that many bedrooms?
+
+    Says something only when the record has what it takes: a unit list to look the unit up
+    in, or bedroom counts to compare with. Otherwise it is not checked.
+    """
+    if record is None:
+        return UnitStatus.NOT_CHECKED
+    if unit and record.units:
+        found = _unit_on_record(unit, record)
+        if found is None:
+            return UnitStatus.NOT_ON_RECORD
+        if beds is not None and found.beds is not None and found.beds != beds:
+            return UnitStatus.BEDS_MISMATCH
+        return UnitStatus.ON_RECORD
+    if beds is not None:
+        known = {plan.beds for plan in record.floor_plan_rents} | {u.beds for u in record.units}
+        known.discard(None)
+        if known and beds not in known:
+            return UnitStatus.BEDS_MISMATCH
+    return UnitStatus.NOT_CHECKED
+
+
+def _plans_to_compare(
+    plans: list[FloorPlanRent], unit: str | None, beds: int | None, record: PropertyRecord
+) -> list[FloorPlanRent]:
+    """The floor plans the listing could be: the unit's own, else those with its bedrooms."""
+    found = _unit_on_record(unit, record)
+    if found is not None:
+        own = [plan for plan in plans if found.floor_plan and plan.name == found.floor_plan]
+        if not own and found.beds is not None:
+            own = [plan for plan in plans if plan.beds == found.beds]
+        if own:
+            return own
+    if beds is not None:
+        return [plan for plan in plans if plan.beds == beds]
+    return plans
+
+
+def check_price(
+    listed_rent: int | None,
+    record: PropertyRecord | None,
+    *,
+    beds: int | None = None,
+    unit: str | None = None,
+) -> PriceResult:
     """Compare the rent in the listing with the rents on the property record.
 
     Not checked unless both numbers exist. Below range means well under the lowest rent on
     record (see `BELOW_RANGE_RATIO`); it is a reason to ask, never a verdict on its own.
+
+    When the record has a rent band per floor plan, the listing is compared with the band for
+    its own floor plan (found by unit, else by bedrooms). A floor plan priced by the bed is
+    never compared with a whole-unit rent: the result says so (`per_bed`) and is not checked.
     """
-    reference = None
-    if record is not None:
-        reference = record.rent_min if record.rent_min is not None else record.rent_median
-    if listed_rent is None or record is None or reference is None:
-        return PriceResult(status=PriceStatus.NOT_CHECKED, listed_rent=listed_rent)
+    unit_status = check_unit(unit, beds, record)
+    if listed_rent is None or record is None:
+        return PriceResult(
+            status=PriceStatus.NOT_CHECKED, listed_rent=listed_rent, unit=unit_status
+        )
+
+    plans = [
+        plan
+        for plan in record.floor_plan_rents
+        if plan.rent_min is not None or plan.rent_max is not None
+    ]
+    if plans:
+        ours = _plans_to_compare(plans, unit, beds, record)
+        whole = [plan for plan in ours if not plan.per_bed]
+        if not whole:
+            return PriceResult(
+                status=PriceStatus.NOT_CHECKED,
+                listed_rent=listed_rent,
+                unit=unit_status,
+                per_bed=bool(ours),
+            )
+        low = min(p.rent_min if p.rent_min is not None else p.rent_max for p in whole)
+        high = max(p.rent_max if p.rent_max is not None else p.rent_min for p in whole)
+        below = listed_rent < BELOW_RANGE_RATIO * low
+        sizes = {plan.beds for plan in whole}
+        return PriceResult(
+            status=PriceStatus.BELOW_RANGE if below else PriceStatus.WITHIN_RANGE,
+            listed_rent=listed_rent,
+            record_min=low,
+            record_max=high,
+            n_floor_plans=len(whole),
+            unit=unit_status,
+            # Named on the card only when every plan compared has the same bedroom count.
+            compared_beds=sizes.pop() if len(sizes) == 1 else None,
+        )
+
+    reference = record.rent_min if record.rent_min is not None else record.rent_median
+    if reference is None:
+        return PriceResult(
+            status=PriceStatus.NOT_CHECKED, listed_rent=listed_rent, unit=unit_status
+        )
 
     below = listed_rent < BELOW_RANGE_RATIO * reference
     return PriceResult(
@@ -337,4 +441,5 @@ def check_price(listed_rent: int | None, record: PropertyRecord | None) -> Price
         record_min=record.rent_min,
         record_max=record.rent_max,
         n_floor_plans=len(record.floor_plans) or None,
+        unit=unit_status,
     )
