@@ -549,6 +549,9 @@ def test_a_run_without_todos_and_the_policy_path_still_work():
     assert verdict is not None
     assert not [e for e in plain.trace.events if e.kind.value == "todo"]
     assert set(plain.notes) >= set(casework.STEMS)  # the case and its notes still complete
+    # A crash would fall back to the policy and still pass the lines above; these would not.
+    assert not [e for e in plain.trace.events if e.kind.value == "error"]
+    assert all(note.by == "model" for note in plain.notes.values())
 
     policy = demo_session("a")
     run_case(policy, PolicyChooser(), lambda draft: "send")
