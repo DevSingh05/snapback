@@ -1,21 +1,27 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 import { ConfirmPage } from "./office/ConfirmPage";
 import { CardPage } from "./pages/CardPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
 import { ReplayNav } from "./replay/ReplayNav";
 import { ReplayPage } from "./replay/ReplayPage";
+import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
 import { UploadPage } from "./upload/UploadPage";
 
+// The city map loads on its own route only: its chunk (and MapLibre) never reaches the home page.
+const MapPage = lazy(() => import("./map/MapPage"));
+
 type Route =
+  | { name: "map" }
   | { name: "result"; id: string }
   | { name: "trace"; id: string }
   | { name: "twin"; id: string }
   | { name: "verify"; id: string }
   | { name: "replay"; slug: string }
+  | { name: "tour"; propertyId: string }
   | { name: "prep-case"; id: string }
   | { name: "prep-place"; propertyId: string }
   | { name: "confirm" }
@@ -23,10 +29,13 @@ type Route =
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  if (/^\/map\/?$/.test(path)) return { name: "map" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
+  const tour = /^\/tour\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
+  if (tour?.[1]) return { name: "tour", propertyId: tour[1] };
   const prepCase = /^\/case\/([A-Za-z0-9_-]+)\/prep\/?$/.exec(path);
   if (prepCase?.[1]) return { name: "prep-case", id: prepCase[1] };
   const prepPlace = /^\/prep\/place\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
@@ -53,6 +62,15 @@ export default function App() {
   }, []);
 
   const route = matchRoute(path);
+  if (route.name === "map") {
+    return (
+      <main className="shell-map">
+        <Suspense fallback={<p className="map-wait">Opening the city...</p>}>
+          <MapPage />
+        </Suspense>
+      </main>
+    );
+  }
   return (
     <main className="shell">
       <ReplayNav />
@@ -64,6 +82,19 @@ export default function App() {
         <ReplayIndexPage />
       ) : route.name === "replay" ? (
         <ReplayPage key={route.slug} slug={route.slug} />
+      ) : route.name === "tour" ? (
+        <TourPage
+          key={`tour-${route.propertyId}-${window.location.search}`}
+          target={{
+            propertyId: route.propertyId,
+            planKey: new URLSearchParams(window.location.search).get("plan_key"),
+            caseId: new URLSearchParams(window.location.search).get("case"),
+            mode:
+              new URLSearchParams(window.location.search).get("where") === "photos"
+                ? "elsewhere"
+                : "claimed",
+          }}
+        />
       ) : route.name === "prep-case" ? (
         <TourPrepPage
           key={`prep-${route.id}`}

@@ -474,6 +474,16 @@ def _line(lang: str, label_key: str, tone: CardTone, text_key: str, **values: ob
     )
 
 
+# What a record calls a house: the kit's residential adapter says "house", and the staged
+# cases say "single family".
+_HOUSE_KINDS = frozenset({"house", "single family"})
+
+
+def _is_a_house(modules: ModuleEvidence) -> bool:
+    kind = (modules.property_type or "").lower().replace("_", " ").replace("-", " ")
+    return " ".join(kind.split()) in _HOUSE_KINDS
+
+
 def _floor_plan(modules: ModuleEvidence) -> str | None:
     if modules.locate is None or modules.locate.chosen is None:
         return None
@@ -538,7 +548,8 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
             total=total,
         )
     elif located:
-        main = _line(lang, "label.real", CardTone.OK, "place.located", located=located, total=total)
+        key = "place.located_home" if _is_a_house(modules) else "place.located"
+        main = _line(lang, "label.real", CardTone.OK, key, located=located, total=total)
     elif all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
         # A photo that names a model belongs to a building whose scan exists and is not in
         # our index. With no model named, there is no scan of the building at all.
@@ -814,6 +825,20 @@ def _payment_ask_flagged(modules: ModuleEvidence) -> bool:
     return any(hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules)
 
 
+# The one rule that is not a red flag and still shows on the card (agent/rules/table.py).
+MONEY_BEFORE_MOVE_IN = "fee.money_before_move_in"
+
+
+def _asks_before_move_in(modules: ModuleEvidence) -> bool:
+    return any(hit.rule_id == MONEY_BEFORE_MOVE_IN for hit in modules.rules)
+
+
+def _rule_sits_beside_payment(modules: ModuleEvidence) -> bool:
+    """The owner's rule is quoted once: beside the payment line whenever the ad asks for
+    money (a flagged ask, or rent or a deposit before move-in), and on the owner line if not."""
+    return _payment_ask_flagged(modules) or _asks_before_move_in(modules)
+
+
 def _quoted_rule(rule: PublishedRule, lang: str, key: str) -> str:
     """The owner's own rule in its own words, with where it is published and when we read it."""
     source = rule.source_url.split("://", 1)[-1].removeprefix("www.").rstrip("/")
@@ -864,7 +889,7 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     text = strings.text(key, lang, company=company)
     # The owner's rule is quoted once. Beside a flagged payment ask when there is one (it is
     # what the rule speaks to), and here otherwise.
-    if owner.published_rule is not None and not _payment_ask_flagged(modules):
+    if owner.published_rule is not None and not _rule_sits_beside_payment(modules):
         text = f"{text} {_quoted_rule(owner.published_rule, lang, 'owner.rule')}"
     return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
 
@@ -934,10 +959,25 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         label = _RULE_LABELS[hit.category]
         by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
     if not by_label["label.payment_ask"]:
-        by_label["label.payment_ask"].append(
-            _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
-        )
+        by_label["label.payment_ask"].append(_quiet_payment_line(modules, lang))
     return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
+
+
+def _quiet_payment_line(modules: ModuleEvidence, lang: str) -> CardLine:
+    """The payment line when no payment ask is a red flag.
+
+    An ad that asks for rent or a deposit before move-in never reads "Matches" (conductor,
+    Sat 10:03). It is a warning when the owner of record publishes how it takes money, or is
+    not the poster, and "Not confirmed" otherwise. Only the tone differs: honest listings
+    ask for the same thing, so this is never a flag and no verdict reads it.
+    """
+    if not _asks_before_move_in(modules):
+        return _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
+    not_poster = _owner_is_not_the_poster(modules)
+    has_rule = modules.owner is not None and modules.owner.published_rule is not None
+    tone = CardTone.HOLD if (not_poster or has_rule) else CardTone.NOT_SHOWN
+    key = "payment.before_move_in_not_owner" if not_poster else "payment.before_move_in"
+    return _line(lang, "label.payment_ask", tone, key)
 
 
 def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
@@ -992,10 +1032,11 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     lines = _rule_lines(modules, lang)
     rule = modules.owner.published_rule if modules.owner else None
-    if rule is not None and _payment_ask_flagged(modules):
+    if rule is not None and _rule_sits_beside_payment(modules):
         # Conductor, Sat 03:00: when the ad asks for money in a way the owner's own rule
         # does not allow, the rule is quoted next to the payment line. It adds no flag and
         # changes no state: the payment ask is the flag, and DONT_PAY still needs proof.
+        # Sat 10:03: the same for rent or a deposit asked before move-in, which is no flag.
         payment = strings.text("label.payment_ask", lang)
         places = [index for index, line in enumerate(lines) if line.label == payment]
         lines.insert(

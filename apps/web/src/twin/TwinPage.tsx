@@ -63,6 +63,9 @@ function TwinViewInner({
   const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
   // A photo placed in a different building than the claimed one: show both buildings.
   const mismatch = hasDifferentHome(locate);
+  const otherHome = locate.photos.find(
+    (p) => p.status === "located_elsewhere" && p.matched_property_id,
+  )?.matched_property_id;
   const poseIsLive = locate !== fixtureBase;
   // Fixture room names belong to the fixture pose only; a live result without labels shows none.
   const roomLabels = roomLabelsProp ?? (poseIsLive ? NO_LABELS : FIXTURE_ROOM_LABELS);
@@ -219,6 +222,24 @@ function TwinViewInner({
         <span className="mono">Photo poses</span>
         <SourceChip source={poseIsLive ? "live" : "fixture"} />
         <span className="mono">{caseId}</span>
+        {mismatch && otherHome && (
+          <a
+            className="mono"
+            href={`/tour/${encodeURIComponent(otherHome)}?case=${encodeURIComponent(caseId)}&where=photos`}
+            data-testid="where-photos-link"
+          >
+            Where the photos were taken
+          </a>
+        )}
+        {locate.claimed_property_id && (
+          <a
+            className="mono"
+            href={`/tour/${encodeURIComponent(locate.claimed_property_id)}?case=${encodeURIComponent(caseId)}`}
+            data-testid="walk-it-first-link"
+          >
+            Walk it first
+          </a>
+        )}
       </header>
       <div className="twin-body">
         <section className="twin-stage" aria-label="3D view" ref={stageRef}>

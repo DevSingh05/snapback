@@ -1,0 +1,186 @@
+/* Minimal on purpose: the layout is plain so a design pass can restyle it. */
+.tour-page {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tour-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.tour-scan {
+  margin: 0;
+  color: var(--muted);
+}
+.tour-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+}
+.tour-stage {
+  background: var(--surface);
+
+  min-height: 360px;
+  overflow: hidden;
+  display: flex;
+}
+.tour-frame,
+.tour-aerial {
+  width: 100%;
+  min-height: 360px;
+  border: 0;
+  object-fit: cover;
+}
+.tour-placeholder {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  background: var(--teal-soft);
+  color: var(--teal);
+  padding: 32px;
+}
+.tour-panel {
+  background: var(--surface);
+
+  padding: clamp(16px, 3vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tour-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.tour-note,
+.tour-status,
+.tour-src {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+.tour-src::before {
+  content: "· ";
+}
+.tour-facts {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tour-tip,
+.tour-photos,
+.tour-outro {
+  margin: 0;
+}
+.tour-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tour-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.tour-rail button[aria-current="step"] {
+  background: var(--teal);
+  color: var(--surface);
+}
+@media (max-width: 760px) {
+  .tour-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tour-stage,
+  .tour-frame {
+    min-height: 240px;
+  }
+}
+
+/* Room stop (W3). Structure lives in RoomStop.tsx; these are the only style hooks. */
+.tour-stage {
+  position: relative;
+}
+.tour-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tour-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.tour-photo-label {
+  margin: 0;
+  font-weight: 700;
+  color: var(--teal);
+}
+.tour-empty-frame {
+  margin: 0;
+  padding: 14px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper),
+    var(--paper) 8px,
+    var(--line) 8px,
+    var(--line) 9px
+  );
+
+  color: var(--muted);
+}
+.tour-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.tour-stop[data-dwell="true"] {
+  background: var(--teal-soft);
+
+  padding: 10px;
+}
+.tour-claims {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--amber);
+}
+.tour-coverage,
+.tour-banner {
+  margin: 0;
+}
+.tour-banner {
+  background: var(--amber-soft);
+  color: var(--amber);
+  padding: 10px 14px;
+}
+.tour-agent-slot:empty {
+  display: none;
+}
+.tour-mode {
+  margin: 0;
+  font-weight: 700;
+}
+.tour-mode-line {
+  margin: 0;
+  color: var(--muted);
+}
+.tour-photo-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.tour-wrong-model {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--amber-soft);
+  color: var(--amber);
+}

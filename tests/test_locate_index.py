@@ -348,6 +348,37 @@ def test_retry_after_is_parsed_safely_and_capped(tmp_path, monkeypatch, retry_af
     assert slept == [expected]
 
 
+def test_warm_extracts_each_uncached_face_once_with_its_feature_key(tmp_path):
+    from snapback.vision.locate.index import warm_features
+    from snapback.vision.locate.verify import FEATURE_KEY
+
+    sweeps = FixtureMatterport(tmp_path / "faces").sweeps("fx-model-a")
+    index = LocateIndex.build("fx", sweeps, TinyEmbedder())
+    cached = {f"fx-model-a/{sweeps[0].sweep_id}/{f}" for f in range(6)}  # sweep 0 is warm
+    seen = []
+    report = warm_features(
+        index,
+        {"fx-model-a": sweeps},
+        is_cached=cached.__contains__,
+        extract=lambda image: seen.append(image.info[FEATURE_KEY]),
+    )
+    assert len(seen) == len(set(seen)) == 6 * (len(sweeps) - 1)
+    assert not cached & set(seen)
+    assert report == {"faces": 6 * len(sweeps), "extracted": len(seen), "missing": 0}
+
+
+def test_warm_counts_faces_whose_files_are_missing(tmp_path):
+    from snapback.vision.locate.index import warm_features
+
+    sweeps = FixtureMatterport(tmp_path / "faces").sweeps("fx-model-a")
+    index = LocateIndex.build("fx", sweeps, TinyEmbedder())
+    sweeps[0].faces[2].unlink()
+    report = warm_features(
+        index, {"fx-model-a": sweeps}, is_cached=lambda key: False, extract=lambda image: None
+    )
+    assert report["missing"] == 1 and report["extracted"] == 6 * len(sweeps) - 1
+
+
 def test_cached_room_labels_read_the_cache_and_never_the_network(tmp_path, monkeypatch):
     from snapback.adapters.matterport import cached_room_labels
 
@@ -358,3 +389,21 @@ def test_cached_room_labels_read_the_cache_and_never_the_network(tmp_path, monke
     assert cached_room_labels("never-fetched", cache_dir=tmp_path) == {}
     (tmp_path / "m7" / "rooms.json").write_text("{not json")
     assert cached_room_labels("m7", cache_dir=tmp_path) == {}
+
+
+def test_cached_room_labels_keep_only_string_labels(tmp_path):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m8").mkdir()
+    (tmp_path / "m8" / "rooms.json").write_text(
+        json.dumps({"sw1": "Kitchen", "sw2": None, "sw3": 7, "sw4": ["Bedroom"], "sw5": {"x": 1}})
+    )
+    assert cached_room_labels("m8", cache_dir=tmp_path) == {"sw1": "Kitchen", "sw2": None}
+
+
+def test_cached_room_labels_survive_a_deeply_nested_file(tmp_path):
+    from snapback.adapters.matterport import cached_room_labels
+
+    (tmp_path / "m9").mkdir()
+    (tmp_path / "m9" / "rooms.json").write_text("[" * 100_000 + "]" * 100_000)
+    assert cached_room_labels("m9", cache_dir=tmp_path) == {}
