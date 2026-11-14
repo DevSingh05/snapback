@@ -350,9 +350,14 @@ def cached_room_labels(model_id: str, cache_dir: Path = LIVE_CACHE) -> dict[str,
     path = Path(cache_dir) / _safe(model_id) / "rooms.json"
     try:
         labels = json.loads(path.read_text())
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):  # a deeply nested file must not stop locate
         return {}
-    return labels if isinstance(labels, dict) else {}
+    if not isinstance(labels, dict):
+        return {}
+    # A drifted file (a number, a list) must not reach the catalog: string labels or None only.
+    return {
+        k: v for k, v in labels.items() if isinstance(k, str) and (v is None or isinstance(v, str))
+    }
 
 
 def purge(cache_dir: Path = LIVE_CACHE, *, index_dir: Path = INDEX_CACHE) -> None:
