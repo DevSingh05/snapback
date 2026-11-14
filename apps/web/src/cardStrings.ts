@@ -147,9 +147,74 @@ function licenseLines(p: CardProofs): CardLine[] {
   ];
 }
 
+const oneLine = (text: string | null | undefined, most: number): string =>
+  (text ?? "").split(/\s+/).filter(Boolean).join(" ").slice(0, most);
+
+// Mirrors the owner.* strings in strings.py (A19, #125). A company is named. A person never
+// is: the line says "a private owner" and whether the name given matches. Never a red flag.
+function ownerLines(p: CardProofs): CardLine[] {
+  const owner = p.owner;
+  if (!owner) return []; // no owner data: the card's "not checked: ownership" says so
+  const label = "Owner of record";
+  if (owner.kind === "person") {
+    if (owner.poster_matches === "yes")
+      return [
+        line(label, "The owner of record is a private owner, and the name given matches.", "ok"),
+      ];
+    if (!owner.poster_says_owner)
+      return [
+        line(
+          label,
+          "Not checked (a private owner is on record, and the poster does not say they are the owner).",
+          "not_checked",
+        ),
+      ];
+    if (owner.poster_matches === "no")
+      return [
+        line(
+          label,
+          "The owner of record is a private owner, and the name given doesn't match. Owners can rent through family or a trust; check with the owner of record or the county records yourself.",
+          "not_shown",
+        ),
+      ];
+    return [
+      line(
+        label,
+        "Not checked (a private owner is on record, and the poster gave no name to compare).",
+        "not_checked",
+      ),
+    ];
+  }
+  const company = oneLine(owner.company, 80);
+  if (!company) return [];
+  if (owner.poster_matches === "yes")
+    return [line(label, `The company they named is the owner of record: ${company}.`, "ok")];
+  if (owner.poster_says_owner && owner.poster_matches === "no")
+    return [line(label, `Owner of record: ${company}, not the poster.`, "not_shown")];
+  return [line(label, `Owner of record: ${company}.`, "not_shown")];
+}
+
+// The owner's own published rule, quoted with its source and the day it was read. Here it
+// always sits in the price row, under the same label the card API uses, so it shows once.
+function ownerRuleLines(p: CardProofs): CardLine[] {
+  const rule = p.owner?.kind === "company" ? p.owner.published_rule : null;
+  if (!rule) return [];
+  const source = rule.source_url
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+    .replace(/^www\./, "")
+    .replace(/\/+$/, "");
+  return [
+    line(
+      "Owner's rule",
+      `${oneLine(rule.company, 80)}, the owner of record, says: "${oneLine(rule.rule, 200)}" (${oneLine(source, 80)}, read ${rule.checked_on.slice(0, 10)}).`,
+      "hold",
+    ),
+  ];
+}
+
 function personLines(p: CardProofs): CardLine[] {
   const a = p.authority;
-  if (!a) return licenseLines(p);
+  if (!a) return [...licenseLines(p), ...ownerLines(p)];
   const out: CardLine[] = [];
   const phone = "Phone in listing";
   // Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
@@ -207,7 +272,7 @@ function personLines(p: CardProofs): CardLine[] {
         "not_checked",
       ),
     );
-  out.push(...licenseLines(p));
+  out.push(...licenseLines(p), ...ownerLines(p));
   if (a.manager_on_record)
     out.push(line("Next step", `Call ${a.manager_on_record} yourself.`, "not_shown"));
   return out;
@@ -241,7 +306,7 @@ export function proofLines(p: CardProofs, forSale?: ForSaleMatch | null): CardRo
   const rows: [CardRowKind, CardLine[]][] = [
     ["place", [...forSaleLines(forSale), ...unitLine(p)]],
     ["person", personLines(p)],
-    ["price", priceLines(p)],
+    ["price", [...ownerRuleLines(p), ...priceLines(p)]],
   ];
   return rows.filter(([, lines]) => lines.length > 0).map(([kind, lines]) => ({ kind, lines }));
 }

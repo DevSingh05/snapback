@@ -32,9 +32,12 @@ from snapback.contracts import (
     LocateStatus,
     MemoryHitKind,
     ModuleEvidence,
+    OwnerKind,
+    OwnerMatch,
     PhoneMatch,
     PresenceStatus,
     PriceStatus,
+    PublishedRule,
     RuleCategory,
     UnitStatus,
     Verdict,
@@ -135,6 +138,7 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
         ),
         unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
         license_flag=_license(modules) is LicenseStatus.NOT_FOUND,
+        owner_flag=_owner_is_not_the_poster(modules),
     )
 
 
@@ -148,13 +152,14 @@ REASON_ORDER = (
     "reason.forged_copy",
     "reason.forged_copy_unknown",
     "reason.photo_elsewhere",
-    # Who: authority first, then the poster's contact, then the licence they claim.
-    # (Owner of record goes here.)
+    # Who: authority first, then the poster's contact, the licence they claim, and the
+    # owner of record.
     "reason.authority_matches",
     "reason.authority_unknown",
     "reason.phone_flag",
     "reason.lookalike_link",
     "reason.license_not_found",
+    "reason.owner_not_poster",
     # Availability: is the home for rent at all?
     "reason.for_sale",
     # Presence: was someone inside, which is not the same as being allowed to rent it.
@@ -183,6 +188,16 @@ def _license(modules: ModuleEvidence) -> LicenseStatus | None:
     return modules.license.status if modules.license else None
 
 
+def _owner_is_not_the_poster(modules: ModuleEvidence) -> bool:
+    """The poster says they own the home, and the owner of record is someone else (A19).
+
+    A company the poster does not name, or a person whose name is not the one they gave.
+    "Not checked" is never this: a near-miss spelling or no name to compare holds nothing.
+    """
+    owner = modules.owner
+    return owner is not None and owner.poster_says_owner and owner.poster_matches is OwnerMatch.NO
+
+
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """Turn the evidence for one case into a verdict with plain-language reasons.
 
@@ -199,8 +214,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
        VERIFIED.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
        (price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike
-       link, unit, a claimed licence with no active one under that name), or a phone that
-       is not the leasing office's (not a red flag by itself, but not confirmed either).
+       link, unit, a claimed licence with no active one under that name), or something
+       not confirmed that is not a red flag by itself: a phone that is not the leasing
+       office's, or a poster who says they own a home whose owner of record is someone else.
 
     Two things hold nothing by themselves (ruling, Sat 01:20): a name that is not the one on
     record reads "not confirmed", and "recently rented" is information, since lease status
@@ -255,6 +271,11 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         unconfirmed = []
     else:
         unconfirmed = phone
+    if evidence.owner_flag:
+        # A19 (#125): the poster says they own it and the owner of record is someone else.
+        # Not confirmed, like any name that does not match (ruling, Sat 01:20): owners rent
+        # through family, trusts and companies. It holds the case and is never a red flag.
+        unconfirmed = [*unconfirmed, "reason.owner_not_poster"]
 
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
         unplaced = (
@@ -575,6 +596,69 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     return [_line(lang, label, CardTone.NOT_CHECKED, key)]
 
 
+MAX_COMPANY_CHARS = 80
+MAX_SOURCE_CHARS = 80
+
+
+def _one_line(text: str | None, most: int) -> str:
+    return " ".join((text or "").split())[:most]
+
+
+def _payment_ask_flagged(modules: ModuleEvidence) -> bool:
+    return any(hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules)
+
+
+def _quoted_rule(rule: PublishedRule, lang: str, key: str) -> str:
+    """The owner's own rule in its own words, with where it is published and when we read it."""
+    source = rule.source_url.split("://", 1)[-1].removeprefix("www.").rstrip("/")
+    return strings.text(
+        key,
+        lang,
+        company=_one_line(rule.company, MAX_COMPANY_CHARS),
+        rule=_one_line(rule.rule, 200),
+        source=_one_line(source, MAX_SOURCE_CHARS),
+        date=rule.checked_on.isoformat(),
+    )
+
+
+def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """The owner of record, beside what the poster says about owning the home (A19, #125).
+
+    A company is named. A person never is: the card says "a private owner" and whether the
+    name the poster gave matches, yes or no. Nothing here is a red flag, and a match is a
+    supporting line: the owner roll is public, so anyone can type the owner's name.
+    """
+    owner = modules.owner
+    if owner is None:
+        return []  # no owner data: the card's standing "not checked: ownership" says so
+    label = "label.owner"
+    if owner.kind is OwnerKind.PERSON:
+        if owner.poster_matches is OwnerMatch.YES:
+            return [_line(lang, label, CardTone.OK, "owner.person_matches")]
+        if not owner.poster_says_owner:
+            # Someone who does not say they own it is not compared with the owner.
+            return [_line(lang, label, CardTone.NOT_CHECKED, "owner.person_no_claim")]
+        if owner.poster_matches is OwnerMatch.NO:
+            return [_line(lang, label, CardTone.NOT_SHOWN, "owner.person_mismatch")]
+        return [_line(lang, label, CardTone.NOT_CHECKED, "owner.person_no_name")]
+
+    company = _one_line(owner.company, MAX_COMPANY_CHARS)
+    if not company:
+        return []
+    if owner.poster_matches is OwnerMatch.YES:
+        tone, key = CardTone.OK, "owner.company_matches"
+    elif _owner_is_not_the_poster(modules):
+        tone, key = CardTone.NOT_SHOWN, "owner.company_not_poster"
+    else:
+        tone, key = CardTone.NOT_SHOWN, "owner.company"
+    text = strings.text(key, lang, company=company)
+    # The owner's rule is quoted once. Beside a flagged payment ask when there is one (it is
+    # what the rule speaks to), and here otherwise.
+    if owner.published_rule is not None and not _payment_ask_flagged(modules):
+        text = f"{text} {_quoted_rule(owner.published_rule, lang, 'owner.rule')}"
+    return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
+
+
 def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
     return CardRow(
         kind=CardRowKind.PERSON,
@@ -583,6 +667,8 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
             *_from_record(modules, [_allowed_line(modules, lang), *_contact_lines(modules, lang)]),
             # Not from the record: the licence list is the state's, and public.
             *_license_lines(modules, lang),
+            # Nor this: the owner roll is the county's, and public.
+            *_owner_lines(modules, lang),
             *_seen_before_lines(modules, lang, replies=True),
         ],
     )
@@ -658,10 +744,23 @@ def _unit_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 
 
 def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
-    return CardRow(
-        kind=CardRowKind.PRICE,
-        lines=[*_rule_lines(modules, lang), *_rent_lines(modules, lang)],
-    )
+    lines = _rule_lines(modules, lang)
+    rule = modules.owner.published_rule if modules.owner else None
+    if rule is not None and _payment_ask_flagged(modules):
+        # Conductor, Sat 03:00: when the ad asks for money in a way the owner's own rule
+        # does not allow, the rule is quoted next to the payment line. It adds no flag and
+        # changes no state: the payment ask is the flag, and DONT_PAY still needs proof.
+        payment = strings.text("label.payment_ask", lang)
+        places = [index for index, line in enumerate(lines) if line.label == payment]
+        lines.insert(
+            (places[-1] + 1) if places else len(lines),
+            CardLine(
+                label=strings.text("label.owner_rule", lang),
+                text=_quoted_rule(rule, lang, "owner.rule_beside_payment"),
+                tone=CardTone.HOLD,
+            ),
+        )
+    return CardRow(kind=CardRowKind.PRICE, lines=[*lines, *_rent_lines(modules, lang)])
 
 
 def build_card(
@@ -704,7 +803,8 @@ def build_card(
         not_checked=[
             strings.text("not_checked.id", lang),
             strings.text("not_checked.lease", lang),
-            strings.text("not_checked.ownership", lang),
+            # Ownership stays on the list unless the owner of record was compared (A19).
+            *([] if _ownership_compared(modules, lang) else [_ownership_item(lang)]),
         ],
         footer=[
             strings.text("footer.two_rules", lang),
@@ -714,6 +814,15 @@ def build_card(
         lang=lang,
         for_sale=_for_sale_finding(modules),
     )
+
+
+def _ownership_item(lang: str) -> str:
+    return strings.text("not_checked.ownership", lang)
+
+
+def _ownership_compared(modules: ModuleEvidence, lang: str) -> bool:
+    """The card has an owner-of-record line that says something, not just "not checked"."""
+    return any(line.tone is not CardTone.NOT_CHECKED for line in _owner_lines(modules, lang))
 
 
 def _for_sale_finding(modules: ModuleEvidence) -> ForSaleMatch | None:

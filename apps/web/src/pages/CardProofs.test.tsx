@@ -164,6 +164,80 @@ describe("place, person and price proof lines", () => {
       "Not checked (we could not look the poster up in the Texas license list).",
     ],
     [
+      "a company owns it and the poster says they do",
+      {
+        owner: {
+          kind: "company",
+          company: "Fixture Homes LLC",
+          poster_matches: "no",
+          poster_says_owner: true,
+        },
+      },
+      "Owner of record: Fixture Homes LLC, not the poster.",
+    ],
+    [
+      "a company owns it, the poster claims nothing",
+      {
+        owner: {
+          kind: "company",
+          company: "Fixture Homes LLC",
+          poster_matches: "not_checked",
+          poster_says_owner: false,
+        },
+      },
+      "Owner of record: Fixture Homes LLC.",
+    ],
+    [
+      "the company they named owns it",
+      {
+        owner: {
+          kind: "company",
+          company: "Fixture Homes LLC",
+          poster_matches: "yes",
+          poster_says_owner: true,
+        },
+      },
+      "The company they named is the owner of record: Fixture Homes LLC.",
+    ],
+    [
+      "a private owner, name matches",
+      { owner: { kind: "person", poster_matches: "yes", poster_says_owner: true } },
+      "The owner of record is a private owner, and the name given matches.",
+    ],
+    [
+      "a private owner, name does not match",
+      { owner: { kind: "person", poster_matches: "no", poster_says_owner: true } },
+      "The owner of record is a private owner, and the name given doesn't match. Owners can rent through family or a trust; check with the owner of record or the county records yourself.",
+    ],
+    [
+      "a private owner, poster does not say owner",
+      { owner: { kind: "person", poster_matches: "no", poster_says_owner: false } },
+      "Not checked (a private owner is on record, and the poster does not say they are the owner).",
+    ],
+    [
+      "a private owner, no name to compare",
+      { owner: { kind: "person", poster_matches: "not_checked", poster_says_owner: true } },
+      "Not checked (a private owner is on record, and the poster gave no name to compare).",
+    ],
+    [
+      "the owner's published rule",
+      {
+        owner: {
+          kind: "company",
+          company: "Fixture Homes LLC",
+          poster_matches: "no",
+          poster_says_owner: true,
+          published_rule: {
+            company: "Fixture Homes",
+            rule: "we only take applications on fixturehomes.example",
+            source_url: "https://www.fixturehomes.example/leasing-fraud/",
+            checked_on: "2026-11-14",
+          },
+        },
+      },
+      'Fixture Homes, the owner of record, says: "we only take applications on fixturehomes.example" (fixturehomes.example/leasing-fraud, read 2026-11-14).',
+    ],
+    [
       "per bed guard",
       price({ status: "not_checked", per_bed: true }),
       "Priced per bed here, so the rent was not compared.",
@@ -273,6 +347,44 @@ describe("place, person and price proof lines", () => {
     unmount();
     render(<CardView card={card} variant="result" proofs={authority({})} />);
     expect(screen.queryByText("License")).toBeNull();
+  });
+
+  it("an owner who is not the poster reads Not confirmed, never Doesn't match", () => {
+    render(
+      <CardView
+        card={card}
+        variant="result"
+        proofs={{
+          owner: {
+            kind: "company",
+            company: "Fixture Homes LLC",
+            poster_matches: "no",
+            poster_says_owner: true,
+          },
+        }}
+      />,
+    );
+    const owner = screen.getByText(/Owner of record: Fixture Homes LLC/).closest("tr");
+    expect(owner).toHaveTextContent("Not confirmed");
+    expect(owner).not.toHaveTextContent("Doesn't match");
+    // No rule in the table for this owner: nothing is quoted, and nothing is guessed.
+    expect(screen.queryByText("Owner's rule")).toBeNull();
+  });
+
+  it("a person owner never puts a name on the page, and no owner data means no line", () => {
+    const person = {
+      kind: "person",
+      company: "Fx Person", // lane D sends none; if one ever arrived it stays off the page
+      poster_matches: "no",
+      poster_says_owner: true,
+    } as const;
+    const { unmount } = render(
+      <CardView card={card} variant="result" proofs={{ owner: person }} />,
+    );
+    expect(text()).not.toContain("Fx Person");
+    unmount();
+    render(<CardView card={card} variant="result" proofs={authority({})} />);
+    expect(screen.queryByText("Owner of record")).toBeNull();
   });
 
   it("skips Call X yourself when the API row already names the manager", () => {

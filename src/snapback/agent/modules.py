@@ -12,6 +12,7 @@ from typing import Protocol
 
 from snapback.agent.rules import check_price
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, Claims, check_authority
+from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
@@ -23,6 +24,7 @@ from snapback.contracts import (
     LocateResult,
     MemoryResult,
     ModuleEvidence,
+    OwnerResult,
     PriceResult,
     PropertyRecord,
     RecaptureResult,
@@ -79,6 +81,10 @@ class Modules(Protocol):
         """The poster's claimed real estate licence, looked up. None when it was not."""
         ...
 
+    def owner(self, case_id: str) -> OwnerResult | None:
+        """The owner of record and how the poster compares. None when there is no owner data."""
+        ...
+
     def record_source(self, case_id: str) -> DataSource | None:
         """Where price, authority and for_sale came from, if not from where the case did."""
         ...
@@ -112,6 +118,7 @@ class FixtureModules:
         record_file: str = "property_record.json",
         for_sale: ForSaleMatch | None = None,
         license: LicenseResult | None = None,
+        owner: OwnerResult | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
@@ -134,6 +141,7 @@ class FixtureModules:
         self._beds = beds
         self._for_sale = for_sale
         self._license = license
+        self._owner = owner
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
             None
@@ -191,6 +199,12 @@ class FixtureModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license if self._license is not None else self.evidence.license
+
+    def owner(self, case_id: str) -> OwnerResult | None:
+        owner = self._owner if self._owner is not None else self.evidence.owner
+        if owner is None or self._contacts is None:
+            return owner
+        return check_owner(self._contacts, owner)
 
     def record_source(self, case_id: str) -> DataSource | None:
         return None  # all of a fixture case is fixture

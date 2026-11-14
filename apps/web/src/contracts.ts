@@ -69,12 +69,33 @@ export interface LicenseResult {
   state?: string;
 }
 
+// D12 (#130) + A19 (#125): the owner of record of the home, and how the poster compares. A
+// company is named; a person never is.
+export type OwnerKind = "company" | "person";
+export type OwnerMatch = "yes" | "no" | "not_checked";
+
+export interface PublishedRule {
+  company: string; // the company, as it names itself
+  rule: string; // its own words, quoted
+  source_url: string;
+  checked_on: string; // the day it was read at the source, YYYY-MM-DD
+}
+
+export interface OwnerResult {
+  kind: OwnerKind;
+  company?: string | null; // company owners only; never a person's name
+  poster_matches: OwnerMatch;
+  poster_says_owner: boolean;
+  published_rule?: PublishedRule | null; // the owner's own rule, when one is verified
+}
+
 // Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
 // Used when the card API has not already put these lines in `rows`.
 export interface CardProofs {
   price?: PriceResult | null;
   authority?: AuthorityResult | null;
   license?: LicenseResult | null; // D10; null or missing means not looked up
+  owner?: OwnerResult | null; // D12 + A19; null or missing means no owner data
   unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
 }
 

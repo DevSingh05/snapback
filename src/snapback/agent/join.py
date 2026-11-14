@@ -20,6 +20,7 @@ from snapback.agent.intake import Listing
 from snapback.agent.modules import ChallengeOutcome, FixtureModules
 from snapback.agent.rules import check_price
 from snapback.agent.rules.contact import check_authority
+from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
@@ -29,6 +30,7 @@ from snapback.contracts import (
     LicenseResult,
     LocateResult,
     LocateStatus,
+    OwnerResult,
     PhotoLocation,
     PriceResult,
     PropertyRecord,
@@ -65,22 +67,36 @@ class Lookups(Protocol):
         """Does a poster who claims a real estate licence hold one? None means not looked up."""
         ...
 
+    def owner(self, listing_text: str) -> OwnerResult | None:
+        """Who owns the home in the listing, by the county roll? None means no owner data."""
+        ...
 
-def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
-    """Lane D's licence answer for this listing, or None when nothing was looked up.
+
+def _ask(lookups: Lookups, name: str, listing_text: str):
+    """One of lane D's later lookups (`license`, `owner`), or None when nothing was looked up.
 
     A lookup that broke is a lookup that did not happen: it must not stop the check, and it
-    must not read as "looked up, nothing found". Lookups written before D10 have no licence
-    method, and that is "not looked up" too. No value is logged.
+    must not read as "looked up, nothing found". Lookups written before the method existed
+    do not have it, and that is "not looked up" too. No value is logged.
     """
-    lookup = getattr(lookups, "license", None)
+    lookup = getattr(lookups, name, None)
     if lookup is None or not listing_text:
         return None
     try:
         return lookup(listing_text)
     except Exception as error:
-        log.warning("licence lookup failed (%s); treated as not looked up", type(error).__name__)
+        log.warning("%s lookup failed (%s); treated as not looked up", name, type(error).__name__)
         return None
+
+
+def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
+    """Lane D's licence answer for this listing (D10), or None when nothing was looked up."""
+    return _ask(lookups, "license", listing_text)
+
+
+def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
+    """Lane D's owner of record for the home in this listing (D12), or None when there is none."""
+    return _ask(lookups, "owner", listing_text)
 
 
 class KitLookups:
@@ -133,6 +149,11 @@ class KitLookups:
             return None  # lane D's lookup (D10) is not here: nothing was looked up
         return trec.check_license(listing_text)
 
+    def owner(self, listing_text: str) -> OwnerResult | None:
+        # D12 (#130) plugs in here: the county owner roll, filtered to the kit's houses. Until
+        # it lands there is no owner data, and the card says ownership was not checked.
+        return None
+
 
 class NoStandIn(RuntimeError):
     """Something asked for the twin or the challenge in a case that has no stand-in for them."""
@@ -156,12 +177,14 @@ class JoinedModules:
         salt: str,
         record_source: DataSource | None,
         license: LicenseResult | None = None,
+        owner: OwnerResult | None = None,
     ) -> None:
         self._stand_in = stand_in
         self._listing = listing
         self._record = record
         self._for_sale = for_sale
         self._license = license
+        self._owner = owner
         self._salt = salt
         self._record_source = record_source
 
@@ -188,6 +211,10 @@ class JoinedModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
+
+    def owner(self, case_id: str) -> OwnerResult | None:
+        # Lane D says who owns the home. What the poster says about owning it is added here.
+        return check_owner(self._listing.contacts, self._owner)
 
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
