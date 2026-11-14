@@ -74,6 +74,11 @@ export interface Card {
   footer: string[];
   verify_url?: string | null;
   lang: string;
+  // Proof plan 3.2, built by code (no model), in the card's language. Missing or empty on an
+  // older card. At most 3 sentences; checks_out and does_not are "label: text" strings.
+  summary?: string[];
+  checks_out?: string[]; // lines with tone ok
+  does_not?: string[]; // red flag, hold and not-shown lines
 }
 
 export type TraceKind =

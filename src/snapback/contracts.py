@@ -490,6 +490,12 @@ class Card(BaseModel):
     # A7 (#67): set when the home is listed for sale or was rented recently, so the web can
     # draw the dates as a history strip. The sentence about it is a PLACE line like any other.
     for_sale: ForSaleMatch | None = None
+    # Proof plan 3.2. Built by code in verdict.build_card, no model. All optional; empty means
+    # the card predates them. At most three plain sentences saying why this is (not) a good deal,
+    # then the lines that check out and the lines that do not, each "label: text".
+    summary: list[str] = Field(default_factory=list)
+    checks_out: list[str] = Field(default_factory=list)  # lines with tone OK
+    does_not: list[str] = Field(default_factory=list)  # red flag, hold and not-shown lines
 
 
 class ChoiceKind(StrEnum):
