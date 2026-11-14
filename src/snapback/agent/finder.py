@@ -644,7 +644,7 @@ def build_agent(session: FinderSession, prefs: PrefDesk, search: SearchDesk) -> 
         """The open decision: which proposal to offer, from a list code wrote."""
         if not prefs.open():
             return json.dumps({"open_choice": None, "note": "nothing is open"})
-        facts = {k: v for k, v in session.learned().items() if k in FINDER_FACT_KEYS}
+        facts = guard_facts({k: v for k, v in session.learned().items() if k in FINDER_FACT_KEYS})
         return json.dumps({"open_choice": "offer", "options": prefs.menu(), "facts": facts})
 
     @tool

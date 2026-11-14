@@ -57,7 +57,13 @@ class FakeCrew(BaseChatModel):
         system = str(messages[0].content)
         if "preferences checker" in system:
             reply = self._sub(
-                messages, system, "read_learned", self.prefs, "prefs_choose", "option"
+                messages,
+                system,
+                "read_learned",
+                self.prefs,
+                "prefs_choose",
+                "option",
+                opener="prefs_open_choice",
             )
         elif "search checker" in system:
             reply = self._sub(messages, system, "read_ranked", self.leads, "lead_pick", "alias")
@@ -65,13 +71,16 @@ class FakeCrew(BaseChatModel):
             reply = self._main(messages)
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
-    def _sub(self, messages, system, reader, picks, chooser, arg):
+    def _sub(self, messages, system, reader, picks, chooser, arg, opener=None):
         path = re.search(r"path `([^`]+)`", system).group(1)
         tools = [m for m in messages if isinstance(m, ToolMessage)]
         names = [m.name for m in tools]
         if reader not in names:
             return _call(reader)
         done = names.count(chooser)
+        # as the prompt says: look at the open decision before each choice
+        if opener and done < len(picks) and names.count(opener) <= done:
+            return _call(opener)
         if done < len(picks):
             return _call(chooser, **{arg: picks[done], "reason": "It fits what the renter did."})
         if "write_file" not in names:
@@ -176,7 +185,19 @@ def test_the_model_is_shown_nothing_it_may_not_see(tmp_path):
     run_turn(s, [*SCRIPT, *finder.read_text(text)])
     blob = "\n".join(m.seen)
     assert m.seen
-    for bait in (BAIT_ADDRESS, BAIT_PHONE, BAIT_COMPANY, "fx-fnd", "call 713", "1450", "1620"):
+    # the renter's own amounts (budget, the rents of what they picked and passed, the cap code
+    # would propose) are as private as an address
+    amounts = ("1800", "1,800", "1500", "1,500", "1000", "1,000", "1100", "1,100")
+    for bait in (
+        BAIT_ADDRESS,
+        BAIT_PHONE,
+        BAIT_COMPANY,
+        "fx-fnd",
+        "call 713",
+        "1450",
+        "1620",
+        *amounts,
+    ):
         assert bait not in blob
     assert "P1" in blob and "passed_walkups" in blob  # it did see the allowed things
 
