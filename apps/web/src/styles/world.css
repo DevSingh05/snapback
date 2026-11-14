@@ -4,9 +4,34 @@
    by teal, ink and slate steps with an icon and a word, never by red or amber. The map's glow
    tokens are used when its set is present. Loaded after app.css. */
 .shell {
+  /* One spacing scale, one type scale, one column. Named w-* here; to be folded into the
+     shell's own tokens when those land. */
+  --w-1: 4px;
+  --w-2: 8px;
+  --w-3: 12px;
+  --w-4: 16px;
+  --w-5: 24px;
+  --w-6: 32px;
+  --w-7: 48px;
+  --w-kicker: 0.72rem;
+  --w-small: 0.9rem;
+  --w-body: 1.0625rem;
+  --w-h3: 1.25rem;
+  --w-h2: clamp(1.5rem, 3.4vw, 2rem);
+  --w-h1: clamp(2rem, 5.6vw, 2.9rem);
+  --w-figure: clamp(2.3rem, 6vw, 3.4rem);
+  --w-col: 880px;
+  --w-pad: clamp(18px, 4vw, 36px);
+  --w-tile: 28px;
+  /* Surfaces. Light: pale slabs on a white panel under a daylight sky. Dark: raised slabs on
+     the panel under a dusk sky with a teal horizon, as on the map. */
+  --w-slab: light-dark(var(--paper), color-mix(in srgb, var(--ink) 7%, var(--surface)));
+  --w-raise: light-dark(var(--surface), color-mix(in srgb, var(--ink) 16%, var(--surface)));
+  --w-sky-a: light-dark(var(--sky), var(--v-band));
+  --w-sky-b: light-dark(var(--paper), color-mix(in srgb, var(--zing) 24%, var(--v-band)));
   --glow: var(--map-glow, var(--zing));
   --glow-edge: var(--glow-line, 0 0 14px color-mix(in srgb, var(--zing) 70%, transparent));
-  --wash: color-mix(in srgb, var(--glow) 10%, var(--paper));
+  --wash: color-mix(in srgb, var(--glow) 12%, var(--w-slab));
 }
 :where(.shell) a {
   color: var(--act);
@@ -39,7 +64,7 @@
 .kicker {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--w-kicker);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -49,12 +74,12 @@
 /* Where a fact comes from: the FIXTURE chip's shape, a quiet fill, no outline. */
 .prov {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px var(--w-2);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--w-kicker);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: var(--paper);
+  background: var(--w-slab);
   color: var(--muted);
 }
 
@@ -145,24 +170,24 @@
   box-shadow: var(--glow-edge);
 }
 .card-page .hero-house {
-  right: clamp(10px, 2.4vw, 26px);
+  right: clamp(10px, 2.4vw, var(--w-tile));
   bottom: 10px;
   width: clamp(170px, 27vw, 268px);
 }
 .hero .eyebrow {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: var(--w-kicker);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .hero .meta {
-  font-size: 0.9rem;
+  font-size: var(--w-small);
   opacity: 0.86;
 }
 
 /* The checks: each line is a slab; its group's label and drawing sit beside it. */
 .card-page .evidence {
-  padding-top: 18px;
+  padding-top: var(--w-4);
 }
 .card-page .group {
   border-top: 0;
@@ -175,18 +200,18 @@
   border-top: 12px solid var(--surface);
 }
 .card-page .evidence td {
-  background: var(--paper);
-  padding-block: 16px;
+  background: var(--w-slab);
+  padding-block: var(--w-4);
 }
 .card-page .cell-kind {
   width: 8.4rem;
-  padding: 4px 16px 4px 10px;
+  padding: var(--w-1) var(--w-4) var(--w-1) var(--w-3);
   vertical-align: top;
 }
 .card-page .kind {
   display: block;
-  padding: 0 0 6px;
-  font-size: 0.72rem;
+  padding: 0 0 var(--w-2);
+  font-size: var(--w-kicker);
   letter-spacing: 0.12em;
 }
 .kind-art {
@@ -211,7 +236,7 @@
 }
 .card-page .cell-what {
   width: 10.5rem;
-  padding-left: 18px;
+  padding-left: var(--w-4);
 }
 .card-page .cell-tone {
   width: 10.6rem;
@@ -253,13 +278,13 @@
 }
 
 .card-page .not-checked {
-  background: var(--paper);
+  background: var(--w-slab);
   color: var(--ink);
-  padding: 12px 16px;
+  padding: var(--w-3) var(--w-4);
 }
 .card-page .not-checked h2 {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--w-kicker);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -267,13 +292,13 @@
 }
 .card-page .rules {
   border-top: 0;
-  background: var(--paper);
+  background: var(--w-slab);
 }
 
 /* Empty, loading and error states: the unlit home, plain words, one action. */
 .notice {
   align-items: flex-start;
-  background-image: linear-gradient(180deg, var(--sky), var(--surface) 14rem);
+  background-image: linear-gradient(180deg, var(--w-sky-a), var(--surface) 14rem);
 }
 .notice .notice-house {
   width: 148px;
@@ -281,8 +306,8 @@
 .wait {
   position: relative;
   margin: 0;
-  padding: 14px 16px 14px 18px;
-  background: var(--paper);
+  padding: var(--w-4) var(--w-4) var(--w-4) var(--w-4);
+  background: var(--w-slab);
   color: var(--muted);
   overflow: hidden;
 }
@@ -297,7 +322,7 @@
 
 @media (max-width: 640px) {
   .card-page .hero {
-    padding-right: clamp(18px, 4vw, 36px);
+    padding-right: var(--w-pad);
   }
   .card-page .hero-house {
     top: 6px;
@@ -306,12 +331,12 @@
     width: 132px;
   }
   .card-page .hero > .eyebrow {
-    padding-right: 120px;
+    padding-right: var(--w-7);
     min-height: 48px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 8px;
+    gap: var(--w-1) var(--w-2);
   }
   .card-page .evidence :is(td, th),
   .card-page .group + .group tr:first-child > * {
@@ -320,13 +345,13 @@
   }
   .card-page .group {
     display: block;
-    margin-bottom: 14px;
+    margin-bottom: var(--w-4);
   }
   .card-page tr {
     position: relative;
-    margin-bottom: 4px;
-    padding: 14px;
-    background: var(--paper);
+    margin-bottom: var(--w-1);
+    padding: var(--w-4);
+    background: var(--w-slab);
     border: 0;
   }
   .card-page tr:has(.tone-is-ok) {
@@ -346,14 +371,14 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 4px 12px;
+    gap: var(--w-1) var(--w-3);
     flex-wrap: wrap;
     width: auto;
-    padding: 0 0 12px;
+    padding: 0 0 var(--w-3);
   }
   .card-page .kind {
     margin: 0;
-    padding: 0 0 4px;
+    padding: 0 0 var(--w-1);
     order: 1;
     flex: 1;
   }
@@ -420,4 +445,62 @@
       transform: translateX(100%);
     }
   }
+}
+
+/* One column: every slab is the same width with the same inner edge, and the nav lines up
+   with it. */
+.shell:has(> :is(.card-page, .pf-stack, .tp-page, .replay-page)) .site-nav {
+  width: 100%;
+  padding-inline: max(0px, (100% - var(--w-col)) / 2);
+}
+.card-page,
+.pf-stack {
+  max-width: var(--w-col);
+}
+.card-page .masthead {
+  padding: var(--w-4) var(--w-pad);
+  border-bottom: 0;
+}
+.card-page .evidence {
+  padding: var(--w-4) var(--w-pad) 0;
+}
+.card-page .cell-kind {
+  padding-left: 0;
+}
+.card-page .not-checked,
+.card-page .history {
+  margin: var(--w-4) var(--w-pad) 0;
+}
+.card-page .not-checked li {
+  background: var(--w-raise);
+}
+.card-page .rules {
+  margin-top: var(--w-5);
+  padding: var(--w-4) var(--w-pad) var(--w-5);
+  font-size: var(--w-small);
+}
+.card-page .replay-link {
+  margin: var(--w-4) var(--w-pad) 0;
+}
+.pf-strip {
+  padding: var(--w-pad);
+  gap: var(--w-3);
+}
+.notice {
+  padding: var(--w-pad);
+  gap: var(--w-3);
+}
+
+/* One button family: 44 px tall, the action filled, everything else quiet with a line under
+   it. */
+.shell :is(.pf-action, .replay-run-btn, .tp-lang-btn, .notice button) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--w-2);
+  min-height: 44px;
+  padding: 0 var(--w-4);
+  font-size: var(--w-body);
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
 }

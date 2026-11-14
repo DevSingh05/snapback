@@ -4,23 +4,23 @@
    amber. Sharp corners, no outline boxes, tokens only. */
 
 .replay-page {
-  width: min(1080px, 100%);
+  width: min(var(--w-col, 880px), 100%);
   margin-inline: auto;
   padding-bottom: clamp(20px, 4vw, 36px);
   display: grid;
-  gap: 20px;
+  gap: var(--w-5);
   background: var(--surface);
   overflow: hidden;
 }
 .replay-page > * {
-  margin-inline: clamp(16px, 4vw, 36px);
+  margin-inline: var(--w-pad);
 }
 
 .replay-page > .replay-head {
   position: relative;
   margin: 0;
-  padding: 0 clamp(16px, 4vw, 36px) clamp(20px, 3vw, 30px);
-  background: linear-gradient(180deg, var(--surface) 68px, var(--sky) 68px, var(--paper));
+  padding: 0 var(--w-pad) clamp(20px, 3vw, var(--w-tile));
+  background: linear-gradient(180deg, var(--surface) 68px, var(--w-sky-a) 68px, var(--w-sky-b));
 }
 .replay-head:has(.replay-art) {
   padding-right: clamp(150px, 26vw, 290px);
@@ -29,12 +29,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--w-3);
   height: 68px;
   margin-bottom: clamp(18px, 3vw, 28px);
 }
 .replay-head:has(.replay-art) .replay-masthead {
-  margin-right: calc(clamp(16px, 4vw, 36px) - clamp(150px, 26vw, 290px));
+  margin-right: calc(var(--w-pad) - clamp(150px, 26vw, 290px));
 }
 .replay-art {
   position: absolute;
@@ -54,19 +54,19 @@
 .tl-label,
 .stop-tag {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--w-kicker);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
 .replay-label {
-  margin: 0 0 8px;
+  margin: 0 0 var(--w-2);
 }
 
 .replay-head h1 {
-  margin: 0 0 10px;
-  font-size: clamp(1.8rem, 4.4vw, 2.9rem);
+  margin: 0 0 var(--w-3);
+  font-size: var(--w-h1);
   font-weight: 800;
   line-height: 1.05;
   max-width: 22ch;
@@ -74,23 +74,23 @@
 
 .replay-source,
 .replay-note {
-  margin: 4px 0 0;
+  margin: var(--w-1) 0 0;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .replay-note {
   display: inline-block;
-  margin-top: 12px;
-  padding: 6px 10px;
-  background: var(--surface);
+  margin-top: var(--w-3);
+  padding: var(--w-2) var(--w-3);
+  background: var(--w-raise, var(--surface));
   color: var(--ink);
 }
 
 .replay-legend {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  gap: var(--w-1);
   margin-bottom: -10px;
 }
 
@@ -100,18 +100,18 @@
   margin-block: 0;
   padding: 0;
   display: grid;
-  gap: 4px;
+  gap: var(--w-1);
 }
 
 .tl-step {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 4px;
+  gap: var(--w-1);
 }
 
 .tl-label {
   display: none;
-  margin-bottom: 6px;
+  margin-bottom: var(--w-2);
 }
 
 /* The nav takes the first row of the shell; the page wraps under it. */
@@ -125,16 +125,16 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 16px;
+  gap: var(--w-4);
   width: min(1320px, 100%);
   margin-inline: auto;
-  padding-block: 12px 0;
+  padding-block: 0;
   white-space: nowrap;
 }
 
 .site-nav a {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: var(--w-kicker);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink);
@@ -149,7 +149,7 @@
 
 .site-nav .site-nav-case {
   position: relative;
-  padding: 0 14px;
+  padding: 0 var(--w-4);
   background: var(--surface);
   box-shadow:
     inset 0 2px 0 var(--glow, var(--zing)),
@@ -161,7 +161,7 @@
   margin-block: 0;
   padding: 0;
   display: grid;
-  gap: 4px;
+  gap: var(--w-1);
 }
 
 .replay-list li {
@@ -169,9 +169,9 @@
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
-  gap: 2px 20px;
-  padding: 0 44px 0 0;
-  background: var(--paper);
+  gap: 2px var(--w-5);
+  padding: 0 var(--w-7) 0 0;
+  background: var(--w-slab);
   transition:
     transform 0.18s var(--ease-out),
     box-shadow 0.18s var(--ease-out);
@@ -187,15 +187,15 @@
   height: 100%;
   min-height: 116px;
   max-height: 132px;
-  padding: 12px;
-  background: linear-gradient(180deg, var(--sky), var(--paper));
+  padding: var(--w-3);
+  background: linear-gradient(180deg, var(--w-sky-a), var(--w-sky-b));
 }
 .replay-pattern {
-  padding-top: 18px;
+  padding-top: var(--w-4);
 }
 .replay-list h2 {
   margin: 2px 0;
-  font-size: 1.22rem;
+  font-size: var(--w-h3);
   line-height: 1.25;
 }
 .replay-list h2 a {
@@ -214,13 +214,13 @@
   right: 16px;
   top: 50%;
   translate: 0 -50%;
-  font-size: 1.3rem;
+  font-size: var(--w-h3);
   font-weight: 700;
   color: var(--act);
 }
 .replay-list .replay-source {
-  padding-bottom: 16px;
-  font-size: 0.92rem;
+  padding-bottom: var(--w-4);
+  font-size: var(--w-small);
 }
 .replay-list .replay-source a {
   position: relative;
@@ -236,15 +236,15 @@
 }
 
 .replay-cant {
-  padding: 16px 18px;
-  background: var(--paper);
+  padding: var(--w-4) var(--w-4);
+  background: var(--w-slab);
   box-shadow: inset 3px 0 0 var(--st-unchecked);
 }
 
 .replay-cant h2 {
-  margin: 0 0 6px;
+  margin: 0 0 var(--w-2);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--w-kicker);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -260,18 +260,18 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
+  gap: var(--w-2) var(--w-4);
 }
 .replay-run p {
   margin: 0;
 }
 .replay-run .muted {
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: var(--w-small);
 }
 .replay-run-btn {
   min-height: 46px;
-  padding: 10px 20px;
+  padding: var(--w-3) var(--w-5);
   background: var(--act);
   color: var(--on-act);
   font: inherit;
@@ -281,27 +281,27 @@
 }
 
 .replay-run-btn:disabled {
-  background: var(--paper);
+  background: var(--w-slab);
   color: var(--muted);
   cursor: not-allowed;
 }
 
 .tl-real,
 .tl-snap {
-  padding: 16px 18px;
-  background: var(--paper);
+  padding: var(--w-4) var(--w-4);
+  background: var(--w-slab);
 }
 
 .tl-real time {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: var(--w-kicker);
   letter-spacing: 0.06em;
   color: var(--muted);
 }
 
 .tl-real h2 {
-  margin: 4px 0 6px;
-  font-size: 1.1rem;
+  margin: var(--w-1) 0 var(--w-2);
+  font-size: var(--w-body);
 }
 
 .tl-real p,
@@ -312,7 +312,7 @@
 .tl-snap {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: var(--w-3);
 }
 
 .tl-snap .muted {
@@ -322,8 +322,8 @@
 /* A finding: the state tile with its icon, then the locked word and the text. */
 .finding {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 2px 12px;
+  grid-template-columns: var(--w-tile) minmax(0, 1fr);
+  gap: 2px var(--w-3);
   align-items: start;
 }
 .finding > strong {
@@ -334,9 +334,9 @@
   grid-row: 1 / span 2;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  font-size: 0.85rem;
+  width: var(--w-tile);
+  height: var(--w-tile);
+  font-size: var(--w-small);
   font-weight: 800;
   background: color-mix(in srgb, var(--ink) 9%, var(--surface));
   color: var(--muted);
@@ -365,18 +365,18 @@
 }
 /* The strongest facts: a step where the record matched is lit. */
 .tl-snap:has(.finding-matches) {
-  background: var(--wash, var(--paper));
+  background: var(--wash, var(--w-slab));
   box-shadow: inset 3px 0 0 var(--glow, var(--zing));
 }
 
 /* After the stop: what went on to happen is set back; SNAPBACK's side is empty. */
 .tl-after .tl-real {
-  background: color-mix(in srgb, var(--paper) 55%, var(--surface));
+  background: color-mix(in srgb, var(--w-slab) 55%, var(--surface));
   color: var(--muted);
 }
 .tl-after .tl-snap {
   background: none;
-  box-shadow: inset 3px 0 0 var(--paper);
+  box-shadow: inset 3px 0 0 var(--w-slab);
 }
 
 /* The stop: the verdict's ink band, the state tile, the words, and the money still safe. */
@@ -385,8 +385,8 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 4px clamp(14px, 2.4vw, 22px);
-  margin-block: 8px;
-  padding: clamp(18px, 3vw, 26px) clamp(16px, 3vw, 28px);
+  margin-block: var(--w-2);
+  padding: clamp(18px, 3vw, var(--w-tile)) clamp(16px, 3vw, 28px);
   background:
     radial-gradient(
       ellipse 50% 120% at 96% 60%,
@@ -423,21 +423,21 @@
 }
 
 .stop-words {
-  font-size: clamp(1.4rem, 3.4vw, 2rem);
+  font-size: var(--w-h2);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
 
 .stop-amount {
-  margin-top: 6px;
+  margin-top: var(--w-2);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 12px;
+  gap: var(--w-1) var(--w-3);
 }
 .stop-figure {
-  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  font-size: var(--w-figure);
   font-weight: 800;
   line-height: 0.95;
   letter-spacing: -0.035em;
@@ -448,19 +448,19 @@
 
 .replay-foot {
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: var(--w-small);
 }
 
 .replay-foot p {
-  margin: 0 0 4px;
+  margin: 0 0 var(--w-1);
 }
 
 .replay-missing {
-  width: min(880px, 100%);
+  width: min(var(--w-col, 880px), 100%);
   padding: clamp(24px, 5vw, 44px);
-  gap: 12px;
+  gap: var(--w-3);
   justify-items: start;
-  background-image: linear-gradient(180deg, var(--sky), var(--surface) 14rem);
+  background-image: linear-gradient(180deg, var(--w-sky-a), var(--surface) 14rem);
 }
 .replay-missing > * {
   margin: 0;
@@ -469,7 +469,7 @@
   width: 148px;
 }
 .replay-missing h1 {
-  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  font-size: var(--w-h2);
 }
 .replay-missing p {
   color: var(--muted);
@@ -481,7 +481,7 @@
 /* Phone and narrow: stack vertically, the stop marker stays between the steps. */
 @media (max-width: 800px) {
   .timeline {
-    gap: 12px;
+    gap: var(--w-3);
   }
 
   .tl-step {
@@ -499,11 +499,11 @@
 
 @media (max-width: 560px) {
   .replay-head:has(.replay-art) {
-    padding-right: clamp(16px, 4vw, 36px);
+    padding-right: var(--w-pad);
   }
   .replay-head:has(.replay-art) .replay-masthead {
     margin-right: 0;
-    margin-bottom: 96px;
+    margin-bottom: var(--w-7);
   }
   .replay-art,
   .replay-art.kit-art-person {
@@ -516,17 +516,17 @@
   }
   .replay-list li {
     grid-template-columns: 84px minmax(0, 1fr);
-    gap: 2px 12px;
-    padding-right: 34px;
+    gap: 2px var(--w-3);
+    padding-right: var(--w-6);
   }
   .replay-list-art {
-    padding: 8px;
+    padding: var(--w-2);
   }
   .replay-list li::after {
     right: 10px;
   }
   .replay-list h2 {
-    font-size: 1.05rem;
+    font-size: var(--w-body);
   }
 }
 
@@ -554,8 +554,8 @@
 }
 
 .replay-error {
-  padding: 16px 18px;
-  background: var(--paper);
+  padding: var(--w-4) var(--w-4);
+  background: var(--w-slab);
   box-shadow: inset 3px 0 0 var(--ink);
   font-weight: 700;
 }

@@ -375,19 +375,26 @@
    panel, the price as the one big figure, must-haves as ticked chips, and the walk as the lit
    action. The key line down the left says how it sits against the budget; the words say it too. */
 .pf-strip h2 {
-  font-size: 1.25rem;
+  font-size: var(--w-h3);
 }
 .pf-asof {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--w-kicker);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+.pf-row,
+.pf-draft-text {
+  background: var(--w-slab, var(--paper));
+}
+.pf-draft {
+  background: var(--w-raise, var(--surface));
 }
 .pf-row {
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
-  gap: 0 18px;
-  padding: 0 0 0 3px;
+  gap: 0 var(--w-4);
+  padding: 0 0 0 var(--w-1);
 }
 .pf-row::before {
   width: 3px;
@@ -409,9 +416,9 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
-  padding: 12px 10px 8px;
-  background: linear-gradient(180deg, var(--sky), var(--paper) 92%);
+  gap: var(--w-1);
+  padding: var(--w-3) var(--w-3) var(--w-2);
+  background: linear-gradient(180deg, var(--w-sky-a), var(--w-sky-b) 92%);
   overflow: hidden;
 }
 .pf-art .kit-art {
@@ -420,7 +427,7 @@
 }
 .pf-art .kit-art-house {
   max-width: 124px;
-  margin-bottom: 6px;
+  margin-bottom: var(--w-2);
 }
 .pf-art-label {
   font-size: 0.56rem;
@@ -432,44 +439,44 @@
 .pf-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--w-2);
   min-width: 0;
-  padding: 16px 16px 8px 0;
+  padding: var(--w-4) var(--w-4) var(--w-2) 0;
 }
 .pf-row-title {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: var(--w-kicker);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
 .pf-price {
-  font-size: 1.42rem;
+  font-size: var(--w-h3);
   font-weight: 800;
   letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums;
 }
 .pf-avail,
 .pf-office {
-  font-size: 0.96rem;
+  font-size: var(--w-small);
 }
 .pf-musts {
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-block: 4px;
+  gap: var(--w-2);
+  margin-block: var(--w-1);
 }
 .pf-musts li,
 .pf-musts li[data-met="yes"],
 .pf-musts li[data-met="no"] {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px 0 0;
-  background: var(--surface);
+  gap: var(--w-2);
+  padding: 0 var(--w-3) 0 0;
+  background: var(--w-raise, var(--surface));
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: var(--w-small);
 }
 .pf-musts li::before {
   content: "–" / "";
@@ -477,10 +484,10 @@
   align-self: stretch;
   display: grid;
   place-items: center;
-  width: 26px;
-  min-height: 26px;
+  width: var(--w-tile);
+  min-height: var(--w-tile);
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: var(--w-small);
   background: color-mix(in srgb, var(--ink) 20%, var(--surface));
   color: var(--ink);
 }
@@ -496,11 +503,11 @@
 }
 .pf-scan {
   margin-block: 2px;
-  padding: 5px 12px 5px 10px;
+  padding: var(--w-1) var(--w-3) var(--w-1) var(--w-3);
   background: var(--wash, var(--surface));
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--glow, var(--zing));
-  font-size: 0.92rem;
+  font-size: var(--w-small);
 }
 .pf-scan::before {
   background: var(--glow, var(--zing));
@@ -509,8 +516,8 @@
   grid-column: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 6px 16px 16px 0;
+  gap: var(--w-2);
+  padding: var(--w-2) var(--w-4) var(--w-4) 0;
 }
 .pf-action {
   display: inline-flex;
@@ -518,28 +525,28 @@
   text-decoration: none;
 }
 .pf-walk {
-  gap: 10px;
+  gap: var(--w-3);
   box-shadow: var(--glow-edge, none);
 }
 .pf-walk::after {
   content: "→" / "";
 }
 .pf-quiet {
-  background: var(--surface);
+  background: var(--w-raise, var(--surface));
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--act);
 }
 .pf-quiet:active:not(:disabled) {
-  background: var(--paper);
+  background: var(--w-slab);
 }
 .pf-row > .pf-error,
 .pf-row > .pf-draft {
   grid-column: 1 / -1;
-  margin: 0 16px 16px 14px;
+  margin: 0 var(--w-4) var(--w-4) var(--w-4);
 }
 .pf-draft {
   box-shadow: inset 3px 0 0 var(--glow, var(--zing));
-  padding-left: 16px;
+  padding-left: var(--w-4);
 }
 .pf-error {
   color: var(--ink);
@@ -550,14 +557,14 @@
   place-items: center;
   width: 22px;
   height: 22px;
-  margin-right: 8px;
+  margin-right: var(--w-2);
   background: var(--ink);
   color: var(--surface);
-  font-size: 0.8rem;
+  font-size: var(--w-small);
 }
 .pf-empty {
-  padding: 22px 20px;
-  background: linear-gradient(180deg, var(--sky), var(--paper) 9rem);
+  padding: var(--w-5) var(--w-5);
+  background: linear-gradient(180deg, var(--w-sky-a), var(--w-sky-b) 9rem);
 }
 .pf-empty-house {
   width: 148px;
@@ -567,19 +574,19 @@
 .pf-stack > .pf-link {
   align-self: stretch;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--w-4);
   min-height: 60px;
-  padding: 14px 22px;
+  padding: var(--w-4) var(--w-5);
   background: var(--surface);
   color: var(--ink);
-  font-size: 1.08rem;
+  font-size: var(--w-body);
   box-shadow:
     inset 3px 0 0 var(--glow, var(--zing)),
     var(--shadow);
 }
 .pf-stack > .pf-link::after {
   content: "→" / "";
-  font-size: 1.3rem;
+  font-size: var(--w-h3);
   color: var(--act);
 }
 
@@ -593,8 +600,8 @@
     justify-content: space-between;
     align-items: flex-end;
     height: 104px;
-    padding: 8px 14px;
-    background: linear-gradient(90deg, var(--sky), var(--paper));
+    padding: var(--w-2) var(--w-4);
+    background: linear-gradient(90deg, var(--w-sky-a), var(--w-sky-b));
   }
   .pf-art .kit-art,
   .pf-art .kit-art-house {
@@ -603,13 +610,13 @@
     margin: 0 0 -22px;
   }
   .pf-body {
-    padding: 14px 14px 8px;
+    padding: var(--w-4) var(--w-4) var(--w-2);
   }
   .pf-price {
-    font-size: 1.22rem;
+    font-size: var(--w-h3);
   }
   .pf-actions {
     grid-column: 1 / -1;
-    padding: 6px 14px 14px;
+    padding: var(--w-2) var(--w-4) var(--w-4);
   }
 }
