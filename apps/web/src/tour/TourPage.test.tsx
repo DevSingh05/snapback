@@ -57,6 +57,24 @@ describe("TourView in fixture mode (no SDK)", () => {
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
   });
 
+  it("reads top to bottom for a first visit, and the rail follows the stop on screen", async () => {
+    render(<TourView plan={FIXTURE_TOUR} />);
+    expect(screen.getByTestId("tour-intro")).toHaveTextContent(
+      `Walk it first.Press play to walk all ${FIXTURE_TOUR.stops.length} stops in 39 seconds, or pick Explore to look around yourself.`,
+    );
+    expect(screen.getByTestId("tour-next")).toHaveAttribute("href", FIXTURE_TOUR.links.tour_prep);
+    expect(screen.getByText(`Step 1 of ${FIXTURE_TOUR.stops.length}`)).toBeInTheDocument();
+    const lit = () =>
+      screen.getAllByTestId("rail-line").find((l) => l.getAttribute("aria-current") === "step")!;
+    expect(lit()).toHaveAttribute("data-agent", "record");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
+    expect(lit()).toHaveAttribute("data-agent", "place");
+    expect(screen.getByTestId("rail-here")).toHaveTextContent("Ad photo P2: 96 matching points.");
+    // The stop's name shows on the view and in the chapter row; the panel does not print it again.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveClass("sr-only");
+    expect(screen.getByTestId("walk-map")).not.toHaveTextContent("Kitchen");
+  });
+
   it("shows every fact with its source and the progress rail jumps to a room", async () => {
     render(<TourView plan={FIXTURE_TOUR} />);
     expect(screen.getByText(/Built in 1998/).parentElement).toHaveTextContent("CoStar record");

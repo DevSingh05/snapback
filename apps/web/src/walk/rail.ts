@@ -1,7 +1,10 @@
 // Pure reads of the trace for the agent rail. Every rail item is one parsed TraceEvent; nothing
 // is added, merged or reworded here, so the rail can never show a step the stream did not carry.
-import type { TraceEvent } from "../contracts";
+import type { TourStop, TraceEvent } from "../contracts";
 import type { AgentFile } from "../evidence/FilesTree";
+import { optionPlain, pointsSentence } from "../evidence/match";
+import { placeLine } from "../evidence/read";
+import type { EvidencePhoto } from "../evidence/types";
 
 export const MAIN_AGENT = "main";
 
@@ -76,4 +79,75 @@ export function lastLine(e: TraceEvent): string {
   if (e.reason) return e.reason;
   const tag = KIND_TAG[e.kind] ?? e.kind;
   return e.pick ? `${tag}: ${e.pick}` : tag;
+}
+
+/** One step in one plain line, for a closed row and the phone sheet. Only the event's own words,
+ *  with a search option put in a renter's words (evidence/match optionPlain). */
+export function plainLine(e: TraceEvent): string {
+  const kind: string = e.kind;
+  if (kind === "choice" && e.pick) return `Picked: ${optionPlain(e.pick)}`;
+  if (kind === "file" && e.pick) return `Saved ${e.pick}`;
+  return lastLine(e);
+}
+
+const lower = (s?: string | null) => (s ?? "").trim().toLowerCase();
+
+/**
+ * The agent step behind a walk stop, as the step's seq. Outside is the record agent's first step,
+ * a stop with an ad photo is the place agent's search that placed that photo, and every other
+ * stop is the walk agent's step (the one that names this room, else its first). Read only from
+ * the trace, the stop and the photo's evidence row. Null when the trace is empty.
+ */
+export function stepForStop(
+  items: RailItem[],
+  stop: TourStop,
+  photo: EvidencePhoto | null = null,
+): number | null {
+  if (items.length === 0) return null;
+  const lane = (name: string) => {
+    const own = items.filter((i) => i.agent === name);
+    return own.length > 0 ? own : items;
+  };
+  const kindIs = (i: RailItem, kind: string) => (i.event.kind as string) === kind;
+  if (stop.kind === "arrive") return lane("record")[0]!.event.seq;
+  if (stop.kind === "outro") return items.at(-1)!.event.seq;
+  if (stop.photos.length > 0) {
+    const pool = lane("place");
+    const won = [...(photo?.searches ?? [])]
+      .reverse()
+      .find((s) => s.result === "placed" || s.result === "elsewhere");
+    const picked =
+      photo && won
+        ? pool.find((i) => kindIs(i, "choice") && i.event.pick === won.option)
+        : undefined;
+    const named = photo ? pool.find((i) => i.alias === photo.alias) : undefined;
+    const base = pool.find((i) => kindIs(i, "tool"));
+    return (picked ?? (won?.option === "base" ? base : named) ?? named ?? base ?? pool[0]!).event
+      .seq;
+  }
+  const pool = lane("walk");
+  const names = [lower(stop.room_label), lower(stop.title)].filter(Boolean);
+  const named = pool.find((i) => kindIs(i, "choice") && names.includes(lower(i.event.pick)));
+  return (named ?? pool[0]!).event.seq;
+}
+
+export const NO_PHOTO_LINE = "The ad showed no photo of this room.";
+
+/**
+ * What the lit step means at this stop, in one plain sentence: the matched points of the ad photo
+ * placed here against the bar, or that the ad showed no photo of this room. Every number is the
+ * evidence file's own. Null when there is nothing to add for this stop.
+ */
+export function stopLine(
+  stop: TourStop,
+  photo: EvidencePhoto | null,
+  bars: Record<string, number>,
+): string | null {
+  if (stop.photos.length > 0)
+    return photo
+      ? `Ad photo ${photo.alias}: ${pointsSentence(photo, bars) ?? placeLine(photo)}`
+      : null;
+  if (stop.ad_view === "none_placed" && (stop.kind === "room" || stop.kind === "stop"))
+    return NO_PHOTO_LINE;
+  return null;
 }

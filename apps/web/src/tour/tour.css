@@ -425,12 +425,14 @@
 @media (max-width: 760px) {
   .tour-page[data-rail="on"] {
     --rail-w: 0px;
-    margin-bottom: var(--sp-8);
   }
-  .tour-page[data-rail="on"] .tour-body,
   .tour-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "stage" "panel";
+  }
+  .tour-page[data-rail="on"] .tour-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "stage" "rail" "panel";
   }
   .tour-stage,
   .tour-frame,
@@ -583,4 +585,40 @@
 }
 .tour-head > .mono {
   margin-left: var(--sp-3);
+}
+
+/* ---------- First visit: what this is, what to do, where to go next ---------- */
+.tour-intro {
+  margin: 0;
+  padding: var(--sp-1) var(--page-pad) var(--sp-3);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  max-width: 96ch;
+}
+.tour-intro strong {
+  font-family: var(--font-display, inherit);
+  font-size: var(--fs-lg);
+  margin-right: var(--sp-2);
+}
+.tour-way-next::after {
+  content: "";
+  width: 14px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(0 35%, 55% 35%, 55% 0, 100% 50%, 55% 100%, 55% 65%, 0 65%);
+}
+/* The stop's name is on the view and in the chapter row, so the panel leads with what you are
+   looking at, not the name a third time. */
+.tour-panel .tour-seeing {
+  margin-top: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.35;
+  font-weight: 500;
+}
+@media (min-width: 761px) {
+  /* The player's chapter row already lists every stop by name, so the strip of stops (and the
+     key that explains it) is for phones, where the chapter row is hidden. */
+  .tour-cover {
+    display: none;
+  }
 }

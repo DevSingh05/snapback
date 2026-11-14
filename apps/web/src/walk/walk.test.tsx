@@ -1,13 +1,13 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { TourStop, TraceEvent, TraceKind } from "../contracts";
 import { EVIDENCE_FIXTURE_A } from "../evidence/fixture";
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { parseTraceEvent } from "../trace/parse";
-import { AgentRail } from "./AgentRail";
+import { AgentRail, FOLLOW_PAUSE_MS } from "./AgentRail";
 import { MISMATCH_TITLE, MismatchAerials, NAMED_LABEL, PICTURED_LABEL } from "./MismatchAerials";
-import { railCounts, railFiles, railItems } from "./rail";
+import { plainLine, railCounts, railFiles, railItems, stepForStop, stopLine } from "./rail";
 import { RAIL_STUB_A, RAIL_STUB_B } from "./railStub";
 import { DRAWING_LABEL, REAL_LABEL, RealStill, StageViews } from "./StageViews";
 import { StageCaption, StopStage } from "./StopStage";
@@ -147,6 +147,9 @@ describe("AgentRail: only what the stream delivered", () => {
     );
     expect(lines).toHaveLength(parsed.length);
     expect(screen.getByTestId("rail-summary")).toHaveTextContent(
+      `${parsed.length} steps our agents took, in order.`,
+    );
+    expect(screen.getByTestId("rail-counts")).toHaveTextContent(
       `${parsed.length} steps, 1 picked by model`,
     );
   });
@@ -156,7 +159,10 @@ describe("AgentRail: only what the stream delivered", () => {
     expect(screen.getByTestId("rail-empty")).toBeInTheDocument();
     expect(screen.queryAllByTestId("rail-line")).toHaveLength(0);
     expect(screen.queryAllByTestId("rail-agent")).toHaveLength(0);
-    expect(screen.getByTestId("rail-summary")).toHaveTextContent("0 steps, 0 picked by model");
+    expect(screen.getByTestId("rail-summary")).toHaveTextContent(
+      "Steps appear here as our agents work.",
+    );
+    expect(screen.queryByTestId("rail-counts")).not.toBeInTheDocument();
   });
 
   it("lists only files that a file event carried", () => {
@@ -189,7 +195,7 @@ describe("AgentRail: only what the stream delivered", () => {
     render(<AgentRail events={RAIL_STUB_B} source="fixture" reduced />);
     const rail = screen.getByTestId("agent-rail");
     expect(rail).toHaveAttribute("data-motion", "reduced");
-    const sheet = within(rail).getByRole("button", { expanded: false, name: /steps/ });
+    const sheet = within(rail).getByRole("button", { expanded: false, name: /How we checked/ });
     fireEvent.click(sheet);
     expect(rail).toHaveAttribute("data-open", "true");
   });
@@ -201,6 +207,138 @@ describe("AgentRail: only what the stream delivered", () => {
 });
 
 const stopOf = (key: string): TourStop => FIXTURE_TOUR.stops.find((s) => s.key === key)!;
+
+describe("the rail follows the walk", () => {
+  const items = railItems(RAIL_STUB_A);
+  const seqOf = (kind: string, pick: string) =>
+    RAIL_STUB_A.find((e) => (e.kind as string) === kind && e.pick === pick)!.seq;
+  const kitchenPhoto = photoAt(stopOf("room-3"), EVIDENCE_FIXTURE_A);
+  const follow = (key: string, reduced = true) => (
+    <AgentRail
+      events={RAIL_STUB_A}
+      source="fixture"
+      evidence={EVIDENCE_FIXTURE_A}
+      reduced={reduced}
+      stop={stopOf(key)}
+      photo={photoAt(stopOf(key), EVIDENCE_FIXTURE_A)}
+    />
+  );
+  const lit = () => screen.getAllByTestId("rail-line").filter((l) => l.dataset.lit === "true");
+
+  afterEach(() => vi.useRealTimers());
+
+  it("maps each stop to the agent step behind it: record, place for a photo stop, walk", () => {
+    expect(stepForStop(items, stopOf("arrive"))).toBe(seqOf("agent", "record"));
+    // The kitchen's photo was placed by the base search, so the base search step is its step.
+    expect(kitchenPhoto?.searches.at(-1)).toMatchObject({ option: "base", result: "placed" });
+    expect(stepForStop(items, stopOf("room-3"), kitchenPhoto)).toBe(seqOf("tool", "locate_photos"));
+    // A photo the agent's own pick placed lights that pick.
+    const p3 = EVIDENCE_FIXTURE_A.photos.find((p) => p.alias === "P3")!;
+    expect(stepForStop(items, stopOf("room-3"), p3)).toBe(seqOf("choice", "focus_scan:S2"));
+    // A room the walk agent named lights that step; any other room, the walk agent's first step.
+    expect(stepForStop(items, stopOf("room-4"))).toBe(seqOf("choice", "Bathroom"));
+    expect(stepForStop(items, stopOf("room-2"))).toBe(seqOf("agent", "walk"));
+    expect(stepForStop(items, stopOf("outro"))).toBe(RAIL_STUB_A.at(-1)!.seq);
+    expect(stepForStop([], stopOf("arrive"))).toBeNull();
+  });
+
+  it("says what the step means at this stop in the evidence file's own numbers", () => {
+    const n = kitchenPhoto!.inliers;
+    const bar = EVIDENCE_FIXTURE_A.bars.min_inliers;
+    expect(stopLine(stopOf("room-3"), kitchenPhoto, EVIDENCE_FIXTURE_A.bars)).toBe(
+      `Ad photo ${kitchenPhoto!.alias}: ${n} matching points. We need ${bar} to be sure, so we say it's this room.`,
+    );
+    expect(stopLine(stopOf("room-2"), null, {})).toBe("The ad showed no photo of this room.");
+    expect(stopLine(stopOf("arrive"), null, {})).toBeNull();
+    expect(stopLine(stopOf("room-3"), null, {})).toBeNull();
+    expect(plainLine(RAIL_STUB_A.find((e) => e.pick === "focus_scan:S2")!)).toBe(
+      "Picked: Look closer at scan S2",
+    );
+  });
+
+  it("lights and opens only the step for this stop; every other step is one line", () => {
+    const { rerender } = render(follow("arrive"));
+    expect(screen.getByRole("heading", { name: "How SNAPBACK checked this ad" })).toBeVisible();
+    expect(screen.getByTestId("rail-summary")).toHaveTextContent(
+      `${RAIL_STUB_A.length} steps our agents took, in order. The step behind this stop is lit.`,
+    );
+    expect(lit()).toHaveLength(1);
+    expect(lit()[0]).toHaveAttribute("data-seq", String(seqOf("agent", "record")));
+    expect(lit()[0]).toHaveAttribute("aria-current", "step");
+    const open = () => screen.getAllByTestId("rail-line").filter((l) => l.dataset.state === "open");
+    expect(open()).toHaveLength(1);
+    expect(
+      screen.getAllByTestId("rail-agent").find((a) => a.getAttribute("aria-current")),
+    ).toHaveTextContent("record");
+
+    rerender(follow("room-3"));
+    expect(lit()[0]).toHaveAttribute("data-seq", String(seqOf("tool", "locate_photos")));
+    expect(open()).toHaveLength(1);
+    expect(screen.getByTestId("rail-here")).toHaveTextContent(
+      "At this stopAd photo P2: 96 matching points. We need 30 to be sure, so we say it's this room.",
+    );
+    expect(within(lit()[0]!).getByTestId("rail-proof")).toHaveTextContent("P2: 96 matching points");
+    expect(
+      screen.getAllByTestId("rail-agent").find((a) => a.getAttribute("aria-current")),
+    ).toHaveTextContent("place");
+    expect(screen.getByTestId("rail-now")).toHaveTextContent(
+      `Step 4 of ${RAIL_STUB_A.length}: Base search of 4 photos.`,
+    );
+
+    // The step's own reason already says it, so the sentence is not shown twice.
+    rerender(follow("room-4"));
+    expect(lit()[0]).toHaveAttribute("data-seq", String(seqOf("choice", "Bathroom")));
+    expect(screen.queryByTestId("rail-here")).not.toBeInTheDocument();
+  });
+
+  it("opens a folded step on a tap and folds it again", () => {
+    render(follow("arrive"));
+    const row = screen.getByRole("button", { name: "Step 5: Picked: Look closer at scan S2" });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(lineOf(seqOf("choice", "focus_scan:S2"))).toHaveTextContent("Picked by the model");
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("a scroll in the rail holds the follow for about 8 s; Follow the walk resumes it", () => {
+    vi.useFakeTimers();
+    render(follow("arrive"));
+    const rail = screen.getByTestId("agent-rail");
+    expect(rail).toHaveAttribute("data-follow", "on");
+    expect(screen.queryByTestId("rail-follow")).not.toBeInTheDocument();
+    fireEvent.wheel(rail.querySelector(".ar-scroll")!);
+    expect(rail).toHaveAttribute("data-follow", "paused");
+    fireEvent.click(screen.getByRole("button", { name: "Follow the walk" }));
+    expect(rail).toHaveAttribute("data-follow", "on");
+
+    fireEvent.wheel(rail.querySelector(".ar-scroll")!);
+    act(() => void vi.advanceTimersByTime(FOLLOW_PAUSE_MS - 1));
+    expect(rail).toHaveAttribute("data-follow", "paused");
+    act(() => void vi.advanceTimersByTime(1));
+    expect(rail).toHaveAttribute("data-follow", "on");
+    expect(screen.queryByTestId("rail-follow")).not.toBeInTheDocument();
+  });
+
+  it("scrolls the lit step into its box, with the step before it in view, unless held", () => {
+    const { rerender } = render(follow("arrive"));
+    const box = screen.getByTestId("agent-rail").querySelector<HTMLElement>(".ar-scroll")!;
+    const tops = (el: HTMLElement) => Number(el.dataset.seq ?? 0) * 50;
+    const spy = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return tops(this);
+    });
+    rerender(follow("room-3"));
+    expect(box.scrollTop).toBe(tops(lineOf(seqOf("tool", "locate_photos") - 1)) - 8);
+    fireEvent.wheel(box);
+    box.scrollTop = 7;
+    rerender(follow("room-4"));
+    expect(box.scrollTop).toBe(7);
+    spy.mockRestore();
+  });
+});
 
 describe("StopStage and StageCaption", () => {
   it("lands the placed ad photo in its room and says Taken here", () => {

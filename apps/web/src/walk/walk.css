@@ -443,7 +443,8 @@
 .ar-count {
   flex: 1 0 100%;
   margin: 0;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
   color: var(--muted);
 }
 .ar-sheet {
@@ -452,9 +453,30 @@
 .ar-fold {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+/* The one scroll box. Its top and bottom fade inside their own padding, so a row at the edge
+   eases out and is never chopped; a row at rest sits clear of the fade. */
+.ar-scroll {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-block: var(--sp-3);
+  scroll-padding-block: var(--sp-3);
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0,
+    var(--ink) var(--sp-3),
+    var(--ink) calc(100% - var(--sp-5)),
+    transparent 100%
+  );
+}
+.ar-foot {
+  padding-bottom: var(--sp-3);
 }
 .ar-empty {
   margin: 0;
@@ -464,7 +486,7 @@
 .ar-relay {
   list-style: none;
   margin: 0;
-  padding: 0 var(--sp-5) var(--sp-4);
+  padding: 0 var(--sp-5) var(--sp-3);
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-1);
@@ -603,6 +625,122 @@
   }
 }
 
+/* ---------- The rail follows the walk ---------- */
+/* Every step is one line; the step behind the stop on screen is lit and open. */
+.ar[data-follow] .ar-line {
+  display: block;
+  padding: 0;
+  scroll-margin-block: var(--sp-3);
+  animation: none;
+}
+.ar-row {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 0 var(--sp-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-5);
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.ar-row:active:not(:disabled) {
+  transform: none;
+}
+.ar-row:focus-visible {
+  outline-offset: -3px;
+}
+.ar-row-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ar-n {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.ar-row[aria-expanded="true"] {
+  color: var(--ink);
+}
+.ar-row[aria-expanded="true"] .ar-row-text {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ar[data-follow] .ar-line > .ar-tag {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 0 var(--sp-3);
+  padding: var(--sp-3) var(--sp-5) 0;
+}
+.ar[data-follow] .ar-body {
+  padding: var(--sp-1) var(--sp-5) var(--sp-4) calc(var(--sp-5) + 28px + var(--sp-3));
+  gap: var(--sp-2);
+}
+.ar[data-follow] .ar-agent {
+  background: none;
+}
+.ar[data-follow] .ar-unsure:not([data-lit]) {
+  background: none;
+}
+.ar-line[data-lit] {
+  background: var(--layer-1);
+  box-shadow: inset 4px 0 0 var(--act);
+  color: var(--ink);
+}
+.ar-line[data-lit] > .ar-tag,
+.ar-line[data-lit] .ar-n {
+  color: var(--act);
+  font-weight: 700;
+}
+.ar-line[data-lit] .ar-reason {
+  font-size: var(--fs-md);
+  color: var(--ink);
+  font-weight: 500;
+}
+/* What the lit step means in the room on screen: one sentence, the evidence file's own numbers. */
+.ar-here {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--layer-3);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.ar-here-tag {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--act);
+  font-weight: 700;
+}
+.ar-follow {
+  position: absolute;
+  left: 50%;
+  bottom: var(--sp-4);
+  translate: -50% 0;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  box-shadow: var(--shadow-lift);
+}
+@media (hover: hover) {
+  .ar-row:hover {
+    background: var(--layer-3);
+    color: var(--ink);
+  }
+}
+
 @media (min-width: 761px) {
   /* Fill the column beside the stage and the facts, and scroll inside it. */
   .ar {
@@ -611,16 +749,10 @@
   }
 }
 @media (max-width: 760px) {
-  /* A bottom sheet: the latest step and the count; tap to open the whole relay. */
+  /* A sheet in the page, under the player: closed, it is one line saying the step behind this
+     stop; tap to open the whole list. */
   .ar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 20;
-    max-height: 78vh;
-    background: var(--layer-1);
-    box-shadow: var(--shadow-lift);
+    border-block: 1px solid var(--line);
   }
   .ar-head {
     padding: 0;
@@ -636,44 +768,65 @@
     flex-direction: column;
     align-items: stretch;
     gap: 2px;
-    min-height: 64px;
+    min-width: 0;
+    min-height: 60px;
     padding: var(--sp-3) var(--sp-7) var(--sp-3) var(--sp-4);
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    background: var(--band);
-    color: var(--band-ink);
+    background: none;
+    color: var(--ink);
     text-align: left;
     position: relative;
+  }
+  .ar-sheet:active:not(:disabled) {
+    transform: none;
   }
   .ar-sheet::after {
     content: "";
     position: absolute;
     right: 18px;
-    top: 26px;
+    top: 50%;
     width: 12px;
     height: 8px;
-    background: currentColor;
-    clip-path: polygon(0 100%, 50% 0, 100% 100%);
+    margin-top: -4px;
+    background: var(--act);
+    clip-path: polygon(0 0, 50% 100%, 100% 0);
   }
   .ar[data-open="true"] .ar-sheet::after {
     transform: rotate(180deg);
   }
-  .ar-sheet-last {
+  .ar-sheet-label {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--act);
     font-weight: 700;
-    font-size: var(--fs-md);
+  }
+  .ar-sheet-last {
+    font-weight: 500;
+    font-size: var(--fs-sm);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .ar-sheet-count {
-    font-size: var(--fs-xs);
-    font-weight: 500;
-  }
   .ar-fold {
     display: none;
-    padding-top: var(--sp-4);
   }
   .ar[data-open="true"] .ar-fold {
     display: flex;
+  }
+  .ar-relay {
+    padding-inline: var(--sp-4);
+  }
+  .ar-scroll {
+    flex: none;
+    max-height: 56vh;
+  }
+  .ar-row,
+  .ar[data-follow] .ar-line > .ar-tag {
+    padding-inline: var(--sp-4);
+  }
+  .ar[data-follow] .ar-body {
+    padding-inline: calc(var(--sp-4) + 28px + var(--sp-3)) var(--sp-4);
   }
   .sv {
     flex: none;
