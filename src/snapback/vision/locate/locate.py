@@ -251,9 +251,16 @@ class Locator:
             ):
                 return None
             return self._best(photo, other_hits, strict)
+
         # Ambiguity (ruling 03:46): another building far stronger than the claimed match means
         # the photo is placed nowhere. No false pass, and no false DON'T PAY either.
-        rival = self._best(photo, other_hits, strict, stop_early=False)
+        # The rival only ever blocks, never places, so it needs inliers and ratio but not the
+        # strict spread (ruling (a), 09:26 on #74): a far stronger match elsewhere packed on a
+        # patch still makes the claimed one doubtful. Placing elsewhere keeps the strict bar.
+        def rival_ok(c: Verification) -> bool:
+            return c.inliers >= t.elsewhere_min_inliers and c.ratio >= t.min_inlier_ratio
+
+        rival = self._best(photo, other_hits, rival_ok, stop_early=False)
         if rival is not None and rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
             # The claimed search may have stopped early at a strong face (only possible at or
             # above stop_at_inliers); compare the rival with the claimed maximum first.
