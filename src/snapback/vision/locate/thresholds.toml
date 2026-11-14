@@ -1,0 +1,30 @@
+# Locate thresholds (V2 #28). Frozen before the held-out set is scored; a change needs a note
+# on the issue. LocateResult.thresholds_version is a hash of this file.
+#
+# Set Sat 01:50 to 02:30 from DISK+LightGlue on renders of live sweeps (n=3 renders vs their
+# own face: 419 to 665 inliers; vs another sweep or building: 0 to 5). top_k_claimed raised
+# from 6 to 24 on the dev gate set (seed 0): with the tiny embedder the right sweep was in the
+# claimed twin's top 6 for 11 of 20 views, top 24 for 17. Then 48 side faces, once DISK
+# features are kept on disk (a cached match is 0.12 s, extraction 0.54 s). Held-out: other seeds.
+
+[retrieve]
+top_k = 6              # candidate views verified per photo, over every indexed building
+top_k_claimed = 48     # plus this many side faces of the claimed property's twins
+
+[verify]
+min_inliers = 30       # RANSAC homography inliers to call a photo placed
+min_inlier_ratio = 0.25
+ransac_px = 6.0        # inlier distance, in pixels of the view
+stop_at_inliers = 150  # good enough: stop verifying more candidates
+# A photo is called "another building" (which can mean DON'T PAY) only on a stricter bar than
+# "this building": the claimed twins are always tried first, and a match elsewhere needs about
+# twice the inliers, spread over enough of the photo that one planar object cannot carry it.
+elsewhere_min_inliers = 50  # p10 of true matches is 56 (n=30, #28); noise tops out at 5 to 7
+elsewhere_min_spread = 0.15  # inlier bounding box area / photo area
+
+[pose]
+default_hfov_deg = 65.0  # used when the photo carries no focal length
+
+[spots]
+top_n = 5              # the challenge draws from this many
+overlap_deg = 60.0     # a spot within this angle of a listing photo, in the same room, is excluded

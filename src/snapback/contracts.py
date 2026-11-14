@@ -35,6 +35,11 @@ class PhotoLocation(BaseModel):
     pano_id: str | None = None
     inliers: int | None = None
     inlier_ratio: float | None = None
+    # Which twin the photo was placed in (claimed or not), for located_in_claimed and
+    # located_elsewhere; for located_elsewhere these name the OTHER building (V2, #41).
+    matched_model_id: str | None = None
+    matched_property_id: str | None = None
+    room_label: str | None = None  # Matterport's room classification, e.g. "Kitchen"
 
 
 class AuthorityStatus(StrEnum):
@@ -319,6 +324,9 @@ class ModuleEvidence(BaseModel):
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
+    # A14: a reply came, could not be accepted, and no further photo will be asked for. The
+    # card then says "we could not confirm", not "ask for a new photo". It changes no state.
+    no_retry_left: bool = False
 
 
 # ---------------------------------------------------------------------------------------------
@@ -504,6 +512,65 @@ class AerialProofResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------------------------
+# The "Report this copy" pack (A20): what a listing agent takes to the platform.
+# ---------------------------------------------------------------------------------------------
+
+
+class ReportPlatform(StrEnum):
+    FACEBOOK = "facebook"
+    ZILLOW = "zillow"
+    CRAIGSLIST = "craigslist"
+
+
+class ReportStatusStrip(BaseModel):
+    """What the home's own record says. The same facts the card already carries in `for_sale`."""
+
+    status: ForSaleStatus
+    site: str  # where the record is listed, e.g. Homes.com
+    listed_on: date | None = None
+    changed_on: date | None = None
+    brokerage: str | None = None  # the listing office on record. A company, never a person
+
+
+class ReportPhotoPair(BaseModel):
+    """One listing photo something was found about. Pictures are references to OUR routes."""
+
+    listing_photo: int  # which listing photo, counting from 1
+    finding: str  # the fixed sentence for what was found about it
+    listing_image_url: str | None = None  # our route for the photo as posted, when one exists
+    match_image_url: str | None = None  # our route for the matching view, when one exists
+
+
+class ReportSteps(BaseModel):
+    platform: ReportPlatform
+    name: str  # "Facebook Marketplace", "Zillow", "Craigslist"
+    steps: list[str]  # what to click, in order, in the pack's language
+
+
+class ReportResponse(BaseModel):
+    """`GET /cases/{case_id}/report`: one pack for reporting a copied listing to a platform.
+
+    Listing facts only. No score, count or threshold; no hash or model id; no image bytes;
+    nothing about the renter; no word about any person."""
+
+    case_id: str  # short public id
+    source: DataSource
+    lang: str
+    checked_at: datetime
+    state: VerdictState
+    # True only on proof (DONT_PAY) or a record that shows the home for sale. Not on a hold
+    # for something that is merely not confirmed: the poster may be a real agent.
+    reportable: bool
+    status_strip: ReportStatusStrip | None = None
+    proof_lines: list[str]  # decide()'s own reasons, in order. Never model text
+    photo_pairs: list[ReportPhotoPair] = Field(default_factory=list)
+    twin_url: str | None = None  # our /case/{id}/twin page, where each photo was placed
+    aerial_url: str | None = None  # our /cases/{id}/aerial route, when the case names a building
+    platforms: list[ReportSteps] = Field(default_factory=list)
+    not_checked: list[str]  # the card's standing list: what this does not show
+
+
+# ---------------------------------------------------------------------------------------------
 # Starting a case over HTTP (lane A's API; the upload page and the iMessage sidecar call it).
 # ---------------------------------------------------------------------------------------------
 
@@ -552,9 +619,13 @@ class CreateCaseResponse(BaseModel):
 class ReplyCheck(StrEnum):
     """What checking one reply photo found. Each is a fact about the photo, not about a person."""
 
-    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"  # one of the listing's own photos: forged
-    CODE_NOT_READ = "code_not_read"  # the code is not on the paper in the photo: forged
-    LATE = "late"  # it came after the deadline, so it was not checked
+    # One of the listing's own photos: forged, whenever it arrives. The only proof here.
+    COPY_OF_LISTING_PHOTO = "copy_of_listing_photo"
+    # The code could not be read on the photo (wrong, missing or unreadable). Not confirmed,
+    # ask again up to the retry cap, then HOLD. Never forged: it is not proof.
+    CODE_NOT_READ = "code_not_read"
+    # It came after the deadline and is not a copy, so it was not counted. Asked again once.
+    LATE = "late"
     # The code is there and the photo is not a copy, but nothing has checked that it was taken
     # at the spot (that needs locate, V2). Not confirmed, never proven.
     CODE_READ_SPOT_NOT_CHECKED = "code_read_spot_not_checked"
@@ -569,7 +640,10 @@ class ReplyResponse(BaseModel):
 
     case_id: str  # short public id
     source: DataSource
-    status: CaseProgress  # waiting_for_reply while another photo is wanted, else done
+    # While another photo is wanted this is waiting_for_approval: the next message is in
+    # `challenge_text` for the renter to approve. It is waiting_for_reply once that is sent,
+    # and done when nothing more will be asked.
+    status: CaseProgress
     check: ReplyCheck
     presence: PresenceStatus
     state: VerdictState | None = None  # set once the case is done

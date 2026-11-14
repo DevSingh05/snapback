@@ -9,6 +9,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
+    POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /healthz                         liveness and the data source
     POST /verdict                         decide() on evidence the caller already has
@@ -35,8 +36,9 @@ from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
 from snapback.adapters.vexcel import aerial_proof, aerial_side
-from snapback.agent.intake import read_listing
+from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
+from snapback.agent.reply import UnreadablePhoto
 from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
@@ -49,6 +51,7 @@ from snapback.api.cases import (
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
+from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
 from snapback.contracts import (
     AerialProofResponse,
@@ -58,6 +61,8 @@ from snapback.contracts import (
     DataSource,
     Evidence,
     LocateStatus,
+    ReplyResponse,
+    ReportResponse,
     Verdict,
 )
 from snapback.safety.paths import resolve_data_dir
@@ -259,7 +264,9 @@ def create_app(
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
         try:
-            case = store.create(read_listing(listing_text, images), property_id, register)
+            listing = read_listing(listing_text, images)
+            listing_photos = [images[index] for index in listing.photo_indexes]
+            case = store.create(listing, property_id, register, photos=listing_photos)
             case.owner = owner if registry is not None else None
             return case
         except NotRegistered:
@@ -504,6 +511,41 @@ def create_app(
             headers={"Cache-Control": "private, max-age=600"},
         )
 
+    @app.get("/cases/{case_id}/report")
+    def get_report(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> ReportResponse:
+        """The "Report this copy" pack (A20): what a listing agent takes to the platform.
+
+        The home's own record, the reasons the check gave, which photos were matched, and
+        where to click on Facebook Marketplace, Zillow and Craigslist. Listing facts only: no
+        score, no hash, no image bytes, nothing about the renter, no word about a person.
+        Report steps are given only on proof or a record that shows the home for sale.
+
+        Needs the case's read token in a header. A token in the address is refused with 401
+        even beside a good header: addresses are what servers log. 404 for an unknown case.
+        """
+        case = find(case_id)
+        if "token" in request.query_params:
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "Send the case's read token in the Authorization header, not in the address."
+                ),
+            )
+        check_read(case, _bearer(authorization, x_case_token), None)
+        return build_report(
+            case.evidence,
+            case.card(settings.snapback_public_base_url, lang),
+            case_id=case_id,
+            lang=lang,
+            aerial=case.property_id is not None,
+        )
+
     @app.get("/cases/{case_id}/trace")
     def get_trace(
         case_id: str,
@@ -549,6 +591,59 @@ def create_app(
                 status_code=409, detail="This case is not waiting for an approval."
             ) from None
         return case.status(with_challenge=True)
+
+    @app.post("/cases/{case_id}/reply")
+    async def post_reply(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> ReplyResponse:
+        """The photo the poster sent back, checked (A14). One image, in the form field `photo`.
+
+        Needs the case's write secret in a header, as the approval does. The photo is checked
+        on this machine: is it a copy of one of the listing's own photos, and is the code on
+        it? A copy is forged, whenever it arrives. A code that cannot be read is not proof:
+        another photo is asked for, up to the cap. A right code is not yet "proven": whether
+        it was taken at the spot needs locate, so it stays not confirmed. A reply that comes
+        too late and is not a copy is asked for again once. 409 unless a reply is awaited.
+        """
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        form = await parse_form(request, 1, max_photo_bytes)
+        try:
+            files = [item for item in form.getlist("photo") if isinstance(item, UploadFile)]
+            if len(files) != 1:
+                raise HTTPException(status_code=422, detail="Send one image as `photo`.")
+            [photo] = read_images(files, 1, max_photo_bytes)
+            try:
+                check = await run_in_threadpool(case.reply, photo)
+            except NothingWaiting:
+                raise HTTPException(
+                    status_code=409, detail="This case is not waiting for a reply."
+                ) from None
+            except UnreadablePhoto:
+                raise HTTPException(
+                    status_code=415, detail="That file is not a picture we can open."
+                ) from None
+            except OcrUnavailable:
+                raise HTTPException(
+                    status_code=503,
+                    detail="The reader for the code is not installed on this server.",
+                ) from None
+        finally:
+            await form.close()
+
+        status = case.status(with_challenge=True)
+        return ReplyResponse(
+            case_id=status.case_id,
+            source=status.source,
+            status=status.status,
+            check=check,
+            presence=case.presence(),
+            state=status.state,
+            challenge_text=status.challenge_text,
+        )
 
     @app.get("/eval/results.csv")
     def get_eval_results() -> Response:

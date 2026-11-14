@@ -24,6 +24,14 @@ export const FIXTURE_MATCHED: AerialSide = {
 /** Demo scenario "copied": the one listing photo is placed in a different building (fixture only). */
 export const COPIED_LOCATE: LocateResult = {
   ...(hold.locate as unknown as LocateResult),
-  photos: [{ photo_id: "l1", status: "located_elsewhere", model_id: "fx-model-b" }],
+  photos: [
+    {
+      photo_id: "l1",
+      status: "located_elsewhere",
+      model_id: "fx-model-b",
+      matched_model_id: "fx-model-b",
+      matched_property_id: "fx-prop-matched",
+    },
+  ],
   poses: {},
 };

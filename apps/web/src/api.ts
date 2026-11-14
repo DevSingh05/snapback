@@ -71,6 +71,20 @@ export function apiFetch(
   return fetch(`${base}${path}`, { ...rest, headers: merged, credentials: "include" });
 }
 
+// GET with the case's read token in the Authorization header (never in a URL; ruling on #113).
+// Returns null when this browser holds no read token for the case, so callers fall back to fixtures.
+export function apiFetchRead(
+  path: string,
+  caseId: string,
+  init: RequestInit = {},
+): Promise<Response> | null {
+  const token = loadCaseReadToken(caseId);
+  if (!apiBase() || !token) return null;
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return apiFetch(path, { ...init, headers });
+}
+
 export async function fetchCard(caseId: string, signal?: AbortSignal): Promise<Card> {
   if (!apiBase()) {
     if (caseId.toUpperCase() === fixtureCard.case_id) return fixtureCard;

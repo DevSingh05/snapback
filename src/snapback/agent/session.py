@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from snapback.agent.modules import Modules
+from snapback.agent.modules import ChallengeOutcome, Modules
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -36,6 +36,7 @@ from snapback.contracts import (
 from snapback.verdict import decide, presence_of, to_evidence
 
 MAX_RETRIES = 2
+MAX_LATE_ASKS = 1  # a reply that came too late (and is not a copy) is asked for again once
 TOP_SPOTS = 5
 
 TWIN_RULES_CHALLENGE = "twin+rules+challenge"
@@ -58,6 +59,7 @@ class Step(StrEnum):
     FLOOR_PLAN = "floor_plan"
     SPOT = "spot"
     APPROVAL = "approval"
+    REPLY = "reply"  # the challenge was sent; waiting for the poster's reply photo (A14)
     RETRY = "retry"
     DONE = "done"
 
@@ -112,6 +114,9 @@ class CaseSession:
         self.step = Step.CHECKS
         self.evidence = ModuleEvidence(case_id=case_id, source=trace.source)
         self.retries = 0
+        self.late_replies = 0  # replies that came after the deadline and were not copies
+        self._late = False  # the reply being weighed now is one of those
+        self._replied = False  # a real reply was checked at least once (A14)
         self.verdict: Verdict | None = None
         self.pending_challenge: ChallengeDraft | None = None
 
@@ -132,6 +137,11 @@ class CaseSession:
     @property
     def waiting_for_approval(self) -> bool:
         return self.step is Step.APPROVAL and self._decision is None
+
+    @property
+    def waiting_for_reply(self) -> bool:
+        """The challenge was sent and the poster's reply photo has not been checked yet."""
+        return self.step is Step.REPLY
 
     @property
     def recorded_decision(self) -> str | None:
@@ -379,6 +389,15 @@ class CaseSession:
         outcome = self.modules.challenge(
             self.case_id, self._spot, draft.code, draft.text, self.retries
         )
+        self._take(outcome)
+        if outcome.awaiting_reply:
+            # Nothing to judge yet. The case waits here: no reply is HOLD, never a failure.
+            self.trace.emit(TraceKind.STATUS, self._say("trace.reply.waiting"))
+            self.step = Step.REPLY
+        else:
+            self.step = Step.RETRY
+
+    def _take(self, outcome: ChallengeOutcome) -> None:
         self.evidence = self.evidence.model_copy(
             update={
                 "challenge": outcome.challenge,
@@ -386,6 +405,27 @@ class CaseSession:
                 "memory": outcome.memory,
             }
         )
+
+    def reply(self, outcome: ChallengeOutcome) -> None:
+        """Take the poster's reply, already checked. The retry-or-stop choice comes next.
+
+        An outcome that is still `awaiting_reply` (the photo came too late to count, say)
+        leaves the case waiting.
+        """
+        if self.step is not Step.REPLY:
+            raise RuntimeError("no reply is awaited now")
+        self._take(outcome)
+        if outcome.awaiting_reply:
+            return
+        self._replied = True
+        self._late = outcome.late
+        if outcome.late:
+            # Too late to count and not a copy (a copy is proof whenever it comes). Nothing
+            # on it was judged; whether to ask again is the next choice.
+            self.late_replies += 1
+            self.trace.emit(TraceKind.STATUS, self._say("trace.reply.late"))
+        else:
+            self.trace.emit(TraceKind.TOOL, self._say("trace.tool.reply"), pick="reply")
         self.step = Step.RETRY
 
     # --- choice 5: retry or stop -----------------------------------------------------------
@@ -398,17 +438,44 @@ class CaseSession:
         forged = presence.status is PresenceStatus.FORGED
         proven = presence.status is PresenceStatus.PROVEN
 
+        # Decision 4 (Sat 02:45): a reply that came too late and is not a copy is asked for
+        # again once. A second late one is not: the case holds, and nobody is accused.
+        late = self._late and not forged
+        late_asks_used_up = late and self.late_replies > MAX_LATE_ASKS
+
         # Proof of a forgery is never retried away, and the cap is enforced here, not asked for.
-        can_retry = not forged and self.retries < MAX_RETRIES and bool(self._spots()[0])
+        can_retry = (
+            not forged
+            and not late_asks_used_up
+            and self.retries < MAX_RETRIES
+            and bool(self._spots()[0])
+        )
         options = (ACCEPT, RETRY, STOP) if can_retry else (ACCEPT, STOP)
+
+        # A14: the reply showed the code, and nothing has checked that it was taken at the
+        # spot (that needs locate). Asking again cannot change that, so the case stops here,
+        # not confirmed.
+        last = spots[-1] if spots else None
+        code_only = (
+            not forged
+            and not proven
+            and last is not None
+            and last.replied_at is not None
+            and last.code_read is True
+            and last.located is None
+        )
 
         if forged:
             default, reason = ACCEPT, self._say("trace.retry.forged")
+        elif code_only:
+            default, reason = STOP, self._say("trace.retry.code_only")
         elif proven and matched == len(spots) == 2:
             default, reason = ACCEPT, self._say("trace.retry.accept_both")
         elif proven:
             default = ACCEPT
             reason = self._say("trace.retry.accept", matched=matched, total=len(spots))
+        elif late and can_retry:
+            default, reason = RETRY, self._say("trace.retry.late")
         elif can_retry:
             default, reason = RETRY, self._say("trace.retry.again")
         else:
@@ -424,6 +491,7 @@ class CaseSession:
                 "code_read_on_every_reply": bool(spots) and all(s.code_read for s in spots),
                 "recapture_flag": any(result.blocks_pass for result in self.evidence.recapture),
                 "reply_copies_a_listing_photo": presence.copies_listing_photo,
+                "reply_came_too_late_to_count": late,
                 "retries_used": self.retries,
                 "retries_left": MAX_RETRIES - self.retries,
             },
@@ -434,6 +502,7 @@ class CaseSession:
     def _apply_retry(self, pick: str) -> None:
         if pick == RETRY:
             self.retries += 1
+            self._late = False
             self.step = Step.SPOT
         else:
             self._finish()
@@ -483,6 +552,10 @@ class CaseSession:
 
     def _finish(self) -> None:
         """Decide on the evidence gathered. This is the only way a case gets a state."""
+        if self._replied and presence_of(self.evidence).status is PresenceStatus.WAITING:
+            # A reply came, it could not be accepted, and nothing more will be asked. The
+            # card must stop telling the renter to ask for a photo. This changes no state.
+            self.evidence = self.evidence.model_copy(update={"no_retry_left": True})
         self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
         reasons: list[str] = []
         for reason in self.verdict.reasons:
