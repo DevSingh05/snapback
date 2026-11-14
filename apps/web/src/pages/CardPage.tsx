@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import { LabSection } from "../lab";
+import { loadBrief } from "../search/api";
+import { PlacesStrip } from "../search/PlacesStrip";
 import { replayForCase } from "../replay";
 import { STATE_WORD, historySteps, shortDate, toneWord } from "../cardStrings";
 import type { Card, CardLine, CardRowKind, CardTone, VerdictState } from "../contracts";
@@ -217,7 +219,14 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
   }, [caseId, attempt]);
 
   if (load.status === "ready")
-    return <CardView card={load.card} variant={variant} withLab={variant === "result"} />;
+    return variant === "result" ? (
+      <div className="pf-stack">
+        <CardView card={load.card} variant={variant} withLab />
+        <PlacesStrip caseId={caseId} brief={loadBrief(caseId)} />
+      </div>
+    ) : (
+      <CardView card={load.card} variant={variant} />
+    );
   return (
     <div className="card-page notice" role="status">
       <span className="wordmark">SNAPBACK</span>

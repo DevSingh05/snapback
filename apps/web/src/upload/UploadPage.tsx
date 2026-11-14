@@ -3,6 +3,9 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import type { DataSource } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
 import { TracePanel } from "../trace";
+import { BudgetFields, EMPTY_BUDGET, budgetToBrief, type BudgetForm } from "../search/BudgetFields";
+import { briefIsEmpty, saveBrief } from "../search/api";
+import { PlacesStrip } from "../search/PlacesStrip";
 import {
   MODE,
   fetchApiSource,
@@ -63,6 +66,8 @@ export function UploadPage({
   }, [mode]);
   const shownMode: DataSource = mode === "live" ? apiSource : mode;
   const [text, setText] = useState("");
+  const [budget, setBudget] = useState<BudgetForm>(EMPTY_BUDGET);
+  const [budgetOnly, setBudgetOnly] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
@@ -149,6 +154,8 @@ export function UploadPage({
     dispatch({ type: "submit" });
     try {
       const made = await createCase({ link: v.link, text: v.text, files: v.files });
+      const brief = budgetToBrief(budget);
+      if (!briefIsEmpty(brief)) saveBrief(made.case_id, brief);
       dispatch({
         type: "created",
         caseId: made.case_id,
@@ -211,14 +218,15 @@ export function UploadPage({
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
           <h1 ref={heading} tabIndex={-1}>
-            Check a rental before you pay.
+            Found a place online? Paste the ad.
           </h1>
           <p className="upload-lead">
-            Paste the listing link, or add screenshots of it. We read it and check the place.
+            See the real listing, the real office and a fair price, plus checked places that fit
+            your budget.
           </p>
 
           <label htmlFor="listing" className="upload-label">
-            Listing link or text
+            Paste the ad you found <span className="upload-hint">(listing link or text)</span>
           </label>
           <textarea
             id="listing"
@@ -314,12 +322,25 @@ export function UploadPage({
             </p>
           )}
 
+          <BudgetFields value={budget} onChange={setBudget} />
+
           <button type="submit" className="upload-submit">
             Check this listing
+          </button>
+          <button
+            type="button"
+            className="upload-secondary"
+            disabled={briefIsEmpty(budgetToBrief(budget))}
+            onClick={() => setBudgetOnly(true)}
+          >
+            Just show places that fit my budget
           </button>
           <p className="upload-hint">
             SNAPBACK never texts anyone for you. You approve and send any message yourself.
           </p>
+          {budgetOnly && !briefIsEmpty(budgetToBrief(budget)) && (
+            <PlacesStrip caseId={null} brief={budgetToBrief(budget)} />
+          )}
         </form>
       </div>
     );
