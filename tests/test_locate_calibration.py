@@ -50,3 +50,20 @@ def test_calibration_round_trips_and_names_its_data(tmp_path):
     assert again.predict(2.5) == pytest.approx(cal.predict(2.5))
     meta = json.loads(path.read_text())
     assert meta["source"] == "renders" and meta["n"] == 3
+
+
+def test_bin_edges_put_exact_edge_values_in_the_right_bins():
+    """0.0 opens the first bin, 0.5 opens a middle bin (lower edge inclusive), and 1.0 closes
+    the last bin (the only upper edge that is inclusive)."""
+    bins = reliability_bins(np.array([0.0, 0.5, 1.0]), np.array([1, 0, 1]))
+    assert [(b.low, b.high, b.k, b.n) for b in bins] == [
+        (0.0, 0.1, 1, 1),
+        (0.5, 0.6, 0, 1),
+        (0.9, 1.0, 1, 1),
+    ]
+    assert sum(b.n for b in bins) == 3  # every input lands in exactly one bin
+
+
+def test_a_value_on_an_inner_edge_goes_up_not_down():
+    bins = reliability_bins(np.array([0.1, 0.9]), np.array([1, 1]))
+    assert [(b.low, b.high) for b in bins] == [(0.1, 0.2), (0.9, 1.0)]
