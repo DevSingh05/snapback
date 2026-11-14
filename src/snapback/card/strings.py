@@ -172,6 +172,30 @@ EN: dict[str, str] = {
         "Only trust a SNAPBACK result you asked for yourself. "
         "SNAPBACK never texts first or asks for money."
     ),
+    # --- the "Report this copy" pack (A20, #126) --------------------------------------------
+    # For a listing agent whose listing was copied. Facts and where to click. No line here is
+    # about a person, and like every string in this table none uses the word the card bans:
+    # Facebook's own menu label for the reason is described, not quoted.
+    "report.pair.elsewhere": "Listing photo {n} was taken in a different property.",
+    "report.platform.facebook": "Facebook Marketplace",
+    "report.platform.zillow": "Zillow",
+    "report.platform.craigslist": "Craigslist",
+    "report.steps.facebook.1": "Open the copied listing on Facebook Marketplace.",
+    "report.steps.facebook.2": (
+        'Open the menu (three dots) and choose "Report listing". Pick the reason for a fake '
+        "or misleading listing."
+    ),
+    "report.steps.facebook.3": "Paste the lines from this page where it asks for details.",
+    "report.steps.zillow.1": "Open the copied listing on Zillow.",
+    "report.steps.zillow.2": (
+        'Choose "Report listing", then "Listing seems to be fraudulent or illegal".'
+    ),
+    "report.steps.zillow.3": "Paste the lines from this page where it asks for details.",
+    "report.steps.craigslist.1": "Open the copied post on Craigslist.",
+    "report.steps.craigslist.2": 'Use the "prohibited" flag at the top of the post.',
+    "report.steps.craigslist.3": (
+        "For a fuller report, use the Craigslist contact form and paste the lines from this page."
+    ),
     # On every card made from a staged demo case (fixtures/demo), first in the footer.
     "footer.staged": (
         "Staged example. The SNAPBACK team wrote this listing to show the checks. "
@@ -468,6 +492,28 @@ ES: dict[str, str] = {
     "footer.only_trust": (
         "Confíe solo en un resultado de SNAPBACK que usted mismo pidió. SNAPBACK nunca "
         "escribe primero ni pide dinero."
+    ),
+    # The platforms' menus are quoted as they appear in English.
+    "report.pair.elsewhere": "La foto {n} del anuncio se tomó en otra propiedad.",
+    "report.platform.facebook": "Facebook Marketplace",
+    "report.platform.zillow": "Zillow",
+    "report.platform.craigslist": "Craigslist",
+    "report.steps.facebook.1": "Abra el anuncio copiado en Facebook Marketplace.",
+    "report.steps.facebook.2": (
+        'Abra el menú (tres puntos) y elija "Report listing". Elija el motivo para un '
+        "anuncio falso o engañoso."
+    ),
+    "report.steps.facebook.3": "Pegue las líneas de esta página donde le pidan detalles.",
+    "report.steps.zillow.1": "Abra el anuncio copiado en Zillow.",
+    "report.steps.zillow.2": (
+        'Elija "Report listing" y luego "Listing seems to be fraudulent or illegal".'
+    ),
+    "report.steps.zillow.3": "Pegue las líneas de esta página donde le pidan detalles.",
+    "report.steps.craigslist.1": "Abra la publicación copiada en Craigslist.",
+    "report.steps.craigslist.2": ('Use la marca "prohibited" que está arriba en la publicación.'),
+    "report.steps.craigslist.3": (
+        "Para un informe más completo, use el formulario de contacto de Craigslist y pegue "
+        "las líneas de esta página."
     ),
     "footer.staged": (
         "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
