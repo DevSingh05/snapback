@@ -178,7 +178,10 @@ def owner(listing_text: str, subset: Path, salt: str) -> OwnerResult | None:
     if entry is None:
         return None
     if entry.get("kind") == OwnerKind.COMPANY.value:
-        return OwnerResult(kind=OwnerKind.COMPANY, company=entry.get("company"))
+        company = (entry.get("company") or "").strip()
+        if not company:
+            return None  # a company owner is never sent without its name (A19 review)
+        return OwnerResult(kind=OwnerKind.COMPANY, company=company)
     name = _poster_name(text)
     if name is None:
         return OwnerResult(kind=OwnerKind.PERSON)

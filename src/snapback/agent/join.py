@@ -166,9 +166,12 @@ class KitLookups:
         return trec.check_license(listing_text)
 
     def owner(self, listing_text: str) -> OwnerResult | None:
-        # D12 (#130) plugs in here: the county owner roll, filtered to the kit's houses. Until
-        # it lands there is no owner data, and the card says ownership was not checked.
-        return None
+        # D12 (#130): the county owner roll (HCAD), filtered to the kit's Houston houses and kept
+        # under data/hcad/. No lookup file, or no street match, is None: ownership not checked.
+        # Lane A fills poster_says_owner and published_rule; a person's name never comes back.
+        from snapback.adapters.hcad import lookup_owner
+
+        return lookup_owner(listing_text)
 
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""

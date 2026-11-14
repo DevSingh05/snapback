@@ -111,3 +111,35 @@ def test_lookup_owner_reads_the_settings_data_dir(tmp_path, monkeypatch):
         assert result is not None and result.kind is OwnerKind.COMPANY
     finally:
         get_settings.cache_clear()
+
+
+def test_a_company_without_a_name_is_never_sent(tmp_path):
+    subset = tmp_path / "data" / "hcad" / "owner_subset.jsonl"
+    subset.parent.mkdir(parents=True)
+    import hashlib
+
+    from snapback.adapters.costar_residential import normalize_address
+
+    key = hashlib.sha256(normalize_address("100 Fixture Ln").encode()).hexdigest()
+    subset.write_text(json.dumps({"key": key, "kind": "company", "company": ""}) + "\n")
+    assert owner("100 Fixture Ln", subset, salt="fx-salt") is None
+
+
+def test_kit_lookups_owner_reads_the_hcad_lookup(tmp_path, monkeypatch):
+    from snapback.agent.join import KitLookups
+    from snapback.contracts import DataSource
+    from snapback.settings import get_settings
+
+    monkeypatch.setenv("SNAPBACK_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr("snapback.agent.rules.contact.phone_salt", lambda *a, **k: "fx-salt")
+    get_settings.cache_clear()
+    try:
+        _subset(tmp_path)
+        lookups = KitLookups(DataSource.LIVE)
+        result = lookups.owner("2 bed at 100 Fixture Ln")
+        assert result is not None and result.kind is OwnerKind.COMPANY
+        assert result.company == "FXAMPLE HOMES LLC"
+        assert result.poster_says_owner is False and result.published_rule is None  # lane A's
+        assert lookups.owner("5 Nowhere Road") is None
+    finally:
+        get_settings.cache_clear()
