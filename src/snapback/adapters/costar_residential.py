@@ -335,6 +335,7 @@ CITY = "houston"
 DETACHED = 1  # ListingPropertyType: a house, not a condo or townhouse
 FOR_SALE_CODE = 1  # ForSaleStatus.ForSale
 SOLD_CODE = 5  # ForSaleStatus.Sold
+TRANSACTION_SALE = 1  # TransactionType.ForSale
 NEWLY_SOLD_CODE = 8  # ListingUpdateType.NewlySold
 MATTERPORT_TYPES = {36, 234}  # media[].externalReferenceType
 
@@ -366,18 +367,15 @@ def _sold_on(rec: dict[str, Any]) -> date | None:
     return max(dates, default=None)
 
 
-def _is_sold(rec: dict[str, Any]) -> bool:
-    return rec.get("forSaleStatus") == SOLD_CODE or _sold_on(rec) is not None
-
-
 def _role(rec: dict[str, Any], enums: dict[str, dict[str, str]], today: date) -> str | None:
     status, _, _ = _status(rec, enums, today)
-    if status is ForSaleStatus.RECENTLY_RENTED:
-        return None  # rented homes are never the for-sale or sold story
     if status is ForSaleStatus.ACTIVE and rec.get("forSaleStatus") == FOR_SALE_CODE:
         return "for_sale"
     sold_on = _sold_on(rec)
-    if _is_sold(rec) and sold_on is not None and 0 <= (today - sold_on).days <= RECENT_DAYS:
+    is_sale = (
+        rec.get("forSaleStatus") == SOLD_CODE or rec.get("transactionType") == TRANSACTION_SALE
+    )
+    if is_sale and sold_on is not None and 0 <= (today - sold_on).days <= RECENT_DAYS:
         return "recently_sold"
     return None
 
@@ -390,10 +388,13 @@ def _candidates(kit_dir: Path, today: date) -> list[dict[str, Any]] | None:
         return None
     enums = _load_enums(kit_dir)
     out: list[dict[str, Any]] = []
+    rented: set[int] = set()  # a propertyId with ANY recently rented record, in any city
     for rec in _iter_jsonl(path):
         city = _get_any(rec, ["property.address.city"])
         models = _matterport_models(rec)
         pid = rec.get("propertyId")
+        if isinstance(pid, int) and _status(rec, enums, today)[0] is ForSaleStatus.RECENTLY_RENTED:
+            rented.add(pid)
         if (
             not _public(rec)
             or not isinstance(city, str)
@@ -404,16 +405,18 @@ def _candidates(kit_dir: Path, today: date) -> list[dict[str, Any]] | None:
         ):
             continue
         zip_code = _get_any(rec, RESIDENTIAL_FIELDS["zip"])
+        subdivision = _get_any(rec, ["property.subdivision"])
         out.append(
             {
                 "property_id": pid,
                 "listing_id": rec.get("residentialListingId") or 0,
                 "zip": str(zip_code)[:5] if zip_code else "",
+                "subdivision": subdivision.strip().lower() if isinstance(subdivision, str) else "",
                 "models": models,
                 "role": _role(rec, enums, today),
             }
         )
-    return out
+    return [c for c in out if c["property_id"] not in rented]
 
 
 def indexed_model_ids(data_dir: Path) -> set[str]:
@@ -463,10 +466,12 @@ def pick_demo_houses(
     indexed = indexed or set()
     picks: list[dict[str, Any]] = []
     taken: set[int] = set()
-    zip_code = ""
+    zip_code = subdivision = ""
     for role in DEMO_ROLES:
         if role == "decoy":
-            pool = [c for c in cands if c["zip"] == zip_code and zip_code]
+            pool = [c for c in cands if zip_code and c["zip"] == zip_code]
+            if subdivision:  # a different subdivision, until tract twins are proven on real scans
+                pool = [c for c in pool if c["subdivision"] and c["subdivision"] != subdivision]
         else:
             pool = [c for c in cands if c["role"] == role]
         chosen = _choose(pool, taken, indexed)
@@ -475,7 +480,7 @@ def pick_demo_houses(
         pick, count, rule = chosen
         taken.add(pick["property_id"])
         if role == "for_sale":
-            zip_code = pick["zip"]
+            zip_code, subdivision = pick["zip"], pick["subdivision"]
         picks.append(
             {
                 "propertyId": pick["property_id"],

@@ -2,7 +2,7 @@
 
 The fixture kit copies the real key paths (`propertyId`, `media[].externalReferenceType` with
 `media[].videoKey`, `property.address.city`, `history[].updateType`); every value is made up.
-Property ids 9000 to 9014 are synthetic.
+Property ids 8998 to 9018 are synthetic.
 """
 
 import json
@@ -33,9 +33,9 @@ def test_the_trio_is_picked_by_role_with_candidate_counts():
     assert (picks["for_sale"]["propertyId"], picks["for_sale"]["candidates"]) == (9001, 2)
     # recently sold: 9004 (closeDate) and 9005 (NewlySold). 9006 sold in 2025, 9009 was rented.
     assert (picks["recently_sold"]["propertyId"], picks["recently_sold"]["candidates"]) == (9004, 2)
-    # decoy: same zip as the for-sale pick (77001), not 9000 in 77099 with a smaller id
-    assert picks["decoy"]["propertyId"] != 9000
-    assert picks["decoy"]["propertyId"] == 9002
+    # decoy: same zip (77001), a different subdivision (9014); not 9000 in 77099 with a smaller
+    # id, and not the rented 8999 with the smallest id
+    assert picks["decoy"]["propertyId"] == 9014
     assert {p["rule"] for p in picks.values()} == {"first by propertyId"}
     assert not any(p["indexed"] for p in picks.values())
 
@@ -59,7 +59,7 @@ def test_an_indexed_twin_beats_a_smaller_property_id(tmp_path):
     picks = by_role(pick_demo_houses(KIT, TODAY, indexed_model_ids(tmp_path)))
     assert picks["for_sale"]["propertyId"] == 9002
     assert picks["for_sale"]["rule"] == "indexed twin" and picks["for_sale"]["indexed"]
-    assert picks["decoy"]["propertyId"] == 9001  # 9002 is taken: the next 77001 home
+    assert picks["decoy"]["propertyId"] == 9014
 
 
 def test_the_recent_window_moves_with_today():
@@ -74,7 +74,7 @@ def test_written_file_holds_only_property_id_and_role_and_stdout_has_no_ids(tmp_
     assert saved == [
         {"propertyId": 9001, "role": "for_sale"},
         {"propertyId": 9004, "role": "recently_sold"},
-        {"propertyId": 9002, "role": "decoy"},
+        {"propertyId": 9014, "role": "decoy"},
     ]
     printed = capsys.readouterr().out
     assert "for_sale: rule=first by propertyId, candidates=2, indexed=no" in printed
@@ -104,3 +104,33 @@ def test_today_flag_makes_the_cli_deterministic(tmp_path, flag, capsys):
     code = main(["--kit", str(KIT), "--data", str(tmp_path), "--today", flag])
     assert code == 0
     assert json.loads((tmp_path / "demo" / "house.json").read_text())[0]["propertyId"] == 9001
+
+
+def test_a_rented_house_is_never_the_decoy():
+    # 8999 is in the for-sale zip with the smallest id, but it was rented this month
+    picks = pick_demo_houses(KIT, TODAY)
+    assert 8999 not in {p["propertyId"] for p in picks}
+
+
+def test_a_property_id_with_any_rented_record_is_never_picked():
+    # 8998 has a for-sale record and a rented record; the sale record alone must not win it
+    picks = pick_demo_houses(KIT, TODAY)
+    assert 8998 not in {p["propertyId"] for p in picks}
+    assert by_role(picks)["for_sale"]["candidates"] == 2
+
+
+def test_without_a_subdivision_field_the_decoy_falls_back_to_the_same_zip(tmp_path):
+    stripped = []
+    for line in (KIT / "residential-listings.jsonl").read_text().splitlines():
+        rec = json.loads(line)
+        rec["property"].pop("subdivision")
+        stripped.append(json.dumps(rec))
+    (tmp_path / "enums.json").write_text((KIT / "enums.json").read_text())
+    (tmp_path / "residential-listings.jsonl").write_text("\n".join(stripped) + "\n")
+    picks = by_role(pick_demo_houses(tmp_path, TODAY))
+    assert picks["decoy"]["propertyId"] == 9002  # same zip, smallest id left
+
+
+def test_a_closed_rental_is_not_recently_sold():
+    # 9017 has a recent closeDate but is a rental; only 9004 and 9005 are sales
+    assert by_role(pick_demo_houses(KIT, TODAY))["recently_sold"]["candidates"] == 2
