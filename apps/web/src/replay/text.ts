@@ -3,10 +3,10 @@
 
 export type Lang = "en" | "es";
 
-export function replayLang(search = window.location.search, nav = navigator.language): Lang {
-  const asked = new URLSearchParams(search).get("lang");
-  if (asked === "es" || asked === "en") return asked;
-  return nav.toLowerCase().startsWith("es") ? "es" : "en";
+// English unless the address says ?lang=es. The browser's language is deliberately not read, so
+// a stage machine set to Spanish still shows the English demo.
+export function replayLang(search = window.location.search): Lang {
+  return new URLSearchParams(search).get("lang") === "es" ? "es" : "en";
 }
 
 const MONTHS: Record<Lang, string[]> = {

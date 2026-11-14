@@ -381,6 +381,11 @@ def create_app(
             if demo_case and demo_case not in {r.case_id for r in load_replays()}:
                 raise HTTPException(status_code=422, detail="That is not a replay case.")
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
+            if demo_case and (text.strip() or link.strip() or photos or property_id):
+                # A replay's case runs its own staged listing and nothing the caller adds.
+                raise HTTPException(
+                    status_code=422, detail="A replay case takes no listing, link or photos."
+                )
             if renter_id and not RENTER_ID.fullmatch(renter_id):
                 raise HTTPException(status_code=422, detail="That is not a renter id.")
 

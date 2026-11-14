@@ -1,10 +1,10 @@
 import { Fragment, useState } from "react";
 
 import { SourceChip } from "../components/SourceChip";
-import { FINDING_WORDS, getReplay, REPLAY_VERDICT_WORDS } from "./index";
+import { findingWord, getReplay, REPLAY_VERDICT_WORDS, startsWithToneWord } from "./index";
 import { openCase, runReplayCase, type RunCase } from "./runCase";
 import { replayLang, shortDate, words, type Lang } from "./text";
-import type { Replay } from "./types";
+import type { Replay, ReplayStepKind } from "./types";
 import { useReplays } from "./useReplays";
 import { dataMode } from "../api";
 import "./replay.css";
@@ -37,26 +37,39 @@ function NotFound() {
 
 function FindingLine({
   finding,
+  stepKind,
   lang,
 }: {
   finding?: Replay["snapback"]["findings"][number];
+  stepKind?: ReplayStepKind;
   lang: Lang;
 }) {
   if (!finding) return <p>{words(lang).nothingFlagged}</p>;
   return (
     <p className={`finding finding-${finding.status}`} data-status={finding.status}>
-      <strong>{FINDING_WORDS[finding.status]}.</strong> {finding.text}
+      {startsWithToneWord(finding.text) ? null : (
+        <strong>{findingWord(finding.status, stepKind ?? "listing")}. </strong>
+      )}
+      {finding.text}
     </p>
   );
 }
 
 // A replay can have several findings for one step; every one is shown, in file order.
-function FindingLines({ list, lang }: { list: Replay["snapback"]["findings"]; lang: Lang }) {
+function FindingLines({
+  list,
+  stepKind,
+  lang,
+}: {
+  list: Replay["snapback"]["findings"];
+  stepKind: ReplayStepKind;
+  lang: Lang;
+}) {
   if (list.length === 0) return <FindingLine lang={lang} />;
   return (
     <>
       {list.map((f) => (
-        <FindingLine key={`${f.step_id}-${f.text}`} finding={f} lang={lang} />
+        <FindingLine key={`${f.step_id}-${f.text}`} finding={f} stepKind={stepKind} lang={lang} />
       ))}
     </>
   );
@@ -191,7 +204,11 @@ export function ReplayView({
                     {i >= stopIndex && stopIndex >= 0 ? (
                       <p className="muted">{t.notSent}</p>
                     ) : (
-                      <FindingLines list={findings.get(step.id) ?? []} lang={lang} />
+                      <FindingLines
+                        list={findings.get(step.id) ?? []}
+                        stepKind={step.kind}
+                        lang={lang}
+                      />
                     )}
                   </div>
                 </li>

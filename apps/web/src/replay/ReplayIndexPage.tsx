@@ -1,5 +1,4 @@
 import { SourceChip } from "../components/SourceChip";
-import { dataMode } from "../api";
 import { replayLang, shortDate, words, type Lang } from "./text";
 import { useReplays } from "./useReplays";
 import type { Replay } from "./types";
@@ -18,7 +17,7 @@ export function ReplayIndexView({
       <header className="replay-head">
         <div className="replay-masthead">
           <span className="wordmark">SNAPBACK</span>
-          <SourceChip source={dataMode()} />
+          <SourceChip source="fixture" />
         </div>
         <h1>{t.indexTitle}</h1>
         <p className="replay-source">{t.indexLead}</p>

@@ -5,8 +5,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { matchRoute } from "../App";
-import { bundledReplays, FEATURED_REPLAY_SLUG } from "./index";
+import { bundledReplays, FEATURED_REPLAY_SLUG, findingWord, startsWithToneWord } from "./index";
 import { ReplayIndexView } from "./ReplayIndexPage";
+import { replayLang } from "./text";
 import { ReplayNav } from "./ReplayNav";
 import { ReplayPage, ReplayView } from "./ReplayPage";
 import type { Replay } from "./types";
@@ -105,9 +106,9 @@ describe("replay page", () => {
     expect(within(step).getByText("Ad seen")).toBeInTheDocument();
     expect(step.querySelector(".tl-real")).toHaveTextContent("What happened");
     expect(step.querySelector(".tl-snap")).toHaveTextContent("With SNAPBACK");
-    // every finding for the step is shown, a risky ask in the card's word "Warning"
+    // every finding for the step is shown; a red flag on a listing step is a mismatch
     expect(step.querySelectorAll("[data-status]")).toHaveLength(2);
-    expect(within(step).getByText("Warning.")).toBeInTheDocument();
+    expect(within(step).getByText("Doesn't match.")).toBeInTheDocument();
   });
 
   it("leaves out the date of a step the source did not date", () => {
@@ -189,5 +190,65 @@ describe("header tab", () => {
     const has = bundledReplays().some((r) => r.slug === FEATURED_REPLAY_SLUG);
     expect(tab).toHaveAttribute("href", has ? `/replay/${FEATURED_REPLAY_SLUG}` : "/replay");
     expect(screen.getByRole("link", { name: "All replays" })).toHaveAttribute("href", "/replay");
+  });
+});
+
+describe("finding labels", () => {
+  const DOUBLED =
+    /^(matches|doesn't match|not confirmed|warning|not checked|not shown)\.\s+(matches|doesn't match|not confirmed|warning|not checked|not shown)\b/i;
+
+  it.each(bundledReplays().map((r) => [r.slug, r] as const))(
+    "%s: no finding line opens with two tone words",
+    (_slug, r) => {
+      render(<ReplayView replay={r} lang="en" />);
+      const lines = Array.from(document.querySelectorAll("[data-status]"));
+      expect(lines.length).toBeGreaterThan(0);
+      for (const line of lines) {
+        expect(line.textContent ?? "").not.toMatch(DOUBLED);
+      }
+    },
+  );
+
+  it("adds the tone word only when the text has none of its own", () => {
+    expect(startsWithToneWord("Not confirmed. Owner of record: X.")).toBe(true);
+    expect(startsWithToneWord("NOT SHOWN. Being inside does not mean they may rent it.")).toBe(
+      true,
+    );
+    expect(startsWithToneWord("Not checked (our data has no rent).")).toBe(true);
+    expect(startsWithToneWord("Taken in this building.")).toBe(false);
+    render(<ReplayView replay={sourced} lang="en" />);
+    expect(screen.getByText("Matches.")).toBeInTheDocument();
+  });
+
+  it("words a red flag by step kind", () => {
+    expect(findingWord("red_flag", "hold_request")).toBe("Warning");
+    expect(findingWord("red_flag", "payment")).toBe("Warning");
+    expect(findingWord("red_flag", "chat")).toBe("Doesn't match");
+    expect(findingWord("matches", "chat")).toBe("Matches");
+  });
+
+  it("shows the owner's own payment rule on the Conroe hold step, not Nothing flagged", () => {
+    const conroe = bundledReplays().find((r) => r.slug === FEATURED_REPLAY_SLUG);
+    if (!conroe) return;
+    render(<ReplayView replay={conroe} lang="en" />);
+    const hold = within(screen.getByTestId("step-hold"));
+    expect(hold.getByText(/only accept applications and leasing funds/)).toBeInTheDocument();
+    expect(hold.queryByText(/Nothing flagged/)).toBeNull();
+  });
+});
+
+describe("English is pinned for the demo", () => {
+  it("ignores the browser language and reads only ?lang=es", () => {
+    expect(replayLang("")).toBe("en");
+    expect(replayLang("?lang=es")).toBe("es");
+    expect(replayLang("?lang=fr")).toBe("en");
+  });
+});
+
+describe("index chip", () => {
+  it("reads FIXTURE for team-made replays even when an API is connected", () => {
+    mode.live = true;
+    render(<ReplayIndexView replays={[sourced]} lang="en" />);
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
   });
 });

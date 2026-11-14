@@ -105,3 +105,57 @@ def test_run_this_case_starts_the_replay_case_and_its_card_names_the_source(clie
 def test_run_this_case_refuses_any_demo_case_that_is_not_a_replay(client):
     assert _make_case(client, demo_case="a").status_code == 422
     assert _make_case(client, demo_case="../x").status_code == 422
+
+
+def _live_client(tmp_path):
+    from snapback.agent.join import KitLookups
+    from snapback.contracts import DataSource
+
+    lookups = KitLookups(DataSource.LIVE, kit_dir=tmp_path / "no-kit")
+    settings = Settings(_env_file=None, snapback_data_dir=tmp_path, snapback_data_source="live")
+    return TestClient(create_app(settings, lookups=lookups))
+
+
+def test_run_this_case_on_a_live_server_is_still_a_fixture_case_with_its_own_cards(tmp_path):
+    from snapback.card import strings
+
+    client = _live_client(tmp_path)
+    owner_case = "replay-owner-not-poster-door-code"
+    assert owner_case in {r.case_id for r in replays.load_replays()}
+    made = _make_case(client, demo_case=owner_case)
+    assert made.status_code == 201, made.text
+    assert made.json()["source"] == "fixture"
+    card = client.get(f"/cases/{made.json()['case_id']}/card").json()
+    assert card["source"] == "fixture"
+    assert card["state"] == "hold"
+    owner = [
+        line["text"]
+        for row in card["rows"]
+        for line in row["lines"]
+        if line["label"] == strings.text("label.owner")
+    ]
+    assert len(owner) == 1 and owner[0].startswith("Not confirmed. Owner of record:")
+    assert card["footer"][0].startswith("Replay of a reported case (")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"text": "Nice house, pay by Zelle"},
+        {"link": "https://example.org/listing"},
+        {"property_id": "P-1"},
+    ],
+)
+def test_run_this_case_takes_no_listing_text_link_or_building(client, extra):
+    replay = next(r for r in replays.load_replays() if not r.fictional)
+    assert _make_case(client, demo_case=replay.case_id, **extra).status_code == 422
+
+
+def test_run_this_case_takes_no_photos(client):
+    replay = next(r for r in replays.load_replays() if not r.fictional)
+    done = client.post(
+        "/cases",
+        data={"demo_case": replay.case_id},
+        files={"photos": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")},
+    )
+    assert done.status_code == 422
