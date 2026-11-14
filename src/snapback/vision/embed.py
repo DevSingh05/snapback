@@ -72,8 +72,14 @@ class Dinov2Embedder:  # pragma: no cover - needs torch and a one-time download
             # weights (Apache-2.0) from Hugging Face; no repository code is downloaded or run.
             import timm
 
+            from snapback.vision.locate.weights import dinov2_file
+
             model = timm.create_model(
-                TIMM_DINOV2, pretrained=True, num_classes=0, img_size=self.SIZE
+                TIMM_DINOV2,
+                pretrained=True,
+                num_classes=0,
+                img_size=self.SIZE,
+                pretrained_cfg_overlay={"file": str(dinov2_file())},  # pinned revision, checked
             )
         except ImportError:
             model = torch.hub.load(DINOV2_REPO, self.name, trust_repo=True)

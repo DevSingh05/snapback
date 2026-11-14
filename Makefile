@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar purge
+.PHONY: setup lint format test hygiene check api web sidecar purge prefetch-weights
 
 setup: ## install python and node dependencies
 	uv sync
@@ -37,3 +37,6 @@ sidecar: ## run the intake sidecar stub
 
 purge: ## delete everything under data/ (sponsor caches, memory DB); sponsor terms: by Sun 16:00
 	uv run python -m snapback.safety purge
+
+prefetch-weights: ## download and sha256-check the DISK, LightGlue and DINOv2 weights (vision extra)
+	uv run python -m snapback.vision.locate.weights

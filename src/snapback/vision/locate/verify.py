@@ -79,6 +79,7 @@ def _shrink(image: Image.Image, side: int = MATCH_SIDE) -> tuple[Image.Image, fl
 
 class PatchMatcher:
     name = "patch"
+    version = "patch"
 
     def __init__(self, max_corners: int = 400, patch: int = 7, side: int = 512) -> None:
         self.max_corners = max_corners
@@ -174,6 +175,11 @@ class DiskLightGlue:  # pragma: no cover - needs torch, kornia and a one-time we
         self.max_keypoints = max_keypoints
         self._disk = kf.DISK.from_pretrained("depth").to(self.device).eval()
         self._glue = kf.LightGlueMatcher("disk").to(self.device).eval()
+        # Stop here if either downloaded weight is not the file the thresholds were set with.
+        from snapback.vision.locate.weights import check_matcher_weights, tag
+
+        check_matcher_weights()
+        self.version = f"{self.name}@{tag()}"
         self._lafs = kf.laf_from_center_scale_ori
         # id(image) -> (image, features). The image is kept so its id is never reused while
         # cached; faces come back as the same objects from the locator's face cache.

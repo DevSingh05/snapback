@@ -362,3 +362,12 @@ def test_thresholds_reject_an_elsewhere_bar_below_the_placement_bar(tmp_path):
     )
     with pytest.raises(ValueError, match="elsewhere_min_inliers"):
         load_thresholds(copy)
+
+
+def test_thresholds_version_names_the_matcher(twins, locator):
+    sweeps, _, _ = twins
+    result = locator.locate(
+        "fx-case-v", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    )
+    assert result.thresholds_version.startswith("thresholds-")
+    assert result.thresholds_version.endswith("+patch")

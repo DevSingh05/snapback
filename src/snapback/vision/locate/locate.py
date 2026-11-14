@@ -301,5 +301,7 @@ class Locator:
             chosen=chosen,
             alternatives=[c for c in candidates if c is not chosen],
             poses=poses,
-            thresholds_version=self.thresholds.version,
+            thresholds_version=(
+                f"{self.thresholds.version}+{getattr(self.matcher, 'version', self.matcher.name)}"
+            ),
         )
