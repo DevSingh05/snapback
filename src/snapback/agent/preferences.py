@@ -29,6 +29,8 @@ FINDER_FACT_KEYS = frozenset(
         "picked_with_scan",
         "picked_below_budget",
         "budget_set",
+        "said_no_walkup",
+        "said_parking",
     }
 )
 _COUNT_TEXT = re.compile(r"\d{1,3} of \d{1,3}")
@@ -79,6 +81,8 @@ class Signals:
     budget: int | None = None
     highest_pick_rent: int | None = None
     n_events: int = 0
+    said_no_walkup: bool = False  # the renter's own words asked for this (read by code)
+    said_parking: bool = False
 
 
 def read_signals(events: list[Event], session: str) -> Signals:
@@ -88,6 +92,7 @@ def read_signals(events: list[Event], session: str) -> Signals:
     scan_picked = picks = 0
     picked_rents: list[int] = []
     budget: int | None = None
+    said_no_walkup = said_parking = False
     n = 0
     for event in events:
         if event.source.value != "renter" or event.payload.get("session") != session:
@@ -97,6 +102,8 @@ def read_signals(events: list[Event], session: str) -> Signals:
             n += 1
             if p.get("brief_field") == "budget" and isinstance(p.get("rent_max"), int):
                 budget = int(p["rent_max"])  # type: ignore[arg-type]
+            said_no_walkup = said_no_walkup or p.get("brief_field") == "no_walkup"
+            said_parking = said_parking or p.get("brief_field") == "parking"
         elif event.kind is EventKind.PLACE_PASSED:
             n += 1
             if isinstance(p.get("walkup"), bool):
@@ -126,6 +133,8 @@ def read_signals(events: list[Event], session: str) -> Signals:
         budget=budget,
         highest_pick_rent=max(picked_rents) if picked_rents else None,
         n_events=n,
+        said_no_walkup=said_no_walkup,
+        said_parking=said_parking,
     )
 
 
@@ -141,6 +150,10 @@ def facts_of(signals: Signals) -> dict[str, object]:
         out["picked_with_scan"] = f"{signals.scan_picked} of {signals.picks}"
     if signals.budget is not None and signals.priced_picks:
         out["picked_below_budget"] = f"{signals.below_budget_picked} of {signals.priced_picks}"
+    if signals.said_no_walkup:
+        out["said_no_walkup"] = True
+    if signals.said_parking:
+        out["said_parking"] = True
     return guard_facts(out)
 
 
@@ -169,21 +182,27 @@ def candidates(signals: Signals, applied: CasePreferences) -> dict[str, Candidat
     """The proposals the counts support and the renter has not already accepted, by key."""
     out: dict[str, Candidate] = {}
     s = signals
-    if not applied.no_walkup and _lopsided(s.walkups_passed, s.walkups_seen):
+    walkups = _lopsided(s.walkups_passed, s.walkups_seen)
+    if not applied.no_walkup and (walkups or s.said_no_walkup):
         out["propose_no_walkup"] = Candidate(
             "propose_no_walkup",
             PreferencesUpdate(no_walkup=True),
             "Skip walk-ups from now on?",
-            f"you passed on {s.walkups_passed} of {s.walkups_seen} walk-ups",
-            "passed_walkups",
+            f"you passed on {s.walkups_passed} of {s.walkups_seen} walk-ups"
+            if walkups
+            else "you said no walk-ups",
+            "passed_walkups" if walkups else "said_no_walkup",
         )
-    if not applied.needs_parking and _lopsided(s.no_parking_passed, s.parking_seen):
+    parking = _lopsided(s.no_parking_passed, s.parking_seen)
+    if not applied.needs_parking and (parking or s.said_parking):
         out["propose_parking"] = Candidate(
             "propose_parking",
             PreferencesUpdate(needs_parking=True),
             "Only show places with parking?",
-            f"you passed on {s.no_parking_passed} of {s.parking_seen} places without parking",
-            "passed_no_parking",
+            f"you passed on {s.no_parking_passed} of {s.parking_seen} places without parking"
+            if parking
+            else "you asked about parking",
+            "passed_no_parking" if parking else "said_parking",
         )
     if not applied.prefer_scans and _lopsided(s.scan_picked, s.picks):
         out["propose_prefer_scans"] = Candidate(
