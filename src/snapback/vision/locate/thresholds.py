@@ -27,6 +27,9 @@ class Thresholds:
 def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
     raw = path.read_bytes()
     data = tomllib.loads(raw.decode())
+    verify_cfg = data["verify"]
+    if verify_cfg["elsewhere_min_inliers"] < verify_cfg["min_inliers"]:
+        raise ValueError("elsewhere_min_inliers must not be below min_inliers")
     return Thresholds(
         top_k=data["retrieve"]["top_k"],
         top_k_claimed=data["retrieve"]["top_k_claimed"],

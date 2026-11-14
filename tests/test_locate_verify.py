@@ -337,3 +337,28 @@ def test_gate_counts_claimed_views_placed_elsewhere_and_not_located(twins, locat
         "views of the claimed building placed in another building: 1 of 4",
         "not located: 1 of 4",
     ]
+
+
+def test_unmapped_twin_is_not_located_never_elsewhere(twins):
+    sweeps, index, _ = twins
+    catalog = Catalog([ModelInfo("fx-model-b", "fx-prop-2")])  # fx-model-a is not mapped
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), THRESHOLDS)
+    photo = locator.locate(
+        "fx-unmapped", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
+    ).photos[0]
+    assert photo.status is not LocateStatus.LOCATED_ELSEWHERE
+    assert photo.status in (LocateStatus.NOT_LOCATED, LocateStatus.NOT_INDEXED)
+    assert photo.matched_property_id is None
+
+
+def test_thresholds_reject_an_elsewhere_bar_below_the_placement_bar(tmp_path):
+    from snapback.vision.locate.thresholds import THRESHOLDS_FILE
+
+    copy = tmp_path / "t.toml"
+    copy.write_text(
+        THRESHOLDS_FILE.read_text().replace(
+            "elsewhere_min_inliers = 60", "elsewhere_min_inliers = 29"
+        )
+    )
+    with pytest.raises(ValueError, match="elsewhere_min_inliers"):
+        load_thresholds(copy)

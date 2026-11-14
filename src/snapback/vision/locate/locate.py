@@ -242,6 +242,14 @@ class Locator:
         for photo_id, image in photos.items():
             photo = image.convert("RGB")
             placed = self._place(photo, claimed_models)
+            if (
+                placed is not None
+                and placed.model_id not in claimed_models
+                and self.catalog.property_of(placed.model_id) is None
+            ):
+                # Never "somewhere else" without a known other building: the catalog may just be
+                # missing the claimed property's own twin.
+                placed = None
             if placed is None:
                 status = LocateStatus.NOT_LOCATED if claimed_models else LocateStatus.NOT_INDEXED
                 locations.append(PhotoLocation(photo_id=photo_id, status=status))
