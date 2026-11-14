@@ -26,7 +26,14 @@ export const S = {
   legendOther: "On record",
   legendScan: "3D scan",
   legendHeight: "Taller: more plans",
-  legendChip: "Chip: lowest asking rent, as of last research",
+  legendChip: (source: "live" | "fixture") =>
+    source === "fixture"
+      ? "Chip: lowest asking rent (sample)"
+      : "Chip: lowest asking rent, as of last research",
+  everyFigure: (source: "live" | "fixture") =>
+    source === "fixture" ? "Every figure is a sample" : `Every figure ${AS_OF}`,
+  cardAsOf: (source: "live" | "fixture") =>
+    source === "fixture" ? "sample figure" : "as of last research",
   mapLabel: "Map of the places. The same places are in the list below.",
   // the brief
   criteria: "Your brief",

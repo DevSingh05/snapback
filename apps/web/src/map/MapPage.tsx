@@ -156,7 +156,7 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
           <li className="lg-other">{S.legendOther}</li>
           <li className="lg-scan">{S.legendScan}</li>
           {flatMap ? null : <li className="lg-height">{S.legendHeight}</li>}
-          <li className="lg-chip">{S.legendChip}</li>
+          <li className="lg-chip">{S.legendChip(feed?.source ?? "fixture")}</li>
         </ul>
 
         <div className="col-left">
@@ -241,7 +241,7 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
       <section className="ledger-wrap" aria-label={ledgerName}>
         <header className="ledger-head">
           <h2>{ledgerName}</h2>
-          <p className="mono">Every figure {S.asOf}</p>
+          <p className="mono">{S.everyFigure(feed?.source ?? "fixture")}</p>
         </header>
         {feed ? (
           <PlaceLedger places={places} passed={passed} selectedPid={selectedPid} onPick={pick} />

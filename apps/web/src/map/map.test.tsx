@@ -6,7 +6,7 @@ import { AS_OF } from "../contracts";
 import type { CityMap } from "./CityMap";
 import MapPage from "./MapPage";
 import { monthsOld } from "./PlaceSheet";
-import { fixturePlacesMap, fixtureSheet } from "./fixture";
+import { SAMPLE_AS_OF, fixturePlacesMap, fixtureSheet } from "./fixture";
 import { columnHeight, columns, hexagon, metresBetween, nearestPlace } from "./geometry";
 import { BANNED } from "./strings";
 import { EMPTY_CRITERIA, toBrief } from "./types";
@@ -44,7 +44,7 @@ describe("the fixture city", () => {
         ].sort(),
       );
       expect(f.properties.pid).toMatch(/^fx-map-\d+$/);
-      expect(f.properties.as_of).toBe(AS_OF);
+      expect(f.properties.as_of).toBe(SAMPLE_AS_OF);
     }
   });
 
@@ -69,7 +69,10 @@ describe("the fixture city", () => {
       expect(lowest).toBe(f.properties.rent_from);
       expect(sheet.plans.length).toBe(f.properties.n_plans);
       expect(sheet.has_3d_scan).toBe(f.properties.has_scan);
-      for (const p of sheet.plans) expect(p.price_text).toContain(AS_OF);
+      for (const p of sheet.plans) {
+        expect(p.price_text).toContain("(sample figure)");
+        expect(p.price_text).not.toContain("CoStar");
+      }
     }
   });
 
@@ -120,7 +123,8 @@ describe("the map page", () => {
     expect(count).toHaveTextContent("sample places, made by the team");
     expect(count).not.toHaveTextContent("CoStar has researched");
     expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("FIXTURE");
-    expect(screen.getAllByText(AS_OF).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(SAMPLE_AS_OF).length).toBeGreaterThan(0);
+    expect(screen.queryByText(AS_OF)).toBeNull();
     const attribution = screen.getByTestId("attribution");
     expect(attribution).toHaveTextContent("OpenFreeMap");
     expect(attribution).toHaveTextContent("OpenMapTiles");
@@ -151,7 +155,8 @@ describe("the map page", () => {
     fireEvent.click(scanned);
     const sheet = await screen.findByTestId("place-sheet");
     await within(sheet).findByText("Floor plans on record");
-    expect(within(sheet).getByText(AS_OF)).toBeInTheDocument();
+    expect(within(sheet).getByText(SAMPLE_AS_OF)).toBeInTheDocument();
+    expect(sheet.textContent).not.toContain(AS_OF);
     expect(within(sheet).getByText(/Management company on record/)).toBeInTheDocument();
     const badge = within(sheet).getByTestId("scan-badge");
     expect(badge).toHaveTextContent("3D scan in this building");

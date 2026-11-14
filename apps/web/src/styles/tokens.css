@@ -83,13 +83,13 @@
 
   /* The city map (map/mapStyle.ts reads these at run time): land, water, streets, the pale
      glass buildings, and the columns that mark researched places. Sky, teal and ink only. */
-  --map-land: #dbe6ed;
+  --map-land: #d0dee7;
   --map-water: #b4d3e6;
-  --map-park: #c8e0d2;
+  --map-park: #bcd9c8;
   --map-road: #ffffff;
-  --map-road-case: #b2c6d2;
+  --map-road-case: #a3bac8;
   --map-road-glow: rgb(255 255 255 / 0);
-  --map-bldg: #c6deeb;
+  --map-bldg: #a9c9dc;
   --map-bldg-flat: #d0dde6;
   --map-roof: #ffffff;
   --map-win: #9fbfd3;

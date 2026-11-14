@@ -322,7 +322,9 @@ export function PlaceLedger({
                   {S.rentFrom(p.rent_from)}
                   {p.rent_from != null ? <small> {S.rentTail}</small> : null}
                 </span>
-                <span className="lcard-meta">{S.units(p.units_reported)}, as of last research</span>
+                <span className="lcard-meta">
+                  {S.units(p.units_reported)}, {S.cardAsOf(p.source)}
+                </span>
               </span>
               {p.has_scan ? (
                 <span className="lcard-inset">

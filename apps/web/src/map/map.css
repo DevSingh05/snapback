@@ -183,6 +183,7 @@
   z-index: 3;
   left: 356px;
   bottom: 40px;
+  max-width: calc(100% - 372px);
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
@@ -192,6 +193,10 @@
   text-transform: uppercase;
   color: var(--ink);
   background: var(--panel);
+}
+/* With the sheet open, the key stays clear of it. */
+.city-picked .legend {
+  max-width: calc(100% - 356px - 440px);
 }
 .legend li {
   display: flex;
@@ -1017,6 +1022,10 @@
   }
   .hud-count {
     margin-top: 8px;
+  }
+  .legend,
+  .city-picked .legend {
+    max-width: none;
   }
   .legend {
     order: 2;

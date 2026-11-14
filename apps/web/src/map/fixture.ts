@@ -1,4 +1,3 @@
-import { AS_OF } from "../contracts";
 import type { MustHaveLine, PlaceMatch } from "../contracts";
 import { passesOwnFilters } from "./types";
 import type { Criteria, PlaceFeature, PlaceSheetData, PlacesMap } from "./types";
@@ -6,6 +5,11 @@ import type { Criteria, PlaceFeature, PlaceSheetData, PlacesMap } from "./types"
 // The FIXTURE city: team-made stand-ins on real Houston streets. Every point is made up by a
 // seeded generator; none is a real place, address, office or name, and no kit id appears here.
 // The same generated record feeds the pin and the sheet, so the two cannot disagree.
+
+// What stands where a live record says "as of CoStar's last research": these are the team's
+// own sample figures, so they never borrow CoStar's name.
+export const SAMPLE_AS_OF = "sample figures, made by the team";
+const SAMPLE = "(sample figure)";
 
 interface FixturePlace {
   pid: string;
@@ -114,7 +118,7 @@ function feature(p: FixturePlace, c: Criteria): PlaceFeature {
     units_reported: p.units_reported,
     fits_brief: false,
     source: "fixture" as const,
-    as_of: AS_OF,
+    as_of: SAMPLE_AS_OF,
   };
   properties.fits_brief = fits(p, c) && passesOwnFilters(properties, c);
   return {
@@ -130,7 +134,7 @@ export function fixturePlacesMap(c: Criteria): PlacesMap {
   return {
     type: "FeatureCollection",
     source: "fixture",
-    as_of: AS_OF,
+    as_of: SAMPLE_AS_OF,
     n_places: features.length,
     n_fit: features.filter((f) => f.properties.fits_brief).length,
     n_unlocated: 0,
@@ -167,7 +171,7 @@ export function fixtureSheet(pid: string): PlaceSheetData | null {
   const availability_text =
     p.units_reported == null
       ? "Units available: not on record"
-      : `${p.units_reported} ${p.units_reported === 1 ? "unit" : "units"} reported available ${AS_OF}`;
+      : `${p.units_reported} ${p.units_reported === 1 ? "unit" : "units"} reported available ${SAMPLE}`;
   const plans: PlaceMatch[] = p.plans.map((pl, i) => ({
     property_id: p.pid,
     kind: p.kind,
@@ -178,7 +182,7 @@ export function fixtureSheet(pid: string): PlaceSheetData | null {
     rent_min: pl.rent,
     rent_max: pl.rent,
     budget_fit: "no_budget",
-    price_text: `${usd(pl.rent)} a month ${AS_OF}`,
+    price_text: `${usd(pl.rent)} a month ${SAMPLE}`,
     availability_text,
     must_haves,
     musts_met: must_haves.filter((m) => m.met).length,
@@ -192,7 +196,7 @@ export function fixtureSheet(pid: string): PlaceSheetData | null {
     property_id: p.pid,
     kind: p.kind,
     source: "fixture",
-    as_of: AS_OF,
+    as_of: SAMPLE_AS_OF,
     office_on_record: p.company,
     has_3d_scan: p.has_scan,
     scan_text: p.has_scan ? "a 3D scan in this building" : null,

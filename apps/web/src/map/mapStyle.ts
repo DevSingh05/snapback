@@ -546,7 +546,7 @@ export function buildStyle(p: Palette, look: Look, data: PlaceData): Record<stri
       ...placeSources(data),
     },
     // One light, from the north-west and fixed to the map, shades every wall the same way.
-    light: { anchor: "map", position: [1.3, 300, 38], intensity: 0.32, color: p["col-cap"] },
+    light: { anchor: "map", position: [1.3, 300, 38], intensity: 0.5, color: p["col-cap"] },
     sky:
       look === "glass"
         ? {
