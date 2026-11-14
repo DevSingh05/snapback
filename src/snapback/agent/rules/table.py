@@ -58,11 +58,12 @@ class Rule:
 # Pieces of the "money before move-in" rule. A deposit that is "no deposit" or "without
 # deposit" is not money asked for, and "not required" is not an ask.
 _MONEY = (
-    r"(?:(?<!no )(?<!without )\bdeposit\b|\bfirst month(?:'s)?\b|\bmonth'?s rent\b"
+    r"(?:(?<!no )(?<!no security )(?<!without )(?<!zero )\bdeposit\b"
+    r"|\bfirst month(?:'s)?\b|\bmonth'?s rent\b"
     r"|\$\d[\d,]{0,12})"
 )
 _NOT = r"(?<!not )(?<!n't )(?<!never )(?<!dont )"
-_A_DEPOSIT = r"(?<!no )(?<!without )(?<!zero )\bdeposit\b"
+_A_DEPOSIT = r"(?<!no )(?<!no security )(?<!without )(?<!zero )\bdeposit\b"
 _DOLLARS = r"\$[1-9][\d,]{0,12}"  # "$0 deposit" asks for nothing
 _BEFORE_MOVE_IN = r"\b(?:before|prior to|ahead of)\b[^.!?]{0,15}\bmov(?:e|ing)[- ]?in\b"
 
@@ -183,7 +184,7 @@ RULES: tuple[Rule, ...] = (
         patterns=(
             # "the deposit is due before move-in"
             _MONEY
-            + r"[^.!?]{0,40}"
+            + r"[^.!?$]{0,40}"  # no "$" in the gap: a run of "$1," cannot stall the match
             + _NOT
             + r"\b(?:due|required|needed|payable|paid|pay|send|collected|owed)\b"
             + r"[^.!?]{0,25}"
@@ -215,13 +216,13 @@ RULES: tuple[Rule, ...] = (
             # "the deposit is $1,100", "$1,100 deposit", "deposit required",
             # "deposit is one month's rent".
             _A_DEPOSIT + r"[^.!?$]{0,20}" + _DOLLARS,
-            _DOLLARS + r"(?:(?! no | without )[^.!?$]){0,15}\bdeposit\b",
+            _DOLLARS + r"(?:(?! no | without | zero )[^.!?$]){0,15}\bdeposit\b",
             _A_DEPOSIT + r"[^.!?]{0,15}" + _NOT + r"\b(?:due|required|needed|payable)\b",
             _A_DEPOSIT + r"[^.!?]{0,15}\b(?:one|two|1|2|a|first|last) month",
             # The first month asked for ahead of time, and "first and last".
             r"\bfirst month(?:'s)?(?: rent)?\b[^.!?]{0,20}"
             r"\b(?:up ?front|in advance|at signing)\b",
-            r"\bfirst and last\b",
+            r"\bfirst and last month'?s?\b(?: rent)?",  # not "first and last name"
         ),
         excused_when_refused=True,
     ),

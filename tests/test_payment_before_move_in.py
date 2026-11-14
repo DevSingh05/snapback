@@ -153,6 +153,11 @@ def test_an_ask_for_money_before_move_in_is_heard(text):
         "A deposit is not required.",
         "Rent is $1,900 a month.",
         "Rent is $1,900 a month, water included.",
+        # Review of #218: a name is not a month, and a negated deposit is not a deposit.
+        "Send me your first and last name and I will set up a showing.",
+        "Text your first and last name to book a tour.",
+        "No security deposit required.",
+        "Rent $1,500, zero deposit.",
         # The writer refusing the thing is not the writer asking for it.
         "We do not require first month's rent to be paid before move-in.",
         "We never ask for a deposit of $500.",
