@@ -5,7 +5,9 @@ import { apiBase, apiFetch } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
 import {
+  calibrationLabel,
   conditionLabel,
+  heldOutFrozenAt,
   type CalibrationPoint,
   ResultsError,
   calibrationSeries,
@@ -178,6 +180,15 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
                 <circle cx={x(p.x)} cy={y(p.rate)} r={4} className="lab-dot">
                   <title>{`${pct(p.rate)} right, n = ${p.n}, 95% CI ${pct(p.ci_low)} to ${pct(p.ci_high)}`}</title>
                 </circle>
+                <text
+                  x={x(p.x)}
+                  y={Math.max(m.top + 8, y(p.ci_high) - 3)}
+                  className="lab-tick lab-n"
+                  textAnchor="middle"
+                  data-testid="cal-point-n"
+                >
+                  {`n=${p.n}`}
+                </text>
               </g>
             ))}
           </g>
@@ -187,7 +198,10 @@ function CalibrationChart({ series }: { series: Map<string, CalibrationPoint[]> 
         {entries.map(([cond], si) => (
           <li key={cond} className={SERIES_CLASS[si % SERIES_CLASS.length]}>
             <span className="lab-swatch" aria-hidden="true" />
-            {cond}
+            {calibrationLabel(cond)}
+            <span className="lab-n" data-testid="cal-legend-n">
+              {` (n per bin: ${(series.get(cond) ?? []).map((p) => p.n).join(", ")})`}
+            </span>
           </li>
         ))}
       </ul>
@@ -210,7 +224,7 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
   const bars = curveBars(parsed.rows);
   const cal = calibrationSeries(parsed.rows);
   const mem = memoryCatch(parsed.rows);
-  const frozen = parsed.rows.find((r) => r.frozen_at && r.frozen_at !== "FIXTURE")?.frozen_at;
+  const frozen = heldOutFrozenAt(parsed.rows);
 
   return (
     <section className="lab-panel" aria-labelledby="lab-title" data-testid="lab-panel">
@@ -251,7 +265,7 @@ export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
             </p>
           ) : null}
           <div className="lab-block">
-            <h3>Calibration: when we say 90%, how often are we right</h3>
+            <h3>Locate score calibration (renders of our scans)</h3>
             {cal.size > 0 ? (
               <CalibrationChart series={cal} />
             ) : (
