@@ -128,3 +128,27 @@ describe("AerialProof privacy", () => {
     expect(text).not.toMatch(/safe|danger|crime|score|neighbou?rhood/i);
   });
 });
+
+describe("AerialProof capture date and banner", () => {
+  it("names the capture date and Vexcel under a live tile", () => {
+    const side = live({
+      ...FIXTURE_MATCHED,
+      tile: { ...FIXTURE_MATCHED.tile!, captured_on: "2025-03-14" },
+    });
+    render(<AerialProof mismatch={false} claimed={side} matched={side} />);
+    expect(screen.getByText("Aerial photo captured Mar 14, 2025 (Vexcel)")).toBeInTheDocument();
+  });
+
+  it("labels a fixture tile's date as a fixture, never as Vexcel", () => {
+    render(<AerialProof mismatch={false} claimed={FIXTURE_CLAIMED} matched={FIXTURE_MATCHED} />);
+    const line = screen.getByText(/Aerial photo captured Jun 1, 2025/);
+    expect(line).toHaveTextContent("(fixture tile)");
+    expect(line).not.toHaveTextContent("Vexcel");
+  });
+
+  it("says nothing about a date when the tile has none", () => {
+    const side = { ...FIXTURE_MATCHED, tile: { ...FIXTURE_MATCHED.tile!, captured_on: null } };
+    render(<AerialProof mismatch={false} claimed={side} matched={side} />);
+    expect(screen.queryByText(/captured/)).toBeNull();
+  });
+});
