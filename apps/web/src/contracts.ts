@@ -28,3 +28,20 @@ export interface Card {
   verify_url?: string | null;
   lang: string;
 }
+
+export type TraceKind = "choice" | "tool" | "status" | "hitl" | "verdict" | "error";
+export type ChoiceKind =
+  "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human";
+
+// One line of the agent trace, sent as SSE `event: trace` with this JSON as `data`.
+export interface TraceEvent {
+  case_id: string;
+  seq: number;
+  at: string;
+  kind: TraceKind;
+  choice?: ChoiceKind | null;
+  options: string[];
+  pick?: string | null;
+  reason: string;
+  source: DataSource;
+}
