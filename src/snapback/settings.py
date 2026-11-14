@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # The eval harness's results, written by `make eval`: aggregate numbers only. Served
     # read-only at GET /eval/results.csv for the Lab panel.
     snapback_eval_results: Path = Path("eval/results.csv")
+    # Locate accuracy on the kit's own photos, written by `make eval-locate-real` (A8):
+    # totals only. Served read-only at GET /eval/locate_real.csv.
+    snapback_eval_locate_real: Path = Path("eval/locate_real.csv")
     # Pause between trace events on the SSE route, for a demo. 0 sends them as they happen.
     snapback_trace_pace_ms: int = 0
     # What happens after the renter approves the challenge (A14). "stand_in" answers at once
