@@ -301,3 +301,48 @@ export interface TourDraft {
   sent: false;
   source: DataSource;
 }
+
+// Mirrors TourPlan in src/snapback/tour.py (GET /places/{id}/tour and /cases/{id}/tour): the
+// "Walk it first" tour, built by code. Every fact has a source line.
+export interface TourFact {
+  text: string;
+  source: string;
+}
+
+export interface TourPhoto {
+  photo_id: string;
+  sweep_id?: string | null;
+  position?: [number, number, number] | null;
+  rotation_quat?: [number, number, number, number] | null;
+  fov_deg?: number | null;
+}
+
+export interface TourStop {
+  kind: "arrive" | "door" | "room" | "stop" | "outro";
+  key: string;
+  title: string;
+  room_label?: string | null;
+  sweep_id?: string | null;
+  sweep_count: number;
+  sweep_ids: string[];
+  photos: TourPhoto[]; // the renter's own ad photos placed in this room (case tour only)
+  position?: [number, number, number] | null;
+  rotation_quat?: [number, number, number, number] | null;
+  facts: TourFact[];
+  tip?: string | null; // "check this in person"
+  note?: string | null;
+}
+
+export interface TourPlan {
+  property_id: string;
+  kind: "apartment" | "house";
+  source: DataSource;
+  as_of: string;
+  has_scan: boolean;
+  scan_label?: string | null;
+  rooms_labelled: boolean;
+  rooms_note: string;
+  aerial?: { source: DataSource; captured_on?: string | null; has_image: boolean } | null;
+  stops: TourStop[];
+  links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
+}

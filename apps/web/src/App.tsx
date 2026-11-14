@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { CardPage } from "./pages/CardPage";
 import { ReplayPage } from "./replay/ReplayPage";
+import { TourPage } from "./tour/TourPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
 import { UploadPage } from "./upload/UploadPage";
@@ -12,11 +13,14 @@ type Route =
   | { name: "twin"; id: string }
   | { name: "verify"; id: string }
   | { name: "replay"; slug: string }
+  | { name: "tour"; propertyId: string }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
+  const tour = /^\/tour\/([A-Za-z0-9_.:-]+)\/?$/.exec(path);
+  if (tour?.[1]) return { name: "tour", propertyId: tour[1] };
   const trace = /^\/case\/([A-Za-z0-9_-]+)\/trace\/?$/.exec(path);
   if (trace?.[1]) return { name: "trace", id: trace[1] };
   const twin = /^\/case\/([A-Za-z0-9_-]+)\/twin\/?$/.exec(path);
@@ -45,6 +49,15 @@ export default function App() {
         <UploadPage />
       ) : route.name === "replay" ? (
         <ReplayPage key={route.slug} slug={route.slug} />
+      ) : route.name === "tour" ? (
+        <TourPage
+          key={`tour-${route.propertyId}-${window.location.search}`}
+          target={{
+            propertyId: route.propertyId,
+            planKey: new URLSearchParams(window.location.search).get("plan_key"),
+            caseId: new URLSearchParams(window.location.search).get("case"),
+          }}
+        />
       ) : route.name === "trace" ? (
         <TracePage key={`trace-${route.id}`} caseId={route.id} />
       ) : route.name === "twin" ? (

@@ -218,6 +218,15 @@ function TwinViewInner({
         <span className="mono">Photo poses</span>
         <SourceChip source={poseIsLive ? "live" : "fixture"} />
         <span className="mono">{caseId}</span>
+        {locate.claimed_property_id && (
+          <a
+            className="mono"
+            href={`/tour/${encodeURIComponent(locate.claimed_property_id)}?case=${encodeURIComponent(caseId)}`}
+            data-testid="walk-it-first-link"
+          >
+            Walk it first
+          </a>
+        )}
       </header>
       <div className="twin-body">
         <section className="twin-stage" aria-label="3D view" ref={stageRef}>

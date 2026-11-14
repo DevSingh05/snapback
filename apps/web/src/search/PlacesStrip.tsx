@@ -30,6 +30,12 @@ interface Props {
   heading?: string;
 }
 
+// The guided walkthrough of a researched place. The plan is picked by its key, never its label.
+function tourHref(place: PlaceMatch): string {
+  const q = place.plan_key ? `?plan_key=${encodeURIComponent(place.plan_key)}` : "";
+  return `/tour/${encodeURIComponent(place.property_id)}${q}`;
+}
+
 const SCAN_LABEL = "a 3D scan in this building";
 
 function PlaceRow({
@@ -86,6 +92,11 @@ function PlaceRow({
         </ul>
       )}
       {place.has_3d_scan && <p className="pf-scan">{place.scan_text ?? SCAN_LABEL}</p>}
+      {place.has_3d_scan && (
+        <a className="pf-action" href={tourHref(place)} data-testid="walk-it-first-link">
+          Walk it first
+        </a>
+      )}
       {place.office_on_record && (
         <p className="pf-office">
           Leasing office on record: <strong>{place.office_on_record}</strong>
