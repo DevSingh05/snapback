@@ -159,6 +159,57 @@ def test_the_zone_can_be_set_and_an_unknown_one_is_refused(tmp_path):
         Settings(_env_file=None, snapback_card_timezone="Mars/Olympus_Mons")
 
 
+def test_the_recorded_houston_card_is_served_on_houston_time_in_both_languages(client):
+    # XO review of #106: it was saved on an Eastern clock and read "21:42 UTC-05:00".
+    for lang in ("en", "es"):
+        card = client.get("/cases/7Q2M/card", params={"lang": lang}).json()
+        checked = datetime.fromisoformat(card["checked_at"])
+        expires = datetime.fromisoformat(card["expires_at"])
+        assert (checked.hour, checked.minute) == (20, 42)  # 21:42 Eastern is 20:42 Central
+        assert checked.utcoffset() == timedelta(hours=-6) == expires.utcoffset()
+        assert checked == CARD.checked_at  # the same moment, read on another clock
+        # The time of the reply, inside the line, is on the same clock as the card.
+        here_now = card["rows"][1]["lines"][0]["text"]
+        assert "20:44" in here_now and "21:44" not in here_now
+
+
+def test_the_recorded_cards_picture_reads_cst(client):
+    from snapback.card.render import _stamp
+
+    card = Card.model_validate(client.get("/cases/7Q2M/card").json())
+    served = card.checked_at.astimezone(ZoneInfo("America/Chicago"))
+    assert _stamp(served) == "2026-11-13 20:42 CST"
+    assert client.get("/cases/7Q2M/card.png").status_code == 200
+
+
+def test_a_recorded_case_with_no_zone_is_served_exactly_as_saved():
+    import json
+
+    from snapback.api.cases import RecordedCase
+    from snapback.contracts import ModuleEvidence
+
+    evidence = ModuleEvidence.model_validate(
+        json.loads((FIXTURES / "module_evidence_hold.json").read_text())
+    )
+    assert RecordedCase("fx-7Q2M", CARD, [], evidence).card("http://localhost:5173") is CARD
+
+
+def test_a_new_renderer_makes_a_new_picture_of_the_same_card(client, monkeypatch):
+    # Without this, a client holding the old picture's tag would be told "unchanged".
+    from snapback.card import render
+
+    before = client.get("/cases/7Q2M/card.png")
+    monkeypatch.setattr(render, "RENDER_VERSION", "test-next")
+    after = client.get("/cases/7Q2M/card.png", headers={"If-None-Match": before.headers["etag"]})
+    assert after.status_code == 200
+    assert after.headers["etag"] != before.headers["etag"]
+
+    pictures = CardPictures()
+    old = pictures.etag(CARD)
+    monkeypatch.setattr(render, "RENDER_VERSION", "test-after-that")
+    assert pictures.etag(CARD) != old
+
+
 def test_the_picture_names_the_zone_and_not_a_bare_offset():
     from snapback.card.render import _stamp
 

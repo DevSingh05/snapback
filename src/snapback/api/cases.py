@@ -27,7 +27,8 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.intake import Listing
+from snapback.agent.demo import demo_modules, load_demo_case, staged
+from snapback.agent.intake import Listing, read_listing
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.card import strings
 from snapback.contracts import (
@@ -93,26 +94,37 @@ class RecordedCase:
     read_token = None
 
     def __init__(
-        self, case_id: str, card: Card, events: list[TraceEvent], evidence: ModuleEvidence
+        self,
+        case_id: str,
+        card: Card,
+        events: list[TraceEvent],
+        evidence: ModuleEvidence,
+        zone: tzinfo | None = None,
     ) -> None:
         self.case_id = case_id
         self._card = card
         self._events = events
         self._evidence = evidence
+        self._zone = zone  # the card's clock: the building's zone, not the one it was saved in
         self._photos = len(evidence.locate.photos) if evidence.locate else 0
 
     def events(self) -> list[TraceEvent]:
         return self._events
 
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
-        """The recorded card as it is. In another language, the same evidence laid out again."""
-        if lang == self._card.lang:
+        """The recorded case, laid out on the card's clock in the language asked for.
+
+        The card is rebuilt from the recorded evidence at the recorded moment, so every time
+        on it (when it was checked, when it expires, when the reply came) is shown in the
+        building's zone. With no zone given it is served exactly as it was saved.
+        """
+        if self._zone is None and lang == self._card.lang:
             return self._card
+        checked_at = self._card.checked_at
+        if self._zone is not None:
+            checked_at = checked_at.astimezone(self._zone)
         return build_card(
-            self._evidence,
-            checked_at=self._card.checked_at,
-            verify_base_url=verify_base_url,
-            lang=lang,
+            self._evidence, checked_at=checked_at, verify_base_url=verify_base_url, lang=lang
         )
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
@@ -146,6 +158,7 @@ class SessionCase:
         self.session = session
         self._listing = listing
         self._runner = runner
+        self.staged = False  # made from a staged demo case (fixtures/demo)
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 
@@ -164,12 +177,14 @@ class SessionCase:
         return list(self.session.trace.events)
 
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
-        return build_card(
+        card = build_card(
             self.session.evidence,
             checked_at=self._checked_at or _now(self._zone),
             verify_base_url=verify_base_url,
             lang=lang,
         )
+        # A card made from a staged demo case says so on the card itself.
+        return staged(card) if self.staged else card
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         """Where the case stands. The drafted challenge is left out unless asked for."""
@@ -247,7 +262,10 @@ class CaseStore:
         evidence = ModuleEvidence.model_validate_json(
             (FIXTURES_DIR / "module_evidence_hold.json").read_text()
         )
-        self._cases[public_id(card.case_id)] = RecordedCase(card.case_id, card, events, evidence)
+        zone = ZoneInfo(self._settings.snapback_card_timezone)
+        self._cases[public_id(card.case_id)] = RecordedCase(
+            card.case_id, card, events, evidence, zone
+        )
 
     def get(self, case_id: str) -> RecordedCase | SessionCase | None:
         return self._cases.get(public_id(case_id))
@@ -269,11 +287,24 @@ class CaseStore:
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
             # The fixture modules stand in for the twin, the record and the challenge. What
             # the renter sent is real: its scope, its rule hits and its rent come from intake.
-            modules = FixtureModules(
-                listing_scope=listing.scope,
-                rules=listing.rule_hits if listing.text else None,
-                listed_rent=listing.listed_rent,
-            )
+            if self._settings.demo_case:
+                # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
+                demo = load_demo_case(self._settings.demo_case)
+                if not listing.text:
+                    staged = read_listing(demo.listing_text)
+                    listing = staged.model_copy(
+                        update={"photos": listing.photos, "screenshots": listing.screenshots}
+                    )
+                modules = demo_modules(demo, listing)
+            else:
+                modules = FixtureModules(
+                    listing_scope=listing.scope,
+                    rules=listing.rule_hits if listing.text else None,
+                    listed_rent=listing.listed_rent,
+                    contacts=listing.contacts,
+                    unit=listing.unit,
+                    beds=listing.beds,
+                )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
@@ -281,6 +312,7 @@ class CaseStore:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             zone = ZoneInfo(self._settings.snapback_card_timezone)
             case = SessionCase(short_id, session, listing, self._runner, zone)
+            case.staged = bool(self._settings.demo_case)
             self._cases[short_id] = case
         case.advance()
         return case

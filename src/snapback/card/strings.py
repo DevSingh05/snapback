@@ -26,6 +26,11 @@ EN: dict[str, str] = {
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
     "label.seen_before": "Seen before",
+    "label.for_sale": "For sale",
+    "label.recently_rented": "Rental history",
+    "label.contact": "Contact on record",
+    "label.link": "Link",
+    "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
         "Taken in this building, in the {floor_plan} floor plan ({located} of {total} photos)."
@@ -37,6 +42,18 @@ EN: dict[str, str] = {
     "place.no_photos": "Not checked (no listing photos were sent).",
     "place.seen_before_dated": "A listing photo also appeared in another check on {date}.",
     "place.seen_before": "A listing photo also appeared in another check.",
+    # For sale is a red flag, never proof: it holds a case and cannot set DON'T PAY by itself.
+    "place.for_sale": "This home is listed for sale on {site}, not for rent. Red flag.",
+    # Lease status is something we do not know and never claim (ruling, Sat 01:20). This is
+    # an information line: it carries no flag and holds no case by itself.
+    "place.recently_rented": (
+        "Not confirmed. The record shows it was rented recently. "
+        "Ask the manager on record if it's still available."
+    ),
+    "place.recently_rented_dated": (
+        "Not confirmed. The record shows it was rented on {date}. "
+        "Ask the manager on record if it's still available."
+    ),
     # --- PERSON: is someone there now, and may they rent it? -------------------------------
     "here_now.proven_plan": (
         "Someone with access to a {floor_plan} unit here sent these just now "
@@ -63,8 +80,25 @@ EN: dict[str, str] = {
     "allowed.call_manager_unnamed": (
         "Not confirmed. Call the manager on record on a number you look up yourself before you pay."
     ),
-    "allowed.mismatch": (
-        "The name they gave does not match the manager on record for this building. Red flag."
+    # A name that is not the one on record is never a red flag by itself (ruling, Sat 01:20):
+    # the manager, the leasing office and a listing brokerage may all market a home.
+    "allowed.call_office": "Not confirmed. Call the office on record yourself.",
+    # Contact on record. The phone number itself and the record's web address are never shown.
+    # A match is a supporting line only. It never counts as matching the record by itself.
+    "contact.phone_match": (
+        "The phone matches the leasing office on record. Call it yourself to confirm."
+    ),
+    # The poster's own contact not matching the record is a real red flag (ruling, Sat 01:20).
+    "contact.phone_mismatch": (
+        "The phone in the listing is not the leasing office on record. "
+        "Call {manager} yourself. Red flag."
+    ),
+    "contact.phone_mismatch_unnamed": (
+        "The phone in the listing is not the leasing office on record. "
+        "Call the office on record yourself. Red flag."
+    ),
+    "contact.lookalike_link": (
+        "A link in the listing imitates this building's website but is not it. Red flag."
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -98,6 +132,20 @@ EN: dict[str, str] = {
     "rent.not_checked": "Not checked (our data has no rent for this building).",
     "rent.within_range": "In line with the rents on record for this building.",
     "rent.below_range": "Below the rents on record for this building. Ask why; discounts happen.",
+    # "NN% under this building's lowest N bed": the comparison with the listing's own size.
+    "rent.below_floor_plan": (
+        "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
+    ),
+    "rent.plan.studio": "studio",
+    "rent.plan.beds": "{beds} bed",
+    "rent.per_bed": "Not checked (priced per bed here, so the rent was not compared).",
+    "unit.not_on_record": (
+        "The record for this building lists no unit with that number. Ask the manager on record."
+    ),
+    "unit.beds_mismatch": (
+        "The bedroom count in the listing does not match the record for this building. "
+        "Ask the manager on record."
+    ),
     # --- what no card ever checks, and the two lines under every card ----------------------
     "not_checked.id": "ID",
     "not_checked.lease": "lease",
@@ -109,6 +157,11 @@ EN: dict[str, str] = {
     "footer.only_trust": (
         "Only trust a SNAPBACK result you asked for yourself. "
         "SNAPBACK never texts first or asks for money."
+    ),
+    # On every card made from a staged demo case (fixtures/demo), first in the footer.
+    "footer.staged": (
+        "Staged example. The SNAPBACK team wrote this listing to show the checks. "
+        "It is not a real poster."
     ),
     # --- the challenge message the renter relays, and the agent's own trace lines ----------
     "challenge.text": (
@@ -163,10 +216,13 @@ EN: dict[str, str] = {
     "reason.forged_copy": "The reply is a copy of listing photo {n}.",
     "reason.forged_copy_unknown": "The reply is a copy of one of the listing photos.",
     "reason.photo_elsewhere": "At least one listing photo was taken in a different property.",
-    "reason.authority_mismatch": "The poster does not match the contact on the property record.",
     "reason.price_flag": "The rent is far below comparable units.",
     "reason.payment_flag": "Payment was requested before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
+    "reason.for_sale": "This home is listed for sale, not for rent.",
+    "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
+    "reason.lookalike_link": "A link in the listing imitates the building's website.",
+    "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
@@ -219,6 +275,11 @@ ES: dict[str, str] = {
     "label.pressure": "Presión",
     "label.rent_vs_record": "Renta frente al registro",
     "label.seen_before": "Visto antes",
+    "label.for_sale": "En venta",
+    "label.recently_rented": "Historial de alquiler",
+    "label.contact": "Contacto en el registro",
+    "label.link": "Enlace",
+    "label.unit": "Unidad en el registro",
     "place.located_plan": (
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
     ),
@@ -231,6 +292,15 @@ ES: dict[str, str] = {
     "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",
+    "place.for_sale": "Esta vivienda está en venta en {site}, no en alquiler. Señal de alerta.",
+    "place.recently_rented": (
+        "Sin confirmar. El registro muestra que se alquiló hace poco. "
+        "Pregunte al administrador que figura en el registro si sigue disponible."
+    ),
+    "place.recently_rented_dated": (
+        "Sin confirmar. El registro muestra que se alquiló el {date}. "
+        "Pregunte al administrador que figura en el registro si sigue disponible."
+    ),
     "here_now.proven_plan": (
         "Alguien con acceso a una unidad de {floor_plan} aquí las envió ahora mismo "
         "({matched} de {total} puntos, código leído, {time})."
@@ -264,9 +334,23 @@ ES: dict[str, str] = {
         "Sin confirmar. Llame al administrador que figura en el registro, a un número que "
         "usted mismo busque, antes de pagar."
     ),
-    "allowed.mismatch": (
-        "El nombre que dieron no coincide con el administrador que figura en el registro de "
-        "este edificio. Señal de alerta."
+    "allowed.call_office": (
+        "Sin confirmar. Llame usted mismo a la oficina que figura en el registro."
+    ),
+    "contact.phone_match": (
+        "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
+        "Llame usted mismo para confirmarlo."
+    ),
+    "contact.phone_mismatch": (
+        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
+        "Llame usted mismo a {manager}. Señal de alerta."
+    ),
+    "contact.phone_mismatch_unnamed": (
+        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
+        "Llame usted mismo a la oficina que figura en el registro. Señal de alerta."
+    ),
+    "contact.lookalike_link": (
+        "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
@@ -317,6 +401,21 @@ ES: dict[str, str] = {
         "Por debajo de las rentas que figuran en el registro de este edificio. Pregunte por "
         "qué; hay descuentos."
     ),
+    "rent.below_floor_plan": (
+        "{percent}% por debajo de la renta más baja que figura en el registro de este edificio "
+        "para {plan}. Pregunte por qué; hay descuentos."
+    ),
+    "rent.plan.studio": "un estudio",
+    "rent.plan.beds": "{beds} hab.",
+    "rent.per_bed": "No comprobado (aquí se cobra por cama, así que la renta no se comparó).",
+    "unit.not_on_record": (
+        "El registro de este edificio no tiene ninguna unidad con ese número. "
+        "Pregunte al administrador que figura en el registro."
+    ),
+    "unit.beds_mismatch": (
+        "El número de habitaciones del anuncio no coincide con el registro de este edificio. "
+        "Pregunte al administrador que figura en el registro."
+    ),
     "not_checked.id": "identificación",
     "not_checked.lease": "contrato",
     "not_checked.ownership": "propiedad",
@@ -327,6 +426,10 @@ ES: dict[str, str] = {
     "footer.only_trust": (
         "Confíe solo en un resultado de SNAPBACK que usted mismo pidió. SNAPBACK nunca "
         "escribe primero ni pide dinero."
+    ),
+    "footer.staged": (
+        "Ejemplo preparado. El equipo de SNAPBACK escribió este anuncio para mostrar las "
+        "revisiones. No es un anunciante real."
     ),
     "challenge.text": (
         "Antes de pagar, pídales que envíen una foto de {spot} con el código {code} escrito "
@@ -390,12 +493,15 @@ ES: dict[str, str] = {
     "reason.forged_copy": "La respuesta es una copia de la foto {n} del anuncio.",
     "reason.forged_copy_unknown": "La respuesta es una copia de una de las fotos del anuncio.",
     "reason.photo_elsewhere": "Al menos una foto del anuncio se tomó en otra propiedad.",
-    "reason.authority_mismatch": (
-        "Quien publicó el anuncio no coincide con el contacto del registro de la propiedad."
-    ),
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
     "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
+    "reason.for_sale": "Esta vivienda está en venta, no en alquiler.",
+    "reason.phone_flag": (
+        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
+    ),
+    "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
+    "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
         "revisar las fotos."

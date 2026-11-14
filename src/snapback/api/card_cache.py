@@ -11,6 +11,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Callable
 
+from snapback.card import render
 from snapback.card.render import render_card_png
 from snapback.contracts import Card
 
@@ -41,7 +42,10 @@ class CardPictures:
                 "expires_at": card.expires_at.replace(second=0, microsecond=0),
             }
         )
-        return hashlib.sha256(shown.model_dump_json().encode()).hexdigest()[:32]
+        # The renderer's version is part of the name: a picture drawn by an older renderer
+        # is a different picture, even of the same card.
+        named = f"{render.RENDER_VERSION}\n{shown.model_dump_json()}"
+        return hashlib.sha256(named.encode()).hexdigest()[:32]
 
     def png(self, card: Card) -> bytes:
         key = self.etag(card)

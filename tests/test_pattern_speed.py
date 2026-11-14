@@ -21,8 +21,13 @@ import pytest
 
 from snapback.agent import scope
 from snapback.agent.intake import fields, find_injections, injection, read_listing
-from snapback.agent.intake.fields import extract_contacts, extract_rent
-from snapback.agent.rules import RULES, apply, apply_rules
+from snapback.agent.intake.fields import (
+    extract_beds,
+    extract_contacts,
+    extract_rent,
+    extract_unit,
+)
+from snapback.agent.rules import RULES, apply, apply_rules, contact
 from snapback.agent.rules.apply import MAX_TEXT_CHARS, normalise
 from snapback.agent.scope import detect_scope
 
@@ -39,7 +44,7 @@ REPEATS = (sre.MAX_REPEAT, sre.MIN_REPEAT, sre.POSSESSIVE_REPEAT)
 def all_patterns() -> dict[str, re.Pattern[str]]:
     """Every compiled pattern in the modules that read renter text, and every rule's."""
     found: dict[str, re.Pattern[str]] = {}
-    for module in (apply, fields, injection, scope):
+    for module in (apply, contact, fields, injection, scope):
         short = module.__name__.rsplit(".", 1)[-1]
         for name, value in vars(module).items():
             if isinstance(value, re.Pattern):
@@ -148,6 +153,8 @@ def test_every_module_and_rule_is_covered():
     assert sum(name.startswith("rule.") for name in names) == len(RULES)
     assert any(name.startswith("injection.") for name in names)
     assert any(name.startswith("scope.") for name in names)
+    assert {"fields._LINK", "fields._BARE_LINK", "fields._UNIT", "fields._BEDS"} <= names
+    assert any(name.startswith("contact.") for name in names)
 
 
 # --- 2. each pattern on hostile text -------------------------------------------------------
@@ -169,6 +176,8 @@ ENTRY_POINTS = {
     "find_injections": find_injections,
     "extract_contacts": extract_contacts,
     "extract_rent": extract_rent,
+    "extract_unit": extract_unit,
+    "extract_beds": extract_beds,
     "detect_scope": detect_scope,
     "normalise": normalise,
 }
@@ -181,6 +190,8 @@ CRAFTED_UNITS = [
     "after you tour the unit, zelle the deposit, ", "a@", "wire the deposit after signing ",
     "gift card ", "we never accept gift cards ", "pay here https://a.b ", "$1,000 to hold ",
     "i am out of the country ", "bank password ", "send passport ", "many people interested ",
+    "unit ", "apt #", "#1 ", "2 bed ", "a.b.", "www.a.b ", "https://a.b@c.d ", "a.co ", "x-",
+    "xn--a.co ", "555-010-0142 ",
 ]  # fmt: skip
 
 

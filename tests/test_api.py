@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,14 +15,23 @@ from snapback.contracts import (
     CreateCaseRequest,
     CreateCaseResponse,
     DataSource,
+    ModuleEvidence,
     TraceEvent,
     TraceKind,
     VerdictState,
 )
 from snapback.settings import Settings
+from snapback.verdict import build_card
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 FIXTURE_CARD = Card.model_validate_json((FIXTURES / "card_hold.json").read_text())
+# The recorded case as the API serves it: the same evidence at the same moment, on the
+# building's clock (Houston), not the clock it was saved on.
+HOUSTON_CARD = build_card(
+    ModuleEvidence.model_validate_json((FIXTURES / "module_evidence_hold.json").read_text()),
+    checked_at=FIXTURE_CARD.checked_at.astimezone(ZoneInfo("America/Chicago")),
+    verify_base_url=Settings(_env_file=None).snapback_public_base_url,
+)
 FIXTURE_TRACE = [
     TraceEvent.model_validate(json.loads(line))
     for line in (FIXTURES / "trace_events.jsonl").read_text().strip().splitlines()
@@ -116,7 +126,11 @@ def test_verdict_endpoint_round_trips_the_contract():
 def test_card_route_returns_card_contract(client, case_id):
     response = client.get(f"/cases/{case_id}/card")
     assert response.status_code == 200
-    assert Card.model_validate(response.json()) == FIXTURE_CARD
+    served = Card.model_validate(response.json())
+    assert served == HOUSTON_CARD
+    # The same case as it was saved, apart from the clock its times are read on.
+    assert (served.state, served.checked_at) == (FIXTURE_CARD.state, FIXTURE_CARD.checked_at)
+    assert [row.kind for row in served.rows] == [row.kind for row in FIXTURE_CARD.rows]
 
 
 def test_trace_route_streams_fixture_events_in_order(client):
@@ -625,7 +639,7 @@ def test_card_png_route_returns_a_png_of_the_card(client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
-    assert response.content == render_card_png(FIXTURE_CARD)
+    assert response.content == render_card_png(HOUSTON_CARD)
 
 
 def test_card_and_png_can_be_asked_for_in_spanish(client):
