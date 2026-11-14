@@ -5,7 +5,7 @@ import { apiBase, apiFetch } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
 import {
-  CONDITION_LABEL,
+  conditionLabel,
   type CalibrationPoint,
   ResultsError,
   calibrationSeries,
@@ -81,7 +81,7 @@ function CurveChart({ bars }: { bars: ResultRow[] }) {
               className="lab-whisker"
             />
             <text x={cx} y={H - M.bottom + 16} className="lab-tick" textAnchor="middle">
-              {CONDITION_LABEL[b.condition] ?? b.condition}
+              {conditionLabel(b.condition)}
             </text>
             <text
               x={cx}

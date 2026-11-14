@@ -56,6 +56,8 @@ export function openLiveTrace(
   onStatus: OnStatus,
   token?: string | null,
 ): () => void {
+  // TODO(#60): when API PR #60 merges, pass the read-only `read_token` from the create response
+  // here instead of the write token. Until then the write token rides in the query.
   // EventSource cannot set an Authorization header, so API PR #60 takes the case secret as
   // ?token= on the trace route. Main ignores it. A recorded fixture case has no secret.
   const query = token ? `?token=${encodeURIComponent(token)}` : "";

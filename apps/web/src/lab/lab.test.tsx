@@ -41,6 +41,23 @@ describe("parseResults", () => {
 describe("chart data and scales", () => {
   const rows = parseResults(sample);
 
+  it("accepts any rules_plus_model_vN_memory condition and puts it last", () => {
+    const line = (c: string) => `${c},forged_false_accept,3,40,0.075,0.02,0.2,2026-11-13`;
+    const parsed = parseResults(
+      [
+        HEADER,
+        line("rules_plus_model_v1_memory"),
+        line("rules_only"),
+        line("rules_plus_model_v0_memory"),
+      ].join("\n"),
+    );
+    expect(curveBars(parsed).map((b) => b.condition)).toEqual([
+      "rules_only",
+      "rules_plus_model_v0_memory",
+      "rules_plus_model_v1_memory",
+    ]);
+  });
+
   it("orders the curve bars rules only first, memory last, and keeps n", () => {
     const bars = curveBars(rows);
     expect(bars.map((b) => b.condition)).toEqual([
