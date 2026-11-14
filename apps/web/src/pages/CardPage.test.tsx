@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import type { Card } from "../contracts";
-import { CardView } from "./CardPage";
+import { CardPage, CardView } from "./CardPage";
 
 const card = cardHold as Card;
 
@@ -56,4 +56,15 @@ describe("CardView with card_hold.json", () => {
       expect(headline.toLowerCase()).not.toMatch(/safe|verified|scam/);
     },
   );
+});
+
+describe("Lab placement", () => {
+  it("is on the result page and hidden on the verify page", async () => {
+    const result = render(<CardPage caseId={card.case_id} variant="result" />);
+    expect(await result.findByTestId("lab-panel")).toBeInTheDocument();
+    result.unmount();
+    const verify = render(<CardPage caseId={card.case_id} variant="verify" />);
+    await verify.findByTestId("case-id");
+    expect(verify.queryByTestId("lab-panel")).toBeNull();
+  });
 });
