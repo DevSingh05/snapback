@@ -15,10 +15,12 @@ NAME never gives NOT_FOUND: it gives LICENSED (supporting) or NOT_CHECKED.
     distinct Broker Company sponsor. Anything looser is NOT_CHECKED.
   - A TREC license number the ad itself gives (6 or 7 digits after "TREC", "license" or "lic.")
     is looked up by `license_number`, leading zeros stripped (ads write 0123456, TREC stores
-    123456-SA). No active row: NOT_FOUND. Active, and the claimed last name (or every claimed
-    token) is in the row's name: LICENSED. Active under any other name: NOT_CHECKED, final, with
-    no fall-through to a name lookup (ruling 04:42). A number counts only next to "TREC" or a
-    real-estate role word, never next to MLS, business, insurance or driver.
+    123456-SA). No row, or only clearly ended ones (inactive, expired, revoked...): NOT_FOUND.
+    An unknown status such as Military: NOT_CHECKED. Active, and the claimed last name (or
+    every claimed token) is in the row's name: LICENSED.
+    Active under any other name: NOT_CHECKED, final, with no fall-through to a name lookup
+    (ruling 04:42). A number counts only next to "TREC" or a real-estate role word,
+    never next to MLS, business, insurance or driver.
     TREC stores "123456-SA", "234567-B" and "3456789-BB".
   - A brokerage the poster names ("listed by Fxample Realty") is looked up among Broker Company
     licenses: an active exact match is LICENSED, anything else NOT_CHECKED.
@@ -109,7 +111,7 @@ _COMPANY = re.compile(
 _LIC_NUMBER = re.compile(
     r"(?i:\btrec\b|\blic(?:ense|ence)?\b)"
     r"(?:[ \t#:.\-]|\b(?:trec|licen[sc]e|lic|number|num|no|is)\b)*?"  # only license-ish filler
-    r"\b(\d{6,7})\b(?![ \t]*(?:sq|sf|ft|square))",  # not "555012 sq ft"
+    r"\b([0-9]{6,7})\b(?![ \t]*(?:sq|sf|ft|square))",  # not "555012 sq ft"
     re.IGNORECASE,
 )
 _NOT_TREC = re.compile(
@@ -237,6 +239,24 @@ def detect_claim(text: str) -> Claim | None:
 def _active(status: str) -> bool:
     s = status.strip()
     return s == "Active" or s.endswith("- Active")
+
+
+_ENDED = (
+    "inactive",
+    "expired",
+    "revoked",
+    "deceased",
+    "closed",
+    "cancelled",
+    "canceled",
+    "suspended",
+)
+
+
+def _ended(status: str) -> bool:
+    """A status that clearly says the license is over (never one that might be active)."""
+    low = status.lower()
+    return not _active(status) and any(word in low for word in _ENDED)
 
 
 def _first_names(name: str) -> set[str]:
@@ -367,19 +387,24 @@ def _lookup_person(claim: Claim, client: httpx.Client, deadline: float) -> Answe
 def _lookup_number(
     number: str, claim: Claim | None, client: httpx.Client, deadline: float
 ) -> Answer:
-    """The ad gives a license number (zeros stripped). No active row: NOT_FOUND. Active under
-    another name: NOT_CHECKED, since a mismatch (maiden name, nickname, a typo) accuses no one."""
+    """The ad gives a license number (zeros stripped). No row, or only ended ones: NOT_FOUND.
+    Active under another name: NOT_CHECKED, since a mismatch (maiden name, nickname, a typo)
+    accuses no one."""
     rows = _get_rows(f"upper(license_number) like '{_soql(number)}%'", client, deadline)
     if rows is None or len(rows) > MAX_ROWS:
         return _NOT_CHECKED
     mine = [
         r
         for r in rows
-        if str(r.get("license_number", "")).strip().upper().split("-")[0].lstrip("0") == number
+        if str(r.get("license_number", "")).strip().upper().split("-")[0].strip().lstrip("0")
+        == number
     ]
     active = [r for r in mine if _active(str(r.get("status", "")))]
     if not active:
-        return LicenseStatus.NOT_FOUND, None
+        # no row at all, or every row clearly ended; an unknown status ("Military") accuses no one
+        if not mine or all(_ended(str(r.get("status", ""))) for r in mine):
+            return LicenseStatus.NOT_FOUND, None
+        return _NOT_CHECKED
     if claim is None:
         return _NOT_CHECKED
     last = _tokens(claim.last or "")

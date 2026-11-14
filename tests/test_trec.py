@@ -752,3 +752,46 @@ def test_the_number_is_read_whatever_the_case_and_whatever_stands_between():
     for text in ("TREC License #0612345", "trec LICENSE # 612345", "TREC lic. No: 612345"):
         assert _license_number(text) == "612345", text
     assert _license_number("TREC License #0000000") == ""
+
+
+def test_a_stored_number_with_a_space_before_the_dash_matches(tmp_path):
+    ad = "Fxjane Fxdoe, realtor. TREC 612345"
+    result = _check(ad, _client(_number_db(number="612345 -SA")), tmp_path)
+    assert result.status is LicenseStatus.LICENSED
+
+
+def test_non_ascii_digits_are_never_a_license_number(tmp_path):
+    from snapback.adapters.trec import _license_number
+
+    for digits in ("\uff16\uff11\uff12\uff13\uff14\uff15", "\u0666\u0661\u0662\u0663\u0664\u0665"):
+        ad = f"I'm Fxjane Fxdoe, a licensed realtor. TREC #{digits}"
+        assert _license_number(ad) is None
+        result = _check(ad, _client(_number_db()), tmp_path / digits)
+        assert result.status is LicenseStatus.LICENSED  # went down the name path
+        none = _check(ad, _client([]), tmp_path / (digits + "n"))
+        assert none.status is LicenseStatus.NOT_CHECKED  # never NOT_FOUND
+
+
+def test_a_number_before_a_unit_is_not_a_license_number():
+    from snapback.adapters.trec import _license_number
+
+    assert _license_number("Realtor. Lic. 120000 sq ft lot") is None
+    assert _license_number("Realtor. Lic. 120000 sqft lot") is None
+    assert _license_number("Realtor. Lic. 120000 lot") == "120000"
+
+
+def test_only_a_clearly_ended_number_is_not_found(tmp_path):
+    ad = "Fxjane Fxdoe, realtor. TREC 123456"
+    ended = ("Inactive", "Expired less than 6 months", "Revoked", "Deceased", "Closed - Upgraded")
+    for i, status in enumerate(ended + ("Cancelled", "Suspended", "Probation - Inactive")):
+        rows = _number_db(status=status)
+        assert _check(ad, _client(rows), tmp_path / str(i)).status is LicenseStatus.NOT_FOUND, (
+            status
+        )
+    for i, status in enumerate(("Military", "Documents Received", "", "Something New")):
+        rows = _number_db(status=status)
+        got = _check(ad, _client(rows), tmp_path / f"u{i}")
+        assert got.status is LicenseStatus.NOT_CHECKED, status
+    # one ended row and one unknown row is not enough to accuse
+    mixed = _number_db(status="Inactive") + _number_db(status="Military")
+    assert _check(ad, _client(mixed), tmp_path / "m").status is LicenseStatus.NOT_CHECKED
