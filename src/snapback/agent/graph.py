@@ -64,6 +64,7 @@ KICKOFF = "A new case is ready. Work through it."
 
 def describe(case: CaseSession) -> str:
     """What the model is told about where the case stands. Aliases and derived facts only."""
+    case.settle()  # a menu of one is not the model's to pick from
     offer = case.offer()
     if offer is not None:
         return json.dumps(
@@ -154,6 +155,7 @@ def run_case_with_agent(
     To carry on after a pause, record the answer with `case.approve(...)` and call this again
     with the same agent and thread id.
     """
+    case.settle()
     if case.step is Step.REPLY:
         return None  # the poster has not replied; there is nothing for a model to choose
     config = {

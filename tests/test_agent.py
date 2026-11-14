@@ -397,8 +397,10 @@ def test_no_twin_still_reads_the_text():
     case = session(has_twin=False)
     model = ScriptedModel()
     verdict = run_case(case, model, always("send"))
-    checks = next(o for o in model.offers if o.kind is ChoiceKind.WHICH_CHECKS)
-    assert checks.options == ("rules only",)
+    # A menu of one is never sent to the model (A24); the trace says nothing was chosen.
+    assert all(o.kind is not ChoiceKind.WHICH_CHECKS for o in model.offers)
+    checks = next(e for e in case.trace.events if e.choice is ChoiceKind.WHICH_CHECKS)
+    assert checks.options == ["rules only"] and checks.chosen_by == "policy"
     assert case.evidence.rules
     assert verdict.state is VerdictState.UNVERIFIED
     assert all(e.kind is not TraceKind.HITL for e in case.trace.events)

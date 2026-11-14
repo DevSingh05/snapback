@@ -46,6 +46,8 @@ RULES_CHALLENGE = "rules+challenge"
 RULES_ONLY = "rules only"
 STATE_ONLY = "state only"
 
+ONLY_OPTION = "Only one option was open."
+
 ACCEPT = "accept"
 RETRY = "retry at a new spot"
 STOP = "stop at hold"
@@ -573,7 +575,10 @@ class CaseSession:
             raise RuntimeError(f"no choice is open at step {self.step.value!r}")
 
         label = offer.resolve(pick)
-        if label is None:
+        if len(offer.options) == 1:
+            # Nothing was chosen: a menu of one. Say so, and never credit a model for it.
+            label, reason, by = offer.options[0], ONLY_OPTION, "policy"
+        elif label is None:
             self.trace.emit(TraceKind.ERROR, self._say("trace.error.bad_pick"))
             label, reason, by = offer.default, offer.default_reason, "policy"
         self.trace.emit(
@@ -594,6 +599,11 @@ class CaseSession:
         else:
             self._apply_retry(label)
         return label
+
+    def settle(self) -> None:
+        """Apply every open choice that has a single option. No chooser is asked about these."""
+        while (offer := self.offer()) is not None and len(offer.options) == 1:
+            self.choose(offer.default, offer.default_reason)
 
     def choose_default(self, *, failed: bool = False) -> str:
         """Apply the code policy's pick, noting in the trace if a model failed to answer."""

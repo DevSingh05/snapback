@@ -78,6 +78,11 @@ describe("TracePanel with a duplicate seq", () => {
       parseTraceEvent(MIN.replace('"source"', '"chosen_by":"model","source"'))?.chosen_by,
     ).toBe("model");
   });
+  it("calls the random spot draw a random draw, not a rule", () => {
+    render(<TracePanel caseId="fx-7Q2M" initialEvents={[at(3)]} mode="static" />);
+    expect(at(3).choice).toBe("which_spot");
+    expect(screen.getByTestId("trace-by")).toHaveTextContent("random draw");
+  });
   it("labels the plan's choice", () => {
     const next: TraceEvent = { ...at(0), choice: "next_check", chosen_by: "model" };
     render(<TracePanel caseId="fx-7Q2M" initialEvents={[next]} mode="static" />);

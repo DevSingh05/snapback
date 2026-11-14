@@ -51,7 +51,10 @@ def run_case(
                 case.approve(approver(case.pending_challenge))
             case.send_challenge()
         else:
+            case.settle()
             offer = case.offer()
+            if offer is None:
+                continue  # settling moved the case on (or finished it)
             try:
                 pick, reason = chooser.choose(offer)
             except Exception:

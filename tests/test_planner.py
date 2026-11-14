@@ -20,6 +20,7 @@ from snapback.contracts import (
     LicenseStatus,
     TraceEvent,
     TraceKind,
+    VerdictState,
 )
 
 
@@ -131,7 +132,8 @@ def test_a_models_pick_is_stamped_model_and_the_code_steps_stay_policy():
         "home record",
         "report pack",
     ]
-    assert {e.chosen_by for e in plan} == {"model"}
+    # The last two menus held one option each, so nobody chose them.
+    assert [e.chosen_by for e in plan] == ["model", "model", "policy", "policy"]
     for event in case.trace.events:
         if event.choice is ChoiceKind.WHICH_SPOT or event.kind in (
             TraceKind.HITL,
@@ -184,7 +186,8 @@ def test_the_verdict_and_card_are_identical_with_the_model_on_and_off(case_id):
     on, verdict_on = run(Model(reversed_plan))
     assert verdict_on == verdict_off
     assert on.evidence == off.evidence
-    assert {e.chosen_by for e in on.trace.events if e.choice is ChoiceKind.NEXT_CHECK} == {"model"}
+    stamps = {e.chosen_by for e in on.trace.events if e.choice is ChoiceKind.NEXT_CHECK}
+    assert ("model" in stamps) is (case_id == "c")  # only the house had a menu worth picking from
     assert case_id in demo_case_ids()
 
 
@@ -196,3 +199,58 @@ def test_the_plan_runs_on_the_apartment_and_the_house_cases():
         picks = [e.pick for e in session.trace.events if e.choice is ChoiceKind.NEXT_CHECK]
         assert picks[0] == PlanKind.RECORD.value or picks[0] == PlanKind.BROKERAGE.value
         assert picks[-1] == PlanKind.REPORT.value, case_id
+
+
+# --- the model is shown derived facts only, and never a menu of one ------------------------------
+
+PLAN_FACT_KEYS = {
+    "home_record_found",
+    "for_sale_listing_active",
+    "ad_names_a_license",
+    "owner_on_public_record",
+    "checks_run",
+    "checks_left",
+}
+
+
+class Recorder(Model):
+    def __init__(self):
+        super().__init__(reversed_plan)
+        self.offers: list[Offer] = []
+
+    def choose(self, offer: Offer):
+        self.offers.append(offer)
+        return super().choose(offer)
+
+
+@pytest.mark.parametrize("case_id", ["a", "b", "c"])
+def test_the_offers_a_model_receives_never_carry_the_verdict(case_id):
+    case = load_demo_case(case_id)
+    session = make(demo_modules(case, read_listing(case.listing_text)))
+    model = Recorder()
+    run_case(session, model, lambda draft: "send")
+    plan_offers = [o for o in model.offers if o.kind is ChoiceKind.NEXT_CHECK]
+    assert all(set(o.facts) == PLAN_FACT_KEYS for o in plan_offers)
+    states = {state.value for state in VerdictState}
+    for offer in model.offers:
+        seen = [
+            *offer.options,
+            *offer.aliases,
+            offer.default,
+            *offer.facts,
+            *map(str, offer.facts.values()),
+        ]
+        for text in seen:
+            assert "verdict" not in text.lower()
+            assert text not in states
+
+
+def test_a_menu_of_one_is_not_sent_to_the_model_and_is_stamped_policy():
+    session = make(FixtureModules())  # only "home record" is open, then only "report pack"
+    model = Recorder()
+    run_case(session, model, lambda draft: "send")
+    assert all(len(o.options) > 1 for o in model.offers)
+    plan = [e for e in session.trace.events if e.choice is ChoiceKind.NEXT_CHECK]
+    assert [e.pick for e in plan] == ["home record", "report pack"]
+    assert {e.chosen_by for e in plan} == {"policy"}
+    assert {e.reason for e in plan} == {"Only one option was open."}
