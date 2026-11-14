@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from leakcheck import leaked
 from snapback.agent.demo import DEMO_DIR, demo_case_ids, load_demo_case, run_demo_case
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, phone_hash
 from snapback.api.main import create_app
@@ -202,8 +203,8 @@ def test_no_demo_card_shows_a_phone_a_hash_a_site_or_a_unit_number(case_id):
     record = PropertyRecord.model_validate_json(
         (DEMO_DIR / case_id / "property_record.json").read_text()
     )
-    for secret in ("0177", "0188", "999", "fixtureliving", record.site_phone_hash):
-        assert secret is None or secret not in said
+    secrets = ("0177", "0188", "999", "fixtureliving", record.site_phone_hash)
+    assert leaked(secrets, said) == []
 
 
 @pytest.mark.parametrize("case_id", ["a", "b", "c"])
