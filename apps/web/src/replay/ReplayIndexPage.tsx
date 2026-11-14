@@ -1,5 +1,7 @@
 import { SourceChip } from "../components/SourceChip";
 import { Wordmark } from "../components/HouseGlyph";
+import { KitArt } from "../components/KitArt";
+import { PATTERN_ART } from "./ReplayPage";
 import { replayLang, shortDate, words, type Lang } from "./text";
 import { useReplays } from "./useReplays";
 import type { Replay } from "./types";
@@ -26,6 +28,7 @@ export function ReplayIndexView({
       <ul className="replay-list" data-testid="replay-list">
         {replays.map((r) => (
           <li key={r.slug} data-slug={r.slug}>
+            <KitArt kind={PATTERN_ART[r.pattern]} className="replay-list-art" detail="low" />
             <span className="replay-pattern">{t.pattern[r.pattern]}</span>
             <h2>
               <a href={`/replay/${r.slug}`}>{r.title}</a>
