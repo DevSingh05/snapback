@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { CaseNotFound, fetchCard } from "../api";
 import { SourceChip } from "../components/SourceChip";
+import { LabSection } from "../lab";
 import type { Card, CardLine, CardTone, VerdictState } from "../contracts";
 
 const ROW_LABEL = { place: "PLACE", person: "PERSON", price: "PRICE" } as const;
@@ -75,7 +76,15 @@ function EvidenceRow({ line, first, label }: { line: CardLine; first: boolean; l
   );
 }
 
-export function CardView({ card, variant }: { card: Card; variant: "result" | "verify" }) {
+export function CardView({
+  card,
+  variant,
+  withLab = false,
+}: {
+  card: Card;
+  variant: "result" | "verify";
+  withLab?: boolean;
+}) {
   const stateTone = STATE_TONE[card.state];
   return (
     <article className={`card-page variant-${variant}`}>
@@ -147,6 +156,8 @@ export function CardView({ card, variant }: { card: Card; variant: "result" | "v
         </ul>
       </section>
 
+      {withLab ? <LabSection /> : null}
+
       <footer className="rules">
         {card.footer.map((line) => (
           <p key={line}>{line}</p>
@@ -183,7 +194,8 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
     return () => ctrl.abort();
   }, [caseId, attempt]);
 
-  if (load.status === "ready") return <CardView card={load.card} variant={variant} />;
+  if (load.status === "ready")
+    return <CardView card={load.card} variant={variant} withLab={variant === "result"} />;
   return (
     <div className="card-page notice" role="status">
       <span className="wordmark">SNAPBACK</span>
