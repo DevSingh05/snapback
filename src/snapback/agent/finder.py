@@ -30,6 +30,7 @@ import json
 import re
 import secrets
 import threading
+import unicodedata
 from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -346,7 +347,7 @@ _UNIT = re.compile(r"\b(?:unit|apt|apartment|suite|ste)\s*#?\s*\d[\w-]*|#\s*\d[\
 # Money and any other 3+ digit number: the renter's amounts are as private as their address,
 # and code has already read the budget out of them.
 _AMOUNT = re.compile(r"\$\s?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\b\d{1,3}(?:,\d{3})+\b|\b\d{3,}\b")
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>{}`]")
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f<>{}`\u2039\u203a\u2329\u232a\u3008-\u300b]")
 REMOVED = "[removed]"
 
 
@@ -356,7 +357,16 @@ def clean_words(text: str | None) -> str:
     whitespace folded, capped at `MAX_WORDS`. Empty when nothing is left."""
     if not text:
         return ""
-    out = _CONTROL.sub(" ", text)
+    # Fold lookalikes first (fullwidth "＜" becomes "<", "７" becomes "7"), then drop format
+    # characters (U+202E, zero-width spaces) and turn control characters into spaces, so no
+    # pattern below can be stepped around and no fence can be faked.
+    folded = unicodedata.normalize("NFKC", text)
+    out = "".join(
+        " " if unicodedata.category(ch) == "Cc" else ch
+        for ch in folded
+        if unicodedata.category(ch) != "Cf"
+    )
+    out = _CONTROL.sub(" ", out)
     for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT, _AMOUNT):
         out = pattern.sub(REMOVED, out)
     out = " ".join(out.split())
@@ -365,16 +375,36 @@ def clean_words(text: str | None) -> str:
     return "" if out.replace(REMOVED, "").strip(" .,;:-") == "" else out
 
 
+# A no to walk-ups only when the no sits next to them ("no walk-ups", "skip the walk-ups",
+# "walk-ups are a no"); "walk-ups are fine" or "not a problem" is the opposite.
+_WALKUP = r"(?:walk[- ]?ups?|stairs)"
+_NO_WALKUP = re.compile(
+    rf"\b(?:no|not|avoid|hate|skip|without|never)\s+(?:\w+\s+){{0,2}}?{_WALKUP}\b"
+    rf"|\b{_WALKUP}\s+(?:are|is)\s+(?:a\s+)?(?:no|out|a dealbreaker)\b"
+)
+_WALKUP_OK = re.compile(
+    rf"\b{_WALKUP}\s+(?:are|is|'re)\s+(?:fine|ok|okay|good|alright|not a problem|no problem)"
+    rf"|\b(?:don't|do not|wouldn't|would not)\s+mind\s+(?:\w+\s+){{0,2}}?{_WALKUP}"
+)
+_PARKING = re.compile(r"\b(?:parking|garage)\b")
+# "no parking needed", "don't need parking", "parking doesn't matter", "no car".
+_PARKING_NOT_NEEDED = re.compile(
+    r"\b(?:no|don't|do not|doesn't|does not|not|never)\s+(?:\w+\s+){0,2}?(?:parking|garage)\b"
+    r"|\b(?:parking|garage)\s+(?:\w+\s+){0,2}?(?:doesn't|does not|isn't|is not|not|never)\b"
+    r"|\b(?:don't|do not)\s+(?:have|own|drive)\s+(?:a\s+)?car\b|\bno car\b"
+)
+
+
 def read_text(text: str | None) -> list[FinderSignal]:
     """Turn a renter's message into signals with a few fixed patterns. These are what code acts
     on; the words themselves go onto no bus and into no preference."""
     if not text:
         return []
-    low = text.lower()
+    low = unicodedata.normalize("NFKC", text).lower().replace("\u2019", "'")
     out: list[FinderSignal] = []
-    if re.search(r"walk[- ]?ups?|stairs", low) and re.search(r"\b(no|not|avoid|hate|skip)\b", low):
+    if _NO_WALKUP.search(low) and not _WALKUP_OK.search(low):
         out.append(FinderSignal(kind="brief", brief_field="no_walkup"))
-    if "parking" in low:
+    if _PARKING.search(low) and not _PARKING_NOT_NEEDED.search(low):
         out.append(FinderSignal(kind="brief", brief_field="parking"))
     if re.search(r"\bpets?\b", low) and not re.search(r"\bno\s+pets?\b", low):
         out.append(FinderSignal(kind="brief", brief_field="pets"))
