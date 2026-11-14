@@ -1,0 +1,200 @@
+[
+  {
+    "id": "fx-rule-zelle-keys",
+    "category": "payment_method",
+    "text": "Send the deposit by Zelle and I will mail the keys.",
+    "expect": ["payment.zelle_before_viewing"]
+  },
+  {
+    "id": "fx-rule-wire-first-month",
+    "category": "payment_method",
+    "text": "Please wire the first month to my account today so I can take the listing down.",
+    "expect": ["payment.wire_before_viewing"]
+  },
+  {
+    "id": "fx-rule-gift-cards",
+    "category": "payment_method",
+    "text": "You can pay the holding fee with two gift cards and text me the numbers.",
+    "expect": ["payment.gift_card"]
+  },
+  {
+    "id": "fx-rule-crypto",
+    "category": "payment_method",
+    "text": "I only take Bitcoin for the deposit.",
+    "expect": ["payment.crypto"]
+  },
+  {
+    "id": "fx-rule-cash-app",
+    "category": "payment_method",
+    "text": "Cash App me $500 tonight to hold it.",
+    "expect": ["payment.p2p_app_before_viewing"]
+  },
+  {
+    "id": "fx-rule-refund-the-difference",
+    "category": "payment_method",
+    "text": "Send $2,400 now; it is more than the deposit but I will refund the difference when you move in.",
+    "expect": ["payment.overpayment_refund"]
+  },
+  {
+    "id": "fx-rule-cheque-for-more",
+    "category": "payment_method",
+    "text": "My agent will mail you a cheque for more than the rent. Put it in your account and send back the difference.",
+    "expect": ["payment.overpayment_refund"]
+  },
+  {
+    "id": "fx-rule-zelle-after-lease",
+    "category": "payment_method",
+    "text": "After you tour the unit and we both sign the lease, you can pay the first month by Zelle.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-we-never-ask",
+    "category": "payment_method",
+    "text": "We never ask for payment by Zelle, wire transfer or gift card.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-wireless",
+    "category": "payment_method",
+    "text": "Rent includes water, trash and wireless internet. Hard-wired smoke detectors in every room.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-resident-portal",
+    "category": "payment_method",
+    "text": "Rent is paid each month through the resident portal by card or bank debit.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-deposit-for-keys",
+    "category": "fee_ask",
+    "text": "Send the deposit by Zelle and I will mail the keys.",
+    "expect": ["fee.holding_deposit_before_viewing"]
+  },
+  {
+    "id": "fx-rule-application-fee-by-app",
+    "category": "fee_ask",
+    "text": "Venmo me the $75 application fee and I will send you the address for a viewing.",
+    "expect": ["fee.application_fee_before_viewing"]
+  },
+  {
+    "id": "fx-rule-holding-fee",
+    "category": "fee_ask",
+    "text": "A $300 holding fee today will take it off the market for you.",
+    "expect": ["fee.holding_deposit_before_viewing"]
+  },
+  {
+    "id": "fx-rule-application-fee-after-tour",
+    "category": "fee_ask",
+    "text": "There is a $45 application fee per adult, paid on the resident portal after your tour.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-deposit-at-signing",
+    "category": "fee_ask",
+    "text": "The security deposit is one month of rent, due at lease signing.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-no-fee-this-month",
+    "category": "fee_ask",
+    "text": "No application fee this month. Tours daily at the leasing office.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-ssn-before-showing",
+    "category": "data_ask",
+    "text": "Before I can show it, text me your full name, SSN and date of birth.",
+    "expect": ["data.ssn_before_viewing"]
+  },
+  {
+    "id": "fx-rule-licence-picture",
+    "category": "data_ask",
+    "text": "Send a picture of your driver's license so I can add you to the list.",
+    "expect": ["data.id_before_viewing"]
+  },
+  {
+    "id": "fx-rule-bank-login",
+    "category": "data_ask",
+    "text": "To check your income, share your online banking login and password.",
+    "expect": ["data.bank_login"]
+  },
+  {
+    "id": "fx-rule-ssn-after-tour",
+    "category": "data_ask",
+    "text": "After your tour, the application on our portal asks for your Social Security number for the credit check.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-bring-id-to-tour",
+    "category": "data_ask",
+    "text": "Bring a photo ID to the leasing office for your tour.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-amenities",
+    "category": "data_ask",
+    "text": "Pets welcome. Two parking spots. Laundry in unit.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-keys-by-mail",
+    "category": "pressure",
+    "text": "Send the deposit by Zelle and I will mail the keys.",
+    "expect": ["pressure.cannot_show"]
+  },
+  {
+    "id": "fx-rule-out-of-the-country",
+    "category": "pressure",
+    "text": "I am out of the country for work, so I cannot show the apartment in person.",
+    "expect": ["pressure.cannot_show"]
+  },
+  {
+    "id": "fx-rule-many-interested",
+    "category": "pressure",
+    "text": "Many people are interested, so the first to pay gets it. Act fast.",
+    "expect": ["pressure.urgency", "pressure.many_interested"]
+  },
+  {
+    "id": "fx-rule-tours-daily",
+    "category": "pressure",
+    "text": "Tours daily from 9 to 5. Call the leasing office to book a showing.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-quiet-street",
+    "category": "pressure",
+    "text": "Quiet street near the park, with a bus stop on the corner.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-pay-link",
+    "category": "link",
+    "text": "Pay the deposit here to lock it in: https://pay.example.com/hold/123",
+    "expect": ["link.payment_link"]
+  },
+  {
+    "id": "fx-rule-cash-app-link",
+    "category": "link",
+    "text": "My link is https://cash.app/fixture and it takes one minute.",
+    "expect": ["link.payment_link"]
+  },
+  {
+    "id": "fx-rule-lease-link",
+    "category": "link",
+    "text": "Sign the lease at https://example.org/lease-form before we meet.",
+    "expect": ["link.lease_link"]
+  },
+  {
+    "id": "fx-rule-gallery-link",
+    "category": "link",
+    "text": "More photos: https://example.com/gallery",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-pay-at-office",
+    "category": "link",
+    "text": "You can pay at the leasing office during your visit.",
+    "expect": []
+  }
+]

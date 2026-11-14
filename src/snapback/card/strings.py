@@ -61,7 +61,26 @@ EN: dict[str, str] = {
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
+    # One entry per red-flag rule in agent/rules/table.py, keyed by its rule id.
     "rule.payment.zelle_before_viewing": "Zelle before a viewing. Red flag.",
+    "rule.payment.wire_before_viewing": "Wire transfer before a viewing. Red flag.",
+    "rule.payment.p2p_app_before_viewing": "Payment by app before a viewing. Red flag.",
+    "rule.payment.gift_card": "Gift cards as payment. Red flag.",
+    "rule.payment.crypto": "Crypto as payment. Red flag.",
+    "rule.payment.overpayment_refund": (
+        "More money than is owed, with the difference to be sent back. Red flag."
+    ),
+    "rule.fee.holding_deposit_before_viewing": (
+        "A deposit or holding fee before a viewing. Red flag."
+    ),
+    "rule.fee.application_fee_before_viewing": (
+        "An application fee sent to a person before a viewing. Red flag."
+    ),
+    "rule.data.ssn_before_viewing": "Social Security number before a viewing. Red flag.",
+    "rule.data.bank_login": "Bank login details. Red flag.",
+    "rule.data.id_before_viewing": "A photo of your ID before a viewing. Red flag.",
+    "rule.pressure.cannot_show": "They say they cannot show the unit in person. Red flag.",
+    "rule.link.payment_link": "A payment link sent by the poster. Red flag.",
     "rule_category.payment_method": (
         "A payment that cannot be taken back, asked for before a viewing. Red flag."
     ),
