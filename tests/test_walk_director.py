@@ -144,3 +144,23 @@ def test_policy_order_is_contradicted_then_hidden():
     living = next(s.key for s in plan.stops if s.title == "Living room")
     assert d.dwell[0] == living and len(d.dwell) <= MAX_DWELL
     assert d.lead_checks[0] == living and len(d.lead_checks) <= MAX_LEAD
+
+
+def test_must_have_kinds_come_from_the_remembered_preferences():
+    from snapback.contracts import CasePreferences
+    from snapback.tour import must_have_kinds_of
+
+    assert must_have_kinds_of(None) == [] and must_have_kinds_of(CasePreferences()) == []
+    assert must_have_kinds_of(CasePreferences(needs_parking=True, no_walkup=True)) == [
+        "garage",
+        "entry",
+    ]
+
+
+def test_a_rejected_walk_up_makes_the_entrance_a_real_dwell_option():
+    plan = walk_plan(with_claim=False)
+    without = [o for o in walk_offers(plan) if o.kind == "dwell"][0]
+    with_pref = [o for o in walk_offers(plan, ["entry"]) if o.kind == "dwell"][0]
+    assert any("Rooms your must-haves live in" in o for o in with_pref.options)
+    assert not any("Rooms your must-haves live in" in o for o in without.options)
+    assert with_pref.facts["must_have"] == 1

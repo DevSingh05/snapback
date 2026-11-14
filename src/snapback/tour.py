@@ -810,7 +810,21 @@ class WalkOffer:
 
 
 def _kind_word(stop: TourStop) -> str:
+    if stop.kind == "door":
+        return "entry"
     return _kind_of(stop.room_label) or "room"
+
+
+def must_have_kinds_of(prefs: object | None) -> list[str]:
+    """Room kinds the renter's remembered must-haves live in (the case's preferences, #195):
+    a parking need lives at the garage; a rejected walk-up lives at the entrance (stairs or
+    elevator). Code-defined keys only; no free text."""
+    kinds: list[str] = []
+    if getattr(prefs, "needs_parking", False):
+        kinds.append("garage")
+    if getattr(prefs, "no_walkup", False):
+        kinds.append("entry")
+    return kinds
 
 
 def _contradicted(stop: TourStop) -> bool:

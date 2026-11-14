@@ -91,6 +91,7 @@ from snapback.tour import (
     choose_walk,
     fixture_sweeps,
     map_locate,
+    must_have_kinds_of,
 )
 from snapback.verdict import decide
 
@@ -823,7 +824,8 @@ def create_app(
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(plan, locate, scan_plan=scan_plan, ad_plan=None)
         plan = attach_claims(plan, ad_notes_of(case))
-        return choose_walk(plan), locate, fields
+        prefs = getattr(case, "preferences", None)
+        return choose_walk(plan, None, must_have_kinds_of(prefs)), locate, fields
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(
