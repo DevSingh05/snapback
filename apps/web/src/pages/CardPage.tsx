@@ -77,7 +77,6 @@ function EvidenceRow({ line, first, label }: { line: CardLine; first: boolean; l
 
 export function CardView({ card, variant }: { card: Card; variant: "result" | "verify" }) {
   const stateTone = STATE_TONE[card.state];
-  const placeLine = card.rows.find((r) => r.kind === "place")?.lines[0];
   return (
     <article className={`card-page variant-${variant}`}>
       <header className="masthead">
@@ -106,8 +105,8 @@ export function CardView({ card, variant }: { card: Card; variant: "result" | "v
         </p>
         {variant === "verify" ? (
           <p className="summary" data-testid="summary">
-            This page confirms a SNAPBACK result. {placeLine ? placeLine.text : ""} Not checked:{" "}
-            {card.not_checked.join(", ")}.
+            This is the SNAPBACK result for case {card.case_id}. It covers the place, the person and
+            the price, and lists what was not checked: {card.not_checked.join(", ")}.
           </p>
         ) : null}
       </section>
