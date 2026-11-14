@@ -266,3 +266,69 @@ def test_committed_results_pass_the_gate_against_the_frozen_baseline(tmp_path):
     out = tmp_path / "results.csv"
     assert main(["--bank", str(BANK), "--out", str(out), "--baseline", str(baseline)]) == 0
     assert read_results(REPO / "eval" / "results.csv") == read_results(out)
+
+
+# --- second review (#62): bank padding, write only after the gate --------------------------------
+
+
+def _padded_bank(tmp_path) -> Path:
+    """The bank plus three copies of a forged case every condition catches."""
+    lines = BANK.read_text().splitlines()
+    caught = next(line for line in lines if '"fx-ev-f03"' in line)
+    extra = [caught.replace('"fx-ev-f03"', f'"fx-ev-f03-copy{i}"') for i in range(3)]
+    padded = tmp_path / "padded.jsonl"
+    padded.write_text("\n".join([*lines, *extra]) + "\n")
+    return padded
+
+
+def test_padding_the_bank_fails_the_gate(tmp_path):
+    baseline = REPO / "eval" / "baseline.csv"
+    code = main(
+        [
+            "--bank",
+            str(_padded_bank(tmp_path)),
+            "--out",
+            str(tmp_path / "r.csv"),
+            "--baseline",
+            str(baseline),
+        ]
+    )
+    assert code == 1
+
+
+def test_gate_names_a_changed_bank_and_changed_n():
+    rows = [ResultRow.measure("rules_only", "forged_false_accept", 6, 7, "FIXTURE")]
+    padded = [ResultRow.measure("rules_only", "forged_false_accept", 6, 10, "FIXTURE")]
+    failures = check_regression(
+        padded,
+        rows,
+        meta={"split": "h0", "bank_sha256": "b"},
+        baseline_meta={"split": "h0", "bank_sha256": "a"},
+    )
+    assert any("bank" in f for f in failures)
+    assert any("n changed" in f for f in failures)
+
+
+def test_a_failed_gate_leaves_the_results_file_untouched(tmp_path):
+    out = tmp_path / "results.csv"
+    out.write_text("previous results\n")
+    code = main(
+        [
+            "--bank",
+            str(_padded_bank(tmp_path)),
+            "--out",
+            str(out),
+            "--baseline",
+            str(REPO / "eval" / "baseline.csv"),
+        ]
+    )
+    assert code == 1
+    assert out.read_text() == "previous results\n"
+    assert not list(tmp_path.glob(".results.csv.*"))  # no temp file left behind
+
+
+def test_meta_records_the_bank_hash(tmp_path):
+    out = tmp_path / "results.csv"
+    assert main(["--bank", str(BANK), "--out", str(out)]) == 0
+    meta = read_meta(out)
+    assert len(meta["bank_sha256"]) == 64

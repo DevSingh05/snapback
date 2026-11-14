@@ -6,6 +6,7 @@ the run cannot be made (a requested model has no results); nothing is written th
 """
 
 import argparse
+import hashlib
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -43,9 +44,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"eval: {error}")
         return 2
     label = "FIXTURE: synthetic case bank, not a measurement" if synthetic else "LIVE"
-    meta = {"split": args.split, "bank": args.bank.name, "models": ",".join(args.models)}
-    write_results(rows, args.out, comment=label, meta=meta)
-    print(f"wrote {len(rows)} rows to {args.out} ({len(cases)} cases in the bank)")
+    meta = {
+        "split": args.split,
+        "bank": args.bank.name,
+        "bank_sha256": hashlib.sha256(args.bank.read_bytes()).hexdigest(),
+        "models": ",".join(args.models),
+    }
 
     failures = check_injections(cases) + check_holdout(cases)
     if args.baseline is not None:
@@ -58,7 +62,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     for failure in failures:
         print(f"gate: FAIL {failure}")
     if failures:
+        # Nothing is written: the results file the API serves stays the last one that passed.
+        print(f"gate failed: {args.out} left as it was")
         return 1
+    write_results(rows, args.out, comment=label, meta=meta)
+    print(f"wrote {len(rows)} rows to {args.out} ({len(cases)} cases in the bank)")
     print("gate: ok")
     return 0
 

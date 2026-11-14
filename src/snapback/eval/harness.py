@@ -121,14 +121,22 @@ def check_regression(
 ) -> list[str]:
     """One failure line per way this run is worse than the baseline, or not comparable to it.
 
-    Fails when a gated (condition, metric) rose, went missing, or was measured on a different
-    frozen set (frozen_at), and when the run used a different split than the baseline.
+    Fails when a gated (condition, metric) rose, went missing, was measured on a different
+    frozen set (frozen_at) or on a different number of cases (n), and when the run used a
+    different split or a different case bank (its sha256) than the baseline. Changing the bank
+    on purpose means freezing a new baseline (`make eval-baseline`), which shows in the diff.
     """
     failures = []
     if meta is not None and baseline_meta is not None:
         old_split, new_split = baseline_meta.get("split"), meta.get("split")
         if old_split != new_split:
             failures.append(f"split changed from {old_split} to {new_split}; runs not comparable")
+        old_bank, new_bank = baseline_meta.get("bank_sha256"), meta.get("bank_sha256")
+        if old_bank and new_bank and old_bank != new_bank:
+            failures.append(
+                "case bank changed since the baseline (sha256 differs); "
+                "freeze a new baseline with make eval-baseline if that is intended"
+            )
 
     now = {(row.condition, row.metric): row for row in rows}
     for old in baseline:
@@ -137,6 +145,11 @@ def check_regression(
         row = now.get((old.condition, old.metric))
         if row is None:
             failures.append(f"{old.condition} {old.metric} is in the baseline but missing now")
+        elif row.n != old.n:
+            failures.append(
+                f"{old.condition} {old.metric} n changed from {old.n} to {row.n}; "
+                "runs not comparable"
+            )
         elif row.frozen_at != old.frozen_at:
             failures.append(
                 f"{old.condition} {old.metric} frozen_at changed from {old.frozen_at} "
