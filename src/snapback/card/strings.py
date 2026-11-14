@@ -39,6 +39,7 @@ EN: dict[str, str] = {
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
+    "place.not_indexed_yet": "Not checked (this building's scan is not indexed yet).",
     "place.no_photos": "Not checked (no listing photos were sent).",
     "place.seen_before_dated": "A listing photo also appeared in another check on {date}.",
     "place.seen_before": "A listing photo also appeared in another check.",
@@ -305,6 +306,9 @@ ES: dict[str, str] = {
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
     ),
     "place.not_indexed": "No comprobado (no tenemos un escaneo 3D de este edificio).",
+    "place.not_indexed_yet": (
+        "No comprobado (el escaneo de este edificio todavía no está indexado)."
+    ),
     "place.no_photos": "No comprobado (no se enviaron fotos del anuncio).",
     "place.seen_before_dated": "Una foto del anuncio también apareció en otra revisión el {date}.",
     "place.seen_before": "Una foto del anuncio también apareció en otra revisión.",

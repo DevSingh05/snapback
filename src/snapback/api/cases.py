@@ -184,6 +184,7 @@ class SessionCase:
         # A second secret that can only read. It is the one a browser may put in an address,
         # where servers log it, so it must never be able to approve anything.
         self.read_token = secrets.token_urlsafe(24)
+        self.owner: str | None = None  # who it is registered under, for delete (A11)
         self.session = session
         self._listing = listing
         self._runner = runner
@@ -350,6 +351,14 @@ class CaseStore:
             self._memory = PhotoMemory(path)
         return self._memory
 
+    def __len__(self) -> int:
+        return len(self._cases)
+
+    def discard(self, case_id: str) -> None:
+        """Forget a case. Used when it has been deleted from disk by the renter's "delete"."""
+        with self._lock:
+            self._cases.pop(public_id(case_id), None)
+
     def _zone_of(self, record: PropertyRecord | None) -> ZoneInfo:
         """The card's clock: the zone of the building's market, else the configured one."""
         market = record.market if record is not None else None
@@ -359,11 +368,15 @@ class CaseStore:
         self,
         listing: Listing,
         property_id: str | None = None,
+        register: Callable[[str], None] | None = None,
         *,
         photos: list[bytes] | None = None,
     ) -> SessionCase:
         """Start a check. `property_id` is our id for the building the listing claims, and
         `photos` are the listing photos as sent, in order.
+
+        `register` is told the new case's id before anything runs. If it raises, there is no
+        case: a check that could not be recorded for later deletion is not started.
 
         The record and the for-sale lookup come from lane D's adapters and feed the price,
         unit and contact rules.
@@ -400,6 +413,8 @@ class CaseStore:
             short_id = self._new_id()
             # Fixture ids are marked as such. A live case carries no stand-in and no mark.
             full_id = short_id if live else f"{FIXTURE_ID_PREFIX}{short_id}"
+            if register is not None:
+                register(full_id)
             if demo is not None and not live and record is None:
                 # The demo pack brings its own stand-ins, record included.
                 modules = demo_modules(demo, listing)

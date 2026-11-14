@@ -148,8 +148,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
        mismatch is not proof (owners live elsewhere, agents act for them), with or without a
        red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
        leasing office's and a unit that does not fit the record are not proof either.
-    2. No photo placed in the claimed property gives UNVERIFIED. What the record flagged is
-       still listed among the reasons.
+    2. No photo placed in the claimed property gives UNVERIFIED, with what the record
+       flagged listed among the reasons. One thing outranks it: a home listed for sale is
+       HOLD, with that reason first, whether or not any photo could be placed.
     3. Presence proven, authority matching the record and no red flag of any kind gives
        VERIFIED.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
@@ -190,9 +191,17 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     ]
 
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
-        if statuses <= {LocateStatus.NOT_INDEXED}:
-            return verdict(VerdictState.UNVERIFIED, say("reason.not_indexed"), *on_record)
-        return verdict(VerdictState.UNVERIFIED, say("reason.not_located"), *on_record)
+        unplaced = say(
+            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
+        )
+        if evidence.for_sale_flag:
+            # For sale outranks "could not place" (conductor ruling, Sat 02:00). A home that
+            # is for sale usually has no scan to place photos in, and "we could not check" is
+            # the wrong thing to lead with. Still HOLD, never DONT_PAY: it is not proof.
+            for_sale = say("reason.for_sale")
+            others = [reason for reason in on_record if reason != for_sale]
+            return verdict(VerdictState.HOLD, for_sale, unplaced, *others)
+        return verdict(VerdictState.UNVERIFIED, unplaced, *on_record)
 
     red_flags = []
     if evidence.price_flag:
@@ -304,7 +313,11 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     elif located:
         main = _line(lang, "label.real", CardTone.OK, "place.located", located=located, total=total)
     elif all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
-        main = _line(lang, "label.real", CardTone.NOT_CHECKED, "place.not_indexed")
+        # A photo that names a model belongs to a building whose scan exists and is not in
+        # our index. With no model named, there is no scan of the building at all.
+        has_scan = any(photo.model_id for photo in photos)
+        key = "place.not_indexed_yet" if has_scan else "place.not_indexed"
+        main = _line(lang, "label.real", CardTone.NOT_CHECKED, key)
     else:
         main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
 

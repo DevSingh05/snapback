@@ -118,19 +118,35 @@ def _date(value: Any) -> date | None:
         return None
 
 
-def _looks_like_unit(word: str) -> bool:
-    """A unit number has a digit in it ('2', '4b', '305') or is a single letter ('B'). 'for' in
-    'apartment for rent' is prose, not a unit."""
-    return any(ch.isdigit() for ch in word) or (len(word) == 1 and word.isalpha())
+_UNIT_WORD = r"(?:\b(?i:apt|apartment|unit|suite|ste)\b\.?|#)\s*#?\s*"
+_LETTER_UPPER = re.compile(_UNIT_WORD + r"([A-Z])\b")
+_LETTER_THEN_STOP = re.compile(_UNIT_WORD + r"([A-Za-z])(?=\s*(?:[,.;:!?)]|$))")
 
 
-def _unit_after(text: str, street: str) -> str | None:
+def letter_units(raw_text: str) -> set[str]:
+    """Single letters the raw text really names as units: right after apt/unit/suite/# and either
+    uppercase ('Apt B', '#C') or followed by punctuation or the end ('unit b.'). The article in
+    'apartment a short walk' is neither."""
+    found = {m.group(1) for m in _LETTER_UPPER.finditer(raw_text)}
+    found |= {m.group(1) for m in _LETTER_THEN_STOP.finditer(raw_text)}
+    return {letter.lower() for letter in found}
+
+
+def _looks_like_unit(word: str, letters: set[str]) -> bool:
+    """A unit number has a digit in it ('2', '4b', '305'), or is a single letter the raw text
+    names as a unit. 'for' in 'apartment for rent' and 'a' in 'apartment a short walk' are prose."""
+    if any(ch.isdigit() for ch in word):
+        return True
+    return len(word) == 1 and word in letters
+
+
+def _unit_after(text: str, street: str, letters: set[str] = frozenset()) -> str | None:
     """The unit the text names right after the street, if any."""
     i = f" {text} ".find(f" {street} ")
     if i < 0:
         return None
     rest = f" {text} "[i + len(street) + 2 :].split()
-    if len(rest) >= 2 and rest[0] == "unit" and _looks_like_unit(rest[1]):
+    if len(rest) >= 2 and rest[0] == "unit" and _looks_like_unit(rest[1], letters):
         return rest[1]
     return None
 
@@ -204,11 +220,11 @@ def _zip_after(text: str, street: str) -> str | None:
     return found[0] if found else None
 
 
-def _any_unit(text: str) -> str | None:
+def _any_unit(text: str, letters: set[str] = frozenset()) -> str | None:
     """The first unit the text names anywhere ('unit 7'), for a match made on coordinates."""
     words = text.split()
     for w, nxt in zip(words, words[1:], strict=False):
-        if w == "unit" and _looks_like_unit(nxt):
+        if w == "unit" and _looks_like_unit(nxt, letters):
             return nxt
     return None
 
@@ -219,7 +235,13 @@ def _same_unit(rec: dict[str, Any], asked: str | None) -> bool:
     return unit is None or asked is None or normalize_address(str(unit)) == asked
 
 
-def _matches(rec: dict[str, Any], text: str, lat: float | None, lon: float | None) -> bool:
+def _matches(
+    rec: dict[str, Any],
+    text: str,
+    lat: float | None,
+    lon: float | None,
+    letters: set[str] = frozenset(),
+) -> bool:
     street_raw = _first(rec, RESIDENTIAL_FIELDS["street"])
     street = normalize_address(street_raw) if isinstance(street_raw, str) else ""
     if street and f" {street} " in f" {text} ":
@@ -227,7 +249,7 @@ def _matches(rec: dict[str, Any], text: str, lat: float | None, lon: float | Non
         zip_in_text = _zip_after(text, street)
         if zip_in_text and record_zip and str(record_zip)[:5] != zip_in_text:
             return False  # same street text, a different town
-        return _same_unit(rec, _unit_after(text, street))
+        return _same_unit(rec, _unit_after(text, street, letters))
     if lat is None or lon is None:
         return False
     rlat, rlon = _get_any(rec, RESIDENTIAL_FIELDS["lat"]), _get_any(rec, RESIDENTIAL_FIELDS["lon"])
@@ -235,7 +257,7 @@ def _matches(rec: dict[str, Any], text: str, lat: float | None, lon: float | Non
         near = _metres(lat, lon, float(rlat), float(rlon)) <= NEAR_M
     except (TypeError, ValueError):
         return False
-    return near and _same_unit(rec, _any_unit(text))
+    return near and _same_unit(rec, _any_unit(text, letters))
 
 
 def for_sale_lookup(
@@ -258,11 +280,12 @@ def for_sale_lookup(
     today = today or date.today()
     enums = _load_enums(kit)
     text = normalize_address(listing_text)
+    letters = letter_units(listing_text)
 
     best: ForSaleMatch | None = None
     rank = {ForSaleStatus.ACTIVE: 2, ForSaleStatus.RECENTLY_RENTED: 1, ForSaleStatus.NONE: 0}
     for rec in _iter_jsonl(path):
-        if not _public(rec) or not _matches(rec, text, lat, lon):
+        if not _public(rec) or not _matches(rec, text, lat, lon, letters):
             continue
         status, listed_on, changed_on = _status(rec, enums, today)
         match = ForSaleMatch(
