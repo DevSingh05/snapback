@@ -333,7 +333,10 @@ SEARCH_FACT_KEYS: dict[str, frozenset[str]] = {
         }
     ),
     "tradeoff": frozenset({"matches", "options", "biggest_saving", "any_saves_money"}),
+    "tour_gate": frozenset({"has_question", "places_with_office"}),
 }
+ASK_FIRST = "Ask the renter that question first"
+DRAFT_NOW = "Go straight to the tour request draft"
 
 
 @dataclass(frozen=True)
@@ -358,11 +361,15 @@ class SearchOffer:
 
     def for_chooser(self) -> "SearchOffer":
         """The offer without its payload: what a model is allowed to see."""
+        from snapback.preferences import MEMORY_FACT_KEYS
+
+        allowed = SEARCH_FACT_KEYS.get(self.kind, frozenset()) | MEMORY_FACT_KEYS
+        facts = {k: v for k, v in self.facts.items() if k in allowed}
         return SearchOffer(
             self.kind,
             self.options,
             self.aliases,
-            dict(self.facts),
+            facts,
             self.default,
             self.default_reason,
         )
@@ -497,18 +504,57 @@ def _decide(offer: SearchOffer, chooser: Any) -> tuple[str, SearchStep]:
     return label, SearchStep(offer.kind, offer.options, label, reason, by)  # type: ignore[arg-type]
 
 
+def tour_gate_offer(question: str | None, places_with_office: int) -> SearchOffer:
+    """Whether to ask the renter the trade-off question before a tour request is drafted. Two
+    options only when there is a question and a checked place with an office to write to."""
+    facts: dict[str, bool | int] = {
+        "has_question": question is not None,
+        "places_with_office": places_with_office,
+    }
+    if question is not None and places_with_office > 0:
+        return SearchOffer(
+            kind="tour_gate",
+            options=(ASK_FIRST, DRAFT_NOW),
+            aliases=("option A", "option B"),
+            facts=facts,
+            default=ASK_FIRST,
+            default_reason="The answer could change which place the renter wants to tour.",
+        )
+    return SearchOffer(
+        kind="tour_gate",
+        options=(DRAFT_NOW,),
+        aliases=("option A",),
+        facts=facts,
+        default=DRAFT_NOW,
+        default_reason="Only one option was open.",
+    )
+
+
 @dataclass(frozen=True)
 class SearchPlan:
     deep_check: list[tuple[str, str]]  # (property_id, floor plan) of the places to check deeply
     question: str | None  # the one trade-off question to put to the renter, or None
     steps: list[SearchStep]
+    ask_first: bool = False  # put the question before any tour request draft
+
+
+def _remember(offer: SearchOffer, memory: dict[str, bool | int] | None) -> SearchOffer:
+    if not memory:
+        return offer
+    from dataclasses import replace
+
+    return replace(offer, facts={**offer.facts, **memory})
 
 
 def plan_search(
-    matches: list[PlaceMatch], tradeoffs: list[TradeOff], chooser: Any | None = None
+    matches: list[PlaceMatch],
+    tradeoffs: list[TradeOff],
+    chooser: Any | None = None,
+    memory: dict[str, bool | int] | None = None,
 ) -> SearchPlan:
-    """Both search choices, in order. `chooser` is a model behind the `Chooser` protocol; with
-    none, the code policy decides every step."""
+    """The search choices, in order. `chooser` is a model behind the `Chooser` protocol; with
+    none, the code policy decides every step. `memory` is the renter's remembered preference
+    keys as yes/no and counts (never an id)."""
     from snapback.agent.runner import PolicyChooser
 
     chooser = chooser or PolicyChooser()
@@ -516,14 +562,19 @@ def plan_search(
     targets: list[tuple[str, str]] = []
     offer = deep_check_offer(matches)
     if offer is not None:
-        label, step = _decide(offer, chooser)
+        label, step = _decide(_remember(offer, memory), chooser)
         steps.append(step)
         targets = list(offer.payload["sets"][label])
     asked = tradeoff_offer(tradeoffs, len(matches))
-    label, step = _decide(asked, chooser)
+    label, step = _decide(_remember(asked, memory), chooser)
     steps.append(step)
     question = None if label == NO_QUESTION else label
-    return SearchPlan(targets, question, steps)
+    by_key = {_place_key(m): m for m in matches}
+    with_office = sum(1 for t in targets if by_key.get(t) and by_key[t].office_on_record)
+    gate = tour_gate_offer(question, with_office)
+    label, step = _decide(_remember(gate, memory), chooser)
+    steps.append(step)
+    return SearchPlan(targets, question, steps, ask_first=label == ASK_FIRST)
 
 
 def tradeoffs_for(

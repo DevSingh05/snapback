@@ -42,6 +42,7 @@ from snapback.adapters.vexcel import aerial_proof, aerial_side
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
+from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
@@ -61,10 +62,12 @@ from snapback.contracts import (
     AerialSideOut,
     AlternativesResponse,
     Card,
+    CasePreferences,
     CreateCaseResponse,
     DataSource,
     Evidence,
     LocateStatus,
+    PreferencesUpdate,
     RenterBrief,
     ReplyResponse,
     ReportResponse,
@@ -73,15 +76,9 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.preferences import merge as merge_preferences
 from snapback.safety.paths import resolve_data_dir
-from snapback.search import (
-    AmbiguousPlace,
-    NoOfficeOnRecord,
-    alternatives_for,
-    draft_tour_request,
-    place_for,
-)
-from snapback.search import search as run_search
+from snapback.search import AmbiguousPlace, NoOfficeOnRecord, draft_tour_request, place_for
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -171,9 +168,11 @@ def create_app(
     lookups: Lookups | None = None,
     *,
     registry: CaseRegistry | None | object = _DEFAULT,
+    search_chooser: object | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
-    started each case; the default is lane D's safety store."""
+    started each case; the default is lane D's safety store. `search_chooser` replaces the
+    search agent's chooser (tests); by default the runner setting picks it."""
     settings = settings or get_settings()
     # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
     lookups = lookups or KitLookups(settings.snapback_data_source)
@@ -189,6 +188,7 @@ def create_app(
 
     pictures = CardPictures()
     search_limit = PerMinuteLimit(SEARCH_PER_MINUTE)
+    chooser = search_chooser or search_chooser_for(settings.snapback_agent)
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -610,18 +610,36 @@ def create_app(
         )
 
     @app.post("/search")
-    def post_search(brief: RenterBrief, request: Request) -> SearchResponse:
-        """CoStar's researched places that fit a renter's brief, in code order.
+    def post_search(
+        brief: RenterBrief,
+        request: Request,
+        case_id: Annotated[str | None, Query(max_length=64)] = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> SearchResponse:
+        """CoStar's researched places that fit a renter's brief, in code order, and what the
+        search agent decided about them.
 
         The budget is compared with the asking price as reported, never a band. Every price and
-        availability line says "as of CoStar's last research". The response carries LIVE or
-        FIXTURE and the counts. No model is involved. A brief is a few hundred bytes (413 above
-        `SEARCH_MAX_BODY`); one address gets `SEARCH_PER_MINUTE` searches a minute (429)."""
+        availability line says "as of CoStar's last research". Code finds and orders the places;
+        then up to three get a deep check (the model picks which, among options code wrote) and
+        `decisions` lists each choice with who made it (`model` or `policy`) and why. A checked
+        place carries `checked: true` and a line built by code; the rest are researched only.
+        The search never gives a verdict. With `case_id` and that case's read token in a header,
+        what the renter already rejected in that case (see `/preferences`) is applied. The
+        response carries LIVE or FIXTURE and the counts. A brief is a few hundred bytes (413
+        above `SEARCH_MAX_BODY`); one address gets `SEARCH_PER_MINUTE` searches a minute (429)."""
         address = request.client.host if request.client else "unknown"
         if not search_limit.allow(address):
             raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        prefs = None
+        if case_id is not None:
+            case = find(case_id)
+            no_token_in_the_address(request)
+            check_read(case, _bearer(authorization, x_case_token))
+            prefs = case.preferences
         try:
-            return run_search(brief, lookups)
+            return agentic_search(brief, lookups, chooser, prefs)
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
 
@@ -634,17 +652,38 @@ def create_app(
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> AlternativesResponse:
         """Up to `n` researched places near the checked ad's price and size, never its own
-        building. Needs the case's read token in a header; a token in the address is refused."""
+        building and never one the renter rejected. Up to three get the deep check; `decisions`
+        says who chose. Needs the case's read token in a header; a token in the address is
+        refused."""
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
         try:
-            matches = alternatives_for(case, None, lookups, n)
+            return agentic_alternatives(
+                case, lookups, chooser, n, case.preferences, settings.snapback_data_source
+            )
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
-        return AlternativesResponse(
-            case_id=case_id, source=settings.snapback_data_source, matches=matches
-        )
+
+    @app.post("/cases/{case_id}/preferences")
+    def post_preferences(
+        case_id: str,
+        body: PreferencesUpdate,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CasePreferences:
+        """The renter rejected a place or a trade-off ("no walk-ups"): remember it for this case.
+
+        Only code-defined keys are kept (`no_walkup`, `needs_parking`, `max_rent`,
+        `avoid_property_id`), never free text. Later searches and alternatives for the case
+        apply them, so a rejected place does not come back. Needs the case's write token in a
+        header; a recorded case cannot be written to (403)."""
+        case = find(case_id)
+        if case.token is None:
+            raise HTTPException(status_code=403, detail="A recorded case cannot be changed.")
+        check_write(case, _bearer(authorization, x_case_token))
+        case.preferences = merge_preferences(case.preferences, body)
+        return case.preferences
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(
