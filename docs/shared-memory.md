@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Fri Nov 13 2026, 22:00. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Fri Nov 13 2026, 23:48. Standing rules for agents are in AGENTS.md; this file holds the changing facts.
 
 ## Decisions (locked)
 
@@ -22,12 +22,12 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
 `epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                                                       |
-| ------- | ----------- | ------------------------------------ | --------------------------------------------------------- |
-| Dev     | DevSingh05  | A. agent and backend                 | data gate #5, then epic #8 (A1 #12)                       |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | data gate #5, then epic #9 (T1 #20)                       |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | data gate #5, then epic #10 (V1 #27)                      |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | data gate #5, then epic #11 (D1 #35); repo invite pending |
+| Person  | GitHub      | Lane                                 | Now                                                                                                                                                                  |
+| ------- | ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dev     | DevSingh05  | A. agent and backend                 | A1-A4 merged (#49 #54 #56 #60). #58 A5 FIX open (regex DoS, more slow patterns found); agent hit usage limit 23:32, waits for Dev to restart it. #59 A6 waits on #58 |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | #53 #55 #64 #65 merged (web wired to real API, read token); design direction A+C being built                                                                         |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | V1 #63 merged; #61 V5 photo memory FIX (SQLite threads, screenshot crops); #62 V6 eval FIX (phantom bars, gate dodge, make eval)                                     |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | D1-D6 pushed on 6 branches 23:07-23:26, no PRs yet; asked on #11 to open them (d/40 conflicts with main)                                                             |
 
 ## Data facts (REPORTED until our probe confirms)
 
@@ -64,7 +64,9 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 
 ## Live facts
 
-- Nothing deployed yet.
+- Nothing deployed yet. main = e635d3c (Fri 23:33).
+- Fri 22:10 data gate GO: 3/3 Houston multifamily Matterport models load on Vidyut's key (issue #5); apartment-listing has min/max rent per floor plan and the management company.
+- API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (trace/status; may go in `?token=`). `/c/:id` card stays public.
 
 ## Gotchas
 
@@ -76,3 +78,7 @@ Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic
 - Quickstart (unchecked on our keys): cube faces at 2k or 4k, a defurnished view of the same panoramas, labelled rooms with dimensions, and a residential folder joined by a home listing id. Probe the residential file too.
 - Sponsor Terms: all copies, caches and derivatives deleted when the event period ends (Sun 16:00); no sponsor data in a public demo or repo.
 - Branch names: `<lane>/<issue#>-<slug>` with lane `a`, `t`, `v` or `d`. Task PRs say `Closes #n`; epic and inbox issues only `Refs #n`.
+- Fri 23:35 Unbounded regex on user text is a DoS: `[\w.+-]+@` took 26 s on 80k chars. Bound every quantifier and cap text length before any pattern runs.
+- Fri 23:38 Never put the write secret in a URL (uvicorn logs the query string); use the read-only token for EventSource.
+- Fri 23:45 SQLite connections are per thread; FastAPI sync routes run in a threadpool. Open per call or lock.
+- Keep PR stacks at most 2 deep; merge `main` into the branch rather than stacking fixes.

@@ -7,8 +7,11 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.162.7",
     "httpx>=0.28.1",
+    "numpy>=2.4.6",
+    "pillow>=13.0.0",
     "pydantic>=2.14.3",
     "pydantic-settings>=2.16.3",
+    "python-multipart>=0.0.33",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -25,6 +28,10 @@ vision = [
 agent = [
     "deepagents>=0.7.38",
     "langchain-anthropic>=1.7.10",
+]
+intake = [
+    "pillow>=13.0.0",
+    "rapidocr-onnxruntime>=1.4.4",
 ]
 
 [build-system]

@@ -371,3 +371,38 @@ class AerialTile(BaseModel):
     direction: str  # "north", "east", "south", "west" or "nadir"
     captured_on: date | None = None
     path: str  # local file under data/ (or fixtures/ for the synthetic tile)
+
+
+# ---------------------------------------------------------------------------------------------
+# Starting a case over HTTP (lane A's API; the upload page and the iMessage sidecar call it).
+# ---------------------------------------------------------------------------------------------
+
+
+class CaseProgress(StrEnum):
+    RUNNING = "running"
+    WAITING_FOR_APPROVAL = "waiting_for_approval"  # a challenge is drafted; the renter decides
+    DONE = "done"
+
+
+class CreateCaseRequest(BaseModel):
+    """`POST /cases`, sent as multipart form data. `photos` are files and are not in this model."""
+
+    link: str | None = None  # the listing's link; read as text, never fetched
+    text: str | None = None  # the listing text or the poster's messages, as the renter has them
+    renter_id: str | None = None  # set by the iMessage sidecar; the web app sends none
+
+
+class CreateCaseResponse(BaseModel):
+    """What `POST /cases` returns. This is the only time the case's secrets are shown."""
+
+    case_id: str  # short public id, for display and for reading the case
+    source: DataSource
+    token: str  # write secret for this case; send it on every write, in a header only
+    # Read-only secret: opens the trace and the challenge text, and may ride in `?token=`.
+    read_token: str | None = None
+    status: CaseProgress
+    state: VerdictState | None = None  # set once the case is done
+    challenge_text: str | None = None  # the message the renter may forward; None if none drafted
+    photos: int = 0
+    screenshots: int = 0  # images that were read as text
+    injection_noticed: bool = False  # the listing had text written for an AI system
