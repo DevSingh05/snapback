@@ -53,8 +53,13 @@ from snapback.verdict import decide
 POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
-# What the sidecar sends: a keyed hash of the thread. Short, and nothing like a sentence.
-RENTER_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+# What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
+# Nothing else is accepted, so a raw phone number or a name can never be stored as one.
+RENTER_ID = re.compile(r"imsg-[0-9a-f]{24}")
+# What a browser is known by: the client cookie this API issued.
+COOKIE_ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
+# Everything a case may be registered under.
+OWNER = re.compile(r"imsg-[0-9a-f]{24}|browser:[A-Za-z0-9_-]{8,64}")
 _DEFAULT = object()
 
 
@@ -145,6 +150,17 @@ def create_app(
         case = store.get(case_id)
         if case is None:
             raise HTTPException(status_code=404, detail="No case with that id.")
+        # A case the renter deleted (lane D's delete, run from anywhere) is no longer
+        # registered. Forget it here too, so it is not served from memory until a restart.
+        owner = getattr(case, "owner", None)
+        deleted = (
+            registry is not None
+            and owner is not None
+            and case.session.case_id not in registry.cases_of(owner)
+        )
+        if deleted:
+            store.discard(case_id)
+            raise HTTPException(status_code=404, detail="No case with that id.")
         return case
 
     @app.get("/healthz")
@@ -211,7 +227,9 @@ def create_app(
         # An image that is mostly text is a screenshot of the listing and is read locally as
         # part of it; the rest are counted as photos.
         try:
-            return store.create(read_listing(listing_text, images), register)
+            case = store.create(read_listing(listing_text, images), register)
+            case.owner = owner if registry is not None else None
+            return case
         except NotRegistered:
             raise HTTPException(
                 status_code=503,
@@ -272,11 +290,15 @@ def create_app(
             # Who is asking. The sidecar names its renter; a browser is known by a cookie.
             address = request.client.host if request.client else "unknown"
             cookie = request.cookies.get(CLIENT_COOKIE)
+            if cookie is not None and not COOKIE_ID.fullmatch(cookie):
+                cookie = None  # not one we issued; a fresh one is set below
             new_cookie = None if renter_id or cookie else secrets.token_urlsafe(16)
             client = f"renter:{renter_id}" if renter_id else f"browser:{cookie or new_cookie}"
             # Who the case is registered under, for delete: the sidecar's own renter id as
             # it sent it, or the browser's client cookie.
             owner = renter_id or client
+            if not OWNER.fullmatch(owner):  # cannot happen with the checks above
+                raise HTTPException(status_code=422, detail="That is not a renter id.")
 
             # A place is taken before the check starts, in one step, so two requests arriving
             # together cannot both take the last one. It is given back if nothing starts.

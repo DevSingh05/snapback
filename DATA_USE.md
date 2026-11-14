@@ -24,14 +24,14 @@ companies only, never a person.
 Everything kept lives under `data/` (git-ignored, never committed; `make check` fails if a file
 there is tracked).
 
-| What                                                               | Where                                         | How long                                                             |
-| ------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------- |
-| CoStar kit                                                         | `data/raw/costar/`                            | Until `make purge`, no later than Sun Nov 15 16:00 (sponsor terms).  |
-| Matterport and Vexcel caches                                       | under `data/`                                 | At most 7 days, and purged by Sun Nov 15 16:00.                      |
-| Photo memory (hashes, never pixels)                                | `data/memory/photo_memory.sqlite` (V5)        | 7-day TTL; cleared per case on "delete"; purged by Sun Nov 15 16:00. |
-| Daily check counts (and, once wired, which renter owns which case) | `data/safety.sqlite`                          | Ids and counts only, no content. Until purge.                        |
-| Case photos                                                        | `data/cases/<case_id>/` if a lane writes them | Until the renter says "delete", or purge.                            |
-| Red-team attacks (team-made photos only)                           | `data/redteam/`                               | Until purge.                                                         |
+| What                                                 | Where                                         | How long                                                             |
+| ---------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------- |
+| CoStar kit                                           | `data/raw/costar/`                            | Until `make purge`, no later than Sun Nov 15 16:00 (sponsor terms).  |
+| Matterport and Vexcel caches                         | under `data/`                                 | At most 7 days, and purged by Sun Nov 15 16:00.                      |
+| Photo memory (hashes, never pixels)                  | `data/memory/photo_memory.sqlite` (V5)        | 7-day TTL; cleared per case on "delete"; purged by Sun Nov 15 16:00. |
+| Daily check counts, and which renter owns which case | `data/safety.sqlite`                          | Ids and counts only, no content. Until purge.                        |
+| Case photos                                          | `data/cases/<case_id>/` if a lane writes them | Until the renter says "delete", or purge.                            |
+| Red-team attacks (team-made photos only)             | `data/redteam/`                               | Until purge.                                                         |
 
 ## Limits and deletion
 
@@ -43,9 +43,17 @@ there is tracked).
   `case_id` in any other SQLite store under `data/`. Deleted rows are overwritten
   (`secure_delete`). Daily counts are kept, since they hold no content and deleting them would
   reset the limit.
-- **"delete" all of a renter's cases**: `delete-renter <renter_id>` is **not wired yet**. It needs
-  each new case registered to its renter (`SafetyStore.register_case`) when the case is created,
-  and nothing calls that yet, so today it deletes nothing. Until then, delete by case id.
+- **"delete" all of a renter's cases**: `uv run python -m snapback.safety delete-renter <renter_id>`
+  deletes every case that renter started, each one as `delete-case` does. It works because the
+  API registers each new case with its renter (`SafetyStore.register_case`) before the check
+  starts; a check that could not be registered is not started.
+  - A case started through iMessage is registered under the sidecar's renter id: `imsg-` and
+    a keyed hash of the thread. It is never a phone number, and the API refuses any other shape.
+  - A case started in a browser has no renter id. It is registered under
+    `browser:<client cookie>`, the random cookie the API issued to that browser.
+  - The running API stops serving a deleted case at once: on each request it checks that the
+    case is still registered, and a case that is not is dropped from memory and answers 404.
+    No restart is needed.
 - **`make purge`** (`uv run python -m snapback.safety purge`): deletes everything under `data/`.
   It refuses any folder not named `data`, and a relative `SNAPBACK_DATA_DIR` is taken from the
   repo root, so it works from any directory. A missing folder is an error, not "0 removed". Run it

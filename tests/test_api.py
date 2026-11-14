@@ -71,6 +71,11 @@ def stream_trace(
         return read_sse(response)
 
 
+def renter(name: str) -> str:
+    """A renter id shaped like the sidecar's: "imsg-" and 24 hex characters."""
+    return "imsg-" + name.encode().hex().ljust(24, "0")[:24]
+
+
 def create(client: TestClient, **form) -> dict:
     response = client.post("/cases", data={"text": "Two bed near the park.", **form})
     assert response.status_code == 201, response.text
@@ -136,12 +141,12 @@ def test_trace_resumes_from_last_event_id(client):
 
 def test_create_case_rejects_more_than_daily_limit(client):
     for _ in range(3):
-        create(client, renter_id="renter-a")
-    refused = client.post("/cases", data={"text": "x", "renter_id": "renter-a"})
+        create(client, renter_id=renter("a"))
+    refused = client.post("/cases", data={"text": "x", "renter_id": renter("a")})
     assert refused.status_code == 429
     assert "3" in refused.json()["detail"]
     # Someone else's limit is their own.
-    create(client, renter_id="renter-b")
+    create(client, renter_id=renter("b"))
 
 
 # --- create: what the upload page sends and reads ------------------------------------------
@@ -290,15 +295,15 @@ def finish(client: TestClient, case: dict) -> Card:
 
 
 def test_rules_run_on_the_text_the_renter_posted(client):
-    quiet = finish(client, create(client, text="Two bed near the park.", renter_id="a"))
-    asked = finish(client, create(client, text=ZELLE_ASK, renter_id="b"))
+    quiet = finish(client, create(client, text="Two bed near the park.", renter_id=renter("a")))
+    asked = finish(client, create(client, text=ZELLE_ASK, renter_id=renter("b")))
     assert quiet.rows[2].lines[0].text == "No risky payment ask found in the text you sent."
     assert "Zelle before a viewing. Red flag." in [line.text for line in asked.rows[2].lines]
 
 
 def test_text_written_for_an_ai_system_is_noticed_and_changes_nothing(client):
-    plain = create(client, text=ZELLE_ASK, renter_id="a")
-    injected = create(client, text=f"{ZELLE_ASK} {INJECTED}", renter_id="b")
+    plain = create(client, text=ZELLE_ASK, renter_id=renter("a"))
+    injected = create(client, text=f"{ZELLE_ASK} {INJECTED}", renter_id=renter("b"))
     assert plain["injection_noticed"] is False
     assert injected["injection_noticed"] is True
 
@@ -338,7 +343,7 @@ def test_a_screenshot_is_read_as_part_of_the_listing(client):
 
 
 def test_case_ids_are_short_and_differ(client):
-    ids = {create(client, renter_id=f"renter-{n}")["case_id"] for n in range(5)}
+    ids = {create(client, renter_id=renter(str(n)))["case_id"] for n in range(5)}
     assert len(ids) == 5
     assert all(len(case_id) == 4 and case_id.isalnum() for case_id in ids)
 

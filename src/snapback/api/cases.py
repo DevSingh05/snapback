@@ -140,6 +140,7 @@ class SessionCase:
         # A second secret that can only read. It is the one a browser may put in an address,
         # where servers log it, so it must never be able to approve anything.
         self.read_token = secrets.token_urlsafe(24)
+        self.owner: str | None = None  # who it is registered under, for delete (A11)
         self.session = session
         self._listing = listing
         self._runner = runner
@@ -264,6 +265,11 @@ class CaseStore:
 
     def __len__(self) -> int:
         return len(self._cases)
+
+    def discard(self, case_id: str) -> None:
+        """Forget a case. Used when it has been deleted from disk by the renter's "delete"."""
+        with self._lock:
+            self._cases.pop(public_id(case_id), None)
 
     def create(
         self, listing: Listing, register: Callable[[str], None] | None = None
