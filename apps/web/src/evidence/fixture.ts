@@ -25,7 +25,7 @@ export const EVIDENCE_FIXTURE_B: EvidenceFile = {
         { option: "base", chosen_by: "policy", seconds: 1.2, result: "not_placed" },
         { option: "wider_index", chosen_by: "model", seconds: 2.4, result: "elsewhere" },
       ],
-      points: EVIDENCE_FIXTURE_A.photos[1]?.points ?? null,
+      points: { n_total: 64, sampled: EVIDENCE_FIXTURE_A.photos[1]?.points?.sampled ?? [] },
     },
   ],
 };

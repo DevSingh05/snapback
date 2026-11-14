@@ -1,7 +1,7 @@
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
-import { boxFaces, points, type Box, type Origin } from "./iso";
-import "../draw/draw.css";
+import { Parts } from "../draw/Parts";
+import { NAMED_SCENE, PICTURED_SCENE } from "./aerialScenes";
 import "./walk.css";
 
 export interface AerialPane {
@@ -24,70 +24,10 @@ export const NAMED_LABEL = "The home the ad names";
 export const PICTURED_LABEL = "The home in its photos";
 export const MISMATCH_TITLE = "The ad's photos were taken in a different building.";
 
-const O: Origin = { ox: 200, oy: 70 };
-
-const BLOCKS: Record<"named" | "pictured", { lot: Box; home: Box[]; around: Box[] }> = {
-  named: {
-    lot: { x: 70, y: 70, w: 100, d: 100, h: 0 },
-    home: [
-      { x: 86, y: 90, w: 68, d: 58, h: 30, tone: "white" },
-      { x: 86, y: 90, z: 30, w: 68, d: 58, h: 6, tone: "slate" },
-    ],
-    around: [
-      { x: 0, y: 0, w: 52, d: 44, h: 24, tone: "pale" },
-      { x: 150, y: -6, w: 56, d: 44, h: 22, tone: "pale" },
-      { x: -10, y: 150, w: 50, d: 54, h: 22, tone: "pale" },
-      { x: 196, y: 150, w: 44, d: 60, h: 26, tone: "pale" },
-    ],
-  },
-  pictured: {
-    lot: { x: 60, y: 60, w: 120, d: 120, h: 0 },
-    home: [
-      { x: 76, y: 76, w: 88, d: 88, h: 84, tone: "white" },
-      { x: 76, y: 76, z: 84, w: 88, d: 88, h: 5, tone: "slate" },
-    ],
-    around: [
-      { x: -6, y: 0, w: 50, d: 50, h: 40, tone: "pale" },
-      { x: 170, y: -10, w: 50, d: 44, h: 52, tone: "pale" },
-      { x: 200, y: 170, w: 40, d: 50, h: 30, tone: "pale" },
-    ],
-  },
-};
-
 function StandIn({ which }: { which: "named" | "pictured" }) {
-  const b = BLOCKS[which];
-  const { x, y, w, d } = b.lot;
-  const draw = (box: Box, i: number, cls: string) => {
-    const f = boxFaces(box, O);
-    return (
-      <g key={`${cls}-${i}`} className={`dk-${box.tone ?? "pale"} ${cls}`}>
-        <polygon className="dk-left" points={f.left} />
-        <polygon className="dk-right" points={f.right} />
-        <polygon className="dk-top" points={f.top} />
-      </g>
-    );
-  };
   return (
     <svg className="ma-standin" viewBox="0 0 400 300" aria-hidden="true" focusable="false">
-      <polygon
-        className="ma-ground"
-        points={points(O, [-40, -40, 0], [260, -40, 0], [260, 260, 0], [-40, 260, 0])}
-      />
-      <polygon
-        className="ma-road"
-        points={points(O, [-40, 108, 0], [60, 108, 0], [60, 132, 0], [-40, 132, 0])}
-      />
-      <polygon
-        className="ma-road"
-        points={points(O, [108, 180, 0], [132, 180, 0], [132, 260, 0], [108, 260, 0])}
-      />
-      {b.around.filter((a) => a.x + a.y < 200).map((a, i) => draw(a, i, "ma-far"))}
-      <polygon
-        className="ma-lot"
-        points={points(O, [x, y, 0], [x + w, y, 0], [x + w, y + d, 0], [x, y + d, 0])}
-      />
-      {b.home.map((h, i) => draw(h, i, "ma-home"))}
-      {b.around.filter((a) => a.x + a.y >= 200).map((a, i) => draw(a, i, "ma-near"))}
+      <Parts parts={which === "named" ? NAMED_SCENE : PICTURED_SCENE} />
     </svg>
   );
 }

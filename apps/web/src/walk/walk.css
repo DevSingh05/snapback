@@ -746,12 +746,6 @@
   display: block;
   object-fit: cover;
 }
-.ma-ground {
-  fill: var(--h-lawn);
-}
-.ma-road {
-  fill: var(--h-path);
-}
 .ma-lot {
   fill: color-mix(in srgb, var(--surface) 55%, var(--h-lawn));
   stroke: var(--ink);

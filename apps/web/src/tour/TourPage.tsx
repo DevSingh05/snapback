@@ -230,6 +230,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
     <div
       className="tour-page"
       data-rail={look.events.length > 0 ? "on" : "off"}
+      data-two-homes={look.mismatch ? "true" : undefined}
       onPointerDownCapture={pause}
       onKeyDownCapture={pause}
       onWheelCapture={pause}

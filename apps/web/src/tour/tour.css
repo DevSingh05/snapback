@@ -302,6 +302,11 @@
   padding: 8px clamp(16px, 2.4vw, 28px);
   color: var(--muted);
 }
+/* In the walk through the pictured building, rooms are not counted against the named home. */
+.tour-page[data-two-homes] .tour-coverage,
+.tour-page[data-two-homes] .tour-cover-key {
+  display: none;
+}
 .tour-coverage {
   margin: 0;
   padding: 0 clamp(16px, 2.4vw, 28px) 12px;
