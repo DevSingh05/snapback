@@ -122,6 +122,48 @@ describe("place, person and price proof lines", () => {
       "Call Oak Court Management yourself.",
     ],
     [
+      "license not found",
+      { license: { status: "not_found", claimed_role: "agent" } },
+      "Says they're a licensed agent. We found no active Texas license under that name. Ask for their license number and look it up yourself at trec.texas.gov.",
+    ],
+    [
+      "license not found, a brokerage",
+      { license: { status: "not_found", claimed_role: "company" } },
+      "Says a brokerage lists this home. We found no active Texas license under that company's name.",
+    ],
+    [
+      "license not found, a role that is not ours",
+      { license: { status: "not_found", claimed_role: "Fx Person" } },
+      "Says they're licensed. We found no active Texas license under that name.",
+    ],
+    [
+      "licensed with a sponsor",
+      {
+        license: {
+          status: "licensed",
+          claimed_role: "agent",
+          sponsor_broker: "Fixture Realty Group",
+        },
+      },
+      "Licensed in Texas, sponsored by Fixture Realty Group.",
+    ],
+    ["licensed", { license: { status: "licensed", claimed_role: "broker" } }, "Licensed in Texas."],
+    [
+      "a licensed brokerage",
+      { license: { status: "licensed", claimed_role: "company" } },
+      "The brokerage they named is licensed in Texas.",
+    ],
+    [
+      "license unchecked, no claim",
+      { license: { status: "not_checked" } },
+      "Not checked (the poster did not say they are an agent, broker or locator).",
+    ],
+    [
+      "license unchecked, lookup failed",
+      { license: { status: "not_checked", claimed_role: "agent" } },
+      "Not checked (we could not look the poster up in the Texas license list).",
+    ],
+    [
       "per bed guard",
       price({ status: "not_checked", per_bed: true }),
       "Priced per bed here, so the rent was not compared.",
@@ -201,6 +243,36 @@ describe("place, person and price proof lines", () => {
     expect(phone).toHaveTextContent("Not confirmed");
     expect(phone).not.toHaveTextContent("Doesn't match");
     expect(screen.getAllByText("Rent vs record")).toHaveLength(1);
+  });
+
+  it("a claimed license that was not found reads Doesn't match, and so does the phone beside it", () => {
+    const notFound = { status: "not_found", claimed_role: "agent" } as const;
+    render(
+      <CardView
+        card={card}
+        variant="result"
+        proofs={{ ...authority({ office_phone_match: "no" }), license: notFound }}
+      />,
+    );
+    const license = screen.getByText(/no active Texas license under that name/).closest("tr");
+    expect(license).toHaveTextContent("Doesn't match");
+    // Alone, a number that is not the office's is Not confirmed (#121). Beside a license that
+    // was claimed and not found, it is a mismatch again (#124).
+    const phone = screen.getByText(/under the name they gave/).closest("tr");
+    expect(phone).toHaveTextContent("Doesn't match");
+    expect(phone).toHaveTextContent("Call the office on record yourself.");
+    expect(text()).not.toContain("Agents often use their own");
+  });
+
+  it("a license found is a supporting line, and no lookup means no line", () => {
+    const licensed = { status: "licensed", claimed_role: "agent" } as const;
+    const { unmount } = render(
+      <CardView card={card} variant="result" proofs={{ license: licensed }} />,
+    );
+    expect(screen.getByText("Licensed in Texas.").closest("tr")).toHaveTextContent("Matches");
+    unmount();
+    render(<CardView card={card} variant="result" proofs={authority({})} />);
+    expect(screen.queryByText("License")).toBeNull();
   });
 
   it("skips Call X yourself when the API row already names the manager", () => {

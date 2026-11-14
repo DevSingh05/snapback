@@ -30,6 +30,7 @@ EN: dict[str, str] = {
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
     "label.link": "Link",
+    "label.license": "License",
     "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
@@ -101,6 +102,43 @@ EN: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    # A number that is not the office's, from a poster who claims a license they do not
+    # hold: the "agents often use their own" excuse is gone, so it is a red flag again.
+    "contact.phone_mismatch_unlicensed": (
+        "This number is not the leasing office's on record, and we found no active Texas "
+        "license under the name they gave. Red flag."
+    ),
+    "contact.phone_mismatch_unlicensed_unnamed": (
+        "This number is not the leasing office's on record, and we found no active Texas "
+        "license under the name they gave. Call the office on record yourself. Red flag."
+    ),
+    # The license line (A18, #124), from the Texas Real Estate Commission's public list.
+    # Never a person's name and never a license number: a role, a yes/no, a company.
+    "license.role.agent": "agent",
+    "license.role.broker": "broker",
+    "license.role.locator": "locator",
+    "license.not_found": (
+        "Says they're a licensed {role}. We found no active Texas license under that name. "
+        "Ask for their license number and look it up yourself at trec.texas.gov. Red flag."
+    ),
+    "license.not_found_unspecified": (
+        "Says they're licensed. We found no active Texas license under that name. "
+        "Ask for their license number and look it up yourself at trec.texas.gov. Red flag."
+    ),
+    "license.not_found_company": (
+        "Says a brokerage lists this home. We found no active Texas license under that "
+        "company's name. Ask for its license number and look it up yourself at "
+        "trec.texas.gov. Red flag."
+    ),
+    "license.licensed": "Licensed in Texas.",
+    "license.licensed_sponsored": "Licensed in Texas, sponsored by {broker}.",
+    "license.licensed_company": "The brokerage they named is licensed in Texas.",
+    "license.not_checked_no_claim": (
+        "Not checked (the poster did not say they are an agent, broker or locator)."
+    ),
+    "license.not_checked_failed": (
+        "Not checked (we could not look the poster up in the Texas license list)."
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -224,6 +262,9 @@ EN: dict[str, str] = {
     "reason.for_sale": "This home is listed for sale, not for rent.",
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
+    "reason.license_not_found": (
+        "The poster says they are licensed, and we found no active Texas license under that name."
+    ),
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
@@ -281,6 +322,7 @@ ES: dict[str, str] = {
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
     "label.link": "Enlace",
+    "label.license": "Licencia",
     "label.unit": "Unidad en el registro",
     "place.located_plan": (
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
@@ -357,6 +399,42 @@ ES: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "contact.phone_mismatch_unlicensed": (
+        "Este número no es el de la oficina de alquiler que figura en el registro, y no "
+        "encontramos ninguna licencia activa de Texas con el nombre que dio. Señal de alerta."
+    ),
+    "contact.phone_mismatch_unlicensed_unnamed": (
+        "Este número no es el de la oficina de alquiler que figura en el registro, y no "
+        "encontramos ninguna licencia activa de Texas con el nombre que dio. Llame usted "
+        "mismo a la oficina que figura en el registro. Señal de alerta."
+    ),
+    "license.role.agent": "agente",
+    "license.role.broker": "corredor",
+    "license.role.locator": "localizador de apartamentos",
+    "license.not_found": (
+        "Dice ser {role} con licencia. No encontramos ninguna licencia activa de Texas con "
+        "ese nombre. Pídale su número de licencia y búsquelo usted mismo en trec.texas.gov. "
+        "Señal de alerta."
+    ),
+    "license.not_found_unspecified": (
+        "Dice tener licencia. No encontramos ninguna licencia activa de Texas con ese "
+        "nombre. Pídale su número de licencia y búsquelo usted mismo en trec.texas.gov. "
+        "Señal de alerta."
+    ),
+    "license.not_found_company": (
+        "Dice que una agencia inmobiliaria anuncia esta vivienda. No encontramos ninguna "
+        "licencia activa de Texas a nombre de esa empresa. Pida su número de licencia y "
+        "búsquelo usted mismo en trec.texas.gov. Señal de alerta."
+    ),
+    "license.licensed": "Con licencia en Texas.",
+    "license.licensed_sponsored": "Con licencia en Texas, patrocinada por {broker}.",
+    "license.licensed_company": "La agencia que nombró tiene licencia en Texas.",
+    "license.not_checked_no_claim": (
+        "No comprobado (quien publica no dijo ser agente, corredor ni localizador)."
+    ),
+    "license.not_checked_failed": (
+        "No comprobado (no pudimos buscar a quien publica en la lista de licencias de Texas)."
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
@@ -507,6 +585,10 @@ ES: dict[str, str] = {
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
+    "reason.license_not_found": (
+        "Quien publica dice tener licencia, y no encontramos ninguna licencia activa de "
+        "Texas con ese nombre."
+    ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "

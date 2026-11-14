@@ -90,16 +90,85 @@ function unitLine(p: CardProofs): CardLine[] {
   }
 }
 
+const LICENSE_ROLES = ["agent", "broker", "locator"];
+const LOOK_IT_UP = "look it up yourself at trec.texas.gov.";
+
+// Mirrors the license.* strings in strings.py (A18, #124). A role of ours, a yes/no and at most
+// a sponsoring company: never a person's name, a license number, or the poster's own words.
+function licenseLines(p: CardProofs): CardLine[] {
+  const found = p.license;
+  if (!found) return []; // never looked up: no line
+  const label = "License";
+  const role = found.claimed_role ?? "";
+  if (found.status === "not_found") {
+    if (role === "company")
+      return [
+        line(
+          label,
+          `Says a brokerage lists this home. We found no active Texas license under that company's name. Ask for its license number and ${LOOK_IT_UP}`,
+          "red_flag",
+        ),
+      ];
+    const says = LICENSE_ROLES.includes(role)
+      ? `Says they're a licensed ${role}.`
+      : "Says they're licensed.";
+    return [
+      line(
+        label,
+        `${says} We found no active Texas license under that name. Ask for their license number and ${LOOK_IT_UP}`,
+        "red_flag",
+      ),
+    ];
+  }
+  if (found.status === "licensed") {
+    if (role === "company")
+      return [line(label, "The brokerage they named is licensed in Texas.", "ok")];
+    const sponsor = (found.sponsor_broker ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 80);
+    return [
+      line(
+        label,
+        sponsor ? `Licensed in Texas, sponsored by ${sponsor}.` : "Licensed in Texas.",
+        "ok",
+      ),
+    ];
+  }
+  return [
+    line(
+      label,
+      role
+        ? "Not checked (we could not look the poster up in the Texas license list)."
+        : "Not checked (the poster did not say they are an agent, broker or locator).",
+      "not_checked",
+    ),
+  ];
+}
+
 function personLines(p: CardProofs): CardLine[] {
   const a = p.authority;
-  if (!a) return [];
+  if (!a) return licenseLines(p);
   const out: CardLine[] = [];
   const phone = "Phone in listing";
   // Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
   // number. Mirrors contact.phone_mismatch and contact.phone_mismatch_unnamed in strings.py.
   // With a manager on record, "Next step" below is the one line that says who to call. With
   // none, nothing else does, so this line carries the call step.
-  if (a.office_phone_match === "no")
+  if (a.office_phone_match === "no" && p.license?.status === "not_found")
+    // A poster who claims a license they do not hold has no agent's reason for another number,
+    // so this is a mismatch again. Mirrors contact.phone_mismatch_unlicensed in strings.py.
+    out.push(
+      line(
+        phone,
+        a.manager_on_record
+          ? "This number is not the leasing office's on record, and we found no active Texas license under the name they gave."
+          : "This number is not the leasing office's on record, and we found no active Texas license under the name they gave. Call the office on record yourself.",
+        "red_flag",
+      ),
+    );
+  else if (a.office_phone_match === "no")
     out.push(
       line(
         phone,
@@ -138,6 +207,7 @@ function personLines(p: CardProofs): CardLine[] {
         "not_checked",
       ),
     );
+  out.push(...licenseLines(p));
   if (a.manager_on_record)
     out.push(line("Next step", `Call ${a.manager_on_record} yourself.`, "not_shown"));
   return out;

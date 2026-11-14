@@ -58,11 +58,23 @@ export interface AuthorityResult {
   link_domain: LinkDomain;
 }
 
+// D10 (#128): the poster's claimed real estate license, looked up in the Texas list. Never a
+// person's name and never a license number.
+export type LicenseStatus = "licensed" | "not_found" | "not_checked";
+
+export interface LicenseResult {
+  status: LicenseStatus;
+  claimed_role?: string | null; // agent, broker, locator or company; never shown as typed
+  sponsor_broker?: string | null; // a company name only
+  state?: string;
+}
+
 // Web-only bundle of the proofs the card rows render. Yes/no only: no phone number is ever here.
 // Used when the card API has not already put these lines in `rows`.
 export interface CardProofs {
   price?: PriceResult | null;
   authority?: AuthorityResult | null;
+  license?: LicenseResult | null; // D10; null or missing means not looked up
   unit_label?: string | null; // the unit as the listing names it, e.g. "4B"
 }
 

@@ -76,6 +76,42 @@ def test_the_line_names_the_role_they_claimed(role):
     assert line.startswith(f"Says they're a licensed {role}.")
 
 
+def test_a_brokerage_named_in_the_listing_gets_its_own_wording():
+    # D10, amendment 2: "listed by X Realty" is looked up as a company.
+    company = {"status": "not_found", "claimed_role": "company"}
+    assert person(passing(license=company))["License"] == (
+        CardTone.RED_FLAG,
+        "Says a brokerage lists this home. We found no active Texas license under that "
+        "company's name. Ask for its license number and look it up yourself at "
+        "trec.texas.gov. Red flag.",
+    )
+    assert state(passing(license=company)) is VerdictState.HOLD
+    found = {"status": "licensed", "claimed_role": "company"}
+    assert person(passing(license=found))["License"] == (
+        CardTone.OK,
+        "The brokerage they named is licensed in Texas.",
+    )
+    assert state(passing(license=found)) is VerdictState.VERIFIED
+
+
+def test_the_poster_s_own_words_are_never_put_on_the_card():
+    # `claimed_role` is typed as text. Only our three roles and "company" are ever said; any
+    # other value gets the general wording, and the value itself goes nowhere.
+    odd = {"status": "not_found", "claimed_role": "Fx Person <b>agent</b>"}
+    tone, text = person(passing(license=odd))["License"]
+    assert tone is CardTone.RED_FLAG
+    assert text.startswith("Says they're licensed. We found no active Texas license")
+    said = build_card(passing(license=odd), checked_at=CHECKED_AT).model_dump_json()
+    assert "Fx Person" not in said and "<b>" not in said
+
+
+def test_a_sponsor_name_is_folded_and_cut_to_a_sane_length():
+    long = {"status": "licensed", "claimed_role": "agent", "sponsor_broker": "Fx  Realty\n" * 40}
+    text = person(passing(license=long))["License"][1]
+    assert "\n" not in text and "  " not in text
+    assert len(text) <= len("Licensed in Texas, sponsored by .") + 80
+
+
 def test_no_licence_is_never_dont_pay_whatever_else_is_true():
     # DON'T PAY needs proof. Not finding a licence is not proof of anything.
     assert state(evidence(license=NOT_FOUND)) is VerdictState.HOLD
@@ -134,7 +170,7 @@ def test_a_lookup_that_failed_is_not_checked_and_never_a_flag():
     assert to_evidence(modules).license_flag is False
     tone, text = person(modules)["License"]
     assert tone is CardTone.NOT_CHECKED
-    assert text == "Not checked (we could not look this name up in the Texas license list)."
+    assert text == "Not checked (we could not look the poster up in the Texas license list)."
 
 
 def test_a_case_that_was_never_looked_up_has_no_licence_line():
@@ -154,10 +190,21 @@ def test_a_phone_mismatch_and_no_licence_together_are_a_red_flag_again():
 
     both = person(passing(authority=differs, license=NOT_FOUND))["Contact on record"]
     assert both[0] is CardTone.RED_FLAG
+    # The manager is named on the "Allowed to rent it" line, so this one does not say "call".
     assert both[1] == (
         "This number is not the leasing office's on record, and we found no active Texas "
-        "license under the name they gave. Call Fixture Living LLC on record yourself. Red flag."
+        "license under the name they gave. Red flag."
     )
+    unnamed = {"status": "unknown", "office_phone_match": "no"}
+    assert person(passing(authority=unnamed, license=NOT_FOUND))["Contact on record"] == (
+        CardTone.RED_FLAG,
+        "This number is not the leasing office's on record, and we found no active Texas "
+        "license under the name they gave. Call the office on record yourself. Red flag.",
+    )
+    # The verdict counts it as a red flag too, and the reason is still said once.
+    verdict = decide(to_evidence(passing(authority=differs, license=NOT_FOUND)))
+    assert verdict.state is VerdictState.HOLD
+    assert verdict.reasons.count(strings.text("reason.phone_flag")) == 1
     # A licence that IS found leaves the phone line as it was.
     assert person(passing(authority=differs, license=LICENSED))["Contact on record"] == alone
 
@@ -184,7 +231,12 @@ def test_the_licence_reason_sits_with_who_after_the_contact_lines():
 
 @pytest.mark.parametrize(
     "result",
-    [NOT_FOUND, LICENSED, {"status": "not_checked"}, {"status": "not_checked", "claimed_role": "x"}],
+    [
+        NOT_FOUND,
+        LICENSED,
+        {"status": "not_checked"},
+        {"status": "not_checked", "claimed_role": "x"},
+    ],
 )
 def test_every_licence_line_follows_the_wording_rules_in_both_languages(result):
     differs = MATCHES | {"office_phone_match": "no"}
@@ -260,6 +312,33 @@ def test_a_lookup_that_breaks_leaves_no_line_and_stops_nothing(tmp_path):
     card = card_from(tmp_path, Lookups(fail=True))
     labels = [line["label"] for row in card["rows"] for line in row["lines"]]
     assert "License" not in labels and card["state"] in ("hold", "verified", "unverified")
+
+
+def test_lookups_from_before_d10_still_work(tmp_path):
+    class Older:
+        def record(self, property_id: str):
+            return None
+
+        def for_sale(self, listing_text: str):
+            return None
+
+    card = card_from(tmp_path, Older())
+    assert "License" not in [line["label"] for row in card["rows"] for line in row["lines"]]
+
+
+def test_a_live_run_asks_lane_d_s_lookup_and_no_test_touches_the_network(monkeypatch):
+    import snapback.adapters.trec as trec
+
+    asked = []
+
+    def stand_in(text, **kwargs):
+        asked.append(text)
+        return LicenseResult(status=LicenseStatus.LICENSED, claimed_role="agent")
+
+    monkeypatch.setattr(trec, "check_license", stand_in)
+    found = KitLookups(DataSource.LIVE).license("I am a licensed agent, Fx Person")
+    assert found is not None and found.status is LicenseStatus.LICENSED
+    assert asked == ["I am a licensed agent, Fx Person"]
 
 
 def test_a_fixture_run_never_calls_the_licence_list(monkeypatch):

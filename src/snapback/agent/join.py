@@ -26,6 +26,7 @@ from snapback.contracts import (
     DataSource,
     FloorPlanCandidate,
     ForSaleMatch,
+    LicenseResult,
     LocateResult,
     LocateStatus,
     PhotoLocation,
@@ -59,6 +60,27 @@ class Lookups(Protocol):
     def for_sale(self, listing_text: str) -> ForSaleMatch | None:
         """Is the home in the listing for sale or just rented? None means not looked up."""
         ...
+
+    def license(self, listing_text: str) -> LicenseResult | None:
+        """Does a poster who claims a real estate licence hold one? None means not looked up."""
+        ...
+
+
+def license_of(lookups: Lookups, listing_text: str) -> LicenseResult | None:
+    """Lane D's licence answer for this listing, or None when nothing was looked up.
+
+    A lookup that broke is a lookup that did not happen: it must not stop the check, and it
+    must not read as "looked up, nothing found". Lookups written before D10 have no licence
+    method, and that is "not looked up" too. No value is logged.
+    """
+    lookup = getattr(lookups, "license", None)
+    if lookup is None or not listing_text:
+        return None
+    try:
+        return lookup(listing_text)
+    except Exception as error:
+        log.warning("licence lookup failed (%s); treated as not looked up", type(error).__name__)
+        return None
 
 
 class KitLookups:
@@ -100,6 +122,17 @@ class KitLookups:
             )
             return None
 
+    def license(self, listing_text: str) -> LicenseResult | None:
+        # The licence list is a public service outside this machine (D10, #128). A fixture
+        # run, and so every test, never calls out: only a live run looks anyone up.
+        if self.source is not DataSource.LIVE:
+            return None
+        try:
+            from snapback.adapters import trec
+        except ImportError:
+            return None  # lane D's lookup (D10) is not here: nothing was looked up
+        return trec.check_license(listing_text)
+
 
 class NoStandIn(RuntimeError):
     """Something asked for the twin or the challenge in a case that has no stand-in for them."""
@@ -122,11 +155,13 @@ class JoinedModules:
         for_sale: ForSaleMatch | None,
         salt: str,
         record_source: DataSource | None,
+        license: LicenseResult | None = None,
     ) -> None:
         self._stand_in = stand_in
         self._listing = listing
         self._record = record
         self._for_sale = for_sale
+        self._license = license
         self._salt = salt
         self._record_source = record_source
 
@@ -150,6 +185,9 @@ class JoinedModules:
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         return self._for_sale
+
+    def license(self, case_id: str) -> LicenseResult | None:
+        return self._license
 
     def record_source(self, case_id: str) -> DataSource | None:
         """Where the record parts came from, or None if there are none."""
