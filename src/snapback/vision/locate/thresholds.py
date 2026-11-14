@@ -1,0 +1,39 @@
+"""The frozen locate thresholds, and the version tag that LocateResult carries."""
+
+import hashlib
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+
+THRESHOLDS_FILE = Path(__file__).with_name("thresholds.toml")
+
+
+@dataclass(frozen=True)
+class Thresholds:
+    top_k: int
+    top_k_claimed: int
+    min_inliers: int
+    min_inlier_ratio: float
+    ransac_px: float
+    stop_at_inliers: int
+    default_hfov_deg: float
+    spots_top_n: int
+    spots_overlap_deg: float
+    version: str
+
+
+def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
+    raw = path.read_bytes()
+    data = tomllib.loads(raw.decode())
+    return Thresholds(
+        top_k=data["retrieve"]["top_k"],
+        top_k_claimed=data["retrieve"]["top_k_claimed"],
+        min_inliers=data["verify"]["min_inliers"],
+        min_inlier_ratio=data["verify"]["min_inlier_ratio"],
+        ransac_px=data["verify"]["ransac_px"],
+        stop_at_inliers=data["verify"]["stop_at_inliers"],
+        default_hfov_deg=data["pose"]["default_hfov_deg"],
+        spots_top_n=data["spots"]["top_n"],
+        spots_overlap_deg=data["spots"]["overlap_deg"],
+        version="thresholds-" + hashlib.sha256(raw).hexdigest()[:12],
+    )
