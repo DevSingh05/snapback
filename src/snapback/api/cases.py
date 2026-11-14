@@ -26,7 +26,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.demo import demo_modules, load_demo_case
+from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.card import strings
@@ -143,6 +143,7 @@ class SessionCase:
         self.session = session
         self._listing = listing
         self._runner = runner
+        self.staged = False  # made from a staged demo case (fixtures/demo)
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
 
@@ -161,12 +162,14 @@ class SessionCase:
         return list(self.session.trace.events)
 
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
-        return build_card(
+        card = build_card(
             self.session.evidence,
             checked_at=self._checked_at or _now(),
             verify_base_url=verify_base_url,
             lang=lang,
         )
+        # A card made from a staged demo case says so on the card itself.
+        return staged(card) if self.staged else card
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         """Where the case stands. The drafted challenge is left out unless asked for."""
@@ -290,6 +293,7 @@ class CaseStore:
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner)
+            case.staged = bool(self._settings.demo_case)
             self._cases[short_id] = case
         case.advance()
         return case

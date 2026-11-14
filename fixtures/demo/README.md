@@ -4,6 +4,12 @@ Three staged cases that each run end to end to a card. In the demo it is a
 **staged poster, real CoStar records**: the listing is written by us, playing the poster, and
 the building records are the sponsor's, read from the kit at run time.
 
+**Every one of these is a staged example, and says so.** Each card made from this pack carries
+"Staged example. The SNAPBACK team wrote this listing to show the checks. It is not a real
+poster." first in its footer, on the web, in the picture and in the printed output. These are
+not replays of reported cases: the sourced replays (D8, #71) get their own
+`fixtures/demo/replay-*` folders next to these.
+
 Nothing of the sponsor's is in this folder. What is here is the staged listing for each case
 and a synthetic stand-in for everything the live run reads from the kit or the twin: the
 record, where the photos were placed, and the reply to the challenge. Ids start with `fx-`,

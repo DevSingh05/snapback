@@ -68,7 +68,34 @@ def test_everything_in_the_pack_is_marked_synthetic():
 def test_the_readme_says_what_is_staged_and_what_is_real():
     readme = (DEMO_DIR / "README.md").read_text()
     assert "staged poster, real CoStar records" in readme
+    assert "Staged example" in readme
     assert "synthetic" in readme.lower()
+
+
+@pytest.mark.parametrize("case_id", ["a", "b", "c"])
+def test_every_demo_card_says_first_in_its_footer_that_it_is_staged(case_id):
+    _, card = run_demo_case(case_id)
+    assert card.footer[0].startswith("Staged example.")
+    assert "not a real poster" in card.footer[0]
+    _, spanish = run_demo_case(case_id, lang="es")
+    assert spanish.footer[0].startswith("Ejemplo preparado.")
+
+
+def test_a_card_from_the_flag_says_it_is_staged_and_an_ordinary_card_does_not(tmp_path):
+    staged_client = client_for(tmp_path, "c")
+    case = staged_client.post("/cases", data={}).json()
+    card = staged_client.get(f"/cases/{case['case_id']}/card").json()
+    assert card["footer"][0].startswith("Staged example.")
+    picture = staged_client.get(f"/cases/{case['case_id']}/card.png")
+    assert picture.status_code == 200
+
+    plain_client = client_for(tmp_path, None)
+    plain = plain_client.post("/cases", data={"text": "Two bed."}).json()
+    plain_card = plain_client.get(f"/cases/{plain['case_id']}/card").json()
+    assert not any("Staged" in line for line in plain_card["footer"])
+    assert not any(
+        "Staged" in line for line in plain_client.get("/cases/7Q2M/card").json()["footer"]
+    )
 
 
 def test_the_office_phone_is_kept_only_as_a_hash():

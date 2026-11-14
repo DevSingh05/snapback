@@ -79,6 +79,12 @@ def demo_modules(case: DemoCase, listing: Listing) -> FixtureModules:
     )
 
 
+def staged(card: Card) -> Card:
+    """The same card, saying first in its footer that it is a staged example."""
+    note = strings.text("footer.staged", card.lang)
+    return card.model_copy(update={"footer": [note, *card.footer]})
+
+
 def run_demo_case(
     case_id: str, *, lang: str = strings.DEFAULT_LANG, checked_at: datetime | None = None
 ) -> tuple[Verdict, Card]:
@@ -89,14 +95,14 @@ def run_demo_case(
     session = CaseSession(full_id, demo_modules(case, listing), Trace(full_id, DataSource.FIXTURE))
     verdict = run_case(session, PolicyChooser(), lambda draft: "send")
     assert verdict is not None  # an approver was given, so the run cannot pause
-    return verdict, build_card(session.evidence, checked_at=checked_at, lang=lang)
+    return verdict, staged(build_card(session.evidence, checked_at=checked_at, lang=lang))
 
 
 def main() -> None:
     for case_id in demo_case_ids():
         case = load_demo_case(case_id)
         verdict, card = run_demo_case(case_id)
-        print(f"\n({case_id}) {case.title}  [FIXTURE]")
+        print(f"\n({case_id}) {case.title}  [FIXTURE, staged example]")
         print(f"    {verdict.state.value.upper()}: {' '.join(verdict.reasons)}")
         for row in card.rows:
             for line in row.lines:
