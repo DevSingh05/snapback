@@ -1,33 +1,142 @@
-"""Evidence in, verdict out.
+"""Module evidence in, verdict and card out.
 
-Pure and deterministic: no I/O, no network, no model calls. A language model may explain a
-verdict in words, but it never sets one.
+Deterministic and free of network or model calls. A language model may explain a verdict in
+words, but it never sets a state and never writes a word that reaches a card: every string
+comes from `snapback.card.strings`.
 
-v0 encodes the rules from the project plan as written. The integrator lane owns this file and
-extends it; every rule here has a test in tests/test_verdict.py.
+Three steps, each usable on its own:
+
+1. `to_evidence` flattens what the modules produced (`ModuleEvidence`) into `Evidence`.
+2. `decide` turns `Evidence` into a `Verdict`. It is the only place a state is chosen.
+3. `build_card` lays the same facts out as the three-row card: PLACE, PERSON, PRICE.
+
+Every rule here has a test in tests/test_verdict.py or tests/test_card_rows.py.
 """
 
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta, tzinfo
+
+from snapback.card import strings
 from snapback.contracts import (
     AuthorityStatus,
+    Card,
+    CardLine,
+    CardRow,
+    CardRowKind,
+    CardTone,
     Evidence,
     LocateStatus,
+    MemoryHitKind,
+    ModuleEvidence,
     PresenceStatus,
+    PriceStatus,
+    RuleCategory,
     Verdict,
     VerdictState,
 )
 
+CARD_TTL = timedelta(hours=24)
+FIXTURE_ID_PREFIX = "fx-"
 
-def decide(evidence: Evidence) -> Verdict:
+# A red-flag rule in one of these categories is an ask for money or for details that let
+# someone take money. Pressure and links are shown on the card but do not set the flag.
+_PAYMENT_CATEGORIES = frozenset(
+    {RuleCategory.PAYMENT_METHOD, RuleCategory.FEE_ASK, RuleCategory.DATA_ASK}
+)
+
+# Which label a fired rule sits under on the PRICE row.
+_RULE_LABELS = {
+    RuleCategory.PAYMENT_METHOD: "label.payment_ask",
+    RuleCategory.FEE_ASK: "label.payment_ask",
+    RuleCategory.LINK: "label.payment_ask",
+    RuleCategory.DATA_ASK: "label.data_ask",
+    RuleCategory.PRESSURE: "label.pressure",
+}
+_RULE_LABEL_ORDER = ("label.payment_ask", "label.data_ask", "label.pressure")
+
+
+@dataclass(frozen=True)
+class _Presence:
+    """What the challenge, the photo memory and the recapture check say together."""
+
+    status: PresenceStatus
+    copies_listing_photo: bool = False  # the reply is a copy of one of this case's photos
+    copied_photo_number: int | None = None  # which one, counting from 1, when we can tell
+    needs_new_photo: bool = False  # a recapture flag stopped a pass; ask again, accuse nobody
+
+
+def _photo_number(modules: ModuleEvidence, photo_id: str | None) -> int | None:
+    if photo_id is None or modules.locate is None:
+        return None
+    for number, photo in enumerate(modules.locate.photos, start=1):
+        if photo.photo_id == photo_id:
+            return number
+    return None
+
+
+def _presence(modules: ModuleEvidence) -> _Presence:
+    status = modules.challenge.presence if modules.challenge else PresenceStatus.NOT_REQUESTED
+
+    copies = [hit for hit in modules.memory if hit.hit is MemoryHitKind.SAME_CASE_LISTING]
+    if copies:
+        return _Presence(
+            PresenceStatus.FORGED,
+            copies_listing_photo=True,
+            copied_photo_number=_photo_number(modules, copies[0].matched_listing_photo_id),
+        )
+
+    # A recapture flag can only stop a pass. It never turns into a forgery on its own.
+    if status is PresenceStatus.PROVEN and any(result.blocks_pass for result in modules.recapture):
+        return _Presence(PresenceStatus.WAITING, needs_new_photo=True)
+
+    return _Presence(status)
+
+
+def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Evidence:
+    """Flatten the module outputs into the evidence `decide` reads. Missing modules are unknowns."""
+    presence = _presence(modules)
+
+    forgery_reason = None
+    if presence.copies_listing_photo:
+        if presence.copied_photo_number is None:
+            forgery_reason = strings.text("reason.forged_copy_unknown", lang)
+        else:
+            forgery_reason = strings.text(
+                "reason.forged_copy", lang, n=presence.copied_photo_number
+            )
+
+    return Evidence(
+        case_id=modules.case_id,
+        source=modules.source,
+        photos=list(modules.locate.photos) if modules.locate else [],
+        authority=modules.authority.status if modules.authority else AuthorityStatus.UNKNOWN,
+        presence=presence.status,
+        forgery_reason=forgery_reason,
+        price_flag=modules.price is not None and modules.price.status is PriceStatus.BELOW_RANGE,
+        payment_flag=any(
+            hit.red_flag and hit.category in _PAYMENT_CATEGORIES for hit in modules.rules
+        ),
+        rule_flag=any(hit.red_flag for hit in modules.rules),
+    )
+
+
+def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """Turn the evidence for one case into a verdict with plain-language reasons.
 
     The order of the checks is the policy:
-    1. Proof of a problem gives DONT_PAY (forged reply, photos from another property, or a
-       record mismatch together with a price or payment red flag).
+    1. Only proof gives DONT_PAY: a forged reply, or a photo taken in another property. A record
+       mismatch is not proof (owners live elsewhere, agents act for them), with or without a
+       red flag beside it.
     2. No photo placed in the claimed property gives UNVERIFIED.
-    3. Presence proven and authority matching the record gives VERIFIED.
-    4. Everything else is HOLD, including "no reply yet" and "present but not on the record".
+    3. Presence proven, authority matching the record and no red flag of any kind gives
+       VERIFIED.
+    4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
+       (price, payment, fee, data ask, pressure, link, overpayment).
     """
     statuses = {photo.status for photo in evidence.photos}
+
+    def say(key: str) -> str:
+        return strings.text(key, lang)
 
     def verdict(state: VerdictState, *reasons: str) -> Verdict:
         return Verdict(
@@ -35,58 +144,291 @@ def decide(evidence: Evidence) -> Verdict:
         )
 
     if evidence.presence is PresenceStatus.FORGED:
-        return verdict(
-            VerdictState.DONT_PAY,
-            evidence.forgery_reason
-            or "The proof-of-presence reply was not a fresh photo taken in the unit.",
-        )
+        return verdict(VerdictState.DONT_PAY, evidence.forgery_reason or say("reason.forged"))
 
     if LocateStatus.LOCATED_ELSEWHERE in statuses:
-        return verdict(
-            VerdictState.DONT_PAY, "At least one listing photo was taken in a different property."
-        )
-
-    red_flags = []
-    if evidence.price_flag:
-        red_flags.append("The rent is far below comparable units.")
-    if evidence.payment_flag:
-        red_flags.append("Payment was requested before any viewing.")
-    if evidence.authority is AuthorityStatus.MISMATCH and red_flags:
-        return verdict(
-            VerdictState.DONT_PAY,
-            "The poster does not match the contact on the property record.",
-            *red_flags,
-        )
+        return verdict(VerdictState.DONT_PAY, say("reason.photo_elsewhere"))
 
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
         if statuses <= {LocateStatus.NOT_INDEXED}:
-            reason = (
-                "This property has no 3D twin in our index, so the photos could not be checked."
-            )
-        else:
-            reason = "The photos could not be located in this property's 3D twin."
-        return verdict(VerdictState.UNVERIFIED, reason)
+            return verdict(VerdictState.UNVERIFIED, say("reason.not_indexed"))
+        return verdict(VerdictState.UNVERIFIED, say("reason.not_located"))
+
+    red_flags = []
+    if evidence.price_flag:
+        red_flags.append(say("reason.price_flag"))
+    if evidence.payment_flag:
+        red_flags.append(say("reason.payment_flag"))
+    elif evidence.rule_flag:
+        red_flags.append(say("reason.rule_flag"))
 
     if (
         evidence.presence is PresenceStatus.PROVEN
         and evidence.authority is AuthorityStatus.MATCHES_RECORD
+        and not red_flags
     ):
         return verdict(
             VerdictState.VERIFIED,
-            "The photos were located in this property.",
-            "The poster matches the contact on the property record.",
-            "A fresh photo proved someone was inside the unit.",
+            say("reason.located"),
+            say("reason.authority_matches"),
+            say("reason.presence_proven"),
         )
 
-    reasons = ["The photos were located in this property."]
+    reasons = [say("reason.located")]
     if evidence.authority is AuthorityStatus.MATCHES_RECORD:
-        reasons.append("The poster matches the contact on the property record.")
+        reasons.append(say("reason.authority_matches"))
     elif evidence.authority is AuthorityStatus.MISMATCH:
-        reasons.append("The poster does not match the contact on the property record.")
+        reasons.append(say("reason.authority_mismatch"))
     else:
-        reasons.append("We could not confirm who is allowed to rent this unit.")
+        reasons.append(say("reason.authority_unknown"))
     if evidence.presence is PresenceStatus.PROVEN:
-        reasons.append("A fresh photo proved someone was inside the unit, which is not authority.")
+        reasons.append(say("reason.presence_proven_not_authority"))
     else:
-        reasons.append("Nobody has proved they are inside the unit yet.")
-    return verdict(VerdictState.HOLD, *reasons)
+        reasons.append(say("reason.presence_missing"))
+    return verdict(VerdictState.HOLD, *reasons, *red_flags)
+
+
+# --- the card ----------------------------------------------------------------------------------
+
+
+def _line(lang: str, label_key: str, tone: CardTone, text_key: str, **values: object) -> CardLine:
+    return CardLine(
+        label=strings.text(label_key, lang), text=strings.text(text_key, lang, **values), tone=tone
+    )
+
+
+def _floor_plan(modules: ModuleEvidence) -> str | None:
+    if modules.locate is None or modules.locate.chosen is None:
+        return None
+    return modules.locate.chosen.floor_plan
+
+
+def _seen_before_lines(modules: ModuleEvidence, lang: str, *, replies: bool) -> list[CardLine]:
+    """One line per date a photo of ours turned up in another check. Never says which check."""
+    reply_ids = set()
+    if modules.challenge is not None:
+        reply_ids = {spot.reply_photo_id for spot in modules.challenge.spots if spot.reply_photo_id}
+    prefix = "here_now" if replies else "place"
+
+    dates = set()
+    for hit in modules.memory:
+        if hit.hit is MemoryHitKind.OTHER_CHECK and (hit.photo_id in reply_ids) == replies:
+            dates.add(hit.first_seen_on)
+
+    lines = []
+    for seen_on in sorted(dates, key=lambda day: (day is None, day)):
+        if seen_on is None:
+            lines.append(_line(lang, "label.seen_before", CardTone.HOLD, f"{prefix}.seen_before"))
+        else:
+            lines.append(
+                _line(
+                    lang,
+                    "label.seen_before",
+                    CardTone.HOLD,
+                    f"{prefix}.seen_before_dated",
+                    date=seen_on.isoformat(),
+                )
+            )
+    return lines
+
+
+def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
+    photos = modules.locate.photos if modules.locate else []
+    total = len(photos)
+    located = sum(photo.status is LocateStatus.LOCATED_IN_CLAIMED for photo in photos)
+    elsewhere = sum(photo.status is LocateStatus.LOCATED_ELSEWHERE for photo in photos)
+    plan = _floor_plan(modules)
+
+    if total == 0:
+        main = _line(lang, "label.real", CardTone.NOT_CHECKED, "place.no_photos")
+    elif elsewhere:
+        main = _line(
+            lang,
+            "label.real",
+            CardTone.RED_FLAG,
+            "place.elsewhere",
+            elsewhere=elsewhere,
+            total=total,
+        )
+    elif located and plan:
+        main = _line(
+            lang,
+            "label.real",
+            CardTone.OK,
+            "place.located_plan",
+            floor_plan=plan,
+            located=located,
+            total=total,
+        )
+    elif located:
+        main = _line(lang, "label.real", CardTone.OK, "place.located", located=located, total=total)
+    elif all(photo.status is LocateStatus.NOT_INDEXED for photo in photos):
+        main = _line(lang, "label.real", CardTone.NOT_CHECKED, "place.not_indexed")
+    else:
+        main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
+
+    return CardRow(
+        kind=CardRowKind.PLACE, lines=[main, *_seen_before_lines(modules, lang, replies=False)]
+    )
+
+
+def _aware(moment: datetime, what: str) -> datetime:
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError(f"{what} must carry a timezone, got a naive datetime: {moment!r}")
+    return moment
+
+
+def _here_now_line(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardLine:
+    presence = _presence(modules)
+    label = "label.here_now"
+
+    if presence.status is PresenceStatus.FORGED:
+        if not presence.copies_listing_photo:
+            return _line(lang, label, CardTone.RED_FLAG, "here_now.forged")
+        if presence.copied_photo_number is None:
+            return _line(lang, label, CardTone.RED_FLAG, "here_now.forged_copy_unknown")
+        return _line(
+            lang, label, CardTone.RED_FLAG, "here_now.forged_copy", n=presence.copied_photo_number
+        )
+
+    if presence.needs_new_photo:
+        return _line(lang, label, CardTone.HOLD, "here_now.retry")
+
+    if presence.status is PresenceStatus.WAITING:
+        return _line(lang, label, CardTone.HOLD, "here_now.waiting")
+
+    if presence.status is PresenceStatus.NOT_REQUESTED:
+        return _line(lang, label, CardTone.NOT_CHECKED, "here_now.not_requested")
+
+    # Replies can arrive stamped in different zones. Compare them as instants, then show the
+    # latest one on the card's own clock.
+    spots = modules.challenge.spots if modules.challenge else []
+    replied = [spot.replied_at.astimezone(zone) for spot in spots if spot.replied_at is not None]
+    if not replied:
+        return _line(lang, label, CardTone.OK, "here_now.proven_bare")
+    details = {
+        "matched": sum(bool(spot.located and spot.code_read) for spot in spots),
+        "total": len(spots),
+        "time": max(replied).strftime("%H:%M"),
+    }
+    plan = _floor_plan(modules)
+    if plan:
+        return _line(lang, label, CardTone.OK, "here_now.proven_plan", floor_plan=plan, **details)
+    return _line(lang, label, CardTone.OK, "here_now.proven", **details)
+
+
+def _allowed_line(modules: ModuleEvidence, lang: str) -> CardLine:
+    # The card says yes or no about the record. It never repeats what the poster called
+    # themselves, which may be a person's name.
+    status = modules.authority.status if modules.authority else AuthorityStatus.UNKNOWN
+    if status is AuthorityStatus.MATCHES_RECORD:
+        # A match does not lift this line: anyone can type a company's public name. The card
+        # names the manager on record (a company, never a person) so the renter can call them.
+        manager = modules.authority.manager_on_record if modules.authority else None
+        if manager:
+            return _line(
+                lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.call_manager", manager=manager
+            )
+        return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.call_manager_unnamed")
+    if status is AuthorityStatus.MISMATCH:
+        return _line(lang, "label.allowed", CardTone.RED_FLAG, "allowed.mismatch")
+    return _line(lang, "label.allowed", CardTone.NOT_SHOWN, "allowed.not_shown")
+
+
+def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
+    return CardRow(
+        kind=CardRowKind.PERSON,
+        lines=[
+            _here_now_line(modules, lang, zone),
+            _allowed_line(modules, lang),
+            *_seen_before_lines(modules, lang, replies=True),
+        ],
+    )
+
+
+def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Red-flag rules, grouped under their labels. "Payment ask" is always there, and first."""
+    by_label: dict[str, list[CardLine]] = {label: [] for label in _RULE_LABEL_ORDER}
+    shown = set()
+    for hit in modules.rules:
+        if not hit.red_flag or hit.rule_id in shown:
+            continue
+        shown.add(hit.rule_id)
+        key = f"rule.{hit.rule_id}"
+        if not strings.has(key, lang):
+            key = f"rule_category.{hit.category.value}"
+        label = _RULE_LABELS[hit.category]
+        by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
+    if not by_label["label.payment_ask"]:
+        by_label["label.payment_ask"].append(
+            _line(lang, "label.payment_ask", CardTone.OK, "payment.none")
+        )
+    return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
+
+
+def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
+    # Only how the asked rent compares. The record's own figures are sponsor data and stay off
+    # the card.
+    status = modules.price.status if modules.price else PriceStatus.NOT_CHECKED
+    if status is PriceStatus.WITHIN_RANGE:
+        return _line(lang, "label.rent_vs_record", CardTone.OK, "rent.within_range")
+    if status is PriceStatus.BELOW_RANGE:
+        return _line(lang, "label.rent_vs_record", CardTone.HOLD, "rent.below_range")
+    return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
+
+
+def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
+    return CardRow(
+        kind=CardRowKind.PRICE, lines=[*_rule_lines(modules, lang), _rent_line(modules, lang)]
+    )
+
+
+def build_card(
+    modules: ModuleEvidence,
+    *,
+    checked_at: datetime | None = None,
+    verify_base_url: str | None = None,
+    lang: str = strings.DEFAULT_LANG,
+) -> Card:
+    """Lay one case out as the three-row card. The state comes from `decide`, nowhere else.
+
+    `checked_at` defaults to now (UTC); pass it to get a reproducible card. Its timezone is the
+    card's clock: every time printed on the card is shown in it. `verify_base_url` is the web
+    app's address; without it the card carries no verify link.
+
+    Raises ValueError if `checked_at` or any reply time has no timezone.
+    """
+    verdict = decide(to_evidence(modules, lang), lang)
+    public_id = modules.case_id.removeprefix(FIXTURE_ID_PREFIX)
+    checked = _aware(checked_at, "checked_at") if checked_at is not None else datetime.now(UTC)
+    for spot in modules.challenge.spots if modules.challenge else []:
+        if spot.replied_at is not None:
+            _aware(spot.replied_at, f"replied_at of spot {spot.spot_id}")
+
+    verify_url = None
+    if verify_base_url:
+        verify_url = f"{verify_base_url.rstrip('/')}/c/{public_id}"
+
+    return Card(
+        case_id=public_id,
+        source=modules.source,
+        state=verdict.state,
+        checked_at=checked,
+        expires_at=checked + CARD_TTL,
+        rows=[
+            _place_row(modules, lang),
+            _person_row(modules, lang, checked.tzinfo),
+            _price_row(modules, lang),
+        ],
+        not_checked=[
+            strings.text("not_checked.id", lang),
+            strings.text("not_checked.lease", lang),
+            strings.text("not_checked.ownership", lang),
+        ],
+        footer=[
+            strings.text("footer.two_rules", lang),
+            strings.text("footer.only_trust", lang),
+        ],
+        verify_url=verify_url,
+        lang=lang,
+    )

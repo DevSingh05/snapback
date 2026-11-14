@@ -65,6 +65,7 @@ class Evidence(BaseModel):
     forgery_reason: str | None = None
     price_flag: bool = False  # listed rent is far below comparable units
     payment_flag: bool = False  # asked for a deposit before viewing, or an irreversible payment
+    rule_flag: bool = False  # any red-flag rule fired, including pressure and links
 
 
 class VerdictState(StrEnum):
