@@ -326,6 +326,11 @@ class JoinedModules:
             return None
         return self._record_source
 
+    def property_type(self, case_id: str) -> str | None:
+        """The record's kind of home, once the home is known. None with no record."""
+        self._identify(case_id)
+        return self._record.property_type if self._record is not None else None
+
     # --- the twin and the challenge: stand-ins, and only in a fixture case -----------------
 
     def _live_twin(self) -> bool:
