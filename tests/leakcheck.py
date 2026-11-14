@@ -1,9 +1,10 @@
 """Leak checks that cannot match by chance.
 
 A "nothing leaked" test searches captured output for the record's values. Short needles
-("1600", "0123", "4B", "999") also occur inside trace timestamps and random tokens, which
-made those tests fail about one run in a few hundred. `leaked` masks timestamps, UUIDs and
-long random-looking tokens before looking for a short needle, and searches long needles
+("1600", "0123", "4B", "999") also occur inside trace timestamps and ids, which
+made those tests fail about one run in a few hundred. `leaked` masks timestamps and UUIDs
+before looking for a short needle (identifiers are not masked, so a value glued into one is
+still found), and searches long needles
 (hashes, hostnames, names) in the raw text so a real leak of those is never hidden.
 """
 
@@ -15,12 +16,12 @@ _TIMESTAMP = re.compile(
     r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
 )
 _UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
-_TOKEN = re.compile(r"[A-Za-z0-9_-]{16,}")
 
 
 def masked(text: str) -> str:
-    """The text with timestamps, UUIDs and long random-looking tokens blanked out."""
-    for pattern in (_TIMESTAMP, _UUID, _TOKEN):
+    """The text with timestamps and UUIDs blanked out. Identifiers are left alone on purpose,
+    so a value glued into one (rent_band_min_1600) is still found."""
+    for pattern in (_TIMESTAMP, _UUID):
         text = pattern.sub(" ", text)
     return text
 
