@@ -28,8 +28,8 @@ def by_role(picks):
 
 def test_the_trio_is_picked_by_role_with_candidate_counts():
     picks = by_role(pick_demo_houses(KIT, TODAY))
-    # for sale: 9001 and 9002 qualify. 9003 is public but off market, 9007 is in Austin, 9008 was
-    # just rented, 9010 is hidden, 9011 is a condo, 9012 has no model, 9013 is not Matterport media.
+    # for sale: 9001 and 9002 qualify; 9015 is for rent only, 9003 is off market, 9007 is in
+    # Austin, 9008 was just rented, 9010 is hidden, 9011 is a condo, 9012 has no model.
     assert (picks["for_sale"]["propertyId"], picks["for_sale"]["candidates"]) == (9001, 2)
     # recently sold: 9004 (closeDate) and 9005 (NewlySold). 9006 sold in 2025, 9009 was rented.
     assert (picks["recently_sold"]["propertyId"], picks["recently_sold"]["candidates"]) == (9004, 2)
@@ -47,6 +47,7 @@ def test_a_tie_on_property_id_picks_the_smaller_listing_id_in_any_file_order(tmp
     forward = by_role(pick_demo_houses(KIT, TODAY))
     backward = by_role(pick_demo_houses(tmp_path, TODAY))
     assert forward == backward
+    assert forward["for_sale"]["models"] == ["fx-fs-a"]  # listing 5001, not 5002
 
 
 def test_an_indexed_twin_beats_a_smaller_property_id(tmp_path):

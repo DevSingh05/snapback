@@ -483,6 +483,7 @@ def pick_demo_houses(
                 "rule": rule,
                 "candidates": count,
                 "indexed": bool(indexed.intersection(pick["models"])),
+                "models": pick["models"],
             }
         )
     return picks
