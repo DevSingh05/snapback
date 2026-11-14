@@ -115,7 +115,7 @@ def test_a_quiet_confirming_line_reads_plainly_and_is_alone():
     (tone, text) = shown[0]
     # one confirming line, then the aerial date the exterior claims earn (a date, not a claim)
     assert len(shown) == 2 and tone is CardTone.OK
-    assert shown[1][1].startswith("Not confirmed. Aerial photo of this property from 2025-06-01")
+    assert shown[1][1].startswith("Not checked. Aerial photo of this property from 2025-06-01")
     assert text == (
         "The ad says hardwood floors. CoStar's record of this home also names hardwood floors "
         "(as of CoStar's last research)."
@@ -326,8 +326,41 @@ def test_a_buildings_parking_and_the_aerial_date_in_both_languages():
     assert en[0].startswith("Not confirmed. The ad says a pool.")
     assert "about 1.5 spaces per unit (as of CoStar's last research)" in en[1]
     assert en[2] == (
-        "Not confirmed. Aerial photo of this property from 2025-06-01 (Vexcel). It is shown for "
-        "you to look at; nothing is read from it."
+        "Not checked. Aerial photo of this property from 2025-06-01 (Vexcel). It is on this "
+        "place's page for you to look at; nothing is read from it."
     )
     assert "unos 1.5 lugares por unidad" in es[1]
-    assert es[2].startswith("Sin confirmar. Foto aérea de esta propiedad del 2025-06-01 (Vexcel).")
+    assert es[2].startswith("No comprobado. Foto aérea de esta propiedad del 2025-06-01 (Vexcel).")
+
+
+def test_the_aerial_line_has_a_neutral_tone_and_the_pool_line_names_no_photos():
+    record = PropertyRecord(property_id="fx-h", source=DataSource.FIXTURE, pool_on_record=False)
+    shown = claims_lines(run(modules_for("Private pool", record))[1])
+    assert [tone for tone, _ in shown] == [CardTone.NOT_SHOWN, CardTone.NOT_CHECKED]
+    assert shown[0][1] == (
+        "Not confirmed. The ad says a pool. CoStar's record of this home does not list or show "
+        "a pool (as of CoStar's last research)."
+    )
+    assert "photos" not in shown[0][1]
+
+
+def test_running_the_claims_step_adds_only_the_notes():
+    from snapback.agent.planner import Plan
+
+    plan = Plan(modules_for(AD), "fx-1")
+    assert set(plan.run(PlanKind.CLAIMS)) == {"ad_notes"}
+
+
+def test_a_note_leaves_a_case_that_reaches_hold_exactly_as_it_was():
+    from snapback.contracts import ForSaleMatch, ForSaleStatus, VerdictState
+
+    def hold(ad: str):
+        modules = modules_for(ad)
+        modules._for_sale = ForSaleMatch(status=ForSaleStatus.ACTIVE, offices=["Fixture Realty"])
+        return run(modules)
+
+    plain_session, plain = hold("Nice home near the park")
+    session, card = hold(AD)
+    assert plain.state is VerdictState.HOLD and card.state is VerdictState.HOLD
+    assert claims_lines(card) and session.verdict == plain_session.verdict
+    assert card.rows[:3] == plain.rows[:3]

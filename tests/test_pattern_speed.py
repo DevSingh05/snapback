@@ -21,7 +21,7 @@ import pytest
 
 from snapback.adapters import trec
 from snapback.agent import scope
-from snapback.agent.intake import fields, find_injections, injection, read_listing
+from snapback.agent.intake import claims, fields, find_injections, injection, read_listing
 from snapback.agent.intake.fields import (
     extract_beds,
     extract_contacts,
@@ -56,6 +56,13 @@ def all_patterns() -> dict[str, re.Pattern[str]]:
                         found[f"{short}.{name}[{number}]"] = item
     for rule in RULES:
         found[f"rule.{rule.rule_id}"] = apply._compiled(rule.rule_id)
+    # ad-vs-record claims: every pattern of every rule, and its before/after vetoes
+    for rule in claims._RULES:
+        for number, pattern in enumerate(rule.patterns):
+            found[f"claims.{rule.kind.value}[{number}]"] = pattern
+        for side in ("before", "after"):
+            if getattr(rule, side) is not None:
+                found[f"claims.{rule.kind.value}.{side}"] = getattr(rule, side)
     return found
 
 

@@ -368,6 +368,9 @@ SCENE_FLOOR = {126: "carpet", 218: "carpet", 219: "carpet", 220: "carpet", 221: 
 SCENE_POOL = {19, 33}
 SCENE_YARD = {65, 129}
 SCENE_MACHINE = {135, 163}  # InUnitLaundry, StackedWasherAndDryer
+_SHARED_POOL = re.compile(
+    r"community|association|shared|common|club|hoa|resort|complex|building|view", re.IGNORECASE
+)
 _WOOD_LOOK = re.compile(r"wood[- ]?(?:look|grain)", re.IGNORECASE)
 
 
@@ -459,13 +462,28 @@ def _home_facts(rec: dict[str, Any], features: dict[str, Any] | None) -> dict[st
     laundry = _unique([_laundry_kind(n) for n in names.get("Laundry", [])])
     if machine_photo and "machine" not in laundry:
         laundry.append("machine")
+    # A community, association or shared pool, or a pool view, is not this home's pool.
+    own_pool = [n for n in everything if "pool" in n and not _SHARED_POOL.search(n)]
+    shared_pool = any("pool" in n and _SHARED_POOL.search(n) for n in everything)
     pool: bool | None = None
-    if pool_photo or any("pool" in n for n in everything):
+    if pool_photo or own_pool:
         pool = True
+    elif shared_pool:
+        pool = None  # only a shared pool is listed: the record cannot say about a private one
     elif everything:
         pool = False  # a listed feature set that names no pool, and no photo shows one
     prop = rec.get("property") if isinstance(rec.get("property"), dict) else {}
-    pets = _get_any(rec, ["resoValues.isPetFriendly"])
+    # isPetFriendly is a default (False on nearly every house), not an answer. An answer is a
+    # Pet Policy feature: "No Pets Allowed" says no; "Pets/Cats/Dogs Allowed" or a True flag
+    # says yes.
+    policy = [n.lower() for n in names.get("Pet Policy", [])]
+    flag = _get_any(rec, ["resoValues.isPetFriendly"])
+    if any(n.startswith("no pets") for n in policy):
+        pets: bool | None = False
+    elif flag is True or any(n in ("pets allowed", "cats allowed", "dogs allowed") for n in policy):
+        pets = True
+    else:
+        pets = None
     sold = [
         d
         for d in (
@@ -499,11 +517,13 @@ def _home_facts(rec: dict[str, Any], features: dict[str, Any] | None) -> dict[st
         "yard_on_record": True
         if yard_photo or any("yard" in n or "fenced" in n for n in everything)
         else None,
-        "pets_ok": pets if isinstance(pets, bool) else None,
+        "pets_ok": pets,
         "beds_range": span("bedsMin", "bedsMax", int),
         "baths_range": span("bathsMin", "bathsMax", float),
         "sqft_range": span("sqftMin", "sqftMax", int),
-        "sale_history_known": bool(rec.get("history")),
+        # other recently sold or off-market listings of this home mean the history is not whole
+        "sale_history_known": bool(rec.get("history"))
+        and rec.get("hasOtherRecentlySoldOrOffMarketListings") is not True,
         "last_sale": max(sold, default=None),
     }
 
@@ -518,15 +538,17 @@ def _merge_facts(into: PropertyRecord, facts: dict[str, Any]) -> None:
     into.yard_on_record = into.yard_on_record or facts["yard_on_record"]
     if into.parking_spaces is None:
         into.parking_spaces = facts["parking_spaces"]
-    if facts["pets_ok"] is True or into.pets_ok is None:
-        into.pets_ok = facts["pets_ok"] if facts["pets_ok"] is not None else into.pets_ok
+    if into.pets_ok is None:
+        into.pets_ok = facts["pets_ok"]
+    elif facts["pets_ok"] is not None and facts["pets_ok"] != into.pets_ok:
+        into.pets_ok = None  # two listings disagree: the record gives no answer
     for key in ("beds_range", "baths_range", "sqft_range"):
         old, new = getattr(into, key), facts[key]
         if old is None or new is None:
             setattr(into, key, old or new)
         else:
             setattr(into, key, (min(old[0], new[0]), max(old[1], new[1])))
-    into.sale_history_known = into.sale_history_known or facts["sale_history_known"]
+    into.sale_history_known = into.sale_history_known and facts["sale_history_known"]
     sales = [d for d in (into.last_sale, facts["last_sale"]) if d]
     into.last_sale = max(sales, default=None)
 
@@ -630,7 +652,8 @@ def rental_houses(
         if pid is None or isinstance(pid, bool):
             continue
         parking = _get_any(rec, ["property.totalParkingSpaces"])
-        pets = _get_any(rec, ["resoValues.isPetFriendly"])
+        # a False flag is a default, not an answer (see _home_facts): only True is kept
+        pets = True if _get_any(rec, ["resoValues.isPetFriendly"]) is True else None
         baths = _get_any(rec, ["property.bathsMin"])
         beds = _get_any(rec, ["property.bedsMin"])
         offices = _offices(rec)
@@ -643,7 +666,7 @@ def rental_houses(
                 baths=float(baths) if isinstance(baths, (int, float)) else None,
                 rent_min=_whole(rec.get("rentMin")),
                 rent_max=_whole(rec.get("rentMax")),
-                pets_ok=pets if isinstance(pets, bool) else None,
+                pets_ok=pets,
                 parking_spaces=_whole(parking),
                 available_on=_date(rec.get("availabilityDate")),
                 office=offices[0] if offices else None,

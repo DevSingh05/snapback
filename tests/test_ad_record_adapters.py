@@ -112,7 +112,7 @@ def test_the_selfcheck_counts_what_an_ad_can_be_held_to():
     from snapback.adapters.kit_selfcheck import ad_vs_record_counts
 
     counts = ad_vs_record_counts(KIT, date(2026, 11, 14))
-    assert counts["houses"] == 3 and counts["houses_with_floor_photos"] == 2
+    assert counts["houses"] == 4 and counts["houses_with_floor_photos"] == 2
     assert counts["houses_with_two_floor_photos"] == 2
     assert counts["houses_with_listing_floors"] == 2 and counts["houses_with_pool_answer"] == 2
     assert counts["listing_photos_with_room_labels"] == 8
@@ -120,3 +120,56 @@ def test_the_selfcheck_counts_what_an_ad_can_be_held_to():
     assert counts["buildings_manager_started_in_12_months"] == 1
     assert counts["buildings_sold_in_12_months"] == 1
     assert all(isinstance(v, int) for v in counts.values())
+
+
+def test_a_default_pet_flag_is_not_an_answer():
+    # 9104: the flag is False but the Pet Policy only says "call for details" -> no answer
+    assert houses()["9104"].pets_ok is None
+    # 9101: a "No Pets Allowed" policy is the only way to read False
+    assert houses()["9101"].pets_ok is False
+    # 9102: the flag is True
+    assert houses()["9102"].pets_ok is True
+
+
+def test_a_flag_false_without_a_policy_reads_none(tmp_path):
+    (tmp_path / "residential-listings.jsonl").write_text(
+        (KIT / "residential-listings.jsonl").read_text()
+    )
+    assert house_records(DataSource.FIXTURE, tmp_path)["9101"].pets_ok is None
+
+
+def test_a_community_pool_or_pool_view_is_not_this_homes_pool():
+    assert houses()["9104"].pool_on_record is None  # only shared names: no answer either way
+
+
+def test_other_listings_of_the_home_make_the_sale_history_not_known():
+    assert houses()["9104"].sale_history_known is False
+    assert houses()["9102"].sale_history_known is True
+
+
+def test_rental_houses_keep_only_a_true_pet_flag(tmp_path):
+    import json
+
+    from snapback.adapters.costar_residential import rental_houses
+
+    base = {
+        "propertyId": 1, "permissionLevels": {"homes": 10}, "transactionType": 2,
+        "listingStatus": 1, "forRentStatus": 1, "rentMin": 1500, "rentMax": 1500,
+        "property": {"address": {"state": "TX"}}, "media": [],
+    }  # fmt: skip
+    rows = [
+        base | {"propertyId": 1, "resoValues": {"isPetFriendly": False}},
+        base | {"propertyId": 2, "resoValues": {"isPetFriendly": True}},
+    ]
+    (tmp_path / "residential-listings.jsonl").write_text("\n".join(map(json.dumps, rows)))
+    (tmp_path / "enums.json").write_text(
+        json.dumps(
+            {
+                "TransactionType": {"2": "ForRent"},
+                "ForRentStatus": {"1": "ForRent"},
+                "ListingStatus": {"1": "Active"},
+            }
+        )
+    )
+    pets = {h.property_id: h.pets_ok for h in rental_houses(DataSource.FIXTURE, tmp_path)}
+    assert pets == {"1": None, "2": True}

@@ -944,6 +944,8 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         elif note.key == "aerial_date":
             label = "label.aerial"
         tone = CardTone.OK if note.matches else CardTone.NOT_SHOWN
+        if note.key == "aerial_date":
+            tone = CardTone.NOT_CHECKED  # a date to look at, not a finding
         lines.append(
             CardLine(
                 label=strings.text(label, lang),

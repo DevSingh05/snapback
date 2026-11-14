@@ -989,8 +989,8 @@ EN.update(
             "(as of CoStar's last research)."
         ),
         "claims.pool_none": (
-            "Not confirmed. The ad says {claim}. CoStar's listing features and photos of this "
-            "home show no pool (as of CoStar's last research)."
+            "Not confirmed. The ad says {claim}. CoStar's record of this home does not list or "
+            "show a pool (as of CoStar's last research)."
         ),
         "claims.pool_match": (
             "The ad says {claim}. CoStar's record of this home shows one "
@@ -1009,8 +1009,8 @@ EN.update(
             "{record_value} spaces per unit (as of CoStar's last research)."
         ),
         "claims.aerial_date": (
-            "Not confirmed. Aerial photo of this property from {ad_value} (Vexcel). It is shown "
-            "for you to look at; nothing is read from it."
+            "Not checked. Aerial photo of this property from {ad_value} (Vexcel). It is on this "
+            "place's page for you to look at; nothing is read from it."
         ),
         "claims.yard_match": (
             "The ad says {claim}. CoStar's record of this home shows one "
@@ -1128,8 +1128,8 @@ ES.update(
             "indican que hay (según la última investigación de CoStar)."
         ),
         "claims.pool_none": (
-            "Sin confirmar. El anuncio dice {claim}. Las características y las fotos de esta "
-            "casa en CoStar no muestran piscina (según la última investigación de CoStar)."
+            "Sin confirmar. El anuncio dice {claim}. El registro de CoStar de esta casa no indica "
+            "ni muestra una piscina (según la última investigación de CoStar)."
         ),
         "claims.pool_match": (
             "El anuncio dice {claim}. El registro de CoStar de esta casa muestra una "
@@ -1149,8 +1149,8 @@ ES.update(
             "investigación de CoStar)."
         ),
         "claims.aerial_date": (
-            "Sin confirmar. Foto aérea de esta propiedad del {ad_value} (Vexcel). Se muestra "
-            "para que usted la mire; no se lee nada de ella."
+            "No comprobado. Foto aérea de esta propiedad del {ad_value} (Vexcel). Está en la "
+            "página de este lugar para que usted la mire; no se lee nada de ella."
         ),
         "claims.yard_match": (
             "El anuncio dice {claim}. El registro de CoStar de esta casa muestra uno "
