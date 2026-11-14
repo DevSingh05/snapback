@@ -18,7 +18,7 @@ const TONE_WORD: Record<CardTone, string> = {
 const STATE_WORD: Record<VerdictState, string> = {
   hold: "Hold",
   dont_pay: "Don't pay · could not verify",
-  unverified: "Not verified yet",
+  unverified: "Could not place these photos",
   verified: "Checks held up",
 };
 
@@ -126,7 +126,7 @@ export function CardView({ card, variant }: { card: Card; variant: "result" | "v
               <tbody key={row.kind} className={`group group-${row.kind}`}>
                 {row.lines.map((line, i) => (
                   <EvidenceRow
-                    key={line.label}
+                    key={`${line.label}-${i}`}
                     line={line}
                     first={i === 0}
                     label={ROW_LABEL[row.kind]}

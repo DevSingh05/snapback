@@ -46,4 +46,14 @@ describe("CardView with card_hold.json", () => {
     expect(screen.getByTestId("expiry")).toBeInTheDocument();
     expect(screen.getByTestId("summary")).toBeInTheDocument();
   });
+
+  it.each(["hold", "dont_pay", "unverified", "verified"] as const)(
+    "headline for state %s never says safe, verified or scam",
+    (state) => {
+      render(<CardView card={{ ...card, state }} variant="result" />);
+      const headline = screen.getByRole("heading", { level: 1 }).textContent ?? "";
+      expect(headline.length).toBeGreaterThan(0);
+      expect(headline.toLowerCase()).not.toMatch(/safe|verified|scam/);
+    },
+  );
 });
