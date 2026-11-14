@@ -85,13 +85,14 @@ def make_router(events: EventBus, model: Any = None, places: Any = None) -> APIR
         authorization: Annotated[str | None, Header()] = None,
         x_finder_token: Annotated[str | None, Header()] = None,
     ) -> FinderReply:
-        """The renter acted or said something. Their text is read by code into signals; a model
-        never sees it. Returns the reply, the new proposals (nothing applied) and the picks."""
+        """The renter acted or said something. Code reads their text into signals; the main agent
+        sees only the cleaned words (`clean_words`). Returns the reply, the new proposals (nothing
+        applied) and the picks."""
         session = find(request, session_id, authorization, x_finder_token)
         address = request.client.host if request.client else "unknown"
         if not limit.allow(f"msg:{address}"):
             raise HTTPException(status_code=429, detail="Too many messages. Try again in a minute.")
-        return run_turn(session, [*body.signals, *read_text(body.text)])
+        return run_turn(session, [*body.signals, *read_text(body.text)], body.text)
 
     @router.get("/finder/{session_id}/state")
     def state(

@@ -447,10 +447,7 @@ export interface TourPrepPack {
 // M9: the finder (src/snapback/agent/finder.py, api/finder.py). Mirrors the Finder* models in
 // contracts.py. Nothing the agent learns applies until the renter accepts a proposal.
 export type FinderProposalKey =
-  | "propose_no_walkup"
-  | "propose_parking"
-  | "propose_prefer_scans"
-  | "propose_lower_budget";
+  "propose_no_walkup" | "propose_parking" | "propose_prefer_scans" | "propose_lower_budget";
 
 export interface FinderSessionStarted {
   session_id: string;
@@ -471,7 +468,7 @@ export interface FinderSignal {
 }
 
 export interface FinderMessageRequest {
-  text?: string | null; // read by code into signals; a model never sees it
+  text?: string | null; // up to 500; code reads it into signals, the model sees it cleaned
   signals?: FinderSignal[];
 }
 
@@ -496,6 +493,10 @@ export interface FinderPick {
   why: string; // one sentence from the search sub-agent
   chosen_by: ChosenBy;
   as_of: string;
+  // The record's facts behind the line, so a pass or pick can go back as a signal.
+  rent_from?: number | null;
+  walkup?: boolean | null;
+  parking?: boolean | null;
 }
 
 export interface FinderNote {

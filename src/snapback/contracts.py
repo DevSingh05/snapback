@@ -975,8 +975,8 @@ class FinderSignal(BaseModel):
 
 
 class FinderMessageRequest(BaseModel):
-    """`POST /finder/{session}/message`. The text is read by code into signals; a model never
-    sees it."""
+    """`POST /finder/{session}/message`. Code reads the text into signals; the main agent sees
+    only the cleaned words (phones, emails, links and addresses removed, 500 characters)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -1010,6 +1010,11 @@ class FinderPick(BaseModel):
     why: str
     chosen_by: Literal["model", "policy"]
     as_of: str = AS_OF
+    # The record's facts behind the line, so the Finder tab can send a pass or a pick back as a
+    # signal (attributes only). Shown to the renter; never shown to a model.
+    rent_from: int | None = None
+    walkup: bool | None = None
+    parking: bool | None = None
 
 
 class FinderNote(BaseModel):
