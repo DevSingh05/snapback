@@ -1,0 +1,106 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import { drawRoom, type RoomKind } from "../walk/rooms";
+import { between, makeScene, project } from "./kit";
+
+const s = makeScene({ ox: 100, oy: 50 });
+const names = (kind: RoomKind) => {
+  const room = drawRoom(kind);
+  return [...room.base, ...room.things].map((p) => p.name);
+};
+
+describe("the drawing kit", () => {
+  it("projects 2:1 isometric: x down-right, y down-left, z up", () => {
+    expect(project([10, 0, 0], { ox: 0, oy: 0 })).toEqual([8.66, 5]);
+    expect(project([0, 10, 0], { ox: 0, oy: 0 })).toEqual([-8.66, 5]);
+    expect(project([0, 0, 10], { ox: 0, oy: 0 })).toEqual([0, -10]);
+  });
+
+  it("a box is three faces shaded by the one light: left, right, top", () => {
+    const faces = s.box("slate", 0, 0, 0, 10, 10, 10);
+    expect(faces.map((f) => f.c)).toEqual([
+      "dk-left dk-slate",
+      "dk-right dk-slate",
+      "dk-top dk-slate",
+    ]);
+  });
+
+  it("spaces values evenly, strictly inside the range", () => {
+    expect(between(0, 30, 2)).toEqual([10, 20]);
+    expect(between(0, 30, 0)).toEqual([]);
+  });
+
+  it("marks material line work and mullions as fine detail, never the big shapes", () => {
+    const [win, detail] = s.windowY(0, 0, 10, 0, 10);
+    expect(win!.fine).toBe(false);
+    expect(detail!.fine).toBe(true);
+    const roof = s.gableRoof("slate", 0, 0, 10, 20, 16, 8);
+    expect(roof.find((p) => p.name === "shingles")!.fine).toBe(true);
+    expect(roof.find((p) => p.name === "roof")!.fine).toBe(false);
+  });
+
+  it("names no colour: every fill and stroke in draw.css is a token", () => {
+    const css = readFileSync(join(__dirname, "draw.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(css.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/g)).toBeNull();
+    for (const banned of ["--coral", "--v-dont-pay", "--amber", "--scan", "--warn", "--v-hold"])
+      expect(css).not.toContain(banned);
+  });
+});
+
+describe("the drawn rooms: real fixtures per room kind", () => {
+  it("kitchen: cabinets with detail, a sink, a range with a hood, a fridge, an island", () => {
+    expect(names("kitchen")).toEqual(
+      expect.arrayContaining([
+        "cabinet",
+        "cabinet-detail",
+        "upper-cabinet",
+        "sink",
+        "range",
+        "hood",
+        "fridge",
+        "island",
+        "window",
+      ]),
+    );
+  });
+
+  it("bathroom: a tub, a toilet, a vanity with a sink and a mirror, tile", () => {
+    expect(names("bathroom")).toEqual(
+      expect.arrayContaining(["tub", "toilet", "cabinet", "sink", "mirror", "wall-tile", "rug"]),
+    );
+  });
+
+  it("bedroom: a bed, nightstands with lamps, a closet", () => {
+    const n = names("bedroom");
+    expect(n).toEqual(expect.arrayContaining(["bed", "lamp", "closet", "window"]));
+    expect(n.filter((x) => x === "nightstand")).toHaveLength(2);
+  });
+
+  it("living room: a sofa, a rug, a coffee table, a TV unit", () => {
+    expect(names("living")).toEqual(
+      expect.arrayContaining(["sofa", "rug", "coffee-table", "tv-unit", "plant", "floor-lamp"]),
+    );
+  });
+
+  it("entry and the fallback room are furnished too", () => {
+    expect(names("entry")).toEqual(expect.arrayContaining(["door", "bench", "window", "rug"]));
+    expect(names("plain")).toEqual(expect.arrayContaining(["sideboard", "armchair", "window"]));
+  });
+
+  it("every room has materials and light: floor marks, baseboard, window light, contact shadows", () => {
+    for (const kind of ["kitchen", "bathroom", "bedroom", "living", "entry", "plain"] as const) {
+      const room = drawRoom(kind);
+      const all = [...room.base, ...room.things];
+      expect(names(kind)).toEqual(
+        expect.arrayContaining(["floor", "floor-marks", "walls", "baseboard", "window-light"]),
+      );
+      expect(all.some((p) => p.prims.some((x) => x.c === "dk-contact"))).toBe(true);
+      // Fine detail is separable, so the corner window can drop it.
+      expect(all.some((p) => p.fine)).toBe(true);
+      expect(all.filter((p) => !p.fine).length).toBeGreaterThan(5);
+    }
+  });
+});

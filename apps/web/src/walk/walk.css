@@ -178,40 +178,95 @@
   fill: var(--h-path);
 }
 .rs-wall-left {
-  fill: color-mix(in srgb, var(--h-wall-shade) 62%, var(--h-wall));
+  fill: color-mix(in srgb, var(--h-wall-shade) 58%, var(--h-wall));
 }
 .rs-wall-right {
   fill: var(--h-wall);
 }
-.rs-window {
+.rs-wall-cap {
+  fill: color-mix(in srgb, var(--h-wall) 80%, var(--surface));
+}
+.rs-wall-end-left {
+  fill: color-mix(in srgb, var(--h-wall-shade) 30%, var(--h-wall));
+}
+.rs-wall-end-right {
+  fill: color-mix(in srgb, var(--h-wall-shade) 86%, var(--ink));
+}
+.rs-base-left {
+  fill: color-mix(in srgb, var(--h-wall-shade) 88%, var(--ink));
+}
+.rs-base-right {
+  fill: color-mix(in srgb, var(--h-wall-shade) 70%, var(--h-wall));
+}
+.rs-tile-left {
+  fill: color-mix(in srgb, var(--h-unlit) 30%, var(--h-wall-shade));
+}
+.rs-tile-right {
+  fill: color-mix(in srgb, var(--h-unlit) 26%, var(--h-wall));
+}
+.rs-mullion,
+.rs-blind {
+  fill: none;
+}
+.rs-mullion {
+  stroke: var(--h-wall);
+  stroke-width: 3;
+}
+.rs-blind {
+  stroke: color-mix(in srgb, var(--h-wall) 80%, transparent);
+  stroke-width: 2;
+}
+.rs-light {
+  fill: color-mix(in srgb, var(--surface) 42%, transparent);
+}
+.rs-trim {
+  fill: color-mix(in srgb, var(--h-wall) 70%, var(--surface));
+}
+.rs-glass {
   fill: var(--h-unlit);
 }
-.rs-door {
+.rs-blind-band {
+  fill: color-mix(in srgb, var(--h-wall) 58%, var(--h-unlit));
+}
+.rs-door,
+.rs-closet {
   fill: var(--h-door);
 }
+.rs-closet {
+  fill: color-mix(in srgb, var(--h-wall) 62%, var(--h-wall-shade));
+}
+.rs-door-panel {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--surface));
+}
 .rs-rug {
-  fill: color-mix(in srgb, var(--act) 20%, var(--h-path));
+  fill: color-mix(in srgb, var(--act) 26%, var(--h-path));
 }
-.rs-slate {
-  --c: var(--h-roof);
+.rs-rug-inner {
+  fill: color-mix(in srgb, var(--act) 14%, var(--h-path));
 }
-.rs-pale {
-  --c: var(--h-unlit);
+.rs-handle {
+  fill: color-mix(in srgb, var(--h-wall) 70%, var(--h-roof));
 }
-.rs-white {
-  --c: var(--h-wall);
+.rs-basin {
+  fill: color-mix(in srgb, var(--h-roof) 38%, var(--h-wall));
 }
-.rs-green {
-  --c: var(--h-lawn);
+.rs-water,
+.rs-mirror {
+  fill: var(--h-unlit);
 }
-.rs-face-top {
-  fill: color-mix(in srgb, var(--c) 76%, var(--surface));
+.rs-shine {
+  fill: color-mix(in srgb, var(--surface) 50%, transparent);
 }
-.rs-face-left {
-  fill: color-mix(in srgb, var(--c) 92%, var(--ink));
+.rs-cooktop,
+.rs-oven {
+  fill: color-mix(in srgb, var(--band) 74%, var(--h-roof));
 }
-.rs-face-right {
-  fill: color-mix(in srgb, var(--c) 80%, var(--ink));
+.rs-burner {
+  fill: color-mix(in srgb, var(--h-roof) 70%, var(--h-wall));
+}
+/* At the corner size the small detail would only be noise. */
+.sv-pane[data-role="corner"] .dk-fine {
+  display: none;
 }
 
 /* The ad photo, set on the wall where it was taken. */
@@ -248,7 +303,7 @@
 .rs-cone {
   fill: color-mix(in srgb, var(--act) 20%, transparent);
 }
-.rs-camera {
+.rs-camera .dk-teal {
   --c: var(--act);
 }
 .rs-missing-frame {

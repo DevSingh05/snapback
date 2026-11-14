@@ -1,6 +1,7 @@
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
 import { boxFaces, points, type Box, type Origin } from "./iso";
+import "../draw/draw.css";
 import "./walk.css";
 
 export interface AerialPane {
@@ -59,10 +60,10 @@ function StandIn({ which }: { which: "named" | "pictured" }) {
   const draw = (box: Box, i: number, cls: string) => {
     const f = boxFaces(box, O);
     return (
-      <g key={`${cls}-${i}`} className={`rs-box rs-${box.tone ?? "pale"} ${cls}`}>
-        <polygon className="rs-face-left" points={f.left} />
-        <polygon className="rs-face-right" points={f.right} />
-        <polygon className="rs-face-top" points={f.top} />
+      <g key={`${cls}-${i}`} className={`dk-${box.tone ?? "pale"} ${cls}`}>
+        <polygon className="dk-left" points={f.left} />
+        <polygon className="dk-right" points={f.right} />
+        <polygon className="dk-top" points={f.top} />
       </g>
     );
   };

@@ -1,0 +1,102 @@
+/* The drawing kit's look (draw/kit.ts). One light: tops lightest, +y faces mid, +x faces
+   darkest. Every fill is a token, so both themes follow. No red, no amber. */
+.dk-slate {
+  --c: var(--h-roof);
+}
+.dk-pale {
+  --c: var(--h-unlit);
+}
+.dk-white {
+  --c: var(--h-wall);
+}
+.dk-green {
+  --c: color-mix(in srgb, var(--h-lawn) 52%, var(--v-ok));
+}
+.dk-wood {
+  --c: var(--h-wall-shade);
+}
+.dk-dark {
+  --c: color-mix(in srgb, var(--band) 62%, var(--h-roof));
+}
+.dk-metal {
+  --c: color-mix(in srgb, var(--h-roof) 34%, var(--h-wall));
+}
+.dk-teal {
+  --c: var(--h-door);
+}
+.dk-cloth {
+  --c: color-mix(in srgb, var(--h-door) 46%, var(--h-unlit));
+}
+.dk-top {
+  fill: color-mix(in srgb, var(--c) 76%, var(--surface));
+}
+.dk-left {
+  fill: color-mix(in srgb, var(--c) 93%, var(--ink));
+}
+.dk-right {
+  fill: color-mix(in srgb, var(--c) 78%, var(--ink));
+}
+.dk-contact {
+  fill: var(--h-shade);
+}
+.dk-seam {
+  stroke: color-mix(in srgb, var(--ink) 24%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  fill: none;
+}
+.dk-mullion {
+  stroke: var(--h-wall);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  fill: none;
+}
+.dk-paint {
+  stroke: color-mix(in srgb, var(--h-wall) 80%, transparent);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  fill: none;
+}
+.dk-trim {
+  fill: color-mix(in srgb, var(--h-wall) 70%, var(--surface));
+}
+.dk-trim-shade {
+  fill: color-mix(in srgb, var(--h-wall) 86%, var(--h-wall-shade));
+}
+.dk-glass {
+  fill: var(--h-unlit);
+}
+.dk-glass-shade {
+  fill: color-mix(in srgb, var(--h-unlit) 82%, var(--ink));
+}
+.dk-door {
+  fill: var(--h-door);
+}
+.dk-door-panel {
+  fill: color-mix(in srgb, var(--h-door) 84%, var(--surface));
+}
+.dk-handle {
+  fill: color-mix(in srgb, var(--h-wall) 70%, var(--h-roof));
+}
+.dk-lawn {
+  fill: var(--h-lawn);
+}
+.dk-path {
+  fill: var(--h-path);
+}
+.dk-asphalt {
+  fill: color-mix(in srgb, var(--h-roof) 46%, var(--h-path));
+}
+.dk-roof-deck {
+  fill: color-mix(in srgb, var(--h-roof) 52%, var(--h-wall));
+}
+.dk-roof-inner-left {
+  fill: color-mix(in srgb, var(--h-roof) 88%, var(--ink));
+}
+.dk-roof-inner-right {
+  fill: color-mix(in srgb, var(--h-roof) 70%, var(--ink));
+}
+/* Small sizes: drop the fine detail, keep the big shapes and the shading. */
+[data-detail="low"] .dk-fine {
+  display: none;
+}
