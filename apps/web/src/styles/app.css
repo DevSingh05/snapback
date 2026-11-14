@@ -1,0 +1,371 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  margin: 0;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: clamp(16px, 4vw, 56px) var(--gutter) 64px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background:
+    radial-gradient(60rem 28rem at 12% -8%, var(--teal-soft), transparent 70%),
+    radial-gradient(48rem 24rem at 100% 0%, var(--blue-soft), transparent 70%), var(--paper);
+}
+
+.card-page {
+  width: 100%;
+  max-width: 880px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px clamp(18px, 4vw, 36px);
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  font-size: 0.95rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+}
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.chip-fixture {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+.chip-live {
+  color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.hero {
+  padding: clamp(24px, 5vw, 44px) clamp(18px, 4vw, 36px) 8px;
+}
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.case-id {
+  display: inline-block;
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  padding: 1px 10px;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.state {
+  font-size: clamp(2.1rem, 7vw, 3.4rem);
+  line-height: 1.05;
+  font-weight: 800;
+  margin: 10px 0 12px;
+}
+.state-amber {
+  color: var(--amber);
+}
+.state-coral {
+  color: var(--coral);
+}
+.state-teal {
+  color: var(--teal);
+}
+.state-blue {
+  color: var(--blue);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+.summary {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--blue-soft);
+  color: var(--ink);
+  max-width: 60ch;
+}
+
+.evidence {
+  padding: 20px clamp(10px, 3vw, 28px) 4px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.group {
+  border-top: 1px solid var(--line);
+}
+.group:first-of-type {
+  border-top: none;
+}
+td,
+th {
+  text-align: left;
+  vertical-align: top;
+  padding: 14px 10px;
+  font-weight: 400;
+}
+.cell-kind {
+  width: 5.5rem;
+}
+.kind {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding-top: 4px;
+  display: inline-block;
+}
+.cell-what {
+  width: 11rem;
+  font-weight: 700;
+}
+.cell-tone {
+  width: 9.5rem;
+}
+.tone {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 3px 11px 3px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.tone-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: currentColor;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.tone-icon {
+  color: inherit;
+}
+.tone-ok {
+  color: var(--teal);
+  background: var(--teal-soft);
+}
+.tone-hold,
+.tone-not_shown {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+.tone-red_flag {
+  color: var(--coral);
+  background: var(--coral-soft);
+}
+.tone-not_checked {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+/* the icon glyph is knocked out of the filled disc */
+.tone-icon {
+  -webkit-text-fill-color: var(--surface);
+}
+
+.not-checked {
+  margin: 12px clamp(18px, 4vw, 36px) 0;
+  padding: 16px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--blue-soft);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.not-checked h2 {
+  font-size: 1.05rem;
+  color: var(--blue);
+}
+.not-checked ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.not-checked li {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.rules {
+  margin-top: 24px;
+  padding: 20px clamp(18px, 4vw, 36px) 28px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.97rem;
+}
+.rules p {
+  margin: 0 0 8px;
+  max-width: 68ch;
+}
+.rules p:last-child {
+  margin-bottom: 0;
+}
+
+.notice {
+  padding: clamp(24px, 5vw, 44px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notice h1 {
+  font-size: clamp(1.7rem, 5vw, 2.4rem);
+}
+.notice p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 56ch;
+}
+button {
+  align-self: flex-start;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1.5px solid var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+  cursor: pointer;
+}
+
+/* Phone: each evidence line becomes a stacked block. */
+@media (max-width: 640px) {
+  .evidence {
+    padding-inline: 14px;
+  }
+  table,
+  tbody,
+  tr,
+  td,
+  th {
+    display: block;
+  }
+  tr {
+    padding: 14px 8px;
+  }
+  td,
+  th {
+    padding: 0;
+  }
+  .cell-kind,
+  .cell-what,
+  .cell-tone {
+    width: auto;
+  }
+  .cell-kind:empty {
+    display: none;
+  }
+  .kind {
+    margin-bottom: 6px;
+  }
+  .cell-what {
+    font-size: 0.95rem;
+    color: var(--muted);
+  }
+  .cell-text {
+    margin: 2px 0 10px;
+    font-size: 1.1rem;
+  }
+  tr + tr {
+    border-top: 1px dashed var(--line);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card-page {
+    animation: rise 0.45s ease-out both;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+}
