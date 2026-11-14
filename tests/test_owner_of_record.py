@@ -472,6 +472,69 @@ def test_other_mentions_of_an_owner_are_not_a_claim(text):
     assert extract_contacts(text).says_owner is False
 
 
+# --- the same claim in Spanish ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Soy el dueño. 3 recámaras, $1,800.",
+        "Soy la dueña de la casa.",
+        "Yo soy el propietario, llámeme.",
+        "Somos los dueños y vivimos cerca.",
+        "Somos los propietarios.",
+        "Se renta por dueño, sin agentes.",
+        "SE RENTA POR EL DUEÑO",
+        "En renta por su propietario.",
+        "Casa en renta, trato directo con el dueño.",
+        "Dueño directo, sin intermediarios.",
+        "Es mi casa y la estoy rentando.",
+        "Rento mi propiedad mientras trabajo fuera.",
+        "soy el dueno de la casa",  # typed without the ñ
+        "Soy  el   dueño.",
+    ],
+)
+def test_a_poster_who_says_in_spanish_that_they_own_it_is_heard(text):
+    assert extract_contacts(text).says_owner is True
+    assert read_listing(text).contacts.says_owner is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2 recámaras cerca del parque, $1,400.",
+        "No soy el dueño, soy el administrador.",
+        "Soy el agente del dueño.",
+        "Contacte al dueño en la oficina.",
+        "El dueño paga el agua y la basura.",
+        "Soy dueño de un perro y mis vecinos también.",
+        "Soy dueña de dos gatos.",
+        "Administrado por Fixture Living LLC.",
+        "Se siente como mi casa. Hágala su casa hoy.",
+        "Aquí estará como en mi casa.",
+        "Esta no es mi casa.",
+        "Vendido por el dueño el año pasado.",
+        "Fue rentada por el dueño anterior.",
+        "Asociación de propietarios incluida.",
+        "El antiguo dueño dejó los muebles.",
+        "Queda cerca de mi casa.",
+        "Mi casa es su casa!",  # a welcome, in listings written in English too
+        "Bienvenidos, mi casa es tu casa.",
+    ],
+)
+def test_other_mentions_of_an_owner_in_spanish_are_not_a_claim(text):
+    assert extract_contacts(text).says_owner is False
+
+
+def test_a_spanish_claim_holds_a_case_the_same_way_an_english_one_does():
+    # The rule does not care which language the claim was made in.
+    for text in ("I am the owner.", "Soy el dueño."):
+        found = check_owner(extract_contacts(text), COMPANY, rules=())
+        assert (found.poster_says_owner, found.poster_matches) == (True, OwnerMatch.NO)
+        assert to_evidence(passing(found)).owner_flag is True
+        assert state(passing(found)) is VerdictState.HOLD
+
+
 # --- through the join ----------------------------------------------------------------------
 
 
