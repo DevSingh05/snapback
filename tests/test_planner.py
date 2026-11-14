@@ -79,7 +79,7 @@ def test_record_is_offered_and_the_unavailable_options_are_skipped_with_reasons(
     assert offered(case) == ["home record"]
     lines = skipped_lines(case)
     assert "Skipped listing brokerage: the home is not listed for sale right now." in lines
-    assert "Skipped TREC license: license lookup not available." in lines
+    assert "Skipped TREC license: the ad names no license to look up." in lines
     assert "Skipped owner of record: owner lookup not available." in lines
 
 
@@ -254,3 +254,30 @@ def test_a_menu_of_one_is_not_sent_to_the_model_and_is_stamped_policy():
     assert [e.pick for e in plan] == ["home record", "report pack"]
     assert {e.chosen_by for e in plan} == {"policy"}
     assert {e.reason for e in plan} == {"Only one option was open."}
+
+
+# --- the words live in strings.py, in both languages ---------------------------------------------
+
+
+def test_the_plans_words_exist_in_english_and_spanish():
+    from snapback.agent.planner import PICK_KEY
+    from snapback.card import strings
+
+    keys = {key for key in strings.TABLES["en"] if key.startswith("plan.")}
+    assert keys == {key for key in strings.TABLES["es"] if key.startswith("plan.")}
+    assert set(PICK_KEY.values()) <= keys
+    assert {"plan.skipped", "plan.only_option"} <= keys
+    for lang in ("en", "es"):
+        line = strings.text(
+            "plan.skipped", lang, option="x", reason=strings.text("plan.skip.owner_off", lang)
+        )
+        assert line.endswith(".") and "{" not in line
+
+
+def test_the_plan_speaks_spanish_when_the_case_does():
+    session = CaseSession(
+        "fx-1", FixtureModules(), Trace("fx-1", DataSource.FIXTURE), rng=random.Random(3), lang="es"
+    )
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    assert any(e.reason.startswith("Omitido ") for e in session.trace.events)
+    assert any(e.reason == "Solo había una opción abierta." for e in session.trace.events)

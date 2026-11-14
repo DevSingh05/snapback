@@ -30,7 +30,7 @@ from snapback.agent import (
 )
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
-from snapback.agent.join import JoinedModules, KitLookups, Lookups
+from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of
 from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
@@ -415,6 +415,9 @@ class CaseStore:
                 update={"photos": listing.photos, "screenshots": listing.screenshots}
             )
         for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+        # D10: only a live run calls the licence list, and a lookup that breaks is "not
+        # looked up". It reads the poster's own claim in the text and keeps no name.
+        license = license_of(self._lookups, listing.text)
 
         live = self._settings.snapback_data_source is DataSource.LIVE or (
             record is not None and record.source is DataSource.LIVE
@@ -436,6 +439,7 @@ class CaseStore:
                     listing=listing,
                     record=record,
                     for_sale=for_sale,
+                    license=license,
                     salt=phone_salt(self._settings),
                     record_source=record.source if record else source,
                     live_locate=self._live_locate if live else None,

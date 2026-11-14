@@ -182,7 +182,13 @@ class Locator:
                 out.append(hit)
         return out
 
-    def _best(self, photo: Image.Image, hits: list, passes: Callable[[Verification], bool]):
+    def _best(
+        self,
+        photo: Image.Image,
+        hits: list,
+        passes: Callable[[Verification], bool],
+        stop_early: bool = True,
+    ):
         """The passing candidate with the most inliers, or None. Stops at a very strong one."""
         t = self.thresholds
         best = None
@@ -197,15 +203,16 @@ class Locator:
                     entry.face,
                     check,
                 )
-            if check.inliers >= t.stop_at_inliers and passes(check):
+            if stop_early and check.inliers >= t.stop_at_inliers and passes(check):
                 break
         return best
 
     def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
-        building places it only on the stricter elsewhere bar (it can lead to DON'T PAY).
-        """
+        building places it only on the stricter elsewhere bar (it can lead to DON'T PAY). When
+        the claimed match passes but another building clears the strict bar with ambiguity_ratio
+        times its inliers, the photo is not placed at all."""
         t = self.thresholds
         hits = self._candidates(photo, claimed_models)
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
@@ -217,22 +224,33 @@ class Locator:
             if (h.entry.model_id, h.entry.sweep_id, h.entry.face) not in seen
             and (h.entry.model_id, h.entry.sweep_id) in self._sweeps
         ]
-        placed = self._best(
-            photo,
-            claimed_hits,
-            lambda c: c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio,
-        )
-        if placed is not None:
-            return placed
-        return self._best(
-            photo,
-            other_hits,
-            lambda c: (
+
+        def strict(c: Verification) -> bool:
+            return (
                 c.inliers >= t.elsewhere_min_inliers
                 and c.ratio >= t.min_inlier_ratio
                 and c.spread >= t.elsewhere_min_spread
-            ),
-        )
+            )
+
+        def claimed_ok(c: Verification) -> bool:
+            return c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio
+
+        placed = self._best(photo, claimed_hits, claimed_ok)
+        if placed is None:
+            return self._best(photo, other_hits, strict)
+        # Ambiguity (ruling 03:46): another building far stronger than the claimed match means
+        # the photo is placed nowhere. No false pass, and no false DON'T PAY either.
+        rival = self._best(photo, other_hits, strict, stop_early=False)
+        if rival is not None and rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
+            # The claimed search may have stopped early at a strong face (only possible at or
+            # above stop_at_inliers); compare the rival with the claimed maximum first.
+            if placed.check.inliers >= t.stop_at_inliers:
+                full = self._best(photo, claimed_hits, claimed_ok, stop_early=False)
+                if full is not None and full.check.inliers > placed.check.inliers:
+                    placed = full
+            if rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
+                return None
+        return placed
 
     def _identify(self, photo: Image.Image) -> tuple[_Placement | None, bool]:
         """The ad names no home. Verify EVERY candidate on the strict bar, with no early stop, so

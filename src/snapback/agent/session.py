@@ -21,7 +21,7 @@ from enum import StrEnum
 from typing import Literal
 
 from snapback.agent.modules import ChallengeOutcome, Modules
-from snapback.agent.planner import PICK_REASON, Plan, PlanKind
+from snapback.agent.planner import PICK_KEY, Plan, PlanKind
 from snapback.agent.scope import ListingScope
 from snapback.agent.trace import Trace, clean_reason
 from snapback.card import strings
@@ -45,8 +45,6 @@ TWIN_RULES_CHALLENGE = "twin+rules+challenge"
 RULES_CHALLENGE = "rules+challenge"
 RULES_ONLY = "rules only"
 STATE_ONLY = "state only"
-
-ONLY_OPTION = "Only one option was open."
 
 ACCEPT = "accept"
 RETRY = "retry at a new spot"
@@ -252,7 +250,9 @@ class CaseSession:
         for skipped in self._plan.skipped():
             self.trace.emit(
                 TraceKind.STATUS,
-                f"Skipped {skipped.kind.value}: {skipped.reason}.",
+                self._say(
+                    "plan.skipped", option=skipped.kind.value, reason=self._say(skipped.reason)
+                ),
                 pick=skipped.kind.value,
             )
         self.step = Step.PLAN
@@ -278,7 +278,7 @@ class CaseSession:
             aliases=labels,
             facts=self._plan.facts(),
             default=labels[0],
-            default_reason=PICK_REASON[kinds[0]],
+            default_reason=self._say(PICK_KEY[kinds[0]]),
         )
 
     def _apply_plan(self, pick: str) -> None:
@@ -577,7 +577,7 @@ class CaseSession:
         label = offer.resolve(pick)
         if len(offer.options) == 1:
             # Nothing was chosen: a menu of one. Say so, and never credit a model for it.
-            label, reason, by = offer.options[0], ONLY_OPTION, "policy"
+            label, reason, by = offer.options[0], self._say("plan.only_option"), "policy"
         elif label is None:
             self.trace.emit(TraceKind.ERROR, self._say("trace.error.bad_pick"))
             label, reason, by = offer.default, offer.default_reason, "policy"

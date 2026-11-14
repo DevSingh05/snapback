@@ -30,6 +30,7 @@ EN: dict[str, str] = {
     "label.recently_rented": "Rental history",
     "label.contact": "Contact on record",
     "label.link": "Link",
+    "label.license": "License",
     "label.unit": "Unit on record",
     # --- PLACE: were the photos taken here? ------------------------------------------------
     "place.located_plan": (
@@ -138,6 +139,17 @@ EN: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    "license.licensed": "Licensed in Texas.",
+    "license.licensed_sponsored": "Licensed in Texas, sponsored by {broker}.",
+    # D10 (#128): NOT_FOUND only from a license number the ad itself gives. A name never gives it.
+    "license.not_found": (
+        "The license number in the ad is not an active Texas license. "
+        "Look it up yourself at trec.texas.gov."
+    ),
+    "license.not_checked_claimed": (
+        "Says they're licensed. Ask for their Texas license number and look it up at "
+        "trec.texas.gov."
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
@@ -258,6 +270,20 @@ EN: dict[str, str] = {
     "trace.tool.reply": "Checked the reply photo for the code and against the listing photos.",
     "trace.hitl.edit": "The renter edited the challenge text and approved it.",
     "trace.hitl.cancel": "The renter chose not to send a challenge.",
+    # --- the evidence-driven plan (A24): which check runs next -------------------------------
+    "plan.pick.record": "The home's own record gives the rent band and who is on record. Read it.",
+    "plan.pick.brokerage": "The home is listed for sale right now. Check the listing office.",
+    "plan.pick.license": "The ad names a license. Look it up with the state.",
+    "plan.pick.owner": "An owner is on public record. Compare it with who is posting.",
+    "plan.pick.report": "Every check that could run has run. Gather what they found for a report.",
+    "plan.skip.record": "no property record to read",
+    "plan.skip.brokerage": "the home is not listed for sale right now",
+    "plan.skip.license_off": "license lookup not available",
+    "plan.skip.license_none": "the ad names no license to look up",
+    "plan.skip.owner_off": "owner lookup not available",
+    "plan.skip.owner_none": "no owner on record to read",
+    "plan.skipped": "Skipped {option}: {reason}.",
+    "plan.only_option": "Only one option was open.",
     "trace.retry.accept_both": "Both spots matched with the code read and no recapture flag.",
     "trace.retry.accept": (
         "{matched} of {total} spots matched with the code read and no recapture flag."
@@ -304,6 +330,7 @@ EN: dict[str, str] = {
     ),
     "reason.phone_flag": "The phone in the listing is not the leasing office on record.",
     "reason.lookalike_link": "A link in the listing imitates the building's website.",
+    "reason.license_not_found": "The license number in the ad is not an active Texas license.",
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
@@ -361,6 +388,7 @@ ES: dict[str, str] = {
     "label.recently_rented": "Historial de alquiler",
     "label.contact": "Contacto en el registro",
     "label.link": "Enlace",
+    "label.license": "Licencia",
     "label.unit": "Unidad en el registro",
     "place.located_plan": (
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
@@ -467,6 +495,15 @@ ES: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "license.licensed": "Con licencia en Texas.",
+    "license.licensed_sponsored": "Con licencia en Texas, patrocinada por {broker}.",
+    "license.not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas. "
+        "Búsquelo usted mismo en trec.texas.gov."
+    ),
+    "license.not_checked_claimed": (
+        "Dice tener licencia. Pídale su número de licencia de Texas y búsquelo en trec.texas.gov."
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
@@ -607,6 +644,23 @@ ES: dict[str, str] = {
     ),
     "trace.hitl.edit": "El inquilino editó el texto del reto y lo aprobó.",
     "trace.hitl.cancel": "El inquilino decidió no enviar un reto.",
+    "plan.pick.record": (
+        "El registro propio de la vivienda da el rango de renta y quién figura. Leerlo."
+    ),
+    "plan.pick.brokerage": "La vivienda está en venta ahora. Revisar la oficina que la anuncia.",
+    "plan.pick.license": "El anuncio menciona una licencia. Buscarla en el estado.",
+    "plan.pick.owner": "Hay un propietario en el registro público. Compararlo con quien publica.",
+    "plan.pick.report": (
+        "Se hicieron todas las comprobaciones posibles. Reunir lo encontrado para un informe."
+    ),
+    "plan.skip.record": "no hay registro de la propiedad que leer",
+    "plan.skip.brokerage": "la vivienda no está en venta ahora",
+    "plan.skip.license_off": "la búsqueda de licencias no está disponible",
+    "plan.skip.license_none": "el anuncio no menciona ninguna licencia que buscar",
+    "plan.skip.owner_off": "la búsqueda de propietarios no está disponible",
+    "plan.skip.owner_none": "no hay propietario en el registro que leer",
+    "plan.skipped": "Omitido {option}: {reason}.",
+    "plan.only_option": "Solo había una opción abierta.",
     "trace.retry.accept_both": (
         "Los dos puntos coincidieron, con el código leído y sin aviso de recaptura."
     ),
@@ -664,6 +718,9 @@ ES: dict[str, str] = {
         "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro."
     ),
     "reason.lookalike_link": "Un enlace del anuncio imita el sitio web del edificio.",
+    "reason.license_not_found": (
+        "El número de licencia del anuncio no es una licencia activa de Texas."
+    ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "

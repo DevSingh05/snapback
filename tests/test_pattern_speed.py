@@ -19,6 +19,7 @@ from functools import cache
 
 import pytest
 
+from snapback.adapters import trec
 from snapback.agent import scope
 from snapback.agent.intake import fields, find_injections, injection, read_listing
 from snapback.agent.intake.fields import (
@@ -180,6 +181,8 @@ ENTRY_POINTS = {
     "extract_beds": extract_beds,
     "detect_scope": detect_scope,
     "normalise": normalise,
+    # Lane D's licence-claim detector (D10). A18 puts it on the path of a live check.
+    "license_claim": trec.detect_claim,
 }
 
 # Text built to make the rules engine work: many asks in one clause, each one excused.

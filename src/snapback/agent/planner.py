@@ -43,31 +43,20 @@ class PlanKind(StrEnum):
 
 ORDER = (PlanKind.RECORD, PlanKind.BROKERAGE, PlanKind.LICENSE, PlanKind.OWNER, PlanKind.REPORT)
 
-# Why the code policy picks this option when it is the first one open.
-PICK_REASON: dict[PlanKind, str] = {
-    PlanKind.RECORD: "The home's own record gives the rent band and who is on record. Read it.",
-    PlanKind.BROKERAGE: "The home is listed for sale right now. Check the listing office.",
-    PlanKind.LICENSE: "The ad names a license. Look it up with the state.",
-    PlanKind.OWNER: "An owner is on public record. Compare it with who is posting.",
-    PlanKind.REPORT: "Every check that could run has run. Gather what they found for a report.",
-}
-
-SKIP_REASON: dict[str, str] = {
-    "record": "no property record to read",
-    "brokerage": "the home is not listed for sale right now",
-    "license_off": "license lookup not available",
-    "license_none": "the ad names no license to look up",
-    "owner_off": "owner lookup not available",
-    "owner_none": "no owner on record to read",
-    "report_wait": "it waits for the other checks",
-    "report_empty": "no check produced anything to report",
+# The words live in card/strings.py (`plan.pick.<key>`, `plan.skip.<key>`); here are the keys.
+PICK_KEY: dict[PlanKind, str] = {
+    PlanKind.RECORD: "plan.pick.record",
+    PlanKind.BROKERAGE: "plan.pick.brokerage",
+    PlanKind.LICENSE: "plan.pick.license",
+    PlanKind.OWNER: "plan.pick.owner",
+    PlanKind.REPORT: "plan.pick.report",
 }
 
 
 @dataclass(frozen=True)
 class Skipped:
     kind: PlanKind
-    reason: str
+    reason: str  # a `plan.skip.*` key
 
 
 class Plan:
@@ -106,23 +95,23 @@ class Plan:
         return bool(self._price or self._authority or self._record_sale)
 
     def _skip_reason(self, kind: PlanKind) -> str | None:
-        """Why `kind` cannot run on the evidence held now; None when it can."""
+        """The `plan.skip.*` key for why `kind` cannot run now; None when it can."""
         if kind is PlanKind.RECORD:
-            return None if self._has_record() else SKIP_REASON["record"]
+            return None if self._has_record() else "plan.skip.record"
         if kind is PlanKind.BROKERAGE:
-            return None if self._active_sale else SKIP_REASON["brokerage"]
+            return None if self._active_sale else "plan.skip.brokerage"
         if kind is PlanKind.LICENSE:
             if not self._license_offered:
-                return SKIP_REASON["license_off"]
-            return None if self._license is not None else SKIP_REASON["license_none"]
+                return "plan.skip.license_off"
+            return None if self._license is not None else "plan.skip.license_none"
         if kind is PlanKind.OWNER:
             if not self._owner_offered:
-                return SKIP_REASON["owner_off"]
-            return None if self._owner is not None else SKIP_REASON["owner_none"]
+                return "plan.skip.owner_off"
+            return None if self._owner is not None else "plan.skip.owner_none"
         # The report pack closes the plan: after everything else, and only if something ran.
         if any(self._pending(other) for other in ORDER if other is not PlanKind.REPORT):
-            return SKIP_REASON["report_wait"]
-        return None if self.ran else SKIP_REASON["report_empty"]
+            return "report_wait"
+        return None if self.ran else "report_empty"
 
     def _pending(self, kind: PlanKind) -> bool:
         return kind not in self.ran and self._skip_reason(kind) is None
