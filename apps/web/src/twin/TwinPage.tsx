@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import aerialFixture from "../../../../fixtures/contracts/aerial_tile.json";
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
+import recordFixture from "../../../../fixtures/contracts/property_record.json";
 import { SourceChip } from "../components/SourceChip";
-import type { LocateResult } from "../contracts";
+import type { AerialTileInfo, LocateResult, PropertyFacts } from "../contracts";
+import { AerialTile } from "./AerialTile";
 import { PhotoOverlay } from "./PhotoOverlay";
 import { poseToSdkCall } from "./pose";
 import { connectShowcase, embedUrl, flyToPose, watchSweeps, type ShowcaseSdk } from "./showcase";
@@ -15,15 +18,28 @@ const PLACEHOLDER_PHOTO =
   );
 
 const fixtureLocate = hold.locate as unknown as LocateResult;
+const fixtureAerial = aerialFixture as AerialTileInfo;
+const fixtureRecord = recordFixture as PropertyFacts;
 
 interface ViewProps {
   caseId: string;
   sdkKey: string | undefined;
   modelId: string | undefined;
   locate?: LocateResult;
+  aerial?: AerialTileInfo;
+  record?: PropertyFacts;
+  aerialImageUrl?: string;
 }
 
-export function TwinView({ caseId, sdkKey, modelId, locate = fixtureLocate }: ViewProps) {
+export function TwinView({
+  caseId,
+  sdkKey,
+  modelId,
+  locate = fixtureLocate,
+  aerial = fixtureAerial,
+  record = fixtureRecord,
+  aerialImageUrl,
+}: ViewProps) {
   const live = Boolean(sdkKey && modelId);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [sdk, setSdk] = useState<ShowcaseSdk | null>(null);
@@ -140,6 +156,7 @@ export function TwinView({ caseId, sdkKey, modelId, locate = fixtureLocate }: Vi
               {status}
             </p>
           </div>
+          <AerialTile tile={aerial} record={record} imageUrl={aerialImageUrl} />
           <div data-testid="trace-slot" className="twin-trace" />
         </aside>
       </div>

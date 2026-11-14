@@ -515,6 +515,29 @@ button {
   display: grid;
   gap: 8px;
 }
+.aerial-tile {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.aerial-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aerial-img {
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+.aerial-fact {
+  color: var(--muted);
+}
 .twin-trace {
   min-height: 120px;
 }

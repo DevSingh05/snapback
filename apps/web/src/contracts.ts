@@ -67,3 +67,19 @@ export interface LocateResult {
   photos: LocatedPhoto[];
   poses: Record<string, Pose>;
 }
+
+// Mirrors AerialTile and the PropertyRecord fields the aerial fact reads (src/snapback/contracts.py).
+export interface AerialTileInfo {
+  property_id: string;
+  source: DataSource;
+  direction: string;
+  captured_on?: string | null;
+  path: string;
+}
+
+export interface PropertyFacts {
+  property_id: string;
+  source: DataSource;
+  floors?: number | null;
+  year_built?: number | null;
+}
