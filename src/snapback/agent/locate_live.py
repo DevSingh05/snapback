@@ -14,6 +14,9 @@ Rules this module keeps:
   module only reads its answer. Identification alone is never DON'T PAY.
 - The cache under `data/locate/` is keyed on the photo hashes and the claimed id. An entry is
   read only if it says it came from live data, and is written only by a live run.
+- The matched pairs (`LiveOutcome.points`, up to 48 normalised pairs per placed photo, E2b) are
+  for the evidence-file writer only. They are never in the cache key, the cache file, a log or
+  anything the agent's chooser sees; a cached answer carries none.
 
 Nothing here logs an id, a hash or a value from a record.
 """
@@ -27,11 +30,12 @@ import time
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from snapback.contracts import (
     DataSource,
+    EvidencePoints,
     FloorPlanCandidate,
     LocateResult,
     LocateStatus,
@@ -50,11 +54,13 @@ CACHE_LABEL = DataSource.LIVE.value
 @dataclass(frozen=True)
 class LiveOutcome:
     """The placed photos, the building they identify when no home was claimed, and whether
-    this came from the cache."""
+    this came from the cache. `points` are the matched pairs per placed photo, for the evidence
+    file only (empty on a cached answer); they are kept out of repr and equality."""
 
     result: LocateResult
     identified_property_id: str | None = None
     from_cache: bool = False
+    points: Mapping[str, EvidencePoints] = field(default_factory=dict, repr=False, compare=False)
 
 
 @dataclass
@@ -235,9 +241,9 @@ class LiveLocate:
             # No home claimed: ONE call with every photo, so lane V's identification rules
             # apply (strict bar, two photos must agree, tangled twins identify nothing). A
             # timeout leaves every photo not located.
-            def finished(result: LocateResult) -> LiveOutcome:
+            def finished(result: LocateResult, points=None) -> LiveOutcome:
                 found = result.claimed_property_id if result.identified_by_scan else None
-                return LiveOutcome(result, found)
+                return LiveOutcome(result, found, points=dict(points or {}))
 
             def late(result: LocateResult) -> None:
                 # Too late for this case, but a COMPLETE answer: keep it for the next one.
@@ -248,25 +254,28 @@ class LiveLocate:
             )
             if whole is None:
                 return LiveOutcome(self._not_located(case_id, blobs))
-            outcome = finished(whole)
+            outcome = finished(*whole)
             self._write_cache(path, outcome)
             return outcome
 
         found_photos: dict[str, PhotoLocation] = {}
         poses: dict[str, Pose] = {}
+        points: dict[str, EvidencePoints] = {}
         versions: list[str] = []
         complete = True
         for photo_id, blob in blobs.items():
-            one = self._run(
+            ran = self._run(
                 ready, case_id, {photo_id: blob}, claimed_property_id, deadline - time.monotonic()
             )
-            if one is None:
+            if ran is None:
                 complete = False
                 found_photos[photo_id] = PhotoLocation(
                     photo_id=photo_id, status=LocateStatus.NOT_LOCATED
                 )
                 continue
+            one, found_points = ran
             found_photos[photo_id] = one.photos[0]
+            points.update(found_points)
             poses.update(one.poses)
             versions.append(one.thresholds_version)
 
@@ -278,7 +287,8 @@ class LiveLocate:
                 poses,
                 claimed_property_id,
                 versions[0] if versions else "live-budget",
-            )
+            ),
+            points=points,
         )
         if complete:
             self._write_cache(path, outcome)
@@ -300,21 +310,26 @@ class LiveLocate:
         claimed: str | None,
         remaining: float,
         on_late: Callable[[LocateResult], None] | None = None,
-    ) -> LocateResult | None:
-        """The locator on the shared worker, or None if it ran out of time, a photo could not
-        be read, or it broke. A run still going at the deadline is left to finish; if it
-        completes, `on_late` gets the answer (it is never used for the case that timed out)."""
+    ) -> tuple[LocateResult, dict[str, EvidencePoints]] | None:
+        """The locator on the shared worker, with the matched pairs per placed photo, or None if
+        it ran out of time, a photo could not be read, or it broke. A run still going at the
+        deadline is left to finish; if it completes, `on_late` gets the answer without its
+        pairs (it is never used for the case that timed out)."""
         if remaining <= 0:
             return None
 
-        def job() -> LocateResult:
+        def job() -> tuple[LocateResult, dict[str, EvidencePoints]]:
             from PIL import Image
 
             images = {}
             for photo_id, blob in blobs.items():
                 with Image.open(io.BytesIO(blob)) as opened:
                     images[photo_id] = opened.convert("RGB")
-            return ready.locator.locate(case_id, images, claimed)  # type: ignore[attr-defined]
+            locator = ready.locator
+            with_points = getattr(locator, "locate_with_points", None)
+            if with_points is None:  # a locator without E2b: the answer, no pairs
+                return locator.locate(case_id, images, claimed), {}  # type: ignore[attr-defined]
+            return with_points(case_id, images, claimed)
 
         future = self._executor().submit(job)
         try:
@@ -332,7 +347,7 @@ class LiveLocate:
         if done.cancelled() or done.exception() is not None:
             return
         try:
-            on_late(done.result())
+            on_late(done.result()[0])
         except Exception as error:  # noqa: BLE001 - a cache write must never break the worker
             log.warning("late locate result not kept (%s)", type(error).__name__)
 

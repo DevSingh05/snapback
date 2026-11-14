@@ -55,6 +55,8 @@ class FakeCrew(BaseChatModel):
 
     case: Any
     pick_last_for_plan: bool = False
+    todos: bool = True
+    agents: list = CHECK_AGENTS
     delegate: bool = True
 
     def bind_tools(self, tools, **kwargs):
@@ -74,6 +76,8 @@ class FakeCrew(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
     def _sub(self, messages, system):
+        if "place checker" in system:
+            return self._place(messages, system)
         tool_name = re.search(r"tool,\s*`(\w+)`", system).group(1)
         path = re.search(r"path `([^`]+)`", system).group(1)
         done = {m.name: m for m in messages if isinstance(m, ToolMessage)}
@@ -83,11 +87,23 @@ class FakeCrew(BaseChatModel):
             return _call("write_file", file_path=path, content=str(done[tool_name].content))
         return AIMessage(content="Note written.")
 
+    def _place(self, messages, system):
+        path = re.search(r"path `([^`]+)`", system).group(1)
+        done = [m for m in messages if isinstance(m, ToolMessage)]
+        if not done:
+            return _call("read_place_facts")
+        if self.case.step.value == "place":
+            offer = self.case.offer()
+            return _call("place_choose_option", option=offer.default, reason="Nearest miss first.")
+        if not any(m.name == "write_file" for m in done):
+            return _call("write_file", file_path=path, content=str(done[0].content))
+        return AIMessage(content="Note written.")
+
     def _main(self, messages):
         asked = [tc for m in messages if isinstance(m, AIMessage) for tc in m.tool_calls]
         names = [tc["name"] for tc in asked]
         case = self.case
-        if "write_todos" not in names:
+        if self.todos and "write_todos" not in names:
             return _call(
                 "write_todos",
                 todos=[
@@ -96,6 +112,12 @@ class FakeCrew(BaseChatModel):
                     {"content": "Write the explanation", "status": "pending"},
                 ],
             )
+        if case.step.value == "place":
+            if not any(tc["args"].get("subagent_type") == "place" for tc in asked):
+                return _call(
+                    "task", description="Retry the unplaced photos.", subagent_type="place"
+                )
+            return AIMessage(content="The place sub-agent has not finished.")
         offer = case.offer()
         if offer is not None:
             if len(offer.options) == 1:
@@ -108,7 +130,7 @@ class FakeCrew(BaseChatModel):
         if step == "spot":
             sent = [tc["args"].get("subagent_type") for tc in asked if tc["name"] == "task"]
             if self.delegate:
-                for name in CHECK_AGENTS:
+                for name in self.agents:
                     if name not in sent:
                         return _call(
                             "task", description=f"Write the {name} note.", subagent_type=name
@@ -426,3 +448,128 @@ def test_permissions_hold_at_runtime_for_main_sub_agent_and_general_purpose():
         if isinstance(m, ToolMessage) and m.name == "write_file"
     ]
     assert len(denied) == 2 and all("permission denied" in str(c) for c in denied)
+
+
+# --- E1 through the harness: the place sub-agent picks the retries -----------------------------
+
+
+def test_the_place_sub_agent_spends_the_retry_budget_through_its_tools():
+    from test_place_agent import StubSearcher
+    from test_place_agent import make_case as make_retry_case
+
+    session = make_retry_case(StubSearcher())
+    session.search_places = lambda: "Source: researched places"
+    verdict = run_with_crew(session)
+    assert verdict is not None
+    picks = [
+        e
+        for e in session.trace.events
+        if e.choice and e.choice.value in ("next_search", "which_photo")
+    ]
+    assert picks and all(e.chosen_by == "model" for e in picks if len(e.options) > 1)
+    assert session.place_desk.searches_used == 2
+    assert "place" in session.notes and session.notes["place"].by == "model"
+    from snapback.verdict import decide, to_evidence
+
+    assert verdict == decide(to_evidence(session.evidence))
+
+
+def test_the_main_agent_cannot_make_the_place_decision():
+    from snapback.agent.graph import describe
+    from test_place_agent import StubSearcher
+    from test_place_agent import make_case as make_retry_case
+
+    session = make_retry_case(StubSearcher())
+    session.choose(session.offer().default)  # which checks
+    assert session.step.value == "place"
+    assert "place sub-agent" in describe(session)
+
+
+def test_the_place_retry_prompt_and_tools_exist_only_when_the_case_can_retry():
+    from test_place_agent import StubSearcher
+
+    plain = next(x for x in build_subagents(make_case()) if x["name"] == "place")
+    assert "could not be placed" not in plain["system_prompt"]
+    assert [t.name for t in plain["tools"]] == ["read_place_facts"]
+    case = make_case()
+    case.place_searcher = StubSearcher()
+    live = next(x for x in build_subagents(case) if x["name"] == "place")
+    assert "could not be placed" in live["system_prompt"]
+    assert [t.name for t in live["tools"]][1:] == ["place_open_choice", "place_choose_option"]
+
+
+def test_a_finished_case_still_tells_the_model_to_delegate_until_the_notes_are_the_agents():
+    from snapback.agent.graph import describe
+
+    session = demo_session("a")
+    run_case(session, PolicyChooser(), lambda draft: "send")
+    assert session.step.value == "done"
+    assert json.loads(describe(session))["notes_missing_delegate_to"] == CHECK_AGENTS
+    for stem in casework.STEMS:
+        casework.keep_note(session, casework.note_path(session.case_id, stem), "x", "model")
+    assert json.loads(describe(session)) == {"finished": True}
+
+
+# --- the opening plan (write_todos) ----------------------------------------------------------
+
+
+def test_the_main_prompt_opens_with_a_write_todos_plan_with_one_todo_per_family():
+    from snapback.agent.graph import KICKOFF, SYSTEM_PROMPT, plan_instruction
+
+    text = plan_instruction(demo_session("a"))
+    assert "very first action" in text and "write_todos" in text
+    for name in CHECK_AGENTS:
+        assert f"Hand the {name} checks to the {name} sub-agent" in text
+    assert "completed" in text and "never mark a step completed before it is done" in text
+    assert "write_todos" in KICKOFF
+    assert "write_todos" in SYSTEM_PROMPT + text
+
+
+def test_a_walk_case_gets_a_walk_todo_too_and_a_plain_case_does_not():
+    from snapback.agent.graph import plan_instruction
+
+    session = demo_session("a")
+    assert "walk" not in plan_instruction(session)
+    session.walk_plan = lambda: None
+    assert "Hand the walk checks to the walk sub-agent" in plan_instruction(session)
+
+
+def test_the_todo_event_is_stamped_as_the_agent_s_own():
+    session = demo_session("a")
+    run_with_crew(session)
+    todos = [e for e in session.trace.events if e.kind.value == "todo"]
+    assert len(todos) == 1 and todos[0].chosen_by == "model" and len(todos[0].options) == 3
+
+
+def test_a_run_without_todos_and_the_policy_path_still_work():
+    from snapback.agent import PolicyChooser, run_case
+
+    plain = demo_session("a")
+    verdict = run_with_crew(plain, todos=False)  # a model that skips the plan
+    assert verdict is not None
+    assert not [e for e in plain.trace.events if e.kind.value == "todo"]
+    assert set(plain.notes) >= set(casework.STEMS)  # the case and its notes still complete
+    # A crash would fall back to the policy and still pass the lines above; these would not.
+    assert not [e for e in plain.trace.events if e.kind.value == "error"]
+    assert all(note.by == "model" for note in plain.notes.values())
+
+    policy = demo_session("a")
+    run_case(policy, PolicyChooser(), lambda draft: "send")
+    assert not [e for e in policy.trace.events if e.kind.value == "todo"]
+    assert policy.verdict == verdict  # same result with or without a plan
+
+
+def test_the_main_agent_really_has_a_write_todos_tool_and_it_works():
+    """deepagents 0.7 adds no planner by itself. Without this the model's write_todos call hit
+    'not a valid tool' and the earlier tests still passed on the call alone."""
+    session = demo_session("a")
+    agent = build_agent(session, FakeCrew(case=session))
+    assert "write_todos" in agent.nodes["tools"].bound.tools_by_name
+    config = {"configurable": {"thread_id": "todos"}, "recursion_limit": 60}
+    agent.invoke({"messages": [("user", "go")]}, config)
+    state = agent.get_state(config).values
+    assert [t["content"] for t in state["todos"]][0] == "Work the open choices"
+    replies = [
+        m for m in state["messages"] if isinstance(m, ToolMessage) and m.name == "write_todos"
+    ]
+    assert replies and all(m.status != "error" for m in replies)
