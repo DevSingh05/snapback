@@ -603,3 +603,12 @@
       height 0.12s ease-out;
   }
 }
+
+/* ---------- "You are here" in the drawn room: the cone turns with the camera's pan ---------- */
+.rs-here-turn {
+  transform-box: view-box;
+  transform: rotate(calc(var(--wp-yaw, 0deg) * 3.4));
+}
+.rs-here-cone {
+  fill: color-mix(in srgb, var(--act) 26%, transparent);
+}

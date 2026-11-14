@@ -44,6 +44,53 @@ const CAMERA_POST = [
   { name: "camera", prims: box("teal", CAMERA[0] - 6, CAMERA[1] - 6, 0, 12, 12, 46) },
 ];
 
+// "You are here": where the camera stands in the drawn room. At a photo stop it stands where the
+// ad photo was taken (the cone runs to the photo's frame). Anywhere else the plan has no pose to
+// draw from, so the marker stands at the room's centre and says so; its cone turns with the
+// camera's pan (the player writes --wp-yaw on the stage).
+const HERE: [number, number, number] = [170, 150, 0];
+const [HERE_X, HERE_Y] = project(HERE, O);
+const [CAM_X, CAM_Y] = project([CAMERA[0], CAMERA[1], 46], O);
+const HERE_POST = [{ name: "here", prims: box("teal", HERE[0] - 6, HERE[1] - 6, 0, 12, 12, 46) }];
+const HERE_CONE = points(
+  O,
+  HERE,
+  [HERE[0] - 130, HERE[1] - 56, 0],
+  [HERE[0] - 130, HERE[1] + 56, 0],
+);
+
+function HereMarker({ placed }: { placed: boolean }) {
+  const [x, y] = placed ? [CAM_X, CAM_Y] : [HERE_X, HERE_Y - 52];
+  return (
+    <g className="rs-here" data-testid="you-are-here" data-placed={placed ? "true" : undefined}>
+      {!placed && (
+        <g
+          className="rs-here-turn"
+          style={{ transformOrigin: `${HERE_X.toFixed(1)}px ${HERE_Y.toFixed(1)}px` }}
+        >
+          <polygon className="rs-cone rs-here-cone" points={HERE_CONE} />
+        </g>
+      )}
+      {!placed && (
+        <g className="rs-camera">
+          <Parts parts={HERE_POST} />
+        </g>
+      )}
+      <rect
+        className="rs-photo-tag"
+        x={x - (placed ? 44 : 76)}
+        y={y - 34}
+        width={placed ? 88 : 152}
+        height={18}
+        rx={3}
+      />
+      <text className="rs-photo-tag-text mono" x={x} y={y - 21} textAnchor="middle">
+        {placed ? "You are here" : "You are here (room centre)"}
+      </text>
+    </g>
+  );
+}
+
 function LandedPhoto({ alias, fly }: { alias: string; fly: boolean }) {
   return (
     <>
@@ -134,6 +181,7 @@ export function StopStage({
             />
             <Room kind={roomKind(stop)} cone={Boolean(photoAlias)} />
             {photoAlias && photoShown && <LandedPhoto alias={photoAlias} fly={!reduced} />}
+            <HereMarker placed={Boolean(photoAlias && photoShown)} />
             {!photoAlias && unshown && <MissingFrame />}
           </g>
         </svg>
