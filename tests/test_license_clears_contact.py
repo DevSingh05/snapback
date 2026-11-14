@@ -31,12 +31,16 @@ LICENSED = {
     "number_from": "ad",
 }
 INFO_EN = (
-    "Their number isn't the office's, but they hold an active Texas license sponsored by "
-    "Fixture Realty LLC, the brokerage on record."
+    "Not the office's number. The license number given is active, under the name in the ad, "
+    "and sponsored by Fixture Realty LLC, the brokerage on record. A license number can be "
+    "copied from a real listing, so call Fixture Realty LLC on a number you look up yourself "
+    "to confirm this agent."
 )
 INFO_ES = (
-    "Su número no es el de la oficina, pero tiene una licencia activa de Texas patrocinada "
-    "por Fixture Realty LLC, la agencia que figura en el registro."
+    "No es el número de la oficina. El número de licencia que se dio está activo, a nombre "
+    "de quien firma el anuncio, y patrocinado por Fixture Realty LLC, la agencia que figura "
+    "en el registro. Un número de licencia se puede copiar de un anuncio real, así que llame "
+    "a Fixture Realty LLC a un número que usted mismo busque para confirmar a este agente."
 )
 NOT_CONFIRMED_START = "Not confirmed. This number is not the leasing office's"
 
@@ -84,6 +88,9 @@ def test_the_phone_mismatch_reason_is_dropped_and_only_that_one():
     # the other holding reasons are the same; the generic "not shown to be the office" says
     # what is still true
     assert set(with_licence) - set(without) == {strings.text("reason.phone_not_confirmed")}
+    # a contact reason always remains, once, in the unmatched case too
+    unmatched = reasons(evidence(authority={**DIFFERS, "status": "unknown"}, license=LICENSED))
+    assert unmatched.count(strings.text("reason.phone_not_confirmed")) == 1
 
 
 def test_a_licence_alone_never_verifies():
@@ -190,3 +197,20 @@ def test_a_renter_number_that_is_not_found_adds_no_second_contact_line():
     card = build_card(modules, checked_at=CHECKED_AT)
     lines = [item for row in card.rows for item in row.lines if item.label == "Contact on record"]
     assert len(lines) == 1 and lines[0].text.startswith(NOT_CONFIRMED_START)
+
+
+def test_a_copied_licence_still_says_call_the_office_and_never_verifies():
+    # a scammer pastes a real agent's name and number: authority unknown, phone differs
+    copied = {
+        "status": "unknown",
+        "manager_on_record": "Fixture Realty LLC",
+        "office_phone_match": "no",
+    }
+    modules = evidence(authority=copied, license=LICENSED)
+    en, es = contact(modules)[1], contact(modules, "es")[1]
+    assert en == INFO_EN and es == INFO_ES
+    assert "Fixture Realty LLC" in en and "call Fixture Realty LLC on a number you look up" in en
+    assert "llame a Fixture Realty LLC" in es
+    verdict = decide(to_evidence(modules))
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.phone_not_confirmed") in verdict.reasons

@@ -157,6 +157,11 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             and modules.authority.office_phone_match is PhoneMatch.NO
             and _licence_clears_contact(modules) is None
         ),
+        phone_cleared_by_licence=(
+            modules.authority is not None
+            and modules.authority.office_phone_match is PhoneMatch.NO
+            and _licence_clears_contact(modules) is not None
+        ),
         phone_confirmed=_the_ad_is_the_office_s(modules),
         brokerage_only=modules.authority is not None and modules.authority.brokerage_only,
         lookalike_link_flag=(
@@ -344,6 +349,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # D10: a licence we could not confirm is no reason to call the number a red flag, so a
     # phone that is not the office's stays "not confirmed" whatever the licence list says.
     unconfirmed = ["reason.phone_flag"] if evidence.phone_flag else []
+    if evidence.phone_cleared_by_licence:
+        # The licence is a number anyone can copy from a real listing (review H1): the contact
+        # is still not shown to be the office, so a contact reason always remains.
+        unconfirmed = ["reason.phone_not_confirmed"]
     if evidence.license_given_flag:
         # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
         # confirmed and HOLD, never a red flag, and never in a report pack.
@@ -397,7 +406,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # H1: the name matches and the ad's contact was not shown to be the office. Said so the
     # hold has a reason. (A phone that is NOT the office's already has its own.)
     contact = []
-    if matches and not evidence.phone_confirmed and not evidence.phone_flag:
+    if (
+        matches
+        and not evidence.phone_confirmed
+        and not evidence.phone_flag
+        and not evidence.phone_cleared_by_licence
+    ):
         contact = [f"reason.phone_not_confirmed{by_brokerage}"]
     return verdict(
         VerdictState.HOLD,

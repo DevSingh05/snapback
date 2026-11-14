@@ -80,6 +80,9 @@ class Evidence(BaseModel):
     phone_flag: bool = False  # the phone in the listing is not the leasing office on record
     # A23 (H1): the phone in the listing IS the leasing office's on record. VERIFIED needs it.
     phone_confirmed: bool = False
+    # the phone is not the office's, but an active licence by number is sponsored by the
+    # brokerage on record (Sat 07:35): no red-flag-like phone reason, but still not confirmed
+    phone_cleared_by_licence: bool = False
     # A15: who is on record is a listing brokerage, not a manager with an office phone.
     brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website

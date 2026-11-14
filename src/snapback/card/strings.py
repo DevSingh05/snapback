@@ -145,14 +145,18 @@ EN: dict[str, str] = {
     # Vidyut, Sat 07:35: an active licence checked by number, sponsored by the brokerage on
     # record. Information, not a confirmation: the number is still not the office's.
     "contact.licensed_sponsor": (
-        "Their number isn't the office's, but they hold an active Texas license sponsored by "
-        "{brokerage}, the brokerage on record."
+        "Not the office's number. The license number given is active, under the name in the "
+        "ad, and sponsored by {brokerage}, the brokerage on record. A license number can be "
+        "copied from a real listing, so call {brokerage} on a number you look up yourself to "
+        "confirm this agent."
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
     "license.licensed": "Licensed in Texas.",
-    "license.licensed_sponsored": "Licensed in Texas, sponsored by {broker}.",
+    "license.licensed_sponsored": (
+        "An active Texas license exists under the name in the ad, sponsored by {broker}."
+    ),
     # D10 (#128): NOT_FOUND only from a license number the ad itself gives. A name never gives it.
     "license.not_found": (
         "The license number in the ad is not an active Texas license. "
@@ -568,14 +572,19 @@ ES: dict[str, str] = {
         "en el registro para confirmarlo."
     ),
     "contact.licensed_sponsor": (
-        "Su número no es el de la oficina, pero tiene una licencia activa de Texas patrocinada "
-        "por {brokerage}, la agencia que figura en el registro."
+        "No es el número de la oficina. El número de licencia que se dio está activo, a nombre "
+        "de quien firma el anuncio, y patrocinado por {brokerage}, la agencia que figura en el "
+        "registro. Un número de licencia se puede copiar de un anuncio real, así que llame a "
+        "{brokerage} a un número que usted mismo busque para confirmar a este agente."
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
     "license.licensed": "Con licencia en Texas.",
-    "license.licensed_sponsored": "Con licencia en Texas, patrocinada por {broker}.",
+    "license.licensed_sponsored": (
+        "Existe una licencia activa de Texas a nombre de quien firma el anuncio, patrocinada "
+        "por {broker}."
+    ),
     "license.not_found": (
         "El número de licencia del anuncio no es una licencia activa de Texas. "
         "Búsquelo usted mismo en trec.texas.gov."
