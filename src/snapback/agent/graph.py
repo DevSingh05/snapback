@@ -99,7 +99,11 @@ def describe(case: CaseSession) -> str:
             }
         )
     if case.step is Step.SPOT:
-        missing = [casework.AGENT_NAMES[stem] for stem in casework.STEMS if stem not in case.notes]
+        missing = [
+            casework.AGENT_NAMES[stem]
+            for stem in casework.STEMS
+            if stem not in case.notes or case.notes[stem].by != "model"
+        ]
         hint: dict[str, Any] = {"next": "call draw_spot"}
         if missing:
             hint["notes_missing_delegate_to"] = missing
@@ -160,11 +164,12 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
         tools=[open_choice, choose_option, draw_spot, send_challenge],
         system_prompt=SYSTEM_PROMPT,
         subagents=build_subagents(case),
-        # The main agent may write its own two notes under this case and nothing else.
+        # The main agent may write its own two notes and nothing else: the family notes belong
+        # to the sub-agents.
         permissions=[
             FilesystemPermission(
                 operations=["write"],
-                paths=[f"/case/{case.case_id}/*.md"],
+                paths=[casework.note_path(case.case_id, stem) for stem in casework.MAIN_STEMS],
                 mode="allow",
             ),
             FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
@@ -209,7 +214,7 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
             if fn is None:
                 return "No search is available for this case."
             try:
-                return fn()
+                return fn(use_model=True)
             except Exception:
                 return "The search could not run for this case."
 

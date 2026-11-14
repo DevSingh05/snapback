@@ -20,6 +20,7 @@ This module does not import deepagents, so the package works without the `agent`
 
 from __future__ import annotations
 
+import unicodedata
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from snapback.agent.trace import _BANNED_IN_REASONS
+from snapback.card import strings
 from snapback.contracts import DataSource, ModuleEvidence
 
 # stem -> (sub-agent name, what the note is about). The order is the order notes are shown.
@@ -47,17 +49,47 @@ AGENT_NAMES: dict[str, str] = {
 MAX_NOTE_CHARS = 1500
 MAX_LINE_CHARS = 280
 
-# Words a note never uses, on top of the trace's list: a note describes what was found; it does
-# not announce a result or tell the renter to pay.
+
+def _plain(text: str) -> str:
+    """Lowercase, NFKC, straight quotes, single spaces: so a curly apostrophe, a double space
+    or a non-breaking space cannot hide a phrase."""
+    flat = unicodedata.normalize("NFKC", text).lower()
+    for curly in ("\u2019", "\u2018", "\u02bc", "\u00b4", "`"):
+        flat = flat.replace(curly, "'")
+    return " ".join(flat.split())
+
+
+def _headline_phrases() -> tuple[str, ...]:
+    """Every result headline the card can print, in each language, a sentence at a time."""
+    out: list[str] = []
+    for table in strings.TABLES.values():
+        for key, value in table.items():
+            if key.startswith("state."):
+                out += [_plain(part).strip(" .") for part in value.split(".") if part.strip()]
+    return tuple(out)
+
+
+# Words a note never uses: the trace's list, a note must not announce a result or tell the renter
+# to pay, so every result headline (EN and ES) is on it too.
 _BANNED_IN_NOTES = (
-    *_BANNED_IN_REASONS,
+    *(_plain(w) for w in _BANNED_IN_REASONS),
     "don't pay",
     "do not pay",
     "checks passed",
     "safe to pay",
     "data:image",
     "base64",
+    *_headline_phrases(),
 )
+# The same phrases with apostrophes dropped, to catch "dont pay".
+_BANNED_NO_APOS = tuple(w.replace("'", "") for w in _BANNED_IN_NOTES)
+
+
+def _banned(line: str) -> bool:
+    flat = _plain(line)
+    bare = flat.replace("'", "")
+    return any(w in flat for w in _BANNED_IN_NOTES) or any(w in bare for w in _BANNED_NO_APOS)
+
 
 By = Literal["model", "policy"]
 
@@ -106,7 +138,7 @@ def clean_note(text: object) -> str:
     kept: list[str] = []
     for raw in str(text or "").splitlines():
         line = raw.rstrip()
-        if any(word in line.lower() for word in _BANNED_IN_NOTES):
+        if _banned(line):
             continue
         if len(line) > MAX_LINE_CHARS:
             line = line[: MAX_LINE_CHARS - 1].rstrip() + "…"
@@ -273,7 +305,10 @@ def refresh_policy_notes(case: Any) -> None:
     for stem, build in FACTS.items():
         keep_note(case, note_path(case.case_id, stem), build(case.evidence), "policy")
     search = getattr(case, "search_places", None)
-    if search is not None:
+    held = case.notes.get(PLACES)
+    if search is not None and not (held is not None and held.by == "model"):
+        # Code notes use the code policy only: a model's search is paid for once, by the
+        # search sub-agent, never again on every advance.
         try:
             body = search()
         except Exception:

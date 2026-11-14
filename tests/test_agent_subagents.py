@@ -5,6 +5,7 @@ sub-agent (read its facts, write its note). No network, no key. Skipped unless t
 extra is installed.
 """
 
+import json
 import random
 import re
 from datetime import UTC, datetime, timedelta
@@ -143,7 +144,9 @@ def demo_session(demo_id: str) -> CaseSession:
         Trace(full_id, DataSource.FIXTURE),
         rng=random.Random(3),
     )
-    session.search_places = lambda: "Source: researched places\nPlace 1: apartment, 2 bed, $1,900"
+    session.search_places = lambda use_model=False: (
+        "Source: researched places\nPlace 1: apartment, 2 bed, $1,900"
+    )
     return session
 
 
@@ -322,3 +325,104 @@ def test_langsmith_turns_on_only_with_a_key(monkeypatch):
     assert enable_langsmith("lsv2_test_key", "snapback") is True
     env = __import__("os").environ
     assert env["LANGSMITH_TRACING"] == "true" and env["LANGSMITH_PROJECT"] == "snapback"
+
+
+# --- review round 1 (#217) ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Don’t pay anyone",  # curly apostrophe
+        "Checks  passed",  # double space
+        "Checks passed",  # non-breaking space
+        "DONT PAY",
+        "DON'T PAY. Something here doesn't match.",
+        "Hold off for now",
+        "No pague",
+        "NO PAGUE a nadie",
+        "Algo aquí no coincide",
+        "Las revisiones pasaron",
+        "Could not place these photos",
+        "Espere por ahora",
+    ],
+)
+def test_a_note_line_that_announces_a_result_is_dropped_however_it_is_spelt(line):
+    assert casework.clean_note(f"Rent within range\n{line}") == "Rent within range"
+
+
+def test_ordinary_fact_lines_survive_the_cleaner():
+    text = "Rent check: within_range\nPhotos: 3 located_in_claimed\nOwner of record: a company"
+    assert casework.clean_note(text) == text
+
+
+def test_code_notes_do_not_call_search_again_once_a_model_wrote_places():
+    session = demo_session("a")
+    calls = []
+    session.search_places = lambda use_model=False: calls.append(use_model) or "Source: places"
+    casework.refresh_policy_notes(session)
+    assert calls == [False]  # code notes use the policy, never the model
+    casework.keep_note(
+        session, casework.note_path(session.case_id, "places"), "From the agent", "model"
+    )
+    casework.refresh_policy_notes(session)
+    assert calls == [False]  # skipped: the model's note is already there
+
+
+def test_a_family_is_missing_until_a_model_wrote_it():
+    from snapback.agent.graph import describe
+
+    session = demo_session("a")
+    session.step = type(session.step)("spot")
+    casework.refresh_policy_notes(session)  # code notes exist for every family
+    missing = json.loads(describe(session))["notes_missing_delegate_to"]
+    assert missing == CHECK_AGENTS
+
+
+class DeniedWrites(BaseChatModel):
+    """Every role tries something it must not do; each role's script is by its system prompt."""
+
+    case: Any
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    @property
+    def _llm_type(self) -> str:
+        return "denied-writes"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        system = str(messages[0].content)
+        turn = sum(isinstance(m, AIMessage) for m in messages)
+        cid = self.case.case_id
+        if "owner checker" in system:
+            script = [_call("write_file", file_path=casework.note_path(cid, "record"), content="x")]
+        elif "has no tools" in system:  # the replaced general-purpose agent
+            script = [
+                _call("write_file", file_path="/gp.md", content="x"),
+                _call("choose_option", option="rules only", reason="x"),
+            ]
+        else:
+            script = [
+                _call("write_file", file_path="/evil.md", content="x"),
+                _call("write_file", file_path=casework.note_path(cid, "record"), content="x"),
+                _call("task", description="d", subagent_type="owner"),
+                _call("task", description="d", subagent_type="general-purpose"),
+            ]
+        reply = script[turn] if turn < len(script) else AIMessage(content="Done.")
+        return ChatResult(generations=[ChatGeneration(message=reply)])
+
+
+def test_permissions_hold_at_runtime_for_main_sub_agent_and_general_purpose():
+    session = demo_session("a")
+    agent = build_agent(session, DeniedWrites(case=session))
+    config = {"configurable": {"thread_id": "perm"}, "recursion_limit": 40}
+    result = agent.invoke({"messages": [("user", "go")]}, config)
+    # nothing it tried to write exists
+    assert not result.get("files")
+    denied = [
+        m.content
+        for m in result["messages"]
+        if isinstance(m, ToolMessage) and m.name == "write_file"
+    ]
+    assert len(denied) == 2 and all("permission denied" in str(c) for c in denied)

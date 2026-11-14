@@ -392,7 +392,7 @@ describe("CaseNotes", () => {
     const written: TraceEvent = { ...at(1), kind: "tool", pick: "file: /case/A/owner.md", seq: 9 };
     rerender(<CaseNotes caseId="A" events={[at(0), written]} />);
     expect(await screen.findByText("Owner of record: a private owner")).toBeTruthy();
-    expect(screen.getByText("written by model")).toBeTruthy();
+    expect(screen.getByText("written by the agent")).toBeTruthy();
     vi.unstubAllEnvs();
   });
 });

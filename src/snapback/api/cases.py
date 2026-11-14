@@ -407,13 +407,13 @@ class CaseStore:
         """The search sub-agent's source: the #195 planner over places near the checked ad, as
         text. The chooser is the model when the agent setting says so, else the code policy."""
 
-        def search() -> str:
+        def search(use_model: bool = False) -> str:
             from snapback.agent.search_agent import agentic_alternatives, search_chooser_for
 
             response = agentic_alternatives(
                 case,
                 self._lookups,
-                search_chooser_for(self._settings.snapback_agent),
+                search_chooser_for(self._settings.snapback_agent if use_model else "policy"),
                 3,
                 case.preferences,
                 self._settings.snapback_data_source,

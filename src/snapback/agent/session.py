@@ -139,8 +139,9 @@ class CaseSession:
         self.question: str | None = None  # the code-written question the renter is asked
         # Working notes per check family (casework.py): derived text only, never read by decide().
         self.notes: dict[str, Note] = {}
-        # Set by the API: researched places near the ad, as text, for the search sub-agent.
-        self.search_places: Callable[[], str] | None = None
+        # Set by the API: researched places near the ad, as text. `search_places()` uses the code
+        # policy (code notes); `search_places(use_model=True)` is the search sub-agent's call.
+        self.search_places: Callable[..., str] | None = None
 
     # --- reading the state -----------------------------------------------------------------
 

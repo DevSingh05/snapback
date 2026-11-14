@@ -51,7 +51,7 @@ export function CaseNotes({ caseId, events }: { caseId: string; events: TraceEve
             <div className="trace-head">
               <span className="trace-title">{AGENT_LABELS[n.agent] ?? n.agent}</span>
               <span className="mono trace-by">
-                {n.written_by === "model" ? "written by model" : "written by code"}
+                {n.written_by === "model" ? "written by the agent" : "written by code"}
               </span>
             </div>
             <p className="mono">{n.path}</p>
