@@ -55,6 +55,7 @@ class FakeCrew(BaseChatModel):
 
     case: Any
     pick_last_for_plan: bool = False
+    agents: list = CHECK_AGENTS
     delegate: bool = True
 
     def bind_tools(self, tools, **kwargs):
@@ -74,6 +75,8 @@ class FakeCrew(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
     def _sub(self, messages, system):
+        if "place checker" in system:
+            return self._place(messages, system)
         tool_name = re.search(r"tool,\s*`(\w+)`", system).group(1)
         path = re.search(r"path `([^`]+)`", system).group(1)
         done = {m.name: m for m in messages if isinstance(m, ToolMessage)}
@@ -81,6 +84,18 @@ class FakeCrew(BaseChatModel):
             return _call(tool_name)
         if "write_file" not in done:
             return _call("write_file", file_path=path, content=str(done[tool_name].content))
+        return AIMessage(content="Note written.")
+
+    def _place(self, messages, system):
+        path = re.search(r"path `([^`]+)`", system).group(1)
+        done = [m for m in messages if isinstance(m, ToolMessage)]
+        if not done:
+            return _call("read_place_facts")
+        if self.case.step.value == "place":
+            offer = self.case.offer()
+            return _call("place_choose_option", option=offer.default, reason="Nearest miss first.")
+        if not any(m.name == "write_file" for m in done):
+            return _call("write_file", file_path=path, content=str(done[0].content))
         return AIMessage(content="Note written.")
 
     def _main(self, messages):
@@ -96,6 +111,12 @@ class FakeCrew(BaseChatModel):
                     {"content": "Write the explanation", "status": "pending"},
                 ],
             )
+        if case.step.value == "place":
+            if not any(tc["args"].get("subagent_type") == "place" for tc in asked):
+                return _call(
+                    "task", description="Retry the unplaced photos.", subagent_type="place"
+                )
+            return AIMessage(content="The place sub-agent has not finished.")
         offer = case.offer()
         if offer is not None:
             if len(offer.options) == 1:
@@ -108,7 +129,7 @@ class FakeCrew(BaseChatModel):
         if step == "spot":
             sent = [tc["args"].get("subagent_type") for tc in asked if tc["name"] == "task"]
             if self.delegate:
-                for name in CHECK_AGENTS:
+                for name in self.agents:
                     if name not in sent:
                         return _call(
                             "task", description=f"Write the {name} note.", subagent_type=name
@@ -426,3 +447,51 @@ def test_permissions_hold_at_runtime_for_main_sub_agent_and_general_purpose():
         if isinstance(m, ToolMessage) and m.name == "write_file"
     ]
     assert len(denied) == 2 and all("permission denied" in str(c) for c in denied)
+
+
+# --- E1 through the harness: the place sub-agent picks the retries -----------------------------
+
+
+def test_the_place_sub_agent_spends_the_retry_budget_through_its_tools():
+    from test_place_agent import StubSearcher
+    from test_place_agent import make_case as make_retry_case
+
+    session = make_retry_case(StubSearcher())
+    session.search_places = lambda: "Source: researched places"
+    verdict = run_with_crew(session)
+    assert verdict is not None
+    picks = [
+        e
+        for e in session.trace.events
+        if e.choice and e.choice.value in ("next_search", "which_photo")
+    ]
+    assert picks and all(e.chosen_by == "model" for e in picks if len(e.options) > 1)
+    assert session.place_desk.searches_used == 2
+    assert "place" in session.notes and session.notes["place"].by == "model"
+    from snapback.verdict import decide, to_evidence
+
+    assert verdict == decide(to_evidence(session.evidence))
+
+
+def test_the_main_agent_cannot_make_the_place_decision():
+    from snapback.agent.graph import describe
+    from test_place_agent import StubSearcher
+    from test_place_agent import make_case as make_retry_case
+
+    session = make_retry_case(StubSearcher())
+    session.choose(session.offer().default)  # which checks
+    assert session.step.value == "place"
+    assert "place sub-agent" in describe(session)
+
+
+def test_the_place_retry_prompt_and_tools_exist_only_when_the_case_can_retry():
+    from test_place_agent import StubSearcher
+
+    plain = next(x for x in build_subagents(make_case()) if x["name"] == "place")
+    assert "could not be placed" not in plain["system_prompt"]
+    assert [t.name for t in plain["tools"]] == ["read_place_facts"]
+    case = make_case()
+    case.place_searcher = StubSearcher()
+    live = next(x for x in build_subagents(case) if x["name"] == "place")
+    assert "could not be placed" in live["system_prompt"]
+    assert [t.name for t in live["tools"]][1:] == ["place_open_choice", "place_choose_option"]

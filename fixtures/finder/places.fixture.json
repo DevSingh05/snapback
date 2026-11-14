@@ -1,0 +1,117 @@
+{
+ "source": "fixture",
+ "as_of": "as of CoStar's last research",
+ "notes": "Team-made stand-ins in the shape of the M1 places feed props (pid, kind, has_scan, n_plans, rent_from, fits_brief) plus walkup and parking. No real place, address, office, name or phone.",
+ "places": [
+  {
+   "pid": "fx-fnd-01",
+   "kind": "apartment",
+   "has_scan": true,
+   "n_plans": 3,
+   "rent_from": 1450,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": true,
+   "parking": true
+  },
+  {
+   "pid": "fx-fnd-02",
+   "kind": "apartment",
+   "has_scan": false,
+   "n_plans": 2,
+   "rent_from": 1180,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": true,
+   "parking": false
+  },
+  {
+   "pid": "fx-fnd-03",
+   "kind": "apartment",
+   "has_scan": true,
+   "n_plans": 4,
+   "rent_from": 1620,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": false,
+   "parking": true
+  },
+  {
+   "pid": "fx-fnd-04",
+   "kind": "house",
+   "has_scan": true,
+   "n_plans": 1,
+   "rent_from": 1900,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": false,
+   "parking": true
+  },
+  {
+   "pid": "fx-fnd-05",
+   "kind": "apartment",
+   "has_scan": false,
+   "n_plans": 2,
+   "rent_from": 980,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": true,
+   "parking": false
+  },
+  {
+   "pid": "fx-fnd-06",
+   "kind": "apartment",
+   "has_scan": true,
+   "n_plans": 1,
+   "rent_from": 1290,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": true,
+   "parking": true
+  },
+  {
+   "pid": "fx-fnd-07",
+   "kind": "apartment",
+   "has_scan": false,
+   "n_plans": 3,
+   "rent_from": 1750,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": false,
+   "parking": true
+  },
+  {
+   "pid": "fx-fnd-08",
+   "kind": "house",
+   "has_scan": false,
+   "n_plans": 1,
+   "rent_from": 2100,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": false,
+   "parking": true
+  },
+  {
+   "pid": "fx-fnd-09",
+   "kind": "apartment",
+   "has_scan": true,
+   "n_plans": 2,
+   "rent_from": 1380,
+   "units_reported": 2,
+   "fits_brief": true,
+   "walkup": true,
+   "parking": false
+  },
+  {
+   "pid": "fx-fnd-10",
+   "kind": "apartment",
+   "has_scan": true,
+   "n_plans": 2,
+   "rent_from": 2400,
+   "units_reported": 2,
+   "fits_brief": false,
+   "walkup": false,
+   "parking": true
+  }
+ ]
+}
