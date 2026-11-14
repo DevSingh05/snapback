@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <style>
+    .l { fill: #161a1b; }
+    .r { fill: #0d6672; }
+    @media (prefers-color-scheme: dark) {
+      .l { fill: #f0ebe1; }
+      .r { fill: #86d3d1; }
+    }
+  </style>
+  <path class="l" d="M2 11.6 11.25 4.2V22.5H2z" />
+  <path class="r" d="M12.75 1.5 22 8.9v11.1h-9.25z" />
+</svg>

@@ -3,7 +3,7 @@
 // - The choice lives under one shared key, "snapback-theme": "light" | "dark" | "system".
 // - A link can carry it: `?theme=dark` (or light, system) applies it and remembers it, so
 //   stepping from the website into the app keeps the same look.
-// - Until the person has chosen, the map opens in dark and every other page in light.
+// - Until the person has chosen, every page opens in light (Day), the map included.
 // - "system" follows the device: the attribute is removed and tokens.css uses the OS setting.
 // Storage can be blocked, so every access is guarded.
 
@@ -45,7 +45,10 @@ export function initialChoice(search: string): ThemeChoice | null {
 }
 
 /** The theme a page opens in when nothing was chosen. */
-export const defaultTheme = (onMap: boolean): Theme => (onMap ? "dark" : "light");
+export function defaultTheme(onMap?: boolean): Theme {
+  void onMap; // Day everywhere, the map included; the argument stays for callers.
+  return "light";
+}
 
 export function applyTheme(choice: ThemeChoice): void {
   if (choice === "system") delete document.documentElement.dataset.theme;

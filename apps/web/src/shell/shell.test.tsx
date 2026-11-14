@@ -44,11 +44,11 @@ describe("the app shell", () => {
     expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
-  it("opens the map in dark and every other page in light, until the person picks", () => {
-    expect(defaultTheme(true)).toBe("dark");
+  it("opens every page in light (Day), the map included, until the person picks", () => {
+    expect(defaultTheme(true)).toBe("light");
     expect(defaultTheme(false)).toBe("light");
     const { unmount } = render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("light");
     unmount();
     render(<AppShell section="home">home</AppShell>);
     expect(document.documentElement.dataset.theme).toBe("light");
