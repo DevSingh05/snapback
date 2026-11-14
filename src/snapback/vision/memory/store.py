@@ -141,6 +141,8 @@ class PhotoMemory:
             db = sqlite3.connect(self.path, timeout=30)
             try:
                 db.execute("pragma foreign_keys = on")
+                # Deleted rows are overwritten on disk, not just unlinked (7-day TTL, delete).
+                db.execute("pragma secure_delete = on")
                 db.execute("begin immediate")
                 yield db
                 db.commit()
