@@ -16,7 +16,7 @@ body {
 
 h1,
 h2 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   margin: 0;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -29,7 +29,7 @@ h2 {
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .sr-only {
@@ -47,17 +47,14 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  background:
-    radial-gradient(60rem 28rem at 12% -8%, var(--teal-soft), transparent 70%),
-    radial-gradient(48rem 24rem at 100% 0%, var(--blue-soft), transparent 70%), var(--paper);
+  background: linear-gradient(180deg, var(--sky), var(--paper) 28rem);
 }
 
 .card-page {
   width: 100%;
   max-width: 880px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -72,7 +69,7 @@ h2 {
 }
 
 .wordmark {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 800;
   letter-spacing: 0.14em;
   font-size: 0.95rem;
@@ -87,13 +84,12 @@ h2 {
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   padding: 5px 12px;
-  border-radius: 999px;
-  border: 1.5px solid currentColor;
+  border-radius: 0;
 }
 .chip-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
 }
 .chip-fixture {
@@ -120,9 +116,8 @@ h2 {
   font-size: 1.05rem;
   letter-spacing: 0.12em;
   padding: 1px 10px;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--paper);
-  border: 1px solid var(--line);
 }
 .state {
   font-size: clamp(2.1rem, 7vw, 3.4rem);
@@ -153,7 +148,7 @@ h2 {
 .summary {
   margin: 18px 0 0;
   padding: 14px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: var(--blue-soft);
   color: var(--ink);
   max-width: 60ch;
@@ -205,7 +200,7 @@ th {
   font-weight: 700;
   font-size: 0.92rem;
   padding: 3px 11px 3px 5px;
-  border-radius: 999px;
+  border-radius: 0;
   white-space: nowrap;
 }
 .tone-icon {
@@ -213,7 +208,7 @@ th {
   place-items: center;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
   font-size: 0.8rem;
   line-height: 1;
@@ -246,8 +241,9 @@ th {
 .not-checked {
   margin: 12px clamp(18px, 4vw, 36px) 0;
   padding: 16px 18px;
-  border-radius: var(--radius-sm);
-  background: var(--blue-soft);
+  border-radius: 0;
+  background: var(--unchecked-soft);
+  color: var(--unchecked);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -269,9 +265,8 @@ th {
   font-family: var(--font-mono);
   font-size: 0.88rem;
   padding: 3px 12px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
 }
 
 .rules {
@@ -308,10 +303,9 @@ button {
   font: inherit;
   font-weight: 700;
   padding: 10px 20px;
-  border-radius: 999px;
-  border: 1.5px solid var(--blue);
-  background: var(--blue-soft);
-  color: var(--blue);
+  border-radius: 0;
+  background: var(--act);
+  color: var(--on-act);
   cursor: pointer;
 }
 
@@ -382,7 +376,7 @@ button {
 }
 .trace-panel-head h2 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
 }
 .trace-judge {
   color: var(--muted);
@@ -395,21 +389,17 @@ button {
   gap: 10px;
 }
 .trace-line {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   padding: 12px 14px;
-  background: var(--surface);
+  background: var(--paper);
 }
 .trace-line.trace-choice {
-  border-color: var(--teal);
   background: var(--teal-soft);
 }
 .trace-line.trace-verdict {
-  border-color: var(--amber);
   background: var(--amber-soft);
 }
 .trace-line.trace-error {
-  border-color: var(--coral);
   background: var(--coral-soft);
 }
 .trace-head {
@@ -434,11 +424,12 @@ button {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 0;
+  background: var(--surface);
 }
 .trace-option.picked {
-  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
   font-weight: 700;
 }
 .trace-pickline,
@@ -447,9 +438,8 @@ button {
 }
 .trace-waiting {
   padding: 10px 14px;
-  border: 1.5px solid var(--amber);
   background: var(--amber-soft);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   font-weight: 700;
 }
 .trace-status {
@@ -633,7 +623,7 @@ button {
   bottom: 56px;
   width: 132px;
   height: 132px;
-  background: rgb(255 255 255 / 0.72);
+  background: var(--glass);
   backdrop-filter: blur(6px);
   box-shadow: var(--shadow);
 }

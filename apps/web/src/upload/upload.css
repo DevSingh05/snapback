@@ -20,25 +20,23 @@
   width: 100%;
   font: inherit;
   padding: 12px 14px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border-radius: 0;
+  background: var(--paper);
   color: var(--ink);
   resize: vertical;
 }
 .upload-input[aria-invalid="true"] {
-  border-color: var(--coral);
+  background: var(--coral-soft);
 }
 .upload-drop {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 14px;
-  border: 1.5px dashed var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
+  background: var(--paper);
 }
 .upload-drop.is-dragging {
-  border-color: var(--blue);
   background: var(--blue-soft);
 }
 .upload-files {
@@ -110,8 +108,7 @@
   place-items: center;
   width: 1.6em;
   height: 1.6em;
-  border-radius: 50%;
-  border: 1.5px solid currentColor;
+  border-radius: 0;
   font-size: 0.85rem;
 }
 .upload h1:focus {
