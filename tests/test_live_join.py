@@ -559,7 +559,17 @@ def test_the_contact_line_says_we_hold_no_phone_for_the_brokerage(tmp_path, cont
     # is true is that we hold none for the brokerage. Said the same with or without a phone.
     client = client_for(tmp_path)
     form = {"text": f"{FOR_SALE_HOME} Listed by Fixture Realty Group.{contact}"}
-    card = finish(client, form)
+    made = client.post("/cases", data=form)
+    assert made.status_code == 201, made.text
+    case = made.json()
+    if case["status"] == "waiting_for_approval":
+        client.post(
+            f"/cases/{case['case_id']}/challenge/approve",
+            json={"decision": "send"},
+            headers={"Authorization": f"Bearer {case['token']}"},
+        )
+    url = f"/cases/{case['case_id']}/card"
+    card = client.get(url).json()
     said = said_on(card)
     assert said["Contact on record"]["tone"] == "not_checked"
     assert said["Contact on record"]["text"] == (
@@ -569,8 +579,18 @@ def test_the_contact_line_says_we_hold_no_phone_for_the_brokerage(tmp_path, cont
     assert "Call Fixture Realty Group" in said["Allowed to rent it"]["text"]
     everything = " ".join(line["text"] for row in card["rows"] for line in row["lines"])
     assert "leasing office" not in everything and "manager" not in everything
-    spanish = finish(client_for(tmp_path / "es"), form)  # the same listing, a fresh server
-    assert spanish["state"] == card["state"]
+
+    # The same case's card, asked for in Spanish, says the same thing in Spanish.
+    spanish = client.get(url, params={"lang": "es"}).json()
+    assert spanish["lang"] == "es" and spanish["state"] == card["state"]
+    dicho = said_on(spanish)
+    assert "Contact on record" not in dicho  # it really is the Spanish card
+    assert dicho["Contacto en el registro"]["tone"] == "not_checked"
+    assert dicho["Contacto en el registro"]["text"] == (
+        "No comprobado (no tenemos un teléfono de la agencia que anuncia la vivienda)."
+    )
+    todo = " ".join(line["text"] for row in spanish["rows"] for line in row["lines"])
+    assert "oficina de alquiler" not in todo and "administrador" not in todo
 
 
 def test_the_reasons_call_a_brokerage_a_brokerage(tmp_path):
