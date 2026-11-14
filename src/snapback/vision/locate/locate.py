@@ -32,6 +32,7 @@ from PIL import Image
 
 from snapback.adapters.matterport import Sweep
 from snapback.contracts import (
+    EvidencePoints,
     FloorPlanCandidate,
     LocateResult,
     LocateStatus,
@@ -184,6 +185,42 @@ class _Placement:
     check: Verification
 
 
+@dataclass(frozen=True)
+class _PlaceOutcome:
+    placed: "_Placement | None"
+    bar_failed: str | None  # "inliers", "ratio", "spread" or "ambiguity" when not placed
+    rival_ratio: float | None  # best rival building's inliers over the claimed match's
+
+
+def _failed_bar(top: Verification | None, t: Thresholds) -> str:
+    """Which claimed bar the strongest candidate missed (a photo that placed nowhere)."""
+    if top is None or top.inliers < t.min_inliers:
+        return "inliers"
+    if top.ratio < t.min_inlier_ratio:
+        return "ratio"
+    if top.spread < t.claimed_min_spread:
+        return "spread"
+    return "inliers"
+
+
+MAX_POINTS = 48
+
+
+def evidence_points(placed: "_Placement", photo_size, face_size) -> EvidencePoints | None:
+    """Up to MAX_POINTS inlier pairs, evenly sampled, each coordinate normalised to 0..1:
+    (ad x, ad y, scan x, scan y). n_total is every inlier."""
+    pairs = placed.check.pairs
+    if pairs is None or len(pairs) == 0:
+        return None
+    keep = sorted({round(i) for i in np.linspace(0, len(pairs) - 1, min(MAX_POINTS, len(pairs)))})
+    scale = np.array([photo_size[0], photo_size[1], face_size[0], face_size[1]], dtype=float)
+    sample = np.clip(pairs[keep] / scale, 0.0, 1.0)
+    return EvidencePoints(
+        n_total=int(placed.check.inliers),
+        sampled=[tuple(round(float(v), 4) for v in row) for row in sample],
+    )
+
+
 class Locator:
     def __init__(
         self,
@@ -275,16 +312,18 @@ class Locator:
         hits: list,
         claimed_ok: Callable[[Verification], bool],
         t: Thresholds | None = None,
-    ) -> tuple[_Placement | None, bool]:
+    ) -> tuple[_Placement | None, bool, Verification | None]:
         """One pass over the claimed candidates, each verified once: the best that passes the
         claimed bar (stopping at a very strong one, as _best does), and whether any cleared
         inliers and ratio (a candidate that fails only the spread floor)."""
         t = t or self.thresholds
-        best, doubtful = None, False
+        best, doubtful, top = None, False, None
         for hit in hits:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
             check = self._verify(photo, face, t)
+            if top is None or check.inliers > top.inliers:
+                top = check
             if check.inliers >= t.min_inliers and check.ratio >= t.min_inlier_ratio:
                 doubtful = True
             if claimed_ok(check) and (best is None or check.inliers > best.check.inliers):
@@ -296,7 +335,7 @@ class Locator:
                 )
             if best is not None and check.inliers >= t.stop_at_inliers and claimed_ok(check):
                 break
-        return best, doubtful
+        return best, doubtful, top
 
     def _place(
         self,
@@ -305,6 +344,15 @@ class Locator:
         t: Thresholds | None = None,
         extra: list | None = None,
     ) -> _Placement | None:
+        return self._place_detail(photo, claimed_models, t, extra).placed
+
+    def _place_detail(
+        self,
+        photo: Image.Image,
+        claimed_models: set[str],
+        t: Thresholds | None = None,
+        extra: list | None = None,
+    ) -> "_PlaceOutcome":
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
         building places it only on the stricter elsewhere bar (it can lead to DON'T PAY). When
@@ -336,14 +384,17 @@ class Locator:
                 and c.spread >= t.claimed_min_spread
             )
 
-        placed, doubtful = self._scan_claimed(photo, claimed_hits, claimed_ok, t)
+        placed, doubtful, top = self._scan_claimed(photo, claimed_hits, claimed_ok, t)
         if placed is None:
             # A claimed match that clears inliers and ratio but fails only the spread floor is
             # doubtful, not absent: could not place, and never search elsewhere (no new route to
             # DON'T PAY; ruling 07:43, #28).
             if doubtful:
-                return None
-            return self._best(photo, other_hits, strict, t=t)
+                return _PlaceOutcome(None, "spread", None)
+            elsewhere = self._best(photo, other_hits, strict, t=t)
+            if elsewhere is not None:
+                return _PlaceOutcome(elsewhere, None, None)
+            return _PlaceOutcome(None, _failed_bar(top, t), None)
 
         # Ambiguity (ruling 03:46): another building far stronger than the claimed match means
         # the photo is placed nowhere. No false pass, and no false DON'T PAY either.
@@ -362,8 +413,11 @@ class Locator:
                 if full is not None and full.check.inliers > placed.check.inliers:
                     placed = full
             if rival.check.inliers >= t.ambiguity_ratio * placed.check.inliers:
-                return None
-        return placed
+                return _PlaceOutcome(
+                    None, "ambiguity", round(rival.check.inliers / placed.check.inliers, 4)
+                )
+        ratio = round(rival.check.inliers / placed.check.inliers, 4) if rival else None
+        return _PlaceOutcome(placed, None, ratio)
 
     def _identify(
         self, photo: Image.Image, t: Thresholds | None = None, extra: list | None = None
@@ -503,6 +557,17 @@ class Locator:
         photos: Mapping[str, Image.Image],
         claimed_property_id: str | None,
     ) -> LocateResult:
+        return self.locate_with_points(case_id, photos, claimed_property_id)[0]
+
+    def locate_with_points(
+        self,
+        case_id: str,
+        photos: Mapping[str, Image.Image],
+        claimed_property_id: str | None,
+    ) -> tuple[LocateResult, dict[str, EvidencePoints]]:
+        """locate(), plus up to 48 normalised matched pairs per placed photo for the evidence
+        file (E2b). The pairs come back beside the result, never inside it, so they never reach
+        the agent's chooser, the trace or a log."""
         claimed_models = self.catalog.models_of(claimed_property_id) & self.index.model_ids()
         # Where a photo may be placed:
         #   claimed home set and indexed -> claimed first, strict bar elsewhere (can say elsewhere)
@@ -514,6 +579,9 @@ class Locator:
         per_model: dict[str, list[int]] = {}
 
         placements: dict[str, _Placement | None] = {}
+        bars: dict[str, str | None] = {}  # photo id -> the bar that stopped it, if any
+        rivals: dict[str, float | None] = {}  # photo id -> best rival over its claimed match
+        points: dict[str, EvidencePoints] = {}
         tangled = False  # a photo passed in more than one property
         for photo_id, image in photos.items():
             if not identify and not claimed_models:
@@ -523,8 +591,11 @@ class Locator:
             if identify:
                 placed, ambiguous = self._identify(photo)
                 tangled = tangled or ambiguous
+                bars[photo_id] = "ambiguity" if ambiguous else (None if placed else "inliers")
             else:
-                placed = self._place(photo, claimed_models)
+                outcome = self._place_detail(photo, claimed_models)
+                placed = outcome.placed
+                bars[photo_id], rivals[photo_id] = outcome.bar_failed, outcome.rival_ratio
             if (
                 placed is not None
                 and placed.model_id not in claimed_models
@@ -578,7 +649,16 @@ class Locator:
                     if claimed_models or conflict or (identify and self.index.model_ids())
                     else LocateStatus.NOT_INDEXED
                 )
-                locations.append(PhotoLocation(photo_id=photo_id, status=status))
+                locations.append(
+                    PhotoLocation(
+                        photo_id=photo_id,
+                        status=status,
+                        bar_failed=bars.get(photo_id)
+                        if status is LocateStatus.NOT_LOCATED
+                        else None,
+                        rival_ratio=rivals.get(photo_id),
+                    )
+                )
                 continue
             in_claimed = placed.model_id in claimed_models
             locations.append(
@@ -596,8 +676,14 @@ class Locator:
                     matched_model_id=placed.model_id,
                     matched_property_id=self.catalog.property_of(placed.model_id),
                     room_label=self.catalog.room(placed.model_id, placed.sweep.sweep_id),
+                    spread=round(placed.check.spread, 4),
+                    rival_ratio=rivals.get(photo_id),
                 )
             )
+            face_size = self._face(placed.model_id, placed.sweep.sweep_id, placed.face).size
+            sample = evidence_points(placed, photos[photo_id].size, face_size)
+            if sample is not None:
+                points[photo_id] = sample
             pose = self._pose(photos[photo_id].convert("RGB"), placed)
             if pose is not None:
                 poses[photo_id] = pose
@@ -620,7 +706,7 @@ class Locator:
             key=lambda c: (-c.photos_located, -c.total_inliers, c.model_id),
         )
         chosen = candidates[0] if candidates and candidates[0].photos_located else None
-        return LocateResult(
+        result = LocateResult(
             case_id=case_id,
             photos=locations,
             claimed_property_id=claimed_property_id,
@@ -633,3 +719,4 @@ class Locator:
                 f"{self.thresholds.version}+{getattr(self.matcher, 'version', self.matcher.name)}"
             ),
         )
+        return result, points
