@@ -85,6 +85,7 @@ from snapback.settings import Settings, get_settings
 from snapback.tour import (
     TourPlan,
     WalkResponse,
+    attach_claims,
     build_tour,
     cached_sweeps,
     choose_walk,
@@ -797,6 +798,18 @@ def create_app(
             raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
         return tour_for(property_id, plan_key)
 
+    def ad_notes_of(case) -> list:
+        """The case's ad-vs-record notes, when its modules produce them (never a network call
+        beyond what the card already made). A recorded case, or any failure, has none."""
+        modules = getattr(getattr(case, "session", None), "modules", None)
+        fn = getattr(modules, "ad_notes", None)
+        if not callable(fn):
+            return []
+        try:
+            return list(fn(getattr(case.session, "case_id", case.case_id)) or [])
+        except Exception:
+            return []
+
     def case_tour(case_id: str, request: Request, authorization, x_case_token) -> tuple:
         case = find(case_id)
         no_token_in_the_address(request)
@@ -809,6 +822,7 @@ def create_app(
             return plan, None, {}
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(plan, locate, scan_plan=scan_plan, ad_plan=None)
+        plan = attach_claims(plan, ad_notes_of(case))
         return choose_walk(plan), locate, fields
 
     @app.get("/cases/{case_id}/tour")

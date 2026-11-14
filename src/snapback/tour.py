@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from snapback.contracts import (
     AS_OF,
+    AdNote,
     DataSource,
     LocateResult,
     LocateStatus,
@@ -124,6 +125,7 @@ class WalkCoverage(BaseModel):
     placed: int = 0
     elsewhere: int = 0
     unplaced: int = 0
+    plan_mismatch: bool = False  # the scan's floor plan differs from the ad's: no room counts
     line: str | None = None
 
 
@@ -710,12 +712,13 @@ def map_locate(
         stops.append(stop.model_copy(update={"photos": mine, "ad_view": view}))
 
     walked = [s for s in stops if s.kind in WALKED]
+    mismatch = bool(scan_plan and ad_plan and scan_plan.strip().lower() != ad_plan.strip().lower())
     with_photo = sum(bool(s.photos) for s in walked)
     counted = "rooms" if plan.rooms_labelled else "spots"
     line: str | None
     if not walked:
         counted, line = "none", None
-    elif scan_plan and ad_plan and scan_plan.strip().lower() != ad_plan.strip().lower():
+    elif mismatch:
         counted = "none"
         line = (
             f"This scan is a {scan_plan} floor plan and the ad is for a {ad_plan}, "
@@ -742,6 +745,7 @@ def map_locate(
         placed=len(placed_ids),
         elsewhere=elsewhere,
         unplaced=unplaced,
+        plan_mismatch=mismatch,
         line=line,
     )
 
@@ -954,3 +958,99 @@ def choose_walk(
         reason=" ".join(reasons) or None,
     )
     return plan.model_copy(update={"director": director})
+
+
+# --- the ad's claims on the stops (W2) -----------------------------------------------------------
+
+SRC_LABELS = "Matterport room labels"
+_FLOOR_CLAIMS = {"floor_wood", "floor_carpet", "floor_tile", "floor_laminate"}
+# Claim kind -> the room kinds (from `_kind_of`) it can land on, best first. A claim with no such
+# stop lands on the arrival. Every note lands on exactly one stop.
+_CLAIM_ROOMS: dict[str, tuple[str, ...]] = {
+    **{k: ("living", "bed", "dining", "hall") for k in _FLOOR_CLAIMS},
+    "washer_dryer": ("laundry",),
+    "garage": ("garage",),
+    "beds": ("bed",),
+    "baths": ("bath",),
+}
+
+
+def claim_text(note: AdNote, lang: str = "en") -> str | None:
+    """The card's own words for an ad-vs-record note (the string table), or None if it has none.
+    Same wording as the card line: facts turned into words by code."""
+    from snapback.card import strings
+
+    if not strings.has(f"claims.{note.key}", lang):
+        return None
+    claim_key = "beds_studio" if note.claim == "beds" and note.ad_value == "0" else note.claim
+    claim = strings.text(
+        f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
+    )
+    record = strings.text("list.and", lang).join(
+        strings.text(f"kind.{w}", lang) for w in note.record
+    )
+    return strings.text(
+        f"claims.{note.key}",
+        lang,
+        claim=claim,
+        record=record,
+        year=note.year if note.year is not None else "",
+        ad_value=note.ad_value or "",
+        record_value=note.record_value or "",
+    )
+
+
+def count_line(kind: str, ad_value: str, rooms: int, word: str) -> str:
+    n = "room" if rooms == 1 else "rooms"
+    return (
+        f"The ad says {ad_value} {word}. This scan has {rooms} {n} labelled "
+        f"{kind.capitalize()}. Labels can be wrong, so count them in person."
+    )
+
+
+def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> TourPlan:
+    """Put each ad-vs-record note on exactly one stop (or the arrival): floors on the living
+    room, bedroom or dining room; washer and dryer on laundry; garage on the garage; bed and bath
+    claims on the first bedroom or bathroom; everything else on the arrival. Then, only when
+    rooms are labelled and the scan's floor plan matches the ad's, an INFO count line on the
+    first bedroom or bathroom when the ad's number differs from the scan's labelled rooms.
+    The wording is the card's own; a note with no words is left out. Never a verdict."""
+    walked = [s for s in plan.stops if s.kind in WALKED]
+    by_kind: dict[str, list[TourStop]] = {}
+    for s in walked:
+        if s.kind != "door":
+            by_kind.setdefault(_kind_of(s.room_label) or "", []).append(s)
+    added: dict[str, list[TourFact]] = {}
+
+    def land(note: AdNote, text: str) -> None:
+        key = "arrive"
+        for room_kind in _CLAIM_ROOMS.get(note.claim, ()):
+            if by_kind.get(room_kind):
+                key = by_kind[room_kind][0].key
+                break
+        added.setdefault(key, []).append(TourFact(text=text, source=SRC_RECORD))
+
+    for note in notes:
+        text = claim_text(note, lang)
+        if text:
+            land(note, text)
+
+    counts_ok = plan.rooms_labelled and not (plan.coverage and plan.coverage.plan_mismatch)
+    if counts_ok:
+        for note in notes:
+            if note.claim not in ("beds", "baths") or note.ad_value is None:
+                continue
+            kind, word = ("bed", "bedrooms") if note.claim == "beds" else ("bath", "bathrooms")
+            rooms = by_kind.get(kind, [])
+            if note.ad_value == "0" or not rooms:
+                continue
+            if str(len(rooms)) != note.ad_value.replace(",", ""):
+                label = rooms[0].room_label or kind
+                line = count_line(label.split()[0], note.ad_value, len(rooms), word)
+                added.setdefault(rooms[0].key, []).append(TourFact(text=line, source=SRC_LABELS))
+
+    stops = [
+        s.model_copy(update={"claims": [*s.claims, *added[s.key]]}) if s.key in added else s
+        for s in plan.stops
+    ]
+    return plan.model_copy(update={"stops": stops})
