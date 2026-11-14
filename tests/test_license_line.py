@@ -104,7 +104,10 @@ def test_a_sponsor_name_is_folded_and_cut_to_a_sane_length():
     long = {"status": "licensed", "claimed_role": "agent", "sponsor_broker": "Fx  Realty\n" * 40}
     text = person(passing(license=long))["License"][1]
     assert "\n" not in text and "  " not in text
-    assert len(text) <= len("Licensed in Texas, sponsored by .") + 80
+    assert (
+        len(text)
+        <= len("An active Texas license exists under the name in the ad, sponsored by .") + 80
+    )
 
 
 def test_no_licence_is_never_dont_pay_whatever_else_is_true():
@@ -129,7 +132,8 @@ def test_a_licence_is_a_supporting_line_and_never_lifts_authority():
     assert state(without) is state(licensed) is VerdictState.HOLD
     assert person(licensed)["License"] == (
         CardTone.OK,
-        "Licensed in Texas, sponsored by Fixture Realty Group.",
+        "An active Texas license exists under the name in the ad, "
+        "sponsored by Fixture Realty Group.",
     )
     assert person(licensed)["Allowed to rent it"] == person(without)["Allowed to rent it"]
     assert to_evidence(licensed).license_flag is False
