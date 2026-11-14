@@ -97,7 +97,8 @@ def test_case_a_is_dont_pay_on_the_copied_reply_and_shows_every_other_finding():
         strings.text("here_now.forged_copy", n=2),
     )
     assert person["Allowed to rent it"][0] is CardTone.NOT_SHOWN
-    assert person["Contact on record"][0] is CardTone.HOLD
+    # The poster's own contact not matching the record is a red flag (ruling, Sat 01:20).
+    assert person["Contact on record"][0] is CardTone.RED_FLAG
     assert person["Link"][0] is CardTone.RED_FLAG
     assert price["Rent vs record"] == (
         CardTone.HOLD,
