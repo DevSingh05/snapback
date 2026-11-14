@@ -85,7 +85,7 @@ ASK_PLAIN = [
 ]
 ASK_REWORDED = [
     "Kindly remit the holding amount ahead of receiving the keys.",
-    "A reservation sum must reach me before the keys are released; the unit is yours once it lands.",
+    "A reservation sum must reach me before the keys are released; the unit is yours.",
     "Send the reservation payment first and I will mail the keys and the lease to you.",
     "To secure it, transfer the first month up front; viewing happens after the keys arrive.",
     "Upfront reservation funds are needed prior to key handover.",
@@ -181,7 +181,7 @@ def generate(seed: int = DEFAULT_SEED) -> tuple[dict[str, object], dict[str, obj
     year_start, year_end = date(2026, 1, 5), date(2026, 6, 28)
 
     # ---- honest ads ------------------------------------------------------------------------
-    for _ in range(170):  # individual owners, one number and one photo set each
+    for _ in range(200):  # individual owners, one number and one photo set each
         beds = rng.randint(1, 4)
         hood = rng.choice(HOODS)
         add(
