@@ -115,18 +115,54 @@ def test_a_phone_that_is_not_the_office_holds_the_case_even_if_the_name_matches(
     assert to_evidence(modules).phone_flag is True
     assert state(modules) is VerdictState.HOLD
 
-    # Ruling, Sat 01:20: the poster's own contact not matching the record is a real red flag.
+    # Ruling, Sat 02:10 (#121): a number that is not the office's reads Not confirmed. A
+    # licensed locator or listing agent posting with their own number is normal and legal.
     tone, text = card_lines(modules, CardRowKind.PERSON)["Contact on record"]
-    assert tone is CardTone.RED_FLAG
+    assert tone is CardTone.NOT_SHOWN
     assert text == (
-        "The phone in the listing is not the leasing office on record. "
-        "Call Fixture Living LLC yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own. Call Fixture Living LLC on record yourself to confirm."
     )
     unnamed = check_authority(ContactClaims(phones=[OTHER]), record(manager_company=None), SALT)
     _, said = card_lines(evidence(authority=unnamed.model_dump(mode="json")), CardRowKind.PERSON)[
         "Contact on record"
     ]
-    assert said.endswith("Call the office on record yourself. Red flag.")
+    assert said == (
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own. Call the office on record yourself to confirm."
+    )
+
+
+def test_a_phone_mismatch_alone_holds_the_case_and_puts_no_red_flag_anywhere_on_the_card():
+    # Everything else is in order: presence proven, the company named is the manager on
+    # record, nothing flagged. Only the phone differs.
+    claims = ContactClaims(company="Fixture Living LLC", phones=[OTHER])
+    authority = check_authority(claims, record(), SALT)
+    assert authority.office_phone_match is PhoneMatch.NO
+    modules = evidence(authority=authority.model_dump(mode="json"), rules=[], price=None)
+
+    verdict = decide(to_evidence(modules))
+    # It still holds: the card cannot say "Checks passed" while the contact is unconfirmed.
+    assert verdict.state is VerdictState.HOLD
+    assert strings.text("reason.phone_flag") in verdict.reasons
+
+    card = build_card(modules, checked_at=CHECKED_AT)
+    tones = [item.tone for row in card.rows for item in row.lines]
+    assert CardTone.RED_FLAG not in tones
+    assert not any("Red flag" in item.text for row in card.rows for item in row.lines)
+    # And without the mismatch the same case passes, so the phone is what holds it.
+    passing = check_authority(ContactClaims(company="Fixture Living LLC"), record(), SALT)
+    assert state(evidence(authority=passing.model_dump(mode="json"), rules=[], price=None)) is (
+        VerdictState.VERIFIED
+    )
+
+
+def test_a_lookalike_link_is_still_a_red_flag_beside_an_unconfirmed_phone():
+    claims = ContactClaims(phones=[OTHER], links=["fixtureliving-apply.example"])
+    authority = check_authority(claims, record(), SALT)
+    person = card_lines(evidence(authority=authority.model_dump(mode="json")), CardRowKind.PERSON)
+    assert person["Contact on record"][0] is CardTone.NOT_SHOWN
+    assert person["Link"][0] is CardTone.RED_FLAG
 
 
 def test_a_matching_phone_is_a_supporting_line_and_never_authority():
@@ -671,7 +707,7 @@ def test_a_dressed_up_listing_is_held_with_each_reason_named_and_nothing_leaked(
     lines = {item.label: item for row in card.rows for item in row.lines}
     assert lines["For sale"].tone is CardTone.RED_FLAG
     assert lines["Link"].tone is CardTone.RED_FLAG
-    assert lines["Contact on record"].tone is CardTone.RED_FLAG
+    assert lines["Contact on record"].tone is CardTone.NOT_SHOWN
     assert lines["Unit on record"].tone is CardTone.HOLD
     assert lines["Rent vs record"].tone is CardTone.HOLD
 

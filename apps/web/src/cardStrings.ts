@@ -95,9 +95,15 @@ function personLines(p: CardProofs): CardLine[] {
   if (!a) return [];
   const out: CardLine[] = [];
   const phone = "Phone in listing";
+  // Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
+  // number. Mirrors contact.phone_mismatch in strings.py; "Next step" below says who to call.
   if (a.office_phone_match === "no")
     out.push(
-      line(phone, "The phone in the listing is not the leasing office on record.", "red_flag"),
+      line(
+        phone,
+        "This number is not the leasing office's on record. Agents often use their own.",
+        "not_shown",
+      ),
     );
   else if (a.office_phone_match === "yes")
     out.push(line(phone, "The phone in the listing is the leasing office on record.", "ok"));

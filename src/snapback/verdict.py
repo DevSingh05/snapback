@@ -154,8 +154,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     3. Presence proven, authority matching the record and no red flag of any kind gives
        VERIFIED.
     4. Everything else is HOLD: no reply yet, present but not on the record, or any red flag
-       (price, payment, fee, data ask, pressure, link, overpayment, for sale, phone,
-       lookalike link, unit).
+       (price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike
+       link, unit), or a phone that is not the leasing office's (not a red flag, but not
+       confirmed either).
 
     Two things hold nothing by themselves (ruling, Sat 01:20): a name that is not the one on
     record reads "not confirmed", and "recently rented" is information, since lease status
@@ -183,12 +184,18 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         say(key)
         for key, raised in (
             ("reason.for_sale", evidence.for_sale_flag),
-            ("reason.phone_flag", evidence.phone_flag),
             ("reason.lookalike_link", evidence.lookalike_link_flag),
             ("reason.unit_flag", evidence.unit_flag),
         )
         if raised
     ]
+    # A phone that is not the leasing office's is not a red flag (ruling, Sat 02:10, #121):
+    # a licensed locator or listing agent posting with their own number is normal. It still
+    # holds a case, because the card cannot say "Checks passed" while the contact is
+    # unconfirmed, and it is still said whatever the state turns out to be.
+    # D10: when the licence check finds the poster is NOT licensed, a phone mismatch is a red
+    # flag again. That plugs in here (A18, #124).
+    unconfirmed = [say("reason.phone_flag")] if evidence.phone_flag else []
 
     if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
         unplaced = say(
@@ -200,8 +207,8 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             # the wrong thing to lead with. Still HOLD, never DONT_PAY: it is not proof.
             for_sale = say("reason.for_sale")
             others = [reason for reason in on_record if reason != for_sale]
-            return verdict(VerdictState.HOLD, for_sale, unplaced, *others)
-        return verdict(VerdictState.UNVERIFIED, unplaced, *on_record)
+            return verdict(VerdictState.HOLD, for_sale, unplaced, *others, *unconfirmed)
+        return verdict(VerdictState.UNVERIFIED, unplaced, *on_record, *unconfirmed)
 
     red_flags = []
     if evidence.price_flag:
@@ -216,6 +223,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         evidence.presence is PresenceStatus.PROVEN
         and evidence.authority is AuthorityStatus.MATCHES_RECORD
         and not red_flags
+        and not unconfirmed
     ):
         return verdict(
             VerdictState.VERIFIED,
@@ -235,7 +243,7 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         reasons.append(say("reason.presence_proven_not_authority"))
     else:
         reasons.append(say("reason.presence_missing"))
-    return verdict(VerdictState.HOLD, *reasons, *red_flags)
+    return verdict(VerdictState.HOLD, *reasons, *red_flags, *unconfirmed)
 
 
 # --- the card ----------------------------------------------------------------------------------
@@ -439,20 +447,23 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         # Supporting only: the number is public, so this is not who the poster is.
         lines.append(_line(lang, "label.contact", CardTone.OK, "contact.phone_match"))
     elif authority.office_phone_match is PhoneMatch.NO:
-        # The poster's own contact is not the one on record: a real red flag.
+        # Not confirmed, never a red flag by itself (ruling, Sat 02:10, #121): agents and
+        # locators often post with their own number.
+        # D10: with a licence check that finds the poster is NOT licensed, this line goes
+        # back to RED_FLAG (A18, #124).
         if authority.manager_on_record:
             lines.append(
                 _line(
                     lang,
                     "label.contact",
-                    CardTone.RED_FLAG,
+                    CardTone.NOT_SHOWN,
                     "contact.phone_mismatch",
                     manager=authority.manager_on_record,
                 )
             )
         else:
             lines.append(
-                _line(lang, "label.contact", CardTone.RED_FLAG, "contact.phone_mismatch_unnamed")
+                _line(lang, "label.contact", CardTone.NOT_SHOWN, "contact.phone_mismatch_unnamed")
             )
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))

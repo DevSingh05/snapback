@@ -90,7 +90,7 @@ describe("place, person and price proof lines", () => {
     [
       "phone differs",
       authority({ office_phone_match: "no" }),
-      "The phone in the listing is not the leasing office on record",
+      "This number is not the leasing office's on record. Agents often use their own",
     ],
     [
       "phone matches",
@@ -186,13 +186,14 @@ describe("place, person and price proof lines", () => {
         }}
       />,
     );
-    for (const re of [
-      /listed for sale on Homes\.com/,
-      /phone in the listing is not/,
-      /looks like the building/,
-    ]) {
+    for (const re of [/listed for sale on Homes\.com/, /looks like the building/]) {
       expect(screen.getByText(re).closest("tr")).toHaveTextContent("Doesn't match");
     }
+    // A phone that is not the office's is Not confirmed, never a mismatch (#121): agents and
+    // locators often post with their own number.
+    const phone = screen.getByText(/number is not the leasing office's on record/).closest("tr");
+    expect(phone).toHaveTextContent("Not confirmed");
+    expect(phone).not.toHaveTextContent("Doesn't match");
     expect(screen.getAllByText("Rent vs record")).toHaveLength(1);
   });
 
