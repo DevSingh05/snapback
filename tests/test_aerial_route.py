@@ -409,3 +409,78 @@ def test_the_tile_cache_sits_under_the_settings_data_dir(tmp_path, monkeypatch):
     )
     assert tile is not None
     assert Path(tile.path).resolve().parent == (tmp_path / "data" / "vexcel").resolve()
+
+
+class _NoKitLookups:
+    """Live-mode lookups with the kit missing: every records() call raises KitMissing."""
+
+    def record(self, property_id):
+        return None
+
+    def for_sale(self, listing_text):
+        return None
+
+    def records(self):
+        from snapback.agent.join import KitMissing
+
+        raise KitMissing()
+
+
+def test_a_missing_kit_is_not_a_500(tmp_path):
+    client = TestClient(
+        create_app(Settings(_env_file=None, snapback_data_dir=tmp_path), lookups=_NoKitLookups())
+    )
+    case = _case(client)
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial", headers={"X-Case-Token": case["read_token"]}
+    )
+    assert got.status_code == 200
+    assert got.json()["claimed"]["tile"] is None
+
+
+def test_a_disk_error_through_the_route_keeps_the_record(tmp_path, monkeypatch):
+    def disk_full(*args, **kwargs):
+        raise OSError("no space left")
+
+    monkeypatch.setattr(vexcel, "get_tile", disk_full)
+    client = _client(tmp_path)
+    case = _case(client, "fx-prop-4")
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial", headers={"X-Case-Token": case["read_token"]}
+    )
+    assert got.status_code == 200
+    body = got.json()
+    assert body["claimed"]["tile"] is None and body["claimed"]["record"]["year_built"] == 2019
+
+
+def test_a_tile_is_written_atomically(tmp_path, monkeypatch):
+    import os
+
+    replaced: list[tuple[str, str]] = []
+    real_replace = os.replace
+
+    def spy(src, dst):
+        replaced.append((str(src), str(dst)))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(vexcel.os, "replace", spy)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("oriented/collections"):
+            feats = [{"properties": {"product-type": "oblique-north", "last-capture-date": "2025"}}]
+            return httpx.Response(200, json={"features": feats})
+        return httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
+
+    live = MATCHED.model_copy(update={"source": DataSource.LIVE})
+    tile = vexcel.get_tile(
+        live,
+        source=DataSource.LIVE,
+        data_dir=tmp_path,
+        api_key="fx-key",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        sleep=lambda s: None,
+    )
+    assert tile is not None and Path(tile.path).read_bytes() == JPEG
+    assert any(dst == tile.path for _, dst in replaced)  # the jpg arrived by rename, whole
+    assert all(Path(src).parent == Path(tile.path).parent for src, _ in replaced)
+    assert not list((tmp_path / "vexcel").glob("*.tmp"))

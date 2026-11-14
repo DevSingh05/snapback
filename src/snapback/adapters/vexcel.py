@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import re
 import threading
 import time
@@ -305,8 +306,11 @@ def get_tile(
         if content is None:
             return None
         cache.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
         meta.write_text(json.dumps({"captured_on": captured.isoformat() if captured else None}))
+        # Atomic: write beside the tile, then rename, so the image route never reads half a jpg.
+        tmp = path.with_suffix(".jpg.tmp")
+        tmp.write_bytes(content)
+        os.replace(tmp, path)
         return AerialTile(
             property_id=record.property_id,
             source=DataSource.LIVE,

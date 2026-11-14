@@ -405,7 +405,12 @@ def create_app(
     def kit_records_for_aerial() -> dict | None:
         """The shared lookups' parsed kit, when they offer one (a test stand-in may not)."""
         records = getattr(lookups, "records", None)
-        return records() if callable(records) else None
+        if not callable(records):
+            return None
+        try:
+            return records()
+        except KitMissing:
+            return {}  # live mode without the kit: no buildings, so no tiles, never a 500
 
     def matched_id_of(case: RecordedCase | SessionCase) -> str | None:
         """The building a photo was located in when it was not the claimed one (V2)."""
