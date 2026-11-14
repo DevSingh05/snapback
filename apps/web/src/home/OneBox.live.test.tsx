@@ -73,7 +73,10 @@ function server(evidence: { alias: string; status: string }[] = []) {
       if (path === "/api/cases/7Q2M/evidence")
         return json({ case_id: "7Q2M", source: "live", photos: evidence });
       if (/\/api\/cases\/7Q2M\/evidence\/\w+\/scan\.jpg$/.test(path))
-        return new Response(new Blob(["jpg"], { type: "image/jpeg" }), { status: 200 });
+        return new Response(new TextEncoder().encode("jpg"), {
+          status: 200,
+          headers: { "Content-Type": "image/jpeg" },
+        });
       return json({ detail: "nope" }, 404);
     }),
   );
