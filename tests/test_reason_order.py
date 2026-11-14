@@ -101,7 +101,11 @@ def test_within_who_authority_comes_before_the_contact_lines():
 
 def test_a_passing_case_also_answers_who_first():
     passing = evidence(
-        authority={"status": "matches_record", "manager_on_record": "Fixture Living LLC"},
+        authority={
+            "status": "matches_record",
+            "manager_on_record": "Fixture Living LLC",
+            "office_phone_match": "yes",
+        },
         rules=[],
         price=None,
     )

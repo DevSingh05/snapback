@@ -77,6 +77,8 @@ class Evidence(BaseModel):
     for_sale_flag: bool = False  # the home is listed for sale, not for rent
     recently_rented_flag: bool = False  # the record shows it was rented out recently
     phone_flag: bool = False  # the phone in the listing is not the leasing office on record
+    # A23 (H1): the phone in the listing IS the leasing office's on record. VERIFIED needs it.
+    phone_confirmed: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
 
