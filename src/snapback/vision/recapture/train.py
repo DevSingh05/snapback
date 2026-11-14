@@ -8,7 +8,10 @@ most 5% (learning-v2 L1a), and the dev AUROC is reported with n.
         --version v0 --out data/recapture/v0.json
 
 The manifest is CSV with `path`, `label` (genuine, screen, print, paste) and `source` (or
-lane D's `source_photo_id`), plus optional `synthetic` (1 or true). Protocol for team photos:
+lane D's `source_photo_id`), plus optional `synthetic` (1 or true). One id scheme: `source` is
+the genuine photo's file stem (what lane D's generator writes), so a genuine photo's own row
+must say its own stem, and every attack must name a genuine photo that is in the data. Paths are
+resolved against the manifest's folder, then the working directory. Protocol for team photos:
 docs/recapture-protocol.md.
 """
 
@@ -23,7 +26,7 @@ import numpy as np
 from PIL import Image
 
 from snapback.contracts import RecaptureLabel
-from snapback.vision.recapture.features import features
+from snapback.vision.recapture.features import features, too_small
 from snapback.vision.recapture.model import CLASSES, RecaptureModel, fit_platt, fit_softmax
 
 MAX_GENUINE_FALSE_REJECT = 0.05
@@ -50,6 +53,14 @@ class TrainReport:
     synthetic_only: bool
     train_sources: tuple[str, ...]
     dev_sources: tuple[str, ...]
+    row_split: tuple[tuple[str, bool], ...]  # (source, is_dev) for every row, in order
+    # Real attacks (team captures) and synthetic ones (lane D's generator), apart, each with n.
+    n_dev_attack_real: int
+    n_dev_attack_synthetic: int
+    dev_auroc_real: float
+    dev_auroc_synthetic: float
+    dev_attack_false_accept_real: float
+    dev_attack_false_accept_synthetic: float
 
 
 def auroc(scores_neg: Sequence[float], scores_pos: Sequence[float]) -> float:
@@ -69,7 +80,14 @@ def _side(source: str, seed: int, dev_share: float) -> str:
 def train(
     rows: Sequence[TrainingRow], version: str, seed: int = 0, dev_share: float = 0.3
 ) -> tuple[RecaptureModel, TrainReport]:
-    rows = [r for r in rows if r.label in CLASSES]
+    rows = [r for r in rows if r.label in CLASSES and not too_small(r.image)]
+    genuine = {r.source for r in rows if r.label is RecaptureLabel.GENUINE}
+    orphans = sorted({r.source for r in rows if r.label is not RecaptureLabel.GENUINE} - genuine)
+    if orphans:
+        raise ValueError(
+            f"{len(orphans)} attack source(s) match no genuine photo in the data (e.g. "
+            f"{orphans[0]!r}); a source must be the genuine photo's file stem"
+        )
     sides = {r.source: _side(r.source, seed, dev_share) for r in rows}
     # Make sure both sides have genuine photos.
     genuine_sources = sorted({r.source for r in rows if r.label is RecaptureLabel.GENUINE})
@@ -97,6 +115,7 @@ def train(
     dev_scores = np.array([model.score_vector(v) for v in vectors[is_dev]])
     dev_genuine = dev_scores[labels[is_dev] == 0]
     dev_attack = dev_scores[labels[is_dev] != 0]
+    dev_synthetic = np.array([r.synthetic for r in rows])[is_dev][labels[is_dev] != 0]
     if len(dev_genuine):
         allowed = int(np.floor(MAX_GENUINE_FALSE_REJECT * len(dev_genuine)))
         ordered = np.sort(dev_genuine)[::-1]
@@ -117,9 +136,30 @@ def train(
         synthetic_only=model.synthetic_only,
         train_sources=tuple(sorted(s for s, side in sides.items() if side == "train")),
         dev_sources=tuple(sorted(s for s, side in sides.items() if side == "dev")),
+        row_split=tuple((r.source, bool(d)) for r, d in zip(rows, is_dev, strict=True)),
+        n_dev_attack_real=int((~dev_synthetic).sum()),
+        n_dev_attack_synthetic=int(dev_synthetic.sum()),
+        dev_auroc_real=auroc(dev_genuine, dev_attack[~dev_synthetic]),
+        dev_auroc_synthetic=auroc(dev_genuine, dev_attack[dev_synthetic]),
+        dev_attack_false_accept_real=_rate(dev_attack[~dev_synthetic] <= model.threshold),
+        dev_attack_false_accept_synthetic=_rate(dev_attack[dev_synthetic] <= model.threshold),
     )
-    model.meta = {k: v for k, v in report.__dict__.items() if not k.endswith("_sources")}
+    model.meta = {
+        k: v for k, v in report.__dict__.items() if not k.endswith("_sources") and k != "row_split"
+    }
     return model, report
+
+
+def _rate(flags: np.ndarray) -> float:
+    return float(flags.mean()) if len(flags) else float("nan")
+
+
+def _resolve(manifest: Path, value: str) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return candidate
+    beside = manifest.parent / candidate
+    return beside if beside.exists() else Path.cwd() / candidate
 
 
 def read_manifest(path: Path) -> list[TrainingRow]:
@@ -129,13 +169,16 @@ def read_manifest(path: Path) -> list[TrainingRow]:
             label = RecaptureLabel(record["label"])
             if label not in CLASSES:
                 continue
-            image_path = Path(record["path"])
-            if not image_path.is_absolute():
-                image_path = path.parent / image_path
+            image_path = _resolve(path, record["path"])
             with Image.open(image_path) as opened:
                 image = opened.convert("RGB")
             synthetic = str(record.get("synthetic", "1")).strip().lower() in ("1", "true", "yes")
             source = record.get("source") or record.get("source_photo_id") or image_path.stem
+            if label is RecaptureLabel.GENUINE and source != image_path.stem:
+                raise ValueError(
+                    f"{path.name}: genuine photo {image_path.name} has source {source!r}; it "
+                    f"must be its file stem {image_path.stem!r} (lane D names attacks that way)"
+                )
             rows.append(TrainingRow(image, label, source, synthetic))
     return rows
 
@@ -159,9 +202,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     kind = "SYNTHETIC ONLY" if report.synthetic_only else "includes team captures"
     print(
         f"recapture {report.version} ({kind}): train n={report.n_train}; dev genuine "
-        f"n={report.n_dev_genuine}, attacks n={report.n_dev_attack}; dev AUROC "
-        f"{report.dev_auroc:.3f}; threshold {report.threshold:.3f} (dev genuine false reject "
-        f"{report.dev_genuine_false_reject:.3f}, attack false accept "
-        f"{report.dev_attack_false_accept:.3f}); saved {args.out.name}"
+        f"n={report.n_dev_genuine}; threshold {report.threshold:.3f} (dev genuine false "
+        f"reject {report.dev_genuine_false_reject:.3f}); saved {args.out.name}"
+    )
+    print(
+        f"  real attacks (team captures): n={report.n_dev_attack_real}, dev AUROC "
+        f"{report.dev_auroc_real:.3f}, false accept {report.dev_attack_false_accept_real:.3f}"
+    )
+    print(
+        f"  SYNTHETIC attacks (lane D generator): n={report.n_dev_attack_synthetic}, dev AUROC "
+        f"{report.dev_auroc_synthetic:.3f}, false accept "
+        f"{report.dev_attack_false_accept_synthetic:.3f}"
     )
     return 0

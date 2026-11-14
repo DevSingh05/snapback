@@ -20,6 +20,7 @@ from snapback.vision.recapture import (
     RecaptureModel,
     TrainingRow,
     features,
+    read_manifest,
     train,
 )
 
@@ -140,9 +141,76 @@ def test_report_gives_dev_auroc_with_n_and_freezes_the_threshold(trained):
     assert report.synthetic_only is True
 
 
-def test_split_keeps_each_source_photo_on_one_side(trained):
+def test_split_keeps_every_row_of_a_source_on_one_side(trained):
+    """Checked per row: a genuine photo and every attack made from it share one side."""
     _, report, _ = trained
-    assert not set(report.train_sources) & set(report.dev_sources)
+    sides: dict[str, set[bool]] = {}
+    for source, is_dev in report.row_split:
+        sides.setdefault(source, set()).add(is_dev)
+    assert sides and all(len(found) == 1 for found in sides.values())
+    assert any(True in found for found in sides.values())
+    assert any(False in found for found in sides.values())
+
+
+def test_an_attack_whose_source_matches_no_genuine_photo_fails_loudly():
+    rows = [
+        TrainingRow(genuine_photo(1), RecaptureLabel.GENUINE, "jeffrey-0001"),
+        TrainingRow(genuine_photo(2), RecaptureLabel.GENUINE, "jeffrey-0002"),
+        TrainingRow(genuine_photo(1), RecaptureLabel.SCREEN, "IMG_0001"),  # lane D names by stem
+    ]
+    with pytest.raises(ValueError, match="no genuine photo"):
+        train(rows, version="v0")
+
+
+def test_manifest_genuine_source_must_be_the_file_stem(tmp_path):
+    genuine_photo(1).save(tmp_path / "IMG_0001.jpg")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text("path,label,source,synthetic\nIMG_0001.jpg,genuine,jeffrey-0001,0\n")
+    with pytest.raises(ValueError, match="file stem"):
+        read_manifest(manifest)
+    manifest.write_text("path,label,source,synthetic\nIMG_0001.jpg,genuine,IMG_0001,0\n")
+    assert read_manifest(manifest)[0].source == "IMG_0001"
+
+
+def test_manifest_paths_resolve_against_the_manifest_then_the_working_directory(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "team").mkdir()
+    genuine_photo(1).save(tmp_path / "team" / "g1.jpg")
+    manifest = tmp_path / "team" / "manifest.csv"
+    manifest.write_text("path,label,source,synthetic\ng1.jpg,genuine,g1,0\n")
+    assert read_manifest(manifest)[0].source == "g1"
+    monkeypatch.chdir(tmp_path)
+    manifest.write_text("path,label,source,synthetic\nteam/g1.jpg,genuine,g1,0\n")
+    assert read_manifest(manifest)[0].source == "g1"
+
+
+def test_real_and_synthetic_attacks_are_reported_apart(tmp_path):
+    rows = bank(tmp_path, range(0, 24), generator_seed=4)
+    # Pretend the genuine photos and the screen attacks are team captures (real).
+    rows = [
+        TrainingRow(
+            r.image,
+            r.label,
+            r.source,
+            synthetic=r.label not in (RecaptureLabel.GENUINE, RecaptureLabel.SCREEN),
+        )
+        for r in rows
+    ]
+    _, report = train(rows, version="v0", seed=0)
+    assert report.n_dev_attack_real + report.n_dev_attack_synthetic == report.n_dev_attack
+    assert report.n_dev_attack_real > 0 and report.n_dev_attack_synthetic > 0
+    assert 0.0 <= report.dev_auroc_real <= 1.0 and 0.0 <= report.dev_auroc_synthetic <= 1.0
+    assert report.synthetic_only is False
+
+
+@pytest.mark.parametrize("size", [(10, 10), (4000, 100), (100, 4000)])
+def test_tiny_or_thin_images_ask_for_a_new_photo(trained, monkeypatch, size):
+    model, _, _ = trained
+    monkeypatch.setenv("RECAPTURE_MODEL", "on")
+    result = RecaptureDetector(model).check("r", Image.new("RGB", size, (120, 120, 120)))
+    assert result.blocks_pass is True
+    assert result.label is RecaptureLabel.UNKNOWN
 
 
 def test_model_round_trips_through_json(trained, tmp_path):

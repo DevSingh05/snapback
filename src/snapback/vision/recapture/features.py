@@ -34,6 +34,16 @@ FEATURE_NAMES = (
 )
 
 
+BLOCK = 16
+
+
+def too_small(image: Image.Image) -> bool:
+    """True when the photo, once scaled to SIDE on its long side, has no BLOCK x BLOCK block."""
+    width, height = image.size
+    scale = min(1.0, SIDE / max(width, height))
+    return min(width, height) * scale < BLOCK
+
+
 def _prepare(image: Image.Image) -> Image.Image:
     image = ImageOps.exif_transpose(image).convert("RGB")
     scale = SIDE / max(image.size)

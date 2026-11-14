@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image
 
 from snapback.contracts import RecaptureLabel, RecaptureResult
-from snapback.vision.recapture.features import features
+from snapback.vision.recapture.features import features, too_small
 from snapback.vision.recapture.model import RecaptureModel
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -37,6 +37,15 @@ class RecaptureDetector:
                 score=0.0,
                 blocks_pass=False,
                 model_version="off",
+            )
+        if too_small(image):
+            # Too small or too thin to check: ask for a new photo, accuse nobody.
+            return RecaptureResult(
+                photo_id=photo_id,
+                label=RecaptureLabel.UNKNOWN,
+                score=1.0,
+                blocks_pass=True,
+                model_version=self.model.version,
             )
         vector = features(image)
         score = self.model.score_vector(vector)
