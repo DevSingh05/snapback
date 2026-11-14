@@ -213,6 +213,49 @@ describe("Arrive and door (W4)", () => {
   });
 });
 
+describe("Summary (W5)", () => {
+  const summarised = () => ({
+    ...FIXTURE_TOUR,
+    summary: {
+      know: ["The ad showed 2 of the 5 rooms in this scan."],
+      see: [
+        "The ad did not show the second bathroom.",
+        "Door widths, steps and the real condition of each room.",
+      ],
+    },
+  });
+  const toEnd = async () => {
+    const rail = screen.getByRole("navigation", { name: "Tour progress" });
+    await userEvent.setup().click(rail.querySelector("li:last-child button")!);
+  };
+
+  it("shows what you now know and what you still need to see, in two columns", async () => {
+    render(<TourView plan={summarised()} />);
+    await toEnd();
+    const know = screen.getByRole("region", { name: "What you now know" });
+    const see = screen.getByRole("region", { name: "What you still need to see in person" });
+    expect(know).toHaveTextContent("The ad showed 2 of the 5 rooms in this scan.");
+    expect(see).toHaveTextContent("The ad did not show the second bathroom.");
+    expect(know).not.toHaveTextContent("second bathroom");
+  });
+
+  it("keeps the tour-prep link and says nothing is sent", async () => {
+    render(<TourView plan={summarised()} />);
+    await toEnd();
+    expect(screen.getByTestId("tour-prep-link")).toHaveAttribute(
+      "href",
+      "/prep/place/fixture-bldg-1",
+    );
+    expect(screen.getByText(/Nothing is sent for you/)).toBeInTheDocument();
+  });
+
+  it("shows no summary columns when the plan has none", async () => {
+    render(<TourView plan={FIXTURE_TOUR} />);
+    await toEnd();
+    expect(screen.queryByRole("region", { name: "What you now know" })).toBeNull();
+  });
+});
+
 describe("evenStops", () => {
   it("starts at the scan start and spaces the rest evenly, capped at 8", () => {
     const ids = Array.from({ length: 30 }, (_, i) => `s${i}`);

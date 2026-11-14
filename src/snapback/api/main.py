@@ -90,6 +90,8 @@ from snapback.tour import (
     build_tour,
     cached_sweeps,
     fixture_sweeps,
+    rooms_to_see_line,
+    with_summary,
 )
 from snapback.verdict import decide
 
@@ -765,17 +767,19 @@ def create_app(
             )
             if tile is not None:
                 aerial_on, aerial_ok = tile.captured_on, tile.source == DataSource.LIVE
-        return build_tour(
-            property_id=property_id,
-            kind=place.kind,
-            source=source,
-            sweeps=sweeps,
-            has_scan=place.has_3d_scan,
-            place=place,
-            record=record,
-            aerial_on=aerial_on,
-            aerial_image=aerial_ok,
-            plan_key=place.plan_key,
+        return with_summary(
+            build_tour(
+                property_id=property_id,
+                kind=place.kind,
+                source=source,
+                sweeps=sweeps,
+                has_scan=place.has_3d_scan,
+                place=place,
+                record=record,
+                aerial_on=aerial_on,
+                aerial_image=aerial_ok,
+                plan_key=place.plan_key,
+            )
         )
 
     @app.get("/places/{property_id}/tour")
@@ -800,6 +804,10 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         if case.property_id is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
+        return plan_and_locate(case)
+
+    def plan_and_locate(case) -> tuple:
+        """The case's building tour with its placed photos, and the locate result."""
         plan = tour_for(case.property_id, None)
         locate = case.evidence.locate
         if locate is None:
@@ -816,7 +824,7 @@ def create_app(
             if p.status is LocateStatus.LOCATED_IN_CLAIMED
             and (pose := locate.poses.get(p.photo_id)) is not None
         ]
-        return attach_photos(plan, placed), locate
+        return with_summary(attach_photos(plan, placed)), locate
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(
@@ -841,6 +849,16 @@ def create_app(
         placed. Needs the case's read token in a header."""
         plan, locate = case_tour(case_id, request, authorization, x_case_token)
         return WalkResponse(plan=plan, locate=locate)
+
+    def rooms_line_for(case, property_id: str) -> str | None:
+        """The rooms the ad left out, only for the case's own building and only when the walk
+        knows them. Any trouble building the walk just leaves the line out."""
+        if case.property_id is None or case.property_id != property_id:
+            return None
+        try:
+            return rooms_to_see_line(plan_and_locate(case)[0])
+        except HTTPException:
+            return None
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(
@@ -867,7 +885,7 @@ def create_app(
         if place is None:
             raise HTTPException(status_code=404, detail="No researched place with that id.")
         try:
-            return draft_tour_request(place, body.brief)
+            return draft_tour_request(place, body.brief, rooms_line_for(case, body.property_id))
         except NoOfficeOnRecord:
             raise HTTPException(
                 status_code=422, detail="That place has no leasing office on record."

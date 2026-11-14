@@ -374,4 +374,5 @@ export interface TourPlan {
   director?: TourDirector | null;
   scan_date_line?: string | null; // "Scanned Mar 2026 (Matterport)" or "Scan date not on record"
   scan_age_note?: string | null; // set when the scan is older than 12 months
+  summary?: { know: string[]; see: string[] } | null; // the last screen's two columns
 }
