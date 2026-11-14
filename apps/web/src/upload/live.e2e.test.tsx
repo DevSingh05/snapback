@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
-import { fetchCard, loadCaseToken } from "../api";
+import { fetchCard, loadCaseReadToken, loadCaseToken } from "../api";
 import type { Card } from "../contracts";
 import { CardPage } from "../pages/CardPage";
 import { UploadPage } from "./UploadPage";
@@ -13,6 +13,7 @@ import { UploadPage } from "./UploadPage";
 //   POST /cases/{id}/challenge/approve (Bearer token) -> CaseStatus, 401 without the token
 //   GET  /cases/{id} -> CaseStatus;  GET /cases/{id}/card -> Card
 const TOKEN = "tok_secret_123";
+const READ_TOKEN = "tok_read_456";
 const liveCard: Card = { ...(cardHold as Card), source: "live" };
 
 interface Call {
@@ -50,6 +51,7 @@ function installServer(opts: { challenge: string | null }) {
           case_id: "7Q2M",
           source: "live",
           token: TOKEN,
+          read_token: READ_TOKEN,
           status,
           state: status === "done" ? "hold" : null,
           challenge_text: opts.challenge,
@@ -114,6 +116,7 @@ describe("web against the API route shapes", () => {
 
     // The token is kept in sessionStorage by case id and is not in any URL.
     expect(loadCaseToken("7Q2M")).toBe(TOKEN);
+    expect(loadCaseReadToken("7Q2M")).toBe(READ_TOKEN);
     expect(calls.some((c) => c.path.includes(TOKEN))).toBe(false);
     const create = calls.find((c) => c.method === "POST" && c.path === "/api/cases")!;
     expect(create).toMatchObject({ method: "POST", path: "/api/cases", credentials: "include" });
@@ -131,7 +134,8 @@ describe("web against the API route shapes", () => {
     expect(JSON.parse(approve.body as string)).toEqual({ decision: "send" });
     // The page followed the real case: the trace stream and the status poll.
     // EventSource cannot send headers, so the trace carries the secret as ?token= (API PR #60).
-    expect(FakeEventSource.urls).toContain(`/api/cases/7Q2M/trace?token=${TOKEN}`);
+    expect(FakeEventSource.urls).toContain(`/api/cases/7Q2M/trace?token=${READ_TOKEN}`);
+    expect(FakeEventSource.urls.some((u) => u.includes(TOKEN))).toBe(false);
     const poll = calls.find((c) => c.method === "GET" && c.path === "/api/cases/7Q2M")!;
     expect(poll.headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
   });
