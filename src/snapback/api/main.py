@@ -34,9 +34,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile
 
-from snapback.adapters.vexcel import aerial_proof
+from snapback.adapters.vexcel import aerial_proof, aerial_side
 from snapback.agent.intake import read_listing
-from snapback.agent.join import KitMissing, Lookups
+from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
@@ -124,6 +124,8 @@ async def _trace_stream(
 def create_app(settings: Settings | None = None, lookups: Lookups | None = None) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests."""
     settings = settings or get_settings()
+    # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
+    lookups = lookups or KitLookups(settings.snapback_data_source)
     store = CaseStore(settings, lookups)
     # One allowance per renter or per browser, and a ceiling per network address so that
     # clearing cookies is not a way around it.
@@ -342,23 +344,31 @@ def create_app(settings: Settings | None = None, lookups: Lookups | None = None)
 
     # --- D9 aerial proof (lane D builder in adapters/vexcel.py; contract approved on #41) ---
 
+    def kit_records_for_aerial() -> dict | None:
+        """The shared lookups' parsed kit, when they offer one (a test stand-in may not)."""
+        records = getattr(lookups, "records", None)
+        return records() if callable(records) else None
+
+    def matched_id_of(case: RecordedCase | SessionCase) -> str | None:
+        """The building a photo was located in when it was not the claimed one (V2)."""
+        locate = case.evidence.locate
+        for photo in locate.photos if locate is not None else []:
+            if photo.status == LocateStatus.LOCATED_ELSEWHERE:
+                found = getattr(photo, "matched_property_id", None)
+                if found:
+                    return found
+        return None
+
     def aerial_for(case: RecordedCase | SessionCase, case_id: str, direction: str):
         """The two buildings for this case. The claimed one is the case's property id (A10); the
         matched one is a photo located in another building (V2). Either may be missing."""
-        evidence = case.evidence
-        matched_id = None
-        if evidence.locate is not None:
-            for photo in evidence.locate.photos:
-                if photo.status == LocateStatus.LOCATED_ELSEWHERE:
-                    matched_id = getattr(photo, "matched_property_id", None)
-                    if matched_id:
-                        break
         return aerial_proof(
             case_id,
-            evidence.source,
+            case.evidence.source,
             case.property_id,
-            matched_id,
+            matched_id_of(case),
             direction=direction,
+            records=kit_records_for_aerial(),
             data_dir=settings.snapback_data_dir,
             image_url=lambda side: f"/cases/{case_id}/aerial/{side}.jpg?direction={direction}",
         )
@@ -397,28 +407,34 @@ def create_app(settings: Settings | None = None, lookups: Lookups | None = None)
         case_id: str,
         side: Literal["claimed", "matched"],
         direction: AerialDirection = "north",
-        token: str | None = None,
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> Response:
-        """One live tile's bytes. An <img> cannot send headers, so the read-only token may be in
-        the address (`?token=`), exactly as for the trace; the write token never is."""
+        """One live tile's bytes. The token goes in a header only (ruling on #113): lane T fetches
+        the image with the header and shows it through a blob URL. Only the side asked for is
+        fetched."""
         case = find(case_id)
-        check_read(case, _bearer(authorization, x_case_token), token)
-        proof = aerial_for(case, case_id, direction)
-        chosen = proof.claimed if side == "claimed" else proof.matched
-        if chosen is None or chosen.tile is None or chosen.tile.source != DataSource.LIVE:
+        check_read(case, _bearer(authorization, x_case_token), None)
+        property_id = case.property_id if side == "claimed" else matched_id_of(case)
+        if property_id is None:
             raise HTTPException(status_code=404, detail=NO_TILE)
-        tile_path = Path(chosen.tile.path).resolve()
+        tile = aerial_side(
+            case.evidence.source,
+            property_id,
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+        )
+        if tile is None or tile.source != DataSource.LIVE:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        tile_path = Path(tile.path).resolve()
         data_root = resolve_data_dir(settings.snapback_data_dir).resolve()
         if not tile_path.is_relative_to(data_root):
             raise HTTPException(status_code=404, detail=NO_TILE)
         try:
             content = tile_path.read_bytes()
         except FileNotFoundError:  # purged between the JSON call and this one
-            raise HTTPException(
-                status_code=404, detail="No aerial tile for this building."
-            ) from None
+            raise HTTPException(status_code=404, detail=NO_TILE) from None
         return Response(
             content=content,
             media_type="image/jpeg",

@@ -103,8 +103,11 @@ def _client(tmp_path) -> TestClient:
     return TestClient(create_app(Settings(_env_file=None, snapback_data_dir=tmp_path)))
 
 
-def _case(client: TestClient) -> dict:
-    made = client.post("/cases", data={"text": "Two bed near the park."})
+def _case(client: TestClient, property_id: str | None = None) -> dict:
+    form = {"text": "Two bed near the park."}
+    if property_id:
+        form["property_id"] = property_id
+    made = client.post("/cases", data=form)
     assert made.status_code == 201
     return made.json()
 
@@ -145,14 +148,16 @@ def test_the_json_route_never_shows_a_server_file_path(tmp_path, monkeypatch):
     assert str(tmp_path) not in got.text
 
 
-def test_the_image_route_takes_only_the_read_token_in_the_address(tmp_path):
+def test_the_image_route_takes_the_token_in_a_header_only(tmp_path):
     client = _client(tmp_path)
     case = _case(client)
     url = f"/cases/{case['case_id']}/aerial/claimed.jpg"
     assert client.get(url).status_code == 401
-    assert client.get(url, params={"token": case["token"]}).status_code == 403  # write token
+    # header only (ruling on #113): a token in the address is not accepted
+    assert client.get(url, params={"token": case["read_token"]}).status_code == 401
+    assert client.get(url, headers={"X-Case-Token": "fx-wrong"}).status_code == 403
     # a fixture case has no live tile to serve
-    assert client.get(url, params={"token": case["read_token"]}).status_code == 404
+    assert client.get(url, headers={"X-Case-Token": case["read_token"]}).status_code == 404
 
 
 def test_the_image_route_streams_a_live_tile_privately(tmp_path, monkeypatch):
@@ -168,17 +173,17 @@ def test_the_image_route_streams_a_live_tile_privately(tmp_path, monkeypatch):
             case_id=case_id, source=DataSource.LIVE, claimed=AerialSideOut(tile=tile)
         )
 
-    monkeypatch.setattr("snapback.api.main.aerial_proof", fake_proof)
+    monkeypatch.setattr("snapback.api.main.aerial_side", lambda *a, **k: tile)
     client = _client(tmp_path)
-    case = _case(client)
+    case = _case(client, "fx-prop-4")
     got = client.get(
-        f"/cases/{case['case_id']}/aerial/claimed.jpg", params={"token": case["read_token"]}
+        f"/cases/{case['case_id']}/aerial/claimed.jpg", headers={"X-Case-Token": case["read_token"]}
     )
     assert got.status_code == 200 and got.content == JPEG
     assert got.headers["content-type"] == "image/jpeg"
     assert got.headers["cache-control"] == "private, max-age=600"
     missing = client.get(
-        f"/cases/{case['case_id']}/aerial/matched.jpg", params={"token": case["read_token"]}
+        f"/cases/{case['case_id']}/aerial/matched.jpg", headers={"X-Case-Token": case["read_token"]}
     )
     assert missing.status_code == 404
 
@@ -186,8 +191,10 @@ def test_the_image_route_streams_a_live_tile_privately(tmp_path, monkeypatch):
 def test_a_bad_side_or_direction_is_refused(tmp_path):
     client = _client(tmp_path)
     case = _case(client)
-    token = {"token": case["read_token"]}
-    assert client.get(f"/cases/{case['case_id']}/aerial/other.jpg", params=token).status_code == 422
+    token = {"X-Case-Token": case["read_token"]}
+    assert (
+        client.get(f"/cases/{case['case_id']}/aerial/other.jpg", headers=token).status_code == 422
+    )
     headers = {"X-Case-Token": case["read_token"]}
     bad = client.get(f"/cases/{case['case_id']}/aerial?direction=up", headers=headers)
     assert bad.status_code == 422
@@ -216,11 +223,11 @@ def test_a_tile_purged_between_calls_is_a_404_not_a_500(tmp_path, monkeypatch):
             case_id=case_id, source=DataSource.LIVE, claimed=AerialSideOut(tile=tile)
         )
 
-    monkeypatch.setattr("snapback.api.main.aerial_proof", fake_proof)
+    monkeypatch.setattr("snapback.api.main.aerial_side", lambda *a, **k: tile)
     client = _client(tmp_path)
-    case = _case(client)
+    case = _case(client, "fx-prop-4")
     got = client.get(
-        f"/cases/{case['case_id']}/aerial/claimed.jpg", params={"token": case["read_token"]}
+        f"/cases/{case['case_id']}/aerial/claimed.jpg", headers={"X-Case-Token": case["read_token"]}
     )
     assert got.status_code == 404
 
@@ -237,11 +244,11 @@ def test_a_tile_path_outside_the_data_dir_is_never_served(tmp_path, monkeypatch)
             case_id=case_id, source=DataSource.LIVE, claimed=AerialSideOut(tile=tile)
         )
 
-    monkeypatch.setattr("snapback.api.main.aerial_proof", fake_proof)
+    monkeypatch.setattr("snapback.api.main.aerial_side", lambda *a, **k: tile)
     client = _client(tmp_path / "data")
-    case = _case(client)
+    case = _case(client, "fx-prop-4")
     got = client.get(
-        f"/cases/{case['case_id']}/aerial/claimed.jpg", params={"token": case["read_token"]}
+        f"/cases/{case['case_id']}/aerial/claimed.jpg", headers={"X-Case-Token": case["read_token"]}
     )
     assert got.status_code == 404
 
@@ -279,3 +286,126 @@ def test_the_kit_is_parsed_once_per_process(monkeypatch, tmp_path):
         aerial_proof("fx-7Q2M", DataSource.FIXTURE, "fx-prop-1", None, data_dir=tmp_path)
     assert len(calls) == 1
     vexcel.kit_records.cache_clear()
+
+
+def test_a_missing_vexcel_key_keeps_the_record_and_distance(tmp_path, monkeypatch):
+    def no_key(*args, **kwargs):
+        raise vexcel.VexcelKeyMissingError("VEXCEL_API_KEY is not set")
+
+    monkeypatch.setattr(vexcel, "get_tile", no_key)
+    proof = aerial_proof("fx-7Q2M", DataSource.LIVE, "fx-prop-1", "fx-prop-3", records=RECORDS)
+    assert proof.claimed.tile is None and proof.claimed.record is not None
+    assert proof.matched is not None and proof.matched.record is not None
+    assert proof.distance_m is not None
+
+
+def test_the_route_answers_200_without_a_vexcel_key(tmp_path, monkeypatch):
+    def no_key(*args, **kwargs):
+        raise vexcel.VexcelKeyMissingError("VEXCEL_API_KEY is not set")
+
+    monkeypatch.setattr(vexcel, "get_tile", no_key)
+    client = _client(tmp_path)
+    made = client.post("/cases", data={"text": "Two bed.", "property_id": "fx-prop-4"})
+    case = made.json()
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial", headers={"X-Case-Token": case["read_token"]}
+    )
+    assert got.status_code == 200
+    body = got.json()
+    assert body["claimed"]["tile"] is None and body["claimed"]["record"]["year_built"] == 2019
+
+
+def test_the_route_never_shows_the_phone_hash_site_units_or_rent_bands(tmp_path):
+    client = _client(tmp_path)
+    made = client.post("/cases", data={"text": "Two bed.", "property_id": "fx-prop-4"})
+    case = made.json()
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial", headers={"X-Case-Token": case["read_token"]}
+    )
+    assert got.status_code == 200
+    record = got.json()["claimed"]["record"]
+    assert record is not None and record["property_id"] == "fx-prop-4"
+    assert record["site_phone_hash"] is None and record["website_host"] is None
+    assert record["units"] == [] and record["floor_plan_rents"] == []
+    assert "fixtureliving" not in got.text and "0123" not in got.text and "4B" not in got.text
+
+
+def test_the_builder_has_a_hard_deadline(monkeypatch):
+    import time as _time
+
+    def slow(*args, **kwargs):
+        _time.sleep(2.0)
+        return None
+
+    monkeypatch.setattr(vexcel, "get_tile", slow)
+    monkeypatch.setattr(vexcel, "TOTAL_BUDGET_S", 0.3)
+    start = _time.perf_counter()
+    proof = aerial_proof("fx-7Q2M", DataSource.LIVE, "fx-prop-1", "fx-prop-3", records=RECORDS)
+    assert _time.perf_counter() - start < 1.0
+    assert proof.claimed.tile is None and proof.matched is not None
+
+
+def test_a_missing_kit_is_not_cached_for_good(monkeypatch):
+    from snapback.adapters import costar_jsonl
+
+    calls = []
+
+    def flaky(source=None, kit_dir=None):
+        calls.append(source)
+        if len(calls) == 1:
+            raise costar_jsonl.KitNotFoundError("not yet")
+        return RECORDS
+
+    monkeypatch.setattr(costar_jsonl, "load_records", flaky)
+    vexcel.kit_records.cache_clear()
+    assert vexcel.kit_records(DataSource.LIVE) == {}
+    assert vexcel.kit_records(DataSource.LIVE) == RECORDS  # the kit arrived: read again
+    vexcel.kit_records(DataSource.LIVE)
+    assert len(calls) == 2  # and then kept
+    vexcel.kit_records.cache_clear()
+
+
+def test_the_image_route_fetches_only_the_side_asked_for(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    def counting(rec, direction="north", **kwargs):
+        calls.append(rec.property_id)
+        return None
+
+    monkeypatch.setattr(vexcel, "get_tile", counting)
+    client = _client(tmp_path)
+    made = client.post("/cases", data={"text": "Two bed.", "property_id": "fx-prop-4"})
+    case = made.json()
+    got = client.get(
+        f"/cases/{case['case_id']}/aerial/claimed.jpg",
+        headers={"X-Case-Token": case["read_token"]},
+    )
+    assert got.status_code == 404  # no tile, but only one building was asked for
+    assert calls == ["fx-prop-4"]
+
+
+def test_the_tile_cache_sits_under_the_settings_data_dir(tmp_path, monkeypatch):
+    from snapback.safety import paths
+
+    monkeypatch.setattr(paths, "REPO_ROOT", tmp_path)
+    elsewhere = tmp_path / "apps" / "web"
+    elsewhere.mkdir(parents=True)
+    monkeypatch.chdir(elsewhere)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("oriented/collections"):
+            feats = [{"properties": {"product-type": "oblique-north", "last-capture-date": "2025"}}]
+            return httpx.Response(200, json={"features": feats})
+        return httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
+
+    live = MATCHED.model_copy(update={"source": DataSource.LIVE})
+    tile = vexcel.get_tile(
+        live,
+        source=DataSource.LIVE,
+        data_dir=Path("data"),
+        api_key="fx-key",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        sleep=lambda s: None,
+    )
+    assert tile is not None
+    assert Path(tile.path).resolve().parent == (tmp_path / "data" / "vexcel").resolve()
