@@ -1,5 +1,6 @@
 """D10 #128: TREC license lookup. Synthetic fx- names, HTTP mocked, no network."""
 
+import re
 import time
 
 import httpx
@@ -29,13 +30,28 @@ def _row(
     }
 
 
+def _matches_where(row: dict, where: str) -> bool:
+    """Apply the parts of the SoQL filter the adapter sends, so the mock cannot hide a bad query."""
+    last = re.search(r"upper\(last_name\)='([^']*)'", where)
+    if last and str(row.get("last_name", "")).upper() != last.group(1):
+        return False
+    kind = re.search(r"license_type='([^']*)'", where)
+    if kind and row.get("license_type") != kind.group(1):
+        return False
+    like = re.search(r"upper\(full_name\) like '([^']*)%'", where)
+    return not like or str(row.get("full_name", "")).upper().startswith(like.group(1))
+
+
 def _client(rows=None, *, status=200, fail=False, seen=None) -> httpx.Client:
     def handler(request: httpx.Request) -> httpx.Response:
         if seen is not None:
             seen.append(request)
         if fail:
             raise httpx.ConnectTimeout("fx timeout")
-        return httpx.Response(status, json=rows or [])
+        where = request.url.params.get("$where", "")
+        limit = int(request.url.params.get("$limit", "1000"))
+        kept = [row for row in (rows or []) if _matches_where(row, where)][:limit]
+        return httpx.Response(status, json=kept)
 
     return httpx.Client(transport=httpx.MockTransport(handler))
 
@@ -182,3 +198,67 @@ def test_a_named_brokerage_is_checked_as_a_company(tmp_path):
     assert "Broker Company" in seen[0].url.params["$where"]
     missing = _check("Managed by Fxnone Properties.", _client([]), tmp_path)
     assert missing.status is LicenseStatus.NOT_FOUND
+
+
+class _Trickle(httpx.SyncByteStream):
+    def __init__(self, now: list[float], body: bytes, step: float) -> None:
+        self.now, self.body, self.step = now, body, step
+
+    def __iter__(self):
+        for i in range(0, len(self.body), 4):
+            self.now[0] += self.step
+            yield self.body[i : i + 4]
+
+
+def test_the_5_s_budget_covers_the_whole_call(tmp_path, monkeypatch):
+    from snapback.adapters import trec
+
+    now = [0.0]
+    monkeypatch.setattr(trec, "_monotonic", lambda: now[0])
+    body = b"[]" + b" " * 200  # a slow server: 4 bytes a second
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=_Trickle(now, body, 1.0))
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    assert _check(CLAIM, client, tmp_path).status is LicenseStatus.NOT_CHECKED
+    assert now[0] <= 6.0
+
+
+def test_labels_are_not_read_as_names(tmp_path):
+    seen: list = []
+    for text in (
+        "Contact our Licensed Real Estate Agent today.",
+        "Free Apartment Locator service, no fees!",
+        "Use Our Apartment Locator to find more.",
+        "Please Contact your agent for a tour.",
+    ):
+        result = _check(text, _client([], seen=seen), tmp_path)
+        assert result.status is LicenseStatus.NOT_CHECKED, text
+    assert seen == []  # no lookup was made for any of them
+
+
+def test_a_signature_wins_over_a_bare_im(tmp_path):
+    seen: list = []
+    text = "I'm Very Excited to show it! I am a licensed agent. - Fxname Fxperson"
+    _check(text, _client([], seen=seen), tmp_path)
+    assert "FXPERSON" in seen[0].url.params["$where"]
+    found = detect_claim(text)
+    assert (found.first, found.last) == ("Fxname", "Fxperson")
+
+
+def test_an_owner_who_claims_a_license_is_checked(tmp_path):
+    text = "I'm the owner and also a licensed broker. - Fxname Fxperson"
+    assert detect_claim(text).role == "broker"
+    assert _check(text, _client([]), tmp_path).status is LicenseStatus.NOT_FOUND
+
+
+def test_a_read_only_cache_still_returns_the_answer(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    def refuse(self, *args, **kwargs):
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr(Path, "write_text", refuse)
+    result = _check(CLAIM, _client([_row("Active")]), tmp_path)
+    assert result.status is LicenseStatus.LICENSED

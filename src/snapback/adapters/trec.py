@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,16 +39,79 @@ TREC_URL = "https://data.texas.gov/resource/s7ft-44qi.json"
 TIMEOUT_S = 5.0
 MAX_TEXT = 2_000  # the claim is in the poster's message, not in a 2 MB paste
 MAX_ROWS = 25
+MAX_BODY_BYTES = 2 * 1024 * 1024  # 26 rows are a few KB
+READ_SLICE_S = 2.0
+_monotonic = time.monotonic  # replaced in tests
 
 # A first name may be an initial ("F."); a last name is a word.
 _NAME = r"([A-Z](?:[A-Za-z'\-]{1,30}|\.))\s+([A-Z][A-Za-z'\-]{1,30})"
 _ROLE = r"(?i:(?:licensed\s+)?(?:real\s+estate\s+)?(agent|realtor|broker|locator))\b"
 _ARTICLE = r"(?i:(?:a|an|the|your)\s+)?"
 _SELF_ROLE = re.compile(r"(?i:\b(?:i'?m|i\s+am|as)\s+)" + _ARTICLE + _ROLE)
+# "I'm the owner and also a licensed broker": a license claimed alongside ownership is checked
+_ALSO_ROLE = re.compile(r"(?i:\b(?:and|also)\s+(?:also\s+)?)" + _ARTICLE + _ROLE)
 _NAMED_ROLE = re.compile(_NAME + r",?\s+" + _ARTICLE + _ROLE)
 _LABEL = re.compile(r"(?i:\b(agent|realtor|broker|locator))\s*:\s*" + _NAME)
-_NAME_INTRO = re.compile(r"(?i:\b(?:my\s+name\s+is|i'?m|i\s+am|this\s+is)\s+)" + _NAME)
+_MY_NAME = re.compile(r"(?i:\bmy\s+name\s+is\s+)" + _NAME)
+_THIS_IS = re.compile(r"(?i:\bthis\s+is\s+)" + _NAME)
+_IM = re.compile(r"(?i:\b(?:i'?m|i\s+am)\s+)" + _NAME)
 _SIGNATURE = re.compile(r"[-\u2013\u2014]\s*" + _NAME + r"\s*$")
+# Capitalised words that start labels and slogans, never a person's name
+_STOPWORDS = {
+    "REAL",
+    "ESTATE",
+    "APARTMENT",
+    "APARTMENTS",
+    "LICENSED",
+    "YOUR",
+    "OUR",
+    "PLEASE",
+    "CONTACT",
+    "FREE",
+    "VERY",
+    "USE",
+    "CALL",
+    "TEXT",
+    "THE",
+    "THIS",
+    "BEST",
+    "TOP",
+    "LOCAL",
+    "PROFESSIONAL",
+    "EXPERIENCED",
+    "CERTIFIED",
+    "TRUSTED",
+    "PROPERTY",
+    "LEASING",
+    "RENTAL",
+    "RENTALS",
+    "HOME",
+    "HOMES",
+    "HOUSE",
+    "TEXAS",
+    "HOUSTON",
+    "DALLAS",
+    "AUSTIN",
+    "SAN",
+    "NEW",
+    "LUXURY",
+    "AFFORDABLE",
+    "SO",
+    "SUPER",
+    "REALLY",
+    "HAPPY",
+    "EXCITED",
+    "AVAILABLE",
+    "NOW",
+    "TODAY",
+    "HELLO",
+    "HI",
+    "DEAR",
+    "THANKS",
+    "THANK",
+    "AN",
+    "A",
+}
 # "Listed by Fxample Realty Group" (capitalised words; a sentence's full stop ends it)
 _COMPANY = re.compile(
     r"(?i:\b(?:listed|managed|marketed|represented|offered)\s+by\s+)"
@@ -101,21 +165,43 @@ class Claim:
     company: str | None = None
 
 
+def _is_name(first: str, last: str) -> bool:
+    return first.upper().rstrip(".") not in _STOPWORDS and last.upper() not in _STOPWORDS
+
+
+def _name_in(text: str) -> tuple[str, str] | None:
+    """The poster's own name, most reliable source first: 'my name is', a signature at the end,
+    'this is', and only then a bare "I'm X Y" (which is often 'I'm Very Excited')."""
+    sources = (
+        _MY_NAME.finditer(text),
+        _SIGNATURE.finditer(text.strip()),
+        _THIS_IS.finditer(text),
+        _IM.finditer(text),
+    )
+    for found in sources:
+        for m in found:
+            if _is_name(m.group(1), m.group(2)):
+                return m.group(1), m.group(2)
+    return None
+
+
 def detect_claim(text: str) -> Claim | None:
     """The poster's own claim to be an agent, broker or locator (and the name they give), or a
     brokerage they say lists the home. Only the first 2,000 characters are read, and no pattern
     can backtrack badly."""
     text = text[:MAX_TEXT]
     for pattern, role_group, first_group in ((_NAMED_ROLE, 3, 1), (_LABEL, 1, 2)):
-        m = pattern.search(text)
-        if m:
+        for m in pattern.finditer(text):
             role = _ROLE_OF[m.group(role_group).lower()]
-            return Claim(role, m.group(first_group), m.group(first_group + 1))
-    m = _SELF_ROLE.search(text)
+            if role == "locator" and pattern is _NAMED_ROLE:
+                continue  # "Free Apartment Locator" is a service label, not a self-claim
+            if _is_name(m.group(first_group), m.group(first_group + 1)):
+                return Claim(role, m.group(first_group), m.group(first_group + 1))
+    m = _SELF_ROLE.search(text) or _ALSO_ROLE.search(text)
     if m:
         role = _ROLE_OF[m.group(1).lower()]
-        named = _NAME_INTRO.search(text) or _SIGNATURE.search(text.strip())
-        return Claim(role, named.group(1), named.group(2)) if named else Claim(role)
+        name = _name_in(text)
+        return Claim(role, *name) if name else Claim(role)
     m = _COMPANY.search(text)
     if m:
         return Claim("company", company=m.group(1).strip())
@@ -165,15 +251,26 @@ def _soql(value: str) -> str:
 
 
 def _get_rows(where: str, client: httpx.Client) -> list[dict] | None:
+    """One query, streamed against a single 5 s deadline for the whole call: httpx timeouts
+    apply per phase, so a server that trickles bytes would otherwise run far past it."""
+    deadline = _monotonic() + TIMEOUT_S
     try:
-        r = client.get(
+        with client.stream(
+            "GET",
             TREC_URL,
             params={"$where": where, "$limit": str(MAX_ROWS + 1)},
-            timeout=httpx.Timeout(TIMEOUT_S),
-        )
-        if r.status_code != 200:
-            return None
-        rows = r.json()
+            timeout=httpx.Timeout(TIMEOUT_S, read=min(READ_SLICE_S, TIMEOUT_S)),
+        ) as r:
+            if r.status_code != 200:
+                return None
+            chunks: list[bytes] = []
+            size = 0
+            for chunk in r.iter_bytes():
+                size += len(chunk)
+                if size > MAX_BODY_BYTES or _monotonic() > deadline:
+                    return None
+                chunks.append(chunk)
+        rows = json.loads(b"".join(chunks))
     except (httpx.HTTPError, ValueError):
         return None
     if not isinstance(rows, list):
@@ -267,10 +364,14 @@ def check_license(
         else:
             answer = _lookup_person(claim.first or "", claim.last or "", http)
         if answer[0] is not LicenseStatus.NOT_CHECKED:
-            cached.parent.mkdir(parents=True, exist_ok=True)
-            cached.write_text(
-                json.dumps({"status": answer[0].value, "sponsor": answer[1]}), encoding="utf-8"
-            )
+            try:
+                cached.parent.mkdir(parents=True, exist_ok=True)
+                cached.write_text(
+                    json.dumps({"status": answer[0].value, "sponsor": answer[1]}),
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass  # a read-only data dir loses the cache, never the answer
 
     status, sponsor = answer
     return LicenseResult(
