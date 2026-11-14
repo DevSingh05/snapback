@@ -194,7 +194,9 @@ Lanes: A agent and backend, T front end, V vision and ML, D data and iMessage. O
   kit's listing photos. No accuracy number appears here, in the demo or on a card until the
   harness measures it, with n shown.
 - **Numbers so far are on renders, not photos.** The locate gate is measured on renders of the
-  scans, and every line it prints says so. Three demo houses are now indexed beside the apartment
+  scans, and every line it prints says so. On renders of our scans (unseen directions from the
+  indexed scan points), n=20 claimed + 10 other-building views: 20/20 placed in the right
+  building, 0 false placements (held-out seed, main 04b9937, #28). Three demo houses are now indexed beside the apartment
   scans; house results so far are on renders too.
 - **Houston only.** Search covers CoStar's Houston listings.
 - **Owner of record and license: Houston/Texas only.** The owner comes from the Harris County record
