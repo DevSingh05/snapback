@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from snapback.contracts import AS_OF, DataSource, RenterBrief
-from snapback.search import _all_matches, _source_of, _supply
+from snapback.contracts import AS_OF, DataSource, PlaceMatch, RenterBrief
+from snapback.search import _all_matches, _match, _source_of, _supply, plan_key
+
+source_of = _source_of  # the data source of a lookups object (LIVE or FIXTURE)
 
 PROP_KEYS = (
     "pid",
@@ -117,9 +120,7 @@ def _build(lookups: Any) -> tuple[list[_Place], int]:
                 pid=pid,
                 kind=kind,
                 has_scan=any(r.has_scan for r in raws),
-                n_plans=1
-                if kind == "house"
-                else len({(r.floor_plan, r.rent_min, r.rent_max) for r in raws}),
+                n_plans=len({plan_key(r) for r in raws}),
                 rent_from=min(prices) if prices else None,
                 units_reported=sum(units) if units and kind == "apartment" else None,
                 lon=lon,
@@ -182,3 +183,92 @@ class PlacesIndex:
 def build_places_map(brief: RenterBrief | None, lookups: Any) -> PlacesMap:
     """One-shot feed (tests and scripts); the API keeps a `PlacesIndex` per process."""
     return PlacesIndex(lookups).feed(brief)
+
+
+# --- the place sheet ------------------------------------------------------------------------------
+
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+class SheetAerial(BaseModel):
+    source: DataSource
+    captured_on: date | None = None
+    line: str | None = None  # "Aerial photo captured Mar 14, 2025 (Vexcel)"; None without a date
+    image_path: str | None = None  # our own route; the Vexcel key never leaves the server
+
+
+class PlaceSheet(BaseModel):
+    """What the map's sheet shows for one place: every priced plan with the same lines search
+    builds, the company on record, the scan badge and the aerial. No address."""
+
+    property_id: str
+    kind: Literal["apartment", "house"]
+    source: DataSource
+    as_of: str = AS_OF
+    office_on_record: str | None = None  # company name only
+    has_3d_scan: bool = False
+    scan_text: str | None = None
+    walk_path: str | None = None  # Walk it first, when a scan is on record
+    plans: list[PlaceMatch]
+    aerial: SheetAerial | None = None
+
+
+def captured_line(captured_on: date | None, source: DataSource) -> str | None:
+    if captured_on is None:
+        return None
+    who = "Vexcel" if source is DataSource.LIVE else "fixture tile"
+    day = f"{MONTHS[captured_on.month - 1]} {captured_on.day}, {captured_on.year}"
+    return f"Aerial photo captured {day} ({who})"
+
+
+def place_sheet(property_id: str, lookups: Any) -> PlaceSheet | None:
+    """The sheet for one place by id, whatever the budget; None when it has no priced plan."""
+    source = _source_of(lookups)
+    open_brief = RenterBrief(max_results=50)
+    seen: set[str] = set()
+    plans: list[PlaceMatch] = []
+    for raw in _supply(lookups):
+        if raw.property_id != property_id:
+            continue
+        match = _match(raw, open_brief, source)
+        if match is None or (match.plan_key or "") in seen:
+            continue
+        seen.add(match.plan_key or "")
+        plans.append(match)
+    if not plans:
+        return None
+    from snapback.search import order_key
+
+    plans.sort(key=order_key)
+    first = plans[0]
+    return PlaceSheet(
+        property_id=property_id,
+        kind=first.kind,
+        source=source,
+        office_on_record=first.office_on_record,
+        has_3d_scan=any(p.has_3d_scan for p in plans),
+        scan_text=first.scan_text if any(p.has_3d_scan for p in plans) else None,
+        walk_path=f"/tour/{property_id}" if any(p.has_3d_scan for p in plans) else None,
+        plans=plans,
+    )
+
+
+def fixture_tile_jpeg(property_id: str) -> bytes:
+    """A plain team-made stand-in tile, labelled as one. Never Vexcel imagery."""
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    h = 0
+    for ch in property_id:
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    tall = 100 + (h % 7) * 12
+    left = 180 + (h % 5) * 20
+    img = Image.new("RGB", (640, 400), "#cfe0ea")
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(0, 300), (640, 250), (640, 400), (0, 400)], fill="#b4d3e6")
+    draw.rectangle([left, 280 - tall, left + 180, 280], fill="#ffffff")
+    draw.text((250, 370), "Aerial tile (fixture)", fill="#43555f")
+    out = BytesIO()
+    img.save(out, format="JPEG", quality=80)
+    return out.getvalue()
