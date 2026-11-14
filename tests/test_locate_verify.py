@@ -355,11 +355,13 @@ def test_thresholds_reject_an_elsewhere_bar_below_the_placement_bar(tmp_path):
     from snapback.vision.locate.thresholds import THRESHOLDS_FILE
 
     copy = tmp_path / "t.toml"
-    copy.write_text(
-        THRESHOLDS_FILE.read_text().replace(
-            "elsewhere_min_inliers = 60", "elsewhere_min_inliers = 29"
-        )
+    import re
+
+    text, swapped = re.subn(
+        r"elsewhere_min_inliers = \d+", "elsewhere_min_inliers = 29", THRESHOLDS_FILE.read_text()
     )
+    assert swapped == 1  # the edit must land, whatever the current value is
+    copy.write_text(text)
     with pytest.raises(ValueError, match="elsewhere_min_inliers"):
         load_thresholds(copy)
 
@@ -475,3 +477,76 @@ def test_two_photos_with_one_strict_and_one_weak_do_not_identify(twins, locator)
     assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * 2
     assert result.identified_by_scan is False and result.identified_photos == 0
     assert result.claimed_property_id is None
+
+
+def test_thresholds_version_names_the_matcher(twins, locator):
+    sweeps, _, _ = twins
+    photo = listing_photo(sweeps, "fx-model-a", 2, 1)
+    result = locator.locate("fx-case-v", {"p": photo}, "fx-prop-1")
+    assert result.thresholds_version.startswith("thresholds-")
+    assert result.thresholds_version.endswith("+patch")
+
+
+def test_seam_neighbours_add_the_faces_either_side_of_the_top_two_hits():
+    from snapback.vision.locate.index import Entry, Hit
+    from snapback.vision.locate.locate import seam_neighbours
+
+    hits = [
+        Hit(Entry("m1", "s1", 1, "c"), 0.9),
+        Hit(Entry("m2", "s4", 4, "face"), 0.8),
+        Hit(Entry("m3", "s9", 2, "c"), 0.7),  # third hit: no neighbours added
+    ]
+    added = {(h.entry.model_id, h.entry.sweep_id, h.entry.face) for h in seam_neighbours(hits)}
+    assert added == {("m1", "s1", 4), ("m1", "s1", 2), ("m2", "s4", 3), ("m2", "s4", 1)}
+    assert all(h.score < 0.7 for h in seam_neighbours(hits))  # tried after the real hits
+
+
+def test_elsewhere_bar_follows_the_ruling():
+    t = load_thresholds()
+    assert t.elsewhere_min_inliers == 50 and t.elsewhere_min_spread == 0.15
+
+
+# --- identification never depends on index order, and its guards each have a test ---------------
+
+
+@pytest.mark.parametrize("sister_first", [True, False])
+@pytest.mark.parametrize("n_photos", [1, 2])
+def test_tract_twin_makes_identification_ambiguous_in_either_index_order(
+    twins, tmp_path, sister_first, n_photos
+):
+    sweeps, _, catalog = twins
+    sister = sister_sweeps(sweeps, tmp_path)
+    ordered = [sister, sweeps["fx-model-a"]] if sister_first else [sweeps["fx-model-a"], sister]
+    index = LocateIndex.build("fx-tract", [s for group in ordered for s in group], TinyEmbedder())
+    models = [*catalog.models.values(), ModelInfo("fx-model-sister", "fx-prop-9")]
+    all_sweeps = {"fx-model-a": sweeps["fx-model-a"], "fx-model-sister": sister}
+    locator = Locator(index, all_sweeps, Catalog(models), PatchMatcher(), THRESHOLDS)
+
+    photos = {
+        "p1": listing_photo(sweeps, "fx-model-a", 2, 1),
+        "p2": listing_photo(sweeps, "fx-model-a", 0, 3),
+    }
+    result = locator.locate("fx-tract", dict(list(photos.items())[:n_photos]), None)
+
+    assert [p.status for p in result.photos] == [LocateStatus.NOT_LOCATED] * n_photos
+    assert result.identified_by_scan is False and result.identified_photos == 0
+    assert result.claimed_property_id is None and result.chosen is None
+
+
+def test_clumped_inliers_do_not_identify(twins):
+    sweeps, index, catalog = twins
+    clumped = replace(THRESHOLDS, elsewhere_min_spread=0.99)  # inliers pass, spread does not
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), clumped)
+    result = locator.locate("fx-clump", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    assert result.identified_by_scan is False
+
+
+def test_unmapped_twin_does_not_identify(twins):
+    sweeps, index, _ = twins
+    catalog = Catalog([ModelInfo("fx-model-b", "fx-prop-2")])  # fx-model-a is not mapped
+    locator = Locator(index, sweeps, catalog, PatchMatcher(), THRESHOLDS)
+    result = locator.locate("fx-unmapped2", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, None)
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
+    assert result.photos[0].matched_property_id is None
+    assert result.identified_by_scan is False and result.claimed_property_id is None

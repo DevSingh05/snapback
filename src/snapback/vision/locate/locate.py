@@ -107,6 +107,26 @@ def photo_hfov(image: Image.Image, default: float) -> float:
     return math.degrees(2 * math.atan(long_side / (2 * float(focal))))
 
 
+_RING = (1, 2, 3, 4)  # side faces, left to right: each meets its neighbours at a seam
+
+
+def seam_neighbours(hits: list, top: int = 2) -> list:
+    """For the `top` best hits on a side face, the side faces either side of it in the same
+    sweep: a photo looking across a seam splits its matches between two faces."""
+    from snapback.vision.locate.index import Entry, Hit
+
+    floor = min((h.score for h in hits), default=0.0)
+    out = []
+    for hit in hits[:top]:
+        entry = hit.entry
+        if entry.face not in _RING:
+            continue
+        at = _RING.index(entry.face)
+        for neighbour in (_RING[at - 1], _RING[(at + 1) % len(_RING)]):
+            out.append(Hit(Entry(entry.model_id, entry.sweep_id, neighbour, "face"), floor - 1e-3))
+    return out
+
+
 @dataclass(frozen=True)
 class _Placement:
     model_id: str
@@ -181,28 +201,22 @@ class Locator:
                 break
         return best
 
-    def _place(
-        self, photo: Image.Image, claimed_models: set[str], identify: bool = False
-    ) -> _Placement | None:
+    def _place(self, photo: Image.Image, claimed_models: set[str]) -> _Placement | None:
         """Claimed twins first, always: a twin of the claimed building that passes places the
         photo there, whatever else matches and whatever order the index was built in. Another
         building places it only on the stricter elsewhere bar (it can lead to DON'T PAY).
-        `identify` (the ad names no home): any building places it, but only on the strict bar,
-        because the answer puts that home's record on the card."""
+        """
         t = self.thresholds
         hits = self._candidates(photo, claimed_models)
-        if identify:
-            return self._best(
-                photo,
-                hits,
-                lambda c: (
-                    c.inliers >= t.elsewhere_min_inliers
-                    and c.ratio >= t.min_inlier_ratio
-                    and c.spread >= t.elsewhere_min_spread
-                ),
-            )
         claimed_hits = [h for h in hits if h.entry.model_id in claimed_models]
         other_hits = [h for h in hits if h.entry.model_id not in claimed_models]
+        seen = {(h.entry.model_id, h.entry.sweep_id, h.entry.face) for h in other_hits}
+        other_hits += [
+            h
+            for h in seam_neighbours(other_hits)
+            if (h.entry.model_id, h.entry.sweep_id, h.entry.face) not in seen
+            and (h.entry.model_id, h.entry.sweep_id) in self._sweeps
+        ]
         placed = self._best(
             photo,
             claimed_hits,
@@ -219,6 +233,32 @@ class Locator:
                 and c.spread >= t.elsewhere_min_spread
             ),
         )
+
+    def _identify(self, photo: Image.Image) -> tuple[_Placement | None, bool]:
+        """The ad names no home. Verify EVERY candidate on the strict bar, with no early stop, so
+        the answer never depends on index order. Returns (best placement, ambiguous): ambiguous
+        when the photo passes in more than one property (tract twins, sister buildings)."""
+        t = self.thresholds
+        best, homes = None, set()
+        for hit in self._candidates(photo, set()):
+            entry = hit.entry
+            face = self._face(entry.model_id, entry.sweep_id, entry.face)
+            check = verify(self.matcher, photo, face, t.ransac_px)
+            if not (
+                check.inliers >= t.elsewhere_min_inliers
+                and check.ratio >= t.min_inlier_ratio
+                and check.spread >= t.elsewhere_min_spread
+            ):
+                continue
+            homes.add(self.catalog.property_of(entry.model_id))
+            if best is None or check.inliers > best.check.inliers:
+                best = _Placement(
+                    entry.model_id,
+                    self._sweeps[(entry.model_id, entry.sweep_id)],
+                    entry.face,
+                    check,
+                )
+        return best, len(homes) > 1
 
     def _pose(self, photo: Image.Image, placed: _Placement) -> Pose | None:
         if placed.check.homography is None:
@@ -262,12 +302,17 @@ class Locator:
         per_model: dict[str, list[int]] = {}
 
         placements: dict[str, _Placement | None] = {}
+        tangled = False  # a photo passed in more than one property
         for photo_id, image in photos.items():
             if not identify and not claimed_models:
                 placements[photo_id] = None
                 continue
             photo = image.convert("RGB")
-            placed = self._place(photo, claimed_models, identify)
+            if identify:
+                placed, ambiguous = self._identify(photo)
+                tangled = tangled or ambiguous
+            else:
+                placed = self._place(photo, claimed_models)
             if (
                 placed is not None
                 and placed.model_id not in claimed_models
@@ -285,7 +330,11 @@ class Locator:
                 self.catalog.property_of(p.model_id) for p in placements.values() if p is not None
             }
             strict_placed = sum(p is not None for p in placements.values())
-            if found and len(photos) >= 2 and strict_placed < 2:
+            if tangled:
+                log.warning("case %s: a photo matches more than one property", case_id)
+                placements = dict.fromkeys(placements)
+                conflict = True
+            elif found and len(photos) >= 2 and strict_placed < 2:
                 # One lone strict match among several photos is not enough to name a home.
                 log.warning(
                     "case %s: only %d of %d photos identify a home",
@@ -368,5 +417,7 @@ class Locator:
             chosen=chosen,
             alternatives=[c for c in candidates if c is not chosen],
             poses=poses,
-            thresholds_version=self.thresholds.version,
+            thresholds_version=(
+                f"{self.thresholds.version}+{getattr(self.matcher, 'version', self.matcher.name)}"
+            ),
         )

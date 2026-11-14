@@ -22,7 +22,9 @@ class LocateStatus(StrEnum):
 
     LOCATED_IN_CLAIMED = "located_in_claimed"  # geometrically verified inside the claimed property
     LOCATED_ELSEWHERE = "located_elsewhere"  # verified inside a different indexed property
-    NOT_LOCATED = "not_located"  # the claimed property is indexed and the photo matches nowhere
+    NOT_LOCATED = (
+        "not_located"  # claimed home indexed, photo matches nowhere; or no claim and no single home
+    )
     NOT_INDEXED = "not_indexed"  # the claimed property has no twin in our index
 
 
