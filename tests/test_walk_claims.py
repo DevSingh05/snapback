@@ -120,6 +120,5 @@ def test_count_line_uses_the_kind_word_and_pluralises_on_the_ads_number():
 
 
 def test_the_aerial_date_claim_is_sourced_to_vexcel():
-    out = attach_claims(plan_of(), [note("aerial_date", "aerial", year=2025)])
-    sources = [c.source for s in out.stops for c in s.claims]
-    assert sources in (["Vexcel"], [])  # sourced to Vexcel when the table has words for it
+    out = attach_claims(plan_of(), [note("aerial_date", "pool", ad_value="2025-03-02")])
+    assert [c.source for c in stop(out, "Arrive outside").claims] == ["Vexcel"]
