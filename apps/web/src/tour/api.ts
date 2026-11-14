@@ -7,6 +7,8 @@ export interface TourTarget {
   planKey?: string | null;
   /** A case whose placed ad photos should appear on their rooms (needs its read token). */
   caseId?: string | null;
+  /** "elsewhere": walk the building the case's photos were taken in (needs the case). */
+  mode?: "claimed" | "elsewhere";
 }
 
 /** The tour plan: the API's when one is configured, else the labelled synthetic fixture. */
@@ -15,7 +17,11 @@ export async function fetchTour(target: TourTarget, signal?: AbortSignal): Promi
   const q = target.planKey ? `?plan_key=${encodeURIComponent(target.planKey)}` : "";
   const place = `/places/${encodeURIComponent(target.propertyId)}/tour${q}`;
   const withCase = target.caseId
-    ? apiFetchRead(`/cases/${encodeURIComponent(target.caseId)}/walk`, target.caseId, { signal })
+    ? apiFetchRead(
+        `/cases/${encodeURIComponent(target.caseId)}/walk${target.mode === "elsewhere" ? "?mode=elsewhere" : ""}`,
+        target.caseId,
+        { signal },
+      )
     : null;
   const caseRes = withCase ? await withCase : null;
   if (caseRes?.ok) return ((await caseRes.json()) as WalkResponse).plan;

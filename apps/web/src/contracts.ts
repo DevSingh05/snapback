@@ -342,6 +342,7 @@ export interface WalkCoverage {
   placed: number;
   elsewhere: number;
   unplaced: number;
+  plan_mismatch?: boolean;
   line?: string | null;
 }
 
@@ -370,6 +371,8 @@ export interface TourPlan {
   aerial?: { source: DataSource; captured_on?: string | null; has_image: boolean } | null;
   stops: TourStop[];
   links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
+  mode?: "claimed" | "elsewhere"; // "elsewhere": the building the ad's photos were taken in
+  mode_line?: string | null;
   coverage?: WalkCoverage | null;
   director?: TourDirector | null;
 }

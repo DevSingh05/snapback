@@ -191,6 +191,16 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
         {live && !sdkFailed ? <SourceChip source="live" /> : <SourceChip source="fixture" />}
       </header>
       {plan.scan_label && <p className="tour-scan">This tour uses {plan.scan_label}.</p>}
+      {plan.mode === "elsewhere" && (
+        <p className="tour-mode" data-testid="elsewhere-heading">
+          Where the photos were taken: the home in these photos.
+        </p>
+      )}
+      {plan.mode_line && (
+        <p className="tour-mode-line" data-testid="mode-line">
+          {plan.mode_line}
+        </p>
+      )}
       {plan.coverage?.line && (
         <p className="tour-coverage" data-testid="coverage-line">
           {plan.coverage.line}

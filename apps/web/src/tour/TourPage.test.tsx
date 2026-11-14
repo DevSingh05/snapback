@@ -178,3 +178,11 @@ describe("links to the tour", () => {
     );
   });
 });
+
+describe("link to where the photos were taken", () => {
+  it("the twin page offers it only when a photo was verified in another building", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} demo="copied" />);
+    const link = screen.getByTestId("where-photos-link");
+    expect(link.getAttribute("href")).toMatch(/^\/tour\/.+\?case=fx-7Q2M&where=photos$/);
+  });
+});

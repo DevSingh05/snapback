@@ -107,3 +107,26 @@ describe("landingOfStop", () => {
     expect(landingOfStop(stopOf("Bathroom"))).toBeNull();
   });
 });
+
+describe("the walk of the building the photos were taken in (X1)", () => {
+  it("shows the heading and the office line, and never the no-photo wording", () => {
+    const plan = planWith({
+      mode: "elsewhere",
+      mode_line:
+        "The home in these photos is listed by Sample Property Group on CoStar's record. We can't tell you if it is for rent, or at this price.",
+      coverage: { counted: "none", total: 0, with_photo: 0, placed: 1, elsewhere: 0, unplaced: 0 },
+      stops: FIXTURE_TOUR.stops.map((s) =>
+        s.ad_view === "none_placed" ? { ...s, ad_view: "unknown" as const } : s,
+      ),
+    });
+    render(<TourView plan={plan} />);
+    expect(screen.getByTestId("elsewhere-heading")).toHaveTextContent(
+      "Where the photos were taken",
+    );
+    expect(screen.getByTestId("mode-line")).toHaveTextContent(
+      "We can't tell you if it is for rent",
+    );
+    expect(screen.queryByTestId("coverage-line")).toBeNull();
+    expect(screen.queryByText(/The ad showed no photo of this room/)).toBeNull();
+  });
+});
