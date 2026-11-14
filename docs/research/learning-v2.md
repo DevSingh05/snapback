@@ -171,7 +171,7 @@ One screen, three panels, every number read from `eval/results.csv`, n and inter
 **Why rentals for the build (evidence).**
 
 - The kit is multifamily: about 1,314 Houston multifamily records with Matterport model units per floor plan (REPORTED, costar-answers.md). There is no single-family for-sale or vacant land coverage in it, so a purchase demo would run on no sponsor data, which costs the CoStar data-use criterion.
-- The whole v3 product (challenge, place row, card) is built for a renter paying a deposit before a viewing. Our hooks are rental stories (Reiling in Conroe; FTC about 32 reports a day).
+- The whole v3 product (challenge, place row, card) is built for a renter paying a deposit before a viewing. Our hooks are rental stories (a renter in Conroe, TX; FTC about 32 reports a day).
 - Correction for the pitch, REPORTED from two secondary sources (closinglock.com, rebillion.ai summaries of IC3 2025; the IC3 PDF is still unread at primary): IC3's "Real Estate Fraud" category ($275.1M, 12,368 complaints) covers losses from real estate investment, **rental** and timeshare fraud, and a diverted closing wire is counted under BEC instead. If confirmed, the $275M stage number is closer to our rental problem than need-evidence.md assumed ("includes sale and wire fraud"). Until confirmed, keep saying "real estate fraud".
 
 **Purchase-side scams and what transfers.**
