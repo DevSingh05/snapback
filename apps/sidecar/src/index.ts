@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { type MessageClient } from "./handler";
 import { connectPhoton, publicWebUrl, runPhoton } from "./photon";
+import { WatchBook, pushMatches, readEvents } from "./watch";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -71,7 +72,25 @@ if (photon) {
   const stop = () => void app.stop?.().finally(() => process.exit(0));
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
+  const watches = new WatchBook();
+  const eventsToken = process.env.SNAPBACK_EVENTS_TOKEN;
+  if (eventsToken) {
+    // Watch alerts (M10): follow the API's events stream and reconnect when it ends.
+    void (async () => {
+      for (;;) {
+        try {
+          await pushMatches(readEvents(API_URL, eventsToken), watches, webUrl, console.log);
+        } catch {
+          console.log("[sidecar] events stream closed; reconnecting");
+        }
+        await new Promise((done) => setTimeout(done, 5000));
+      }
+    })();
+  } else {
+    console.log("[sidecar] SNAPBACK_EVENTS_TOKEN is not set: watch alerts will not be sent.");
+  }
   await runPhoton(app, {
+    watches,
     apiUrl: API_URL,
     webUrl,
     allowedThreads: new Set(allowed),
