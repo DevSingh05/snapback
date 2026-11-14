@@ -1,4 +1,4 @@
-.PHONY: setup lint format test hygiene check api web sidecar
+.PHONY: setup lint format test hygiene check api web sidecar eval-locate-real
 
 setup: ## install python and node dependencies
 	uv sync
@@ -33,3 +33,6 @@ web: ## run the web app on :5173 against the API on :8000 via the /api proxy (LI
 
 sidecar: ## run the intake sidecar stub
 	npm run dev -w apps/sidecar
+
+eval-locate-real: ## A8: locate accuracy on the kit's own photos; writes totals to eval/locate_real.csv
+	uv run python -m snapback.agent.locate_eval
