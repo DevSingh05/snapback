@@ -15,24 +15,6 @@
   gap: var(--sp-3);
 }
 
-.tour-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-2) var(--sp-4);
-  padding: 16px var(--page-pad);
-}
-.tour-head > .mono {
-  font-size: var(--fs-sm);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.tour-head > .mono:first-of-type {
-  color: var(--act);
-  font-weight: 700;
-  margin-right: auto;
-}
 .tour-scan,
 .tour-render {
   margin: 0;
@@ -553,10 +535,6 @@
 }
 
 /* ---------- Finding your way: out of the walk, where you are, how far along ---------- */
-/* The app bar carries the mark; the walk's own header keeps only what the walk needs. */
-.tour-head .wordmark {
-  display: none;
-}
 .tour-ways {
   display: flex;
   flex-wrap: wrap;
@@ -624,24 +602,6 @@
     margin-left: 0;
   }
 }
-/* Plain labels: the bar already says Walk, so the header only says which data this is. */
-.tour-head {
-  padding-block: var(--sp-2);
-}
-.tour-head > .wordmark + .mono {
-  display: none;
-}
-.tour-head::before {
-  content: "Record";
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.tour-head > .mono {
-  margin-left: var(--sp-3);
-}
 
 /* ---------- First visit: what this is, what to do, where to go next ---------- */
 .tour-intro {
@@ -688,4 +648,151 @@
 }
 .tour-aerial-over .sv-still {
   flex: 1;
+}
+
+/* ---------- Ticket 6: the page around the player ---------- */
+/* The path rail carries the page's LIVE or FIXTURE tags (one for the record, one for the 3D view). */
+.tour-path {
+  padding-inline: var(--page-pad);
+}
+.tour-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: var(--sp-3);
+}
+.tour-page {
+  box-shadow: none;
+  background: var(--layer-0);
+}
+/* The stage is matte, edge to edge; whatever shows through while a view loads is the matte. */
+.tour-stage {
+  background: var(--matte);
+  color: var(--on-matte);
+}
+/* The aerial opens the walk: sharp, under the matte finish, . */
+.tour-aerial-frame {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  display: flex;
+  min-height: inherit;
+}
+.tour-aerial-photo {
+  flex: 1;
+  min-height: inherit;
+}
+.tour-aerial-photo > img {
+  position: absolute;
+  inset: 0;
+}
+/* On this stop: two rows under the stage, a label and a sentence each. They change with the stop. */
+.tour-panel > .tour-onstop {
+  grid-column: 1 / -1;
+  padding: var(--sp-4) var(--page-pad) var(--sp-2);
+  display: grid;
+  gap: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.tour-onstop-h {
+  margin: 0;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--act);
+  font-weight: 700;
+}
+.tour-onstop-row {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr) auto;
+  gap: var(--sp-1) var(--sp-4);
+  align-items: start;
+}
+.tour-onstop-k,
+.tour-onstop-v {
+  margin: 0;
+}
+.tour-onstop-k {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 0.2em;
+}
+.tour-onstop-v {
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  max-width: 60ch;
+}
+/* The ad's photo, where the hand-off from the result lands. */
+.tour-adthumb {
+  width: 132px;
+  aspect-ratio: 4 / 3;
+  view-transition-name: ad-photo;
+}
+/* Hand-off from the case result: the same photo name on both pages, so the browser flies it.
+   Without View Transitions the photo fades in instead. */
+@view-transition {
+  navigation: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tour-adthumb {
+    animation: tour-adthumb-in 360ms var(--ease-out) backwards;
+  }
+}
+@keyframes tour-adthumb-in {
+  from {
+    opacity: 0;
+  }
+}
+@supports (view-transition-name: none) {
+  .tour-adthumb {
+    animation: none;
+  }
+}
+::view-transition-group(ad-photo) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+@media (max-width: 760px) {
+  /* Phone: the stage is 62vh, the stop's rows stack, the ad's photo is a 72px thumb. */
+  .tour-stage,
+  .tour-frame,
+  .tour-aerial {
+    min-height: 62vh;
+  }
+  .tour-stage {
+    height: 62vh;
+  }
+  .tour-onstop-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .tour-onstop-k {
+    grid-column: 1 / -1;
+  }
+  .tour-adthumb {
+    width: 72px;
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .tour-path {
+    overflow-x: clip;
+  }
+}
+/* The player's controls sit over the bottom of the stage, so the aerial's stamp rides under the
+   3D | Real switch instead. */
+@media (min-width: 761px) {
+  .tour-aerial-photo .ui-stamp {
+    top: 64px;
+    bottom: auto;
+    left: auto;
+    right: 0;
+  }
 }

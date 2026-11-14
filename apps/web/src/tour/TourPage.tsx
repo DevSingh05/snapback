@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { STATE_WORD } from "../cardStrings";
 import { SourceChip } from "../components/SourceChip";
+import { PathRail } from "../ui/PathRail";
 import { EvidenceDrawer, RENDER_NOTE } from "../evidence/EvidenceDrawer";
 import type { TourPlan, VerdictState } from "../contracts";
 import { PhotoLanding } from "../twin/PhotoLanding";
@@ -14,7 +15,7 @@ import { MismatchAerials } from "../walk/MismatchAerials";
 import { RealStill, StageViews } from "../walk/StageViews";
 import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
-import { seeingLine, waysOut } from "../walk/seeing";
+import { waysOut } from "../walk/seeing";
 import { WalkPlayer, buildChapters, totalMs, type PlayerPhoto } from "../walk/player";
 import { ScanOffer } from "./ScanOffer";
 import { WalkMap } from "../walk/WalkMap";
@@ -22,6 +23,7 @@ import { useWalkLive } from "../walk/useWalkLive";
 import { photoAt, walkLook } from "../walk/walkLook";
 import { fetchTour, type TourResult, type TourTarget } from "./api";
 import { RoomStop, landingOfStop } from "./RoomStop";
+import { AerialOpening, OnThisStop } from "./StageFrames";
 import { useAdPhoto } from "./useAdPhoto";
 import "./tour.css";
 
@@ -148,8 +150,7 @@ export function TourView({
     : live
       ? "Placeholder: the ad's own photo could not be loaded here."
       : "Placeholder photo (fixture).";
-  const aerialSrc = aerial.status === "ready" ? aerial.claimed.imageUrl : null;
-  const showAerial = stop.kind === "arrive" && aerial.status === "ready" && aerial.claimed.imageUrl;
+  const aerialSrc = aerial.status === "ready" ? (aerial.claimed.imageUrl ?? null) : null;
 
   // The look layer: evidence, real images, trace events and the two-buildings case.
   const narrow = useNarrow();
@@ -182,7 +183,11 @@ export function TourView({
       {/* Open outside: the building's aerial over the scan while it sits in its dollhouse. */}
       {stop.kind === "arrive" && aerialSrc && !wrongModel && (
         <div className="tour-aerial-over" data-testid="tour-aerial-over">
-          <RealStill src={aerialSrc} label="Vexcel aerial" alt="Aerial view of the building" />
+          <AerialOpening
+            src={aerialSrc}
+            capturedOn={plan.aerial?.captured_on}
+            seed={plan.property_id}
+          />
         </div>
       )}
       {landing && !wrongModel && (
@@ -196,8 +201,8 @@ export function TourView({
         />
       )}
     </>
-  ) : showAerial ? (
-    <RealStill src={showAerial} label="Vexcel aerial" alt="Aerial view of the building" />
+  ) : stop.kind === "arrive" ? (
+    <AerialOpening src={aerialSrc} capturedOn={plan.aerial?.captured_on} seed={plan.property_id} />
   ) : inRoom && stills?.scan ? (
     <RealStill
       src={stills.scan}
@@ -259,13 +264,19 @@ export function TourView({
         Press play to walk all {plan.stops.length} stops in {walkSeconds} seconds, or pick Explore
         to look around yourself.
       </p>
-      <header className="tour-head">
-        <span className="wordmark">SNAPBACK</span>
-        <span className="mono">Walk it first</span>
-        <SourceChip source={plan.source} />
-        <span className="mono">3D view</span>
-        {live && !sdkFailed ? <SourceChip source="live" /> : <SourceChip source="fixture" />}
-      </header>
+      <PathRail
+        className="tour-path"
+        next={2}
+        hrefs={{ 1: waysOut(plan, caseId).back.href, 3: "/listings", 4: plan.links.tour_prep }}
+      >
+        <span className="tour-tag">
+          Record <SourceChip source={plan.source} />
+        </span>
+        <span className="tour-tag">
+          3D view{" "}
+          {live && !sdkFailed ? <SourceChip source="live" /> : <SourceChip source="fixture" />}
+        </span>
+      </PathRail>
       {plan.scan_label && <p className="tour-scan">This tour uses {plan.scan_label}.</p>}
       {look.evidence && (
         <p className="tour-render mono" data-testid="tour-render-note">
@@ -394,6 +405,13 @@ export function TourView({
           )}
         </section>
         <aside className="tour-panel" aria-live="polite">
+          <OnThisStop
+            stop={stop}
+            plan={plan}
+            adPhoto={realPhoto}
+            liveScan={liveScan && !wrongModel}
+            sampleSeed={plan.property_id}
+          />
           <div className="tour-panel-top">
             <p className="mono tour-count">
               Step {Math.min(index, last) + 1} of {plan.stops.length}
@@ -416,9 +434,6 @@ export function TourView({
           </div>
           {/* The name is on the view and in the chapter row; here it is for screen readers only. */}
           <h1 className="sr-only">{stop.title}</h1>
-          <p className="tour-seeing" data-testid="tour-seeing">
-            {seeingLine(stop, plan, liveScan && !wrongModel)}
-          </p>
           <WalkMap stops={plan.stops} current={Math.min(index, last)} onPick={setIndex} />
           <RoomStop
             stop={stop}

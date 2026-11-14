@@ -46,10 +46,13 @@ afterEach(() => vi.useRealTimers());
 const title = () => screen.getByRole("heading", { level: 1 }).textContent;
 
 describe("the sample walk", () => {
-  it("stays on the drawn 3D view and offers the real scan only through the scan card", () => {
+  it("opens on the stock aerial stamped SAMPLE PHOTO, never loads the scan, and offers it only through the scan card", () => {
     render(<TourView plan={FIXTURE_TOUR} sdkKey="k" modelId="m" sample />);
     expect(screen.queryByTitle("Matterport 3D view")).toBeNull();
-    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "drawing");
+    // The opening frame is the stock exterior, marked as a sample (never a runtime aerial).
+    expect(screen.getByTestId("aerial-opening")).toHaveAttribute("data-live", "false");
+    expect(screen.getByTestId("aerial-opening")).toHaveTextContent("SAMPLE PHOTO");
+    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "real");
     expect(screen.getByTestId("scan-offer")).toBeInTheDocument();
     expect(screen.queryByText(/Loading the 3D/)).toBeNull();
     expect(screen.getByTestId("walk-player")).toHaveAttribute("data-mode", "playing");
