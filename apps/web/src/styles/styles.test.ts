@@ -176,6 +176,28 @@ describe("Day and Dusk contrast", () => {
     }
   });
 
+  // The focus ring is --focus: the accent on plaster, the matte accent on matte and photos.
+  it("keeps the focus ring at 3:1 on plaster and on matte, in both themes", () => {
+    const ui = strip(readFileSync(join(SRC, "ui", "ui.css"), "utf8"));
+    for (const cls of [".ui-on-matte", ".ui-band"]) {
+      const rule = new RegExp(`\\${cls} \\{[^}]*--focus:\\s*var\\(--act-matte\\)`).test(ui);
+      expect(rule, `${cls} sets --focus to the matte accent`).toBe(true);
+    }
+    for (const [theme, vars] of [
+      ["Day", day],
+      ["Dusk", dusk],
+    ] as const) {
+      for (const bg of grounds) {
+        const r = ratio(colour(vars, "--focus"), colour(vars, bg));
+        report.push(`${theme} focus ring (--focus) on ${bg}: ${r.toFixed(2)}`);
+        expect(r, `${theme} --focus on ${bg}`).toBeGreaterThanOrEqual(3);
+      }
+      const onMatte = ratio(colour(vars, "--act-matte"), colour(vars, "--matte"));
+      report.push(`${theme} focus ring on matte (--act-matte on --matte): ${onMatte.toFixed(2)}`);
+      expect(onMatte, `${theme} focus on matte`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it("keeps Dusk in one block and Day as the default", () => {
     expect(css.match(/color-scheme:\s*dark/g)).toHaveLength(1);
     expect(css).not.toMatch(/prefers-color-scheme/);

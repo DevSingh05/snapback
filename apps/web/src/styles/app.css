@@ -89,8 +89,27 @@ h2 {
 }
 
 .chip {
-  /* LIVE or FIXTURE: drawn by ui/Tag (a mono word and a 7px square, no tile). */
+  /* LIVE or FIXTURE is drawn by ui/Tag. These rules keep the same look for the few places that
+     still write the chip by hand (a mono word with a 7px square before it, no tile). */
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.chip-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--st-unchecked);
+}
+.chip-live .chip-dot {
+  background: var(--st-ok);
 }
 
 .hero {
