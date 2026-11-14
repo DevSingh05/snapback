@@ -171,10 +171,31 @@ def test_no_demo_card_shows_a_phone_a_hash_a_site_or_a_unit_number(case_id):
 
 
 @pytest.mark.parametrize("case_id", ["a", "b", "c"])
-def test_a_demo_card_is_the_same_every_time_and_in_spanish_if_spanish_exists(case_id):
+def test_a_demo_card_is_the_same_every_time(case_id):
     first, second = run_demo_case(case_id), run_demo_case(case_id)
     assert first[0] == second[0]
     assert first[1].rows == second[1].rows
+
+
+@pytest.mark.parametrize("case_id", ["a", "b", "c"])
+def test_a_demo_card_can_be_had_in_spanish_with_the_same_findings(case_id):
+    (verdict, english), (verdicto, spanish) = (
+        run_demo_case(case_id),
+        run_demo_case(case_id, lang="es"),
+    )
+    assert spanish.lang == "es" and verdicto.state is verdict.state
+    for en_row, es_row in zip(english.rows, spanish.rows, strict=True):
+        assert [item.tone for item in es_row.lines] == [item.tone for item in en_row.lines]
+        for en_line, es_line in zip(en_row.lines, es_row.lines, strict=True):
+            assert es_line.text != en_line.text
+
+
+@pytest.mark.parametrize("case_id", ["a", "b", "c"])
+def test_a_demo_card_draws_as_a_picture(case_id):
+    from snapback.card.render import render_card_png
+
+    _, card = run_demo_case(case_id)
+    assert render_card_png(card).startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_an_unknown_demo_case_is_a_clear_error():
