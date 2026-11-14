@@ -38,31 +38,40 @@ uv sync --extra agent    # deepagents, langchain-anthropic
 
 ## Get the CoStar kit
 
-1. Open the kit portal: https://beta-app.matterport.com/2026-princeton-hackathon
-2. Get the sponsor keys from the CoStar track Discord (`/costar-keys` in `#costar-group`) and put
-   them in `.env` only (names in `.env.example`).
+The team accepted the CoStar hackathon Terms as written (Fri 21:48). Each person accepts for
+themselves and gets their own key.
+
+1. Open the kit portal: https://beta-app.matterport.com/2026-princeton-hackathon and accept the Terms.
+2. Get your own sponsor keys from the CoStar track Discord (`/costar-keys` in `#costar-group`) and
+   put them in `.env` only (names in `.env.example`).
 3. Unzip the kit under `data/` (git-ignored), for example `data/raw/costar/costar-hackathon-kit/`.
 4. Run `python3 scripts/probe_kit.py`. It prints field names and counts only, never record values,
-   so its output is safe to paste into an issue.
-
-**Do not click "I Agree" on the sponsor Terms until Vidyut confirms the team decision** (the Terms
-include an IP assignment to CoStar).
+   so its output is safe to paste into the data gate issue.
 
 ## Layout
 
-| Path                        | What it is                                                                       | Lane       |
-| --------------------------- | -------------------------------------------------------------------------------- | ---------- |
-| `src/snapback/contracts.py` | Shared data shapes every lane reads and writes                                   | integrator |
-| `src/snapback/verdict.py`   | Evidence in, verdict out. Pure code, no model                                    | integrator |
-| `src/snapback/api/`         | FastAPI service                                                                  | integrator |
-| `src/snapback/agent/`       | Agent orchestration                                                              | integrator |
-| `src/snapback/vision/`      | Photo index, matching, forgery checks                                            | vision     |
-| `src/snapback/eval/`        | Eval harness that produces every number we quote                                 | vision     |
-| `src/snapback/adapters/`    | CoStar and Vexcel adapters, live and fixture (`matterport.py` belongs to vision) | data       |
-| `apps/sidecar/`             | Intake bridge for inbound renter messages                                        | data       |
-| `apps/web/`                 | Vite + React + TypeScript app                                                    | web        |
-| `fixtures/`                 | Synthetic, team-made test data only                                              | everyone   |
-| `tests/`                    | Python tests                                                                     | everyone   |
+| Path                                  | What it is                                          | Lane |
+| ------------------------------------- | --------------------------------------------------- | ---- |
+| `src/snapback/contracts.py`           | Shared data shapes every lane reads and writes      | XO   |
+| `fixtures/contracts/`                 | One synthetic fixture per contract                  | XO   |
+| `src/snapback/verdict.py`             | Evidence in, verdict out. Pure code, no model       | A    |
+| `src/snapback/agent/`                 | Agent (5 choices), rules tables, intake             | A    |
+| `src/snapback/api/`                   | FastAPI service and SSE trace stream                | A    |
+| `src/snapback/card/`                  | Card strings (en, es), PNG card, verify link and QR | A    |
+| `apps/web/`                           | Vite + React + TypeScript app: S1, S2, S3           | T    |
+| `src/snapback/vision/`                | locate, recapture, memory                           | V    |
+| `src/snapback/eval/`                  | Eval harness that produces every number we quote    | V    |
+| `src/snapback/adapters/matterport.py` | Matterport skybox fetch                             | V    |
+| `src/snapback/adapters/`              | CoStar and Vexcel adapters, live and fixture        | D    |
+| `src/snapback/challenge/`             | Proof-of-presence challenge                         | D    |
+| `src/snapback/redteam/`               | Scripted attack generator                           | D    |
+| `src/snapback/safety/`                | Limits, delete, purge                               | D    |
+| `apps/sidecar/`                       | Photon iMessage bridge                              | D    |
+| `fixtures/`                           | Synthetic, team-made test data only                 | all  |
+| `tests/`                              | Python tests                                        | all  |
+
+Lanes: A agent and backend (Dev), T front end (Vidyut), V vision and ML (Jeffrey), D data and
+iMessage (Rishit). Details in [docs/ROLES.md](docs/ROLES.md).
 
 ## Rules that are not negotiable
 

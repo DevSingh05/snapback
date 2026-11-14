@@ -1,25 +1,35 @@
-# Lane ownership. A PR that touches a path asks that lane's human for review.
+# Lane ownership (final split, Vidyut Fri Nov 13 21:53). A PR that touches a path asks that
+# lane's human for review. Only the XO (for Vidyut) merges to main. The last matching line wins.
 
-# Integrator lane: shared contracts, verdict rules, API, agent orchestration
-/src/snapback/contracts.py  @vs-githjk
-/src/snapback/verdict.py    @vs-githjk
-/src/snapback/settings.py   @vs-githjk
-/src/snapback/api/          @vs-githjk
-/src/snapback/agent/        @vs-githjk
+# Repo rules, CI, shared docs and the cross-lane contracts: Vidyut + Claude + XO
 /AGENTS.md                  @vs-githjk
+/CLAUDE.md                  @vs-githjk
 /.github/                   @vs-githjk
+/docs/                      @vs-githjk
+/src/snapback/contracts.py  @vs-githjk
+/fixtures/contracts/        @vs-githjk
 
-# Vision + eval lane
-/src/snapback/vision/       @DevSingh05
-/src/snapback/eval/         @DevSingh05
+# A. Agent and backend: Dev
+/src/snapback/verdict.py    @DevSingh05
+/src/snapback/settings.py   @DevSingh05
+/src/snapback/api/          @DevSingh05
+/src/snapback/agent/        @DevSingh05
+/src/snapback/card/         @DevSingh05
 
-# Web lane
-/apps/web/                  @jeffrey-g05
+# T. Front end: Vidyut (with Claude)
+/apps/web/                  @vs-githjk
 
-# Data + intake lane
+# V. Vision and ML: Jeffrey
+/src/snapback/vision/       @jeffrey-g05
+/src/snapback/eval/         @jeffrey-g05
+
+# D. Data, iMessage, challenge, red team generator, safety: Rishit
 /src/snapback/adapters/     @RishitRai
 /apps/sidecar/              @RishitRai
+/src/snapback/challenge/    @RishitRai
+/src/snapback/redteam/      @RishitRai
+/src/snapback/safety/       @RishitRai
+/DATA_USE.md                @RishitRai
 
-# Matterport twin access is on the vision lane's critical path, so that one adapter is theirs.
-# Keep this after the directory rule above: the last matching line wins.
-/src/snapback/adapters/matterport.py  @DevSingh05
+# The Matterport adapter feeds the locate index, so vision owns it. Keep after adapters/.
+/src/snapback/adapters/matterport.py  @jeffrey-g05

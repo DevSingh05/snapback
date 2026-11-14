@@ -6,13 +6,13 @@ This file holds the standing rules. The issues hold the plan.
 
 ## Start of every session
 
-1. Read the pinned issue labelled `start-here` (`gh issue list --label start-here`).
-2. Read your lane issue (`gh issue list --label agent:<your-human>`; names: `dev`, `vidyut`,
-   `jeffrey`, `rishit`) and its newest comments.
+1. Read the pinned "Team inbox" issue labelled `start-here` (`gh issue list --label start-here`).
+2. Read your lane epic (`gh issue list --label epic --label agent:<your-human>`; names: `dev`,
+   `vidyut`, `jeffrey`, `rishit`), its newest comments, then your task issues in order.
 3. Run `make setup && make check` before changing anything, so you know the baseline is green.
 4. Read `docs/shared-memory.md` (decisions, data facts, gates, open questions) and your lane in
-   `docs/ROLES.md`. Session routine prompts: `docs/agents/KICKOFF.md` to start,
-   `docs/agents/HANDOFF.md` before you stop.
+   `docs/ROLES.md`. Your paste-ready prompt: `docs/agents/kickoff-<name>.md`. Before you stop:
+   `docs/agents/HANDOFF.md`.
 
 ## Commands
 
@@ -58,22 +58,22 @@ These exist for reasons that will not change this weekend. Do not work around th
 
 ## Working agreement
 
-- **Branch and PR.** Never push to `main`. Branch as `<lane>/<short-topic>`, open a PR, link the
-  issue. Keep PRs small enough to review in five minutes.
+- **Branch and PR.** Never push to `main`. Branch as `<lane>/<issue#>-<slug>` (lane is `a`, `t`,
+  `v` or `d`, e.g. `v/14-dinov2-index`), open a PR with `Closes #<task issue>`. Keep PRs small enough to review in five minutes.
 - **One issue per PR.** `Closes #<n>` for a task issue, `Refs #<n>` for a lane or inbox issue
   (`Closes` would close it). Never force-push, never push to someone else's branch.
 - **Plain commits.** No `Co-Authored-By` lines and no AI attribution in commits or PR text.
 - **Stay in your lane's paths** (see the table in `README.md` and `.github/CODEOWNERS`). You may
   ask for a merge when `make check` is green and the PR touches only your lane's paths. Only the XO
   (on Vidyut's behalf) merges to `main`; agents never push or merge to `main`.
-- **Shared contracts.** A change to `src/snapback/contracts.py` or `src/snapback/verdict.py`
-  needs the integrator lane's approval, because every lane depends on them. Propose the change
-  in an issue first if it is more than adding an optional field.
+- **Shared contracts.** `src/snapback/contracts.py` and `fixtures/contracts/` are held by the XO,
+  because every lane depends on them. Adding an optional field is fine in your PR; anything else
+  (rename, remove, new required field) goes in an issue labelled `contracts` first.
 - **Need something from another lane?** Open an issue with that lane's `agent:` label, say
   exactly what you need (interface, example payload, deadline) and what you will do meanwhile.
   Do not edit their files.
-- **Report on the message board.** At each checkpoint in the timeline issue, comment on your
-  lane issue: what is done, what is next, what is blocked, and any measured numbers with n.
+- **Report on the message board.** About every 30 minutes while working, comment on the task
+  issue you are on (heartbeat): what is done, what is next, what is blocked, and any measured numbers with n.
   Say plainly when something does not work.
 - **Blocked?** Say so within 15 minutes, not after two hours. Label `human-needed` if a human
   has to act.
