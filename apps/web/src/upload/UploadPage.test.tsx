@@ -18,6 +18,20 @@ function setup(createCase: CreateCase = vi.fn().mockResolvedValue(made)) {
 }
 
 describe("UploadPage", () => {
+  it("shows the tagline above the heading, with the sub-head under it", () => {
+    setup();
+    expect(screen.getByText("Trust the home, not the ad.")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Found a place online? Paste the ad.",
+    );
+    expect(
+      screen.getByText(
+        /See the real listing, the real office and a fair price, plus researched places that fit your budget\./,
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/check a rental before you pay/i)).toBeNull();
+  });
+
   it("submits a link, shows the approval step, and only navigates after approval", async () => {
     const user = userEvent.setup();
     const { createCase, navigate } = setup();
