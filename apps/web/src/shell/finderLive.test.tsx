@@ -259,7 +259,37 @@ describe("Finder, connected to the deep agent", () => {
     const honest = await screen.findByTestId("finder-honest");
     expect(honest).toHaveTextContent("The Finder service is not running right now");
     expect(honest).toHaveTextContent("Picked by our rules");
-    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(within(honest).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("a turn still running (409) reads as still thinking; a 429 says the daily limit", async () => {
+    let status = 409;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s });
+        if (url.endsWith("/finder/sessions"))
+          return json({ session_id: "fs-1", token: TOKEN, source: "fixture", mode: "policy" }, 201);
+        if (url.endsWith("/state")) return json(baseState());
+        return json({ detail: "busy or capped" }, status);
+      }),
+    );
+    render(<FinderPage />);
+    await screen.findByTestId("finder-status");
+    const send = (words: string) => {
+      fireEvent.change(screen.getByLabelText("Your message"), { target: { value: words } });
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    };
+    send("hello");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Still thinking");
+    status = 429;
+    send("hello again");
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Daily limit reached; your saved preferences still filter places.",
+      ),
+    );
   });
 
   it("puts what it learned in plain words", () => {

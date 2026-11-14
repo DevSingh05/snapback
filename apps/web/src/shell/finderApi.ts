@@ -29,6 +29,10 @@ export interface FinderAuth {
 export class FinderOffline extends Error {}
 /** The server forgot this session (it restarted): start a new one. */
 export class FinderGone extends Error {}
+/** The last turn is still running on the server (409 on a message). */
+export class FinderBusy extends Error {}
+
+export const DAILY_LIMIT = "Daily limit reached; your saved preferences still filter places.";
 
 export function loadAuth(): FinderAuth | null {
   try {
@@ -68,7 +72,14 @@ async function call<T>(path: string, init: RequestInit, auth?: FinderAuth): Prom
     if (auth) throw new FinderGone("This Finder session has ended.");
     throw new FinderOffline("The Finder service is not on this server.");
   }
-  if (res.status === 429) throw new Error("Too many messages. Wait a minute and send again.");
+  if (res.status === 409 && path.endsWith("/message"))
+    throw new FinderBusy("Still thinking about your last message.");
+  if (res.status === 429) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      /minute/i.test(detail) ? "Too many messages. Wait a minute and send again." : DAILY_LIMIT,
+    );
+  }
   if (res.status >= 500) throw new FinderOffline("The Finder service is not running.");
   if (!res.ok) throw new Error(`The Finder answered ${res.status}.`);
   return (await res.json()) as T;
@@ -127,6 +138,8 @@ export function learnedLines(learned: Record<string, string | boolean>): string[
   if (scan) out.push(`Picked ${scan} places with a 3D scan`);
   const cheap = of(learned.picked_below_budget);
   if (cheap) out.push(`${cheap} picks cost well under your budget`);
+  if (learned.said_no_walkup === true) out.push("You said no walk-ups");
+  if (learned.said_parking === true) out.push("You asked about parking");
   if (learned.budget_set === true) out.push("You set a budget");
   return out;
 }

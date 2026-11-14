@@ -12,6 +12,7 @@ import type {
 import { PlacesStrip } from "../search/PlacesStrip";
 import {
   decide,
+  FinderBusy,
   FinderGone,
   FinderOffline,
   getState,
@@ -215,7 +216,9 @@ function LiveFinder({
           onOffline();
           return;
         }
-        if (err instanceof FinderGone) {
+        if (err instanceof FinderBusy) {
+          setError("Still thinking about your last message. Give it a moment, then send again.");
+        } else if (err instanceof FinderGone) {
           setError("This Finder session ended on the server. Start over to begin a new one.");
         } else {
           setError(err instanceof Error ? err.message : "The Finder could not answer.");
@@ -330,9 +333,9 @@ function LiveFinder({
                   data-kind={it.event.kind}
                   data-testid="finder-did"
                 >
-                  <span className="fd-did-tag mono">
-                    {it.event.signal || it.event.kind === "criteria" ? "On the map" : "Here"}
-                  </span>{" "}
+                  {(it.event.signal || it.event.kind === "criteria") && (
+                    <span className="fd-did-tag mono">On the map </span>
+                  )}
                   {it.event.text}
                 </li>
               ),
@@ -471,7 +474,9 @@ function LiveFinder({
         </div>
         {fs.picks.length === 0 ? (
           <p className="fd-empty" data-testid="picks-empty">
-            Send a message and the Finder lines up three places here.
+            {thread.some((t) => t.who === "finder")
+              ? "No place fits everything you kept. A higher budget would open more places."
+              : "Send a message and the Finder lines up three places here."}
           </p>
         ) : (
           <ol className="fd-picks">
@@ -571,7 +576,18 @@ const TRACE_TAG: Record<string, string> = {
 };
 const SHOWN_STEPS = 12;
 
+const PROPOSAL_WORDS: Record<string, string> = {
+  propose_no_walkup: "skipping walk-ups",
+  propose_parking: "only places with parking",
+  propose_prefer_scans: "3D-scan places first",
+  propose_lower_budget: "a lower budget",
+};
+
 function traceLine(e: FinderTraceEvent): string {
+  const said = /^The renter said (yes|no) to (\w+)\.$/.exec(e.reason);
+  if (said) return `You said ${said[1]} to ${PROPOSAL_WORDS[said[2]!] ?? "the offer"}.`;
+  if (e.kind === "choice" && e.pick && PROPOSAL_WORDS[e.pick])
+    return `Offered ${PROPOSAL_WORDS[e.pick]}: ${e.reason}`;
   if (e.kind === "agent") return e.reason;
   if (e.kind === "file") return "Wrote its notes for this session.";
   if (e.kind === "choice" && e.pick?.startsWith("lead "))
