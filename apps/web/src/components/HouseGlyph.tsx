@@ -1,113 +1,104 @@
-// The small isometric house from the worlds page, drawn inline so nothing loads from another
-// host. Every fill is a token (styles/tokens.css), so it follows the light and dark sets.
-// It is decoration: aria-hidden, and it never carries a word.
+// The isometric house, drawn inline with the shared drawing kit (draw/kit.ts) so nothing loads
+// from another host and it shares one light with every other drawn scene. Every fill is a
+// token, so it follows the light and dark sets. It is decoration: aria-hidden, and it never
+// carries a word. At small sizes (`detail="low"`, as in the wordmark) the fine detail (siding,
+// shingles, mullions, door panels) is dropped and the big shapes carry it.
+import { Parts } from "../draw/Parts";
+import { makeScene, part, type Part, type Prim } from "../draw/kit";
 
-const K = 0.866;
-type P = [number, number, number];
+const s = makeScene({ ox: 0, oy: 0 });
 
-// 2:1 isometric projection: x runs down-right, y runs down-left, z is up.
-function at([x, y, z]: P): string {
-  return `${((x - y) * K).toFixed(1)},${((x + y) * 0.5 - z).toFixed(1)}`;
-}
-function poly(...points: P[]): string {
-  return points.map(at).join(" ");
-}
+const W = 100; // along x: the long wall faces +y
+const D = 80; // along y: the gable end with the door faces +x
+const H = 55; // wall height
+const RISE = 40; // ridge above the walls
 
-const W = 22; // along x
-const D = 16; // along y
-const H = 10; // wall height
-const R = 5; // ridge above the walls: a low pitch, so both slopes show, as on the worlds page
-const O = 1.6; // eave overhang
-const V = 1.2; // overhang past each gable end
-const T = 0.9; // roof thickness
-const MID = D / 2;
-const EAVE = H - (O * R) / MID; // where the overhanging slope ends
-const RIDGE = H + R;
-// Height of the roof surface above a point at depth y.
-const roofAt = (y: number) => RIDGE - (Math.abs(y - MID) * R) / MID;
+// Window glass keeps the `house-window` class so the lit state can warm it.
+const lit = (parts: Part[]): Part[] =>
+  parts.map((p) => ({
+    ...p,
+    prims: p.prims.map((x): Prim =>
+      x.c.startsWith("dk-glass") ? { ...x, c: `${x.c} house-window` } : x,
+    ),
+  }));
 
-const LAWN = poly([-6, -6, 0], [28, -6, 0], [28, 22, 0], [-6, 22, 0]);
-const SHADE = poly([0, 0, 0], [-4, 0, 0], [-4, D, 0], [0, D, 0]);
-const PATH = poly([W, 9, 0], [28, 9, 0], [28, 13, 0], [W, 13, 0]);
-const WALL_LEFT = poly([0, D, 0], [W, D, 0], [W, D, H], [0, D, H]);
-const WALL_RIGHT = poly([W, 0, 0], [W, D, 0], [W, D, H], [W, MID, RIDGE], [W, 0, H]);
-const ROOF_FAR = poly([-V, -O, EAVE], [W + V, -O, EAVE], [W + V, MID, RIDGE], [-V, MID, RIDGE]);
-const ROOF_NEAR = poly(
-  [-V, D + O, EAVE],
-  [W + V, D + O, EAVE],
-  [W + V, MID, RIDGE],
-  [-V, MID, RIDGE],
-);
-const FASCIA = poly(
-  [-V, D + O, EAVE],
-  [W + V, D + O, EAVE],
-  [W + V, D + O, EAVE - T],
-  [-V, D + O, EAVE - T],
-);
-const VERGE = poly(
-  [W + V, -O, EAVE],
-  [W + V, MID, RIDGE],
-  [W + V, D + O, EAVE],
-  [W + V, D + O, EAVE - T],
-  [W + V, MID, RIDGE - T],
-  [W + V, -O, EAVE - T],
-);
-const CHIMNEY_TOP = RIDGE + 2.4;
-const CHIMNEY_LEFT = poly(
-  [3, 5.5, roofAt(5.5)],
-  [6, 5.5, roofAt(5.5)],
-  [6, 5.5, CHIMNEY_TOP],
-  [3, 5.5, CHIMNEY_TOP],
-);
-const CHIMNEY_RIGHT = poly(
-  [6, 2.5, roofAt(2.5)],
-  [6, 5.5, roofAt(5.5)],
-  [6, 5.5, CHIMNEY_TOP],
-  [6, 2.5, CHIMNEY_TOP],
-);
-const CHIMNEY_CAP = poly(
-  [3, 2.5, CHIMNEY_TOP],
-  [6, 2.5, CHIMNEY_TOP],
-  [6, 5.5, CHIMNEY_TOP],
-  [3, 5.5, CHIMNEY_TOP],
-);
-const WINDOWS = [
-  poly([3, D, 3.4], [8.5, D, 3.4], [8.5, D, 7.6], [3, D, 7.6]),
-  poly([13.5, D, 3.4], [19, D, 3.4], [19, D, 7.6], [13.5, D, 7.6]),
-  poly([W, 2.6, 3.4], [W, 6.4, 3.4], [W, 6.4, 7.6], [W, 2.6, 7.6]),
+const HOUSE: Part[] = [
+  part("lawn", [s.onZ("dk-lawn", 0, -26, -26, 152, 132)]),
+  part("ground-shadow", [s.contact(0, 0, W, D, 18)]),
+  // The walk from the street to the stoop, with two paving joints.
+  part("path", [s.onZ("dk-path", 0.1, W, 46, 26, 22)]),
+  part("path-joints", s.tile(W, 46, 26, 22, 9, 0.2), true),
+  part("walls", s.box("white", 0, 0, 0, W, D, H)),
+  part("foundation", [
+    s.onY("house-plinth-left", D + 0.1, 0, W, 0, 4),
+    s.onX("house-plinth-right", W + 0.1, 0, D, 0, 4),
+  ]),
+  part(
+    "siding",
+    [...s.coursesY(D + 0.2, 0, W, 4, H, 5.5), ...s.coursesX(W + 0.2, 0, D, 4, H, 5.5)],
+    true,
+  ),
+  part(
+    "corner-boards",
+    [s.onY("dk-trim", D + 0.3, 0, 3, 4, H), s.onY("dk-trim", D + 0.3, W - 3, W, 4, H)],
+    true,
+  ),
+  ...lit(s.windowY(D, 12, 36, 20, 42, 1.8)),
+  ...lit(s.windowY(D, 62, 86, 20, 42, 1.8)),
+  part(
+    "shutters",
+    [
+      s.onY("dk-door", D + 0.3, 6, 10, 19, 43),
+      s.onY("dk-door", D + 0.3, 38, 42, 19, 43),
+      s.onY("dk-door", D + 0.3, 56, 60, 19, 43),
+      s.onY("dk-door", D + 0.3, 88, 92, 19, 43),
+    ],
+    true,
+  ),
+  ...lit(s.windowX(W, 10, 32, 20, 42, 1.8)),
+  ...s.doorX(W, 47, 67, 36, 1.8),
+  // The stoop: a slab, a step and a small roof over the door.
+  part("stoop", [
+    s.contact(W, 43, 12, 28, 4),
+    ...s.box("white", W, 43, 0, 12, 28, 4),
+    ...s.box("white", W + 12, 47, 0, 5, 20, 2),
+  ]),
+  part("porch-roof", [
+    ...s.box("slate", W, 43, 40, 11, 28, 2.5),
+    ...s.box("white", W + 8, 44, 4, 2, 2, 36),
+    ...s.box("white", W + 8, 68, 4, 2, 2, 36),
+  ]),
+  ...s.gableRoof("slate", 0, 0, H, W, D, RISE, 6),
+  part("gable-vent", [s.onX("dk-trim-shade", W + 0.2, 35, 45, 66, 76)], true),
+  part("chimney", [
+    ...s.box("wood", 20, 46, 76, 11, 11, 28),
+    ...s.box("dark", 19, 45, 104, 13, 13, 2.5),
+  ]),
+  // Planting: shrubs under the windows, a hedge by the path and a tree on the lawn.
+  s.shrub(8, D + 2, 30, 7, 7),
+  s.shrub(60, D + 2, 30, 7, 7),
+  s.shrub(W + 2, 8, 7, 30, 6),
+  s.tree(-8, 66, 2),
 ];
-const DOOR = poly([W, 9, 0], [W, 13, 0], [W, 13, 6.8], [W, 9, 6.8]);
 
 interface Props {
   className?: string;
   // Lit windows. Off for empty and error states.
   lit?: boolean;
+  // "low" drops the fine detail, for small sizes such as the wordmark.
+  detail?: "full" | "low";
 }
 
-export function HouseGlyph({ className, lit = true }: Props) {
+export function HouseGlyph({ className, lit: isLit = true, detail = "full" }: Props) {
   return (
     <svg
-      className={`house${lit ? " house-lit" : ""}${className ? ` ${className}` : ""}`}
-      viewBox="-25 -17 55 43"
+      className={`house${isLit ? " house-lit" : ""}${className ? ` ${className}` : ""}`}
+      viewBox="-120 -86 256 206"
+      data-detail={detail === "low" ? "low" : undefined}
       aria-hidden="true"
       focusable="false"
     >
-      <polygon className="house-lawn" points={LAWN} />
-      <polygon className="house-shade" points={SHADE} />
-      <polygon className="house-path" points={PATH} />
-      <polygon className="house-wall-left" points={WALL_LEFT} />
-      <polygon className="house-wall-right" points={WALL_RIGHT} />
-      {WINDOWS.map((w) => (
-        <polygon key={w} className="house-window" points={w} />
-      ))}
-      <polygon className="house-door" points={DOOR} />
-      <polygon className="house-roof-far" points={ROOF_FAR} />
-      <polygon className="house-roof" points={ROOF_NEAR} />
-      <polygon className="house-fascia" points={FASCIA} />
-      <polygon className="house-verge" points={VERGE} />
-      <polygon className="house-wall-left" points={CHIMNEY_LEFT} />
-      <polygon className="house-wall-right" points={CHIMNEY_RIGHT} />
-      <polygon className="house-path" points={CHIMNEY_CAP} />
+      <Parts parts={HOUSE} />
     </svg>
   );
 }
@@ -115,7 +106,7 @@ export function HouseGlyph({ className, lit = true }: Props) {
 export function Wordmark() {
   return (
     <span className="wordmark">
-      <HouseGlyph className="wordmark-house" />
+      <HouseGlyph className="wordmark-house" detail="low" />
       SNAPBACK
     </span>
   );

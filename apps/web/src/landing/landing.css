@@ -1,0 +1,218 @@
+/* The first screen's scene (hs) and the three-step strip (hiw). Kit drawings, tokens only.
+   The lit home shares the map's teal: its tokens are used when the map's set is present. */
+.hs {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  --lit: var(--map-col, color-mix(in srgb, var(--act) 68%, var(--h-unlit)));
+}
+.upload-intro:has(.hs) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 44%);
+  grid-template-areas: "eyebrow scene" "title scene" "lead scene";
+  align-content: center;
+  column-gap: clamp(12px, 3vw, 32px);
+  padding-right: 0;
+  padding-block: 0;
+}
+.upload-intro:has(.hs) .upload-eyebrow {
+  margin-top: clamp(20px, 3vw, 30px);
+  grid-area: eyebrow;
+  justify-self: start;
+  align-self: end;
+}
+.upload-intro:has(.hs) h1 {
+  grid-area: title;
+}
+.upload-intro:has(.hs) .upload-lead {
+  grid-area: lead;
+  align-self: start;
+  padding-bottom: clamp(20px, 3vw, 30px);
+}
+.upload-intro .hs {
+  grid-area: scene;
+  align-self: end;
+}
+.hs-lot {
+  fill: color-mix(in srgb, var(--lit) 22%, var(--h-lawn));
+  stroke: var(--lit);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--map-glow, var(--act)) 70%, transparent));
+}
+/* The lit roof: the one home the ad's photos lead to. */
+.hs-lit .dk-teal {
+  --c: var(--lit);
+}
+.hs-lit [data-part="roof"] {
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--map-glow, var(--act)) 60%, transparent));
+}
+.hs-mat {
+  fill: var(--surface);
+  filter: drop-shadow(0 5px 8px var(--h-shade));
+}
+.hs-pic {
+  fill: var(--h-unlit);
+}
+.hs-pic-floor {
+  fill: var(--h-path);
+}
+.hs-pic-thing {
+  fill: var(--h-roof);
+}
+.hs-trace {
+  stroke: var(--lit);
+  stroke-width: 1.6;
+  stroke-dasharray: 1;
+  fill: none;
+}
+.hs-pin {
+  fill: var(--lit);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.hiw {
+  padding: clamp(18px, 3vw, 28px) 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hiw-title {
+  font-size: 1.25rem;
+}
+.hiw-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.hiw-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  align-content: start;
+  padding: 0 0 14px;
+  background: var(--paper);
+}
+.hiw-art {
+  grid-column: 1 / -1;
+  height: 132px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  background: linear-gradient(180deg, var(--sky), var(--paper));
+  overflow: hidden;
+}
+.hiw-art svg {
+  height: 118px;
+  width: auto;
+  max-width: 100%;
+}
+.hiw-thumb {
+  fill: var(--h-wall-shade);
+}
+.hiw-text {
+  margin: 0;
+}
+polygon.hiw-text {
+  fill: color-mix(in srgb, var(--muted) 50%, var(--h-wall));
+}
+.hiw-n {
+  grid-row: span 2;
+  margin: 0 0 0 14px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: var(--act);
+  color: var(--on-act);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.hiw-step-title {
+  margin: 0;
+  padding-right: 14px;
+  font-size: 1.02rem;
+  line-height: 1.25;
+}
+p.hiw-text {
+  padding-right: 14px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* The ad box leads the form: it is the one thing to do here. */
+.upload-body > .upload-label[for="listing"] {
+  font-size: 1.25rem;
+}
+.upload-body > #listing {
+  min-height: 7.5rem;
+  border-left: 6px solid var(--act);
+}
+
+@media (max-width: 760px) {
+  .upload-intro:has(.hs) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "scene" "eyebrow" "title" "lead";
+    padding-top: 0;
+    padding-inline: 0;
+  }
+  .upload-intro:has(.hs) > :not(.hs) {
+    margin-inline: clamp(18px, 4vw, 36px);
+  }
+  .upload-intro:has(.hs) .upload-eyebrow {
+    margin-top: 14px;
+  }
+  .hiw-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hiw-step {
+    grid-template-columns: 110px auto minmax(0, 1fr);
+    padding: 0;
+    align-items: start;
+  }
+  .hiw-art {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    height: 100%;
+    min-height: 104px;
+    margin: 0;
+  }
+  .hiw-art svg {
+    height: 84px;
+  }
+  .hiw-n {
+    margin: 12px 0 0 2px;
+  }
+  .hiw-step-title {
+    padding-top: 12px;
+  }
+  p.hiw-text {
+    grid-column: 2 / -1;
+    padding-bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hs-photo {
+    animation: hs-drop 0.5s var(--ease-out) backwards;
+  }
+  @keyframes hs-drop {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+  .hs-trace {
+    animation: hs-draw 0.6s ease-out backwards;
+  }
+  @keyframes hs-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+  }
+}
