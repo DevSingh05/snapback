@@ -9,6 +9,7 @@ import { PlaceSheet } from "./PlaceSheet";
 import { fetchPlacesMap } from "./api";
 import type { Look } from "./mapStyle";
 import { CriteriaPanel, FinderPip, PlaceLedger } from "./panels";
+import { recordFinderEvent } from "../shell/finderStore";
 import { S } from "./strings";
 import { EMPTY_CRITERIA, criteriaCount } from "./types";
 import type { Criteria, PlaceSheetData, PlacesMap, RenterEvent } from "./types";
@@ -58,6 +59,7 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
 
   const log = useCallback((kind: RenterEvent["kind"], text: string, pid?: string) => {
     setEvents((prev) => [{ id: nextId.current++, kind, text, pid }, ...prev].slice(0, 30));
+    recordFinderEvent(kind, text); // so the Finder tab can show this visit's events
   }, []);
 
   useEffect(() => {
