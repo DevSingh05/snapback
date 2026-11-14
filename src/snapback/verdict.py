@@ -13,6 +13,7 @@ Three steps, each usable on its own:
 Every rule here has a test in tests/test_verdict.py or tests/test_card_rows.py.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 
@@ -76,8 +77,22 @@ class Presence:
     needs_new_photo: bool = False  # a recapture flag stopped a pass; ask again, accuse nobody
 
 
+# Listing photos are named l1, l2, ... in the order the renter sent them.
+_LISTING_PHOTO_ID = re.compile(r"l([1-9][0-9]{0,3})")
+
+
 def _photo_number(modules: ModuleEvidence, photo_id: str | None) -> int | None:
-    if photo_id is None or modules.locate is None:
+    """Which listing photo this is, counting from 1.
+
+    The id carries its own number. It is not looked up among the photos the twin placed:
+    that list can be shorter than what the renter sent, and the number would be lost.
+    """
+    if photo_id is None:
+        return None
+    named = _LISTING_PHOTO_ID.fullmatch(photo_id)
+    if named:
+        return int(named.group(1))
+    if modules.locate is None:
         return None
     for number, photo in enumerate(modules.locate.photos, start=1):
         if photo.photo_id == photo_id:
@@ -470,9 +485,23 @@ def _here_now_line(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardLine
         )
 
     if presence.needs_new_photo:
-        return _line(lang, label, CardTone.HOLD, "here_now.retry")
+        # With no retry left, do not tell the renter to ask for a photo nobody will check.
+        key = "here_now.no_retry_left" if modules.no_retry_left else "here_now.retry"
+        return _line(lang, label, CardTone.HOLD, key)
 
     if presence.status is PresenceStatus.WAITING:
+        # A reply may have come and settled nothing (A14). Say what it showed.
+        answered = [
+            spot
+            for spot in (modules.challenge.spots if modules.challenge else [])
+            if spot.replied_at is not None
+        ]
+        if answered and answered[-1].code_read and answered[-1].located is None:
+            return _line(lang, label, CardTone.NOT_SHOWN, "here_now.code_only")
+        if modules.no_retry_left:
+            return _line(lang, label, CardTone.HOLD, "here_now.no_retry_left")
+        if answered and answered[-1].code_read is False:
+            return _line(lang, label, CardTone.HOLD, "here_now.code_missing")
         return _line(lang, label, CardTone.HOLD, "here_now.waiting")
 
     if presence.status is PresenceStatus.NOT_REQUESTED:

@@ -32,6 +32,7 @@ from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
 from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of, owner_of
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
+from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
 from snapback.card import strings
 from snapback.contracts import (
@@ -39,13 +40,16 @@ from snapback.contracts import (
     CaseProgress,
     DataSource,
     ModuleEvidence,
+    PresenceStatus,
     PropertyRecord,
+    ReplyCheck,
     TraceEvent,
     TraceKind,
     VerdictState,
 )
 from snapback.settings import Settings
-from snapback.verdict import FIXTURE_ID_PREFIX, build_card
+from snapback.verdict import FIXTURE_ID_PREFIX, build_card, presence_of
+from snapback.vision.memory.store import PhotoMemory
 
 log = logging.getLogger("snapback.api")
 
@@ -54,7 +58,7 @@ MARKET_ZONES = {"Houston": "America/Chicago", "Los Angeles": "America/Los_Angele
 
 
 class NothingWaiting(Exception):
-    """An approval arrived for a case that is not waiting for one."""
+    """An approval or a reply arrived for a case that is not waiting for one."""
 
 
 class UnknownProperty(Exception):
@@ -158,6 +162,12 @@ class RecordedCase:
     def approve(self, decision: str, text: str | None) -> None:
         raise NothingWaiting(self.case_id)
 
+    def reply(self, photo: bytes) -> ReplyCheck:
+        raise NothingWaiting(self.case_id)
+
+    def presence(self) -> PresenceStatus:
+        return presence_of(self._evidence).status
+
 
 class SessionCase:
     def __init__(
@@ -218,6 +228,8 @@ class SessionCase:
             status = CaseProgress.DONE
         elif self.session.waiting_for_approval:
             status = CaseProgress.WAITING_FOR_APPROVAL
+        elif self.session.waiting_for_reply:
+            status = CaseProgress.WAITING_FOR_REPLY
         else:
             status = CaseProgress.RUNNING
         draft = self.session.pending_challenge
@@ -246,6 +258,24 @@ class SessionCase:
             except RuntimeError as error:
                 raise NothingWaiting(self.case_id) from error
         self.advance()
+
+    def reply(self, photo: bytes) -> ReplyCheck:
+        """Check the poster's reply photo and carry the case on (A14).
+
+        Raises `NothingWaiting` unless a reply is awaited, and `UnreadablePhoto` if the file
+        is not a picture; in both cases nothing about the case changes.
+        """
+        with self._lock:
+            modules = self.session.modules
+            if not self.session.waiting_for_reply or not isinstance(modules, ReplyModules):
+                raise NothingWaiting(self.case_id)
+            check, outcome = modules.check_reply(self.session.case_id, photo)
+            self.session.reply(outcome)
+        self.advance()
+        return check
+
+    def presence(self) -> PresenceStatus:
+        return presence_of(self.session.evidence).status
 
 
 def _policy_runner(session: CaseSession) -> object:
@@ -277,6 +307,7 @@ class CaseStore:
         self._lookups = lookups or KitLookups(settings.snapback_data_source)
         self._cases: dict[str, RecordedCase | SessionCase] = {}
         self._lock = threading.Lock()
+        self._memory: PhotoMemory | None = None
         self._runner = (
             _deepagents_runner() if settings.snapback_agent == "deepagents" else _policy_runner
         )
@@ -313,6 +344,13 @@ class CaseStore:
             if candidate not in self._cases:
                 return candidate
 
+    def _photo_memory(self) -> PhotoMemory:
+        """Lane V's photo memory under the data dir, opened the first time it is needed."""
+        if self._memory is None:
+            path = self._settings.snapback_data_dir / "memory" / "photo_memory.sqlite"
+            self._memory = PhotoMemory(path)
+        return self._memory
+
     def __len__(self) -> int:
         return len(self._cases)
 
@@ -331,8 +369,11 @@ class CaseStore:
         listing: Listing,
         property_id: str | None = None,
         register: Callable[[str], None] | None = None,
+        *,
+        photos: list[bytes] | None = None,
     ) -> SessionCase:
-        """Start a check. `property_id` is our id for the building the listing claims.
+        """Start a check. `property_id` is our id for the building the listing claims, and
+        `photos` are the listing photos as sent, in order.
 
         `register` is told the new case's id before anything runs. If it raises, there is no
         case: a check that could not be recorded for later deletion is not started.
@@ -393,6 +434,12 @@ class CaseStore:
                     salt=phone_salt(self._settings),
                     record_source=record.source if record else source,
                 )
+            if self._settings.snapback_challenge == "reply" and not live:
+                # The poster's real reply is awaited and checked (A14). The listing photos
+                # go into the photo memory now, so a reply that copies one is caught. A live
+                # case has no challenge yet (no stand-in), so there is nothing to reply to.
+                modules = ReplyModules(modules, self._photo_memory())
+                modules.remember_listing_photos(full_id, photos or [])
             session = CaseSession(full_id, modules, Trace(full_id, source))
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
