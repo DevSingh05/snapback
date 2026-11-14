@@ -222,6 +222,7 @@ PLAN_FACT_KEYS = {
     "for_sale_listing_active",
     "ad_names_a_license",
     "owner_on_public_record",
+    "license_number_given",  # yes/no, A24 stretch: the renter answered with a number
     "checks_run",
     "checks_left",
 }

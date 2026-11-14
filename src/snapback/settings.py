@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # from the fixture. "reply" waits for the poster's real reply photo, sent to
     # POST /cases/{id}/reply, and checks it.
     snapback_challenge: Literal["stand_in", "reply"] = "stand_in"
+    # A24 stretch: may the agent ask the renter for a license number the ad did not give?
+    # Off by default: a case that asks waits for POST /cases/{id}/answer, and no screen sends it.
+    snapback_ask_renter: bool = False
     # A22: the live locator. Index folder under data/index, and the time one case may spend
     # placing its photos (a photo not done in time reads "not located", never "elsewhere").
     snapback_locate_index: str = "demo"
