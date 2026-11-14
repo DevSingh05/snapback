@@ -12,6 +12,7 @@ Nothing here logs or returns a value from a record. The rules turn it into statu
 """
 
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Protocol
@@ -109,6 +110,48 @@ def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
     except Exception as error:
         log.warning("owner lookup failed (%s); treated as not looked up", type(error).__name__)
         return None
+
+
+MAX_OFFICE_CHARS = 80
+# A "company" that is really a street address (11 kit buildings with scans): never shown.
+_STREET_WORDS = (
+    r"st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|ct|court|pkwy|parkway|"
+    r"hwy|highway|fwy|freeway|pl|place|cir|circle|trl|trail|sq|square|ter|terrace|loop"
+)
+ADDRESS_LIKE = re.compile(
+    rf"\b\d{{1,6}}\s+(?:[A-Za-z0-9.'-]+\s+){{0,4}}(?:{_STREET_WORDS})\b", re.I
+)
+# A name that opens with a bare number ("4821 Quillfeather LLC") is an address with a suffix.
+_STARTS_WITH_NUMBER = re.compile(r"^\d{1,6}\s")
+
+
+def _first_two_words(text: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+", text.lower())[:2])
+
+
+def _looks_like_address(company: str, street_address: str | None) -> bool:
+    if ADDRESS_LIKE.search(company) or _STARTS_WITH_NUMBER.match(company):
+        return True
+    words = _first_two_words(company)
+    return len(words) == 2 and words == _first_two_words(street_address or "")
+
+
+def matched_office_of(lookups: object, locate: LocateResult | None) -> str | None:
+    """The office on CoStar's record for the home a photo was placed in (the first such photo),
+    company name only. None when no photo was placed elsewhere, the home is not held, or its
+    record names no company. Nothing is looked up for the claimed home."""
+    if lookups is None or locate is None:
+        return None
+    for photo in locate.photos:
+        found = photo.matched_property_id
+        if photo.status is not LocateStatus.LOCATED_ELSEWHERE or not found:
+            continue
+        record = lookups.record(found)  # type: ignore[attr-defined]
+        company = (record.manager_company or "").strip() if record is not None else ""
+        if not company or _looks_like_address(company, record.street_address):
+            return None
+        return company[:MAX_OFFICE_CHARS]
+    return None
 
 
 class KitLookups:
@@ -299,6 +342,14 @@ class JoinedModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
+
+    def matched_office(self, case_id: str, locate: LocateResult | None) -> str | None:
+        """X1: the office on record for the home the photos were placed in, if elsewhere."""
+        try:
+            return matched_office_of(self._lookups, locate)
+        except Exception as error:  # a lookup that breaks leaves the line out, never the case
+            log.warning("matched office not read (%s)", type(error).__name__)
+            return None
 
     def ad_notes(self, case_id: str) -> list[AdNote]:
         """Ad vs record: the ad's claims against the home's record. No record, no notes."""

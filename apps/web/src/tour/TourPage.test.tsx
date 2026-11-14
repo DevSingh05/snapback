@@ -201,3 +201,34 @@ describe("link to where the photos were taken", () => {
     expect(link.getAttribute("href")).toMatch(/^\/tour\/.+\?case=fx-7Q2M&where=photos$/);
   });
 });
+
+describe("TourView passes the plan's up axis to the mini-map (#246)", () => {
+  it("draws a z-up live photo at its viewer-frame floor point", () => {
+    const room = FIXTURE_TOUR.stops.find((s) => s.kind === "room")!;
+    const plan = {
+      ...FIXTURE_TOUR,
+      up_axis: "z" as const,
+      stops: [
+        {
+          ...room,
+          photos: [
+            {
+              photo_id: "l1",
+              sweep_id: room.sweep_id,
+              position: [4, 5, 1.4] as [number, number, number],
+              rotation_quat: [0, 0, 0, 1] as [number, number, number, number],
+              fov_deg: 62,
+              yaw_deg: 30,
+              pitch_deg: -5,
+            },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<TourView plan={plan} />);
+    // (4, 5, 1.4) z-up is (4, -5) on the viewer's floor: 120 + clamp(80, 60), 120 + clamp(-100, 60).
+    expect(container.querySelector(".landing-map > g")?.getAttribute("transform")).toBe(
+      "translate(180 60)",
+    );
+  });
+});

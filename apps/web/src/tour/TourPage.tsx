@@ -142,7 +142,7 @@ export function TourView({
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, last)), [last]);
   const back = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
 
-  const landing = landingOfStop(stop);
+  const landing = landingOfStop(stop, plan.up_axis ?? "y");
   // The ad's real photo when this browser can read it; else the labelled placeholder.
   const realPhoto = useAdPhoto(caseId, stop.photos[0]?.alias);
   const photoNote = realPhoto

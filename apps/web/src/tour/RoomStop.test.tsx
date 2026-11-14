@@ -128,3 +128,24 @@ describe("the walk of the building the photos were taken in (X1)", () => {
     expect(screen.queryByText(/The ad showed no photo of this room/)).toBeNull();
   });
 });
+
+describe("landingOfStop on a z-up live stop (#244 follow-up)", () => {
+  it("takes the photo's viewer angles and the viewer floor point", () => {
+    const stop: TourStop = {
+      ...stopOf("Kitchen"),
+      photos: [
+        {
+          photo_id: "l1",
+          sweep_id: "z1",
+          position: [4, 5, 1.4],
+          rotation_quat: [0.5, 0.5, 0.5, 0.5],
+          fov_deg: 62,
+          yaw_deg: 30,
+          pitch_deg: -5,
+        },
+      ],
+    };
+    const m = landingOfStop(stop, "z");
+    expect(m).toMatchObject({ kind: "match", yaw: 30, pitch: -5, floor: [4, -5], fovDeg: 62 });
+  });
+});
