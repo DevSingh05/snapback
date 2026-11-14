@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CardPage } from "./pages/CardPage";
 import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
+import { UploadPage } from "./upload/UploadPage";
 
 type Route =
   | { name: "result"; id: string }
@@ -37,14 +38,7 @@ export default function App() {
   return (
     <main className="shell">
       {route.name === "home" ? (
-        <div className="card-page notice">
-          <span className="wordmark">SNAPBACK</span>
-          <h1>Check any rental before you pay.</h1>
-          <p>
-            Open a result at <span className="mono">/case/7Q2M</span> or a verify page at{" "}
-            <span className="mono">/c/7Q2M</span>.
-          </p>
-        </div>
+        <UploadPage />
       ) : route.name === "trace" ? (
         <TracePage key={`trace-${route.id}`} caseId={route.id} />
       ) : route.name === "twin" ? (

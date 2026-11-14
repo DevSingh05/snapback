@@ -116,6 +116,10 @@ EN: dict[str, str] = {
     ),
     "trace.checks.twin": "The building is in our data area and has a 3D twin.",
     "trace.checks.no_twin": "We have no 3D scan of this building, so only the text can be checked.",
+    "trace.checks.short_term": (
+        "This is a short-term stay listing, which this check does not cover."
+    ),
+    "trace.checks.commercial": "This is a commercial listing, which this check does not cover.",
     "trace.tool.locate": "Placing {count} listing photos in the twin.",
     "trace.floor_plan.best": "{alias}: {best} inliers vs {next}.",
     "trace.floor_plan.only": "Only one floor plan is in the running.",

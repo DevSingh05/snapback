@@ -67,3 +67,29 @@ export interface LocateResult {
   photos: LocatedPhoto[];
   poses: Record<string, Pose>;
 }
+
+// Mirrors PropertyRecord and AerialTile in src/snapback/contracts.py.
+export interface PropertyRecord {
+  property_id: string;
+  source: DataSource;
+  market?: string | null;
+  property_type?: string | null;
+  floors?: number | null;
+  year_built?: number | null;
+  lat?: number | null;
+  lon?: number | null;
+  model_ids: string[];
+  floor_plans: string[];
+  manager_company?: string | null;
+  rent_min?: number | null;
+  rent_median?: number | null;
+  rent_max?: number | null;
+}
+
+export interface AerialTile {
+  property_id: string;
+  source: DataSource;
+  direction: string; // "north", "east", "south", "west" or "nadir"
+  captured_on?: string | null;
+  path: string;
+}
