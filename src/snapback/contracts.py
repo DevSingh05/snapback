@@ -284,6 +284,24 @@ class ForSaleMatch(BaseModel):
     offices: list[str] = Field(default_factory=list)
 
 
+class LicenseStatus(StrEnum):
+    LICENSED = "licensed"  # an active TREC license under the claimed name
+    NOT_FOUND = "not_found"  # claims to be an agent/broker/locator; no ACTIVE license has that name
+    NOT_CHECKED = "not_checked"  # no claim, no name, an owner's own home, or the lookup failed
+
+
+class LicenseResult(BaseModel):
+    """D10 (lane D, #128): the poster's real estate license claim, looked up in TREC.
+
+    Never keeps the license number or any person's name (the poster's, or an individual
+    sponsoring broker's)."""
+
+    status: LicenseStatus
+    claimed_role: str | None = None  # "agent", "broker" or "locator", from the poster's words
+    sponsor_broker: str | None = None  # LICENSED only, and only when the sponsor is a company
+    state: str = "TX"
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -297,6 +315,7 @@ class ModuleEvidence(BaseModel):
     price: PriceResult | None = None
     authority: AuthorityResult | None = None
     for_sale: ForSaleMatch | None = None  # D7; None means not looked up
+    license: LicenseResult | None = None  # D10; None means not looked up
     # A10: where price, authority and for_sale came from, when the record is real and the
     # rest of the case is not. None means "the same as `source`".
     record_source: DataSource | None = None
