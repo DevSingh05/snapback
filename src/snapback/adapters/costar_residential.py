@@ -32,7 +32,6 @@ from snapback.adapters.costar_jsonl import (
     _get_any,
     _iter_jsonl,
     _load_enums,
-    _model_ids,
     decode,
 )
 from snapback.contracts import DataSource, ForSaleMatch, ForSaleStatus
@@ -327,57 +326,202 @@ def coverage_residential(kit_dir: Path) -> dict[str, Any]:
     return {"residential_records": records, "residential_fields": fields, "status_codes": codes}
 
 
-# --- #74: the demo house (case c) -------------------------------------------------------------
+# --- #74: the demo houses (direction A trio) --------------------------------------------------
 
 DEMO_HOUSE_FILE = Path("demo") / "house.json"
+DEMO_HOUSE_SHOWN = "data/demo/house.json"  # printed in place of the absolute path
+DEMO_ROLES = ("for_sale", "recently_sold", "decoy")
+CITY = "houston"
+DETACHED = 1  # ListingPropertyType: a house, not a condo or townhouse
+FOR_SALE_CODE = 1  # ForSaleStatus.ForSale
+SOLD_CODE = 5  # ForSaleStatus.Sold
+NEWLY_SOLD_CODE = 8  # ListingUpdateType.NewlySold
+MATTERPORT_TYPES = {36, 234}  # media[].externalReferenceType
 
 
-def pick_demo_house(kit_dir: Path, today: date | None = None) -> dict[str, Any] | None:
-    """The house for demo case c: public on Homes.com, active for sale, with a Matterport model.
-    Deterministic: the most model references wins, then the smallest listing id."""
+def _matterport_models(rec: dict[str, Any]) -> list[str]:
+    """Matterport model ids on a residential record: `media[].videoKey` where
+    `media[].externalReferenceType` is 36 or 234 (the real kit's key paths)."""
+    keys = [
+        str(m["videoKey"])
+        for m in rec.get("media") or []
+        if isinstance(m, dict)
+        and m.get("externalReferenceType") in MATTERPORT_TYPES
+        and m.get("videoKey")
+    ]
+    return list(dict.fromkeys(keys))
+
+
+def _sold_on(rec: dict[str, Any]) -> date | None:
+    """When the home sold: `closeDate`, else the last NewlySold entry in `history[]`."""
+    closed = _date(rec.get("closeDate"))
+    if closed is not None:
+        return closed
+    dates = [
+        d
+        for h in rec.get("history") or []
+        if isinstance(h, dict) and h.get("updateType") == NEWLY_SOLD_CODE
+        if (d := _date(h.get("date"))) is not None
+    ]
+    return max(dates, default=None)
+
+
+def _is_sold(rec: dict[str, Any]) -> bool:
+    return rec.get("forSaleStatus") == SOLD_CODE or _sold_on(rec) is not None
+
+
+def _role(rec: dict[str, Any], enums: dict[str, dict[str, str]], today: date) -> str | None:
+    status, _, _ = _status(rec, enums, today)
+    if status is ForSaleStatus.RECENTLY_RENTED:
+        return None  # rented homes are never the for-sale or sold story
+    if status is ForSaleStatus.ACTIVE and rec.get("forSaleStatus") == FOR_SALE_CODE:
+        return "for_sale"
+    sold_on = _sold_on(rec)
+    if _is_sold(rec) and sold_on is not None and 0 <= (today - sold_on).days <= RECENT_DAYS:
+        return "recently_sold"
+    return None
+
+
+def _candidates(kit_dir: Path, today: date) -> list[dict[str, Any]] | None:
+    """Houston, public, detached homes with a Matterport model, tagged with the role each can
+    play. None when the kit has no residential file."""
     path = _find(kit_dir, RESIDENTIAL_FILE)
     if path is None:
         return None
-    today = today or date.today()
     enums = _load_enums(kit_dir)
-    best: tuple[int, str] | None = None
-    pick: dict[str, Any] | None = None
+    out: list[dict[str, Any]] = []
     for rec in _iter_jsonl(path):
-        if not _public(rec):
+        city = _get_any(rec, ["property.address.city"])
+        models = _matterport_models(rec)
+        pid = rec.get("propertyId")
+        if (
+            not _public(rec)
+            or not isinstance(city, str)
+            or city.strip().lower() != CITY
+            or _get_any(rec, ["property.listingPropertyType"]) != DETACHED
+            or not models
+            or not isinstance(pid, int)
+        ):
             continue
-        status, _, _ = _status(rec, enums, today)
-        models = _model_ids(rec)
-        listing_id = rec.get("homeListingId")
-        if status is not ForSaleStatus.ACTIVE or not models or listing_id is None:
-            continue
-        key = (-len(models), str(listing_id))
-        if best is None or key < best:
-            best = key
-            pick = {"home_listing_id": str(listing_id), "model_ids": models}
-    return pick
-
-
-def write_demo_house(kit_dir: Path, data_dir: Path) -> Path | None:
-    """Save the pick under data/ (git-ignored) for lane V's indexer. Prints no ids: the sponsor
-    terms keep record ids out of logs, issues and PRs."""
-    house = pick_demo_house(kit_dir)
-    if house is None:
-        print("demo house: no public, active, for-sale home with a Matterport model")
-        return None
-    out = Path(data_dir) / DEMO_HOUSE_FILE
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(house, indent=2), encoding="utf-8")
-    print(f"demo house picked: {len(house['model_ids'])} Matterport model(s); written to {out}")
+        zip_code = _get_any(rec, RESIDENTIAL_FIELDS["zip"])
+        out.append(
+            {
+                "property_id": pid,
+                "listing_id": rec.get("residentialListingId") or 0,
+                "zip": str(zip_code)[:5] if zip_code else "",
+                "models": models,
+                "role": _role(rec, enums, today),
+            }
+        )
     return out
 
 
-if __name__ == "__main__":
+def indexed_model_ids(data_dir: Path) -> set[str]:
+    """Model ids already in a locate index under `data/index/*/index.json`."""
+    found: set[str] = set()
+    for path in sorted((Path(data_dir) / "index").glob("*/index.json")):
+        try:
+            meta = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        found |= {str(e["model_id"]) for e in meta.get("entries", []) if "model_id" in e}
+    return found
+
+
+def _choose(
+    pool: list[dict[str, Any]], taken: set[int], indexed: set[str]
+) -> tuple[dict[str, Any], int, str] | None:
+    """One home per propertyId; indexed twins first, then the smallest propertyId, then the
+    smallest listing id, so ties and file order never change the pick."""
+    best: dict[int, dict[str, Any]] = {}
+    for c in pool:
+        if c["property_id"] in taken:
+            continue
+        cur = best.get(c["property_id"])
+        if cur is None or c["listing_id"] < cur["listing_id"]:
+            best[c["property_id"]] = c
+
+    def key(c: dict[str, Any]) -> tuple[bool, int]:
+        return (not indexed.intersection(c["models"]), c["property_id"])
+
+    if not best:
+        return None
+    pick = min(best.values(), key=key)
+    rule = "indexed twin" if indexed.intersection(pick["models"]) else "first by propertyId"
+    return pick, len(best), rule
+
+
+def pick_demo_houses(
+    kit_dir: Path, today: date | None = None, indexed: set[str] | None = None
+) -> list[dict[str, Any]] | None:
+    """The trio: for_sale, recently_sold, and a decoy (another house with a model in the same
+    zip as the for-sale pick). None when the kit has no residential file or a role has no
+    candidate. Each entry also carries the rule, candidate count and indexed flag for printing."""
+    cands = _candidates(kit_dir, today or date.today())
+    if cands is None:
+        return None
+    indexed = indexed or set()
+    picks: list[dict[str, Any]] = []
+    taken: set[int] = set()
+    zip_code = ""
+    for role in DEMO_ROLES:
+        if role == "decoy":
+            pool = [c for c in cands if c["zip"] == zip_code and zip_code]
+        else:
+            pool = [c for c in cands if c["role"] == role]
+        chosen = _choose(pool, taken, indexed)
+        if chosen is None:
+            return None
+        pick, count, rule = chosen
+        taken.add(pick["property_id"])
+        if role == "for_sale":
+            zip_code = pick["zip"]
+        picks.append(
+            {
+                "propertyId": pick["property_id"],
+                "role": role,
+                "rule": rule,
+                "candidates": count,
+                "indexed": bool(indexed.intersection(pick["models"])),
+            }
+        )
+    return picks
+
+
+def write_demo_house(kit_dir: Path, data_dir: Path, today: date | None = None) -> Path | None:
+    """Save the trio (propertyId and role only) under data/ (git-ignored) for lane V. Prints
+    roles, rules, counts and indexed yes/no: the sponsor terms keep record ids out of logs."""
+    kit_dir = Path(kit_dir)
+    if _find(kit_dir, RESIDENTIAL_FILE) is None:
+        print(f"kit not found ({RESIDENTIAL_FILE})")
+        return None
+    picks = pick_demo_houses(kit_dir, today, indexed_model_ids(Path(data_dir)))
+    if picks is None:
+        print("demo house: no Houston, public house with a Matterport model for every role")
+        return None
+    out = Path(data_dir) / DEMO_HOUSE_FILE
+    out.parent.mkdir(parents=True, exist_ok=True)
+    saved = [{"propertyId": p["propertyId"], "role": p["role"]} for p in picks]
+    out.write_text(json.dumps(saved, indent=2), encoding="utf-8")
+    for p in picks:
+        answer = "yes" if p["indexed"] else "no"
+        print(f"{p['role']}: rule={p['rule']}, candidates={p['candidates']}, indexed={answer}")
+    print(f"written to {DEMO_HOUSE_SHOWN}")
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
     import argparse
 
     from snapback.safety.paths import resolve_data_dir
 
-    parser = argparse.ArgumentParser(description="Pick the demo house (#74) where the kit lives.")
+    parser = argparse.ArgumentParser(description="Pick the demo houses (#74) from the kit.")
     parser.add_argument("--kit", type=Path, default=DEFAULT_KIT)
     parser.add_argument("--data", type=Path, default=Path("data"))
-    args = parser.parse_args()
-    write_demo_house(args.kit, resolve_data_dir(args.data))
+    parser.add_argument("--today", type=date.fromisoformat, default=None, help="YYYY-MM-DD")
+    args = parser.parse_args(argv)
+    return 0 if write_demo_house(args.kit, resolve_data_dir(args.data), args.today) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
