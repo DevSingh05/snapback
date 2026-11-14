@@ -250,7 +250,15 @@ HONEST_MORE = [
     "Showings start Saturday. Text the leasing office to book a time.",
     "Drop the application fee at the leasing office with your paperwork.",
 ]
-HONEST = HONEST_REPORT + HONEST_MORE
+# Round 1 FIX, item 4: five realtor lines that still red-flagged.
+HONEST_REALTOR = [
+    "Holding deposit of one month's rent is due within 48 hours of approval to reserve the home.",
+    "Holding deposit due within 24 hours of approval.",
+    "Following approval, pay the holding deposit to reserve the home.",
+    "Approved applicants pay a holding deposit to take the home off the market.",
+    "Send the application fee to my office.",
+]
+HONEST = HONEST_REPORT + HONEST_MORE + HONEST_REALTOR
 
 # The conductor's three, verbatim, from the locked rules.
 SCAMS_REPORT = [
@@ -285,7 +293,14 @@ SCAMS_MORE = [
     ("Venmo me the $75 application fee and I will send you the address.", "fee.application"),
     ("Send the application fee to our office in cash today.", "fee.application"),
 ]
-SCAMS = SCAMS_REPORT + SCAMS_MORE
+# Round 1 FIX, item 3: an ordinary step does not excuse a sentence that skips the viewing.
+SCAMS_SKIP_VIEWING = [
+    ("Send the $500 holding deposit through our website to reserve it before you tour.", "fee."),
+    ("Once you are approved, send the deposit to hold the house, no need to see it.", "fee."),
+    ("Pay the application fee online, sight unseen.", "fee.application"),
+    ("Approved applicants send the holding deposit to hold it, no viewing.", "fee."),
+]
+SCAMS = SCAMS_REPORT + SCAMS_MORE + SCAMS_SKIP_VIEWING
 
 
 def red_flags(text: str) -> list[str]:
