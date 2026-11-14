@@ -21,23 +21,27 @@ import type { PhotonContent, PhotonSpace } from "./photon";
 export const MAX_PUSHES_A_DAY = 3;
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const CODE_TTL_MS = 60 * 60 * 1000;
+export const MAX_WRONG_CODES_A_DAY = 5;
 
 /** An event from the API's events stream, as far as the sidecar reads it. */
 export type StreamEvent = {
   id: string;
   kind: string;
   source?: string; // "renter" | "pipeline" | "simulated"
-  subject: string; // match_found: the place; watch_added: the Finder session
+  at?: string; // when the API published it: a code expires by this, never by when we read it
+  subject: string; // match_found: the place; watch_added / watch_linked: the Finder session
   payload: {
     session?: string;
-    code?: number; // watch_added: the one-time link code the web shows
+    code?: string; // watch_added / watch_linked: the one-time link code the web shows
     fits_brief?: boolean;
     rent_from?: number;
     has_scan?: boolean;
   };
 };
 
-const LINK = /^\s*watch\s+(\d{4})\s*[.!]?\s*$/i;
+// Lane A's code format: 6 or more characters with no look-alikes (no 0, O, 1, I or L).
+const CODE = /^[A-HJKMNP-Z2-9]{6,16}$/;
+const LINK = /^\s*watch\s+([A-HJKMNP-Z2-9]{6,16})\s*[.!]?\s*$/i;
 const BARE_WATCH = /^\s*watch\s*[.!]?\s*$/i;
 const STOP = /^\s*(stop|unsubscribe|cancel|end|quit)\b/i;
 
@@ -59,6 +63,9 @@ type Link = { session: string; space: PhotonSpace };
 /** The links this sidecar holds. In memory only. */
 export class WatchBook {
   private codes = new Map<string, { session: string; at: number }>();
+  private used = new Set<string>(); // linked here or by a replayed watch_linked: never again
+  private refused = new Set<string>(); // offered for two sessions: never links
+  private wrong = new Map<string, number[]>(); // wrong codes per thread, for the lockout
   private byThread = new Map<string, Link>();
   private bySession = new Map<string, string>();
   private sent = new Map<string, number[]>(); // per thread, kept across stop and re-link
@@ -70,18 +77,52 @@ export class WatchBook {
     return this.byThread.size;
   }
 
-  /** A `watch_added` with a code: the code may link a thread for CODE_TTL_MS. */
+  /** A `watch_added` with a code: the code may link a thread until CODE_TTL_MS after the
+   * event's own time. A replayed old event is already expired; a code offered for a second
+   * session is refused for both, never overwritten. */
   offer(event: StreamEvent): void {
     const { session, code } = event.payload;
-    if (typeof session !== "string" || typeof code !== "number") return;
-    this.codes.set(String(code).padStart(4, "0"), { session, at: this.now() });
+    if (typeof session !== "string" || typeof code !== "string") return;
+    const key = code.toUpperCase();
+    if (!CODE.test(key) || this.used.has(key)) return;
+    const at = event.at ? Date.parse(event.at) : Number.NaN;
+    if (Number.isNaN(at)) return; // no time to expire it by: never offered
+    const other = this.codes.get(key);
+    if ((other && other.session !== session) || this.refused.has(key)) {
+      this.codes.delete(key);
+      this.refused.add(key);
+      return;
+    }
+    this.codes.set(key, { session, at });
   }
 
-  /** Link the thread to the session the code was issued for. Null if unknown or expired. */
+  /** A `watch_linked` (the API saw the code used): the code never links again. */
+  used_up(event: StreamEvent): void {
+    const code = event.payload.code;
+    if (typeof code !== "string") return;
+    this.used.add(code.toUpperCase());
+    this.codes.delete(code.toUpperCase());
+  }
+
+  /** True when the thread sent MAX_WRONG_CODES_A_DAY wrong codes in the last 24 hours. */
+  locked(threadId: string): boolean {
+    const now = this.now();
+    const recent = (this.wrong.get(threadId) ?? []).filter((at) => now - at < DAY_MS);
+    this.wrong.set(threadId, recent);
+    return recent.length >= MAX_WRONG_CODES_A_DAY;
+  }
+
+  /** Link the thread to the session the code was issued for. Null if unknown, used, refused
+   * or expired (and the miss counts toward the lockout). */
   link(space: PhotonSpace, code: string): string | null {
-    const offered = this.codes.get(code);
-    if (!offered || this.now() - offered.at > CODE_TTL_MS) return null;
-    this.codes.delete(code); // a code links once
+    const key = code.toUpperCase();
+    const offered = this.codes.get(key);
+    if (!offered || this.used.has(key) || this.now() - offered.at > CODE_TTL_MS) {
+      this.wrong.set(space.id, [...(this.wrong.get(space.id) ?? []), this.now()]);
+      return null;
+    }
+    this.codes.delete(key); // a code links once
+    this.used.add(key);
     this.stop(space.id);
     this.byThread.set(space.id, { session: offered.session, space });
     this.bySession.set(offered.session, space.id);
@@ -138,13 +179,17 @@ export function answerCommand(
   }
   const linked = LINK.exec(text);
   if (linked?.[1]) {
+    if (book.locked(space.id)) {
+      return "Too many wrong codes today. Try again tomorrow with a new code from the Finder.";
+    }
     if (book.link(space, linked[1]) === null) {
       return `That code did not match a watch. Get a new one from the Finder: ${finder}`;
     }
     log("[sidecar] linked a thread to a Finder watch");
     return (
       "Watching. SNAPBACK will text you here when a researched place fits your brief, at most " +
-      `${MAX_PUSHES_A_DAY} times a day. Text stop to end it.`
+      `${MAX_PUSHES_A_DAY} times a day. Text stop to end it. If SNAPBACK restarts, the watch ` +
+      "ends; link it again from the Finder."
     );
   }
   if (BARE_WATCH.test(text)) {
@@ -184,6 +229,10 @@ export async function pushEvents(
     if (!book.firstTime(event.id)) continue;
     if (event.kind === "watch_added") {
       book.offer(event);
+      continue;
+    }
+    if (event.kind === "watch_linked") {
+      book.used_up(event);
       continue;
     }
     if (event.kind !== "match_found" || event.payload.fits_brief === false) continue;

@@ -4,7 +4,8 @@
  * The message logic is in handler.ts; Photon (Spectrum, iMessage) is in photon.ts. Both are
  * tested with fakes, so CI needs no account.
  * Hard rule: outbound messages only go back to the renter's own thread. We never message the
- * person who posted a listing, and SNAPBACK never texts first.
+ * person who posted a listing. SNAPBACK texts first only in a thread that linked a Finder
+ * watch (ruling R-M1, M10, watch.ts): at most 3 a day, and a stop word ends it.
  *
  * Env (read from the shell, then the repo's local .env, which is git-ignored):
  * API_URL, WEB_URL, SIDECAR_ALLOWED_THREADS (comma-separated thread ids, or their keyed hashes

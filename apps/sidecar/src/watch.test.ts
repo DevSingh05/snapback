@@ -63,10 +63,21 @@ function config(book: WatchBook, calls: Call[] = [], allowed: string[] = [RENTER
 }
 
 let next = 0;
-const watchAdded = (code: number, session = SESSION): StreamEvent => ({
+// Lane A's code format: 6 or more characters, no look-alikes (no 0 O 1 I L).
+const CODE = "K7P4QX";
+const watchAdded = (code: string, session = SESSION, at = new Date()): StreamEvent => ({
   id: `ev-${String(++next).padStart(6, "0")}`,
   kind: "watch_added",
   source: "renter",
+  at: at.toISOString(),
+  subject: session,
+  payload: { session, code },
+});
+const watchLinked = (code: string, session = SESSION): StreamEvent => ({
+  id: `ev-${String(++next).padStart(6, "0")}`,
+  kind: "watch_linked",
+  source: "pipeline",
+  at: new Date().toISOString(),
   subject: session,
   payload: { session, code },
 });
@@ -84,11 +95,11 @@ async function* events(...items: StreamEvent[]) {
 }
 
 /** A book with RENTER linked to SESSION through the code flow. */
-async function linked(now?: () => number) {
+async function linked(now: () => number = Date.now) {
   const book = new WatchBook(now);
   const renter = space(RENTER);
-  await pushEvents(events(watchAdded(4821)), book, WEB);
-  await runPhoton(app([[renter, said("WATCH 4821")]]), config(book));
+  await pushEvents(events(watchAdded(CODE, SESSION, new Date(now()))), book, WEB);
+  await runPhoton(app([[renter, said(`WATCH ${CODE}`)]]), config(book));
   return { book, renter };
 }
 
@@ -105,17 +116,22 @@ test("'WATCH <code>' links the thread to the Finder session the code was issued 
 });
 
 test("a code links once, an unknown or expired code links nothing", async () => {
-  let now = 0;
+  let now = Date.parse("2026-11-14T12:00:00Z");
   const book = new WatchBook(() => now);
   const a = space(RENTER);
   const b = space("fx-space-other");
-  await pushEvents(events(watchAdded(1111), watchAdded(2222)), book, WEB);
+  const at = new Date(now);
+  await pushEvents(
+    events(watchAdded("HJK234", SESSION, at), watchAdded("MNP567", "fs-2", at)),
+    book,
+    WEB,
+  );
   const cfg = config(book, [], [RENTER, "fx-space-other"]);
-  await runPhoton(app([[a, said("watch 1111")]]), cfg);
-  await runPhoton(app([[b, said("watch 1111")]]), cfg); // already used
+  await runPhoton(app([[a, said("watch hjk234")]]), cfg); // case does not matter
+  await runPhoton(app([[b, said("watch HJK234")]]), cfg); // already used
   assert.match(b.sent[0] ?? "", /did not match a watch/);
   now += CODE_TTL_MS + 1;
-  await runPhoton(app([[b, said("watch 2222")]]), cfg); // expired
+  await runPhoton(app([[b, said("watch MNP567")]]), cfg); // expired
   assert.match(b.sent[1] ?? "", /did not match a watch/);
   assert.equal(book.size(), 1);
 });
@@ -131,8 +147,8 @@ test("no local sessions: a bare 'watch' points to the Finder and links nothing",
 test("'WATCH <code>' from a thread not on the allowlist links nothing and sends nothing", async () => {
   const book = new WatchBook();
   const stranger = space("fx-space-stranger");
-  await pushEvents(events(watchAdded(4821)), book, WEB);
-  await runPhoton(app([[stranger, said("watch 4821")]]), config(book));
+  await pushEvents(events(watchAdded(CODE)), book, WEB);
+  await runPhoton(app([[stranger, said(`watch ${CODE}`)]]), config(book));
   assert.equal(book.size(), 0);
   assert.equal(stranger.sent.length, 0);
 });
@@ -153,9 +169,9 @@ test("an ad whose price looks like a live code is still checked, and links nothi
   const book = new WatchBook();
   const renter = space(RENTER);
   const calls: Call[] = [];
-  await pushEvents(events(watchAdded(1200)), book, WEB);
+  await pushEvents(events(watchAdded("ZXCV23")), book, WEB);
   await runPhoton(
-    app([[renter, said("watch out: 2 bed $1200, Zelle first")]]),
+    app([[renter, said("watch out ZXCV23: 2 bed $1200, Zelle first")]]),
     config(book, calls),
   );
   assert.equal(calls.filter((c) => c.method === "POST").length, 1);
@@ -216,8 +232,8 @@ test("item 6: linking again does not reset the day's count", async () => {
   const now = Date.parse("2026-11-14T12:00:00Z");
   const { book, renter } = await linked(() => now);
   await pushEvents(events(match(), match(), match()), book, WEB);
-  await pushEvents(events(watchAdded(5555)), book, WEB);
-  await runPhoton(app([[renter, said("watch 5555")]]), config(book));
+  await pushEvents(events(watchAdded("QRS789", SESSION, new Date(now))), book, WEB);
+  await runPhoton(app([[renter, said("watch QRS789")]]), config(book));
   const before = renter.sent.length;
   await pushEvents(events(match()), book, WEB);
   assert.equal(renter.sent.length, before);
@@ -261,7 +277,7 @@ test("an ad that starts with 'End unit' is checked, not taken as a stop", async 
 test("a thread with no watch is never texted first", async () => {
   const book = new WatchBook();
   const renter = space(RENTER);
-  await pushEvents(events(watchAdded(4821), match()), book, WEB);
+  await pushEvents(events(watchAdded(CODE), match()), book, WEB);
   assert.equal(renter.sent.length, 0);
 });
 
@@ -269,7 +285,7 @@ test("a thread with no watch is never texted first", async () => {
 
 test("the stream is read with the token in a header, and ids are kept", async () => {
   const body =
-    'id: ev-000001\nevent: event\ndata: {"id":"ev-000001","kind":"watch_added","subject":"fs-1","payload":{"session":"fs-1","code":4821}}\n\n' +
+    'id: ev-000001\nevent: event\ndata: {"id":"ev-000001","kind":"watch_added","subject":"fs-1","payload":{"session":"fs-1","code":"K7P4QX"}}\n\n' +
     ": keep-alive\n\n" +
     'id: ev-000002\nevent: event\ndata: {"id":"ev-000002","kind":"match_found","source":"simulated","subject":"fx-place-1","payload":{"session":"fs-1","fits_brief":true}}\n\n';
   const seen: { url: string; auth: string | null; last: string | null }[] = [];
@@ -308,4 +324,78 @@ test("a reconnect that replays an event does not text the same match twice", asy
   await pushEvents(events(once), book, WEB); // the server replayed it
   assert.equal(renter.sent.length, 2);
   assert.equal(lastId, once.id);
+});
+
+// --- round 2 (XO 21:20): restarts, guessing, collisions ---------------------------------------
+
+test("[H] an old watch_added replayed into a fresh sidecar is refused", async () => {
+  const now = Date.parse("2026-11-14T15:00:00Z");
+  const book = new WatchBook(() => now); // a fresh sidecar: no Last-Event-ID, full replay
+  const mallory = space(RENTER);
+  const old = watchAdded(CODE, SESSION, new Date(now - CODE_TTL_MS - 1));
+  await pushEvents(events(old), book, WEB);
+  await runPhoton(app([[mallory, said(`watch ${CODE}`)]]), config(book));
+  assert.equal(book.size(), 0);
+  assert.match(mallory.sent[0] ?? "", /did not match a watch/);
+});
+
+test("[H] a replayed watch_linked marks its code used, even inside the hour", async () => {
+  const book = new WatchBook();
+  const mallory = space(RENTER);
+  await pushEvents(events(watchAdded(CODE), watchLinked(CODE)), book, WEB);
+  await runPhoton(app([[mallory, said(`watch ${CODE}`)]]), config(book));
+  assert.equal(book.size(), 0);
+});
+
+test("[M] codes are 6+ characters with no look-alikes; a 4-digit code is not a command", async () => {
+  const book = new WatchBook();
+  const renter = space(RENTER);
+  const calls: Call[] = [];
+  await runPhoton(app([[renter, said("watch 4821")]]), config(book, calls));
+  assert.equal(book.size(), 0);
+  // "watch 4821" is not a watch command, so it is read as text and checked like an ad
+  assert.equal(calls.filter((c) => c.method === "POST").length, 1);
+  for (const lookalike of [
+    "watch K0P4QX",
+    "watch K1P4QX",
+    "watch KOP4QX",
+    "watch KIP4QX",
+    "watch KLP4QX",
+  ]) {
+    const b = new WatchBook();
+    await pushEvents(events(watchAdded(lookalike.slice(6))), b, WEB);
+    await runPhoton(app([[space(RENTER), said(lookalike)]]), config(b));
+    assert.equal(b.size(), 0, lookalike);
+  }
+});
+
+test("[M] a thread is locked after 5 wrong codes in a day", async () => {
+  let now = Date.parse("2026-11-14T12:00:00Z");
+  const book = new WatchBook(() => now);
+  const renter = space(RENTER);
+  const cfg = config(book);
+  for (const guess of ["AAAAA2", "AAAAA3", "AAAAA4", "AAAAA5", "AAAAA6"]) {
+    await runPhoton(app([[renter, said(`watch ${guess}`)]]), cfg);
+  }
+  await pushEvents(events(watchAdded(CODE, SESSION, new Date(now))), book, WEB);
+  await runPhoton(app([[renter, said(`watch ${CODE}`)]]), cfg); // the right code, but locked
+  assert.equal(book.size(), 0);
+  assert.match(renter.sent.at(-1) ?? "", /Too many wrong codes/);
+  now += DAY_MS + 1;
+  await pushEvents(events(watchAdded("BBBBB2", SESSION, new Date(now))), book, WEB);
+  await runPhoton(app([[renter, said("watch BBBBB2")]]), cfg); // a day later it works
+  assert.equal(book.size(), 1);
+});
+
+test("[M] a code offered for two sessions is refused, never overwritten", async () => {
+  const book = new WatchBook();
+  const renter = space(RENTER);
+  await pushEvents(events(watchAdded(CODE, "fs-a"), watchAdded(CODE, "fs-b")), book, WEB);
+  await runPhoton(app([[renter, said(`watch ${CODE}`)]]), config(book));
+  assert.equal(book.size(), 0);
+});
+
+test("[L] the Watching reply says a restart ends the watch", async () => {
+  const { renter } = await linked();
+  assert.match(renter.sent[0] ?? "", /restart/i);
 });
