@@ -124,7 +124,7 @@ _AFTER_APPROVAL = re.compile(
 )
 # A sentence that skips or postpones the viewing: no ordinary step excuses the money in it.
 _SKIPS_VIEWING = re.compile(
-    r"\bbefore (?:you |we |they )?(?:to )?(?:tour|see|view)\w{0,6}|\bno need to (?:see|tour|view)\b"
+    r"\bbefore (?:you |we |they )?(?:to )?(?:the |a |any |your )?(?:tour|see|view|show)\w{0,6}|\bno need to (?:see|tour|view)\b"
     r"|\bsight unseen\b|\bno (?:viewing|showing|tour)s?\b",
     re.IGNORECASE,
 )

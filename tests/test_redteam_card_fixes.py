@@ -298,6 +298,11 @@ SCAMS_SKIP_VIEWING = [
     ("Send the $500 holding deposit through our website to reserve it before you tour.", "fee."),
     ("Once you are approved, send the deposit to hold the house, no need to see it.", "fee."),
     ("Pay the application fee online, sight unseen.", "fee.application"),
+    ("Once approved, pay the holding deposit online before the showing.", "fee."),
+    (
+        "Pay the holding deposit through our portal to reserve the home before the viewing.",
+        "fee.",
+    ),
     ("Approved applicants send the holding deposit to hold it, no viewing.", "fee."),
 ]
 SCAMS = SCAMS_REPORT + SCAMS_MORE + SCAMS_SKIP_VIEWING

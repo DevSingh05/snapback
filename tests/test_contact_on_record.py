@@ -774,3 +774,12 @@ def test_the_shared_fixture_record_has_nothing_to_compare_so_nothing_changes(tmp
     with_claims = FixtureModules(contacts=listing.contacts)
     assert with_claims.authority("fx-1") == plain.authority("fx-1")
     assert plain.for_sale("fx-1") is None
+
+
+def test_authority_matches_says_anyone_can_type_the_name():
+    assert strings.text("reason.authority_matches") == (
+        "The ad names the manager on record. Anyone can type that name."
+    )
+    assert strings.text("reason.authority_matches", "es") == (
+        "El anuncio nombra al administrador del registro. Cualquiera puede escribir ese nombre."
+    )
