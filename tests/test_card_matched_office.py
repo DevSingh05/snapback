@@ -24,11 +24,11 @@ FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "contracts"
 CHECKED_AT = datetime.fromisoformat("2026-11-14T10:00:00-05:00")
 OFFICE = "Fixture Property Management Co"
 EN = (
-    "The home in these photos is listed by its office on CoStar's record: "
+    "Not checked. The home in these photos is listed by its office on CoStar's record: "
     f"{OFFICE}. We can't tell you if it is offered, or at this price."
 )
 ES = (
-    "La vivienda de estas fotos figura con esta oficina en el registro de CoStar: "
+    "No comprobado. La vivienda de estas fotos figura con esta oficina en el registro de CoStar: "
     f"{OFFICE}. No podemos decirle si se ofrece, ni a este precio."
 )
 
@@ -136,3 +136,97 @@ def test_the_card_never_says_for_rent():
         assert "for rent" not in text and "en alquiler" not in text.split(OFFICE.lower())[-1]
     en_table = strings._table("en")
     assert [k for k, v in en_table.items() if "for rent" in str(v).lower()] == []
+
+
+class StubLookups:
+    """Records by id, as the real lookups return them."""
+
+    def __init__(self, companies):
+        from snapback.contracts import PropertyRecord
+
+        self._records = {
+            pid: PropertyRecord(property_id=pid, source=DataSource.FIXTURE, manager_company=name)
+            for pid, name in companies.items()
+        }
+
+    def record(self, pid):
+        return self._records.get(pid)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "1234 Main Street",
+        "500 Westheimer Rd Suite 4",
+        "77 Sunset Blvd",
+        "9 Oak Ln",
+        "  100 N Loop Fwy W  ",
+        "1 Kirby Drive Management",
+    ],
+)
+def test_an_office_shaped_like_a_street_address_is_never_shown(name):
+    locate = evidence().locate  # photo 0 is elsewhere, matched to fx-prop-3
+    assert matched_office_of(StubLookups({"fx-prop-3": name}), locate) is None
+
+
+@pytest.mark.parametrize(
+    "name", ["Fixture Property Management Co", "Greystar Real Estate Partners", "ABC 123 Homes LLC"]
+)
+def test_a_company_name_is_kept(name):
+    assert matched_office_of(StubLookups({"fx-prop-3": name}), evidence().locate) == name
+
+
+def test_only_a_photo_placed_elsewhere_counts_not_one_placed_in_the_claimed_home():
+    base = evidence().locate
+    claimed = base.photos[0].model_copy(
+        update={
+            "status": LocateStatus.LOCATED_IN_CLAIMED,
+            "matched_property_id": "fx-prop-4",  # a stray id on a claimed photo
+        }
+    )
+    elsewhere = base.photos[0].model_copy(
+        update={
+            "photo_id": "l9",
+            "status": LocateStatus.LOCATED_ELSEWHERE,
+            "matched_property_id": "fx-prop-3",
+        }
+    )
+    locate = base.model_copy(update={"photos": [claimed, elsewhere]})
+    lookups = KitLookups(DataSource.FIXTURE)
+    assert matched_office_of(lookups, locate) == OFFICE  # fx-prop-3, not fx-prop-4's company
+    only_claimed = base.model_copy(update={"photos": [claimed]})
+    assert matched_office_of(lookups, only_claimed) is None
+
+
+def test_joined_modules_matched_office_is_the_real_path():
+    from snapback.agent.intake import read_listing
+    from snapback.agent.join import JoinedModules
+
+    lookups = KitLookups(DataSource.FIXTURE)
+    listing = read_listing("Nice 1 bed, $1,500 a month", [])
+    modules = JoinedModules(
+        stand_in=None,
+        listing=listing,
+        record=None,
+        for_sale=None,
+        salt="x",
+        record_source=None,
+        lookups=lookups,
+    )
+    assert modules.matched_office("fx-1", evidence().locate) == OFFICE
+    assert modules.matched_office("fx-1", None) is None
+
+    class Broken:
+        def record(self, pid):
+            raise RuntimeError("lookup down")
+
+    broken = JoinedModules(
+        stand_in=None,
+        listing=listing,
+        record=None,
+        for_sale=None,
+        salt="x",
+        record_source=None,
+        lookups=Broken(),
+    )
+    assert broken.matched_office("fx-1", evidence().locate) is None  # the line is left out

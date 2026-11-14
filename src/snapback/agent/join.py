@@ -12,6 +12,7 @@ Nothing here logs or returns a value from a record. The rules turn it into statu
 """
 
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Protocol
@@ -112,6 +113,14 @@ def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
 
 
 MAX_OFFICE_CHARS = 80
+# A "company" that is really a street address (11 kit buildings with scans): never shown.
+_STREET_WORDS = (
+    r"st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|way|ct|court|pkwy|parkway|"
+    r"hwy|highway|fwy|freeway|pl|place|cir|circle|trl|trail|sq|square|ter|terrace|loop"
+)
+ADDRESS_LIKE = re.compile(
+    rf"\b\d{{1,6}}\s+(?:[A-Za-z0-9.'-]+\s+){{0,4}}(?:{_STREET_WORDS})\b", re.I
+)
 
 
 def matched_office_of(lookups: object, locate: LocateResult | None) -> str | None:
@@ -126,7 +135,9 @@ def matched_office_of(lookups: object, locate: LocateResult | None) -> str | Non
             continue
         record = lookups.record(found)  # type: ignore[attr-defined]
         company = (record.manager_company or "").strip() if record is not None else ""
-        return company[:MAX_OFFICE_CHARS] or None
+        if not company or ADDRESS_LIKE.search(company):
+            return None
+        return company[:MAX_OFFICE_CHARS]
     return None
 
 
