@@ -163,7 +163,6 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             and _licence_clears_contact(modules) is not None
         ),
         phone_confirmed=_the_ad_is_the_office_s(modules),
-        licence_verified_by=_licence_verified_by(modules),
         brokerage_only=modules.authority is not None and modules.authority.brokerage_only,
         lookalike_link_flag=(
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
@@ -189,7 +188,6 @@ REASON_ORDER = (
     "reason.photo_elsewhere",
     # Who: authority first, then the poster's contact, the licence they claim, and the
     # owner of record.
-    "reason.licence_checked",
     "reason.authority_matches",
     "reason.authority_matches_brokerage",
     "reason.authority_unknown",
@@ -257,8 +255,9 @@ def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
     was checked by NUMBER (the ad's or the renter's, never a name lookup); its sponsor is a
     company; and that company is the brokerage or office on record (the authority's, or a
     listing office of an ACTIVE for-sale match), by the same matcher as everywhere else. Then
-    a phone that is not the office's is information, not "Not confirmed". On its own it
-    verifies nothing (see `_licence_verified_by`); the owner line and the for-sale hold are
+    a phone that is not the office's is information, not "Not confirmed". It verifies
+    nothing, even with presence (a door code or a copied name and number can pass all of it,
+    Vidyut Sat 09:30); the owner line and the for-sale hold are
     not touched.
     Returns that brokerage's name from the record, or None.
     """
@@ -284,20 +283,6 @@ def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
     return next(
         (name for name in on_record if same_company(found.sponsor_broker, name) is True), None
     )
-
-
-def _licence_verified_by(modules: ModuleEvidence) -> str | None:
-    """The brokerage's name when the full four-part check holds (Vidyut, Sat 09:05), else None.
-
-    Active licence by number + sponsor is the brokerage on record + presence PROVEN (all in
-    `_licence_clears_contact`) + at least one photo placed in the claimed home. Whether anything
-    else holds the case is `decide`'s call.
-    """
-    brokerage = _licence_clears_contact(modules)
-    if brokerage is None or modules.locate is None:
-        return None
-    placed = any(photo.status is LocateStatus.LOCATED_IN_CLAIMED for photo in modules.locate.photos)
-    return " ".join(brokerage.split())[:MAX_BROKERAGE_CHARS] if placed else None
 
 
 def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
@@ -404,18 +389,6 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     elif evidence.rule_flag:
         red_flags.append("reason.rule_flag")
     red_flags.extend(on_record)
-
-    # The one stated exception to "VERIFIED needs the office's phone" (Vidyut, Sat 09:05): the
-    # four-part licence check. Every other reason still holds the case, so the contact reason
-    # the licence itself cleared is the only one set aside.
-    if evidence.licence_verified_by and evidence.presence is PresenceStatus.PROVEN:
-        other = [key for key in unconfirmed if key != "reason.phone_not_confirmed"]
-        if not red_flags and not other:
-            return verdict(
-                VerdictState.VERIFIED,
-                "reason.licence_checked",
-                brokerage=evidence.licence_verified_by,
-            )
 
     if (
         evidence.presence is PresenceStatus.PROVEN

@@ -83,10 +83,6 @@ class Evidence(BaseModel):
     # the phone is not the office's, but an active licence by number is sponsored by the
     # brokerage on record (Sat 07:35): no red-flag-like phone reason, but still not confirmed
     phone_cleared_by_licence: bool = False
-    # The full four-part check (Vidyut, Sat 09:05): an active licence by number, sponsored by
-    # the brokerage on record (its name here), photos placed in the claimed home, and presence
-    # PROVEN. The one stated exception to "VERIFIED needs phone_confirmed".
-    licence_verified_by: str | None = None
     # A15: who is on record is a listing brokerage, not a manager with an office phone.
     brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website

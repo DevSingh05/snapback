@@ -1,10 +1,11 @@
 """Vidyut, Sat 07:35 and 09:05: an active Texas licence, checked by number, sponsored by the
 brokerage on record, turns the contact "Not confirmed" line into an information line, but ONLY
 when presence is also PROVEN (a fresh in-home photo with the code), which defeats a copied
-licence. With photos placed in the claimed home as well, the headline may read VERIFIED
-(the one stated exception to "VERIFIED needs the office's phone"), and only then.
+licence. The headline never reads VERIFIED on a licence, even with everything else passing
+(Vidyut revoked that at Sat 09:30: a self-tour scammer with a door code can copy the public
+name and number, name the brokerage and send a fresh in-home photo).
 
-Never on a licence alone, and the owner line and the for-sale hold are untouched. The default
+The owner line and the for-sale hold are untouched. The default
 fixture here has presence PROVEN and photos located; tests drop one condition at a time.
 Synthetic names only; the lookup result holds no person and no number.
 """
@@ -252,31 +253,26 @@ def test_a_forged_reply_does_not_count_as_presence():
 
 # --- the headline: all four parts, and nothing else holding the case ---------------------------
 
-CHECKED_EN = (
-    "Checked: an active Texas license under the name in the ad, sponsored by Fixture Realty "
-    "LLC, the brokerage on record; the photos are of this home; a fresh photo with the code "
-    "came from inside. Call Fixture Realty LLC on a number you look up yourself to confirm."
-)
-CHECKED_ES = (
-    "Comprobado: una licencia activa de Texas a nombre de quien firma el anuncio, patrocinada "
-    "por Fixture Realty LLC, la agencia que figura en el registro; las fotos son de esta "
-    "vivienda; una foto nueva con el código se tomó desde dentro. Llame a Fixture Realty LLC "
-    "a un número que usted mismo busque para confirmar."
-)
-
 
 def state(modules: ModuleEvidence) -> VerdictState:
     return decide(to_evidence(modules)).state
 
 
-def test_all_four_parts_read_verified_and_say_what_was_checked():
+def test_all_four_parts_stay_hold_with_the_softened_contact_line():
     modules = evidence(authority=DIFFERS, license=LICENSED)
     assert to_evidence(modules).phone_confirmed is False
-    assert decide(to_evidence(modules)).state is VerdictState.VERIFIED
-    assert decide(to_evidence(modules)).reasons == [CHECKED_EN]
-    assert decide(to_evidence(modules, "es"), "es").reasons == [CHECKED_ES]
-    # the card keeps its call-the-office guidance on the contact line
+    assert decide(to_evidence(modules)).state is VerdictState.HOLD
+    assert contact(modules) == (CardTone.NOT_SHOWN, INFO_EN)
     assert "call Fixture Realty LLC on a number you look up yourself" in contact(modules)[1]
+
+
+def test_a_self_tour_attacker_never_reads_verified():
+    # a door code gives a fresh in-home photo; name, number and brokerage are all public
+    for authority in (DIFFERS, COPIED):
+        for extra in ({}, {"owner": None}):
+            modules = evidence(authority=authority, license=LICENSED, **extra)
+            assert to_evidence(modules).presence.value == "proven"
+            assert state(modules) is VerdictState.HOLD
 
 
 def test_the_for_sale_brokerage_counts_as_on_record_for_the_headline():
@@ -299,13 +295,12 @@ def test_the_for_sale_brokerage_counts_as_on_record_for_the_headline():
         ),
         pytest.param({"license": LICENSED | {"sponsor_broker": None}}, id="no-sponsor"),
         pytest.param(NO_PRESENCE, id="no-presence"),
-        pytest.param({"locate": None}, id="no-locate"),
     ],
 )
-def test_dropping_any_one_part_is_not_verified(drop):
-    base = {"authority": DIFFERS, "license": LICENSED}
-    assert state(evidence(**base)) is VerdictState.VERIFIED
-    assert state(evidence(**(base | drop))) is not VerdictState.VERIFIED
+def test_dropping_any_one_part_loses_the_softened_line(drop):
+    assert contact(evidence(authority=DIFFERS, license=LICENSED))[0] is CardTone.NOT_SHOWN
+    softened = contact(evidence(authority=DIFFERS, **({"license": LICENSED} | drop)))
+    assert softened[1].startswith(NOT_CONFIRMED_START)
 
 
 def test_photos_not_placed_in_the_claimed_home_is_not_verified():
@@ -314,7 +309,6 @@ def test_photos_not_placed_in_the_claimed_home_is_not_verified():
         photo["status"] = "not_located"
     modules = evidence(authority=DIFFERS, license=LICENSED, locate=raw)
     assert state(modules) is VerdictState.UNVERIFIED
-    assert to_evidence(modules).licence_verified_by is None
 
 
 def test_presence_proven_with_a_name_only_licence_is_not_verified():
@@ -349,8 +343,6 @@ def test_a_renter_typed_number_that_is_not_active_still_holds():
 
 
 def test_a_payment_rule_red_flag_keeps_the_case_on_hold():
-    modules = evidence(authority=DIFFERS, license=LICENSED)
-    assert state(modules) is VerdictState.VERIFIED
     hit = {
         "rule_id": "fx-pay",
         "category": "payment_method",
