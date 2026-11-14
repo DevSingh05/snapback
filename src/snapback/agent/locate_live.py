@@ -89,6 +89,7 @@ class LiveLocate:
         embedder_factory: Callable[[str], object] = _default_embedder,
         budget_s: float = DEFAULT_BUDGET_S,
         thresholds: object | None = None,
+        rooms_for: Callable[[str], Mapping[str, str | None]] | None = None,
     ) -> None:
         self._data_dir = Path(data_dir)
         self._records = records
@@ -98,6 +99,9 @@ class LiveLocate:
         self._embedder_factory = embedder_factory
         self.budget_s = budget_s
         self._thresholds = thresholds
+        # Room labels per sweep (Matterport's classifications), from the local cache only, so a
+        # live result can say "Taken here: Kitchen" (#74). None means the cache-only default.
+        self._rooms_for = rooms_for
         self._ready: _Ready | None = None
         self._pool: ThreadPoolExecutor | None = None
         self._lock = threading.Lock()
@@ -129,7 +133,17 @@ class LiveLocate:
                 model_ids = index.model_ids()
                 if not model_ids:
                     return None
-                catalog = catalog_from_records(list(self._records()))
+                rooms_for = self._rooms_for
+                if rooms_for is None:
+                    from snapback.adapters.matterport import cached_room_labels as rooms_for
+                catalog = catalog_from_records(list(self._records()), rooms=rooms_for)
+                # Room labels are part of the answer, so they are part of the cache key: a cached
+                # answer from before the labels were cached must not hide them.
+                room_digest = hashlib.sha256(
+                    json.dumps(
+                        {m: dict(rooms_for(m)) for m in sorted(model_ids)}, sort_keys=True
+                    ).encode()
+                ).hexdigest()[:16]
                 sweeps = {m: self._sweeps_for(m) for m in sorted(model_ids)}
                 locator = Locator(index, sweeps, catalog, self._make_matcher(), self._thresholds)
             except Exception as error:  # noqa: BLE001 - extra missing, kit missing, bad files
@@ -138,7 +152,7 @@ class LiveLocate:
             matcher = locator.matcher
             version = getattr(matcher, "version", matcher.name)
             index_hash = hashlib.sha256((self._index_dir / "index.json").read_bytes()).hexdigest()
-            key = f"{self._index_name}|{index_hash}|{locator.thresholds!r}|{version}"
+            key = f"{self._index_name}|{index_hash}|{locator.thresholds!r}|{version}|{room_digest}"
             self._ready = _Ready(locator, model_ids, key)
             return self._ready
 
