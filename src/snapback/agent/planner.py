@@ -9,6 +9,10 @@ in a fixed order and works out, from evidence it already holds, which of them ca
   property record, and the listing brokerages are then who is on record);
 - `TREC license`: the license the ad names, looked up with the state (D10);
 - `owner of record`: the public owner file (D12) and how the poster compares (A19);
+- `compare the ad's claims with the record`: what the ad says (floors, laundry, pool, "new
+  management", "just sold") held against what CoStar's record shows (ad vs record). Offered only
+  when the ad makes a claim the record clearly answers; information lines only, no verdict reads
+  them;
 - `ask renter for license number`: offered only when the ad claims a license or a role but gives
   no number (A24 stretch). The renter is asked for it; their answer re-runs the license lookup
   by number and nothing else;
@@ -24,13 +28,14 @@ the trace, after `clean_reason`, and never reaches a card.
 """
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal
 
 from snapback.agent.trace import clean_reason
 from snapback.contracts import (
+    AdNote,
     AuthorityResult,
     ForSaleMatch,
     ForSaleStatus,
@@ -48,6 +53,7 @@ class PlanKind(StrEnum):
     BROKERAGE = "listing brokerage"
     LICENSE = "TREC license"
     OWNER = "owner of record"
+    CLAIMS = "compare the ad's claims with the record"
     ASK = "ask renter for license number"
     REPORT = "report pack"
 
@@ -57,6 +63,7 @@ ORDER = (
     PlanKind.BROKERAGE,
     PlanKind.LICENSE,
     PlanKind.OWNER,
+    PlanKind.CLAIMS,
     PlanKind.ASK,
     PlanKind.REPORT,
 )
@@ -86,6 +93,7 @@ PICK_KEY: dict[PlanKind, str] = {
     PlanKind.BROKERAGE: "plan.pick.brokerage",
     PlanKind.LICENSE: "plan.pick.license",
     PlanKind.OWNER: "plan.pick.owner",
+    PlanKind.CLAIMS: "plan.pick.claims",
     PlanKind.ASK: "plan.pick.ask",
     PlanKind.REPORT: "plan.pick.report",
 }
@@ -118,6 +126,16 @@ class Plan:
         self._owner_offered = callable(owner_fn)
         self._license: LicenseResult | None = license_fn(case_id) if callable(license_fn) else None
         self._owner: OwnerResult | None = owner_fn(case_id) if callable(owner_fn) else None
+        # Ad vs record: the notes are worked out once, here. A compare that broke is a compare
+        # that did not happen: the option is simply not offered.
+        claims_fn = getattr(modules, "ad_notes", None)
+        self._claims_offered = callable(claims_fn)
+        self._ad_notes: list[AdNote] = []
+        if callable(claims_fn):
+            try:
+                self._ad_notes = list(claims_fn(case_id) or [])
+            except Exception:
+                self._ad_notes = []
         by_number = getattr(modules, "license_by_number", None)
         self._ask_offered = ask_enabled and callable(by_number)
         self.number_given = False  # the renter's answer held a license number (a yes/no fact)
@@ -183,6 +201,10 @@ class Plan:
             if not self._owner_offered:
                 return "plan.skip.owner_off"
             return None if self._owner is not None else "plan.skip.owner_none"
+        if kind is PlanKind.CLAIMS:
+            if not self._claims_offered:
+                return "plan.skip.claims_off"
+            return None if self._ad_notes else "plan.skip.claims_none"
         if kind is PlanKind.ASK:
             if not self._ask_offered:
                 return "plan.skip.ask_off"
@@ -216,6 +238,8 @@ class Plan:
         out = []
         for kind in ORDER[:-1]:
             reason = self._skip_reason(kind)
+            if kind is PlanKind.CLAIMS:
+                continue  # an ad with nothing the record can answer is not worth a trace line
             if kind is PlanKind.ASK and not (self._ask_offered and self._names_a_license):
                 continue  # asking is off, or there is no claim: the license skip line says it
             if reason is not None and kind not in self.ran:
@@ -259,6 +283,8 @@ class Plan:
             return {"license": self._license}
         if kind is PlanKind.OWNER:
             return {"owner": self._owner}
+        if kind is PlanKind.CLAIMS:
+            return {"ad_notes": self._ad_notes}
         if kind is PlanKind.ASK:
             raise ValueError("the question is asked by the session; the answer comes to answer()")
         return {}
@@ -308,7 +334,7 @@ class Plan:
 # Search planning (council 4): the model chooses among options code wrote, from derived facts.
 #
 # Two choices follow a search, each with 2+ code-written options or none is asked:
-#   1. which of the top matches get the deep check (record, for-sale, licence, owner);
+#   1. which top matches get the deep check (office on record; for-sale status for houses);
 #   2. which trade-off question to put to the renter ("$140 a month less with a walk-up. OK?").
 # The chooser sees option labels and counts and yes/no facts only: never a kit row, an id, an
 # office name or an address. Whatever it answers, code applies only a pick that is on the list;
@@ -333,7 +359,10 @@ SEARCH_FACT_KEYS: dict[str, frozenset[str]] = {
         }
     ),
     "tradeoff": frozenset({"matches", "options", "biggest_saving", "any_saves_money"}),
+    "tour_gate": frozenset({"has_question", "places_with_office"}),
 }
+ASK_FIRST = "Ask the renter that question first"
+DRAFT_NOW = "Go straight to the tour request draft"
 
 
 @dataclass(frozen=True)
@@ -358,11 +387,15 @@ class SearchOffer:
 
     def for_chooser(self) -> "SearchOffer":
         """The offer without its payload: what a model is allowed to see."""
+        from snapback.preferences import MEMORY_FACT_KEYS
+
+        allowed = SEARCH_FACT_KEYS.get(self.kind, frozenset()) | MEMORY_FACT_KEYS
+        facts = {k: v for k, v in self.facts.items() if k in allowed}
         return SearchOffer(
             self.kind,
             self.options,
             self.aliases,
-            dict(self.facts),
+            facts,
             self.default,
             self.default_reason,
         )
@@ -388,7 +421,7 @@ class TradeOff:
 
 
 def _place_key(place: PlaceMatch) -> tuple[str, str]:
-    return place.property_id, place.floor_plan or ""
+    return place.property_id, place.plan_key or place.floor_plan or ""
 
 
 def deep_check_offer(matches: list[PlaceMatch]) -> SearchOffer | None:
@@ -497,44 +530,115 @@ def _decide(offer: SearchOffer, chooser: Any) -> tuple[str, SearchStep]:
     return label, SearchStep(offer.kind, offer.options, label, reason, by)  # type: ignore[arg-type]
 
 
+def tour_gate_offer(question: str | None, places_with_office: int) -> SearchOffer:
+    """Whether to ask the renter the trade-off question before a tour request is drafted. Two
+    options only when there is a question and a checked place with an office to write to."""
+    facts: dict[str, bool | int] = {
+        "has_question": question is not None,
+        "places_with_office": places_with_office,
+    }
+    if question is not None and places_with_office > 0:
+        return SearchOffer(
+            kind="tour_gate",
+            options=(ASK_FIRST, DRAFT_NOW),
+            aliases=("option A", "option B"),
+            facts=facts,
+            default=ASK_FIRST,
+            default_reason="The answer could change which place the renter wants to tour.",
+        )
+    return SearchOffer(
+        kind="tour_gate",
+        options=(DRAFT_NOW,),
+        aliases=("option A",),
+        facts=facts,
+        default=DRAFT_NOW,
+        default_reason="Only one option was open.",
+    )
+
+
 @dataclass(frozen=True)
 class SearchPlan:
-    deep_check: list[tuple[str, str]]  # (property_id, floor plan) of the places to check deeply
+    deep_check: list[tuple[str, str]]  # (property_id, plan_key) of the places to check deeply
     question: str | None  # the one trade-off question to put to the renter, or None
     steps: list[SearchStep]
+    ask_first: bool = False  # put the question before any tour request draft
+
+
+def _remember(offer: SearchOffer, memory: dict[str, bool | int] | None) -> SearchOffer:
+    if not memory:
+        return offer
+    from dataclasses import replace
+
+    return replace(offer, facts={**offer.facts, **memory})
+
+
+class _StopAfterFailure:
+    """One search's view of a chooser: after its first failure (an error or a timeout) it is
+    not asked again in this search, so the code policy decides the rest, each stamped `policy`.
+    A new search gets a fresh wrapper."""
+
+    def __init__(self, chooser: Any) -> None:
+        self._chooser = chooser
+        self._down = False
+
+    @property
+    def chosen_by(self) -> Any:
+        return self._chooser.chosen_by
+
+    def choose(self, offer: Any) -> tuple[str, str]:
+        if self._down:
+            raise RuntimeError("chooser failed earlier in this search")
+        try:
+            return self._chooser.choose(offer)
+        except Exception:
+            self._down = True
+            raise
 
 
 def plan_search(
-    matches: list[PlaceMatch], tradeoffs: list[TradeOff], chooser: Any | None = None
+    matches: list[PlaceMatch],
+    tradeoffs: list[TradeOff],
+    chooser: Any | None = None,
+    memory: dict[str, bool | int] | None = None,
 ) -> SearchPlan:
-    """Both search choices, in order. `chooser` is a model behind the `Chooser` protocol; with
-    none, the code policy decides every step."""
+    """The search choices, in order. `chooser` is a model behind the `Chooser` protocol; with
+    none, the code policy decides every step. `memory` is the renter's remembered preference
+    keys as yes/no and counts (never an id)."""
     from snapback.agent.runner import PolicyChooser
 
-    chooser = chooser or PolicyChooser()
+    chooser = _StopAfterFailure(chooser or PolicyChooser())
     steps: list[SearchStep] = []
     targets: list[tuple[str, str]] = []
     offer = deep_check_offer(matches)
     if offer is not None:
-        label, step = _decide(offer, chooser)
+        label, step = _decide(_remember(offer, memory), chooser)
         steps.append(step)
         targets = list(offer.payload["sets"][label])
     asked = tradeoff_offer(tradeoffs, len(matches))
-    label, step = _decide(asked, chooser)
+    label, step = _decide(_remember(asked, memory), chooser)
     steps.append(step)
     question = None if label == NO_QUESTION else label
-    return SearchPlan(targets, question, steps)
+    by_key = {_place_key(m): m for m in matches}
+    with_office = sum(1 for t in targets if by_key.get(t) and by_key[t].office_on_record)
+    gate = tour_gate_offer(question, with_office)
+    label, step = _decide(_remember(gate, memory), chooser)
+    steps.append(step)
+    return SearchPlan(targets, question, steps, ask_first=label == ASK_FIRST)
 
 
 def tradeoffs_for(
-    brief: RenterBrief, lookups: Any, matches: list[PlaceMatch] | None = None
+    brief: RenterBrief,
+    lookups: Any,
+    matches: list[PlaceMatch] | None = None,
+    exclude: Collection[str] = (),
 ) -> list[TradeOff]:
     """Questions code can ask, each computed from a second search with one need relaxed.
 
     The base list is computed here from the whole kit, never from a caller's cut-down list, and
     "places" are distinct buildings (a building has many floor plans). Only a question that
     would change the list (a lower price or more places) is offered. A parking need never
-    removes a place (an unknown stays in), so there is no parking question."""
+    removes a place (an unknown stays in), so there is no parking question. Buildings in
+    `exclude` (places the renter rejected) count for nothing: they cannot be the saving."""
     from snapback.search import _all_matches
 
     def cheapest(items: list[PlaceMatch]) -> int | None:
@@ -544,11 +648,14 @@ def tradeoffs_for(
     def buildings(items: list[PlaceMatch]) -> set[str]:
         return {m.property_id for m in items}
 
-    _, base_all = _all_matches(brief, lookups)
+    def run(b: RenterBrief) -> list[PlaceMatch]:
+        return [m for m in _all_matches(b, lookups)[1] if m.property_id not in exclude]
+
+    base_all = run(brief)
     base = cheapest(base_all)
     out: list[TradeOff] = []
     if brief.needs_no_walkup:
-        _, relaxed = _all_matches(brief.model_copy(update={"needs_no_walkup": False}), lookups)
+        relaxed = run(brief.model_copy(update={"needs_no_walkup": False}))
         walkups = [
             m
             for m in relaxed
@@ -569,9 +676,7 @@ def tradeoffs_for(
             )
     if brief.max_rent_month:
         step = max(50, round(brief.max_rent_month * 0.1 / 50) * 50)
-        _, higher = _all_matches(
-            brief.model_copy(update={"max_rent_month": brief.max_rent_month + step}), lookups
-        )
+        higher = run(brief.model_copy(update={"max_rent_month": brief.max_rent_month + step}))
         more = len(buildings(higher)) - len(buildings(base_all))
         if more > 0:
             out.append(

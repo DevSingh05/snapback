@@ -42,6 +42,7 @@ from snapback.adapters.vexcel import aerial_proof, aerial_side, known_capture_da
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
+from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
@@ -61,10 +62,12 @@ from snapback.contracts import (
     AerialSideOut,
     AlternativesResponse,
     Card,
+    CasePreferences,
     CreateCaseResponse,
     DataSource,
     Evidence,
     LocateStatus,
+    PreferencesUpdate,
     RenterBrief,
     ReplyResponse,
     ReportResponse,
@@ -74,16 +77,17 @@ from snapback.contracts import (
     Verdict,
 )
 from snapback.pack import TourPrepPack, build_tour_prep
+from snapback.preferences import merge as merge_preferences
+from snapback.replays import SLUG as REPLAY_SLUG
+from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
 from snapback.search import (
     AmbiguousPlace,
     NoOfficeOnRecord,
-    alternatives_for,
     draft_tour_request,
     place_and_raw_for,
     place_for,
 )
-from snapback.search import search as run_search
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -173,9 +177,11 @@ def create_app(
     lookups: Lookups | None = None,
     *,
     registry: CaseRegistry | None | object = _DEFAULT,
+    search_chooser: object | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
-    started each case; the default is lane D's safety store."""
+    started each case; the default is lane D's safety store. `search_chooser` replaces the
+    search agent's chooser (tests); by default the runner setting picks it."""
     settings = settings or get_settings()
     # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
     lookups = lookups or KitLookups(settings.snapback_data_source)
@@ -191,6 +197,7 @@ def create_app(
 
     pictures = CardPictures()
     search_limit = PerMinuteLimit(SEARCH_PER_MINUTE)
+    chooser = search_chooser or search_chooser_for(settings.snapback_agent)
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -226,6 +233,20 @@ def create_app(
             store.discard(case_id)
             raise HTTPException(status_code=404, detail="No case with that id.")
         return case
+
+    @app.get("/replays")
+    def replays() -> list[Replay]:
+        """Every replay of a reported case, read-only, from demo/replays. No case data."""
+        return load_replays()
+
+    @app.get("/replays/{slug}")
+    def replay(slug: str) -> Replay:
+        found = None
+        if REPLAY_SLUG.match(slug):
+            found = next((r for r in load_replays() if r.slug == slug), None)
+        if found is None:
+            raise HTTPException(status_code=404, detail="No replay with that name.")
+        return found
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -278,7 +299,12 @@ def create_app(
             )
 
     def start_case(
-        text: str, link: str, photos: list[UploadFile], property_id: str | None, owner: str
+        text: str,
+        link: str,
+        photos: list[UploadFile],
+        property_id: str | None,
+        owner: str,
+        demo_case: str | None = None,
     ) -> SessionCase:
         if property_id is not None and not PROPERTY_ID.fullmatch(property_id):
             raise HTTPException(status_code=422, detail="That is not one of our building ids.")
@@ -299,7 +325,9 @@ def create_app(
         try:
             listing = read_listing(listing_text, images)
             listing_photos = [images[index] for index in listing.photo_indexes]
-            case = store.create(listing, property_id, register, photos=listing_photos)
+            case = store.create(
+                listing, property_id, register, photos=listing_photos, demo_case=demo_case
+            )
             case.owner = owner if registry is not None else None
             return case
         except NotRegistered:
@@ -328,6 +356,7 @@ def create_app(
                                 "text": {"type": "string"},
                                 "renter_id": {"type": "string"},
                                 "property_id": {"type": "string"},
+                                "demo_case": {"type": "string"},
                                 "photos": {
                                     "type": "array",
                                     "items": {"type": "string", "format": "binary"},
@@ -354,7 +383,16 @@ def create_app(
                 str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
             property_id = str(form.get("property_id") or "").strip() or None
+            # "Run this case" on a replay page: only the case id of a served replay is accepted.
+            demo_case = str(form.get("demo_case") or "").strip() or None
+            if demo_case and demo_case not in {r.case_id for r in load_replays()}:
+                raise HTTPException(status_code=422, detail="That is not a replay case.")
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
+            if demo_case and (text.strip() or link.strip() or photos or property_id):
+                # A replay's case runs its own staged listing and nothing the caller adds.
+                raise HTTPException(
+                    status_code=422, detail="A replay case takes no listing, link or photos."
+                )
             if renter_id and not RENTER_ID.fullmatch(renter_id):
                 raise HTTPException(status_code=422, detail="That is not a renter id.")
 
@@ -379,7 +417,9 @@ def create_app(
                 per_client.release(client)
                 raise HTTPException(status_code=429, detail=limit_reached)
             try:
-                case = await run_in_threadpool(start_case, text, link, photos, property_id, owner)
+                case = await run_in_threadpool(
+                    start_case, text, link, photos, property_id, owner, demo_case
+                )
             except BaseException:
                 per_client.release(client)
                 per_address.release(address)
@@ -612,18 +652,36 @@ def create_app(
         )
 
     @app.post("/search")
-    def post_search(brief: RenterBrief, request: Request) -> SearchResponse:
-        """CoStar's researched places that fit a renter's brief, in code order.
+    def post_search(
+        brief: RenterBrief,
+        request: Request,
+        case_id: Annotated[str | None, Query(max_length=64)] = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> SearchResponse:
+        """CoStar's researched places that fit a renter's brief, in code order, and what the
+        search agent decided about them.
 
         The budget is compared with the asking price as reported, never a band. Every price and
-        availability line says "as of CoStar's last research". The response carries LIVE or
-        FIXTURE and the counts. No model is involved. A brief is a few hundred bytes (413 above
-        `SEARCH_MAX_BODY`); one address gets `SEARCH_PER_MINUTE` searches a minute (429)."""
+        availability line says "as of CoStar's last research". Code finds and orders the places;
+        then up to three get a deep check (the model picks which, among options code wrote) and
+        `decisions` lists each choice with who made it (`model` or `policy`) and why. A checked
+        place carries `checked: true` and a line built by code; the rest are researched only.
+        The search never gives a verdict. With `case_id` and that case's read token in a header,
+        what the renter already rejected in that case (see `/preferences`) is applied. The
+        response carries LIVE or FIXTURE and the counts. A brief is a few hundred bytes (413
+        above `SEARCH_MAX_BODY`); one address gets `SEARCH_PER_MINUTE` searches a minute (429)."""
         address = request.client.host if request.client else "unknown"
         if not search_limit.allow(address):
             raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        prefs = None
+        if case_id is not None:
+            case = find(case_id)
+            no_token_in_the_address(request)
+            check_read(case, _bearer(authorization, x_case_token))
+            prefs = case.preferences
         try:
-            return run_search(brief, lookups)
+            return agentic_search(brief, lookups, chooser, prefs)
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
 
@@ -636,17 +694,39 @@ def create_app(
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> AlternativesResponse:
         """Up to `n` researched places near the checked ad's price and size, never its own
-        building. Needs the case's read token in a header; a token in the address is refused."""
+        building and never one the renter rejected. Up to three get the deep check; `decisions`
+        says who chose. Needs the case's read token in a header; a token in the address is
+        refused."""
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
         try:
-            matches = alternatives_for(case, None, lookups, n)
+            return agentic_alternatives(
+                case, lookups, chooser, n, case.preferences, settings.snapback_data_source
+            )
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
-        return AlternativesResponse(
-            case_id=case_id, source=settings.snapback_data_source, matches=matches
-        )
+
+    @app.post("/cases/{case_id}/preferences")
+    def post_preferences(
+        case_id: str,
+        body: PreferencesUpdate,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CasePreferences:
+        """The renter rejected a place or a trade-off ("no walk-ups"): remember it for this case.
+
+        Only code-defined keys are kept (`no_walkup`, `needs_parking`, `max_rent`,
+        `avoid_property_id`), never free text. Later searches and alternatives for the case
+        apply them, so a rejected place does not come back. Needs the case's write token in a
+        header; a recorded case cannot be written to (403)."""
+        case = find(case_id)
+        if case.token is None:
+            raise HTTPException(status_code=403, detail="A recorded case cannot be changed.")
+        check_write(case, _bearer(authorization, x_case_token))
+        with case._lock:  # two writes at once must both land
+            case.preferences = merge_preferences(case.preferences, body)
+            return case.preferences
 
     def capture_date_of(record):
         """The aerial capture date when already known (never a fetch), else None."""

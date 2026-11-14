@@ -19,14 +19,25 @@ compares. No victim names, no addresses. Each says plainly what SNAPBACK cannot 
   copied from an older listing. Real photos of a real house do not show the poster may rent it.
 - **Replay:** `demo/replays/zelle-deposit-real-house-video-tour.json`
 
+## 2. A move-in paid to a poster who did not own the house (PERSON)
+
+- **Source:** ABC13 Houston, 2025-02-15,
+  https://abc13.com/post/conroe-woman-loses-2200-fears-homelessness-renting-home-landlord-did-not-own-property/15907951/
+- **Story (3 lines):** A renter in Conroe, near Houston, finds a house on Craigslist. The poster
+  says he is the landlord and gives her a door code; she pays $1,100 rent and a $1,100 deposit
+  and moves in. Two days later the real owner, a rental company, says he does not own it. $2,200.
+- **SNAPBACK:** Hold off, before the payment. The poster says they are the owner, and the owner
+  of record is a company: "Not confirmed. Owner of record: Invitation Homes, not the poster",
+  with the company's own published rule quoted. The photos were taken in this house, and the
+  right to rent is not shown.
+- **Can't catch:** a door code gets anyone inside, so a photo from inside proves nothing about
+  who may rent (red team H1). A private owner renting through family, or no owner on the roll,
+  is not caught. The replay's house is synthetic: the source house is in Montgomery County, and
+  D12 reads Harris County (HCAD).
+- **Replay:** `demo/replays/owner-not-poster-door-code.json`
+
 ## Parked
 
-- **Door code, owner of record differs (PERSON).** ABC13 Houston, 2025-02-15. The renter moved
-  in on Saturday Feb 8 and was told on "the following Monday" (2 days later) that the poster did
-  not own the house. Parked until A19 #140 and D12 #160 merge, so the owner-of-record line comes
-  from code. The source house is in Montgomery County and D12 reads Harris County (HCAD), so
-  it will be re-created on a kit Harris County house. Can't catch: a door-code holder passes
-  the presence check (red team H1).
 - **Photos of a different apartment (PLACE).** BBB scam study "Is that rental listing real?".
   The page is undated; it will carry the source's own date once one is found, never an invented
   one.

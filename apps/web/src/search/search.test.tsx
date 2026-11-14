@@ -82,7 +82,7 @@ describe("first screen", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /see the real listing, the real office and a fair price, plus checked places that fit your budget/i,
+        /see the real listing, the real office and a fair price, plus researched places that fit your budget/i,
       ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/paste the ad you found/i)).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe("budget row", () => {
   });
 });
 
-describe("checked places strip", () => {
+describe("researched places strip", () => {
   it("says 'near this price' when there is no stored brief, 'fit your budget' when there is", async () => {
     saveCaseReadToken("7Q2M", "r");
     vi.stubGlobal(
@@ -200,7 +200,7 @@ describe("checked places strip", () => {
     );
     const { unmount } = render(<PlacesStrip caseId="7Q2M" brief={null} />);
     expect(
-      await screen.findByRole("heading", { name: "Checked places near this price" }),
+      await screen.findByRole("heading", { name: "Researched places near this price" }),
     ).toBeInTheDocument();
     unmount();
     vi.stubGlobal(
@@ -209,7 +209,7 @@ describe("checked places strip", () => {
     );
     render(<PlacesStrip caseId="7Q2M" brief={{ max_rent_month: 2000 }} />);
     expect(
-      await screen.findByRole("heading", { name: "Checked places that fit your budget" }),
+      await screen.findByRole("heading", { name: "Researched places that fit your budget" }),
     ).toBeInTheDocument();
   });
 
@@ -300,7 +300,7 @@ describe("checked places strip", () => {
     );
     render(<PlacesStrip caseId={null} brief={{ max_rent_month: 900 }} />);
     expect(await screen.findByTestId("places-empty")).toHaveTextContent(
-      "No checked places fit this budget",
+      "No researched places fit this budget",
     );
     expect(screen.getByText("$140 a month less with a walk-up. OK?")).toBeInTheDocument();
   });

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { CardPage } from "./pages/CardPage";
+import { ReplayIndexPage } from "./replay/ReplayIndexPage";
+import { ReplayNav } from "./replay/ReplayNav";
 import { ReplayPage } from "./replay/ReplayPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
@@ -15,9 +17,11 @@ type Route =
   | { name: "replay"; slug: string }
   | { name: "prep-case"; id: string }
   | { name: "prep-place"; propertyId: string }
+  | { name: "replays" }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
   const prepCase = /^\/case\/([A-Za-z0-9_-]+)\/prep\/?$/.exec(path);
@@ -48,8 +52,11 @@ export default function App() {
   const route = matchRoute(path);
   return (
     <main className="shell">
+      <ReplayNav />
       {route.name === "home" ? (
         <UploadPage />
+      ) : route.name === "replays" ? (
+        <ReplayIndexPage />
       ) : route.name === "replay" ? (
         <ReplayPage key={route.slug} slug={route.slug} />
       ) : route.name === "prep-case" ? (

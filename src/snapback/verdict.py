@@ -250,12 +250,15 @@ def _the_ad_is_the_office_s(modules: ModuleEvidence) -> bool:
 def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
     """The brokerage on record, when an active licence clears the contact line (Vidyut, Sat 07:35).
 
-    All four must hold: the licence is active (LICENSED); it was checked by NUMBER (the ad's or
-    the renter's, never a name lookup); its sponsor is a company; and that company is the
-    brokerage or office on record (the authority's, or a listing office of an ACTIVE
-    for-sale match), by the same matcher as everywhere else. Then a phone that is not the
-    office's is information, not "Not confirmed". It never verifies a case: the phone is
-    still not the office's, the owner line and the for-sale hold are not touched.
+    All five must hold: presence is PROVEN (a fresh in-home photo with the code, Vidyut Sat
+    09:05: a copied licence is defeated only by that); the licence is active (LICENSED); it
+    was checked by NUMBER (the ad's or the renter's, never a name lookup); its sponsor is a
+    company; and that company is the brokerage or office on record (the authority's, or a
+    listing office of an ACTIVE for-sale match), by the same matcher as everywhere else. Then
+    a phone that is not the office's is information, not "Not confirmed". It verifies
+    nothing, even with presence (a door code or a copied name and number can pass all of it,
+    Vidyut Sat 09:30); the owner line and the for-sale hold are
+    not touched.
     Returns that brokerage's name from the record, or None.
     """
     # Imported here: snapback.agent imports this module while it loads.
@@ -264,6 +267,9 @@ def _licence_clears_contact(modules: ModuleEvidence) -> str | None:
     found = modules.license
     if (
         found is None
+        # Presence PROVEN is needed too (Vidyut, Sat 09:05): a real agent's name and number are
+        # public, so only a fresh in-home photo with the code separates them from a copier.
+        or presence_of(modules).status is not PresenceStatus.PROVEN
         or found.status is not LicenseStatus.LICENSED
         or found.number_from not in ("ad", "renter")
         or not found.sponsor_broker
@@ -310,13 +316,15 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     """
     statuses = {photo.status for photo in evidence.photos}
 
-    def verdict(state: VerdictState, *keys: str, proof: str | None = None) -> Verdict:
+    def verdict(
+        state: VerdictState, *keys: str, proof: str | None = None, **values: str
+    ) -> Verdict:
         """The verdict, with its reasons in the order a renter asks about them."""
         if proof is not None:
             reasons = [proof]
         else:
             ordered = sorted(dict.fromkeys(keys), key=_REASON_RANK.__getitem__)
-            reasons = [strings.text(key, lang) for key in ordered]
+            reasons = [strings.text(key, lang, **values) for key in ordered]
         return Verdict(
             case_id=evidence.case_id, state=state, reasons=reasons, source=evidence.source
         )
@@ -532,6 +540,24 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
 MAX_BROKERAGE_CHARS = 80
 
 
+def for_sale_record(found: ForSaleMatch, lang: str) -> tuple[str, str | None]:
+    """What the for-sale record says, in the card's LOCKED words, and the brokerage it names.
+    One place builds this sentence, so a search line and the card never word it differently."""
+    offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
+    brokerage = next((name for name in offices if name), None)
+    since = found.listed_on.isoformat() if found.listed_on else None
+    record_key = {
+        (True, True): "place.for_sale_record",
+        (True, False): "place.for_sale_record_no_date",
+        (False, True): "place.for_sale_record_no_brokerage",
+        (False, False): "place.for_sale_record_bare",
+    }[(brokerage is not None, since is not None)]
+    record = strings.text(
+        record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
+    )
+    return record, brokerage
+
+
 def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     status = _for_sale(modules)
     if status is ForSaleStatus.ACTIVE:
@@ -539,18 +565,7 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         # for sale are sometimes also offered for lease, and whether this one is leased is
         # something we do not know. The line says what the record says and who to ask.
         found = modules.for_sale
-        offices = [" ".join(name.split())[:MAX_BROKERAGE_CHARS] for name in found.offices]
-        brokerage = next((name for name in offices if name), None)
-        since = found.listed_on.isoformat() if found.listed_on else None
-        record_key = {
-            (True, True): "place.for_sale_record",
-            (True, False): "place.for_sale_record_no_date",
-            (False, True): "place.for_sale_record_no_brokerage",
-            (False, False): "place.for_sale_record_bare",
-        }[(brokerage is not None, since is not None)]
-        record = strings.text(
-            record_key, lang, site=found.site, brokerage=brokerage or "", date=since or ""
-        )
+        record, brokerage = for_sale_record(found, lang)
         if _the_ad_is_the_office_s(modules):
             # The brokerage itself is offering the home (ruling, Sat 03:36). Information
             # only: it holds nothing, and the renter is told who to ask.
@@ -913,6 +928,49 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     return CardRow(kind=CardRowKind.PRICE, lines=[*lines, *_rent_lines(modules, lang)])
 
 
+def _join_words(words: list[str], lang: str) -> str:
+    return strings.text("list.and", lang).join(strings.text(f"kind.{word}", lang) for word in words)
+
+
+def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Ad vs record: one line per note, as facts turned into the table's words. Information
+    only: `decide` never reads these, and a note the table has no words for is not shown."""
+    lines = []
+    for note in modules.ad_notes:
+        if not strings.has(f"claims.{note.key}", lang):
+            continue
+        claim_key = note.claim
+        if note.claim == "beds" and note.ad_value == "0":
+            claim_key = "beds_studio"
+        claim = strings.text(
+            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
+        )
+        label = "label.ad_claim"
+        if note.pretext:
+            label = "label.ad_pretext"
+        elif note.key == "aerial_date":
+            label = "label.aerial"
+        tone = CardTone.OK if note.matches else CardTone.NOT_SHOWN
+        if note.key == "aerial_date":
+            tone = CardTone.NOT_CHECKED  # a date to look at, not a finding
+        lines.append(
+            CardLine(
+                label=strings.text(label, lang),
+                text=strings.text(
+                    f"claims.{note.key}",
+                    lang,
+                    claim=claim,
+                    record=_join_words(note.record, lang),
+                    year=note.year if note.year is not None else "",
+                    ad_value=note.ad_value or "",
+                    record_value=note.record_value or "",
+                ),
+                tone=tone,
+            )
+        )
+    return _from_record(modules, lines)
+
+
 def build_card(
     modules: ModuleEvidence,
     *,
@@ -939,17 +997,22 @@ def build_card(
     if verify_base_url:
         verify_url = f"{verify_base_url.rstrip('/')}/c/{public_id}"
 
+    rows = [
+        _place_row(modules, lang),
+        _person_row(modules, lang, checked.tzinfo),
+        _price_row(modules, lang),
+    ]
+    claims = _claims_lines(modules, lang)
+    if claims:  # only when there is something to say; the three rows above are always there
+        rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
+
     return Card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
         checked_at=checked,
         expires_at=checked + CARD_TTL,
-        rows=[
-            _place_row(modules, lang),
-            _person_row(modules, lang, checked.tzinfo),
-            _price_row(modules, lang),
-        ],
+        rows=rows,
         not_checked=[
             strings.text("not_checked.id", lang),
             strings.text("not_checked.lease", lang),

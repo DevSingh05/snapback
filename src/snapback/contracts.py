@@ -8,7 +8,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DataSource(StrEnum):
@@ -372,6 +372,24 @@ class OwnerResult(BaseModel):
     published_rule: PublishedRule | None = None  # lane A: the owner's own rule, if verified
 
 
+class AdNote(BaseModel):
+    """One ad-vs-record line, as facts. The words live in card/strings.py (`claims.<key>`).
+
+    `claim` names what the ad says (a `ClaimKind` value). `record` holds word keys for what
+    the record says (floor kinds and the like). `year` and `number` carry a date or a count.
+    `matches` is True for the one quiet confirming line. It carries no flag and holds no case.
+    """
+
+    key: str
+    claim: str
+    matches: bool = False
+    pretext: bool = False  # the ad explains why nothing can be seen (new management, away...)
+    record: list[str] = Field(default_factory=list)
+    year: int | None = None
+    ad_value: str | None = None
+    record_value: str | None = None
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -394,6 +412,9 @@ class ModuleEvidence(BaseModel):
     # A14: a reply came, could not be accepted, and no further photo will be asked for. The
     # card then says "we could not confirm", not "ask for a new photo". It changes no state.
     no_retry_left: bool = False
+    # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
+    # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
+    ad_notes: list[AdNote] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -405,6 +426,8 @@ class CardRowKind(StrEnum):
     PLACE = "place"
     PERSON = "person"
     PRICE = "price"
+    # Ad vs record: info lines only, drawn after PRICE and only when there is something to say.
+    CLAIMS = "claims"
 
 
 class CardTone(StrEnum):
@@ -438,7 +461,7 @@ class Card(BaseModel):
     state: VerdictState
     checked_at: datetime
     expires_at: datetime
-    rows: list[CardRow]  # always PLACE, PERSON, PRICE in that order
+    rows: list[CardRow]  # PLACE, PERSON, PRICE always; CLAIMS after them only when it has a line
     not_checked: list[str]  # "ID", "lease", "ownership"
     footer: list[str]
     verify_url: str | None = None
@@ -560,6 +583,22 @@ class PropertyRecord(BaseModel):
     has_elevator: bool | None = None  # True only when an elevator is on record
     metering: str | None = None  # "individual" or "master"
     parking_ratio: float | None = None  # spaces per unit, as reported
+    # What the ad can be held to (ad vs record). Derived words and numbers only, never a
+    # photo, a caption or a sentence from the kit. Empty or None means the record does not say.
+    floors_photos: list[str] = Field(default_factory=list)  # "wood", "carpet", "tile", "laminate"
+    floor_photo_count: int = 0  # photos whose labels name a floor
+    floors_listing: list[str] = Field(default_factory=list)  # the same words, from listing features
+    laundry_listing: list[str] = Field(default_factory=list)  # "machine", "hookup", "room"
+    pool_on_record: bool | None = None  # True: seen or listed; False: listed features name none
+    parking_spaces: int | None = None
+    yard_on_record: bool | None = None  # True only; the record never says "no yard"
+    pets_ok: bool | None = None
+    beds_range: tuple[int, int] | None = None
+    baths_range: tuple[float, float] | None = None
+    sqft_range: tuple[int, int] | None = None
+    manager_since: date | None = None  # the latest start of a property manager on record
+    sale_history_known: bool = False  # the record covers sales, so "no sale" is a finding
+    last_sale: date | None = None
 
 
 class AerialTile(BaseModel):
@@ -801,7 +840,44 @@ class PlaceMatch(BaseModel):
     has_3d_scan: bool = False
     scan_text: str | None = None  # "a 3D scan in this building"
     office_on_record: str | None = None  # company name only
+    # True only for a place that got the record-side deep check (the model picks up to three
+    # per search); every other place is "researched" only. The line is built by code from the
+    # record, so it is the same for the same place whoever chose it.
+    checked: bool = False
+    check_line: str | None = None
     source: DataSource
+
+
+class SearchDecision(BaseModel):
+    """One choice the search agent made, in the trace's own shape. `chosen_by` is "model" only
+    when a language model picked from the options code wrote; a menu of one is always "policy"."""
+
+    kind: Literal["deep_check", "tradeoff", "tour_gate"]
+    options: list[str]
+    pick: str
+    reason: str
+    chosen_by: Literal["model", "policy"]
+
+
+class CasePreferences(BaseModel):
+    """What the agent remembers about one renter's session. Code-defined keys only: a rejected
+    walk-up, a parking need, a lower budget, places to stop showing. Never free text."""
+
+    no_walkup: bool = False
+    needs_parking: bool = False
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class PreferencesUpdate(BaseModel):
+    """`POST /cases/{id}/preferences`: the renter rejected something. Each field is optional."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    no_walkup: bool | None = None
+    needs_parking: bool | None = None
+    max_rent: int | None = Field(default=None, ge=0, le=1_000_000)
+    avoid_property_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class SearchResponse(BaseModel):
@@ -810,6 +886,11 @@ class SearchResponse(BaseModel):
     n_considered: int  # priced places looked at before the brief's filters
     n_matches: int  # places that passed, before max_results cut the list
     matches: list[PlaceMatch]
+    # What the agent decided, in order, each stamped model or policy with a reason.
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None  # the one trade-off question to put to the renter
+    ask_first: bool = False  # ask it before drafting a tour request
+    remembered: list[str] = Field(default_factory=list)  # preference keys applied to this search
 
 
 class AlternativesResponse(BaseModel):
@@ -817,6 +898,10 @@ class AlternativesResponse(BaseModel):
     source: DataSource
     as_of: str = AS_OF
     matches: list[PlaceMatch]
+    decisions: list[SearchDecision] = Field(default_factory=list)
+    question: str | None = None
+    ask_first: bool = False
+    remembered: list[str] = Field(default_factory=list)
 
 
 class TourDraftRequest(BaseModel):
