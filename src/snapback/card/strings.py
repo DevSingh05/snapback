@@ -22,7 +22,7 @@ EN: dict[str, str] = {
     "label.matched_home": "Home in the photos",
     "place.matched_office": (
         "The home in these photos is listed by its office on CoStar's record: {office}. "
-        "We can't tell you if it is for rent, or at this price."
+        "We can't tell you if it is offered, or at this price."
     ),
     "label.here_now": "Here now",
     "label.allowed": "Allowed to rent it",
@@ -473,7 +473,7 @@ ES: dict[str, str] = {
     "label.matched_home": "Vivienda de las fotos",
     "place.matched_office": (
         "La vivienda de estas fotos figura con esta oficina en el registro de CoStar: {office}. "
-        "No podemos decirle si está en alquiler, ni a este precio."
+        "No podemos decirle si se ofrece, ni a este precio."
     ),
     "label.here_now": "Aquí ahora",
     "label.allowed": "Con permiso para alquilarlo",

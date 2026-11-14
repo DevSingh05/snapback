@@ -25,11 +25,11 @@ CHECKED_AT = datetime.fromisoformat("2026-11-14T10:00:00-05:00")
 OFFICE = "Fixture Property Management Co"
 EN = (
     "The home in these photos is listed by its office on CoStar's record: "
-    f"{OFFICE}. We can't tell you if it is for rent, or at this price."
+    f"{OFFICE}. We can't tell you if it is offered, or at this price."
 )
 ES = (
     "La vivienda de estas fotos figura con esta oficina en el registro de CoStar: "
-    f"{OFFICE}. No podemos decirle si está en alquiler, ni a este precio."
+    f"{OFFICE}. No podemos decirle si se ofrece, ni a este precio."
 )
 
 
@@ -77,7 +77,7 @@ def test_the_line_is_information_not_a_finding_and_carries_no_banned_claim():
     low = line.text.lower()
     for word in ("the real one", "available", "—", "–"):
         assert word not in low
-    assert "for rent" in low and "can't tell you if it is for rent" in low  # only as a refusal
+    assert "can't tell you if it is offered" in low
     assert not re.search(r"\d{3}[\s.-]\d{3,4}|\b\d+ [A-Z][a-z]+ (St|Ave|Rd)\b", line.text)
 
 
@@ -125,3 +125,14 @@ def test_a_case_run_carries_the_office_from_the_modules_to_the_card(lang):
     assert session.evidence.matched_office == OFFICE
     card = build_card(session.evidence, checked_at=CHECKED_AT, lang=lang)
     assert any(OFFICE in ln.text for r in card.rows for ln in r.lines)
+
+
+def test_the_card_never_says_for_rent():
+    from snapback.card import strings
+
+    for lang in ("en", "es"):
+        card = build_card(evidence(), checked_at=CHECKED_AT, lang=lang)
+        text = " ".join(ln.text for r in card.rows for ln in r.lines).lower()
+        assert "for rent" not in text and "en alquiler" not in text.split(OFFICE.lower())[-1]
+    en_table = strings._table("en")
+    assert [k for k, v in en_table.items() if "for rent" in str(v).lower()] == []
