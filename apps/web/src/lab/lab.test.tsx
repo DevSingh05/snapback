@@ -186,3 +186,28 @@ describe("LabSection against an API without results", () => {
     expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
   });
 });
+
+describe("LabSection source label from the served file", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+  const body = `${HEADER}\nrules_only,forged_false_accept,9,40,0.225,0.1232,0.375,t\n`;
+
+  it("shows FIXTURE when the 200 body starts with # FIXTURE", async () => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    vi.stubGlobal(
+      "fetch",
+      async () => new Response(`# FIXTURE synthetic\n${body}`, { status: 200 }),
+    );
+    render(<LabSection />);
+    expect(await screen.findByTestId("source-chip")).toHaveTextContent("FIXTURE");
+  });
+
+  it("shows LIVE for a 200 body without the marker", async () => {
+    vi.stubEnv("VITE_API_URL", "/api");
+    vi.stubGlobal("fetch", async () => new Response(body, { status: 200 }));
+    render(<LabSection />);
+    expect(await screen.findByTestId("source-chip")).toHaveTextContent("LIVE");
+  });
+});
