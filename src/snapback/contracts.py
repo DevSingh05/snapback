@@ -512,6 +512,8 @@ class FloorPlanRent(BaseModel):
     rent_min: int | None = None  # whole dollars per month
     rent_max: int | None = None
     per_bed: bool = False  # priced per bed: never compare with a whole-unit rent
+    baths: float | None = None  # search (council 4): bathrooms on the floor plan
+    units_available: int | None = None  # units CoStar reported available at its last research
 
 
 class UnitOnRecord(BaseModel):
@@ -546,6 +548,11 @@ class PropertyRecord(BaseModel):
     website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
     floor_plan_rents: list[FloorPlanRent] = Field(default_factory=list)
     units: list[UnitOnRecord] = Field(default_factory=list)
+    # Search (council 4): building facts for must-haves. None means the record does not say.
+    is_walkup: bool | None = None
+    has_elevator: bool | None = None  # True only when an elevator is on record
+    metering: str | None = None  # "individual" or "master"
+    parking_ratio: float | None = None  # spaces per unit, as reported
 
 
 class AerialTile(BaseModel):
@@ -717,3 +724,103 @@ class ReplyResponse(BaseModel):
     state: VerdictState | None = None  # set once the case is done
     # The next message for the renter to forward, when another photo is asked for.
     challenge_text: str | None = None
+
+
+# ---------------------------------------------------------------------------------------------
+# Search (council 4 core): a renter's brief in, CoStar's researched places out.
+# ---------------------------------------------------------------------------------------------
+
+AS_OF = "as of CoStar's last research"
+
+
+class RenterBrief(BaseModel):
+    """What the renter asked for. Every field is optional; code filters on what is given."""
+
+    max_rent_month: int | None = Field(default=None, ge=0, le=1_000_000)  # whole unit, a month
+    beds_min: int | None = Field(default=None, ge=0, le=20)  # 0 is a studio
+    baths_min: float | None = Field(default=None, ge=0, le=20)
+    needs_no_walkup: bool = False
+    needs_parking: bool = False
+    pets: bool = False
+    move_in_by: date | None = None
+    max_results: int = Field(default=10, ge=1, le=50)
+
+
+class RentalHouse(BaseModel):
+    """One active house rental from the Homes.com records in the kit (search supply)."""
+
+    property_id: str
+    source: DataSource
+    beds: int | None = None
+    baths: float | None = None
+    rent_min: int | None = None  # as listed, whole dollars a month
+    rent_max: int | None = None
+    pets_ok: bool | None = None  # None: the record does not say
+    parking_spaces: int | None = None
+    available_on: date | None = None
+    office: str | None = None  # the listing office, company name only
+    has_scan: bool = False
+
+
+class BudgetFit(StrEnum):
+    WITHIN = "within"  # the whole reported price range is at or under the budget
+    STARTS_WITHIN = "starts_within"  # the low end fits, the high end does not
+    NO_FULL_PRICE = "no_full_price"  # one end of the price is missing: not counted as within
+    NO_BUDGET = "no_budget"  # the brief gave no budget
+
+
+class MustHaveLine(BaseModel):
+    key: str  # "walkup", "parking", "pets", "utilities"
+    text: str
+    met: bool | None = None  # None: the record does not say
+
+
+class PlaceMatch(BaseModel):
+    property_id: str
+    kind: Literal["apartment", "house"]
+    floor_plan: str | None = None  # "2 bed / 2 bath" for an apartment, None for a house
+    beds: int | None = None
+    baths: float | None = None
+    rent_min: int | None = None  # the asking price as reported, for code to compare
+    rent_max: int | None = None
+    budget_fit: BudgetFit
+    price_text: str
+    availability_text: str
+    must_haves: list[MustHaveLine] = Field(default_factory=list)
+    musts_met: int = 0
+    has_3d_scan: bool = False
+    scan_text: str | None = None  # "a 3D scan in this building"
+    office_on_record: str | None = None  # company name only
+    source: DataSource
+
+
+class SearchResponse(BaseModel):
+    source: DataSource
+    as_of: str = AS_OF
+    n_considered: int  # priced places looked at before the brief's filters
+    n_matches: int  # places that passed, before max_results cut the list
+    matches: list[PlaceMatch]
+
+
+class AlternativesResponse(BaseModel):
+    case_id: str
+    source: DataSource
+    as_of: str = AS_OF
+    matches: list[PlaceMatch]
+
+
+class TourDraftRequest(BaseModel):
+    property_id: str = Field(min_length=1, max_length=64)
+    floor_plan: str | None = Field(default=None, max_length=64)
+    brief: RenterBrief | None = None
+
+
+class TourDraft(BaseModel):
+    """A draft for the renter to approve. Nothing is sent; there is no send route."""
+
+    property_id: str
+    addressee: str  # the office on record, company name only
+    text: str
+    status: Literal["draft"] = "draft"
+    sent: Literal[False] = False
+    source: DataSource

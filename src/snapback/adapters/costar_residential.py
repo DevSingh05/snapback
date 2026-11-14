@@ -35,7 +35,13 @@ from snapback.adapters.costar_jsonl import (
     _load_enums,
     decode,
 )
-from snapback.contracts import DataSource, ForSaleMatch, ForSaleStatus, PropertyRecord
+from snapback.contracts import (
+    DataSource,
+    ForSaleMatch,
+    ForSaleStatus,
+    PropertyRecord,
+    RentalHouse,
+)
 from snapback.settings import get_settings
 
 RESIDENTIAL_FILE = "residential-listings.jsonl"
@@ -404,6 +410,71 @@ def house_records(
         if not record.model_ids:
             del out[property_id]
     return out
+
+
+def _whole(value: Any) -> int | None:
+    return (
+        int(round(value))
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+        else None
+    )
+
+
+def rental_houses(
+    source: DataSource | None = None, kit_dir: Path | None = None
+) -> list[RentalHouse]:
+    """The active house rentals in the kit (search supply): public on Homes.com, a rental
+    transaction, `forRentStatus` ForRent and `listingStatus` Active. A Texas home only when the
+    record names a state. The asking price is `rentMin`/`rentMax` exactly as listed; no other
+    field is kept. Our id is the kit's `propertyId` as text (the same as `house_records`)."""
+    source = source or get_settings().snapback_data_source
+    kit = kit_dir or (FIXTURE_KIT if source == DataSource.FIXTURE else DEFAULT_KIT)
+    path = _find(kit, RESIDENTIAL_FILE)
+    if path is None:
+        return []
+    enums = _load_enums(kit)
+    out: dict[str, RentalHouse] = {}
+    for rec in _iter_jsonl(path):
+        if not _public(rec):
+            continue
+        transaction = _label(
+            enums, "TransactionType", _first(rec, RESIDENTIAL_FIELDS["transaction"])
+        )
+        rent_status = _label(
+            enums, "ForRentStatus", _first(rec, RESIDENTIAL_FIELDS["for_rent_status"])
+        )
+        code = _get_any(rec, RESIDENTIAL_FIELDS["listing_status"])
+        active = _label(enums, "ListingStatus", code) == "active" or str(code) == str(ACTIVE_CODE)
+        if "rent" not in transaction or rent_status != "forrent" or not active:
+            continue
+        state = _get_any(rec, ["property.address.state"])
+        if isinstance(state, str) and state.strip().upper() not in ("", "TX"):
+            continue
+        pid = rec.get("propertyId", rec.get("homeListingId"))
+        if pid is None or isinstance(pid, bool):
+            continue
+        parking = _get_any(rec, ["property.totalParkingSpaces"])
+        pets = _get_any(rec, ["resoValues.isPetFriendly"])
+        baths = _get_any(rec, ["property.bathsMin"])
+        beds = _get_any(rec, ["property.bedsMin"])
+        offices = _offices(rec)
+        out.setdefault(
+            str(pid),
+            RentalHouse(
+                property_id=str(pid),
+                source=source,
+                beds=_whole(beds),
+                baths=float(baths) if isinstance(baths, (int, float)) else None,
+                rent_min=_whole(rec.get("rentMin")),
+                rent_max=_whole(rec.get("rentMax")),
+                pets_ok=pets if isinstance(pets, bool) else None,
+                parking_spaces=_whole(parking),
+                available_on=_date(rec.get("availabilityDate")),
+                office=offices[0] if offices else None,
+                has_scan=bool(_matterport_models(rec)),
+            ),
+        )
+    return sorted(out.values(), key=lambda h: h.property_id)
 
 
 def _sold_on(rec: dict[str, Any]) -> date | None:

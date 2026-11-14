@@ -31,7 +31,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -59,16 +59,28 @@ from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form,
 from snapback.contracts import (
     AerialProofResponse,
     AerialSideOut,
+    AlternativesResponse,
     Card,
     CreateCaseResponse,
     DataSource,
     Evidence,
     LocateStatus,
+    RenterBrief,
     ReplyResponse,
     ReportResponse,
+    SearchResponse,
+    TourDraft,
+    TourDraftRequest,
     Verdict,
 )
 from snapback.safety.paths import resolve_data_dir
+from snapback.search import (
+    NoOfficeOnRecord,
+    alternatives_for,
+    draft_tour_request,
+    place_for,
+)
+from snapback.search import search as run_search
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -591,6 +603,65 @@ def create_app(
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @app.post("/search")
+    def post_search(brief: RenterBrief) -> SearchResponse:
+        """CoStar's researched places that fit a renter's brief, in code order.
+
+        The budget is compared with the asking price as reported, never a band. Every price and
+        availability line says "as of CoStar's last research". The response carries LIVE or
+        FIXTURE and the counts. No model is involved."""
+        try:
+            return run_search(brief, lookups)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+
+    @app.get("/cases/{case_id}/alternatives")
+    def get_alternatives(
+        case_id: str,
+        request: Request,
+        n: Annotated[int, Query(ge=1, le=10)] = 3,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> AlternativesResponse:
+        """Up to `n` researched places near the checked ad's price and size, never its own
+        building. Needs the case's read token in a header; a token in the address is refused."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        try:
+            matches = alternatives_for(case, None, lookups, n)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        return AlternativesResponse(
+            case_id=case_id, source=settings.snapback_data_source, matches=matches
+        )
+
+    @app.post("/cases/{case_id}/tour-draft")
+    def post_tour_draft(
+        case_id: str,
+        body: TourDraftRequest,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> TourDraft:
+        """A tour-request draft addressed only to the leasing office on record, for the renter
+        to approve. Needs the case's write token in a header. It is never sent: the response is
+        a draft (`status: draft`, `sent: false`) and no route sends it. 404 for a place we do
+        not hold, 422 when it has no office on record."""
+        case = find(case_id)
+        check_write(case, _bearer(authorization, x_case_token))
+        try:
+            place = place_for(body.property_id, body.floor_plan, lookups, body.brief)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if place is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        try:
+            return draft_tour_request(place, body.brief)
+        except NoOfficeOnRecord:
+            raise HTTPException(
+                status_code=422, detail="That place has no leasing office on record."
+            ) from None
 
     @app.post("/cases/{case_id}/challenge/approve")
     def approve_challenge(

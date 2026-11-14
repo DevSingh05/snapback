@@ -36,6 +36,7 @@ from snapback.contracts import (
     PhotoLocation,
     PriceResult,
     PropertyRecord,
+    RentalHouse,
     RuleHit,
     SpotCandidate,
     SpotRanking,
@@ -113,6 +114,7 @@ class KitLookups:
         self.source = source
         self._kit_dir = kit_dir
         self._records: dict[str, PropertyRecord] | None = None
+        self._rentals: list[RentalHouse] | None = None
         self._lock = threading.Lock()
 
     def records(self) -> dict[str, PropertyRecord]:
@@ -141,6 +143,19 @@ class KitLookups:
 
     def record(self, property_id: str) -> PropertyRecord | None:
         return self.records().get(property_id)
+
+    def rentals(self) -> list[RentalHouse]:
+        """The active house rentals in the kit (search supply), read once and kept."""
+        with self._lock:
+            if self._rentals is None:
+                try:
+                    from snapback.adapters import costar_residential
+
+                    self._rentals = costar_residential.rental_houses(self.source, self._kit_dir)
+                except Exception as error:  # a broken residential file must not hide buildings
+                    log.warning("house rentals not read (%s)", type(error).__name__)
+                    self._rentals = []
+            return self._rentals
 
     def for_sale(self, listing_text: str) -> ForSaleMatch | None:
         try:

@@ -25,10 +25,11 @@ the trace, after `clean_reason`, and never reaches a card.
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
+from snapback.agent.trace import clean_reason
 from snapback.contracts import (
     AuthorityResult,
     ForSaleMatch,
@@ -36,7 +37,9 @@ from snapback.contracts import (
     LicenseResult,
     LicenseStatus,
     OwnerResult,
+    PlaceMatch,
     PriceResult,
+    RenterBrief,
 )
 
 
@@ -299,3 +302,292 @@ class Plan:
         self.looked_up = True
         self._license = found
         return {"license": found}
+
+
+# ---------------------------------------------------------------------------------------------
+# Search planning (council 4): the model chooses among options code wrote, from derived facts.
+#
+# Two choices follow a search, each with 2+ code-written options or none is asked:
+#   1. which of the top matches get the deep check (record, for-sale, licence, owner);
+#   2. which trade-off question to put to the renter ("$140 a month less with a walk-up. OK?").
+# The chooser sees option labels and counts and yes/no facts only: never a kit row, an id, an
+# office name or an address. Whatever it answers, code applies only a pick that is on the list;
+# an off-list pick, a failed chooser or a menu of one gets the code policy and the step is stamped
+# `policy`. A model pick is stamped `model`. Code still sets every verdict.
+# ---------------------------------------------------------------------------------------------
+
+DEEP_CHECK_COUNT = 3
+SHORTLIST_SIZE = 6
+NO_QUESTION = "Ask nothing; show the matches as they are"
+
+# The only facts a chooser may be shown, by choice. Values are yes/no or whole numbers.
+SEARCH_FACT_KEYS: dict[str, frozenset[str]] = {
+    "deep_check": frozenset(
+        {
+            "shortlist_size",
+            "within_budget",
+            "with_3d_scan",
+            "with_office_on_record",
+            "distinct_sets",
+        }
+    ),
+    "tradeoff": frozenset({"matches", "options", "biggest_saving", "any_saves_money"}),
+}
+
+
+@dataclass(frozen=True)
+class SearchOffer:
+    """One open search choice. Same shape as `session.Offer`, so any `Chooser` can take it."""
+
+    kind: str  # "deep_check" | "tradeoff"
+    options: tuple[str, ...]
+    aliases: tuple[str, ...]
+    facts: dict[str, bool | int]
+    default: str
+    default_reason: str
+    # Not shown to a chooser: what each option means in code. Keyed by option label.
+    payload: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
+
+    def resolve(self, pick: object) -> str | None:
+        wanted = str(pick or "").strip().casefold()
+        for label, alias in zip(self.options, self.aliases, strict=True):
+            if wanted in (label.casefold(), alias.casefold()):
+                return label
+        return None
+
+    def for_chooser(self) -> "SearchOffer":
+        """The offer without its payload: what a model is allowed to see."""
+        return SearchOffer(
+            self.kind,
+            self.options,
+            self.aliases,
+            dict(self.facts),
+            self.default,
+            self.default_reason,
+        )
+
+
+@dataclass(frozen=True)
+class SearchStep:
+    kind: str
+    options: tuple[str, ...]
+    pick: str
+    reason: str
+    chosen_by: Literal["model", "policy"]
+
+
+@dataclass(frozen=True)
+class TradeOff:
+    """A question code can ask: what the renter would give up, and what it saves."""
+
+    key: str  # "walkup" | "parking" | "budget"
+    question: str
+    saves: int  # dollars a month; 0 for the budget question
+    extra_places: int
+
+
+def _place_key(place: PlaceMatch) -> tuple[str, str]:
+    return place.property_id, place.floor_plan or ""
+
+
+def deep_check_offer(matches: list[PlaceMatch]) -> SearchOffer | None:
+    """Which of the shortlist get the deep check. Options are different sets of up to three
+    places, each picked by a plain code rule; sets that come out the same collapse to one."""
+    shortlist = matches[:SHORTLIST_SIZE]
+    if not shortlist:
+        return None
+    k = min(DEEP_CHECK_COUNT, len(shortlist))
+    rules: list[tuple[str, str, list[PlaceMatch]]] = [
+        ("first", f"The first {k} in the list", list(shortlist)),
+        (
+            "cheapest",
+            f"The {k} cheapest",
+            sorted(
+                shortlist,
+                key=lambda m: (
+                    min(p for p in (m.rent_min, m.rent_max) if p is not None)
+                    if (m.rent_min is not None or m.rent_max is not None)
+                    else 0,
+                    *_place_key(m),
+                ),
+            ),
+        ),
+        (
+            "musts",
+            f"The {k} that meet the most must-haves",
+            sorted(shortlist, key=lambda m: (-m.musts_met, *_place_key(m))),
+        ),
+        (
+            "scans",
+            f"The {k} with a 3D scan, then the rest",
+            sorted(shortlist, key=lambda m: (not m.has_3d_scan, *_place_key(m))),
+        ),
+    ]
+    options: list[str] = []
+    sets: dict[str, tuple[tuple[str, str], ...]] = {}
+    seen: set[tuple[tuple[str, str], ...]] = set()
+    for _key, label, ordered in rules:
+        chosen = tuple(_place_key(m) for m in ordered[:k])
+        if chosen in seen:
+            continue
+        seen.add(chosen)
+        options.append(label)
+        sets[label] = chosen
+    facts: dict[str, bool | int] = {
+        "shortlist_size": len(shortlist),
+        "within_budget": sum(1 for m in shortlist if m.budget_fit.value in ("within", "no_budget")),
+        "with_3d_scan": sum(1 for m in shortlist if m.has_3d_scan),
+        "with_office_on_record": sum(1 for m in shortlist if m.office_on_record),
+        "distinct_sets": len(options),
+    }
+    return SearchOffer(
+        kind="deep_check",
+        options=tuple(options),
+        aliases=tuple(f"option {chr(65 + i)}" for i in range(len(options))),
+        facts=facts,
+        default=options[0],
+        default_reason="Check the top of the list first; it fits the budget best.",
+        payload={"sets": sets},
+    )
+
+
+def tradeoff_offer(options: list[TradeOff], n_matches: int) -> SearchOffer:
+    """Which question to ask the renter, or none. The default is the biggest saving."""
+    labels = [t.question for t in options] + [NO_QUESTION]
+    default = (
+        max(options, key=lambda t: (t.saves, t.extra_places)).question if options else NO_QUESTION
+    )
+    facts: dict[str, bool | int] = {
+        "matches": n_matches,
+        "options": len(options),
+        "biggest_saving": max((t.saves for t in options), default=0),
+        "any_saves_money": any(t.saves > 0 for t in options),
+    }
+    return SearchOffer(
+        kind="tradeoff",
+        options=tuple(labels),
+        aliases=tuple(f"option {chr(65 + i)}" for i in range(len(labels))),
+        facts=facts,
+        default=default,
+        default_reason="Ask the question that saves the renter the most.",
+        payload={"options": {t.question: t for t in options}},
+    )
+
+
+def _decide(offer: SearchOffer, chooser: Any) -> tuple[str, SearchStep]:
+    """Apply the chooser's pick if it is on the list; otherwise the code policy. A menu of one
+    never goes to a chooser and is stamped `policy`."""
+    label, reason, by = offer.default, offer.default_reason, "policy"
+    if len(offer.options) > 1:
+        try:
+            pick, said = chooser.choose(offer.for_chooser())
+        except Exception:
+            pick, said = None, None  # a chooser that fails must not stall the search
+        else:
+            resolved = offer.resolve(pick)
+            if resolved is not None:
+                label, reason, by = (
+                    resolved,
+                    clean_reason(said, offer.default_reason),
+                    chooser.chosen_by,
+                )
+    else:
+        reason = "Only one option was open."
+    return label, SearchStep(offer.kind, offer.options, label, reason, by)  # type: ignore[arg-type]
+
+
+@dataclass(frozen=True)
+class SearchPlan:
+    deep_check: list[tuple[str, str]]  # (property_id, floor plan) of the places to check deeply
+    question: str | None  # the one trade-off question to put to the renter, or None
+    steps: list[SearchStep]
+
+
+def plan_search(
+    matches: list[PlaceMatch], tradeoffs: list[TradeOff], chooser: Any | None = None
+) -> SearchPlan:
+    """Both search choices, in order. `chooser` is a model behind the `Chooser` protocol; with
+    none, the code policy decides every step."""
+    from snapback.agent.runner import PolicyChooser
+
+    chooser = chooser or PolicyChooser()
+    steps: list[SearchStep] = []
+    targets: list[tuple[str, str]] = []
+    offer = deep_check_offer(matches)
+    if offer is not None:
+        label, step = _decide(offer, chooser)
+        steps.append(step)
+        targets = list(offer.payload["sets"][label])
+    asked = tradeoff_offer(tradeoffs, len(matches))
+    label, step = _decide(asked, chooser)
+    steps.append(step)
+    question = None if label == NO_QUESTION else label
+    return SearchPlan(targets, question, steps)
+
+
+def tradeoffs_for(brief: RenterBrief, lookups: Any, matches: list[PlaceMatch]) -> list[TradeOff]:
+    """Questions code can ask, each computed from a second search with one need relaxed.
+    Only a question that would change the list (more places or a lower price) is offered."""
+    from snapback.search import _all_matches
+
+    def cheapest(items: list[PlaceMatch]) -> int | None:
+        lows = [p for m in items for p in (m.rent_min,) if p is not None]
+        return min(lows) if lows else None
+
+    base = cheapest(matches)
+    out: list[TradeOff] = []
+    wide = brief.model_copy(update={"max_results": 50})
+    if brief.needs_no_walkup:
+        _, relaxed = _all_matches(wide.model_copy(update={"needs_no_walkup": False}), lookups)
+        walkups = [
+            m
+            for m in relaxed
+            if any(
+                line.key == "walkup" and line.met is None and "Walk-up building" in line.text
+                for line in m.must_haves
+            )
+        ]
+        low = cheapest(walkups)
+        if low is not None and base is not None and low < base:
+            out.append(
+                TradeOff(
+                    "walkup",
+                    f"${base - low:,} a month less with a walk-up building. OK with stairs?",
+                    base - low,
+                    len(walkups),
+                )
+            )
+    if brief.needs_parking:
+        _, relaxed = _all_matches(wide.model_copy(update={"needs_parking": False}), lookups)
+        extra = [
+            m
+            for m in relaxed
+            if m.musts_met == 0 and _place_key(m) not in {_place_key(x) for x in matches}
+        ]
+        low = cheapest(extra)
+        if extra and low is not None and base is not None and low < base:
+            out.append(
+                TradeOff(
+                    "parking",
+                    f"${base - low:,} a month less if parking is not on record. OK without it?",
+                    base - low,
+                    len(extra),
+                )
+            )
+    if brief.max_rent_month:
+        step = max(50, round(brief.max_rent_month * 0.1 / 50) * 50)
+        _, higher = _all_matches(
+            wide.model_copy(update={"max_rent_month": brief.max_rent_month + step}), lookups
+        )
+        more = len(higher) - len(matches)
+        if more > 0:
+            out.append(
+                TradeOff(
+                    "budget",
+                    f"${step:,} more a month shows {more} more "
+                    f"place{'s' if more != 1 else ''}. Raise the budget?",
+                    0,
+                    more,
+                )
+            )
+    return out

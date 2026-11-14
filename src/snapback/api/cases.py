@@ -199,6 +199,11 @@ class SessionCase:
         self._lock = threading.Lock()
 
     @property
+    def listing(self) -> Listing:
+        """What intake read from the ad. Read-only for other routes (search alternatives)."""
+        return self._listing
+
+    @property
     def done(self) -> bool:
         return self.session.done
 
