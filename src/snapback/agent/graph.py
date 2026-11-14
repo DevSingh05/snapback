@@ -80,6 +80,8 @@ def describe(case: CaseSession) -> str:
         return json.dumps({"next": "call send_challenge, then wait for the renter"})
     if case.step is Step.REPLY:
         return json.dumps({"waiting": "the poster has not replied yet; nothing to do now"})
+    if case.step is Step.ASK:
+        return json.dumps({"waiting": "the renter was asked for the license number; nothing to do"})
     return json.dumps({"finished": True})
 
 
@@ -156,8 +158,8 @@ def run_case_with_agent(
     with the same agent and thread id.
     """
     case.settle()
-    if case.step is Step.REPLY:
-        return None  # the poster has not replied; there is nothing for a model to choose
+    if case.step in (Step.REPLY, Step.ASK):
+        return None  # waiting for the poster or the renter; there is nothing for a model to choose
     config = {
         "configurable": {"thread_id": thread_id or case.case_id},
         "recursion_limit": RECURSION_LIMIT,
