@@ -445,3 +445,145 @@ def test_a_claimed_house_id_is_located_in_claimed(house_world):
     _, card, case = run(modules)
     assert [p.status for p in case.evidence.locate.photos] == [LocateStatus.LOCATED_IN_CLAIMED]
     assert place_line(card).tone is CardTone.OK
+
+
+# --- follow-up: the cache key, id collisions, the worker rules, shared models -------------------
+
+
+class PatchV2(PatchMatcher):
+    version = "patch@v2"
+
+
+def prime(data_dir, adapter, blob, **kwargs):
+    live = make_live(data_dir, adapter, **kwargs)
+    live.locate("c0", blob, "fx-prop-1")
+    return live
+
+
+def test_an_edited_index_file_misses_the_cache(world, tmp_path):
+    data, sweeps, adapter = world
+    shutil.copytree(data / "index", tmp_path / "index")
+    blob = [photo(sweeps, "fx-model-a", 2, 1)]
+    prime(tmp_path, adapter, blob)
+    assert make_live(tmp_path, adapter).locate("c1", blob, "fx-prop-1").from_cache is True
+
+    meta_path = tmp_path / "index" / "demo" / "index.json"
+    meta = json.loads(meta_path.read_text())
+    meta["built_at"] = "2030-01-01T00:00:00+00:00"  # same views, a different build
+    meta_path.write_text(json.dumps(meta))
+    assert make_live(tmp_path, adapter).locate("c2", blob, "fx-prop-1").from_cache is False
+
+
+def test_a_new_matcher_version_misses_the_cache(world, tmp_path):
+    data, sweeps, adapter = world
+    (tmp_path / "index").symlink_to(data / "index")
+    blob = [photo(sweeps, "fx-model-a", 2, 1)]
+    prime(tmp_path, adapter, blob)
+    assert make_live(tmp_path, adapter).locate("c1", blob, "fx-prop-1").from_cache is True
+    again = make_live(tmp_path, adapter, matcher=PatchV2).locate("c2", blob, "fx-prop-1")
+    assert again.from_cache is False
+
+
+def test_a_building_wins_an_id_collision_with_a_house(monkeypatch):
+    from snapback.adapters import costar_residential
+
+    building = KitLookups(DataSource.FIXTURE).records()["fx-prop-1"]
+    assert building.property_type != "house"
+    imposter = record("fx-prop-1", ["fx-fs-a"], property_type="house")
+    monkeypatch.setattr(
+        costar_residential, "house_records", lambda *a, **k: {"fx-prop-1": imposter}
+    )
+    kept = KitLookups(DataSource.FIXTURE).records()["fx-prop-1"]
+    assert kept == building and kept.model_ids != ["fx-fs-a"]
+
+
+def drain(live):
+    """Wait for the single worker to be idle: callbacks of finished jobs have run by then."""
+    live._executor().submit(lambda: None).result(30)
+
+
+def gated_live(tmp_path, adapter, gate):
+    return LiveLocate(
+        data_dir=tmp_path,
+        records=lambda: RECORDS,
+        sweeps_for=adapter.sweeps,
+        matcher_factory=lambda: GatedMatcher(gate),
+        budget_s=0.05,
+        thresholds=THRESHOLDS,
+    )
+
+
+def test_a_claimed_case_that_times_out_never_writes_the_cache_later(world, tmp_path):
+    import threading
+
+    data, sweeps, adapter = world
+    (tmp_path / "index").symlink_to(data / "index")
+    gate = threading.Event()
+    live = gated_live(tmp_path, adapter, gate)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    first = live.locate("c1", blobs, "fx-prop-1")
+    assert {p.status for p in first.result.photos} == {LocateStatus.NOT_LOCATED}
+    gate.set()
+    drain(live)
+    assert not (tmp_path / "locate").exists()  # the late photo did not complete the case
+
+
+def test_a_job_queued_behind_a_stuck_one_is_cancelled_and_never_runs(world, tmp_path):
+    import threading
+
+    data, sweeps, adapter = world
+    (tmp_path / "index").symlink_to(data / "index")
+    gate = threading.Event()
+    live = gated_live(tmp_path, adapter, gate)
+    live._load()
+    ran: list[str] = []
+    real = live._ready.locator.locate
+
+    def counting(case_id, photos, claimed):
+        ran.append(case_id)
+        return real(case_id, photos, claimed)
+
+    live._ready.locator.locate = counting
+    blob = [photo(sweeps, "fx-model-a", 2, 1)]
+    live.locate("stuck", blob, "fx-prop-1")  # running on the one worker, blocked on the gate
+    queued = live.locate("queued", [photo(sweeps, "fx-model-a", 0, 3)], "fx-prop-1")
+    assert {p.status for p in queued.result.photos} == {LocateStatus.NOT_LOCATED}
+    gate.set()
+    drain(live)
+    assert ran == ["stuck"]  # the queued job was cancelled before it started
+
+
+def test_a_model_on_two_houses_belongs_to_neither(tmp_path):
+    from snapback.adapters.costar_residential import house_records
+    from snapback.vision.locate.locate import catalog_from_records
+
+    text = (HOUSE_KIT / "residential-listings.jsonl").read_text()
+    rows = [json.loads(line) for line in text.splitlines()]
+    base = next(r for r in rows if r["propertyId"] == 9001 and r["residentialListingId"] == 5001)
+
+    def house(pid, listing, keys):
+        row = json.loads(json.dumps(base))
+        row["propertyId"], row["residentialListingId"] = pid, listing
+        row["media"] = [
+            {"id": n, "type": 3, "externalReferenceType": 36, "videoKey": key}
+            for n, key in enumerate(keys, start=1)
+        ]
+        return json.dumps(row)
+
+    lines = [
+        house(7001, 1, ["fx-shared", "fx-own-1"]),
+        house(7002, 2, ["fx-shared"]),  # only a shared model: no twin at all
+        house(7003, 3, ["fx-shared", "fx-own-3"]),
+        house(7004, 4, ["fx-own-4"]),
+    ]
+    (tmp_path / "residential-listings.jsonl").write_text("\n".join(lines) + "\n")
+    shutil.copy(HOUSE_KIT / "enums.json", tmp_path / "enums.json")
+
+    records = house_records(DataSource.FIXTURE, tmp_path)
+    assert {pid: r.model_ids for pid, r in records.items()} == {
+        "7001": ["fx-own-1"],
+        "7003": ["fx-own-3"],
+        "7004": ["fx-own-4"],
+    }
+    catalog = catalog_from_records(records.values())
+    assert catalog.property_of("fx-shared") is None  # so it can never read "elsewhere"
