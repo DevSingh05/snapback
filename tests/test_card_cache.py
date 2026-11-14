@@ -210,6 +210,38 @@ def test_a_new_renderer_makes_a_new_picture_of_the_same_card(client, monkeypatch
     assert pictures.etag(CARD) != old
 
 
+def test_a_case_on_a_los_angeles_record_is_stamped_in_pacific_time(tmp_path):
+    # XO note on #106: the zone follows the record's market once the record is in the store.
+    import json
+
+    from snapback.contracts import PropertyRecord
+
+    raw = json.loads((FIXTURES / "property_record_contact.json").read_text())
+
+    class OneRecord:
+        def __init__(self, market: str) -> None:
+            self._record = PropertyRecord.model_validate(raw | {"market": market})
+
+        def record(self, property_id: str):
+            return self._record
+
+        def for_sale(self, listing_text: str):
+            return None
+
+    def stamped(market: str) -> datetime:
+        settings = Settings(_env_file=None, snapback_data_dir=tmp_path)
+        client = TestClient(create_app(settings, lookups=OneRecord(market)))
+        made = client.post("/cases", data={"text": "2 bed.", "property_id": "fx-prop-2"}).json()
+        card = client.get(f"/cases/{made['case_id']}/card").json()
+        return datetime.fromisoformat(card["checked_at"])
+
+    pacific = datetime.now(ZoneInfo("America/Los_Angeles")).utcoffset()
+    central = datetime.now(ZoneInfo("America/Chicago")).utcoffset()
+    assert stamped("Los Angeles").utcoffset() == pacific
+    assert stamped("Houston").utcoffset() == central
+    assert stamped("Fixture City").utcoffset() == central  # an unknown market: the default
+
+
 def test_the_picture_names_the_zone_and_not_a_bare_offset():
     from snapback.card.render import _stamp
 
