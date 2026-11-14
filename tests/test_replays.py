@@ -161,7 +161,12 @@ def finding_is_on_card(
     over two steps), with the status that line has. The only other thing allowed is the
     owner's rule beside the payment step, as a warning on the hold step."""
     text, status = finding["text"], finding["status"]
-    if any(line.startswith(text) and st == status for line, st in lines):
+    # a start of a line must end at a sentence boundary: it ends in . ? or !, and the line
+    # either is exactly it or goes on after a space
+    whole_sentence = text.endswith((".", "?", "!"))
+    if whole_sentence and any(
+        st == status and (line == text or line.startswith(text + " ")) for line, st in lines
+    ):
         return True
     return finding["step_id"] == "hold" and status == "warning" and text in beside_payment
 
@@ -186,6 +191,17 @@ def test_the_finding_check_accepts_a_whole_line_and_the_start_of_one():
     [
         {"step_id": "chat", "status": "matches", "text": "Not confirmed. Owner of record"},
         {"step_id": "chat", "status": "matches", "text": "NOT SHOWN. Inside is not allowed."},
+        # a start of a line that stops mid-sentence, dropping "not the poster"
+        {
+            "step_id": "chat",
+            "status": "not_confirmed",
+            "text": "Not confirmed. Owner of record: Invitation Homes",
+        },
+        {
+            "step_id": "chat",
+            "status": "not_confirmed",
+            "text": "Not confirmed. Owner of record: Invitation Homes,",
+        },
         # a fragment from the middle of a line
         {"step_id": "chat", "status": "not_confirmed", "text": "Invitation Homes"},
         {"step_id": "chat", "status": "not_confirmed", "text": "Owner of record: Invitation Homes"},
