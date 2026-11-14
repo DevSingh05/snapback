@@ -4,10 +4,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from snapback.contracts import DataSource
+
+DEMO_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "demo"
 
 
 class Settings(BaseSettings):
@@ -34,6 +36,21 @@ class Settings(BaseSettings):
     # Upload caps, enforced before the body is parsed and again per file.
     snapback_max_photos: int = 10
     snapback_max_photo_mb: int = 10
+
+    # A staged demo case from fixtures/demo (a, b or c), read from DEMO_CASE. With it set,
+    # every new check runs on that case's stand-ins. Unset or empty for normal runs.
+    demo_case: str | None = None
+
+    @field_validator("demo_case", mode="before")
+    @classmethod
+    def _a_known_demo_case(cls, value: object) -> str | None:
+        chosen = str(value).strip().lower() if value is not None else ""
+        if not chosen:
+            return None
+        known = sorted(path.parent.name for path in DEMO_DIR.glob("*/case.json"))
+        if chosen not in known:
+            raise ValueError(f"DEMO_CASE must be one of: {', '.join(known)}. Got {chosen!r}.")
+        return chosen
 
     # Sponsor credentials. SecretStr keeps them out of logs and reprs.
     matterport_api_key: SecretStr | None = None

@@ -26,7 +26,8 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.intake import Listing
+from snapback.agent.demo import demo_modules, load_demo_case
+from snapback.agent.intake import Listing, read_listing
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.card import strings
 from snapback.contracts import (
@@ -255,14 +256,24 @@ class CaseStore:
             full_id = f"{FIXTURE_ID_PREFIX}{short_id}"
             # The fixture modules stand in for the twin, the record and the challenge. What
             # the renter sent is real: its scope, its rule hits and its rent come from intake.
-            modules = FixtureModules(
-                listing_scope=listing.scope,
-                rules=listing.rule_hits if listing.text else None,
-                listed_rent=listing.listed_rent,
-                contacts=listing.contacts,
-                unit=listing.unit,
-                beds=listing.beds,
-            )
+            if self._settings.demo_case:
+                # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
+                demo = load_demo_case(self._settings.demo_case)
+                if not listing.text:
+                    staged = read_listing(demo.listing_text)
+                    listing = staged.model_copy(
+                        update={"photos": listing.photos, "screenshots": listing.screenshots}
+                    )
+                modules = demo_modules(demo, listing)
+            else:
+                modules = FixtureModules(
+                    listing_scope=listing.scope,
+                    rules=listing.rule_hits if listing.text else None,
+                    listed_rent=listing.listed_rent,
+                    contacts=listing.contacts,
+                    unit=listing.unit,
+                    beds=listing.beds,
+                )
             session = CaseSession(full_id, modules, Trace(full_id, DataSource.FIXTURE))
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
