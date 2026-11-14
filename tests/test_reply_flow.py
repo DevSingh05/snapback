@@ -408,3 +408,43 @@ def test_the_photo_memory_holds_hashes_under_the_data_dir_and_delete_clears_them
 
     report = delete_case(f"fx-{case['case_id']}", tmp_path)
     assert report.memory_cleared is True
+
+
+# --- with the real reader, on a code drawn by the test -------------------------------------
+
+
+def paper(code: str) -> bytes:
+    """A sheet of paper with the code written large, as a poster would hold it up."""
+    from PIL import ImageFont
+
+    sheet = Image.new("RGB", (900, 500), (246, 244, 238))
+    pen = ImageDraw.Draw(sheet)
+    pen.text((150, 140), code, fill=(20, 20, 20), font=ImageFont.load_default(size=200))
+    out = io.BytesIO()
+    sheet.save(out, "PNG")
+    return out.getvalue()
+
+
+def test_the_local_reader_finds_a_code_written_on_paper(tmp_path):
+    pytest.importorskip("rapidocr_onnxruntime")
+    memory = PhotoMemory(tmp_path / "m.sqlite")
+    inner = FixtureModules()
+    modules = ReplyModules(inner, memory, clock=Clock())  # the real reader, no stand-in
+    modules.remember_listing_photos("fx-R2", LISTING)
+    spot = inner.spot_ranking("fx-R2", None).spots[0]
+    modules.challenge("fx-R2", spot, "K7P4", "the approved text", 0)
+
+    check, outcome = modules.check_reply("fx-R2", paper("K7P4"))
+    assert check is ReplyCheck.CODE_READ_SPOT_NOT_CHECKED
+    assert outcome.challenge.spots[-1].code_read is True
+
+
+def test_the_local_reader_does_not_find_a_code_that_is_not_there(tmp_path):
+    pytest.importorskip("rapidocr_onnxruntime")
+    memory = PhotoMemory(tmp_path / "m.sqlite")
+    inner = FixtureModules()
+    modules = ReplyModules(inner, memory, clock=Clock())
+    spot = inner.spot_ranking("fx-R3", None).spots[0]
+    modules.challenge("fx-R3", spot, "K7P4", "the approved text", 0)
+    check, _ = modules.check_reply("fx-R3", paper("M2Q9"))
+    assert check is ReplyCheck.CODE_NOT_READ
