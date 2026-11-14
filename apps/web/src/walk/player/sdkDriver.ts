@@ -1,4 +1,5 @@
 import type { TourStop } from "../../contracts";
+import { PAN_DEG } from "./timeline";
 import { stopMove } from "../../tour/walkMove";
 import type { ShowcaseSdk } from "../../twin/showcase";
 
@@ -21,7 +22,10 @@ export type PlayerSdk = ShowcaseSdk & {
 
 export interface CameraDriver {
   /** Put the camera at a stop, turned `panDeg` into its pan. */
-  goto(stop: TourStop, at: { panDeg: number; instant: boolean; speed: number }): void;
+  goto(
+    stop: TourStop,
+    at: { panDeg: number; instant: boolean; speed: number; next?: TourStop },
+  ): void;
   /** Turn the camera by `deg` over `ms`. */
   pan(deg: number, ms: number): void;
   /** The stop nearest to where the person has walked to, or null when it cannot be told. */
@@ -37,16 +41,40 @@ interface Options {
 
 const FLY_MS = 2000;
 
+const wrap = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
+type Places = Record<string, { x: number; z: number }>;
+
+/** The yaw that faces from one sweep to another, in the Showcase's frame: 0 looks down -Z, and a
+ *  turn to the left is positive (a clockwise Camera.rotate lowers it). */
+function headingTo(places: Places, from: string, to: string | null | undefined): number | null {
+  const a = places[from];
+  const b = to ? places[to] : undefined;
+  if (!a || !b || (a.x === b.x && a.z === b.z)) return null;
+  return (Math.atan2(-(b.x - a.x), -(b.z - a.z)) * 180) / Math.PI;
+}
+
 export function createSdkDriver(sdk: PlayerSdk, { sweeps, onStatus }: Options): CameraDriver {
   let move = 0;
   let moving = false;
   let here: string | null = null;
+  // Where the model's sweeps are, in the Showcase's frame, so a pan can face the next stop.
+  const places: Places = {};
+  const data = sdk.Sweep.data.subscribe({
+    onCollectionUpdated(all) {
+      for (const [sid, v] of Object.entries(all)) {
+        const p = (v as { position?: { x?: number; z?: number } }).position;
+        if (p && typeof p.x === "number" && typeof p.z === "number") places[sid] = { x: p.x, z: p.z };
+      }
+    },
+  });
+  // How much of the plain pan each chunk keeps, and which way it turns: set at every stop.
+  let panScale = 1;
   const watch = sdk.Sweep.current?.subscribe((sweep) => {
     here = sweep.sid || sweep.id || here;
   });
 
   return {
-    goto(stop, { panDeg, instant, speed }) {
+    goto(stop, { panDeg, instant, speed, next }) {
       const to = stopMove(stop, instant);
       if (!to) return;
       if (!sweeps.includes(to.sweepId)) {
@@ -55,10 +83,29 @@ export function createSdkDriver(sdk: PlayerSdk, { sweeps, onStatus }: Options): 
       }
       const mine = ++move;
       moving = true;
+      // Matterport's rule for a guided tour: always turn toward the next highlight. A stop with an
+      // ad photo keeps the photo's own view on arrival, then turns toward the next stop (never
+      // more than one pan's worth); any other stop opens already facing that way.
+      const bearing = headingTo(
+        places,
+        to.sweepId,
+        next?.photos.find((p) => p.sweep_id && p.rotation_quat)?.sweep_id ?? next?.sweep_id,
+      );
+      const hasPhoto = stop.photos.some((p) => p.sweep_id && p.rotation_quat);
+      let startYaw = to.options.rotation.y;
+      panScale = 1;
+      if (bearing !== null) {
+        if (hasPhoto) {
+          const turn = Math.max(-PAN_DEG, Math.min(-wrap(bearing - startYaw), PAN_DEG));
+          panScale = turn / PAN_DEG;
+        } else {
+          startYaw = bearing + PAN_DEG / 2;
+        }
+      }
       const options = {
         ...to.options,
         transitionTime: instant ? 0 : Math.round(FLY_MS / speed),
-        rotation: { x: to.options.rotation.x, y: to.options.rotation.y + panDeg },
+        rotation: { x: to.options.rotation.x, y: startYaw - panScale * panDeg },
       };
       sdk.Sweep.moveTo(to.sweepId, options)
         .then(() => mine === move && onStatus?.(`At: ${stop.title}`))
@@ -75,7 +122,9 @@ export function createSdkDriver(sdk: PlayerSdk, { sweeps, onStatus }: Options): 
     pan(deg, ms) {
       // A turn sent mid-flight would cut the move short: the pan waits for the camera to land.
       if (moving || !sdk.Camera || ms <= 0) return;
-      sdk.Camera.rotate(deg, 0, { speed: Math.abs(deg) / (ms / 1000) }).catch(() => {
+      const turn = deg * panScale;
+      if (Math.abs(turn) < 0.5) return;
+      sdk.Camera.rotate(turn, 0, { speed: Math.abs(turn) / (ms / 1000) }).catch(() => {
         // The person took the camera, or a move replaced the turn. Nothing to do.
       });
     },
@@ -94,6 +143,7 @@ export function createSdkDriver(sdk: PlayerSdk, { sweeps, onStatus }: Options): 
     dispose() {
       move += 1;
       watch?.cancel();
+      data?.cancel();
     },
   };
 }

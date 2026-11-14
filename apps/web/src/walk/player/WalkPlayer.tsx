@@ -138,7 +138,7 @@ export function WalkPlayer({
     transport.onCue = (cue: Cue) => {
       const now = live.current;
       if (cue.type === "stop" || cue.type === "index") now.onIndex(cue.index);
-      if (cue.type === "stop") now.driver?.goto(now.stops[cue.index]!, cue);
+      if (cue.type === "stop") now.driver?.goto(now.stops[cue.index]!, { ...cue, next: now.stops[cue.index + 1] });
       if (cue.type === "pan") now.driver?.pan(cue.deg, cue.ms);
       // The pinned photo only lines up with the scan while the camera holds still.
       if (cue.type === "photo" && (cue.shown || now.surface === "scan")) now.onPhoto?.(cue.shown);

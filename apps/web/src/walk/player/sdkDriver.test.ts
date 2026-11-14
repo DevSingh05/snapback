@@ -8,13 +8,22 @@ import { Transport, fakeClock, type Cue } from "./transport";
 const STOPS = FIXTURE_TOUR.stops;
 const SWEEPS = ["fx-sweep-00", "fx-sweep-01", "fx-sweep-03", "fx-sweep-04", "fx-sweep-06"];
 
-function fakeSdk() {
+function fakeSdk(positions: Record<string, [number, number, number]> = {}) {
   let onSweep: (s: { sid?: string }) => void = () => {};
   const sdk = {
     disconnect: vi.fn(),
     Sweep: {
       moveTo: vi.fn().mockResolvedValue(undefined),
-      data: { subscribe: vi.fn() },
+      data: {
+        subscribe: (o: { onCollectionUpdated(c: Record<string, unknown>): void }) => {
+          o.onCollectionUpdated(
+            Object.fromEntries(
+              Object.entries(positions).map(([sid, [x, y, z]]) => [sid, { position: { x, y, z } }]),
+            ),
+          );
+          return { cancel: vi.fn() };
+        },
+      },
       current: {
         subscribe: (on: (s: { sid?: string }) => void) => {
           onSweep = on;
@@ -87,7 +96,8 @@ describe("the scan's camera", () => {
     const [sweep, options] = fake.sdk.Sweep.moveTo.mock.calls[0]!;
     expect(sweep).toBe("fx-sweep-00");
     expect(options.transitionTime).toBe(1333);
-    expect(options.rotation.y).toBeCloseTo(PAN_DEG / 2);
+    // Camera.rotate(+) turns clockwise, which lowers the Showcase yaw: a seek lands where the pan would.
+    expect(options.rotation.y).toBeCloseTo(-PAN_DEG / 2);
   });
 
   it("calls nothing at all in explore mode, and resumes at the stop nearest the person", () => {
@@ -135,5 +145,64 @@ describe("the scan's camera", () => {
       expect.objectContaining({ transition: "transition.instant", transitionTime: 0 }),
     );
     expect(d.nearestStop(STOPS)).toBeNull();
+  });
+
+  describe("looking toward the next stop", () => {
+    const at = (positions: Record<string, [number, number, number]>) => {
+      const f = fakeSdk(positions);
+      const d = createSdkDriver(f.sdk as unknown as PlayerSdk, { sweeps: SWEEPS });
+      return { f, d };
+    };
+    // fx-sweep-00 is the first sweep stop; the next sweep stop is fx-sweep-01.
+    const NEXT = STOPS[2]!;
+
+    it("a room with no ad photo opens facing the next stop, half the pan to its left", () => {
+      const { f, d } = at({ "fx-sweep-00": [0, 0, 0], "fx-sweep-01": [3, 0, 0] });
+      d.goto(STOPS[1]!, { panDeg: 0, instant: false, speed: 1, next: NEXT });
+      // +x is to the right of the default view: a quarter turn clockwise is yaw -90.
+      expect(f.sdk.Sweep.moveTo.mock.calls[0]![1].rotation.y).toBeCloseTo(-90 + PAN_DEG / 2);
+    });
+
+    it("pans the way the next stop lies, never the long way round, and never past the cap", async () => {
+      const photoStop = {
+        ...STOPS[1]!,
+        photos: [
+          {
+            photo_id: "p",
+            alias: "P1",
+            sweep_id: "fx-sweep-00",
+            position: [0, 0, 0],
+            rotation_quat: [0, 0, 0, 1],
+            fov_deg: 65,
+          },
+        ],
+      } as typeof NEXT;
+      const right = at({ "fx-sweep-00": [0, 0, 0], "fx-sweep-01": [3, 0, 0] });
+      right.d.goto(photoStop, { panDeg: 0, instant: false, speed: 1, next: NEXT });
+      await flush();
+      right.d.pan(10, 500);
+      expect(right.f.sdk.Camera.rotate).toHaveBeenCalledWith(10, 0, { speed: 20 });
+
+      const left = at({ "fx-sweep-00": [0, 0, 0], "fx-sweep-01": [-3, 0, 0] });
+      left.d.goto(photoStop, { panDeg: 0, instant: false, speed: 1, next: NEXT });
+      await flush();
+      left.d.pan(10, 500);
+      expect(left.f.sdk.Camera.rotate).toHaveBeenCalledWith(-10, 0, { speed: 20 });
+
+      // Next stop dead ahead: nothing to turn toward, so the camera holds its heading.
+      const ahead = at({ "fx-sweep-00": [0, 0, 0], "fx-sweep-01": [0, 0, -3] });
+      ahead.d.goto(photoStop, { panDeg: 0, instant: false, speed: 1, next: NEXT });
+      await flush();
+      ahead.d.pan(10, 500);
+      expect(ahead.f.sdk.Camera.rotate).not.toHaveBeenCalled();
+    });
+
+    it("keeps the plain pan when the sweeps' places are not known", async () => {
+      const { f, d } = at({});
+      d.goto(STOPS[1]!, { panDeg: 0, instant: false, speed: 1, next: NEXT });
+      await flush();
+      d.pan(10, 500);
+      expect(f.sdk.Camera.rotate).toHaveBeenCalledWith(10, 0, { speed: 20 });
+    });
   });
 });

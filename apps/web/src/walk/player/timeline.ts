@@ -7,8 +7,8 @@ import type { TourStop } from "../../contracts";
 export const ARRIVE_MS = 2000;
 export const LAND_MS = 1000;
 export const PAN_MS = 3500;
-/** How far the real camera turns during one stop's pan, in degrees. */
-export const PAN_DEG = 110;
+/** How far the real camera turns during one stop's pan, in degrees: a slow drift, never a spin. */
+export const PAN_DEG = 24;
 /** The pan is sent to the scan in short turns, so a pause stops it within half a second. */
 export const PAN_CHUNK_MS = 500;
 
