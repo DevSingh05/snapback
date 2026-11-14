@@ -1,7 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
+import type { DataSource } from "../contracts";
 import { SourceChip } from "../components/SourceChip";
-import { createCase as defaultCreateCase, type CreateCase } from "./api";
+import { MODE, createCase as defaultCreateCase, type CreateCase } from "./api";
 import { initialState, reduce } from "./machine";
 import { MAX_FILES, addFiles, classifyListingText, validateSubmission } from "./validate";
 import "./upload.css";
@@ -16,6 +17,7 @@ interface Props {
   navigate?: (caseId: string) => void;
   checkingMs?: number;
   waitingMs?: number;
+  mode?: DataSource;
 }
 
 const STEPS = [
@@ -30,6 +32,7 @@ export function UploadPage({
   navigate = goToCase,
   checkingMs = 900,
   waitingMs = 1800,
+  mode = MODE,
 }: Props) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [text, setText] = useState("");
@@ -39,6 +42,8 @@ export function UploadPage({
   const [copied, setCopied] = useState(false);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const removeButtons = useRef<Array<HTMLButtonElement | null>>([]);
+  const focusAfterRemove = useRef<number | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
   // Move focus to the new step's heading so keyboard and screen reader users follow along.
@@ -47,20 +52,28 @@ export function UploadPage({
   }, [state.step]);
 
   useEffect(() => {
-    if (state.step !== "checking") return;
+    if (state.step !== "checking" || mode !== "fixture") return;
     const t = setTimeout(() => dispatch({ type: "checked" }), checkingMs);
     return () => clearTimeout(t);
-  }, [state.step, checkingMs]);
+  }, [state.step, checkingMs, mode]);
 
   useEffect(() => {
-    if (state.step !== "waiting") return;
+    if (state.step !== "waiting" || mode !== "fixture") return;
     const t = setTimeout(() => dispatch({ type: "done" }), waitingMs);
     return () => clearTimeout(t);
-  }, [state.step, waitingMs]);
+  }, [state.step, waitingMs, mode]);
 
   useEffect(() => {
     if (state.step === "done") navigate(state.caseId);
   }, [state, navigate]);
+
+  // After Remove, focus the Remove button that took the removed one's place, or the file input.
+  useEffect(() => {
+    const i = focusAfterRemove.current;
+    if (i === null) return;
+    focusAfterRemove.current = null;
+    (removeButtons.current[i] ?? fileInput.current)?.focus();
+  }, [files]);
 
   function take(list: FileList | File[] | null) {
     if (!list) return;
@@ -112,6 +125,7 @@ export function UploadPage({
       <div className="card-page upload" data-testid="upload-page">
         <header className="masthead">
           <span className="wordmark">SNAPBACK</span>
+          <SourceChip source={mode} />
         </header>
         <form className="upload-body" onSubmit={onSubmit} noValidate>
           <h1 ref={heading} tabIndex={-1}>
@@ -182,14 +196,21 @@ export function UploadPage({
 
           {files.length > 0 && (
             <ul className="upload-files" aria-label="Added photos">
-              {files.map((f) => (
+              {files.map((f, i) => (
                 <li key={`${f.name}-${f.size}`}>
                   <span>{f.name}</span>
                   <button
                     type="button"
                     className="upload-remove"
                     aria-label={`Remove ${f.name}`}
-                    onClick={() => setFiles(files.filter((g) => g !== f))}
+                    ref={(el) => {
+                      removeButtons.current[i] = el;
+                    }}
+                    onClick={() => {
+                      focusAfterRemove.current = i;
+                      removeButtons.current.length = files.length - 1;
+                      setFiles(files.filter((g) => g !== f));
+                    }}
                   >
                     Remove
                   </button>
@@ -225,6 +246,10 @@ export function UploadPage({
   if (state.step === "error") {
     return (
       <div className="card-page upload" data-testid="upload-page">
+        <header className="masthead">
+          <span className="wordmark">SNAPBACK</span>
+          <SourceChip source={mode} />
+        </header>
         <div className="upload-body">
           <h1 ref={heading} tabIndex={-1}>
             That did not go through
@@ -246,13 +271,13 @@ export function UploadPage({
   }
 
   const activeIndex = STEPS.findIndex((s) => s.key === state.step);
-  const source = state.step === "reading" ? null : "source" in state ? state.source : null;
+  const source: DataSource = "source" in state ? state.source : mode;
 
   return (
     <div className="card-page upload" data-testid="upload-page">
       <header className="masthead">
         <span className="wordmark">SNAPBACK</span>
-        {source && <SourceChip source={source} />}
+        <SourceChip source={source} />
       </header>
       <div className="upload-body">
         <ol className="upload-steps" aria-label="Progress">
@@ -295,7 +320,23 @@ export function UploadPage({
               <h1 ref={heading} tabIndex={-1}>
                 Checking the building
               </h1>
-              <p className="upload-lead">Looking up the place on the listing.</p>
+              {mode === "fixture" ? (
+                <p className="upload-lead">Looking up the place on the listing.</p>
+              ) : (
+                <>
+                  <p className="upload-lead" data-testid="not-wired">
+                    Not wired yet: the server does not report building-check progress, so nothing
+                    was checked at this step.
+                  </p>
+                  <button
+                    type="button"
+                    className="upload-submit"
+                    onClick={() => dispatch({ type: "checked" })}
+                  >
+                    Continue
+                  </button>
+                </>
+              )}
             </>
           )}
           {state.step === "waiting" && (
@@ -307,6 +348,12 @@ export function UploadPage({
                 No reply yet means HOLD, not a failure. You can open your result now; it updates
                 when they answer.
               </p>
+              {mode === "live" && (
+                <p className="upload-hint" data-testid="not-wired">
+                  Not wired yet: the server does not report the poster's reply, so this page does
+                  not wait for it.
+                </p>
+              )}
               <button
                 type="button"
                 className="upload-submit"

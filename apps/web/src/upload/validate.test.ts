@@ -44,6 +44,27 @@ describe("validateLink", () => {
   });
 });
 
+describe("validateLink strictness", () => {
+  it("rejects an email address and says it is not a listing link", () => {
+    for (const raw of ["john@gmail.com", "https://john@gmail.com", "https://u:p@zillow.com/x"]) {
+      const r = validateLink(raw);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/email address/);
+    }
+  });
+
+  it("does not treat 1.5BR or an unknown suffix as a bare link", () => {
+    expect(validateLink("1.5BR").ok).toBe(false);
+    expect(validateLink("foo.zzzz/x").ok).toBe(false);
+    expect(classifyListingText("1.5BR").kind).toBe("text");
+    expect(classifyListingText("$1.800/mo").kind).toBe("text");
+  });
+
+  it("still accepts an explicit https link on an unusual suffix", () => {
+    expect(validateLink("https://rooms.example.xyz/1").ok).toBe(true);
+  });
+});
+
 describe("classifyListingText", () => {
   it("tells links from pasted listing text from nothing", () => {
     expect(classifyListingText("https://a.com/x").kind).toBe("link");

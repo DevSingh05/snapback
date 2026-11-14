@@ -8,19 +8,64 @@ export type LinkResult = { ok: true; url: string } | { ok: false; error: string 
 const LINK_HELP =
   "That does not look like a web address. Paste the full address of the listing, for example https://www.zillow.com/homedetails/123.";
 
+const TLDS = new Set([
+  "com",
+  "org",
+  "net",
+  "edu",
+  "gov",
+  "io",
+  "co",
+  "us",
+  "app",
+  "info",
+  "biz",
+  "me",
+  "ly",
+  "homes",
+  "rent",
+  "realty",
+  "apartments",
+  "uk",
+  "ca",
+]);
+
+// The host part of a scheme-less token, e.g. "craigslist.org" from "craigslist.org/apa/1".
+function bareHost(text: string): string {
+  const afterAt = text.includes("@") ? text.slice(text.lastIndexOf("@") + 1) : text;
+  return (afterAt.split(/[/?#:]/)[0] ?? "").toLowerCase();
+}
+
+function hasKnownTld(text: string): boolean {
+  const host = bareHost(text);
+  const tld = host.split(".").pop() ?? "";
+  return host.includes(".") && TLDS.has(tld);
+}
+
 export function validateLink(raw: string): LinkResult {
   const text = raw.trim();
   if (!text || /\s/.test(text)) return { ok: false, error: LINK_HELP };
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(text);
-  const withScheme = scheme ? text : `https://${text}`;
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(text);
+  if (!scheme && /^[a-z][a-z0-9+.-]*:/i.test(text) && !/^[^/]*\.[a-z]+:\d+/i.test(text)) {
+    return { ok: false, error: LINK_HELP };
+  }
   if (scheme && !/^https?$/i.test(scheme[1] ?? "")) {
     return { ok: false, error: LINK_HELP };
   }
+  if (!scheme && !hasKnownTld(text)) return { ok: false, error: LINK_HELP };
+  const withScheme = scheme ? text : `https://${text}`;
   let url: URL;
   try {
     url = new URL(withScheme);
   } catch {
     return { ok: false, error: LINK_HELP };
+  }
+  if (url.username || url.password) {
+    return {
+      ok: false,
+      error:
+        "That looks like an email address, not a listing link. Paste the address of the listing page instead.",
+    };
   }
   const host = url.hostname;
   if (!host.includes(".") || host.startsWith(".") || host.endsWith(".")) {
@@ -31,15 +76,12 @@ export function validateLink(raw: string): LinkResult {
 
 export type ListingText = { kind: "link" | "text" | "empty" };
 
-// One box takes either a link or pasted listing text. A single token that has a scheme or a
-// dot and no spaces is treated as a link; anything longer is the listing text itself.
+// One box takes either a link or pasted listing text. A single token with an http(s) scheme,
+// an at sign, or a host ending in a known TLD is a link; "1.5BR" and longer text are listing text.
 export function classifyListingText(raw: string): ListingText {
   const text = raw.trim();
   if (!text) return { kind: "empty" };
-  if (
-    !/\s/.test(text) &&
-    (/^https?:/i.test(text) || text.includes(".") || /^[a-z]+:/i.test(text))
-  ) {
+  if (!/\s/.test(text) && (/^https?:/i.test(text) || text.includes("@") || hasKnownTld(text))) {
     return { kind: "link" };
   }
   return { kind: "text" };

@@ -92,6 +92,41 @@ describe("UploadPage", () => {
     expect(screen.getByLabelText(/listing link or text/i)).toBeInTheDocument();
   });
 
+  it("live mode runs no timers and says the steps are not wired yet", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    const live = vi.fn().mockResolvedValue({ ...made, source: "live" });
+    render(
+      <UploadPage createCase={live} navigate={navigate} checkingMs={0} waitingMs={0} mode="live" />,
+    );
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE");
+    await user.type(screen.getByLabelText(/listing link or text/i), "zillow.com/x/1");
+    await user.click(screen.getByRole("button", { name: /check this listing/i }));
+    expect(await screen.findByTestId("not-wired")).toHaveTextContent(/not wired yet/i);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByLabelText(/message to forward/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(await screen.findByRole("button", { name: /i approve it/i }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("LIVE");
+  });
+
+  it("shows a chip on the input step and moves focus after Remove", async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    const input = screen.getByLabelText(/screenshots or photos/i);
+    await user.upload(input, [
+      new File(["x"], "a.png", { type: "image/png" }),
+      new File(["y"], "b.png", { type: "image/png" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: /remove a\.png/i }));
+    expect(screen.getByRole("button", { name: /remove b\.png/i })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: /remove b\.png/i }));
+    expect(input).toHaveFocus();
+  });
+
   it("shows the FIXTURE chip once the case exists", async () => {
     const user = userEvent.setup();
     setup();

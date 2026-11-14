@@ -15,6 +15,9 @@ export interface CaseInput {
   files: File[];
 }
 
+// Fixture mode unless VITE_API_URL is set. Every screen shows this as a LIVE or FIXTURE chip.
+export const MODE: DataSource = import.meta.env.VITE_API_URL ? "live" : "fixture";
+
 export const FIXTURE_CHALLENGE_TEXT =
   "Hi! Before I book a viewing, could you send me a photo of the front door of the unit, taken right now, with today's date written on a piece of paper in the shot? Thanks!";
 
