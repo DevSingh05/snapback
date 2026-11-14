@@ -232,6 +232,20 @@
   border-left: 10px solid var(--act);
 }
 
+/* One quiet link to the Stories page: three renters' stories, played on the real app. */
+.ob-stories {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.ob-stories a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--act);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
 /* ---------- What you can do: three photo tiles, one tap each ---------- */
 .ob-can {
   display: flex;

@@ -10,6 +10,7 @@ import { AppShell, type Section } from "./shell/AppShell";
 import { FinderPage } from "./shell/FinderPage";
 import { ListingsPage } from "./shell/ListingsPage";
 import { loadPrefs, tabOf } from "./shell/prefs";
+import { StoriesPage } from "./stories/StoriesPage";
 import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
@@ -33,6 +34,7 @@ type Route =
   | { name: "confirm" }
   | { name: "investigate" }
   | { name: "replays" }
+  | { name: "stories" }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
@@ -40,6 +42,7 @@ export function matchRoute(path: string): Route {
   if (/^\/listings\/?$/.test(path)) return { name: "listings" };
   if (/^\/finder\/?$/.test(path)) return { name: "finder" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
+  if (/^\/stories\/?$/.test(path)) return { name: "stories" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
@@ -118,6 +121,8 @@ export default function App() {
           <ListingsPage />
         ) : route.name === "finder" ? (
           <FinderPage />
+        ) : route.name === "stories" ? (
+          <StoriesPage />
         ) : route.name === "confirm" ? (
           <ConfirmPage />
         ) : route.name === "investigate" ? (
