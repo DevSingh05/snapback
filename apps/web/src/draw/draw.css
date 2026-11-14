@@ -10,10 +10,10 @@
   --c: var(--h-wall);
 }
 .dk-green {
-  --c: color-mix(in srgb, var(--h-lawn) 52%, var(--v-ok));
+  --c: var(--h-leaf);
 }
 .dk-wood {
-  --c: var(--h-wall-shade);
+  --c: color-mix(in srgb, var(--h-wood) 62%, var(--h-wall-shade));
 }
 .dk-dark {
   --c: color-mix(in srgb, var(--band) 62%, var(--h-roof));
