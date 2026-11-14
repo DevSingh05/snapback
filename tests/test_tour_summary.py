@@ -187,3 +187,67 @@ def test_the_draft_route_adds_no_rooms_line_without_a_placed_photo_result(client
     )
     assert r.status_code == 200
     assert "I'd like to see" not in r.json()["text"]
+
+
+def test_the_case_walk_summary_for_the_claimed_home_counts_the_placed_photos(client):
+    body = client.get("/cases/fx-7Q2M/walk").json()
+    summary = body["plan"]["summary"]
+    assert "3 of 3 ad photos were placed in this scan." in summary["know"]
+    assert any("The ad showed" in line for line in summary["know"])
+    assert summary["know"][-1].startswith("What the record says is")
+    assert summary["see"][-len(STILL_ALWAYS) :] == list(STILL_ALWAYS)
+
+
+def test_the_case_walk_summary_for_the_home_elsewhere_has_no_ad_photo_counts(client, monkeypatch):
+    import snapback.api.main as api
+
+    monkeypatch.setattr(api, "elsewhere_property", lambda _l: "fx-prop-3")
+    body = client.get("/cases/fx-7Q2M/walk?mode=elsewhere").json()
+    summary = body["plan"]["summary"]
+    assert body["plan"]["mode"] == "elsewhere"
+    assert not any("ad photos were placed" in line for line in summary["know"])
+    assert summary["know"][-1].startswith("What the record says is")
+    assert summary["see"][-len(STILL_ALWAYS) :] == list(STILL_ALWAYS)
+    assert not any(line.startswith("The ad did not show") for line in summary["see"])
+
+
+def test_the_draft_route_adds_the_rooms_line_when_the_walk_has_rooms_with_no_ad_photo(
+    client, monkeypatch
+):
+    import snapback.api.main as api
+
+    real = api.map_locate
+
+    def none_placed(plan, locate, **kw):
+        plan, fields = real(plan, locate, **kw)
+        stops = [
+            s.model_copy(update={"ad_view": "none_placed"}) if s.kind == "room" else s
+            for s in plan.stops
+        ]
+        return plan.model_copy(update={"stops": stops}), fields
+
+    place = PlaceMatch(
+        property_id="fx-prop-1",
+        kind="apartment",
+        source=DataSource.FIXTURE,
+        budget_fit="within",
+        availability_text="as of CoStar's last research",
+        price_text="$1,500 a month, as of CoStar's last research",
+        office_on_record="Fixture Property Management Co",
+    )
+    monkeypatch.setattr(api, "map_locate", none_placed)
+    real_place_for = api.place_for
+    calls = []
+
+    def place_once(*a, **k):
+        # The draft asks first (fx-prop-1 has no priced plan); the walk then gets the real one.
+        calls.append(a[0])
+        return place if len(calls) == 1 else real_place_for(*a, **k)
+
+    monkeypatch.setattr(api, "place_for", place_once)
+    # fx-7Q2M is the seeded case whose own home is fx-prop-1.
+    r = client.post("/cases/fx-7Q2M/tour-draft", json={"property_id": "fx-prop-1"})
+    assert r.status_code == 200
+    text = r.json()["text"]
+    assert "I'd like to see " in text and "which the listing did not show." in text
+    assert r.json()["sent"] is False and r.json()["status"] == "draft"

@@ -98,12 +98,9 @@ interface Props {
   mismatch: boolean;
   /** With a read token for this case in the browser, the proof comes from the live route instead. */
   caseId?: string;
-  /** Shown above the two buildings on a mismatch (the walk: none of the ad's photos are from this home). */
-  banner?: string;
 }
 
 interface ViewProps {
-  banner?: string;
   matched: AerialSide;
   claimed: AerialSide;
   mismatch: boolean;
@@ -112,7 +109,7 @@ interface ViewProps {
   chip?: "live" | "fixture";
 }
 
-function ProofView({ matched, claimed, mismatch, live = false, chip, banner }: ViewProps) {
+function ProofView({ matched, claimed, mismatch, live = false, chip }: ViewProps) {
   const shown = mismatch ? [claimed, matched] : [matched];
   // Fixture path: LIVE only when every tile and record on show is live; anything else reads FIXTURE.
   const allLive = shown.every((s) => s.tile?.source === "live" && s.record?.source === "live");
@@ -123,11 +120,6 @@ function ProofView({ matched, claimed, mismatch, live = false, chip, banner }: V
         <span className="mono">Aerial</span>
         <SourceChip source={chip ?? (allLive ? "live" : "fixture")} />
       </div>
-      {mismatch && banner ? (
-        <p className="aerial-banner" role="note">
-          {banner}
-        </p>
-      ) : null}
       <div className={mismatch ? "aerial-pair" : "aerial-single"}>
         {mismatch ? (
           <Tile side={claimed} caption="The listing says here." showFacts={live} />
@@ -147,7 +139,7 @@ function ProofView({ matched, claimed, mismatch, live = false, chip, banner }: V
   );
 }
 
-function LiveAerialProof({ caseId, banner }: { caseId: string; banner?: string }) {
+function LiveAerialProof({ caseId }: { caseId: string }) {
   const aerial = useLiveAerial(caseId, true);
   if (aerial.status === "loading") {
     return (
@@ -178,7 +170,6 @@ function LiveAerialProof({ caseId, banner }: { caseId: string; banner?: string }
   return (
     <ProofView
       live
-      banner={banner}
       mismatch={matched !== null}
       claimed={claimed}
       matched={matched ?? claimed}
@@ -188,6 +179,6 @@ function LiveAerialProof({ caseId, banner }: { caseId: string; banner?: string }
 }
 
 export function AerialProof({ caseId, ...rest }: Props) {
-  if (canGoLive(caseId)) return <LiveAerialProof caseId={caseId} banner={rest.banner} />;
+  if (canGoLive(caseId)) return <LiveAerialProof caseId={caseId} />;
   return <ProofView {...rest} />;
 }

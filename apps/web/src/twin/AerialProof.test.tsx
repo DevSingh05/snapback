@@ -151,21 +151,4 @@ describe("AerialProof capture date and banner", () => {
     render(<AerialProof mismatch={false} claimed={side} matched={side} />);
     expect(screen.queryByText(/captured/)).toBeNull();
   });
-
-  it("shows the banner above the two buildings only on a mismatch", () => {
-    const banner = "None of the ad's photos are from this home.";
-    const { rerender } = render(
-      <AerialProof mismatch banner={banner} claimed={FIXTURE_CLAIMED} matched={FIXTURE_MATCHED} />,
-    );
-    expect(screen.getByText(banner)).toBeInTheDocument();
-    rerender(
-      <AerialProof
-        mismatch={false}
-        banner={banner}
-        claimed={FIXTURE_CLAIMED}
-        matched={FIXTURE_MATCHED}
-      />,
-    );
-    expect(screen.queryByText(banner)).toBeNull();
-  });
 });
