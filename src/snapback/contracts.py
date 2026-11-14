@@ -80,6 +80,8 @@ class Evidence(BaseModel):
     phone_flag: bool = False  # the phone in the listing is not the leasing office on record
     # A23 (H1): the phone in the listing IS the leasing office's on record. VERIFIED needs it.
     phone_confirmed: bool = False
+    # A15: who is on record is a listing brokerage, not a manager with an office phone.
+    brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
     license_flag: bool = False  # claims a real estate license; no active one holds that name
@@ -280,6 +282,9 @@ class AuthorityResult(BaseModel):
     # A7 (#67). Yes/no only: no phone number, hash or web address is ever kept here.
     office_phone_match: PhoneMatch = PhoneMatch.NOT_CHECKED
     link_domain: LinkDomain = LinkDomain.NOT_CHECKED
+    # A15: the comparison was with the listing brokerages alone. The home has no property
+    # record, so there is no manager, office phone or website on record to compare with.
+    brokerage_only: bool = False
 
 
 class ForSaleStatus(StrEnum):
@@ -655,7 +660,8 @@ class CreateCaseResponse(BaseModel):
     case_id: str  # short public id, for display and for reading the case
     source: DataSource
     token: str  # write secret for this case; send it on every write, in a header only
-    # Read-only secret: opens the trace and the challenge text, and may ride in `?token=`.
+    # Read-only secret: opens the trace, the challenge text, the report and the aerial proof.
+    # Header only, like the write secret; never in the address (locked, Sat 02:27).
     read_token: str | None = None
     status: CaseProgress
     state: VerdictState | None = None  # set once the case is done

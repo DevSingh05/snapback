@@ -4,7 +4,9 @@ After the first choice (which kinds of check) the case enters a plan. Code lists
 in a fixed order and works out, from evidence it already holds, which of them can run:
 
 - `home record`: the home's own record (rent band, who is on record, sale history);
-- `listing brokerage`: the listing office behind an ACTIVE for-sale match;
+- `listing brokerage`: the listing office behind an ACTIVE for-sale match, and how the
+  poster compares with who is on record for that home (A15: a home for sale usually has no
+  property record, and the listing brokerages are then who is on record);
 - `TREC license`: the license the ad names, looked up with the state (D10);
 - `owner of record`: the public owner file (D12) and how the poster compares (A19);
 - `report pack`: the closing step, open once every other check has run or been skipped.
@@ -108,7 +110,10 @@ class Plan:
         return self._for_sale if self._for_sale is not None and not self._active_sale else None
 
     def _has_record(self) -> bool:
-        return bool(self._price or self._authority or self._record_sale)
+        # With an ACTIVE listing, who is on record is the brokerage step's finding (A15), so
+        # it does not by itself make a home record to read.
+        authority = self._authority if not self._active_sale else None
+        return bool(self._price or authority or self._record_sale)
 
     def _skip_reason(self, kind: PlanKind) -> str | None:
         """The `plan.skip.*` key for why `kind` cannot run now; None when it can."""
@@ -133,6 +138,15 @@ class Plan:
         return kind not in self.ran and self._skip_reason(kind) is None
 
     # --- reading the plan ------------------------------------------------------------------
+
+    def pick_key(self, kind: PlanKind) -> str:
+        """The `plan.pick.*` key for why `kind` is worth running now.
+
+        With a listing active, who is on record is the brokerage step's finding (A15), so
+        the record step promises the rent band and no more."""
+        if kind is PlanKind.RECORD and self._active_sale:
+            return "plan.pick.record_rent"
+        return PICK_KEY[kind]
 
     def open_options(self) -> list[PlanKind]:
         """The options that can run now, in the fixed order."""
@@ -167,12 +181,19 @@ class Plan:
             raise ValueError(f"{kind.value!r} cannot run now")
         self.ran.append(kind)
         if kind is PlanKind.RECORD:
-            update: dict[str, object] = {"price": self._price, "authority": self._authority}
+            update: dict[str, object] = {"price": self._price}
+            if not self._active_sale:
+                # No listing to check: who is on record comes with the home's own record.
+                update["authority"] = self._authority
             if self._record_sale is not None:
                 update["for_sale"] = self._record_sale
             return update
         if kind is PlanKind.BROKERAGE:
-            return {"for_sale": self._for_sale}
+            # A15 (#132): the listing office behind an ACTIVE for-sale match is on record as
+            # a marketer, and for a home with no property record it is all that is. So how
+            # the poster compares with who is on record is this step's finding. It is held
+            # by exactly one step, so the evidence is the same whichever runs first.
+            return {"for_sale": self._for_sale, "authority": self._authority}
         if kind is PlanKind.LICENSE:
             return {"license": self._license}
         if kind is PlanKind.OWNER:

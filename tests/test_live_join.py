@@ -518,3 +518,134 @@ def test_nothing_from_the_record_is_logged_or_traced(tmp_path, caplog):
     traced = " ".join(event.model_dump_json() for event in events)
     for secret in ("Quiet Manager", "fixtureliving.example", "1600", "fx-prop-2"):
         assert secret not in logged and secret not in traced
+
+
+# --- through lane D's real for-sale lookup, on its synthetic kit (A15, #132) ----------------
+
+# In fixtures/adapters/costar-kit: 100 Fixture Lane is for sale, listed by Fixture Realty
+# Group and Sample Homes Brokerage, and there is no property record for it. All invented.
+FOR_SALE_HOME = "House at 100 Fixture Lane Apt 2, 3 bed, $1,400 a month."
+
+
+def test_the_real_lookup_finds_the_home_for_sale_and_its_brokerages():
+    found = KitLookups(DataSource.FIXTURE).for_sale(FOR_SALE_HOME)
+    assert found is not None and found.status == "active"
+    assert "Fixture Realty Group" in found.offices
+
+
+def test_a_listing_that_names_the_listing_brokerage_matches_and_is_still_for_sale(tmp_path):
+    client = client_for(tmp_path)
+    card = finish(client, {"text": f"{FOR_SALE_HOME} Listed by Fixture Realty Group."})
+    said = said_on(card)
+    # Naming the brokerage on record matches. It lifts nothing: the line still says to call,
+    # and now it can say whom.
+    assert said["Allowed to rent it"]["tone"] == "not_shown"
+    assert said["Allowed to rent it"]["text"] == (
+        "Not confirmed. Call Fixture Realty Group on a number you look up yourself before you pay."
+    )
+    # The for-sale warning stands: a name in an ad is not the brokerage's own contact.
+    assert said["For sale"]["tone"] == "hold"
+    assert said["For sale"]["text"].startswith("Listed for sale on Homes.com by Fixture Realty")
+    assert card["state"] != "verified" and card["state"] != "dont_pay"
+
+
+@pytest.mark.parametrize(
+    "contact",
+    ["", " Call (555) 010-0142.", " Text 555-010-0177 or see fixturerealty.example."],
+)
+def test_the_contact_line_says_we_hold_no_phone_for_the_brokerage(tmp_path, contact):
+    # Review of #174: with no property record there is no office phone on record at all. The
+    # card must not say "no phone in the listing could be compared" when the ad has one; what
+    # is true is that we hold none for the brokerage. Said the same with or without a phone.
+    client = client_for(tmp_path)
+    form = {"text": f"{FOR_SALE_HOME} Listed by Fixture Realty Group.{contact}"}
+    card = finish(client, form)
+    said = said_on(card)
+    assert said["Contact on record"]["tone"] == "not_checked"
+    assert said["Contact on record"]["text"] == (
+        "Not checked (we hold no phone for the listing brokerage)."
+    )
+    # One "call" on the row: the "Allowed to rent it" line names who to call.
+    assert "Call Fixture Realty Group" in said["Allowed to rent it"]["text"]
+    everything = " ".join(line["text"] for row in card["rows"] for line in row["lines"])
+    assert "leasing office" not in everything and "manager" not in everything
+    spanish = finish(client_for(tmp_path / "es"), form)  # the same listing, a fresh server
+    assert spanish["state"] == card["state"]
+
+
+def test_the_reasons_call_a_brokerage_a_brokerage(tmp_path):
+    from snapback.agent.intake import read_listing as read
+    from snapback.card import strings
+
+    listing = read(f"{FOR_SALE_HOME} Listed by Fixture Realty Group.")
+    modules = JoinedModules(
+        stand_in=FixtureModules(),
+        listing=listing,
+        record=None,
+        for_sale=KitLookups(DataSource.FIXTURE).for_sale(listing.text),
+        salt=FIXTURE_PHONE_SALT,
+        record_source=DataSource.FIXTURE,
+    )
+    verdict, card, case = run(modules)
+    assert case.evidence.authority.brokerage_only is True
+    for lang in ("en", "es"):
+        assert strings.text("reason.authority_matches_brokerage", lang)
+        assert strings.text("reason.phone_not_confirmed_brokerage", lang)
+    assert strings.text("reason.authority_matches_brokerage") in verdict.reasons
+    assert strings.text("reason.phone_not_confirmed_brokerage") in verdict.reasons
+    said = " ".join(verdict.reasons)
+    assert "manager" not in said and "leasing office" not in said
+    assert verdict.state is VerdictState.HOLD
+
+
+def test_a_home_with_a_record_keeps_the_leasing_office_wording(tmp_path):
+    # The manager on record is named and the listing has no phone: nothing changes here.
+    record = contact_record(source=DataSource.FIXTURE)
+    modules = joined("Unit 204, 2 bed, $1,700 a month. Managed by Fixture Living LLC.", record)
+    verdict, card, case = run(modules)
+    assert case.evidence.authority.brokerage_only is False
+    assert lines(card)["Contact on record"].text == (
+        "Not checked (no phone number in the listing could be compared with the leasing "
+        "office on record)."
+    )
+    assert "The ad names the manager on record. Anyone can type that name." in verdict.reasons
+
+
+def test_a_listing_that_names_someone_else_reads_not_confirmed_never_a_red_flag(tmp_path):
+    client = client_for(tmp_path)
+    card = finish(client, {"text": f"{FOR_SALE_HOME} Listed by Somebody Else Realty."})
+    said = said_on(card)
+    assert said["Allowed to rent it"]["tone"] == "not_shown"
+    assert (
+        said["Allowed to rent it"]["text"] == "Not confirmed. Call the office on record yourself."
+    )
+    assert said["For sale"]["tone"] == "hold"
+    tones = [line["tone"] for row in card["rows"] for line in row["lines"]]
+    assert "red_flag" not in tones  # a name that is not on record is never a red flag
+    assert card["state"] != "dont_pay"
+
+
+def test_the_for_sale_flag_stands_whoever_the_listing_names(tmp_path):
+    from snapback.agent.intake import read_listing as read
+
+    for named in ("Listed by Fixture Realty Group.", "Listed by Somebody Else Realty.", ""):
+        listing = read(f"{FOR_SALE_HOME} {named}")
+        found = KitLookups(DataSource.FIXTURE).for_sale(listing.text)
+        modules = JoinedModules(
+            stand_in=FixtureModules(),
+            listing=listing,
+            record=None,
+            for_sale=found,
+            salt=FIXTURE_PHONE_SALT,
+            record_source=DataSource.FIXTURE,
+        )
+        verdict, _, case = run(modules)
+        assert case.evidence.for_sale.status == "active", named
+        assert verdict.state is VerdictState.HOLD, named
+
+
+def test_an_ordinary_listing_is_looked_up_and_nothing_is_found(tmp_path):
+    client = client_for(tmp_path)
+    card = finish(client, {"text": "2 bed near the park, $1,700 a month."})
+    labels = [line["label"] for row in card["rows"] for line in row["lines"]]
+    assert "For sale" not in labels and "Rental history" not in labels
