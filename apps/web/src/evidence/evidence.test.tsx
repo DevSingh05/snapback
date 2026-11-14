@@ -4,13 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { BarGauges } from "./BarGauges";
 import { ConfidenceChip } from "./ConfidenceChip";
 import { EvidenceDrawer, RENDER_NOTE } from "./EvidenceDrawer";
-import { EVIDENCE_STUB_A, EVIDENCE_STUB_B } from "./evidenceStub";
+import { EVIDENCE_FIXTURE_A, EVIDENCE_FIXTURE_B } from "./fixture";
 import { FilesTree } from "./FilesTree";
 import { MatchLines } from "./MatchLines";
 import { chipState, failedLine, gauges, placeLine, searchLine } from "./read";
 import type { EvidencePhoto } from "./types";
 
-const file = EVIDENCE_STUB_A;
+const file = EVIDENCE_FIXTURE_A;
 const bars = file.bars;
 const photo = (alias: string): EvidencePhoto => file.photos.find((p) => p.alias === alias)!;
 const strongBars = { ...bars, stop_at_inliers: 150 };
@@ -73,12 +73,10 @@ describe("ConfidenceChip: three states only", () => {
 describe("BarGauges", () => {
   it("draws three gauges against the bars in the evidence file", () => {
     render(<BarGauges photo={photo("P3")} bars={bars} thresholdsVersion="fixture-synthetic" />);
-    expect(screen.getByTestId("gauge-points")).toHaveTextContent("88");
-    expect(screen.getByTestId("gauge-points")).toHaveTextContent("bar 30");
-    expect(screen.getByTestId("gauge-spread")).toHaveTextContent("0.31");
-    expect(screen.getByTestId("gauge-spread")).toHaveTextContent("bar 0.05");
-    expect(screen.getByTestId("gauge-rival")).toHaveTextContent("0.05x");
-    expect(screen.getByTestId("gauge-rival")).toHaveTextContent("blocks at 3x");
+    expect(screen.getByTestId("gauge-points-plain")).toHaveTextContent("88 of 30 needed");
+    expect(screen.getByTestId("gauge-spread-plain")).toHaveTextContent("0.31 of 0.05 needed");
+    expect(screen.getByTestId("gauge-rival-plain")).toHaveTextContent("0.05x, must stay under 3x");
+    expect(screen.getByTestId("gauge-points")).toHaveTextContent("Met");
     expect(screen.getByText(/thresholds fixture-synthetic/)).toBeInTheDocument();
   });
 
@@ -90,8 +88,9 @@ describe("BarGauges", () => {
   it("marks a missed bar in words, and holds a photo from another building to the strict bars", () => {
     render(<BarGauges photo={photo("P4")} bars={bars} thresholdsVersion="v" />);
     expect(screen.getByTestId("gauge-points")).toHaveAttribute("data-pass", "false");
-    expect(screen.getByTestId("gauge-points")).toHaveTextContent("not met");
-    const strict = gauges(EVIDENCE_STUB_B.photos[0]!, bars);
+    expect(screen.getByTestId("gauge-points")).toHaveTextContent("Short of the bar");
+    expect(screen.getByTestId("gauge-points-plain")).toHaveTextContent("24 of 30 needed");
+    const strict = gauges(EVIDENCE_FIXTURE_B.photos[0]!, bars);
     expect(strict[0]!.bar).toBe(bars.elsewhere_min_inliers);
     expect(strict[1]!.bar).toBe(bars.elsewhere_min_spread);
   });
@@ -178,10 +177,10 @@ describe("EvidenceDrawer", () => {
   });
 
   it("says a photo was taken in a different building, on the stricter bar", () => {
-    render(<EvidenceDrawer file={EVIDENCE_STUB_B} onClose={() => {}} reduced />);
+    render(<EvidenceDrawer file={EVIDENCE_FIXTURE_B} onClose={() => {}} reduced />);
     expect(screen.getByTestId("place-line")).toHaveTextContent("Taken in a different building");
-    expect(screen.getByTestId("gauge-points")).toHaveTextContent("bar 50");
-    expect(placeLine(EVIDENCE_STUB_B.photos[0]!)).not.toMatch(/real one|for rent|available/i);
+    expect(screen.getByTestId("gauge-points-plain")).toHaveTextContent("64 of 50 needed");
+    expect(placeLine(EVIDENCE_FIXTURE_B.photos[0]!)).not.toMatch(/real one|for rent|available/i);
   });
 
   it("closes on the button and on Escape, and is static under reduced motion", () => {
@@ -193,6 +192,34 @@ describe("EvidenceDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.keyDown(drawer, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("leads with the real images when our server gave them, and can switch to the drawing", () => {
+    const img = "data:image/png;base64,AA==";
+    const { container } = render(
+      <EvidenceDrawer
+        file={file}
+        alias="P1"
+        onClose={() => {}}
+        reduced
+        images={{ P1: { ad: img, scan: img } }}
+      />,
+    );
+    const real = within(screen.getByTestId("view-toggle")).getByRole("button", { name: "Real" });
+    expect(real).toHaveAttribute("aria-pressed", "true");
+    expect(container.querySelectorAll("svg image")).toHaveLength(2);
+    expect(screen.getAllByTestId("match-pair")).toHaveLength(48);
+    expect(screen.queryByText(/stand-in drawing/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Drawing" }));
+    expect(container.querySelectorAll("svg image")).toHaveLength(0);
+    expect(screen.getByTestId("view-note")).toHaveTextContent("Drawn stand-in");
+    // A photo with no real image falls back to the drawing, labelled, with Real switched off.
+    fireEvent.click(screen.getByRole("tab", { name: /P2/ }));
+    expect(screen.getByRole("button", { name: "Real" })).toBeDisabled();
+    expect(screen.getByTestId("view-note")).toHaveTextContent(
+      "Drawn stand-in: no real image is here for this photo.",
+    );
+    expect(screen.getAllByText(/stand-in drawing/)).toHaveLength(2);
   });
 
   it("has an empty state when no photo was measured", () => {

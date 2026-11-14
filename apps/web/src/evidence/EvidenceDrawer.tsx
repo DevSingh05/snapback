@@ -7,6 +7,7 @@ import "./evidence.css";
 import { MatchLines } from "./MatchLines";
 import { CHIP_LABEL, chipState, placeLine, searchLine } from "./read";
 import type { Calibration, EvidenceFile } from "./types";
+import { ViewToggle, type ViewChoice } from "./ViewToggle";
 
 export const RENDER_NOTE = "Photos: renders made from the scan";
 export const LABEL_NOTE = "Matterport's label, can be wrong";
@@ -39,6 +40,11 @@ export function EvidenceDrawer({
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   const photo = file.photos.find((p) => p.alias === open);
+  // Real images lead whenever our server gave them; the drawing is the labelled fallback.
+  const [view, setView] = useState<ViewChoice>("real");
+  const real = photo ? images?.[photo.alias] : undefined;
+  const hasReal = Boolean(real?.ad && real?.scan);
+  const showReal = hasReal && view === "real";
 
   return (
     <section
@@ -84,11 +90,26 @@ export function EvidenceDrawer({
             })}
           </div>
           <div className="ev-body" role="tabpanel" aria-label={`Photo ${photo.alias}`}>
+            <div className="ev-view">
+              <ViewToggle
+                value={showReal ? "real" : "drawing"}
+                onChange={setView}
+                hasReal={hasReal}
+                label="Real images or the drawing"
+              />
+              <p className="ev-view-note" data-testid="view-note">
+                {showReal
+                  ? "The ad's own photo beside the view of the scan it matched."
+                  : hasReal
+                    ? "Drawn stand-in. Switch to Real for the ad's photo and the scan view."
+                    : "Drawn stand-in: no real image is here for this photo."}
+              </p>
+            </div>
             <MatchLines
-              key={`${photo.alias}-${stacked ? "s" : "w"}`}
+              key={`${photo.alias}-${stacked ? "s" : "w"}-${showReal ? "r" : "d"}`}
               photo={photo}
-              adSrc={images?.[photo.alias]?.ad}
-              scanSrc={images?.[photo.alias]?.scan}
+              adSrc={showReal ? real?.ad : null}
+              scanSrc={showReal ? real?.scan : null}
               reduced={reduced}
               stacked={stacked}
             />

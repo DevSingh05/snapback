@@ -61,6 +61,8 @@ export interface Gauge {
   pass: boolean;
   valueText: string;
   barText: string;
+  /** The gauge in plain words, e.g. "24 of 30 needed". */
+  plain: string;
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -86,6 +88,9 @@ function gauge(
     pass: lowerIsBetter ? value < bar : value >= bar,
     valueText,
     barText,
+    plain: lowerIsBetter
+      ? `${valueText}, must stay under ${num(bar)}x`
+      : `${valueText} of ${num(bar)} needed`,
   };
 }
 

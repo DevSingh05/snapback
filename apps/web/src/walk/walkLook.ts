@@ -1,24 +1,24 @@
-// What the walk screens draw beyond the tour plan: the evidence file, the trace events, the
-// coverage line and (case b) the two-buildings mismatch. In a live walk these come from the API
-// (E3 routes, the trace stream, W1 coverage, X1 walk mode) and this file passes them through.
-// In FIXTURE mode, until those land, it reads the local stubs so the screens can be seen.
-import type { TourPlan, TourStop, TraceEvent, WalkCoverage } from "../contracts";
-import { EVIDENCE_STUB_A, EVIDENCE_STUB_B } from "../evidence/evidenceStub";
+// What the walk screens draw beyond the tour plan: the evidence file, its real images, the
+// trace events and (copied-ad case) the two-buildings view. A live case passes its own data
+// through (walk/useWalkLive). In FIXTURE mode the evidence is the E0 fixture and the rail reads
+// a local stub until the recorded runs land.
+import type { TourPlan, TourStop, TraceEvent } from "../contracts";
+import { EVIDENCE_FIXTURE_A, EVIDENCE_FIXTURE_B } from "../evidence/fixture";
 import type { EvidenceFile, EvidencePhoto } from "../evidence/types";
 import { RAIL_STUB_A, RAIL_STUB_B } from "./railStub";
+import type { EvidenceImages, WalkLive } from "./useWalkLive";
 
 export interface Mismatch {
   officeLine: string;
   officeName: string | null;
-  namedCapturedOn: string | null;
-  picturedCapturedOn: string | null;
-  banner: string;
+  /** Shown only when the plan itself does not already say which building this walk is in. */
+  banner: string | null;
 }
 
 export interface WalkLook {
   evidence: EvidenceFile | null;
+  images: EvidenceImages;
   events: TraceEvent[];
-  coverage: WalkCoverage | null;
   mismatch: Mismatch | null;
 }
 
@@ -35,10 +35,10 @@ const same = (a?: string | null, b?: string | null) =>
 const isPlaced = (p: EvidencePhoto) =>
   (p.status === "located_in_claimed" || p.status === "located_elsewhere") && !p.bar_failed;
 
-/** The placed ad photo that belongs to a stop: by the walk's own stop alias (W1), else by the
- *  room label both files carry. */
+/** The evidence row of the ad photo the plan placed at this stop: by the walk's own stop alias
+ *  (W1), else by the room label both files carry. Null when the plan placed no photo here. */
 export function photoAt(stop: TourStop, evidence: EvidenceFile | null): EvidencePhoto | null {
-  if (!evidence || (stop.kind !== "room" && stop.kind !== "stop")) return null;
+  if (!evidence || stop.photos.length === 0) return null;
   const placed = evidence.photos.filter(isPlaced);
   return (
     placed.find((p) => p.stop_alias === stop.key) ??
@@ -47,60 +47,28 @@ export function photoAt(stop: TourStop, evidence: EvidenceFile | null): Evidence
   );
 }
 
-/** Whether the ad showed this room. The plan's own field wins; "unknown" stays unknown unless
- *  an evidence file is there to answer it. */
-export function adViewOf(
-  stop: TourStop,
-  evidence: EvidenceFile | null,
-  mismatch: boolean,
-): TourStop["ad_view"] {
-  if (stop.ad_view !== "unknown") return stop.ad_view;
-  if (stop.photos.length > 0) return "placed";
-  if (!evidence || stop.kind !== "room") return "unknown";
-  if (photoAt(stop, evidence)) return "placed";
-  // In the walk through the pictured building, rooms without a photo are not counted against
-  // the home the ad names.
-  return mismatch ? "unknown" : "none_placed";
-}
-
-function coverageOf(plan: TourPlan, evidence: EvidenceFile): WalkCoverage {
-  const rooms = plan.stops.filter((s) => s.kind === "room");
-  const shown = rooms.filter((s) => adViewOf(s, evidence, false) === "placed").length;
-  const count = (status: EvidencePhoto["status"]) =>
-    evidence.photos.filter((p) => p.status === status).length;
-  return {
-    counted: "rooms",
-    total: rooms.length,
-    with_photo: shown,
-    placed: count("located_in_claimed"),
-    elsewhere: count("located_elsewhere"),
-    unplaced: count("not_located"),
-    line: `The ad showed ${shown} of the ${rooms.length} rooms in this scan.`,
-  };
-}
-
-/** `search` is the page's query string. In FIXTURE mode `?case=b` shows the copied-ad case. */
-export function walkLook(plan: TourPlan, search: string): WalkLook {
+/** `search` is the page's query string. In FIXTURE mode `?demo=b` shows the copied-ad case. */
+export function walkLook(plan: TourPlan, search: string, live?: WalkLive | null): WalkLook {
+  const elsewhere = plan.mode === "elsewhere";
   if (plan.source !== "fixture")
-    return { evidence: null, events: [], coverage: plan.coverage ?? null, mismatch: null };
-  const caseB = new URLSearchParams(search).get("case") === "b";
-  if (caseB)
     return {
-      evidence: EVIDENCE_STUB_B,
-      events: RAIL_STUB_B,
-      coverage: null,
-      mismatch: {
-        officeLine: OFFICE_LINE,
-        officeName: "Fixture Leasing Office",
-        namedCapturedOn: plan.aerial?.captured_on ?? null,
-        picturedCapturedOn: plan.aerial?.captured_on ?? null,
-        banner: MISMATCH_BANNER,
-      },
+      evidence: live?.evidence ?? null,
+      images: live?.images ?? {},
+      events: live?.events ?? [],
+      // The office line and name come from the card (X1-card, lane A); not wired yet.
+      mismatch: elsewhere ? { officeLine: OFFICE_LINE, officeName: null, banner: null } : null,
     };
-  return {
-    evidence: EVIDENCE_STUB_A,
-    events: RAIL_STUB_A,
-    coverage: plan.coverage ?? coverageOf(plan, EVIDENCE_STUB_A),
-    mismatch: null,
-  };
+  const caseB = elsewhere || new URLSearchParams(search).get("demo") === "b";
+  return caseB
+    ? {
+        evidence: EVIDENCE_FIXTURE_B,
+        images: {},
+        events: RAIL_STUB_B,
+        mismatch: {
+          officeLine: OFFICE_LINE,
+          officeName: "Fixture Leasing Office",
+          banner: elsewhere ? null : MISMATCH_BANNER,
+        },
+      }
+    : { evidence: EVIDENCE_FIXTURE_A, images: {}, events: RAIL_STUB_A, mismatch: null };
 }

@@ -33,11 +33,10 @@ export function BarGauges({ photo, bars, thresholdsVersion }: Props) {
               <span className="bg-fill" />
               <span className="bg-mark" />
             </span>
-            <span className="bg-value mono">{g.valueText}</span>
-            <span className="bg-bar mono">
-              {g.barText}
-              <span className="bg-verdict">{g.pass ? " · met" : " · not met"}</span>
+            <span className="bg-plain" data-testid={`gauge-${g.key}-plain`}>
+              {g.plain}
             </span>
+            <span className="bg-verdict">{g.pass ? "Met" : "Short of the bar"}</span>
           </li>
         ))}
       </ul>

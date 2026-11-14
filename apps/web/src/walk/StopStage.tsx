@@ -68,7 +68,11 @@ const FURNITURE: Record<RoomKind, Box[]> = {
     { x: 196, y: 0, w: 84, d: 30, h: 62, tone: "pale" },
     { x: 0, y: 200, w: 30, d: 60, h: 36, tone: "slate" },
   ],
-  plain: [{ x: 120, y: 0, w: 110, d: 40, h: 50, tone: "pale" }],
+  plain: [
+    { x: 110, y: 0, w: 130, d: 40, h: 50, tone: "slate" },
+    { x: 0, y: 150, w: 36, d: 90, h: 44, tone: "pale" },
+    { x: 150, y: 150, w: 70, d: 50, h: 24, tone: "white" },
+  ],
 };
 
 const RUG: Partial<Record<RoomKind, [number, number, number, number]>> = {
@@ -76,6 +80,7 @@ const RUG: Partial<Record<RoomKind, [number, number, number, number]>> = {
   bedroom: [40, 196, 210, 70],
   bathroom: [96, 70, 96, 60],
   entry: [80, 60, 120, 80],
+  plain: [110, 120, 150, 110],
 };
 
 function Room({ kind, cone }: { kind: RoomKind; cone: boolean }) {
@@ -197,11 +202,20 @@ interface Props {
   reduced: boolean;
   /** The evidence alias of the ad photo placed at this stop, if one was. */
   photoAlias?: string | null;
+  /** False hides the landed photo, to look at the room behind it. */
+  photoShown?: boolean;
   /** True when the ad showed no photo of this room. */
   unshown?: boolean;
 }
 
-export function StopStage({ stop, plan, reduced, photoAlias, unshown = false }: Props) {
+export function StopStage({
+  stop,
+  plan,
+  reduced,
+  photoAlias,
+  photoShown = true,
+  unshown = false,
+}: Props) {
   const outside = stop.kind === "arrive" || stop.kind === "outro";
   return (
     <div
@@ -223,6 +237,7 @@ export function StopStage({ stop, plan, reduced, photoAlias, unshown = false }: 
         </div>
       ) : (
         <svg className="rs-svg" viewBox="0 0 800 520" aria-hidden="true" focusable="false">
+          <ellipse className="rs-shadow" cx={400} cy={438} rx={250} ry={46} />
           <g className="rs-sway">
             <polygon
               className="rs-ground"
@@ -235,12 +250,16 @@ export function StopStage({ stop, plan, reduced, photoAlias, unshown = false }: 
               )}
             />
             <Room kind={roomKind(stop)} cone={Boolean(photoAlias)} />
-            {photoAlias && <LandedPhoto alias={photoAlias} fly={!reduced} />}
+            {photoAlias && photoShown && <LandedPhoto alias={photoAlias} fly={!reduced} />}
             {!photoAlias && unshown && <MissingFrame />}
           </g>
         </svg>
       )}
-      <span className="rs-standin mono">Drawn stand-in (fixture)</span>
+      <span className="rs-standin mono">
+        {plan.source === "fixture"
+          ? "Drawn stand-in (fixture)"
+          : "Drawn stand-in. Not this home's real layout."}
+      </span>
     </div>
   );
 }

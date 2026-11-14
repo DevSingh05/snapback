@@ -203,7 +203,7 @@
   stroke: none;
 }
 
-/* Gauges */
+/* Gauges: a solid fill against the bar. Teal when the bar is met, muted when it is short. */
 .bg {
   display: flex;
   flex-direction: column;
@@ -215,13 +215,13 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .bg-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px 12px;
-  align-items: center;
+  gap: 5px 12px;
+  align-items: baseline;
 }
 .bg-label {
   grid-column: 1;
@@ -229,12 +229,15 @@
   font-weight: 700;
   font-size: 0.95rem;
 }
-.bg-value {
+.bg-verdict {
   grid-column: 2;
   grid-row: 1;
-  font-size: 1.05rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  text-align: right;
+  color: var(--act);
+}
+.bg-row[data-pass="false"] .bg-verdict {
+  color: var(--muted);
 }
 .bg-track {
   position: relative;
@@ -250,11 +253,7 @@
   transform-origin: left;
 }
 .bg-row[data-pass="false"] .bg-fill {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--unchecked) 0 4px,
-    var(--unchecked-soft) 4px 8px
-  );
+  background: var(--muted);
 }
 .bg-mark {
   position: absolute;
@@ -264,18 +263,57 @@
   width: 3px;
   background: var(--ink);
 }
-.bg-bar {
+.bg-plain {
   grid-column: 1 / -1;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.bg-row[data-pass="false"] .bg-verdict {
-  color: var(--ink);
-  font-weight: 700;
+  font-size: 0.95rem;
 }
 .bg-source {
   margin: 0;
   font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* The Real | Drawing switch */
+.vt {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.vt-opt {
+  min-height: 40px;
+  min-width: 56px;
+  padding: 6px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+.vt-opt[aria-pressed="true"] {
+  background: var(--band);
+  color: var(--band-ink);
+}
+.vt-opt:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: default;
+}
+.ev-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.ev-view .vt {
+  box-shadow: none;
+  background: var(--paper);
+}
+.ev-view .vt-opt:not([aria-pressed="true"]) {
+  background: var(--paper);
+}
+.ev-view-note {
+  margin: 0;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 

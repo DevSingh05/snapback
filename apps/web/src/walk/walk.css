@@ -1,6 +1,158 @@
 /* The walk's own pieces: the drawn room on the stage (rs), the agent rail (ar) and the two
    aerials of the copied-ad case (ma). Colours are tokens only; every corner is sharp. */
 
+/* ---------- Two views of a stop: one fills the stage, one sits in the corner ---------- */
+.sv {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: clamp(360px, 31vw, 450px);
+}
+.sv-pane {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+  background: linear-gradient(180deg, var(--sky), var(--paper));
+}
+.sv-pane[data-role="corner"] {
+  right: 16px;
+  bottom: 16px;
+  width: max(22%, 150px);
+  height: max(22%, 96px);
+  z-index: 3;
+  outline: 2px solid var(--ink);
+  box-shadow: var(--shadow-lift);
+}
+/* In the real view, a room the ad never showed is framed in dashes. */
+.tour-stage[data-unshown] .sv-pane[data-view="real"][data-role="main"]::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  outline: 3px dashed var(--surface);
+}
+.sv-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.sv-content .tour-frame,
+.sv-content .tour-aerial {
+  min-height: 0;
+  height: 100%;
+}
+.sv-swap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  background: transparent;
+  color: inherit;
+}
+.sv-swap:active:not(:disabled) {
+  transform: none;
+}
+.sv-label {
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--surface);
+}
+.sv-switch {
+  position: absolute;
+  z-index: 4;
+  right: 14px;
+  top: 14px;
+}
+.sv-pane[data-role="corner"] .rs-standin,
+.sv-pane[data-role="corner"] .sv-still-label,
+.sv-pane[data-role="corner"] .landing-line,
+.sv-pane[data-role="corner"] .landing-note {
+  display: none;
+}
+.sv-still {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+}
+.sv-still-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.sv-still-label {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  padding: 3px 8px;
+  background: var(--glass);
+}
+@media (hover: hover) {
+  .sv-swap:hover .sv-label {
+    background: var(--act);
+    color: var(--on-act);
+  }
+}
+
+/* ---------- Listing photos from CoStar's record ---------- */
+.lp {
+  padding: 16px clamp(16px, 2.4vw, 28px) 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+.lp-title {
+  font-size: 1.2rem;
+}
+.lp-source {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.lp-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.lp-item {
+  flex: none;
+  width: clamp(160px, 22vw, 260px);
+  aspect-ratio: 4 / 3;
+  background: var(--paper);
+}
+.lp-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
 /* ---------- The stage: a cutaway room, standing in the sky ---------- */
 .rs {
   position: relative;
@@ -17,6 +169,10 @@
 }
 .rs-ground {
   fill: color-mix(in srgb, var(--surface) 46%, transparent);
+}
+.rs-shadow {
+  fill: var(--h-shade);
+  filter: blur(16px);
 }
 .rs-floor {
   fill: var(--h-path);
@@ -119,7 +275,7 @@
 .rs-standin {
   position: absolute;
   left: 14px;
-  top: 12px;
+  top: 14px;
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -130,10 +286,11 @@
 
 .rs-caption {
   position: absolute;
-  left: 20px;
-  bottom: 20px;
+  z-index: 4;
+  left: 16px;
+  bottom: 16px;
   margin: 0;
-  max-width: min(400px, calc(100% - 220px));
+  max-width: min(400px, calc(78% - 64px));
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
@@ -448,6 +605,27 @@
   .ar[data-open="true"] .ar-fold {
     display: flex;
   }
+  .sv {
+    flex: none;
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+  .sv-pane[data-role="corner"] {
+    right: 10px;
+    bottom: 10px;
+    width: 36%;
+    height: 34%;
+  }
+  .sv-switch {
+    right: 10px;
+    top: 10px;
+  }
+  .rs-standin,
+  .sv-still-label {
+    left: 10px;
+    top: 10px;
+    max-width: calc(100% - 150px);
+  }
   .rs-caption {
     position: relative;
     left: 0;
@@ -611,6 +789,29 @@
 
 /* ---------- Motion: the photo flies home, the rest settles. Off under reduced motion. ---------- */
 @media (prefers-reduced-motion: no-preference) {
+  .sv[data-motion="full"] .sv-pane {
+    transition:
+      width 0.42s var(--ease-out),
+      height 0.42s var(--ease-out),
+      right 0.42s var(--ease-out),
+      bottom 0.42s var(--ease-out);
+  }
+  .sv[data-motion="full"] .sv-pane[data-role="main"] {
+    animation: sv-main 0.42s ease-out;
+  }
+  .sv[data-motion="full"] .sv-pane[data-role="corner"] {
+    animation: sv-corner 0.42s ease-out;
+  }
+  @keyframes sv-main {
+    from {
+      opacity: 0.35;
+    }
+  }
+  @keyframes sv-corner {
+    from {
+      opacity: 0.35;
+    }
+  }
   .rs-sway {
     animation: rs-sway 6s ease-in-out infinite alternate;
   }

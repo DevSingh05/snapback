@@ -2,15 +2,17 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TourStop, TraceEvent, TraceKind } from "../contracts";
-import { EVIDENCE_STUB_A } from "../evidence/evidenceStub";
+import { EVIDENCE_FIXTURE_A } from "../evidence/fixture";
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { parseTraceEvent } from "../trace/parse";
 import { AgentRail } from "./AgentRail";
 import { MISMATCH_TITLE, MismatchAerials, NAMED_LABEL, PICTURED_LABEL } from "./MismatchAerials";
 import { railCounts, railFiles, railItems } from "./rail";
 import { RAIL_STUB_A, RAIL_STUB_B } from "./railStub";
+import { DRAWING_LABEL, REAL_LABEL, RealStill, StageViews } from "./StageViews";
 import { StageCaption, StopStage } from "./StopStage";
-import { MISMATCH_BANNER, OFFICE_LINE, adViewOf, photoAt, walkLook } from "./walkLook";
+import { ListingPhotos } from "./ListingPhotos";
+import { MISMATCH_BANNER, OFFICE_LINE, photoAt, walkLook } from "./walkLook";
 
 function ev(seq: number, kind: string, over: Partial<TraceEvent> = {}): TraceEvent {
   return {
@@ -166,7 +168,7 @@ describe("AgentRail: only what the stream delivered", () => {
       <AgentRail
         events={RAIL_STUB_A}
         source="fixture"
-        evidence={EVIDENCE_STUB_A}
+        evidence={EVIDENCE_FIXTURE_A}
         reduced={false}
         onOpenPhoto={onOpen}
       />,
@@ -236,40 +238,112 @@ describe("StopStage and StageCaption", () => {
   });
 });
 
-describe("walkLook: what the fixture walk reads", () => {
-  it("joins placed photos to rooms and counts coverage from them", () => {
+describe("walkLook: what the walk reads", () => {
+  it("FIXTURE: the E0 evidence fixture, and the placed photo joins its stop", () => {
     const look = walkLook(FIXTURE_TOUR, "");
+    expect(look.evidence?.case_id).toBe(EVIDENCE_FIXTURE_A.case_id);
+    expect(look.mismatch).toBeNull();
     expect(photoAt(stopOf("room-3"), look.evidence)?.alias).toBe("P2");
     expect(photoAt(stopOf("room-4"), look.evidence)).toBeNull();
-    expect(adViewOf(stopOf("room-4"), look.evidence, false)).toBe("none_placed");
-    expect(look.coverage?.line).toBe("The ad showed 3 of the 4 rooms in this scan.");
-    expect(look.coverage).toMatchObject({ total: 4, with_photo: 3, placed: 3, unplaced: 1 });
   });
 
-  it("uses the plan's own coverage when the walk has written one", () => {
-    const line = "The ad showed 2 of the 5 rooms in this scan.";
-    const cov = {
-      counted: "rooms",
-      total: 5,
-      with_photo: 2,
-      placed: 2,
-      elsewhere: 0,
-      unplaced: 0,
-      line,
-    } as const;
-    expect(walkLook({ ...FIXTURE_TOUR, coverage: cov }, "").coverage?.line).toBe(line);
+  it("LIVE: passes the case's own evidence, images and events through, and draws no stub", () => {
+    const livePlan = { ...FIXTURE_TOUR, source: "live" as const };
+    expect(walkLook(livePlan, "?demo=b")).toEqual({
+      evidence: null,
+      images: {},
+      events: [],
+      mismatch: null,
+    });
+    const images = { P1: { ad: "blob:a", scan: "blob:b" } };
+    const look = walkLook(livePlan, "", { evidence: EVIDENCE_FIXTURE_A, images, events: [] });
+    expect(look.images).toBe(images);
+    expect(look.evidence).toBe(EVIDENCE_FIXTURE_A);
   });
 
-  it("draws no stub over a live plan", () => {
-    const look = walkLook({ ...FIXTURE_TOUR, source: "live" }, "?case=b");
-    expect(look).toEqual({ evidence: null, events: [], coverage: null, mismatch: null });
+  it("the copied-ad case: by the plan's own mode, or ?demo=b in FIXTURE", () => {
+    expect(walkLook(FIXTURE_TOUR, "?demo=b").mismatch?.banner).toBe(MISMATCH_BANNER);
+    const elsewhere = walkLook({ ...FIXTURE_TOUR, mode: "elsewhere" }, "");
+    expect(elsewhere.mismatch?.banner).toBeNull();
+    expect(elsewhere.mismatch?.officeLine).toBe(OFFICE_LINE);
+  });
+});
+
+const IMG = "data:image/png;base64,AA==";
+
+describe("StageViews: 3D and Real, one large and one in the corner", () => {
+  const drawing = <div data-testid="the-drawing">drawing</div>;
+  const real = <div data-testid="the-real">real</div>;
+
+  it("Real fills the stage when a real view exists; the drawing sits in the corner, labelled", () => {
+    render(<StageViews real={real} drawing={drawing} reduced={false} />);
+    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "real");
+    expect(screen.getByTestId("view-real")).toHaveAttribute("data-role", "main");
+    expect(screen.getByTestId("view-drawing")).toHaveAttribute("data-role", "corner");
+    expect(screen.getByTestId("view-swap")).toHaveTextContent(DRAWING_LABEL);
   });
 
-  it("case b: no coverage count for the home the ad names, and no room is marked unshown", () => {
-    const look = walkLook(FIXTURE_TOUR, "?case=b");
-    expect(look.coverage).toBeNull();
-    expect(look.mismatch?.banner).toBe(MISMATCH_BANNER);
-    expect(adViewOf(stopOf("room-4"), look.evidence, true)).toBe("unknown");
+  it("tapping the corner window swaps the two, and both stay mounted", () => {
+    render(<StageViews real={real} drawing={drawing} reduced={false} />);
+    const realNode = screen.getByTestId("the-real");
+    fireEvent.click(screen.getByTestId("view-swap"));
+    expect(screen.getByTestId("view-drawing")).toHaveAttribute("data-role", "main");
+    expect(screen.getByTestId("view-swap")).toHaveTextContent(REAL_LABEL);
+    expect(screen.getByTestId("the-real")).toBe(realNode);
+    fireEvent.click(screen.getByTestId("view-swap"));
+    expect(screen.getByTestId("view-real")).toHaveAttribute("data-role", "main");
+  });
+
+  it("the 3D | Real switch does the same", () => {
+    render(<StageViews real={real} drawing={drawing} reduced={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "drawing");
+    expect(screen.getByRole("button", { name: "3D" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Real" }));
+    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "real");
+  });
+
+  it("with no real view the drawing fills the stage, Real is off and there is no corner", () => {
+    render(<StageViews real={null} drawing={drawing} reduced={false} />);
+    expect(screen.getByTestId("view-drawing")).toHaveAttribute("data-role", "main");
+    expect(screen.queryByTestId("view-real")).toBeNull();
+    expect(screen.queryByTestId("view-swap")).toBeNull();
+    expect(screen.getByRole("button", { name: "Real" })).toBeDisabled();
+  });
+
+  it("is instant under reduced motion", () => {
+    render(<StageViews real={real} drawing={drawing} reduced />);
+    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-motion", "reduced");
+  });
+
+  it("a real still says what it is", () => {
+    render(<RealStill src={IMG} label="Scan view: a render made from the scan" alt="scan" />);
+    expect(screen.getByTestId("real-still")).toHaveTextContent("a render made from the scan");
+    expect(screen.getByRole("img", { name: "scan" })).toHaveAttribute("src", IMG);
+  });
+});
+
+describe("ListingPhotos", () => {
+  it("shows the record's photos with their source and as-of line", () => {
+    render(
+      <ListingPhotos
+        photos={[
+          { src: IMG, alt: "Listing photo 1" },
+          { src: IMG, alt: "Listing photo 2" },
+        ]}
+        site="Homes.com"
+        asOf="as of CoStar's last research"
+      />,
+    );
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+    expect(screen.getByTestId("listing-source")).toHaveTextContent(
+      "Homes.com, on CoStar's record · as of CoStar's last research",
+    );
+  });
+
+  it("draws nothing when the record gives no photos", () => {
+    const { container } = render(<ListingPhotos photos={[]} site="Homes.com" asOf="x" />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
