@@ -51,6 +51,37 @@ const withLine = (kind: CardRowKind, line: CardLine): Card => ({
   rows: card.rows.map((r) => (r.kind === kind ? { ...r, lines: [...r.lines, line] } : r)),
 });
 
+describe("ad vs record row", () => {
+  const said =
+    "Not confirmed. The ad says hardwood floors. CoStar's photos of this home are labelled carpet (as of CoStar's last research).";
+  const claims: Card = {
+    ...card,
+    rows: [
+      ...card.rows,
+      { kind: "claims", lines: [{ label: "Ad vs record", text: said, tone: "not_shown" }] },
+    ],
+  };
+
+  it("draws the fourth row under its own title, with the line as given and the Not confirmed word", () => {
+    render(<CardView card={claims} variant="result" />);
+    expect(screen.getByText("WHAT THE AD CLAIMS")).toBeInTheDocument();
+    const tr = screen.getByText(said).closest("tr");
+    expect(tr).toHaveTextContent("Ad vs record");
+    expect(tr).toHaveTextContent("Not confirmed");
+    expect(tr).not.toHaveTextContent("Doesn't match");
+  });
+
+  it("a card without the row shows no such title", () => {
+    render(<CardView card={card} variant="result" />);
+    expect(screen.queryByText("WHAT THE AD CLAIMS")).toBeNull();
+  });
+
+  it("the row does not change the headline", () => {
+    render(<CardView card={claims} variant="result" />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Hold off for now");
+  });
+});
+
 describe("API lines render as given", () => {
   it("a recently_rented info line keeps its API tone and text, never Doesn't match", () => {
     const text = "Rented on Oct 4 per Homes.com, the lease may have been taken.";

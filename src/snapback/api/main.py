@@ -91,6 +91,8 @@ from snapback.office.models import (
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
 from snapback.preferences import merge as merge_preferences
+from snapback.replays import SLUG as REPLAY_SLUG
+from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
 from snapback.search import AmbiguousPlace, NoOfficeOnRecord, draft_tour_request, place_for
 from snapback.settings import Settings, get_settings
@@ -240,6 +242,20 @@ def create_app(
             raise HTTPException(status_code=404, detail="No case with that id.")
         return case
 
+    @app.get("/replays")
+    def replays() -> list[Replay]:
+        """Every replay of a reported case, read-only, from demo/replays. No case data."""
+        return load_replays()
+
+    @app.get("/replays/{slug}")
+    def replay(slug: str) -> Replay:
+        found = None
+        if REPLAY_SLUG.match(slug):
+            found = next((r for r in load_replays() if r.slug == slug), None)
+        if found is None:
+            raise HTTPException(status_code=404, detail="No replay with that name.")
+        return found
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         """Liveness plus the active data source, so every client can show LIVE or FIXTURE."""
@@ -291,7 +307,12 @@ def create_app(
             )
 
     def start_case(
-        text: str, link: str, photos: list[UploadFile], property_id: str | None, owner: str
+        text: str,
+        link: str,
+        photos: list[UploadFile],
+        property_id: str | None,
+        owner: str,
+        demo_case: str | None = None,
     ) -> SessionCase:
         if property_id is not None and not PROPERTY_ID.fullmatch(property_id):
             raise HTTPException(status_code=422, detail="That is not one of our building ids.")
@@ -312,7 +333,9 @@ def create_app(
         try:
             listing = read_listing(listing_text, images)
             listing_photos = [images[index] for index in listing.photo_indexes]
-            case = store.create(listing, property_id, register, photos=listing_photos)
+            case = store.create(
+                listing, property_id, register, photos=listing_photos, demo_case=demo_case
+            )
             case.owner = owner if registry is not None else None
             return case
         except NotRegistered:
@@ -341,6 +364,7 @@ def create_app(
                                 "text": {"type": "string"},
                                 "renter_id": {"type": "string"},
                                 "property_id": {"type": "string"},
+                                "demo_case": {"type": "string"},
                                 "photos": {
                                     "type": "array",
                                     "items": {"type": "string", "format": "binary"},
@@ -367,7 +391,16 @@ def create_app(
                 str(form.get(name) or "") for name in ("text", "link", "renter_id")
             )
             property_id = str(form.get("property_id") or "").strip() or None
+            # "Run this case" on a replay page: only the case id of a served replay is accepted.
+            demo_case = str(form.get("demo_case") or "").strip() or None
+            if demo_case and demo_case not in {r.case_id for r in load_replays()}:
+                raise HTTPException(status_code=422, detail="That is not a replay case.")
             photos = [item for item in form.getlist("photos") if isinstance(item, UploadFile)]
+            if demo_case and (text.strip() or link.strip() or photos or property_id):
+                # A replay's case runs its own staged listing and nothing the caller adds.
+                raise HTTPException(
+                    status_code=422, detail="A replay case takes no listing, link or photos."
+                )
             if renter_id and not RENTER_ID.fullmatch(renter_id):
                 raise HTTPException(status_code=422, detail="That is not a renter id.")
 
@@ -392,7 +425,9 @@ def create_app(
                 per_client.release(client)
                 raise HTTPException(status_code=429, detail=limit_reached)
             try:
-                case = await run_in_threadpool(start_case, text, link, photos, property_id, owner)
+                case = await run_in_threadpool(
+                    start_case, text, link, photos, property_id, owner, demo_case
+                )
             except BaseException:
                 per_client.release(client)
                 per_address.release(address)

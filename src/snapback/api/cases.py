@@ -197,6 +197,7 @@ class SessionCase:
         self._listing = listing
         self._runner = runner
         self.staged = False  # made from a staged demo case (fixtures/demo)
+        self.demo_case_id: str | None = None  # which one, so a replay can name its source
         # What the renter rejected in this case ("no walk-ups", a place), code-defined keys only.
         self.preferences = CasePreferences()
         self.property_id: str | None = None  # our id for the building the listing claims
@@ -235,7 +236,7 @@ class SessionCase:
             lang=lang,
         )
         # A card made from a staged demo case says so on the card itself.
-        return staged(card) if self.staged else card
+        return staged(card, self.demo_case_id) if self.staged else card
 
     def status(self, with_challenge: bool = False) -> CaseStatus:
         """Where the case stands. The drafted challenge is left out unless asked for."""
@@ -430,9 +431,11 @@ class CaseStore:
         register: Callable[[str], None] | None = None,
         *,
         photos: list[bytes] | None = None,
+        demo_case: str | None = None,
     ) -> SessionCase:
         """Start a check. `property_id` is our id for the building the listing claims, and
-        `photos` are the listing photos as sent, in order.
+        `photos` are the listing photos as sent, in order. `demo_case` names one staged case
+        (a replay's) for this request alone; without it the server's DEMO_CASE setting applies.
 
         `register` is told the new case's id before anything runs. If it raises, there is no
         case: a check that could not be recorded for later deletion is not started.
@@ -454,22 +457,30 @@ class CaseStore:
             if record is None:
                 raise UnknownProperty
 
-        demo = load_demo_case(self._settings.demo_case) if self._settings.demo_case else None
+        demo_id = demo_case or self._settings.demo_case
+        demo = load_demo_case(demo_id) if demo_id else None
         if demo is not None and not listing.text:
             # A staged case (fixtures/demo). With nothing pasted, its own listing is read.
             own = read_listing(demo.listing_text)
             listing = own.model_copy(
                 update={"photos": listing.photos, "screenshots": listing.screenshots}
             )
-        for_sale = self._lookups.for_sale(listing.text) if listing.text else None
-        # D10: only a live run calls the licence list, and a lookup that breaks is "not
-        # looked up". It reads the poster's own claim in the text and keeps no name.
-        license = license_of(self._lookups, listing.text)
-        # D12: the owner of record of the home the listing claims, when lane D holds one.
-        owner = owner_of(self._lookups, listing.text)
+        # A case asked for by name (a replay's "Run this case") always runs on its own
+        # fixtures, on any server: it is a staged example, so it is never a LIVE card and
+        # calls no lookup.
+        asked_by_name = demo_case is not None
+        for_sale = license = owner = None
+        if not asked_by_name:
+            for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+            # D10: only a live run calls the licence list, and a lookup that breaks is "not
+            # looked up". It reads the poster's own claim in the text and keeps no name.
+            license = license_of(self._lookups, listing.text)
+            # D12: the owner of record of the home the listing claims, when lane D holds one.
+            owner = owner_of(self._lookups, listing.text)
 
-        live = self._settings.snapback_data_source is DataSource.LIVE or (
-            record is not None and record.source is DataSource.LIVE
+        live = not asked_by_name and (
+            self._settings.snapback_data_source is DataSource.LIVE
+            or (record is not None and record.source is DataSource.LIVE)
         )
         source = DataSource.LIVE if live else DataSource.FIXTURE
 
@@ -515,6 +526,7 @@ class CaseStore:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner, self._zone_of(record))
             case.staged = demo is not None
+            case.demo_case_id = demo.case_id if demo is not None else None
             case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()

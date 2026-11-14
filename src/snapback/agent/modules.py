@@ -7,15 +7,20 @@ shared fixtures in `fixtures/contracts/`, so the agent runs end to end today.
 
 import secrets
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Protocol
 
 from snapback.adapters import trec
+from snapback.adapters.vexcel import known_capture
+from snapback.agent.intake.claims import extract_claims
 from snapback.agent.rules import check_price
+from snapback.agent.rules.ad_vs_record import compare_ad_to_record
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, Claims, check_authority
 from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
+    AdNote,
     AuthorityResult,
     ChallengeResult,
     DataSource,
@@ -133,6 +138,7 @@ class FixtureModules:
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
+        today: date | None = None,
     ) -> None:
         self.evidence = ModuleEvidence.model_validate_json(
             (fixtures_dir / evidence_file).read_text()
@@ -167,6 +173,7 @@ class FixtureModules:
         )
         self._recapture_clears_after = recapture_clears_after
         self._spots_available = spots_available
+        self._today = today  # ad vs record: what "the last 12 months" is counted from
 
     def listing_scope(self, case_id: str) -> ListingScope:
         return self._listing_scope
@@ -216,6 +223,17 @@ class FixtureModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license if self._license is not None else self.evidence.license
+
+    def ad_notes(self, case_id: str) -> list[AdNote]:
+        """Ad vs record: the ad's claims against this fixture's record. No ad text, no notes."""
+        if not self._ad_text:
+            return []
+        return compare_ad_to_record(
+            extract_claims(self._ad_text),
+            self.record,
+            self._today,
+            aerial_on=known_capture(self.record, DataSource.FIXTURE),
+        )
 
     def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
         """The license lookup by a number the renter gave (A24 stretch)."""

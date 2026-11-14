@@ -10,7 +10,12 @@ import { replayForCase } from "../replay";
 import { STATE_WORD, historySteps, shortDate, toneWord } from "../cardStrings";
 import type { Card, CardLine, CardRowKind, CardTone, VerdictState } from "../contracts";
 
-const ROW_LABEL = { place: "PLACE", person: "PERSON", price: "PRICE" } as const;
+const ROW_LABEL = {
+  place: "PLACE",
+  person: "PERSON",
+  price: "PRICE",
+  claims: "WHAT THE AD CLAIMS",
+} as const;
 
 const STATE_TONE: Record<VerdictState, string> = {
   hold: "amber",

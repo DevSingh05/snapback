@@ -16,14 +16,18 @@ import threading
 from pathlib import Path
 from typing import Protocol
 
+from snapback.adapters.vexcel import known_capture
 from snapback.agent.intake import Listing
+from snapback.agent.intake.claims import extract_claims
 from snapback.agent.locate_live import LiveLocate, LiveOutcome
 from snapback.agent.modules import ChallengeOutcome, FixtureModules
 from snapback.agent.rules import check_price
+from snapback.agent.rules.ad_vs_record import compare_ad_to_record
 from snapback.agent.rules.contact import check_authority
 from snapback.agent.rules.owner import check_owner
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
+    AdNote,
     AuthorityResult,
     DataSource,
     FloorPlanCandidate,
@@ -295,6 +299,18 @@ class JoinedModules:
 
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license
+
+    def ad_notes(self, case_id: str) -> list[AdNote]:
+        """Ad vs record: the ad's claims against the home's record. No record, no notes."""
+        self._identify(case_id)
+        record = self._record
+        aerial_on = None
+        if record is not None:
+            try:  # the date of a tile already held; never a network call
+                aerial_on = known_capture(record, self._record_source or DataSource.LIVE)
+            except Exception as error:
+                log.warning("aerial date not read (%s)", type(error).__name__)
+        return compare_ad_to_record(extract_claims(self._listing.text), record, aerial_on=aerial_on)
 
     def license_by_number(self, case_id: str, number: str) -> LicenseResult | None:
         """D10 again, with the number the renter gave (A24 stretch): the number goes straight to
