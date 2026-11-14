@@ -47,16 +47,20 @@ export function openReplayTrace(
   };
 }
 
-// GET {base}/cases/{id}/trace as SSE. EventSource reconnects by itself; repeats after a
+// GET {base}/cases/{id}/trace[?token=] as SSE. EventSource reconnects by itself; repeats after a
 // reconnect are dropped by mergeEvent. The stream closes after the verdict line.
 export function openLiveTrace(
   base: string,
   caseId: string,
   onEvent: OnEvent,
   onStatus: OnStatus,
+  token?: string | null,
 ): () => void {
-  const url = `${base.replace(/\/$/, "")}/cases/${encodeURIComponent(caseId)}/trace`;
-  const es = new EventSource(url);
+  // EventSource cannot set an Authorization header, so the trace route takes the read-only
+  // `read_token` as ?token=. The write token is refused in a query. A fixture case needs none.
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  const url = `${base.replace(/\/$/, "")}/cases/${encodeURIComponent(caseId)}/trace${query}`;
+  const es = new EventSource(url, { withCredentials: true });
   onStatus("connecting");
   es.addEventListener("open", () => onStatus("live"));
   es.addEventListener("trace", (msg) => {
