@@ -43,10 +43,38 @@ def _subset(tmp_path: Path) -> Path:
     return out
 
 
-def test_a_company_owner_is_returned_by_name(tmp_path):
+def test_a_company_we_do_not_know_is_sent_with_no_name(tmp_path):
+    # round 5 on #160: only a company we already know is named; any other is "a company owner"
     result = owner("2 bed at 100 Fixture Ln, Houston", _subset(tmp_path), salt="fx-salt")
     assert result is not None and result.kind is OwnerKind.COMPANY
-    assert result.company == "FXAMPLE HOMES LLC"
+    assert (result.company, result.company_known) == (None, False)
+    assert "FXAMPLE" not in result.model_dump_json().upper()
+
+
+def test_a_company_in_the_published_rule_table_is_named_by_the_table(tmp_path, monkeypatch):
+    from datetime import date
+
+    from snapback.agent.rules import published
+
+    row = published.PublishedRuleRow(
+        company="Fxample Homes",
+        rule="we only take applications on fxample.example",
+        source_url="https://fxample.example/fraud",
+        checked_on=date(2026, 11, 14),
+    )
+    monkeypatch.setattr(published, "PUBLISHED_RULES", (row,))
+    result = owner("2 bed at 100 Fixture Ln", _subset(tmp_path), salt="fx-salt")
+    # the table's own name, never the county roll's string
+    assert (result.company, result.company_known) == ("Fxample Homes", True)
+
+
+def test_a_company_that_is_an_office_on_record_in_the_kit_is_named_by_the_kit(tmp_path):
+    subset = _subset(tmp_path)
+    result = owner("2 bed at 100 Fixture Ln", subset, salt="fx-salt", known=["Fxample Homes"])
+    assert (result.company, result.company_known) == ("Fxample Homes", True)
+    # an office that only shares a later word is not the owner
+    other = owner("2 bed at 100 Fixture Ln", subset, salt="fx-salt", known=["Homes Of Fxample"])
+    assert (other.company, other.company_known) == (None, False)
 
 
 def test_a_person_owner_gives_yes_or_no_only(tmp_path):
@@ -115,7 +143,7 @@ def test_lookup_owner_reads_the_settings_data_dir(tmp_path, monkeypatch):
         get_settings.cache_clear()
 
 
-def test_a_company_without_a_name_is_never_sent(tmp_path):
+def test_a_company_without_a_name_is_a_company_owner_with_no_name(tmp_path):
     subset = tmp_path / "data" / "hcad" / "owner_subset.jsonl"
     subset.parent.mkdir(parents=True)
     import hashlib
@@ -124,7 +152,8 @@ def test_a_company_without_a_name_is_never_sent(tmp_path):
 
     key = hashlib.sha256(normalize_address("100 Fixture Ln").encode()).hexdigest()
     subset.write_text(json.dumps({"key": key, "kind": "company", "company": ""}) + "\n")
-    assert owner("100 Fixture Ln", subset, salt="fx-salt") is None
+    result = owner("100 Fixture Ln", subset, salt="fx-salt")
+    assert result.kind is OwnerKind.COMPANY and result.company is None  # "a company owner"
 
 
 def test_kit_lookups_owner_reads_the_hcad_lookup(tmp_path, monkeypatch):
@@ -140,7 +169,7 @@ def test_kit_lookups_owner_reads_the_hcad_lookup(tmp_path, monkeypatch):
         lookups = KitLookups(DataSource.LIVE)
         result = lookups.owner("2 bed at 100 Fixture Ln")
         assert result is not None and result.kind is OwnerKind.COMPANY
-        assert result.company == "FXAMPLE HOMES LLC"
+        assert (result.company, result.company_known) == (None, False)  # not one we know
         assert result.poster_says_owner is False and result.published_rule is None  # lane A's
         assert lookups.owner("5 Nowhere Road") is None
     finally:
@@ -227,6 +256,18 @@ def test_kit_lookups_owner_reads_the_hcad_lookup(tmp_path, monkeypatch):
         "FXDOE FXJON - FXCO LLC",
         "FXDOE FXJON . FXCO LLC",
         "FXDOE FXJON FXCO LLC-",
+        # round 5: exactly one word after OF, separators with no letter, more person tokens
+        "CITY OF HOUSTON FXDOE FXJON",
+        "FXDOE FXJON -- FXCO LLC",
+        "FXDOE FXJON .. FXCO LLC",
+        "FXDOE FXJON CUST FXCO LLC",
+        "FXDOE FXJON EXEC FXCO LLC",
+        "FXDOE FXJON TTEES FXCO LLC",
+        "FXDOE FXJON GDN FXCO LLC",
+        "FXDOE FXJON POA FXCO LLC",
+        "FXCO LLC UTMA FXDOE FXJON",
+        "FXCO LLC BY FXDOE FXJON",
+        "FXCO LLC WITH FXDOE FXJON",
     ],
 )
 def test_a_name_that_carries_a_person_is_a_private_owner(name):

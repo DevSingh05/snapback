@@ -12,8 +12,11 @@ It keeps only the HCAD rows whose site address is a kit Houston house, and write
 - for a private owner, keyed hashes of the name's words (HMAC with the shared phone salt), so the
   poster's name can be compared without any person's name being kept.
 
-`owner(listing_text)` returns the contract's `OwnerResult` (approved on #41): `kind`, `company`
-and `poster_matches` (yes / no / not_checked). Lane A fills the rest. None means no owner data.
+`owner(listing_text)` returns the contract's `OwnerResult` (approved on #41): `kind`, `company`,
+`company_known` and `poster_matches` (yes / no / not_checked). Lane A fills the rest. None means
+no owner data. A company is named only when it is one we already know: a row in the
+published-rule table, or an office on record in the kit, and then by that entry's own name. Any
+other company goes out with no name, and the card says "a company owner" (round 5 on #160).
 
 Column names are read from each file's header row, not assumed; `--probe` prints the header
 names only, so they can be checked on the real files before the first run.
@@ -54,7 +57,7 @@ _PERSON_TOKENS = {
     "ESTATE", "IRA", "AS", "AGENT", "JR", "SR", "II", "III", "IV", "UX", "FAMILY", "LIVING",
     "TRUST", "TR", "TRS", "TRUSTEE", "TRUSTEES", "DBA", "FOR", "ETUX", "ETVIR", "AKA", "FKA",
     "NKA", "OR", "CARE", "HEIRS", "EXECUTOR", "EXECUTRIX", "ADMINISTRATOR", "GUARDIAN",
-    "TENANT", "MGR",
+    "TENANT", "MGR", "CUST", "EXEC", "TTEES", "GDN", "POA", "UTMA", "BY", "WITH",
 }  # fmt: skip
 _ENTITY_SUFFIXES = {"LLC", "INC", "LP", "LTD", "CORP", "CO", "REIT"}
 _COMPANY_LAST_WORDS = {
@@ -96,8 +99,8 @@ def classify(owner_name: str) -> OwnerKind:
     name = owner_name.strip().upper()
     if not name or not _ALLOWED_CHARS.fullmatch(name):
         return OwnerKind.PERSON  # '&', '/', '+', ',', '%' ... join or point at another party
-    if name.endswith("-") or {"-", "."} & set(name.split()):
-        return OwnerKind.PERSON  # a lone '-' or '.' between parts, or a cut-off name
+    if name.endswith("-") or any(not re.search(r"[A-Z0-9]", part) for part in name.split()):
+        return OwnerKind.PERSON  # a separator with no letter ('-', '--', '..'), or a cut-off name
     # dotted single letters (A.N.D., E.T. A.L.) spell a joining word; only N.A. after BANK or
     # ASSOCIATION is allowed, and only at the end
     dotted = re.sub(r"\b(BANK|ASSOCIATION) N\.\s*A\.?$", r"\1", name)
@@ -110,7 +113,7 @@ def classify(owner_name: str) -> OwnerKind:
     # person tokens outrank every institution form ("STATE OF TEXAS FBO ..." is a person)
     if set(words) & _PERSON_TOKENS:
         return OwnerKind.PERSON
-    institution_of = re.fullmatch(r"(CITY|STATE|COUNTY) OF( \w+)+", joined)
+    institution_of = re.fullmatch(r"(CITY|STATE|COUNTY) OF \w+", joined)  # one word after OF
     church_of = re.fullmatch(r"\w+( \w+)* CHURCH( OF \w+)?", joined)
     if "OF" in tokens and not (institution_of or church_of):
         return OwnerKind.PERSON  # "... OF FXCO LLC": of-before-an-entity names a person
@@ -219,7 +222,32 @@ def _street_windows(text: str) -> Iterator[str]:
                     yield " ".join(words[i : i + n])
 
 
-def owner(listing_text: str, subset: Path, salt: str) -> OwnerResult | None:
+def _known_company(on_roll: str, known: Iterable[str]) -> str | None:
+    """The name of a company we already know that is the owner on the roll, or None.
+
+    Known means a row in the published-rule table (by its name or a verified other name) or a
+    name in `known` (offices and brokerages on record in the kit), matched as `same_company`
+    reads names. The known entry's own name is returned, never the roll's string, so a name
+    that only the county roll holds never leaves here (conductor ruling, round 5 on #160).
+    """
+    from snapback.agent.rules import published
+    from snapback.agent.rules.contact import same_company
+    from snapback.agent.rules.owner import published_rule
+
+    if not on_roll:
+        return None
+    row = published_rule(on_roll, published.PUBLISHED_RULES)
+    if row is not None:
+        return row.company
+    for name in list(known)[:50]:
+        if isinstance(name, str) and name.strip() and same_company(name, on_roll):
+            return " ".join(name.split())
+    return None
+
+
+def owner(
+    listing_text: str, subset: Path, salt: str, known: Iterable[str] = ()
+) -> OwnerResult | None:
     if not subset.is_file():
         return None
     text = listing_text[:_MAX_TEXT]
@@ -234,10 +262,9 @@ def owner(listing_text: str, subset: Path, salt: str) -> OwnerResult | None:
         return None  # no match, or two accounts / two kit streets: never pick one at random
     entry = found[0]
     if entry.get("kind") == OwnerKind.COMPANY.value:
-        company = (entry.get("company") or "").strip()
-        if not company:
-            return None  # a company owner is never sent without its name (A19 review)
-        return OwnerResult(kind=OwnerKind.COMPANY, company=company)
+        name = _known_company((entry.get("company") or "").strip(), known)
+        # any other company is "a company owner": its name is never sent
+        return OwnerResult(kind=OwnerKind.COMPANY, company=name, company_known=name is not None)
     name = _poster_name(text)
     if name is None or fingerprint != _salt_fingerprint(salt):
         # no name to compare, or the lookup was keyed with another salt: never a false NO
@@ -255,15 +282,16 @@ def owner(listing_text: str, subset: Path, salt: str) -> OwnerResult | None:
     return OwnerResult(kind=OwnerKind.PERSON, poster_matches=matches)
 
 
-def lookup_owner(listing_text: str) -> OwnerResult | None:
+def lookup_owner(listing_text: str, known: Iterable[str] = ()) -> OwnerResult | None:
     """The entry point lane A's `KitLookups.owner` calls: the lookup under SNAPBACK_DATA_DIR and
-    the shared phone salt (set SNAPBACK_PHONE_SALT so the lookup and the check agree)."""
+    the shared phone salt (set SNAPBACK_PHONE_SALT so the lookup and the check agree). `known`
+    is the kit's offices on record for the home, the companies besides the table we can name."""
     from snapback.agent.rules.contact import phone_salt
     from snapback.safety.paths import resolve_data_dir
     from snapback.settings import get_settings
 
     subset = resolve_data_dir(get_settings().snapback_data_dir) / SUBSET
-    return owner(listing_text, subset, phone_salt())
+    return owner(listing_text, subset, phone_salt(), known)
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -168,6 +168,10 @@ EN: dict[str, str] = {
     ),
     "owner.company_not_poster": "Not confirmed. Owner of record: {company}, not the poster.",
     "owner.company": "Not confirmed. Owner of record: {company}.",
+    "owner.company_unnamed_not_poster": (
+        "Not confirmed. Owner of record: a company owner, not the poster."
+    ),
+    "owner.company_unnamed": "Not confirmed. Owner of record: a company owner.",
     "owner.company_matches": "The company they named is the owner of record: {company}.",
     "owner.person_matches": "The owner of record is a private owner, and the name given matches.",
     "owner.person_mismatch": (
@@ -585,6 +589,10 @@ ES: dict[str, str] = {
         "Sin confirmar. Propietario registrado: {company}, no quien publica."
     ),
     "owner.company": "Sin confirmar. Propietario registrado: {company}.",
+    "owner.company_unnamed_not_poster": (
+        "Sin confirmar. Propietario registrado: una empresa, no quien publica."
+    ),
+    "owner.company_unnamed": "Sin confirmar. Propietario registrado: una empresa.",
     "owner.company_matches": "La empresa que nombró es la propietaria registrada: {company}.",
     "owner.person_matches": (
         "El propietario registrado es un particular, y el nombre dado coincide."

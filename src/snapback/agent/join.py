@@ -182,9 +182,12 @@ class KitLookups:
         # D12 (#130): the county owner roll (HCAD), filtered to the kit's Houston houses and kept
         # under data/hcad/. No lookup file, or no street match, is None: ownership not checked.
         # Lane A fills poster_says_owner and published_rule; a person's name never comes back.
+        # A company is named only when we know it: a row in the published-rule table, or an
+        # office on record in the kit for this home (ruling, round 5 on #160).
         from snapback.adapters.hcad import lookup_owner
 
-        return lookup_owner(listing_text)
+        match = self.for_sale(listing_text)
+        return lookup_owner(listing_text, getattr(match, "offices", None) or ())
 
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""

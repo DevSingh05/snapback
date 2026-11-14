@@ -358,6 +358,10 @@ class OwnerResult(BaseModel):
 
     kind: OwnerKind
     company: str | None = None  # COMPANY only. A company name, never a person's
+    # COMPANY only: the name is one we already know (a row in the published-rule table, or an
+    # office on record in the kit). `company` is set only then; any other company is shown
+    # as "a company owner", with no name (conductor ruling, round 5 on #160).
+    company_known: bool = False
     # Does what the poster calls themselves match the owner of record? Yes or no, nothing
     # more. For a person owner lane D compares inside its adapter and sends only this.
     poster_matches: OwnerMatch = OwnerMatch.NOT_CHECKED
