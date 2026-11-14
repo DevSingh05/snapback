@@ -47,16 +47,22 @@ export function openReplayTrace(
   };
 }
 
-// GET {base}/cases/{id}/trace as SSE. EventSource reconnects by itself; repeats after a
+// GET {base}/cases/{id}/trace[?token=] as SSE. EventSource reconnects by itself; repeats after a
 // reconnect are dropped by mergeEvent. The stream closes after the verdict line.
 export function openLiveTrace(
   base: string,
   caseId: string,
   onEvent: OnEvent,
   onStatus: OnStatus,
+  token?: string | null,
 ): () => void {
-  const url = `${base.replace(/\/$/, "")}/cases/${encodeURIComponent(caseId)}/trace`;
-  const es = new EventSource(url);
+  // TODO(#60): when API PR #60 merges, pass the read-only `read_token` from the create response
+  // here instead of the write token. Until then the write token rides in the query.
+  // EventSource cannot set an Authorization header, so API PR #60 takes the case secret as
+  // ?token= on the trace route. Main ignores it. A recorded fixture case has no secret.
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  const url = `${base.replace(/\/$/, "")}/cases/${encodeURIComponent(caseId)}/trace${query}`;
+  const es = new EventSource(url, { withCredentials: true });
   onStatus("connecting");
   es.addEventListener("open", () => onStatus("live"));
   es.addEventListener("trace", (msg) => {

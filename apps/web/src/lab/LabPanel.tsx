@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import "./lab.css";
+import { apiBase, apiFetch } from "../api";
 import { SourceChip } from "../components/SourceChip";
 import type { DataSource } from "../contracts";
 import {
-  CONDITION_LABEL,
+  conditionLabel,
   type CalibrationPoint,
   ResultsError,
   calibrationSeries,
@@ -80,7 +81,7 @@ function CurveChart({ bars }: { bars: ResultRow[] }) {
               className="lab-whisker"
             />
             <text x={cx} y={H - M.bottom + 16} className="lab-tick" textAnchor="middle">
-              {CONDITION_LABEL[b.condition] ?? b.condition}
+              {conditionLabel(b.condition)}
             </text>
             <text
               x={cx}
@@ -279,15 +280,16 @@ export function LabSection() {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   useEffect(() => {
     const ctrl = new AbortController();
-    const base = import.meta.env.VITE_API_URL as string | undefined;
+    const base = apiBase();
     const run = async () => {
-      if (!base) {
+      const sample = async () => {
         const mod = await import("../../../../fixtures/contracts/results_sample.csv?raw");
         return { csv: mod.default, source: "fixture" as const };
-      }
-      const res = await fetch(`${base.replace(/\/$/, "")}/eval/results.csv`, {
-        signal: ctrl.signal,
-      });
+      };
+      if (!base) return sample();
+      const res = await apiFetch("/eval/results.csv", { signal: ctrl.signal });
+      // The API does not serve results yet: show the synthetic sample, labelled FIXTURE.
+      if (res.status === 404) return sample();
       if (!res.ok) throw new Error(String(res.status));
       return { csv: await res.text(), source: "live" as const };
     };
