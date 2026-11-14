@@ -28,3 +28,42 @@ export interface Card {
   verify_url?: string | null;
   lang: string;
 }
+
+export type TraceKind = "choice" | "tool" | "status" | "hitl" | "verdict" | "error";
+export type ChoiceKind =
+  "which_checks" | "which_floor_plan" | "which_spot" | "retry_or_stop" | "ask_human";
+
+// One line of the agent trace, sent as SSE `event: trace` with this JSON as `data`.
+export interface TraceEvent {
+  case_id: string;
+  seq: number;
+  at: string;
+  kind: TraceKind;
+  choice?: ChoiceKind | null;
+  options: string[];
+  pick?: string | null;
+  reason: string;
+  source: DataSource;
+}
+
+// Mirrors Pose and the parts of LocateResult the twin reads (src/snapback/contracts.py).
+export interface Pose {
+  sweep_id?: string | null;
+  position: [number, number, number];
+  rotation_quat: [number, number, number, number]; // x, y, z, w
+  fov_deg?: number | null;
+}
+
+export interface LocatedPhoto {
+  photo_id: string;
+  status: string;
+  model_id?: string | null;
+  pano_id?: string | null;
+  inliers?: number | null;
+}
+
+export interface LocateResult {
+  case_id: string;
+  photos: LocatedPhoto[];
+  poses: Record<string, Pose>;
+}

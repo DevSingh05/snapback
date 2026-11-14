@@ -155,6 +155,91 @@ def test_matching_ignores_case():
     assert "payment.zelle_before_viewing" in fired("SEND IT BY ZELLE NOW")
 
 
+# --- review fixes: excuses that leaked, odd characters, honest sentences -------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I don't take checks, Zelle the deposit today please.",
+        "We never ask for a deposit before you tour, but send the $500 deposit by Zelle today.",
+        "Don't pay by check, pay by Zelle.",
+        "Don't send cash, only Zelle.",
+        "I don't take checks so Zelle me the deposit.",
+    ],
+)
+def test_refusing_one_thing_does_not_excuse_asking_for_another(text):
+    assert "payment.zelle_before_viewing" in fired(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Zelle the deposit today, after signing you get the keys.",
+        "After signing you get the keys, Zelle the deposit today.",
+        "Zelle me the deposit now and after the tour I will hand over the lease.",
+    ],
+)
+def test_paying_now_is_not_excused_by_something_else_happening_after_signing(text):
+    assert "payment.zelle_before_viewing" in fired(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "After signing the lease you can Zelle the deposit.",
+        "You can pay the deposit by Zelle after your tour.",
+        "Pay by Zelle after you sign the lease at our office.",
+        "The deposit can be paid by Zelle, after your tour.",
+        "Once you have toured the unit, you may send the deposit by Zelle.",
+    ],
+)
+def test_paying_after_a_viewing_or_a_signed_lease_is_still_excused(text):
+    assert "payment.zelle_before_viewing" not in fired(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "rule_id"),
+    [
+        ("I\u2019m out of the country so I can\u2019t show the apartment.", "pressure.cannot_show"),
+        ("Send a copy of your driver\u2019s license.", "data.id_before_viewing"),
+        ("Send the deposit by \uff3a\uff45\uff4c\uff4c\uff45.", "payment.zelle_before_viewing"),
+        ("Send the deposit by Zel\u200ble.", "payment.zelle_before_viewing"),
+        ("Send the deposit by Zel\u00adle.", "payment.zelle_before_viewing"),
+    ],
+    ids=[
+        "curly apostrophes",
+        "curly apostrophe in licence",
+        "fullwidth",
+        "zero width",
+        "soft hyphen",
+    ],
+)
+def test_odd_characters_do_not_hide_an_ask(text, rule_id):
+    assert rule_id in fired(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Tenants can pay rent by Venmo or Zelle.",
+        "Do not pay anyone by Zelle before a showing.",
+        "Apply at https://apply.example.com, application fee $40 paid to the management office.",
+        "Never pay by Zelle, wire transfer or gift card before you have seen the unit.",
+        "Rent is paid monthly by check, Zelle or the resident portal.",
+        "We accept Zelle, Venmo and checks for monthly rent.",
+    ],
+)
+def test_honest_sentences_raise_no_red_flag(text):
+    # A red flag holds a case below the top state, so an honest listing must not raise one.
+    assert [hit.rule_id for hit in apply_rules(text) if hit.red_flag] == []
+
+
+def test_rent_terms_do_not_excuse_an_ask_for_a_deposit_now():
+    assert "payment.zelle_before_viewing" in fired("We accept Zelle for the deposit today.")
+    assert "payment.zelle_before_viewing" in fired("Tenants pay by Zelle, so Zelle me the deposit.")
+
+
 # --- the table itself ----------------------------------------------------------------------
 
 
