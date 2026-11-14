@@ -1,0 +1,78 @@
+/* Lab panel. Tokens only (styles/tokens.css); the design pass restyles on top of this. */
+.lab-panel {
+  margin: 12px clamp(18px, 4vw, 36px) 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.lab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lab-sub,
+.lab-note {
+  color: var(--muted);
+  max-width: 68ch;
+}
+.lab-error {
+  color: var(--coral);
+}
+.lab-block h3 {
+  font-size: 1rem;
+  margin: 18px 0 8px;
+}
+.lab-scroll {
+  overflow-x: auto;
+}
+.lab-svg {
+  width: 100%;
+  min-width: 700px;
+  height: auto;
+  display: block;
+}
+.lab-svg-square {
+  min-width: 0;
+  max-width: 360px;
+}
+.lab-grid {
+  stroke: var(--line);
+}
+.lab-tick {
+  fill: var(--muted);
+  font-size: 10.5px;
+  font-family: var(--font-body);
+}
+.lab-n {
+  font-family: var(--font-mono);
+}
+.lab-axis {
+  fill: var(--ink);
+  font-size: 11px;
+  font-family: var(--font-body);
+}
+.lab-bar {
+  fill: var(--blue);
+}
+.lab-whisker {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.lab-diagonal {
+  stroke: var(--muted);
+  stroke-dasharray: 4 4;
+}
+.lab-line {
+  stroke: var(--teal);
+  stroke-width: 2;
+}
+.lab-dot {
+  fill: var(--teal);
+}
+.lab-rule {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}

@@ -1,0 +1,291 @@
+import { useEffect, useMemo, useState } from "react";
+
+import "./lab.css";
+import { SourceChip } from "../components/SourceChip";
+import type { DataSource } from "../contracts";
+import {
+  CONDITION_LABEL,
+  ResultsError,
+  calibrationPoints,
+  curveBars,
+  linearScale,
+  parseResults,
+  pct,
+  type ResultRow,
+} from "./results";
+
+const W = 760;
+const H = 290;
+const M = { top: 12, right: 16, bottom: 72, left: 52 };
+
+function ticks(max: number): number[] {
+  return [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
+}
+
+function CurveChart({ bars }: { bars: ResultRow[] }) {
+  const max = Math.min(1, Math.max(0.1, ...bars.map((b) => b.ci_high)) * 1.1);
+  const y = linearScale([0, max], [H - M.bottom, M.top]);
+  const slot = (W - M.left - M.right) / bars.length;
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      role="img"
+      aria-labelledby="curve-title"
+      className="lab-svg"
+      data-testid="curve-chart"
+    >
+      <title id="curve-title">
+        Forged-reply false-accept rate by condition, with 95% interval and n
+      </title>
+      {ticks(max).map((t) => (
+        <g key={t}>
+          <line x1={M.left} x2={W - M.right} y1={y(t)} y2={y(t)} className="lab-grid" />
+          <text x={M.left - 8} y={y(t)} className="lab-tick" textAnchor="end" dy="0.32em">
+            {pct(t)}
+          </text>
+        </g>
+      ))}
+      <text
+        transform={`translate(12 ${(M.top + H - M.bottom) / 2}) rotate(-90)`}
+        className="lab-axis"
+        textAnchor="middle"
+      >
+        False-accept rate
+      </text>
+      {bars.map((b, i) => {
+        const cx = M.left + slot * (i + 0.5);
+        const bw = Math.min(56, slot * 0.6);
+        return (
+          <g key={b.condition} data-testid="curve-bar">
+            <rect
+              x={cx - bw / 2}
+              y={y(b.rate)}
+              width={bw}
+              height={Math.max(0, H - M.bottom - y(b.rate))}
+              className="lab-bar"
+            />
+            <line x1={cx} x2={cx} y1={y(b.ci_low)} y2={y(b.ci_high)} className="lab-whisker" />
+            <line
+              x1={cx - 6}
+              x2={cx + 6}
+              y1={y(b.ci_low)}
+              y2={y(b.ci_low)}
+              className="lab-whisker"
+            />
+            <line
+              x1={cx - 6}
+              x2={cx + 6}
+              y1={y(b.ci_high)}
+              y2={y(b.ci_high)}
+              className="lab-whisker"
+            />
+            <text x={cx} y={H - M.bottom + 16} className="lab-tick" textAnchor="middle">
+              {CONDITION_LABEL[b.condition] ?? b.condition}
+            </text>
+            <text
+              x={cx}
+              y={H - M.bottom + 30}
+              className="lab-tick lab-n"
+              textAnchor="middle"
+              data-testid="bar-n"
+            >
+              {`n = ${b.n}`}
+            </text>
+            <text
+              x={cx}
+              y={H - M.bottom + 44}
+              className="lab-tick"
+              textAnchor="middle"
+              data-testid="bar-ci"
+            >
+              {`95% CI ${pct(b.ci_low)} to ${pct(b.ci_high)}`}
+            </text>
+            <text
+              x={cx}
+              y={H - M.bottom + 58}
+              className="lab-axis"
+              textAnchor="middle"
+              data-testid="bar-rate"
+            >
+              {`${pct(b.rate)} (${b.k} of ${b.n})`}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function CalibrationChart({ rows }: { rows: ResultRow[] }) {
+  const pts = calibrationPoints(rows);
+  const S = 280;
+  const m = { top: 12, right: 16, bottom: 40, left: 48 };
+  const x = linearScale([0.5, 1], [m.left, S - m.right]);
+  const y = linearScale([0, 1], [S - m.bottom, m.top]);
+  return (
+    <svg
+      viewBox={`0 0 ${S} ${S}`}
+      role="img"
+      aria-labelledby="cal-title"
+      className="lab-svg lab-svg-square"
+      data-testid="calibration-chart"
+    >
+      <title id="cal-title">
+        Reliability diagram: stated confidence against how often the place check was right
+      </title>
+      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+        <g key={t}>
+          <line x1={m.left} x2={S - m.right} y1={y(t)} y2={y(t)} className="lab-grid" />
+          <text x={m.left - 6} y={y(t)} className="lab-tick" textAnchor="end" dy="0.32em">
+            {pct(t)}
+          </text>
+        </g>
+      ))}
+      {[0.5, 0.75, 1].map((t) => (
+        <text key={t} x={x(t)} y={S - m.bottom + 14} className="lab-tick" textAnchor="middle">
+          {pct(t)}
+        </text>
+      ))}
+      <line x1={x(0.5)} y1={y(0.5)} x2={x(1)} y2={y(1)} className="lab-diagonal" />
+      <text x={(m.left + S - m.right) / 2} y={S - 6} className="lab-axis" textAnchor="middle">
+        Stated confidence
+      </text>
+      <text
+        transform={`translate(10 ${(m.top + S - m.bottom) / 2}) rotate(-90)`}
+        className="lab-axis"
+        textAnchor="middle"
+      >
+        Right this often
+      </text>
+      <polyline
+        points={pts.map((p) => `${x(p.x)},${y(p.rate)}`).join(" ")}
+        className="lab-line"
+        fill="none"
+      />
+      {pts.map((p) => (
+        <g key={p.metric} data-testid="cal-point">
+          <line
+            x1={x(p.x)}
+            x2={x(p.x)}
+            y1={y(p.ci_low)}
+            y2={y(p.ci_high)}
+            className="lab-whisker"
+          />
+          <circle cx={x(p.x)} cy={y(p.rate)} r={4} className="lab-dot">
+            <title>{`${pct(p.rate)} right, n = ${p.n}, 95% CI ${pct(p.ci_low)} to ${pct(p.ci_high)}`}</title>
+          </circle>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+export function LabPanel({ csv, source }: { csv: string; source: DataSource }) {
+  const parsed = useMemo(() => {
+    try {
+      return { rows: parseResults(csv), error: null as string | null };
+    } catch (err) {
+      return {
+        rows: [] as ResultRow[],
+        error: err instanceof ResultsError ? err.message : "results.csv could not be read",
+      };
+    }
+  }, [csv]);
+
+  const bars = curveBars(parsed.rows);
+  const cal = calibrationPoints(parsed.rows);
+  const frozen = parsed.rows.find((r) => r.frozen_at && r.frozen_at !== "FIXTURE")?.frozen_at;
+
+  return (
+    <section className="lab-panel" aria-labelledby="lab-title" data-testid="lab-panel">
+      <header className="lab-head">
+        <h2 id="lab-title">Lab</h2>
+        <SourceChip source={source} />
+      </header>
+      <p className="lab-sub">
+        Every number comes from eval/results.csv, with n and a 95% interval. Small n means wide
+        intervals.{frozen ? ` Held-out set frozen ${frozen}.` : ""}
+      </p>
+
+      {parsed.error ? (
+        <p role="alert" className="lab-note lab-error">
+          {parsed.error}
+        </p>
+      ) : parsed.rows.length === 0 ? (
+        <p className="lab-note" data-testid="lab-empty">
+          No results yet. Run the eval to fill this in.
+        </p>
+      ) : (
+        <>
+          <div className="lab-block">
+            <h3>Forged replies we let through, on attackers never trained on</h3>
+            {bars.length > 0 ? (
+              <div className="lab-scroll">
+                <CurveChart bars={bars} />
+              </div>
+            ) : (
+              <p className="lab-note" data-testid="curve-empty">
+                No forged-reply rows in this file.
+              </p>
+            )}
+          </div>
+          <div className="lab-block">
+            <h3>Calibration: when we say 90%, how often are we right</h3>
+            {cal.length > 0 ? (
+              <CalibrationChart rows={cal} />
+            ) : (
+              <p className="lab-note" data-testid="calibration-empty">
+                No calibration rows in this file.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+      <p className="lab-rule">
+        Learned models can stop a pass. They can never call anyone a scammer.
+      </p>
+    </section>
+  );
+}
+
+type Load =
+  | { status: "loading" }
+  | { status: "ready"; csv: string; source: DataSource }
+  | { status: "error" };
+
+// VITE_API_URL unset means fixture mode, same as the card: the synthetic sample is shown
+// and labelled FIXTURE. With an API, the CSV is served at /eval/results.csv and labelled LIVE.
+export function LabSection() {
+  const [load, setLoad] = useState<Load>({ status: "loading" });
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const base = import.meta.env.VITE_API_URL as string | undefined;
+    const run = async () => {
+      if (!base) {
+        const mod = await import("../../../../fixtures/contracts/results_sample.csv?raw");
+        return { csv: mod.default, source: "fixture" as const };
+      }
+      const res = await fetch(`${base.replace(/\/$/, "")}/eval/results.csv`, {
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      return { csv: await res.text(), source: "live" as const };
+    };
+    run()
+      .then((r) => setLoad({ status: "ready", ...r }))
+      .catch(() => {
+        if (!ctrl.signal.aborted) setLoad({ status: "error" });
+      });
+    return () => ctrl.abort();
+  }, []);
+
+  if (load.status === "ready") return <LabPanel csv={load.csv} source={load.source} />;
+  return (
+    <section className="lab-panel" aria-labelledby="lab-title">
+      <h2 id="lab-title">Lab</h2>
+      <p className="lab-note" role="status">
+        {load.status === "loading" ? "Loading results…" : "Results are not available right now."}
+      </p>
+    </section>
+  );
+}
