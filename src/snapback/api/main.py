@@ -25,6 +25,7 @@ valid or not.
 """
 
 import asyncio
+import json
 import re
 import secrets
 from collections.abc import AsyncIterator
@@ -44,6 +45,7 @@ from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
 from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.api.card_cache import CardPictures
+from snapback.api.casefiles import ALIAS, CaseFiles
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
@@ -66,6 +68,7 @@ from snapback.contracts import (
     CreateCaseResponse,
     DataSource,
     Evidence,
+    EvidenceFile,
     LocateStatus,
     PreferencesUpdate,
     RenterBrief,
@@ -119,6 +122,9 @@ class NotRegistered(Exception):
     """The case could not be recorded with its renter, so it must not be started."""
 
 
+EVIDENCE_FIXTURE = (
+    Path(__file__).resolve().parents[3] / "fixtures" / "demo" / "evidence.fixture.json"
+)
 Language = Literal["en", "es"]
 
 
@@ -599,6 +605,86 @@ def create_app(
             content=content,
             media_type="image/jpeg",
             headers={"Cache-Control": "private, max-age=600"},
+        )
+
+    def case_files(case, case_id: str) -> CaseFiles | None:
+        """The case's evidence files. A staged demo case "a" with none of its own serves the
+        team-made fixture (labelled FIXTURE inside), so the drawer works without a live run."""
+        files = getattr(case, "files", None)
+        if files is not None:
+            return files
+        if getattr(case, "demo_case_id", None) == "a" and EVIDENCE_FIXTURE.exists():
+            fixture = EvidenceFile.model_validate_json(EVIDENCE_FIXTURE.read_text())
+            return CaseFiles(evidence=fixture)
+        return None
+
+    NO_STORE = {"Cache-Control": "private, no-store"}
+
+    @app.get("/cases/{case_id}/evidence")
+    def get_evidence(
+        case_id: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """The evidence file the code wrote for this case: every ad photo's measurements, the
+        bars they were held to and where the bars came from. Read token in a header only."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        files = case_files(case, case_id)
+        if files is None or files.evidence is None:
+            raise HTTPException(status_code=404, detail="No evidence file for this case yet.")
+        body = files.evidence.model_copy(update={"case_id": case_id})
+        return Response(
+            content=body.model_dump_json(), media_type="application/json", headers=NO_STORE
+        )
+
+    @app.get("/cases/{case_id}/files/{path:path}")
+    def get_case_file(
+        case_id: str,
+        path: str,
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """One file from the agent's file system, read only: its notes and the evidence file."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        files = case_files(case, case_id)
+        found = files.read(path) if files is not None else None
+        if found is None:
+            raise HTTPException(status_code=404, detail="No file with that path.")
+        text, by = found
+        return Response(
+            content=json.dumps({"path": path, "text": text, "written_by": by}),
+            media_type="application/json",
+            headers=NO_STORE,
+        )
+
+    @app.get("/cases/{case_id}/evidence/{alias}/{kind}.jpg")
+    def get_evidence_image(
+        case_id: str,
+        alias: str,
+        kind: Literal["photo", "scan"],
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """The ad's photo or the scan view it matched, for the drawer's side-by-side. Read token
+        in a header only; the bytes are the session's, never a file path."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        files = case_files(case, case_id)
+        data = files.image(alias, kind) if files is not None and ALIAS.fullmatch(alias) else None
+        if data is None:
+            raise HTTPException(status_code=404, detail="No picture for that photo.")
+        return Response(
+            content=data,
+            media_type="image/jpeg",
+            headers={**NO_STORE, "X-Content-Type-Options": "nosniff"},
         )
 
     @app.get("/cases/{case_id}/report")
