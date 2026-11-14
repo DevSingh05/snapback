@@ -537,13 +537,13 @@ def test_a_job_queued_behind_a_stuck_one_is_cancelled_and_never_runs(world, tmp_
     live = gated_live(tmp_path, adapter, gate)
     live._load()
     ran: list[str] = []
-    real = live._ready.locator.locate
+    real = live._ready.locator.locate_with_points  # what a live job calls
 
-    def counting(case_id, photos, claimed):
+    def counting(case_id, photos, claimed, **kwargs):
         ran.append(case_id)
-        return real(case_id, photos, claimed)
+        return real(case_id, photos, claimed, **kwargs)
 
-    live._ready.locator.locate = counting
+    live._ready.locator.locate_with_points = counting
     blob = [photo(sweeps, "fx-model-a", 2, 1)]
     live.locate("stuck", blob, "fx-prop-1")  # running on the one worker, blocked on the gate
     queued = live.locate("queued", [photo(sweeps, "fx-model-a", 0, 3)], "fx-prop-1")
@@ -609,3 +609,102 @@ def test_a_live_result_carries_the_room_label_when_the_cache_has_it(world, rooms
     placed = outcome.result.photos[0]
     assert placed.status is LocateStatus.LOCATED_IN_CLAIMED and placed.pano_id == "fx-sweep-02"
     assert placed.room_label == expected
+
+
+# --- E2b: matched pairs ride beside the result, for the evidence file only (#224) -------------
+
+
+def fresh_data(world, tmp_path):
+    """The world's index in a data dir of its own, so no earlier test's cache answers."""
+    data, sweeps, adapter = world
+    shutil.copytree(data / "index", tmp_path / "index")
+    return tmp_path, sweeps, adapter
+
+
+def pair_values(points):
+    return {round(v, 6) for p in points.values() for pair in p.sampled for v in pair}
+
+
+def test_a_live_claimed_case_carries_points_for_each_placed_photo(world, tmp_path):
+    from snapback.contracts import EvidencePoints
+
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    outcome = make_live(data, adapter).locate("c", blobs, "fx-prop-1")
+    placed = {
+        p.photo_id for p in outcome.result.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED
+    }
+    assert placed == {"l1", "l2"} and set(outcome.points) == placed
+    for points in outcome.points.values():
+        assert isinstance(points, EvidencePoints) and 0 < len(points.sampled) <= 48
+        assert all(0.0 <= v <= 1.0 for pair in points.sampled for v in pair)
+    assert "points" not in repr(outcome)  # never printed with the outcome
+
+
+def test_a_live_case_with_no_claimed_home_carries_points_too(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    outcome = make_live(data, adapter).locate("c", blobs, None)
+    placed = {p.photo_id for p in outcome.result.photos if p.matched_model_id}
+    assert set(outcome.points) == placed
+
+
+def test_points_never_enter_the_cache_key_or_the_cache_file(world, tmp_path):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    live = make_live(data, adapter)
+    outcome = live.locate("c", blobs, "fx-prop-1")
+    assert outcome.points
+    files = list((data / "locate").glob("*.json"))
+    assert len(files) == 1
+    # the key is the photo hashes, the claimed id and the index/thresholds/matcher: no pairs
+    assert files[0] == live._cache_path(live._load(), blobs, "fx-prop-1")
+    text = files[0].read_text()
+    assert "sampled" not in text and "n_total" not in text and "points" not in text
+    stored = json.loads(text)
+    assert set(stored) == {"source", "identified_property_id", "result"}
+    # a cached answer carries no pairs; the matcher does not run
+    again = make_live(data, adapter, matcher=ExplodingMatcher).locate("c", blobs, "fx-prop-1")
+    assert again.from_cache and again.points == {}
+
+
+def test_points_never_reach_a_log_the_trace_or_the_chooser(world, tmp_path, caplog):
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1), photo(sweeps, "fx-model-a", 0, 3)]
+    live = make_live(data, adapter)
+    seen: list = []
+    kept: list = []
+    real_locate = live.locate
+
+    def spy(*args, **kwargs):
+        outcome = real_locate(*args, **kwargs)
+        kept.append(outcome)
+        return outcome
+
+    live.locate = spy  # type: ignore[method-assign]
+
+    class Watching(PolicyChooser):
+        def choose(self, offer):
+            seen.append(repr(offer))
+            return super().choose(offer)
+
+    caplog.set_level("DEBUG")
+    case = CaseSession(
+        "LIVE-P", joined(live, blobs, "fx-prop-1"), Trace("LIVE-P", DataSource.FIXTURE)
+    )
+    events: list = []
+    case.trace.subscribe(events.append)
+    run_case(case, Watching(), lambda draft: "send")
+    assert kept and kept[0].points, "the live run produced pairs"
+    values = {f"{v:.6f}"[:7] for v in pair_values(kept[0].points) if 0.01 < v < 0.99}
+    assert values
+    blobs_seen = {
+        "logs": "\n".join(r.getMessage() for r in caplog.records),
+        "trace": "\n".join(repr(e) for e in events),
+        "chooser": "\n".join(seen),
+        "evidence": case.evidence.model_dump_json(),
+    }
+    for where, text in blobs_seen.items():
+        assert "sampled" not in text and "n_total" not in text, where
+        hits = sum(value in text for value in values)
+        assert hits <= len(values) // 10, where  # no run of pair values leaked

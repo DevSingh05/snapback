@@ -58,6 +58,7 @@ from snapback.api.cases import (
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.finder import make_router as finder_router
+from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
@@ -135,6 +136,7 @@ KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
 # Our ids for records: short, and nothing that could be a path or a sentence.
 SEARCH_MAX_BODY = 4096  # bytes: a RenterBrief is a few hundred
+FORENSICS_MAX_BODY = 2048  # bytes: a question is at most 300 characters
 SEARCH_PER_MINUTE = 30  # searches one address may make in a minute
 PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 # What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
@@ -277,11 +279,12 @@ def create_app(
 
         model = build_model(settings.anthropic_api_key.get_secret_value())
     app.include_router(finder_router(events, model))
+    app.include_router(forensics_router)  # the investigator view: SYNTHETIC data only
 
     app.add_middleware(
         UploadSizeGuard,
         max_body_bytes=settings.snapback_max_photos * max_photo_bytes + FORM_OVERHEAD,
-        small_posts={"/search": SEARCH_MAX_BODY},
+        small_posts={"/search": SEARCH_MAX_BODY, "/forensics/ask": FORENSICS_MAX_BODY},
     )
     app.add_middleware(
         CORSMiddleware,
