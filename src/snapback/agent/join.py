@@ -9,6 +9,7 @@ whole stays FIXTURE while any stand-in is in it.
 Nothing here logs or returns a value from a record. The rules turn it into statuses.
 """
 
+import logging
 import threading
 from pathlib import Path
 from typing import Protocol
@@ -30,6 +31,8 @@ from snapback.contracts import (
     SpotCandidate,
     SpotRanking,
 )
+
+log = logging.getLogger("snapback.join")
 
 
 class KitMissing(Exception):
@@ -79,7 +82,15 @@ class KitLookups:
             from snapback.adapters import costar_residential
         except ImportError:
             return None  # lane D's lookup (D7) is not here: nothing was looked up
-        return costar_residential.for_sale_lookup(listing_text, self.source, self._kit_dir)
+        try:
+            return costar_residential.for_sale_lookup(listing_text, self.source, self._kit_dir)
+        except Exception as error:
+            # A lookup that broke is a lookup that did not happen. It must not stop the
+            # check, and it must not read as "looked up, nothing found". No value is logged.
+            log.warning(
+                "for-sale lookup failed (%s); treated as not looked up", type(error).__name__
+            )
+            return None
 
 
 class JoinedModules:
@@ -115,7 +126,10 @@ class JoinedModules:
         return check_price(listing.listed_rent, self._record, beds=listing.beds, unit=listing.unit)
 
     def authority(self, case_id: str) -> AuthorityResult | None:
-        return check_authority(self._listing.contacts, self._record, self._salt)
+        # The listing brokerage on record may market the home as the manager may (ruling,
+        # Sat 01:20). Lane D's lookup carries those names once D7 (#95) is on main.
+        offices = getattr(self._for_sale, "offices", None) or ()
+        return check_authority(self._listing.contacts, self._record, self._salt, offices)
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         return self._for_sale

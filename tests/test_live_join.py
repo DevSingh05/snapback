@@ -158,6 +158,48 @@ def test_phone_link_and_unit_are_compared_when_the_record_has_them():
     assert (price.status, price.compared_beds) == (PriceStatus.BELOW_RANGE, 2)
 
 
+def test_a_brokerage_the_lookup_found_on_record_counts_as_a_marketer():
+    # Ruling, Sat 01:20. `offices` arrives on ForSaleMatch with lane D's D7 (#95); until then
+    # this stand-in carries it the same way.
+    class WithOffices(ForSaleMatch):
+        offices: list[str] = []
+
+    text = "2 bed, $1,700 a month. Listed by Fixture Realty Group."
+    plain = joined(text, contact_record(), ForSaleMatch(status="none"))
+    assert plain.authority("fx-1").status is AuthorityStatus.MISMATCH
+    found = WithOffices(status="none", offices=["Fixture Realty Group LLC"])
+    assert joined(text, contact_record(), found).authority("fx-1").status is (
+        AuthorityStatus.MATCHES_RECORD
+    )
+
+
+def test_a_name_that_differs_is_not_a_red_flag_on_a_joined_card():
+    text = "2 bed, $1,700 a month. Listed by Somebody Else Realty."
+    _, card, _ = run(joined(text, contact_record(), source=DataSource.LIVE))
+    allowed = lines(card)["Allowed to rent it"]
+    assert allowed.tone is CardTone.NOT_SHOWN
+    assert allowed.text == "Not confirmed. Call the office on record yourself."
+
+
+def test_a_for_sale_lookup_that_breaks_is_not_a_lookup_and_stops_nothing(monkeypatch, caplog):
+    import sys
+    import types
+
+    def broken(listing_text, source=None, kit_dir=None):
+        raise RuntimeError("12 Secret Street could not be parsed")
+
+    fake = types.ModuleType("snapback.adapters.costar_residential")
+    fake.for_sale_lookup = broken
+    monkeypatch.setitem(sys.modules, "snapback.adapters.costar_residential", fake)
+    import snapback.adapters as adapters
+
+    monkeypatch.setattr(adapters, "costar_residential", fake, raising=False)
+    with caplog.at_level(logging.WARNING):
+        assert KitLookups(DataSource.FIXTURE).for_sale("3 bed at 12 Secret Street") is None
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "RuntimeError" in logged and "Secret Street" not in logged
+
+
 def test_with_no_record_nothing_is_claimed():
     modules = joined("2 bed, $900 a month. Managed by Fixture Living LLC.")
     assert modules.price("fx-1").status is PriceStatus.NOT_CHECKED
