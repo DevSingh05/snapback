@@ -34,6 +34,20 @@ HOUSTON_MARKET_ID = 14  # primaryAddress.researchMarketId (reported by another t
 MULTIFAMILY_TYPE = 11  # propertyType
 MATTERPORT_REF_TYPES = {36, 234}  # attachments[].videoExternalReferenceType
 MATTERPORT_GRAPH_URL = "https://api.matterport.com/api/models/graph"
+
+
+def _ssl_context():
+    """Use certifi's CA bundle when present (python.org Python on macOS ships without one)."""
+    import ssl
+
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 INTEREST = re.compile(
     r"rent|owner|contact|manag|leas|phone|email|photo|image|url|price|floor ?plan|unit", re.I
 )
@@ -112,7 +126,7 @@ def probe_model(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
             payload = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         return False, f"HTTP {e.code}", 0, 0

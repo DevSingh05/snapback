@@ -55,6 +55,9 @@ These exist for reasons that will not change this weekend. Do not work around th
    going on whatever is not blocked.
 9. **Licences.** No copyleft (GPL/AGPL/LGPL) dependencies and no non-commercial-only model
    weights without a human's say-so; the sponsor terms restrict both. Check before you add.
+   Exception decided by Vidyut (22:15): for the vision lane, SuperPoint vs ALIKED or DISK with
+   LightGlue is **Jeffrey's call**. He picks whatever is best for the team and notes the choice
+   and its licence in his PR.
 
 ## Working agreement
 
