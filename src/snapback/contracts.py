@@ -316,3 +316,57 @@ class TraceEvent(BaseModel):
     pick: str | None = None
     reason: str  # one plain sentence; may be model-written, never sets a state
     source: DataSource
+
+
+# ---------------------------------------------------------------------------------------------
+# Data handed between lanes before verdict time (XO, Fri Nov 13 22:10).
+# ---------------------------------------------------------------------------------------------
+
+
+class SpotCandidate(BaseModel):
+    """One fixed-structure spot (window frame, door, built-in) a challenge may name."""
+
+    spot_id: str
+    model_id: str
+    label: str  # plain words the renter reads: "the north window frame in the living room"
+    pose: Pose
+    inliers: int  # how well the scan matches at this spot; higher ranks first
+    overlaps_listing_photo: bool  # True means excluded from the draw
+
+
+class SpotRanking(BaseModel):
+    """locate/ (lane V) output that challenge/ (lane D) draws from: top 5, at random."""
+
+    case_id: str
+    model_id: str
+    floor_plan: str | None = None
+    spots: list[SpotCandidate]  # ranked best first
+
+
+class PropertyRecord(BaseModel):
+    """CoStar adapter (lane D) output. Our own id, never an address in fixtures or tests."""
+
+    property_id: str
+    source: DataSource
+    market: str | None = None
+    property_type: str | None = None
+    floors: int | None = None
+    year_built: int | None = None
+    lat: float | None = None
+    lon: float | None = None
+    model_ids: list[str] = Field(default_factory=list)
+    floor_plans: list[str] = Field(default_factory=list)
+    manager_company: str | None = None  # company only, and only if the probe finds the field
+    rent_min: int | None = None
+    rent_median: int | None = None
+    rent_max: int | None = None
+
+
+class AerialTile(BaseModel):
+    """Vexcel adapter (lane D) output: one oblique tile, kept at most 7 days, never in git."""
+
+    property_id: str
+    source: DataSource
+    direction: str  # "north", "east", "south", "west" or "nadir"
+    captured_on: date | None = None
+    path: str  # local file under data/ (or fixtures/ for the synthetic tile)

@@ -20,14 +20,14 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 ## Who is doing what
 
 Lanes and paths: `.github/CODEOWNERS` and `docs/ROLES.md`. Each lane has an epic issue (label
-`epic`) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
+`epic`: A #8, T #9, V #10, D #11) with ordered task issues; each person's agent starts from `docs/agents/kickoff-<name>.md`.
 
-| Person  | GitHub      | Lane                                 | Now                          |
-| ------- | ----------- | ------------------------------------ | ---------------------------- |
-| Dev     | DevSingh05  | A. agent and backend                 | data gate probe, then A epic |
-| Vidyut  | vs-githjk   | T. front end (with Claude)           | data gate probe, then T epic |
-| Jeffrey | jeffrey-g05 | V. vision and ML                     | data gate probe, then V epic |
-| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | data gate probe, then D epic |
+| Person  | GitHub      | Lane                                 | Now                                                       |
+| ------- | ----------- | ------------------------------------ | --------------------------------------------------------- |
+| Dev     | DevSingh05  | A. agent and backend                 | data gate #5, then epic #8 (A1 #12)                       |
+| Vidyut  | vs-githjk   | T. front end (with Claude)           | data gate #5, then epic #9 (T1 #20)                       |
+| Jeffrey | jeffrey-g05 | V. vision and ML                     | data gate #5, then epic #10 (V1 #27)                      |
+| Rishit  | RishitRai   | D. data, iMessage, challenge, safety | data gate #5, then epic #11 (D1 #35); repo invite pending |
 
 ## Data facts (REPORTED until our probe confirms)
 
