@@ -31,23 +31,16 @@ def write(path: Path, text: str) -> None:
     path.write_text(text)
 
 
-def new_case(client: TestClient) -> dict:
-    response = client.post("/cases", data={"text": "Two bed near the park."})
-    assert response.status_code == 201, response.text
-    return response.json()
-
-
 def test_the_columns_are_the_ones_in_the_shared_fixture():
     rows = [line for line in SAMPLE.read_text().splitlines() if not line.startswith("#")]
     assert tuple(rows[0].split(",")) == RESULTS_COLUMNS
 
 
-def test_the_file_is_served_as_it_was_written(client, results):
+def test_the_file_is_served_as_it_was_written_with_no_token(client, results):
     results.parent.mkdir(parents=True)
     results.write_bytes(SAMPLE.read_bytes())
-    case = new_case(client)
 
-    response = client.get(URL, params={"token": case["read_token"]})
+    response = client.get(URL)
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/csv; charset=utf-8"
     assert response.headers["cache-control"] == "no-store"
@@ -56,42 +49,22 @@ def test_the_file_is_served_as_it_was_written(client, results):
 
 
 def test_no_file_yet_is_a_404(client, results):
-    case = new_case(client)
     assert not results.exists()
-    assert client.get(URL, params={"token": case["read_token"]}).status_code == 404
+    assert client.get(URL).status_code == 404
 
 
-def test_a_secret_is_needed_and_is_checked_before_the_file(client, results):
-    # Without a secret the answer is the same whether or not the file exists.
-    assert client.get(URL).status_code == 401
+def test_it_is_public_so_a_token_changes_nothing(client, results):
+    # Aggregate numbers only, no case data (XO ruling on #69). A token is neither needed
+    # nor looked at, so a wrong one does no harm.
     write(results, f"{HEADER}\n{ROW}\n")
-    assert client.get(URL).status_code == 401
-    assert client.get(URL, params={"token": "nope"}).status_code == 403
-    assert client.get(URL, headers={"Authorization": "Bearer nope"}).status_code == 403
-
-
-def test_any_case_on_this_server_can_read_with_its_read_token(client, results):
-    write(results, f"{HEADER}\n{ROW}\n")
-    first, second = new_case(client), new_case(client)
-    for case in (first, second):
-        assert client.get(URL, params={"token": case["read_token"]}).status_code == 200
-        bearer = {"Authorization": f"Bearer {case['read_token']}"}
-        assert client.get(URL, headers=bearer).status_code == 200
-
-
-def test_the_write_secret_reads_from_a_header_and_is_refused_in_the_address(client, results):
-    write(results, f"{HEADER}\n{ROW}\n")
-    case = new_case(client)
-    assert client.get(URL, headers={"Authorization": f"Bearer {case['token']}"}).status_code == 200
-    assert client.get(URL, headers={"X-Case-Token": case["token"]}).status_code == 200
-    assert client.get(URL, params={"token": case["token"]}).status_code == 403
-
-
-def test_a_secret_from_another_server_is_refused(tmp_path, client, results):
-    write(results, f"{HEADER}\n{ROW}\n")
-    other = TestClient(create_app(Settings(_env_file=None, snapback_data_dir=tmp_path / "other")))
-    stranger = new_case(other)
-    assert client.get(URL, params={"token": stranger["read_token"]}).status_code == 403
+    plain = client.get(URL)
+    for extra in (
+        {"params": {"token": "anything"}},
+        {"headers": {"Authorization": "Bearer anything"}},
+        {"headers": {"X-Case-Token": "anything"}},
+    ):
+        again = client.get(URL, **extra)
+        assert (again.status_code, again.content) == (200, plain.content)
 
 
 @pytest.mark.parametrize(
@@ -102,59 +75,74 @@ def test_a_secret_from_another_server_is_refused(tmp_path, client, results):
         "name,phone,rent\nA,555-0100,1200\n",
         f"{HEADER},extra\n{ROW},1\n",
         ",".join(reversed(RESULTS_COLUMNS)) + "\n",
+        f"{HEADER}\nA,555-0100,1200\n",  # the right header on top of some other table
+        f"{HEADER}\n{ROW}\nrules_only,forged_fal",  # caught half written
+        f"{HEADER}\nrules_only,forged_false_accept,nine,40,0.2250,0.1232,0.3750,FIXTURE\n",
     ],
 )
 def test_a_file_that_is_not_the_agreed_csv_is_never_served(client, results, text):
-    # The path is a setting. If it is pointed at some other CSV, nothing from it leaves.
+    # The route is public and the path is a setting. If it is pointed at some other CSV, or
+    # read while it is being written, nothing from the file leaves.
     write(results, text)
-    case = new_case(client)
-    response = client.get(URL, params={"token": case["read_token"]})
+    response = client.get(URL)
     assert response.status_code == 500
-    assert "555-0100" not in response.text
+    assert "555-0100" not in response.text and "forged_fal" not in response.text
     assert "csv" not in response.headers["content-type"]
 
 
 def test_a_file_that_is_too_large_or_not_text_is_never_served(client, results):
-    case = new_case(client)
     write(results, f"{HEADER}\n" + f"{ROW}\n" * (MAX_RESULTS_BYTES // len(ROW) + 1))
-    assert client.get(URL, params={"token": case["read_token"]}).status_code == 500
+    assert client.get(URL).status_code == 500
     results.write_bytes(HEADER.encode() + b"\n\xff\xfe\x00")
-    assert client.get(URL, params={"token": case["read_token"]}).status_code == 500
+    assert client.get(URL).status_code == 500
 
 
 def test_a_folder_at_that_path_counts_as_no_file(client, results):
     results.mkdir(parents=True)
-    case = new_case(client)
-    assert client.get(URL, params={"token": case["read_token"]}).status_code == 404
+    assert client.get(URL).status_code == 404
 
 
 def test_comment_lines_and_windows_line_ends_are_fine(client, results):
     results.parent.mkdir(parents=True)
-    results.write_bytes(f"# LIVE: frozen Sat 02:00\r\n# n per row below\r\n{HEADER}\r\n".encode())
-    case = new_case(client)
-    response = client.get(URL, params={"token": case["read_token"]})
+    results.write_bytes(
+        f"# LIVE: frozen Sat 02:00\r\n# n per row below\r\n{HEADER}\r\n{ROW}\r\n".encode()
+    )
+    response = client.get(URL)
     assert response.status_code == 200
     assert response.text.startswith("# LIVE")
+
+
+def test_a_header_with_no_rows_yet_is_served(client, results):
+    write(results, f"# FIXTURE\n{HEADER}\n")
+    assert client.get(URL).status_code == 200
 
 
 def test_the_route_only_reads(client, results):
     write(results, f"{HEADER}\n{ROW}\n")
     before = results.read_bytes()
-    case = new_case(client)
-    bearer = {"Authorization": f"Bearer {case['token']}"}
     for method in ("post", "put", "patch", "delete"):
-        assert getattr(client, method)(URL, headers=bearer).status_code == 405
+        assert getattr(client, method)(URL).status_code == 405
     assert results.read_bytes() == before
 
 
 def test_the_path_comes_from_settings_and_not_from_the_request(client, results, tmp_path):
     write(results, f"{HEADER}\n{ROW}\n")
     write(tmp_path / "eval" / "other.csv", f"{HEADER}\nsecret_row,x,1,1,1,1,1,X\n")
-    case = new_case(client)
-    token = {"token": case["read_token"]}
-    assert client.get("/eval/other.csv", params=token).status_code == 404
-    assert client.get("/eval/..%2Feval%2Fother.csv", params=token).status_code == 404
-    assert "secret_row" not in client.get(URL, params={**token, "path": "other.csv"}).text
+    assert client.get("/eval/other.csv").status_code == 404
+    assert client.get("/eval/..%2Feval%2Fother.csv").status_code == 404
+    assert "secret_row" not in client.get(URL, params={"path": "other.csv"}).text
+
+
+def test_a_file_swapped_in_whole_is_never_seen_half_written(client, results):
+    # What `make eval` should do (asked of lane V on #32): write beside the file, then rename.
+    # A rename replaces the file in one step, so every read gets the old file or the new one.
+    write(results, f"{HEADER}\n{ROW}\n")
+    old = client.get(URL).content
+    beside = results.with_suffix(".csv.tmp")
+    beside.write_text(f"# LIVE\n{HEADER}\n{ROW}\n{ROW}\n")
+    assert client.get(URL).content == old  # the half-finished copy is not what is served
+    beside.replace(results)
+    assert client.get(URL).text.startswith("# LIVE")
 
 
 def test_the_default_path_is_where_make_eval_writes():

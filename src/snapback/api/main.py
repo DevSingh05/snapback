@@ -336,29 +336,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return case.status(with_challenge=True)
 
     @app.get("/eval/results.csv")
-    def get_eval_results(
-        token: str | None = None,
-        authorization: Annotated[str | None, Header()] = None,
-        x_case_token: Annotated[str | None, Header()] = None,
-    ) -> Response:
-        """The eval harness's results as CSV, for the Lab panel. Read-only (issue #69).
+    def get_eval_results() -> Response:
+        """The eval harness's results as CSV, for the Lab panel. Public and read-only (#69).
 
-        Needs a secret of some case on this server: a read token as `?token=`, or either
-        secret in `Authorization: Bearer` or `X-Case-Token`. The write token is refused in
-        the address, as on the trace. The secret is checked before the file is looked for.
+        The file holds aggregate numbers only (how often each condition caught what it should,
+        with n), and no case data, so it needs no token. The path comes from settings, never
+        from the request, and only the agreed CSV is ever served.
         """
-        in_header = _bearer(authorization, x_case_token)
-        if in_header is not None:
-            if not store.knows(in_header, read_only=False):
-                raise HTTPException(status_code=403, detail="That token is not from this server.")
-        elif token is not None:
-            if not store.knows(token, read_only=True):
-                raise HTTPException(
-                    status_code=403, detail="Only a case's read token is accepted in the address."
-                )
-        else:
-            raise HTTPException(status_code=401, detail="This needs a case's read token.")
-
         try:
             results = read_results(settings.snapback_eval_results)
         except NotTheAgreedCsv:

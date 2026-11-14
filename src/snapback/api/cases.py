@@ -235,20 +235,6 @@ class CaseStore:
         photos = len(evidence.locate.photos) if evidence.locate else 0
         self._cases[public_id(card.case_id)] = RecordedCase(card.case_id, card, events, photos)
 
-    def knows(self, secret: str, *, read_only: bool) -> bool:
-        """Is `secret` one this server handed out for a case? With `read_only`, only a read
-        token counts; otherwise a write token does too. Every case is compared, so the time
-        taken does not say which one matched."""
-        with self._lock:
-            cases = list(self._cases.values())
-        offered = secret.encode()
-        found = False
-        for case in cases:
-            for held in (case.read_token, None if read_only else case.token):
-                if held is not None and secrets.compare_digest(offered, held.encode()):
-                    found = True
-        return found
-
     def get(self, case_id: str) -> RecordedCase | SessionCase | None:
         return self._cases.get(public_id(case_id))
 
