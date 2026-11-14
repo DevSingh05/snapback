@@ -15,7 +15,8 @@ import json
 import secrets
 import threading
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, tzinfo
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
@@ -81,8 +82,9 @@ def public_id(case_id: str) -> str:
     return case_id.strip().upper().removeprefix(FIXTURE_ID_PREFIX.upper())
 
 
-def _now() -> datetime:
-    return datetime.now().astimezone()
+def _now(zone: tzinfo | None = None) -> datetime:
+    """Now, on the card's clock: the building's zone when one is given."""
+    return datetime.now(zone) if zone is not None else datetime.now().astimezone()
 
 
 class RecordedCase:
@@ -133,8 +135,10 @@ class SessionCase:
         session: CaseSession,
         listing: Listing,
         runner: Callable[[CaseSession], object],
+        zone: tzinfo | None = None,
     ) -> None:
         self.case_id = case_id  # short, shown to people, enough to read the case
+        self._zone = zone  # the card's clock: the building's zone, not the server's
         self.token = secrets.token_urlsafe(24)  # 192 bits, needed for every write
         # A second secret that can only read. It is the one a browser may put in an address,
         # where servers log it, so it must never be able to approve anything.
@@ -154,7 +158,7 @@ class SessionCase:
         with self._lock:
             self._runner(self.session)
             if self.session.done and self._checked_at is None:
-                self._checked_at = _now()
+                self._checked_at = _now(self._zone)
 
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
@@ -162,7 +166,7 @@ class SessionCase:
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
         return build_card(
             self.session.evidence,
-            checked_at=self._checked_at or _now(),
+            checked_at=self._checked_at or _now(self._zone),
             verify_base_url=verify_base_url,
             lang=lang,
         )
@@ -275,7 +279,8 @@ class CaseStore:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
-            case = SessionCase(short_id, session, listing, self._runner)
+            zone = ZoneInfo(self._settings.snapback_card_timezone)
+            case = SessionCase(short_id, session, listing, self._runner, zone)
             self._cases[short_id] = case
         case.advance()
         return case
