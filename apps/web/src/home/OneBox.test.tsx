@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CreateCase } from "../upload/api";
-import { EXAMPLES, FB_ASK, OneBox } from "./OneBox";
+import { EXAMPLES, FB_ASK, MEASURED, OneBox, sendLabel } from "./OneBox";
+
+// The box's button names what it will do: it follows the routing of what is typed.
+const SEND = /^(check it|find places|ask)$/i;
 
 const AD =
   "Sunny 2 bed 2 bath in Midtown, $1,350/month. I'm abroad so I can't show it, send the $600 deposit by Zelle.";
@@ -20,7 +23,7 @@ const box = () => screen.getByLabelText(/paste an ad, a link, or say what you ne
 
 async function say(user: ReturnType<typeof userEvent.setup>, words: string) {
   await user.type(box(), words);
-  await user.click(screen.getByRole("button", { name: /^send$/i }));
+  await user.click(screen.getByRole("button", { name: SEND }));
 }
 
 beforeEach(() => {
@@ -45,20 +48,87 @@ describe("Home is one box", () => {
     render(<OneBox mode="fixture" />);
     const hero = screen.getByTestId("hero-photo");
     expect(hero).toHaveAttribute("alt", expect.stringMatching(/apartment building/i));
-    const samples = screen.getAllByTestId("sample-photo");
-    expect(samples).toHaveLength(3);
+    // The sample case's proof pair and the four path steps: six stock photos, every one stamped.
+    const samples = [
+      ...screen.getAllByTestId("sample-photo"),
+      ...within(screen.getByTestId("how-it-works")).getAllByText("SAMPLE PHOTO"),
+    ].map((el) => (el.dataset.testid === "sample-photo" ? el : el.parentElement!));
+    expect(samples).toHaveLength(6);
     for (const s of samples) {
-      expect(s).toHaveTextContent("Sample photo");
+      expect(s).toHaveTextContent(/sample photo/i);
       expect(within(s).getByRole("img")).toHaveAttribute("alt", expect.stringMatching(/\w/));
     }
+  });
+
+  it("leads with checking an ad; looking for a place is the last, quiet starter", () => {
+    render(<OneBox mode="fixture" />);
+    const starters = within(screen.getByRole("list", { name: "Try one" })).getAllByRole("listitem");
+    expect(starters[0]).toHaveTextContent("Paste the ad you were sent");
+    expect(starters[1]).toHaveTextContent("Is this landlord real?");
+    expect(starters.map((li) => li.hasAttribute("data-quiet"))).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect(starters[3]).toHaveTextContent("Find me a 1 bed");
+    expect(box()).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/^Paste the ad you were sent/),
+    );
+  });
+
+  it("carries the one measured line, word for word, and no other figure of its own", () => {
+    render(<OneBox mode="fixture" />);
+    expect(screen.getByTestId("ob-measured").textContent).toBe(
+      "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it",
+    );
+    expect(MEASURED).not.toMatch(/right room|[–—]/);
+  });
+
+  it("the button names what the box will do, following the routing of what is typed", async () => {
+    const user = userEvent.setup();
+    render(<OneBox mode="fixture" />);
+    expect(screen.getByRole("button", { name: "Check it" })).toBeDisabled();
+    await user.type(box(), "Find me a 1 bed under $1,500 near downtown");
+    expect(screen.getByRole("button", { name: "Find places" })).toBeEnabled();
+    await user.clear(box());
+    await user.type(box(), "Is this landlord real?");
+    expect(screen.getByRole("button", { name: "Check it" })).toBeEnabled();
+    await user.clear(box());
+    await user.type(box(), "Is it ok to pay a deposit by Zelle?");
+    expect(screen.getByRole("button", { name: "Ask" })).toBeEnabled();
+    expect(sendLabel("https://example.com/listing/1", 0, false)).toBe("Check it");
+    expect(sendLabel("", 2, false)).toBe("Check it");
+  });
+
+  it("the sample case shows the fixture card's own verdict and opens it through the box", async () => {
+    const user = userEvent.setup();
+    render(<OneBox mode="fixture" createCase={made()} checkingMs={0} waitingMs={0} />);
+    const sample = screen.getByTestId("ob-sample");
+    expect(sample).toHaveTextContent("Sample case 7Q2M");
+    expect(sample).toHaveTextContent("Hold off for now");
+    expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    // Proof, not features: the ad's photo beside the scan view, then the fixture card's own lines.
+    const pair = within(sample).getByTestId("ob-pair");
+    expect(pair).toHaveTextContent("The ad's photo");
+    expect(pair).toHaveTextContent("Found in the building's 3D scan");
+    expect(within(pair).getAllByTestId("sample-photo")).toHaveLength(2);
+    expect(sample).toHaveTextContent("Taken in this building");
+    expect(sample).toHaveTextContent("Zelle before a viewing. Red flag.Warning");
+    await user.click(sample);
+    // The photograph collapses to a strip and the thread takes the page.
+    expect(screen.getByTestId("hero-street")).toHaveClass("hs-strip");
+    expect(screen.getByTestId("ob-you")).toHaveTextContent("send the $600 deposit by Zelle");
+    expect(screen.queryByTestId("how-it-works")).not.toBeInTheDocument();
   });
 
   it("an empty send says what to do and starts nothing", async () => {
     const user = userEvent.setup();
     const createCase = made();
     render(<OneBox mode="fixture" createCase={createCase} />);
-    await user.click(screen.getByRole("button", { name: /^send$/i }));
-    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: SEND }));
+    expect(screen.getByRole("button", { name: SEND })).toBeDisabled();
     await user.type(box(), "   {Enter}");
     expect(await screen.findByRole("alert")).toHaveTextContent(/paste an ad, or add screenshots/i);
     expect(createCase).not.toHaveBeenCalled();
@@ -191,7 +261,7 @@ describe("routing each message, shown honestly", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("lease.pdf is not a photo");
     await user.upload(input, new File(["x"], "ad.png", { type: "image/png" }));
     expect(screen.getByRole("list", { name: "Added screenshots" })).toHaveTextContent("ad.png");
-    await user.click(screen.getByRole("button", { name: /^send$/i }));
+    await user.click(screen.getByRole("button", { name: SEND }));
     expect(screen.getByTestId("ob-you")).toHaveTextContent("1 screenshot: ad.png");
     await waitFor(() =>
       expect(createCase).toHaveBeenCalledWith(

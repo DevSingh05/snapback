@@ -8,6 +8,9 @@ import type { Card } from "../contracts";
 import type { CreateCase } from "../upload/api";
 import { OneBox, VerdictCard } from "./OneBox";
 
+// The box's button names what it will do: it follows the routing of what is typed.
+const SEND = /^(check it|find places|ask)$/i;
+
 // A mocked API with the route shapes the one box calls in live mode.
 interface Call {
   method: string;
@@ -87,7 +90,7 @@ const box = () => screen.getByLabelText(/paste an ad, a link, or say what you ne
 async function paste(user: ReturnType<typeof userEvent.setup>, words: string) {
   await user.click(box());
   await user.paste(words);
-  await user.click(screen.getByRole("button", { name: /^send$/i }));
+  await user.click(screen.getByRole("button", { name: SEND }));
 }
 
 const AD =
@@ -197,15 +200,16 @@ describe("chips on every sample", () => {
         screen.getAllByTestId("source-chip").some((c) => /LIVE/.test(c.textContent ?? "")),
       ).toBe(true),
     );
-    const tile = screen.getByRole("button", { name: /check an ad/i });
-    expect(within(tile).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    const sample = screen.getByTestId("ob-sample");
+    expect(sample).toHaveTextContent("Sample case 7Q2M");
+    expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
   });
 
   it("the Find tile sends the budget its picture shows", async () => {
     server();
     const user = userEvent.setup();
     render(<OneBox mode="live" />);
-    await user.click(screen.getByRole("button", { name: /find a place/i }));
+    await user.click(screen.getByRole("button", { name: /find safer places/i }));
     expect(screen.getByTestId("ob-you")).toHaveTextContent(
       "Find me a 1 bed under $1,500 near downtown",
     );
