@@ -932,6 +932,11 @@ class PlaceMatch(BaseModel):
     # record, so it is the same for the same place whoever chose it.
     checked: bool = False
     check_line: str | None = None
+    # Proof plan 3.3: where the renter goes to see this place's real listing. The plan's
+    # availability page on CoStar's record, else https://<the building's own website host>, else
+    # None. A LIVE place gets one only when SNAPBACK_SHOW_RECORD_FIGURES is on (local demo).
+    handoff_url: str | None = None
+    handoff_label: str | None = None  # "Its listing on Apartments.com" or "The building's own site"
     source: DataSource
 
 

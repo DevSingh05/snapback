@@ -1379,6 +1379,8 @@ EN.update(
         "real.phone_not_office": "The ad's number is not the office's on record.",
         "real.cta": "See the real listing",
         "real.no_record": "CoStar has no record of the building this ad names.",
+        "handoff.listing": "Its listing on Apartments.com",
+        "handoff.site": "The building's own site",
         "summary.price_gap": "The rent is {percent}% under this building's {plan} listing.",
         "summary.price_gap_any": "The rent is {percent}% under this building's listings.",
     }
@@ -1428,6 +1430,8 @@ ES.update(
         "real.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
         "real.cta": "Ver el anuncio real",
         "real.no_record": "CoStar no tiene registro del edificio que nombra este anuncio.",
+        "handoff.listing": "Su anuncio en Apartments.com",
+        "handoff.site": "El sitio del propio edificio",
         "summary.price_gap": (
             "La renta está {percent}% por debajo de lo que el edificio anuncia para {plan}."
         ),

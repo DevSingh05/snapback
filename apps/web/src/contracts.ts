@@ -313,6 +313,11 @@ export interface PlaceMatch {
   office_on_record?: string | null; // company name only
   checked?: boolean; // true only for a place that got the deep check; the rest are "researched"
   check_line?: string | null; // built by code: "Checked: listed for rent by ...; ..."
+  // GET /cases/{id}/alternatives only: where the renter goes to see this place's real listing.
+  // The plan's availability page, else https://<website host>, else null. A LIVE place has none
+  // unless the local demo's figures flag is on.
+  handoff_url?: string | null;
+  handoff_label?: string | null; // "Its listing on Apartments.com" or "The building's own site"
   source: DataSource;
 }
 

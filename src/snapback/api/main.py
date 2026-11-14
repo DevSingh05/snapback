@@ -1101,7 +1101,13 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         try:
             return agentic_alternatives(
-                case, lookups, chooser, n, case.preferences, settings.snapback_data_source
+                case,
+                lookups,
+                chooser,
+                n,
+                case.preferences,
+                settings.snapback_data_source,
+                settings.snapback_show_record_figures,
             )
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None

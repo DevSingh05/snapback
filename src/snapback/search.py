@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from snapback.card import strings
 from snapback.contracts import (
     AS_OF,
     BudgetFit,
@@ -606,6 +607,52 @@ def deep_check(place: PlaceMatch, lookups: Any) -> PlaceMatch:
 def place_key(place: PlaceMatch) -> tuple[str, str]:
     """A place is one floor plan of one building (a house is its own plan)."""
     return place.property_id, place.plan_key or place.floor_plan or ""
+
+
+def _record_for(lookups: Any, property_id: str) -> PropertyRecord | None:
+    record_of = getattr(lookups, "record", None)
+    if callable(record_of):
+        return record_of(property_id)
+    records = getattr(lookups, "records", None)
+    return records().get(property_id) if callable(records) else None
+
+
+def handoff_for(place: PlaceMatch, record: PropertyRecord | None) -> tuple[str, str] | None:
+    """The link out for one place and its words, from the record alone: the plan's availability
+    page, else the building's, else its own website. A house has none of these today."""
+    if record is None:
+        return None
+    for rent in record.floor_plan_rents:
+        if (
+            rent.availability_url
+            and rent.name == place.floor_plan
+            and (rent.rent_min, rent.rent_max) == (place.rent_min, place.rent_max)
+        ):
+            return rent.availability_url, strings.text("handoff.listing")
+    if record.availability_url:
+        return record.availability_url, strings.text("handoff.listing")
+    if record.website_host:
+        return f"https://{record.website_host}", strings.text("handoff.site")
+    return None
+
+
+def with_handoff(
+    matches: list[PlaceMatch], lookups: Any, *, show_live_links: bool = False
+) -> list[PlaceMatch]:
+    """Each place with its hand-off link. A LIVE place keeps none unless `show_live_links`
+    (the record's links are CoStar data: local demo only); a fixture place always has them."""
+    out = []
+    for place in matches:
+        if place.source is DataSource.LIVE and not show_live_links:
+            out.append(place)
+            continue
+        found = handoff_for(place, _record_for(lookups, place.property_id))
+        out.append(
+            place.model_copy(update={"handoff_url": found[0], "handoff_label": found[1]})
+            if found
+            else place
+        )
+    return out
 
 
 def apply_deep_checks(
