@@ -27,6 +27,8 @@ export type InboundMessage = {
 /** The part of a Photon client the sidecar uses. The real one is wired in index.ts. */
 export interface MessageClient {
   reply(threadId: string, text: string): Promise<void>;
+  /** Send a picture (the card PNG) to the same thread. Optional: without it, text only. */
+  image?(threadId: string, bytes: Uint8Array, mimeType: string): Promise<void>;
 }
 
 type VerdictState = "verified" | "hold" | "dont_pay" | "unverified";
@@ -38,6 +40,10 @@ type Card = {
   rows: { kind: string; lines: CardLine[] }[];
   not_checked: string[];
   footer: string[];
+  // #250: built by code in verdict.build_card. Optional: a card from before has none.
+  summary?: string[];
+  checks_out?: string[];
+  does_not?: string[];
 };
 type CreateCaseResponse = { case_id: string; challenge_text?: string | null };
 
@@ -48,7 +54,33 @@ export type SidecarConfig = {
   renterSalt: string;
   maxPhotos?: number;
   fetch?: typeof fetch;
+  /** Each thread's last case, for "why?" and "what should I do?". Without it, no follow-ups. */
+  memory?: CaseMemory;
 };
+
+const CASE_TTL_MS = 24 * 60 * 60 * 1000; // a card expires in 24 h; so does the follow-up
+
+/** Each thread's last case (public id and the challenge to send), in memory only. */
+export class CaseMemory {
+  private last = new Map<string, { caseId: string; challenge?: string | null; at: number }>();
+
+  constructor(private now: () => number = Date.now) {}
+
+  remember(threadId: string, caseId: string, challenge?: string | null): void {
+    this.last.set(threadId, { caseId, challenge, at: this.now() });
+  }
+
+  /** This thread's own case, if it is still fresh. Never another thread's. */
+  recall(threadId: string): { caseId: string; challenge?: string | null } | null {
+    const found = this.last.get(threadId);
+    if (!found || this.now() - found.at > CASE_TTL_MS) return null;
+    return found;
+  }
+}
+
+const WHY = /^\s*(why|why not|how come|what did you find|what's wrong|whats wrong)\s*[?.!]*\s*$/i;
+const WHAT_NOW =
+  /^\s*(what (should|do|can) i do|what now|now what|what next|next steps?|what do i do now)\s*[?.!]*\s*$/i;
 
 const MAX_PHOTOS = 10;
 
@@ -90,6 +122,64 @@ export function cardText(card: Card, link: string, challenge?: string | null): s
   return lines.join("\n");
 }
 
+const BAD_TONES = new Set(["red_flag", "hold", "not_shown"]);
+
+/** Every card line as "label: text", in the card's own order. */
+function cardLines(card: Card, tones: (tone: string) => boolean): string[] {
+  return card.rows.flatMap((row) =>
+    row.lines.filter((line) => tones(line.tone)).map((line) => `${line.label}: ${line.text}`),
+  );
+}
+
+/** The lines that explain the verdict, all of them, from the card (never written here). */
+function reasons(card: Card): string[] {
+  if (card.state === "verified") {
+    return card.checks_out?.length ? card.checks_out : cardLines(card, (t) => t === "ok");
+  }
+  if (card.does_not?.length) return card.does_not;
+  // a card from before #250: red flags first, then hold and not-shown lines
+  const red = cardLines(card, (t) => t === "red_flag");
+  return [...red, ...cardLines(card, (t) => BAD_TONES.has(t) && t !== "red_flag")];
+}
+
+/** One next step: the challenge to send when there is one, else the card's own two rules. */
+function nextStep(card: Card, challenge?: string | null): string {
+  if (challenge) return `send the poster this message: ${challenge}`;
+  return card.footer.find((line) => line.startsWith("Two rules")) ?? card.footer[0] ?? "";
+}
+
+/** The reply: the locked headline, the top two reasons, one next step and the link. Every
+ * word of the verdict and the reasons comes from the card; the sidecar writes no verdict. */
+export function reportText(card: Card, link: string, challenge?: string | null): string {
+  const lines = [
+    HEADLINES[card.state] ?? HEADLINES.hold,
+    `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`,
+  ];
+  const top = reasons(card).slice(0, 2);
+  if (top.length) lines.push("", "Why:", ...top.map((line) => `- ${line}`));
+  const step = nextStep(card, challenge);
+  if (step) lines.push("", `Next: ${step}`);
+  lines.push("", `Full result: ${link}`, 'Ask me "why?" or "what should I do?"');
+  return lines.join("\n");
+}
+
+/** "why?": every reason on this case's card, what was not checked, and the link. */
+function whyText(card: Card, link: string): string {
+  const lines = [HEADLINES[card.state] ?? HEADLINES.hold, "", "Why:"];
+  lines.push(...reasons(card).map((line) => `- ${line}`));
+  if (card.not_checked.length) lines.push("", `Not checked: ${card.not_checked.join(", ")}`);
+  lines.push("", `Full result: ${link}`);
+  return lines.join("\n");
+}
+
+/** "what should I do?": the challenge to send (if any), then the card's own footer rules. */
+function whatNowText(card: Card, link: string, challenge?: string | null): string {
+  const lines = [HEADLINES[card.state] ?? HEADLINES.hold, ""];
+  if (challenge) lines.push("Send the poster this message:", challenge, "");
+  lines.push(...card.footer, "", `Full result: ${link}`);
+  return lines.join("\n");
+}
+
 async function photos(urls: string[], max: number, get: typeof fetch): Promise<Blob[]> {
   const out: Blob[] = [];
   for (const url of urls.slice(0, max)) {
@@ -99,7 +189,35 @@ async function photos(urls: string[], max: number, get: typeof fetch): Promise<B
   return out;
 }
 
-async function check(msg: InboundMessage, config: SidecarConfig): Promise<string> {
+type Checked = { text: string; caseId?: string };
+
+function caseLink(config: SidecarConfig, caseId: string): string {
+  return `${config.webUrl.replace(/\/$/, "")}/case/${encodeURIComponent(caseId)}`;
+}
+
+async function fetchCard(config: SidecarConfig, caseId: string): Promise<Card | null> {
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/card`);
+  return res.ok ? ((await res.json()) as Card) : null;
+}
+
+/** A "why?" or "what should I do?" about this thread's last case, or null if it is neither
+ * (or there is no fresh case): then the text is checked like any other. */
+async function followUp(msg: InboundMessage, config: SidecarConfig): Promise<string | null> {
+  const text = msg.text ?? "";
+  if ((msg.images?.length ?? 0) > 0 || msg.imageUrls.length > 0) return null;
+  const why = WHY.test(text);
+  if (!why && !WHAT_NOW.test(text)) return null;
+  const last = config.memory?.recall(msg.threadId);
+  if (!last) return null;
+  const card = await fetchCard(config, last.caseId);
+  if (!card) return null;
+  const link = caseLink(config, last.caseId);
+  return why ? whyText(card, link) : whatNowText(card, link, last.challenge);
+}
+
+async function check(msg: InboundMessage, config: SidecarConfig): Promise<Checked> {
   const get = config.fetch ?? fetch;
   const api = config.apiUrl.replace(/\/$/, "");
 
@@ -111,15 +229,36 @@ async function check(msg: InboundMessage, config: SidecarConfig): Promise<string
   images.forEach((blob, i) => form.append("photos", blob, `photo-${i + 1}.jpg`));
 
   const created = await get(`${api}/cases`, { method: "POST", body: form });
-  if (created.status === 429) return LIMIT_REACHED;
-  if (!created.ok) return COULD_NOT_CHECK;
+  if (created.status === 429) return { text: LIMIT_REACHED };
+  if (!created.ok) return { text: COULD_NOT_CHECK };
   // Only the public id is read from the response; the case token never leaves this function.
   const { case_id: caseId, challenge_text: challenge } =
     (await created.json()) as CreateCaseResponse;
-  const link = `${config.webUrl.replace(/\/$/, "")}/case/${encodeURIComponent(caseId)}`;
-  const cardRes = await get(`${api}/cases/${encodeURIComponent(caseId)}/card`);
-  if (!cardRes.ok) return `${HEADLINES.hold}\nSNAPBACK check ${caseId} started.\n${link}`;
-  return cardText((await cardRes.json()) as Card, link, challenge);
+  config.memory?.remember(msg.threadId, caseId, challenge);
+  const link = caseLink(config, caseId);
+  const card = await fetchCard(config, caseId);
+  if (!card) return { text: `${HEADLINES.hold}\nSNAPBACK check ${caseId} started.\n${link}` };
+  return { text: reportText(card, link, challenge), caseId };
+}
+
+/** The card as a picture, sent after the text. A failure here never undoes the text. */
+async function sendCardPicture(
+  client: MessageClient,
+  msg: InboundMessage,
+  config: SidecarConfig,
+  caseId: string,
+): Promise<void> {
+  if (!client.image) return;
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  try {
+    const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/card.png`);
+    if (!res.ok) return;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    await client.image(msg.threadId, bytes, res.headers.get("content-type") ?? "image/png");
+  } catch {
+    // the text reply already went out
+  }
 }
 
 /** Handle one inbound message. Returns false when the thread is not allowed (nothing is sent). */
@@ -129,12 +268,22 @@ export async function handleMessage(
   config: SidecarConfig,
 ): Promise<boolean> {
   if (!isAllowed(msg.threadId, config)) return false;
-  let text: string;
   try {
-    text = await check(msg, config);
+    const answer = await followUp(msg, config);
+    if (answer !== null) {
+      await client.reply(msg.threadId, answer);
+      return true;
+    }
   } catch {
-    text = COULD_NOT_CHECK;
+    // a follow-up that cannot be answered is checked like any other text
   }
-  await client.reply(msg.threadId, text);
+  let checked: Checked;
+  try {
+    checked = await check(msg, config);
+  } catch {
+    checked = { text: COULD_NOT_CHECK };
+  }
+  await client.reply(msg.threadId, checked.text);
+  if (checked.caseId) await sendCardPicture(client, msg, config, checked.caseId);
   return true;
 }

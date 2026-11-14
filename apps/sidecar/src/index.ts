@@ -18,7 +18,7 @@
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { type MessageClient } from "./handler";
+import { CaseMemory, type MessageClient } from "./handler";
 import { connectPhoton, publicWebUrl, runPhoton } from "./photon";
 import { WatchBook, pushEvents, readEvents } from "./watch";
 
@@ -95,9 +95,12 @@ if (photon) {
     console.log("[sidecar] SNAPBACK_EVENTS_TOKEN is not set: watch alerts will not be sent.");
   }
   // Voice replies (Best Voice Agent): the SDK's own builder sends a native voice memo bubble.
-  const { voice } = await import("spectrum-ts");
+  const { voice, attachment } = await import("spectrum-ts");
   await runPhoton(app, {
     makeVoice: (bytes: Uint8Array, mimeType: string) => voice(Buffer.from(bytes), { mimeType }),
+    makeImage: (bytes: Uint8Array, mimeType: string) =>
+      attachment(Buffer.from(bytes), { mimeType, name: "snapback-card.png" }),
+    memory: new CaseMemory(),
     watches,
     apiUrl: API_URL,
     webUrl,

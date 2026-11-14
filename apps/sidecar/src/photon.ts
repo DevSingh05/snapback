@@ -73,6 +73,8 @@ export type PhotonConfig = SidecarConfig & {
   watches?: WatchBook;
   /** Voice replies: the SDK's `voice(buffer, { mimeType })` builder. Without it, text only. */
   makeVoice?: (bytes: Uint8Array, mimeType: string) => unknown;
+  /** The card picture: the SDK's `attachment(buffer, { mimeType, name })`. Without it, text only. */
+  makeImage?: (bytes: Uint8Array, mimeType: string) => unknown;
   /** CAF to m4a before speech to text. Defaults to ffmpeg. */
   convertVoice?: ConvertVoice;
 };
@@ -196,6 +198,16 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
         await item.space.send(text);
         replied = text;
       },
+      // the card picture, through the SDK's attachment builder, to the same space only
+      ...(config.makeImage
+        ? {
+            async image(threadId: string, bytes: Uint8Array, mimeType: string) {
+              if (threadId !== item.space.id)
+                throw new Error("a reply may only go to its own thread");
+              await item.space.send(config.makeImage!(bytes, mimeType));
+            },
+          }
+        : {}),
     };
     await handleMessage(msg, client, config);
     if (!spoken || !replied || !config.makeVoice) return;
