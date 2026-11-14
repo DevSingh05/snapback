@@ -8,10 +8,10 @@ import { CardPage, CardView } from "./CardPage";
 const card = cardHold as Card;
 
 describe("CardView with card_hold.json", () => {
-  it("shows PLACE, PERSON, PRICE in that order", () => {
+  it("names the kind of every check, failing ones first, then passing, then not checked", () => {
     render(<CardView card={card} variant="result" />);
     const labels = screen.getAllByTestId("row-label").map((el) => el.textContent);
-    expect(labels).toEqual(["PLACE", "PERSON", "PRICE"]);
+    expect(labels).toEqual(["PERSON", "PRICE", "PLACE", "PERSON", "PRICE"]);
   });
 
   it("shows the FIXTURE chip for fixture data and LIVE for live data", () => {
@@ -59,9 +59,11 @@ describe("CardView with card_hold.json", () => {
 });
 
 describe("Lab placement", () => {
-  it("is on the result page and hidden on the verify page", async () => {
+  it("is on neither the result page nor the verify page", async () => {
+    // Conductor ruling, Sat 18:2x: the Lab chart block leaves the case result entirely.
     const result = render(<CardPage caseId={card.case_id} variant="result" />);
-    expect(await result.findByTestId("lab-panel")).toBeInTheDocument();
+    await result.findByTestId("case-id");
+    expect(result.queryByTestId("lab-panel")).toBeNull();
     result.unmount();
     const verify = render(<CardPage caseId={card.case_id} variant="verify" />);
     await verify.findByTestId("case-id");
