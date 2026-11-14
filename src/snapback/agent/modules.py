@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from snapback.agent.rules import check_price
 from snapback.agent.scope import ListingScope
 from snapback.contracts import (
     AuthorityResult,
@@ -87,6 +88,8 @@ class FixtureModules:
         fixtures_dir: Path = FIXTURES_DIR,
         has_twin: bool = True,
         listing_scope: ListingScope = ListingScope.RENTAL,
+        rules: list[RuleHit] | None = None,
+        listed_rent: int | None = None,
         recapture_override: list[dict] | None = None,
         recapture_clears_after: int | None = None,
         spots_available: int | None = None,
@@ -102,6 +105,10 @@ class FixtureModules:
         )
         self._has_twin = has_twin
         self._listing_scope = ListingScope(listing_scope)
+        # The renter's own text is not fixture data: when intake has read it, its rule hits
+        # and its rent replace the fixture's.
+        self._rules = rules
+        self._listed_rent = listed_rent
         self.sent_messages: list[str] = []  # every challenge text handed over for sending
         self._recapture_override = (
             None
@@ -138,10 +145,12 @@ class FixtureModules:
         return self.evidence.locate
 
     def rules(self, case_id: str) -> list[RuleHit]:
-        return list(self.evidence.rules)
+        return list(self.evidence.rules if self._rules is None else self._rules)
 
     def price(self, case_id: str) -> PriceResult | None:
-        return self.evidence.price
+        if self._listed_rent is None:
+            return self.evidence.price
+        return check_price(self._listed_rent, self.record)
 
     def authority(self, case_id: str) -> AuthorityResult | None:
         return self.evidence.authority

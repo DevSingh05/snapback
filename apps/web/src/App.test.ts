@@ -11,4 +11,11 @@ describe("matchRoute", () => {
   it("still routes the result page", () => {
     expect(matchRoute("/case/fx-7Q2M")).toEqual({ name: "result", id: "fx-7Q2M" });
   });
+
+  it("routes /replay/:slug to the replay page", () => {
+    expect(matchRoute("/replay/zelle-deposit-copied-tour")).toEqual({
+      name: "replay",
+      slug: "zelle-deposit-copied-tour",
+    });
+  });
 });

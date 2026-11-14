@@ -11,7 +11,7 @@ export type UploadState =
 
 export type UploadEvent =
   | { type: "submit" }
-  | { type: "created"; caseId: string; challengeText: string; source: DataSource }
+  | { type: "created"; caseId: string; challengeText: string | null; source: DataSource }
   | { type: "checked" }
   | { type: "approve" }
   | { type: "skip" }
@@ -28,14 +28,17 @@ export function reduce(state: UploadState, event: UploadEvent): UploadState {
     case "submit":
       return state.step === "input" ? { step: "reading" } : state;
     case "created":
-      return state.step === "reading"
-        ? {
-            step: "checking",
-            caseId: event.caseId,
-            challengeText: event.challengeText,
-            source: event.source,
-          }
-        : state;
+      if (state.step !== "reading") return state;
+      // No challenge drafted (out-of-scope listing): there is nothing to approve, so go to the card.
+      if (event.challengeText === null) {
+        return { step: "done", caseId: event.caseId, challengeSent: false, source: event.source };
+      }
+      return {
+        step: "checking",
+        caseId: event.caseId,
+        challengeText: event.challengeText,
+        source: event.source,
+      };
     case "checked":
       return state.step === "checking" ? { ...state, step: "approval" } : state;
     case "approve":
@@ -49,7 +52,7 @@ export function reduce(state: UploadState, event: UploadEvent): UploadState {
         ? { step: "done", caseId: state.caseId, challengeSent: true, source: state.source }
         : state;
     case "fail":
-      return state.step === "reading" || state.step === "checking"
+      return ["reading", "checking", "approval"].includes(state.step)
         ? { step: "error", message: event.message }
         : state;
     case "retry":
