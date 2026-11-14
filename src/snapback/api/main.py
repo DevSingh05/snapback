@@ -111,14 +111,22 @@ from snapback.search import (
 )
 from snapback.settings import Settings, get_settings
 from snapback.tour import (
-    TourPhoto,
     TourPlan,
     WalkResponse,
-    attach_photos,
+    ad_beds_of,
+    ad_plan_word,
+    attach_claims,
     build_tour,
     cached_sweeps,
+    choose_walk,
+    elsewhere_property,
     fixture_sweeps,
+    map_elsewhere,
+    map_locate,
+    must_have_kinds_of,
+    office_on_record,
     rooms_to_see_line,
+    scan_model_of,
     with_summary,
 )
 from snapback.verdict import decide
@@ -1053,28 +1061,35 @@ def create_app(
             case.preferences = merge_preferences(case.preferences, body)
             return case.preferences
 
-    def tour_for(property_id: str, plan_key: str | None) -> TourPlan:
+    def tour_for(
+        property_id: str,
+        plan_key: str | None,
+        any_plan: bool = False,
+        model_id: str | None = None,
+    ) -> TourPlan:
         """The walkthrough plan for a researched place, from its record and the scan's cache."""
         try:
             place = place_for(property_id, None, lookups, None, plan_key)
             record = lookups.record(property_id)
         except AmbiguousPlace:
-            raise HTTPException(
-                status_code=422,
-                detail="Several floor plans share that building. Send the plan_key you picked.",
-            ) from None
+            if not any_plan:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Several floor plans share that building. Send the plan_key you picked.",
+                ) from None
+            place = None
+            record = lookups.record(property_id)
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
-        if place is None:
+        if place is None and not any_plan:
             raise HTTPException(status_code=404, detail="No researched place with that id.")
-        source = place.source
+        source = place.source if place else (record.source if record else DataSource.FIXTURE)
         sweeps: list = []
-        for model_id in record.model_ids if record is not None else []:
-            sweeps = (
-                fixture_sweeps(model_id)
-                if source is DataSource.FIXTURE
-                else cached_sweeps(model_id)
-            )
+        # The scan the photos were placed in comes first; only then the record's other scans.
+        wanted = [model_id] if model_id else []
+        wanted += [m for m in (record.model_ids if record is not None else []) if m != model_id]
+        for each in wanted:
+            sweeps = fixture_sweeps(each) if source is DataSource.FIXTURE else cached_sweeps(each)
             if sweeps:
                 break
         aerial_on = None
@@ -1091,15 +1106,15 @@ def create_app(
         return with_summary(
             build_tour(
                 property_id=property_id,
-                kind=place.kind,
+                kind=place.kind if place else "apartment",
                 source=source,
                 sweeps=sweeps,
-                has_scan=place.has_3d_scan,
+                has_scan=place.has_3d_scan if place else bool(record and record.model_ids),
                 place=place,
                 record=record,
                 aerial_on=aerial_on,
                 aerial_image=aerial_ok,
-                plan_key=place.plan_key,
+                plan_key=place.plan_key if place else None,
             )
         )
 
@@ -1119,33 +1134,64 @@ def create_app(
             raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
         return tour_for(property_id, plan_key)
 
-    def case_tour(case_id: str, request: Request, authorization, x_case_token) -> tuple:
+    def ad_notes_of(case) -> list:
+        """The case's ad-vs-record notes, when its modules produce them (never a network call
+        beyond what the card already made). A recorded case, or any failure, has none."""
+        modules = getattr(getattr(case, "session", None), "modules", None)
+        fn = getattr(modules, "ad_notes", None)
+        if not callable(fn):
+            return []
+        try:
+            return list(fn(getattr(case.session, "case_id", case.case_id)) or [])
+        except Exception:
+            return []
+
+    def office_of(property_id: str) -> str | None:
+        return office_on_record(lookups, property_id)
+
+    def case_tour(
+        case_id: str, request: Request, authorization, x_case_token, mode: str = "claimed"
+    ) -> tuple:
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
+        locate = case.evidence.locate
+        if mode == "elsewhere":
+            other = elsewhere_property(locate) if locate else None
+            if other is None or locate is None:
+                raise HTTPException(
+                    status_code=404, detail="No photo of this case was placed in another building."
+                )
+            model = scan_model_of(locate, other)
+            plan = tour_for(other, None, any_plan=True, model_id=model)
+            plan, fields = map_elsewhere(plan, locate, other, office_of(other))
+            return with_summary(choose_walk(plan)), locate, fields, model
         if case.property_id is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
-        return plan_and_locate(case)
+        return claimed_walk(case, locate)
 
-    def plan_and_locate(case) -> tuple:
-        """The case's building tour with its placed photos, and the locate result."""
-        plan = tour_for(case.property_id, None)
-        locate = case.evidence.locate
+    def claimed_walk(case, locate) -> tuple:
+        """The case's own building walk (the claimed home), with its placed photos and summary."""
+        model = scan_model_of(locate)
+        plan = tour_for(case.property_id, None, any_plan=True, model_id=model)
         if locate is None:
-            return plan, None
-        placed = [
-            TourPhoto(
-                photo_id=p.photo_id,
-                sweep_id=pose.sweep_id,
-                position=tuple(pose.position),
-                rotation_quat=tuple(pose.rotation_quat),
-                fov_deg=pose.fov_deg,
-            )
-            for p in locate.photos
-            if p.status is LocateStatus.LOCATED_IN_CLAIMED
-            and (pose := locate.poses.get(p.photo_id)) is not None
-        ]
-        return with_summary(attach_photos(plan, placed)), locate
+            return with_summary(plan), None, {}, model
+        scan_plan = locate.chosen.floor_plan if locate.chosen else None
+        plan, fields = map_locate(
+            plan,
+            locate,
+            scan_plan=scan_plan,
+            ad_plan=ad_plan_word(ad_beds_of(case)),
+            model_id=model,
+        )
+        plan = attach_claims(plan, ad_notes_of(case))
+        prefs = getattr(case, "preferences", None)
+        return (
+            with_summary(choose_walk(plan, None, must_have_kinds_of(prefs))),
+            locate,
+            fields,
+            model,
+        )
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(
@@ -1162,24 +1208,15 @@ def create_app(
     def get_case_walk(
         case_id: str,
         request: Request,
+        mode: Annotated[Literal["claimed", "elsewhere"], Query()] = "claimed",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
     ) -> WalkResponse:
         """The case-scoped walk: the tour plan plus the case's locate result, so the page can
         show which ad photos were placed, which were taken elsewhere and which could not be
         placed. Needs the case's read token in a header."""
-        plan, locate = case_tour(case_id, request, authorization, x_case_token)
-        return WalkResponse(plan=plan, locate=locate)
-
-    def rooms_line_for(case, property_id: str) -> str | None:
-        """The rooms the ad left out, only for the case's own building and only when the walk
-        knows them. Any trouble building the walk just leaves the line out."""
-        if case.property_id is None or case.property_id != property_id:
-            return None
-        try:
-            return rooms_to_see_line(plan_and_locate(case)[0])
-        except HTTPException:
-            return None
+        plan, locate, fields, model = case_tour(case_id, request, authorization, x_case_token, mode)
+        return WalkResponse(plan=plan, model_id=model, locate=locate, photos=fields)
 
     def capture_date_of(record):
         """The aerial capture date when already known (never a fetch), else None."""
@@ -1262,6 +1299,16 @@ def create_app(
             record=record,
             aerial_on=capture_date_of(record),
         )
+
+    def rooms_line_for(case, property_id: str) -> str | None:
+        """The rooms the ad left out, only for the case's own building and only when the walk
+        knows them. Any trouble building the walk just leaves the line out."""
+        if case.property_id is None or case.property_id != property_id:
+            return None
+        try:
+            return rooms_to_see_line(claimed_walk(case, case.evidence.locate)[0])
+        except HTTPException:
+            return None
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(

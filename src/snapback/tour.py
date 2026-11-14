@@ -25,14 +25,23 @@ school or people, never say "available now" and never offer to book.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from snapback.contracts import AS_OF, DataSource, LocateResult, PlaceMatch, PropertyRecord
+from snapback.contracts import (
+    AS_OF,
+    AdNote,
+    DataSource,
+    LocateResult,
+    LocateStatus,
+    PlaceMatch,
+    PropertyRecord,
+)
 
 ROOM_LINK_M = 4.0  # same-label sweeps closer than this (metres) belong to one room
 MAX_ROOM_STOPS = 12
@@ -111,6 +120,9 @@ class TourPhoto(BaseModel):
     stop: the design that shows "your photo, taken here" fills it from the case's locate result."""
 
     photo_id: str
+    # P1, P2... in the case's photo order: the key of `GET /cases/{id}/evidence/{alias}/photo.jpg`
+    # (the ad's own picture, header token). None for a photo not in a case.
+    alias: str | None = None
     sweep_id: str | None = None
     position: tuple[float, float, float] | None = None
     rotation_quat: tuple[float, float, float, float] | None = None
@@ -128,6 +140,8 @@ class WalkCoverage(BaseModel):
     placed: int = 0
     elsewhere: int = 0
     unplaced: int = 0
+    other_scan: int = 0  # placed in this home, but in another scan of the building: not mapped
+    plan_mismatch: bool = False  # the scan's floor plan differs from the ad's: no room counts
     line: str | None = None
 
 
@@ -184,6 +198,13 @@ class TourPlan(BaseModel):
     aerial: TourAerial | None = None
     stops: list[TourStop]
     links: TourLinks
+    # "claimed": the ad's own home. "elsewhere": the building the ad's photos were taken in (X1);
+    # then `mode_line` says what that is, and no coverage is counted for the claimed home.
+    # Which model axis is vertical in the stops' positions ("y" for fixtures, "z" for Matterport's
+    # cache). Photo poses are in the same frame, so placement uses this axis too.
+    up_axis: Literal["y", "z"] = "y"
+    mode: Literal["claimed", "elsewhere"] = "claimed"
+    mode_line: str | None = None
     coverage: WalkCoverage | None = None
     director: TourDirector | None = None
     # W4: the scan's date as Matterport gives it, or "Scan date not on record". Never invented.
@@ -192,11 +213,25 @@ class TourPlan(BaseModel):
     summary: TourSummary | None = None  # W5: the two columns of the last screen
 
 
+class PhotoWalkFields(BaseModel):
+    """What the walk knows about one ad photo, keyed by photo id. `stop_alias` is the alias (S1..)
+    of the stop that holds it, or None when it is on no stop. `covers_unshown_room` is True when
+    the photo's own room label names a stop that no placed photo covers (the agent's photo
+    budget weighs these first)."""
+
+    stop_alias: str | None = None
+    covers_unshown_room: bool = False
+
+
 class WalkResponse(BaseModel):
-    """`GET /cases/{id}/walk`: the plan with the case's placed photos, and the locate result."""
+    """`GET /cases/{id}/walk`: the plan with the case's placed photos, and the locate result.
+    `model_id` is the scan the walk was built from, for the token-gated page to load: the
+    browser shows that model and no other."""
 
     plan: TourPlan
+    model_id: str | None = None
     locate: LocateResult | None = None
+    photos: dict[str, PhotoWalkFields] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -210,28 +245,51 @@ class TourSweep:
 # --- geometry ----------------------------------------------------------------------------------
 
 
-def _dist(a: TourSweep, b: TourSweep) -> float:
-    """Walking distance on the floor plane (x, z; y is up), inf when a position is unknown."""
+# Which coordinate is "up". Positions are in the scan's own model frame, and the two sources
+# differ: the synthetic fixtures are y-up (x, 1.4, z) while Matterport's cached sweeps (the LIVE
+# source) are z-up (x, y, height). Placed-photo poses are the same sweep positions from the same
+# cache, so they share the frame. The axis follows the data source, never a guess from the
+# numbers (a multi-floor scan fools a spread test), and is stored on the plan as `up_axis`.
+
+
+def up_axis_for(source: DataSource) -> Literal["y", "z"]:
+    return "z" if source is DataSource.LIVE else "y"
+
+
+def floor_xy(position: Sequence[float], up: str = "y") -> tuple[float, float]:
+    """The two horizontal coordinates of a position, given which axis is up."""
+    return (position[0], position[1] if up == "z" else position[2])
+
+
+def _dist(a: TourSweep, b: TourSweep, up: str = "y") -> float:
+    """Walking distance on the floor plane, inf when a position is unknown."""
     if a.position is None or b.position is None:
         return math.inf
-    return math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2])
+    ax, ay = floor_xy(a.position, up)
+    bx, by = floor_xy(b.position, up)
+    return math.hypot(ax - bx, ay - by)
 
 
 def _central(
-    group: Sequence[TourSweep], order: dict[str, int], avoid: str | None = None
+    group: Sequence[TourSweep],
+    order: dict[str, int],
+    avoid: str | None = None,
+    up: str = "y",
 ) -> TourSweep:
     """The sweep with the least total distance to the rest. Ties go to the one the scan lists
     first. `avoid` is skipped when another sweep is available."""
     pool = [s for s in group if s.sweep_id != avoid] or list(group)
 
     def cost(s: TourSweep) -> tuple[float, int]:
-        total = sum(_dist(s, o) for o in group if o is not s)
+        total = sum(_dist(s, o, up) for o in group if o is not s)
         return (0.0 if math.isinf(total) else total, order[s.sweep_id])
 
     return min(pool, key=cost)
 
 
-def _clusters(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[list[TourSweep]]:
+def _clusters(
+    sweeps: Sequence[TourSweep], order: dict[str, int], up: str = "y"
+) -> list[list[TourSweep]]:
     """Single-link groups of sweeps closer than ROOM_LINK_M; with no positions, one group."""
     parent = list(range(len(sweeps)))
 
@@ -243,7 +301,7 @@ def _clusters(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[list[T
 
     for i, a in enumerate(sweeps):
         for j in range(i + 1, len(sweeps)):
-            if _dist(a, sweeps[j]) <= ROOM_LINK_M:
+            if _dist(a, sweeps[j], up) <= ROOM_LINK_M:
                 parent[find(j)] = find(i)
     out: dict[int, list[TourSweep]] = {}
     for i, s in enumerate(sweeps):
@@ -254,14 +312,14 @@ def _clusters(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[list[T
 
 
 def _nearest_first(
-    start: TourSweep, reps: list[TourSweep], order: dict[str, int]
+    start: TourSweep, reps: list[TourSweep], order: dict[str, int], up: str = "y"
 ) -> list[TourSweep]:
     """Nearest neighbour from `start`; ties go to the sweep the scan lists first."""
     left = list(reps)
     here = start
     path: list[TourSweep] = []
     while left:
-        nxt = min(left, key=lambda s: (_dist(here, s), order[s.sweep_id]))
+        nxt = min(left, key=lambda s: (_dist(here, s, up), order[s.sweep_id]))
         path.append(nxt)
         left.remove(nxt)
         here = nxt
@@ -408,6 +466,7 @@ def walk(
     sweeps: Sequence[TourSweep],
     place: PlaceMatch | None = None,
     record: PropertyRecord | None = None,
+    up: str = "y",
 ) -> tuple[list[TourStop], bool]:
     """The door and the room (or numbered) stops in walking order, and if rooms are labelled."""
     if not sweeps:
@@ -415,12 +474,12 @@ def walk(
     order = {s.sweep_id: i for i, s in enumerate(sweeps)}
     labelled = [s for s in sweeps if (s.label or "").strip()]
     if not labelled:
-        return _numbered(sweeps, order), False
+        return _numbered(sweeps, order, up), False
 
     entry = [s for s in labelled if _is_entry(s.label)]
     used: set[str] = set()
     if entry:
-        door_sweep = _central(entry, order)
+        door_sweep = _central(entry, order, up=up)
         door = _stop_for(
             door_sweep,
             kind="door",
@@ -445,10 +504,10 @@ def walk(
         groups.setdefault((s.label or "").strip(), []).append(s)
     rooms: list[tuple[str, list[TourSweep]]] = []
     for label in sorted(groups, key=lambda lab: min(order[s.sweep_id] for s in groups[lab])):
-        rooms.extend((label, c) for c in _clusters(groups[label], order))
+        rooms.extend((label, c) for c in _clusters(groups[label], order, up))
 
-    reps = {id(g): _central(g, order, avoid=door_sweep.sweep_id) for _l, g in rooms}
-    path = _nearest_first(door_sweep, [reps[id(g)] for _l, g in rooms], order)
+    reps = {id(g): _central(g, order, avoid=door_sweep.sweep_id, up=up) for _l, g in rooms}
+    path = _nearest_first(door_sweep, [reps[id(g)] for _l, g in rooms], order, up)
     by_rep = {reps[id(g)].sweep_id: (lab, g) for lab, g in rooms}
     path = path[:MAX_ROOM_STOPS]
 
@@ -476,13 +535,13 @@ def walk(
     return stops, True
 
 
-def _numbered(sweeps: Sequence[TourSweep], order: dict[str, int]) -> list[TourStop]:
+def _numbered(sweeps: Sequence[TourSweep], order: dict[str, int], up: str = "y") -> list[TourStop]:
     """No labels: the door is the scan's start, then evenly spaced stops along the path."""
     start = sweeps[0]
     door = _stop_for(start, kind="door", key="door", title="Front door", count=1)
     door.note = START_NOTE
     door.tip = _START_TIP
-    path = _nearest_first(start, list(sweeps[1:]), order)
+    path = _nearest_first(start, list(sweeps[1:]), order, up)
     n = min(MAX_FALLBACK_STOPS, len(path))
     picks = [path[round(i * (len(path) - 1) / (n - 1))] for i in range(n)] if n > 1 else path[:n]
     stops = [door]
@@ -619,7 +678,8 @@ def build_tour(
         facts=outside_facts(place, record, aerial_on),
         tip="Look at the entrance, the lighting and the parking as you walk up.",
     )
-    inside, labelled = walk(sweeps, place, record) if has_scan else ([], False)
+    up = up_axis_for(source)
+    inside, labelled = walk(sweeps, place, record, up) if has_scan else ([], False)
     outro = TourStop(
         kind="outro",
         key="outro",
@@ -637,6 +697,7 @@ def build_tour(
     scan_date_line, scan_age_note = scan_date_lines(scan_on, today) if has_scan else (None, None)
     prep = f"/prep/place/{property_id}" + (f"?plan_key={plan_key}" if plan_key else "")
     return TourPlan(
+        up_axis=up,  # type: ignore[arg-type]
         property_id=property_id,
         kind=kind,
         source=source,
@@ -721,3 +782,681 @@ def cached_sweeps(model_id: str, cache_dir=None) -> list[TourSweep]:
     return [
         TourSweep(s.sweep_id, s.position, s.rotation_quat, labels.get(s.sweep_id)) for s in sweeps
     ]
+
+
+# --- the ad's photos on the stops (W1) -----------------------------------------------------------
+
+WALKED = ("door", "room", "stop")  # the stop kinds that are places in the scan
+
+
+def stop_aliases(plan: TourPlan) -> dict[str, str]:
+    """Stop key -> alias S1..Sn over the stops inside the scan, in walking order. Aliases are
+    what a model may see in place of room names and ids."""
+    keys = [s.key for s in plan.stops if s.kind in WALKED]
+    return {key: f"S{i}" for i, key in enumerate(keys, start=1)}
+
+
+def _plural_photos(n: int) -> str:
+    return f"{n} photo" if n == 1 else f"{n} photos"
+
+
+def coverage_line(
+    *, counted: str, total: int, with_photo: int, unplaced: int, elsewhere: int, other_scan: int = 0
+) -> str:
+    base = (
+        f"The ad showed {with_photo} of the {total} rooms in this scan."
+        if counted == "rooms"
+        else f"The ad's photos were taken at {with_photo} of {total} spots in this scan."
+    )
+    if unplaced:
+        base += f" {_plural_photos(unplaced)} could not be placed, so the real count may be higher."
+    if elsewhere:
+        was = "was" if elsewhere == 1 else "were"
+        base += f" {_plural_photos(elsewhere)} {was} taken in a different building and not counted."
+    if other_scan:
+        was = "was" if other_scan == 1 else "were"
+        base += (
+            f" {_plural_photos(other_scan)} {was} placed in this home, in another scan of this "
+            "building, and not shown in a room here."
+        )
+    return base
+
+
+def _is_start_door(stop: TourStop) -> bool:
+    """The front door that is only the scan's first sweep (no entry room was labelled)."""
+    return stop.kind == "door" and stop.note == START_NOTE
+
+
+def _beds_of(plan: str | None) -> int | None:
+    """Bedrooms in a floor-plan label ("2 bed / 2 bath" is 2, "studio / 1 bath" is 0)."""
+    low = (plan or "").strip().lower()
+    if low.startswith("studio"):
+        return 0
+    m = re.match(r"(\d+)\s*(?:bed|br)", low)
+    return int(m.group(1)) if m else None
+
+
+def _bed_word(plan: str | None) -> str:
+    n = _beds_of(plan)
+    return "studio" if n == 0 else f"{n}-bed" if n is not None else str(plan)
+
+
+def _plans_differ(scan_plan: str | None, ad_plan: str | None) -> bool:
+    if not scan_plan or not ad_plan:
+        return False
+    a, b = _beds_of(scan_plan), _beds_of(ad_plan)
+    if a is not None and b is not None:
+        return a != b
+    return scan_plan.strip().lower() != ad_plan.strip().lower()
+
+
+def stop_for_photo(
+    plan: TourPlan, sweep: str | None, position: Sequence[float] | None
+) -> TourStop | None:
+    """The stop a placed photo belongs to. Its sweep's room first (a room beats the scan's start
+    door, which only shares that sweep); else the nearest stop within ROOM_LINK_M of the photo's
+    position (a photo 0.7 m from the Kitchen sweep is in the Kitchen); else the start door when
+    the sweep is its own; else None. A photo is never put on a far room."""
+    walked = [s for s in plan.stops if s.kind in WALKED]
+    holding = [s for s in walked if sweep and sweep in s.sweep_ids]
+    rooms = [s for s in holding if not _is_start_door(s)]
+    if rooms:
+        return rooms[0]
+    if position is not None:
+        px, py = floor_xy(position, plan.up_axis)
+        near = [
+            (
+                math.hypot(
+                    px - floor_xy(s.position, plan.up_axis)[0],
+                    py - floor_xy(s.position, plan.up_axis)[1],
+                ),
+                i,
+                s,
+            )
+            for i, s in enumerate(walked)
+            if s.position is not None and not _is_start_door(s)
+        ]
+        near = [n for n in near if n[0] <= ROOM_LINK_M]
+        if near:
+            return min(near, key=lambda n: (n[0], n[1]))[2]
+    return holding[0] if holding else None
+
+
+def map_locate(
+    plan: TourPlan,
+    locate: LocateResult,
+    *,
+    scan_plan: str | None = None,
+    ad_plan: str | None = None,
+    alias_order: dict[str, int] | None = None,
+    model_id: str | None = None,
+) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
+    """Put the ad's placed photos on the stops that hold their sweep, set each stop's `ad_view`,
+    and count coverage. Only `located_in_claimed` photos ever enter a room: a photo taken in
+    another building, or one that could not be placed, is counted but never put in a room.
+
+    `ad_view` is "placed" for a stop with a photo; "none_placed" for one without only when every
+    ad photo was placed in this home (so "the ad showed no photo of this room" is true); else
+    "unknown". When an apartment scan's floor plan differs from the ad's, rooms are not counted.
+
+    `model_id` is the scan this walk shows. A building can have several scans, each in its own
+    coordinate frame, so with it set only photos whose own scan (`matched_model_id`, else
+    `model_id`) is that scan are put on stops. A photo placed in a sibling scan, or whose scan is
+    not named, is counted as "placed in this home, in another scan" and never mapped by position.
+    """
+    status = {p.photo_id: p.status for p in locate.photos}
+    claimed = [p for p in locate.photos if p.status is LocateStatus.LOCATED_IN_CLAIMED]
+    on_this_scan = [
+        p for p in claimed if model_id is None or (p.matched_model_id or p.model_id) == model_id
+    ]
+    placed_ids = [p.photo_id for p in on_this_scan]
+    other_scan = len(claimed) - len(placed_ids)
+    elsewhere = sum(s is LocateStatus.LOCATED_ELSEWHERE for s in status.values())
+    unplaced = len(status) - len(claimed) - elsewhere
+
+    order_of = alias_order or {p.photo_id: i for i, p in enumerate(locate.photos, start=1)}
+    by_stop: dict[str, list[TourPhoto]] = {}
+    where: dict[str, str] = {}  # photo id -> stop key
+    for photo in locate.photos:
+        if photo.photo_id not in placed_ids:
+            continue
+        pose = locate.poses.get(photo.photo_id)
+        sweep = photo.pano_id or (pose.sweep_id if pose else None)
+        stop = stop_for_photo(plan, sweep, pose.position if pose else None)
+        if stop is None:
+            continue  # placed, but on no stop and near none: never forced onto a far room
+        by_stop.setdefault(stop.key, []).append(
+            TourPhoto(
+                photo_id=photo.photo_id,
+                alias=f"P{order_of[photo.photo_id]}",
+                sweep_id=sweep,
+                position=tuple(pose.position) if pose else None,
+                rotation_quat=tuple(pose.rotation_quat) if pose else None,
+                fov_deg=pose.fov_deg if pose else None,
+            )
+        )
+        where[photo.photo_id] = stop.key
+    # "The ad showed no photo of this room" is true only when every ad photo was placed in this
+    # home AND sits on a stop; one placed photo on no stop leaves every empty room unknown.
+    all_placed = bool(status) and all(pid in where for pid in status)
+
+    stops = []
+    for stop in plan.stops:
+        if stop.kind not in WALKED:
+            stops.append(stop)
+            continue
+        mine = by_stop.get(stop.key, [])
+        if _is_start_door(stop) and not mine:
+            view = "unknown"  # the scan's start is not a room: it says nothing about the ad
+        else:
+            view = "placed" if mine else ("none_placed" if all_placed else "unknown")
+        stops.append(stop.model_copy(update={"photos": mine, "ad_view": view}))
+
+    # The scan's start sweep, when it is no labelled room, stays out of the room total unless a
+    # photo sits on it.
+    walked = [s for s in stops if s.kind in WALKED and not (_is_start_door(s) and not s.photos)]
+    mismatch = _plans_differ(scan_plan, ad_plan)
+    with_photo = sum(bool(s.photos) for s in walked)
+    counted = "rooms" if plan.rooms_labelled else "spots"
+    line: str | None
+    if not walked:
+        counted, line = "none", None
+    elif mismatch:
+        counted = "none"
+        line = (
+            f"This scan is a {_bed_word(scan_plan)} floor plan and the ad is for a "
+            f"{_bed_word(ad_plan)}, so we show the scan without counting rooms."
+        )
+    elif not placed_ids and other_scan:
+        counted = "none"
+        line = (
+            "The ad's photos were placed in another scan of this building, "
+            "so we show this scan without counting rooms."
+        )
+    elif not placed_ids:
+        counted = "none"
+        line = (
+            "None of the ad's photos could be placed in this scan, "
+            "so we show it without counting rooms."
+        )
+    else:
+        line = coverage_line(
+            counted=counted,
+            total=len(walked),
+            with_photo=with_photo,
+            unplaced=unplaced,
+            elsewhere=elsewhere,
+            other_scan=other_scan,
+        )
+    coverage = WalkCoverage(
+        counted=counted,  # type: ignore[arg-type]
+        total=len(walked) if counted != "none" else 0,
+        with_photo=with_photo if counted != "none" else 0,
+        placed=len(placed_ids),
+        elsewhere=elsewhere,
+        unplaced=unplaced,
+        other_scan=other_scan,
+        plan_mismatch=mismatch,
+        line=line,
+    )
+
+    aliases = stop_aliases(plan)
+    unshown = {
+        (s.room_label or "").strip().lower() for s in walked if not s.photos and s.room_label
+    }
+    fields: dict[str, PhotoWalkFields] = {}
+    for photo in locate.photos:
+        key = where.get(photo.photo_id)
+        label = (photo.room_label or "").strip().lower()
+        fields[photo.photo_id] = PhotoWalkFields(
+            stop_alias=aliases.get(key) if key else None,
+            covers_unshown_room=bool(label and label in unshown),
+        )
+    return plan.model_copy(update={"stops": stops, "coverage": coverage}), fields
+
+
+# --- the tour director: choices among options code wrote (W6) ------------------------------------
+#
+# Code builds the walk and every line. The only things a model may pick are WHICH stops open
+# expanded (at most three) and WHICH checks lead the summary and the tour request, each from a
+# short list of options code wrote. An off-list pick, a failed chooser or a menu of one gets the
+# code policy, and the step is stamped `model` or `policy`. The chooser sees stop aliases (S1..),
+# room kind words, counts and yes/no flags: never an id, an address, a record row or an image.
+
+MAX_DWELL = 3
+MAX_LEAD = 5
+# The only facts a chooser may be shown. Values are whole numbers (counts).
+WALK_FACT_KEYS = frozenset(
+    {"stops", "hidden", "contradicted", "must_have", "photographed", "unplaced_photos", "options"}
+)
+NOT_CONFIRMED = "Not confirmed"
+
+
+@dataclass(frozen=True)
+class WalkOffer:
+    """One open walk choice. Same shape as `planner.SearchOffer`, so any `Chooser` can take it."""
+
+    kind: Literal["dwell", "lead"]
+    options: tuple[str, ...]
+    aliases: tuple[str, ...]
+    facts: dict[str, int]
+    default: str
+    default_reason: str
+    # Not shown to a chooser: the stop keys each option means, keyed by option label.
+    payload: dict[str, list[str]] = field(default_factory=dict, compare=False, repr=False)
+
+    def resolve(self, pick: object) -> str | None:
+        wanted = str(pick or "").strip().casefold()
+        for label, alias in zip(self.options, self.aliases, strict=True):
+            if wanted in (label.casefold(), alias.casefold()):
+                return label
+        return None
+
+    def for_chooser(self) -> WalkOffer:
+        """The offer without its payload, and with only allow-listed facts."""
+        facts = {k: v for k, v in self.facts.items() if k in WALK_FACT_KEYS}
+        return WalkOffer(
+            self.kind, self.options, self.aliases, facts, self.default, self.default_reason
+        )
+
+
+def _kind_word(stop: TourStop) -> str:
+    if stop.kind == "door":
+        return "entry"
+    return _kind_of(stop.room_label) or "room"
+
+
+def must_have_kinds_of(prefs: object | None) -> list[str]:
+    """Room kinds the renter's remembered must-haves live in (the case's preferences, #195):
+    a parking need lives at the garage; a rejected walk-up lives at the entrance (stairs or
+    elevator). Code-defined keys only; no free text."""
+    kinds: list[str] = []
+    if getattr(prefs, "needs_parking", False):
+        kinds.append("garage")
+    if getattr(prefs, "no_walkup", False):
+        kinds.append("entry")
+    return kinds
+
+
+def _contradicted(stop: TourStop) -> bool:
+    return any(c.text.startswith(NOT_CONFIRMED) for c in stop.claims)
+
+
+def _names(stops: Sequence[TourStop], alias: dict[str, str]) -> str:
+    return ", ".join(f"{alias[s.key]} {_kind_word(s)}" for s in stops)
+
+
+def walk_offers(plan: TourPlan, must_have_kinds: Sequence[str] = ()) -> list[WalkOffer]:
+    """The choices open for this walk: which stops to dwell on and which checks lead. A choice
+    with fewer than two distinct options is not offered (a menu of one is policy)."""
+    alias = stop_aliases(plan)
+    walked = [s for s in plan.stops if s.kind in WALKED]
+    want = {k.lower() for k in must_have_kinds}
+    sets: list[tuple[str, str, list[TourStop]]] = [
+        (
+            "contradicted",
+            "Rooms with a claim the record does not confirm",
+            [s for s in walked if _contradicted(s)],
+        ),
+        (
+            "hidden",
+            "Rooms the ad showed no photo of",
+            [s for s in walked if s.ad_view == "none_placed"],
+        ),
+        (
+            "must_have",
+            "Rooms your must-haves live in",
+            [s for s in walked if _kind_word(s) in want],
+        ),
+        ("photographed", "Rooms the ad photographed", [s for s in walked if s.ad_view == "placed"]),
+    ]
+    facts = {
+        "stops": len(walked),
+        "hidden": len(sets[1][2]),
+        "contradicted": len(sets[0][2]),
+        "must_have": len(sets[2][2]),
+        "photographed": len(sets[3][2]),
+        "unplaced_photos": plan.coverage.unplaced if plan.coverage else 0,
+    }
+    offers: list[WalkOffer] = []
+
+    dwell: dict[str, list[str]] = {}
+    seen: list[tuple[str, ...]] = []
+    first = None
+    for _key, label, stops in sets:
+        keys = tuple(s.key for s in stops[:MAX_DWELL])
+        if not keys or keys in seen:
+            continue
+        seen.append(keys)
+        text = f"{label}: {_names(stops[:MAX_DWELL], alias)}"
+        dwell[text] = list(keys)
+        first = first or text
+    if len(dwell) >= 2 and first:
+        labels = tuple(dwell)
+        offers.append(
+            WalkOffer(
+                "dwell",
+                labels,
+                tuple(f"D{i}" for i in range(1, len(labels) + 1)),
+                {**facts, "options": len(labels)},
+                first,
+                "Claims the record does not confirm first, then rooms the ad hid, then must-haves.",
+                dwell,
+            )
+        )
+
+    def lead_keys(order: Sequence[TourStop]) -> list[str]:
+        return [s.key for s in order if s.tip or s.claims][:MAX_LEAD]
+
+    orders: list[tuple[str, list[TourStop]]] = [
+        (
+            "Claims the record does not confirm first",
+            sorted(walked, key=lambda s: not _contradicted(s)),
+        ),
+        (
+            "Rooms the ad showed no photo of first",
+            sorted(walked, key=lambda s: s.ad_view != "none_placed"),
+        ),
+        ("Walking order", list(walked)),
+    ]
+    lead: dict[str, list[str]] = {}
+    seen_lead: list[list[str]] = []
+    for label, order in orders:
+        keys = lead_keys(order)
+        if keys and keys not in seen_lead:
+            seen_lead.append(keys)
+            lead[label] = keys
+    if len(lead) >= 2:
+        labels = tuple(lead)
+        offers.append(
+            WalkOffer(
+                "lead",
+                labels,
+                tuple(f"L{i}" for i in range(1, len(labels) + 1)),
+                {**facts, "options": len(labels)},
+                labels[0],
+                "Code priority: unconfirmed claims, then hidden rooms, then walking order.",
+                lead,
+            )
+        )
+    return offers
+
+
+def policy_director(plan: TourPlan, must_have_kinds: Sequence[str] = ()) -> TourDirector:
+    """The director with every pick left to the code policy (what runs with the model off)."""
+    return choose_walk(plan, None, must_have_kinds).director or TourDirector()
+
+
+def choose_walk(
+    plan: TourPlan, chooser: object | None = None, must_have_kinds: Sequence[str] = ()
+) -> TourPlan:
+    """Fill `plan.director`. A chooser (anything with `choose(offer) -> (pick, reason)` and a
+    `chosen_by`) is asked only when an offer has two or more options and sees only the
+    `for_chooser()` offer; code applies a pick only if it is on the list. Facts, stops and
+    coverage are never touched: only the director field changes."""
+    offers = {o.kind: o for o in walk_offers(plan, must_have_kinds)}
+    stamp: Literal["model", "policy"] = "policy"
+    reasons: list[str] = []
+    picked: dict[str, list[str]] = {}
+    for kind in ("dwell", "lead"):
+        offer = offers.get(kind)
+        if offer is None:
+            continue
+        label, why, by = offer.default, offer.default_reason, "policy"
+        if chooser is not None:
+            try:
+                raw, said = chooser.choose(offer.for_chooser())  # type: ignore[attr-defined]
+            except Exception:  # a chooser that broke did not choose
+                raw, said = None, ""
+            resolved = offer.resolve(raw)
+            if resolved is not None:
+                label, by = resolved, getattr(chooser, "chosen_by", "policy")
+                why = str(said or "").strip()[:200] or why
+        picked[kind] = offer.payload[label]
+        if by == "model":
+            stamp = "model"
+        reasons.append(why)
+    director = TourDirector(
+        dwell=picked.get("dwell", []),
+        lead_checks=picked.get("lead", []),
+        stamp=stamp,
+        reason=" ".join(reasons) or None,
+    )
+    return plan.model_copy(update={"director": director})
+
+
+# --- the ad's claims on the stops (W2) -----------------------------------------------------------
+
+SRC_LABELS = "Matterport room labels"
+_FLOOR_CLAIMS = {"floor_wood", "floor_carpet", "floor_tile", "floor_laminate"}
+# Claim kind -> the room kinds (from `_kind_of`) it can land on, best first. A claim with no such
+# stop lands on the arrival. Every note lands on exactly one stop.
+_CLAIM_ROOMS: dict[str, tuple[str, ...]] = {
+    **{k: ("living", "bed", "dining", "hall") for k in _FLOOR_CLAIMS},
+    "washer_dryer": ("laundry",),
+    "garage": ("garage",),
+    "beds": ("bed",),
+    "baths": ("bath",),
+}
+
+
+def claim_text(note: AdNote, lang: str = "en") -> str | None:
+    """The card's own words for an ad-vs-record note (the string table), or None if it has none.
+    Same wording as the card line: facts turned into words by code."""
+    from snapback.card import strings
+
+    if not strings.has(f"claims.{note.key}", lang):
+        return None
+    claim_key = "beds_studio" if note.claim == "beds" and note.ad_value == "0" else note.claim
+    claim = strings.text(
+        f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
+    )
+    record = strings.text("list.and", lang).join(
+        strings.text(f"kind.{w}", lang) for w in note.record
+    )
+    return strings.text(
+        f"claims.{note.key}",
+        lang,
+        claim=claim,
+        record=record,
+        year=note.year if note.year is not None else "",
+        ad_value=note.ad_value or "",
+        record_value=note.record_value or "",
+    )
+
+
+def count_line(label: str, ad_value: str, rooms: int, word: str) -> str:
+    """`word` is the singular kind word (Bedroom, Bathroom); the ad's number sets the plural."""
+    ad_word = word if ad_value == "1" else f"{word}s"
+    n = "room" if rooms == 1 else "rooms"
+    return (
+        f"The ad says {ad_value} {ad_word.lower()}. This scan has {rooms} {n} labelled "
+        f"{label}. Labels can be wrong, so count them in person."
+    )
+
+
+def attach_claims(plan: TourPlan, notes: Sequence[AdNote], lang: str = "en") -> TourPlan:
+    """Put each ad-vs-record note on exactly one stop (or the arrival): floors on the living
+    room, bedroom or dining room; washer and dryer on laundry; garage on the garage; bed and bath
+    claims on the first bedroom or bathroom; everything else on the arrival. Then, only when
+    rooms are labelled and the scan's floor plan matches the ad's, an INFO count line on the
+    first bedroom or bathroom when the ad's number differs from the scan's labelled rooms.
+    The wording is the card's own; a note with no words is left out. Never a verdict."""
+    walked = [s for s in plan.stops if s.kind in WALKED]
+    by_kind: dict[str, list[TourStop]] = {}
+    for s in walked:
+        if s.kind != "door":
+            by_kind.setdefault(_kind_of(s.room_label) or "", []).append(s)
+    added: dict[str, list[TourFact]] = {}
+
+    def land(note: AdNote, text: str) -> None:
+        key = "arrive"
+        for room_kind in _CLAIM_ROOMS.get(note.claim, ()):
+            if by_kind.get(room_kind):
+                key = by_kind[room_kind][0].key
+                break
+        source = "Vexcel" if note.key == "aerial_date" else SRC_RECORD
+        added.setdefault(key, []).append(TourFact(text=text, source=source))
+
+    for note in notes:
+        text = claim_text(note, lang)
+        if text:
+            land(note, text)
+
+    counts_ok = plan.rooms_labelled and not (plan.coverage and plan.coverage.plan_mismatch)
+    if counts_ok:
+        for note in notes:
+            if note.claim not in ("beds", "baths") or note.ad_value is None:
+                continue
+            kind, word = ("bed", "bedroom") if note.claim == "beds" else ("bath", "bathroom")
+            rooms = by_kind.get(kind, [])
+            if note.ad_value == "0" or not rooms:
+                continue
+            if str(len(rooms)) != note.ad_value.replace(",", ""):
+                line = count_line(word.capitalize(), note.ad_value, len(rooms), word)
+                added.setdefault(rooms[0].key, []).append(TourFact(text=line, source=SRC_LABELS))
+
+    stops = [
+        s.model_copy(update={"claims": [*s.claims, *added[s.key]]}) if s.key in added else s
+        for s in plan.stops
+    ]
+    return plan.model_copy(update={"stops": stops})
+
+
+# --- where the photos were taken (X1) ------------------------------------------------------------
+
+ELSEWHERE_LINE = {
+    "en": (
+        "The home in these photos is listed by {office} on CoStar's record. "
+        "We can't tell you if it is offered, or at this price."
+    ),
+    "es": (
+        "La casa de estas fotos aparece a nombre de {office} en el registro de CoStar. "
+        "No podemos decirle si se ofrece, ni a qué precio."
+    ),
+}
+# Used only when the office truly cannot be read from the record (never "has no office").
+ELSEWHERE_UNREAD = {
+    "en": (
+        "We could not read this home's office from CoStar's record. "
+        "We can't tell you if it is offered, or at this price."
+    ),
+    "es": (
+        "No pudimos leer la oficina de esta casa en el registro de CoStar. "
+        "No podemos decirle si se ofrece, ni a qué precio."
+    ),
+}
+
+
+def elsewhere_property(locate: LocateResult) -> str | None:
+    """The building most of the case's `located_elsewhere` photos were verified in (ties go to
+    the id that sorts first), or None when no photo names one. Never a guess."""
+    names = [
+        p.matched_property_id
+        for p in locate.photos
+        if p.status is LocateStatus.LOCATED_ELSEWHERE and p.matched_property_id
+    ]
+    if not names:
+        return None
+    return min(set(names), key=lambda n: (-names.count(n), n))
+
+
+def map_elsewhere(
+    plan: TourPlan,
+    locate: LocateResult,
+    property_id: str,
+    office: str | None,
+    lang: str = "en",
+) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
+    """The tour of the building the ad's photos were taken in. Only photos verified in THIS
+    building enter its rooms; photos of the claimed home never do (they are another walk). No
+    coverage is counted, and an empty room never says "the ad showed no photo of this room"
+    (the ad was for a different home). The line names the office on record and says nothing about
+    rent, availability, an address or the ad being fake."""
+    mine = [
+        p.model_copy(update={"status": LocateStatus.LOCATED_IN_CLAIMED})
+        for p in locate.photos
+        if p.status is LocateStatus.LOCATED_ELSEWHERE and p.matched_property_id == property_id
+    ]
+    shadow = locate.model_copy(update={"photos": mine})
+    out, fields = map_locate(
+        plan, shadow, alias_order={p.photo_id: i for i, p in enumerate(locate.photos, start=1)}
+    )
+    stops = [
+        s.model_copy(update={"ad_view": "unknown"}) if s.ad_view == "none_placed" else s
+        for s in out.stops
+    ]
+    coverage = WalkCoverage(counted="none", placed=len(mine))
+    line = ELSEWHERE_LINE[lang].format(office=office) if office else ELSEWHERE_UNREAD[lang]
+    return (
+        out.model_copy(
+            update={"stops": stops, "coverage": coverage, "mode": "elsewhere", "mode_line": line}
+        ),
+        fields,
+    )
+
+
+def scan_model_of(locate: LocateResult | None, property_id: str | None = None) -> str | None:
+    """The Matterport model the photos were placed in, so the walk uses the same scan: the chosen
+    floor plan's model, else the model most claimed photos name. For the other building (X1),
+    the model its photos matched. None when nothing names one."""
+    if locate is None:
+        return None
+    if property_id is None:
+        if locate.chosen and locate.chosen.model_id:
+            return locate.chosen.model_id
+        names = [
+            p.model_id
+            for p in locate.photos
+            if p.status is LocateStatus.LOCATED_IN_CLAIMED and p.model_id
+        ]
+    else:
+        names = [
+            p.matched_model_id
+            for p in locate.photos
+            if p.status is LocateStatus.LOCATED_ELSEWHERE
+            and p.matched_property_id == property_id
+            and p.matched_model_id
+        ]
+    return min(set(names), key=lambda n: (-names.count(n), n)) if names else None
+
+
+def ad_beds_of(case: object) -> int | None:
+    """Bedrooms the ad claims, read from the listing text the case already holds (never a
+    network call). None when the ad names none or the case holds no text."""
+    from snapback.agent.intake.claims import ClaimKind, extract_claims
+
+    modules = getattr(getattr(case, "session", None), "modules", None)
+    text = getattr(getattr(modules, "_listing", None), "text", None)
+    if not isinstance(text, str):
+        return None
+    try:
+        for claim in extract_claims(text).claims:
+            if claim.kind is ClaimKind.BEDS and claim.value is not None:
+                return int(claim.value)
+    except Exception:  # a reading that broke did not happen
+        return None
+    return None
+
+
+def ad_plan_word(beds: int | None) -> str | None:
+    return None if beds is None else ("studio" if beds == 0 else f"{beds} bed")
+
+
+def office_on_record(lookups: object, property_id: str) -> str | None:
+    """The leasing office on CoStar's record for a building or house, looked up BY ID in the
+    whole supply (every floor plan, every house), never in a cheapest-first page of a search.
+    Falls back to the record's manager company. None only when neither can be read."""
+    from snapback.search import _supply
+
+    try:
+        for raw in _supply(lookups):
+            if raw.property_id == property_id and raw.office:
+                return raw.office
+    except Exception:  # a lookup that broke did not happen
+        pass
+    try:
+        record = lookups.record(property_id)  # type: ignore[attr-defined]
+    except Exception:
+        return None
+    return (record.manager_company or None) if record is not None else None

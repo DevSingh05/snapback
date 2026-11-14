@@ -13,7 +13,7 @@ Retrieval only ranks candidates; this is the check that decides.
 """
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import numpy as np
@@ -43,6 +43,9 @@ class Verification:
     inliers: int
     homography: np.ndarray | None  # maps a pixels to b pixels
     spread: float = 0.0  # bounding box of the inliers in a, as a fraction of a's area
+    # Inlier pairs (a x, a y, b x, b y) in pixels, for the evidence drawing. Left out of repr
+    # and equality, so they never land in a log line by accident (E2b).
+    pairs: np.ndarray | None = field(default=None, repr=False, compare=False)
 
     @property
     def ratio(self) -> float:
@@ -54,7 +57,9 @@ def verify(matcher: Matcher, a: Image.Image, b: Image.Image, ransac_px: float) -
     if len(pa) < 4:
         return Verification(len(pa), 0, None)
     h, mask = ransac_homography(pa, pb, ransac_px)
-    return Verification(len(pa), int(mask.sum()), h, _spread(pa[mask], a.size))
+    return Verification(
+        len(pa), int(mask.sum()), h, _spread(pa[mask], a.size), np.c_[pa[mask], pb[mask]]
+    )
 
 
 def _spread(points: np.ndarray, size: tuple[int, int]) -> float:

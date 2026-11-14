@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 import { ConfirmPage } from "./office/ConfirmPage";
 import { CardPage } from "./pages/CardPage";
@@ -11,20 +11,25 @@ import { TracePage } from "./trace/TracePage";
 import { TwinPage } from "./twin/TwinPage";
 import { UploadPage } from "./upload/UploadPage";
 
+// The city map loads on its own route only: its chunk (and MapLibre) never reaches the home page.
+const MapPage = lazy(() => import("./map/MapPage"));
+
 type Route =
+  | { name: "map" }
   | { name: "result"; id: string }
   | { name: "trace"; id: string }
   | { name: "twin"; id: string }
   | { name: "verify"; id: string }
   | { name: "replay"; slug: string }
+  | { name: "tour"; propertyId: string }
   | { name: "prep-case"; id: string }
   | { name: "prep-place"; propertyId: string }
   | { name: "confirm" }
   | { name: "replays" }
-  | { name: "tour"; propertyId: string }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
+  if (/^\/map\/?$/.test(path)) return { name: "map" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
@@ -57,6 +62,15 @@ export default function App() {
   }, []);
 
   const route = matchRoute(path);
+  if (route.name === "map") {
+    return (
+      <main className="shell-map">
+        <Suspense fallback={<p className="map-wait">Opening the city...</p>}>
+          <MapPage />
+        </Suspense>
+      </main>
+    );
+  }
   return (
     <main className="shell">
       <ReplayNav />
@@ -75,6 +89,10 @@ export default function App() {
             propertyId: route.propertyId,
             planKey: new URLSearchParams(window.location.search).get("plan_key"),
             caseId: new URLSearchParams(window.location.search).get("case"),
+            mode:
+              new URLSearchParams(window.location.search).get("where") === "photos"
+                ? "elsewhere"
+                : "claimed",
           }}
         />
       ) : route.name === "prep-case" ? (

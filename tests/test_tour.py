@@ -296,4 +296,4 @@ def test_case_walk_route_needs_the_read_token_and_returns_plan_and_locate(client
     ok = client.get(url, headers={"Authorization": f"Bearer {made['read_token']}"})
     assert ok.status_code in (200, 404)
     if ok.status_code == 200:
-        assert set(ok.json()) == {"plan", "locate"}
+        assert set(ok.json()) == {"plan", "model_id", "locate", "photos"}

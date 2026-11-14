@@ -1,44 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { SourceChip } from "../components/SourceChip";
 import type { TourPlan, TourStop } from "../contracts";
-import { poseToSdkCall } from "../twin/pose";
+import { PhotoLanding } from "../twin/PhotoLanding";
 import { connectShowcase, embedUrl, watchSweeps, type ShowcaseSdk } from "../twin/showcase";
 import { AerialProof, formatCaptured, type AerialSide } from "../twin/AerialProof";
 import { canGoLive } from "../twin/useLiveAerial";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
-import { fetchTour, type TourTarget } from "./api";
+import { fetchTour, type TourResult, type TourTarget } from "./api";
+import { RoomStop, landingOfStop } from "./RoomStop";
+import { useAdPhoto } from "./useAdPhoto";
+import { stopMove } from "./walkMove";
 import "./tour.css";
 
 export const AUTOPLAY_MS = 6000;
-const MAX_LOCAL_STOPS = 8;
+const LANDED_OPACITY = 0.6;
 
-/** Stops from the 3D view's own sweeps, evenly spaced, when the plan's sweeps are not in the
- *  loaded model. Never labelled with room names, and the plan's note says so. */
-export function evenStops(ids: string[]): TourStop[] {
-  if (ids.length === 0) return [];
-  const rest = ids.slice(1);
-  const n = Math.min(MAX_LOCAL_STOPS, rest.length);
-  const picks =
-    n > 1
-      ? Array.from({ length: n }, (_, i) => rest[Math.round((i * (rest.length - 1)) / (n - 1))]!)
-      : rest.slice(0, n);
-  const mk = (kind: TourStop["kind"], key: string, title: string, id: string): TourStop => ({
-    kind,
-    key,
-    title,
-    sweep_id: id,
-    sweep_count: 1,
-    sweep_ids: [id],
-    photos: [],
-    ad_view: "unknown",
-    claims: [],
-    facts: [],
-  });
-  return [
-    { ...mk("door", "door", "Front door", ids[0]!), note: "Start of the 3D scan" },
-    ...picks.map((id, i) => mk("stop", `stop-${i + 1}`, `Stop ${i + 1}`, id)),
-  ];
+// Synthetic stand-in for an ad photo (team-made, not sponsor imagery). An image cannot read page
+// CSS variables, so the design tokens are resolved here and written into the picture.
+function token(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function placeholderPhoto(): string {
+  const bg = token("--teal-soft", "white");
+  const ink = token("--teal", "gray");
+  return (
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="${bg}"/><text x="320" y="205" text-anchor="middle" font-family="sans-serif" font-size="28" fill="${ink}">Listing photo (fixture)</text></svg>`,
+    )
+  );
 }
 
 function Placeholder({ stop, plan }: { stop: TourStop; plan: TourPlan }) {
@@ -66,9 +60,13 @@ interface ViewProps {
   sdkKey?: string;
   modelId?: string;
   caseId?: string | null;
+  /** Where the agent rail mounts (the walk's real trace); nothing is shown until it exists. */
+  rail?: ReactNode;
+  /** Said above the tour when the case's own photos could not be loaded. */
+  notice?: string | null;
 }
 
-export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
+export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }: ViewProps) {
   const live = Boolean(sdkKey && modelId);
   const reduced = usePrefersReducedMotion();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -103,23 +101,15 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
     };
   }, [live, sdkKey]);
 
-  // When the loaded model holds none of the plan's sweeps, walk the model's own sweeps instead.
-  const plan = useMemo<TourPlan>(() => {
-    const walk = given.stops.filter((s) => s.sweep_id);
-    if (!sdk || sweeps.length === 0 || walk.some((s) => sweeps.includes(s.sweep_id!))) return given;
-    const mid = evenStops(sweeps);
-    return {
-      ...given,
-      rooms_labelled: false,
-      rooms_note:
-        "Rooms are not labelled for the loaded 3D model, so the stops are numbered along its path.",
-      stops: [
-        ...given.stops.filter((s) => s.kind === "arrive"),
-        ...mid,
-        ...given.stops.filter((s) => s.kind === "outro"),
-      ],
-    };
-  }, [given, sdk, sweeps]);
+  // The loaded model must be this home's scan. When the plan has sweep stops and the model holds
+  // none of them, the 3D view is some other home: show the placeholder and say so. Never walk
+  // another home's sweeps in its place.
+  const plan = given;
+  const wrongModel =
+    Boolean(sdk) &&
+    sweeps.length > 0 &&
+    given.stops.some((s) => s.sweep_id) &&
+    !given.stops.some((s) => s.sweep_id && sweeps.includes(s.sweep_id));
 
   const last = plan.stops.length - 1;
   const stop = plan.stops[Math.min(index, last)]!;
@@ -143,23 +133,19 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
   const noneFromHome = (plan.coverage?.elsewhere ?? 0) > 0 && (plan.coverage?.placed ?? 0) === 0;
   const banner = noneFromHome ? "None of the ad's photos are from this home." : undefined;
 
-  // Move the 3D view to the stop's own sweep. Never a stand-in sweep: a stop not in the model
-  // says so instead of flying somewhere else.
+  // Move the 3D view to the stop (or to where its ad photo was taken). Never a stand-in sweep:
+  // a stop not in the model says so instead of flying somewhere else.
+  const [showPhoto, setShowPhoto] = useState(true);
+  useEffect(() => setShowPhoto(true), [stop.key]);
   useEffect(() => {
-    if (!sdk || !stop.sweep_id || sweeps.length === 0) return;
-    if (!sweeps.includes(stop.sweep_id)) {
+    const move = stopMove(stop, reduced);
+    if (!sdk || !move || sweeps.length === 0 || wrongModel) return;
+    if (!sweeps.includes(move.sweepId)) {
       setStatus("This stop is not in the loaded 3D model");
       return;
     }
-    const call = poseToSdkCall({
-      sweep_id: stop.sweep_id,
-      position: stop.position ?? [0, 0, 0],
-      rotation_quat: stop.rotation_quat ?? [0, 0, 0, 1],
-    });
-    if (reduced)
-      call.options = { ...call.options, transition: "transition.instant", transitionTime: 0 };
     let current = true;
-    sdk.Sweep.moveTo(call.sweepId, call.options)
+    sdk.Sweep.moveTo(move.sweepId, move.options)
       .then(() => current && setStatus(`At: ${stop.title}`))
       .catch(
         (e: unknown) =>
@@ -168,7 +154,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
     return () => {
       current = false;
     };
-  }, [sdk, sweeps, stop, reduced]);
+  }, [sdk, sweeps, stop, reduced, wrongModel]);
 
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, last)), [last]);
   const back = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
@@ -185,6 +171,14 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
   }, [autoplay, index, last, next]);
   const pause = () => setAutoplay(false);
 
+  const landing = landingOfStop(stop);
+  // The ad's real photo when this browser can read it; else the labelled placeholder.
+  const realPhoto = useAdPhoto(caseId, stop.photos[0]?.alias);
+  const photoNote = realPhoto
+    ? null
+    : live
+      ? "Placeholder: the ad's own photo could not be loaded here."
+      : "Placeholder photo (fixture).";
   const arriveAerial = stop.kind === "arrive" && (liveAerial || fixtureSide !== null);
   return (
     <div
@@ -201,11 +195,39 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
         {live && !sdkFailed ? <SourceChip source="live" /> : <SourceChip source="fixture" />}
       </header>
       {plan.scan_label && <p className="tour-scan">This tour uses {plan.scan_label}.</p>}
+      {notice && (
+        <p className="tour-banner" data-testid="tour-notice" role="alert">
+          {notice}
+        </p>
+      )}
+      {plan.mode === "elsewhere" && (
+        <p className="tour-mode" data-testid="elsewhere-heading">
+          Where the photos were taken: the home in these photos.
+        </p>
+      )}
+      {plan.mode_line && (
+        <p className="tour-mode-line" data-testid="mode-line">
+          {plan.mode_line}
+        </p>
+      )}
+      {plan.coverage?.line && (
+        <p className="tour-coverage" data-testid="coverage-line">
+          {plan.coverage.line}
+        </p>
+      )}
+      {plan.coverage && plan.coverage.elsewhere > 0 && (
+        <p className="tour-banner" data-testid="elsewhere-banner">
+          {plan.coverage.elsewhere === 1
+            ? "1 of the ad's photos was taken in a different building. It is not shown in these rooms."
+            : `${plan.coverage.elsewhere} of the ad's photos were taken in a different building. They are not shown in these rooms.`}
+        </p>
+      )}
       <div className="tour-body">
         <section className="tour-stage" aria-label="3D view">
           {live && modelId && sdkKey ? (
             <iframe
               ref={iframeRef}
+              hidden={wrongModel}
               className="tour-frame"
               title="Matterport 3D view"
               src={embedUrl(modelId, sdkKey)}
@@ -222,53 +244,45 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
           ) : (
             <Placeholder stop={stop} plan={plan} />
           )}
+          {wrongModel && (
+            <>
+              <Placeholder stop={stop} plan={plan} />
+              <p className="tour-wrong-model" data-testid="wrong-model" role="status">
+                The 3D view here is not this home&apos;s scan
+              </p>
+            </>
+          )}
+          {landing && !wrongModel && (
+            <PhotoLanding
+              state={landing}
+              photoSrc={realPhoto ?? placeholderPhoto()}
+              opacity={showPhoto ? LANDED_OPACITY : 0}
+              phase="landed"
+              sdk={live && sdk ? "ready" : "unavailable"}
+              reduced={reduced}
+            />
+          )}
         </section>
         <aside className="tour-panel" aria-live="polite">
           <p className="mono tour-count">
             Step {Math.min(index, last) + 1} of {plan.stops.length}
           </p>
           <h1 className="tour-title">{stop.title}</h1>
-          {stop.note && <p className="tour-note">{stop.note}</p>}
-          {stop.kind === "room" && <p className="tour-note">{plan.rooms_note}</p>}
-          {stop.kind === "door" && !plan.rooms_labelled && (
-            <p className="tour-note">{plan.rooms_note}</p>
-          )}
+          <RoomStop
+            stop={stop}
+            plan={plan}
+            dwell={Boolean(plan.director?.dwell.includes(stop.key))}
+            showingPhoto={showPhoto}
+            onToggle={() => setShowPhoto((v) => !v)}
+            photoNote={photoNote}
+            rail={rail}
+          />
           {stop.kind === "door" && (
             <div className="tour-door-scan" data-testid="tour-door-scan">
               {plan.scan_label && <p>This is {plan.scan_label}.</p>}
               {plan.scan_date_line && <p className="mono">{plan.scan_date_line}</p>}
               {plan.scan_age_note && <p>{plan.scan_age_note}</p>}
             </div>
-          )}
-          {stop.kind === "arrive" && stop.claims.length > 0 && (
-            <ul className="tour-claims" aria-label="What the ad says, to look for as you arrive">
-              {stop.claims.map((c) => (
-                <li key={c.text}>
-                  {c.text} <span className="tour-src">{c.source}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {stop.facts.length > 0 && (
-            <ul className="tour-facts" aria-label="What the record says">
-              {stop.facts.map((f) => (
-                <li key={f.text}>
-                  {f.text} <span className="tour-src">{f.source}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {stop.photos.length > 0 && (
-            <p className="tour-photos">
-              {stop.photos.length === 1 ? "Your ad photo" : "Your ad photos"}{" "}
-              {stop.photos.map((p) => p.photo_id).join(", ")}{" "}
-              {stop.photos.length === 1 ? "was" : "were"} placed in this room.
-            </p>
-          )}
-          {stop.tip && (
-            <p className="tour-tip">
-              <strong>Check this in person:</strong> {stop.tip}
-            </p>
           )}
           {stop.kind === "outro" && plan.summary && (
             <div className="tour-summary">
@@ -347,7 +361,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId }: ViewProps) {
 
 type Load =
   | { status: "loading" }
-  | { status: "ready"; plan: TourPlan }
+  | { status: "ready"; result: TourResult }
   | { status: "error"; message: string };
 
 export function TourPage({ target }: { target: TourTarget }) {
@@ -356,7 +370,7 @@ export function TourPage({ target }: { target: TourTarget }) {
     const ctl = new AbortController();
     setLoad({ status: "loading" });
     fetchTour(target, ctl.signal)
-      .then((plan) => !ctl.signal.aborted && setLoad({ status: "ready", plan }))
+      .then((result) => !ctl.signal.aborted && setLoad({ status: "ready", result }))
       .catch((e: unknown) => {
         if (!ctl.signal.aborted)
           setLoad({ status: "error", message: e instanceof Error ? e.message : String(e) });
@@ -366,10 +380,17 @@ export function TourPage({ target }: { target: TourTarget }) {
   if (load.status === "ready")
     return (
       <TourView
-        plan={load.plan}
+        plan={load.result.plan}
         sdkKey={import.meta.env.VITE_MATTERPORT_SDK_KEY}
-        modelId={import.meta.env.VITE_DEMO_MODEL_ID}
-        caseId={target.caseId}
+        // A case walk loads the scan the walk was built from, and no other. The configured demo
+        // model is only for a place tour with no case.
+        modelId={
+          load.result.fromCase
+            ? (load.result.modelId ?? undefined)
+            : import.meta.env.VITE_DEMO_MODEL_ID
+        }
+        caseId={load.result.fromCase ? target.caseId : null}
+        notice={load.result.notice}
       />
     );
   return (

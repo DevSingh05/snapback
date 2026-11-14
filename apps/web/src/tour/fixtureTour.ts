@@ -43,6 +43,7 @@ export const FIXTURE_TOUR: TourPlan = {
     stop({
       kind: "door",
       key: "door",
+      ad_view: "none_placed",
       title: "Front door",
       room_label: "Entryway",
       sweep_id: "fx-sweep-00",
@@ -56,6 +57,7 @@ export const FIXTURE_TOUR: TourPlan = {
     stop({
       kind: "room",
       key: "room-2",
+      ad_view: "none_placed",
       title: "Living room",
       room_label: "Living room",
       sweep_id: "fx-sweep-01",
@@ -63,6 +65,12 @@ export const FIXTURE_TOUR: TourPlan = {
       sweep_ids: ["fx-sweep-01", "fx-sweep-02"],
       position: [3, 1.4, 0],
       rotation_quat: Q,
+      claims: [
+        {
+          text: "Not confirmed. The ad says hardwood floors. CoStar's photos of this home are labelled carpet (as of CoStar's last research).",
+          source: "CoStar record",
+        },
+      ],
       tip: "Turn on the AC and look at the vents; check the outlets and the outside noise.",
     }),
     stop({
@@ -75,12 +83,23 @@ export const FIXTURE_TOUR: TourPlan = {
       sweep_ids: ["fx-sweep-03"],
       position: [8, 1.4, -2],
       rotation_quat: Q,
-      photos: [{ photo_id: "photo-1", sweep_id: "fx-sweep-03" }],
+      photos: [
+        {
+          photo_id: "photo-1",
+          alias: "P1",
+          sweep_id: "fx-sweep-03",
+          position: [8, 1.4, -2],
+          rotation_quat: Q,
+          fov_deg: 70,
+        },
+      ],
+      ad_view: "placed",
       tip: "Open the fridge, oven and dishwasher: check every appliance listed is there and works.",
     }),
     stop({
       kind: "room",
       key: "room-4",
+      ad_view: "none_placed",
       title: "Bathroom",
       room_label: "Bathroom",
       sweep_id: "fx-sweep-06",
@@ -99,6 +118,7 @@ export const FIXTURE_TOUR: TourPlan = {
     stop({
       kind: "room",
       key: "room-5",
+      ad_view: "none_placed",
       title: "Bedroom",
       room_label: "Bedroom",
       sweep_id: "fx-sweep-04",
@@ -121,6 +141,21 @@ export const FIXTURE_TOUR: TourPlan = {
       tip: "Book nothing and pay nothing until you have seen it. Take this list with you.",
     }),
   ],
+  coverage: {
+    counted: "rooms",
+    total: 5,
+    with_photo: 1,
+    placed: 1,
+    elsewhere: 0,
+    unplaced: 0,
+    line: "The ad showed 1 of the 5 rooms in this scan.",
+  },
+  director: {
+    dwell: ["room-2", "room-4"],
+    lead_checks: ["room-2", "room-4", "room-5"],
+    stamp: "policy",
+    reason: "Claims the record does not confirm first, then rooms the ad hid, then must-haves.",
+  },
   links: {
     tour_prep: "/prep/place/fixture-bldg-1",
     tour_prep_api: "/places/fixture-bldg-1/tour-prep",

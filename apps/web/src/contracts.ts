@@ -338,6 +338,7 @@ export interface TourFact {
 
 export interface TourPhoto {
   photo_id: string;
+  alias?: string | null; // P1, P2...: the key of /cases/{id}/evidence/{alias}/photo.jpg
   sweep_id?: string | null;
   position?: [number, number, number] | null;
   rotation_quat?: [number, number, number, number] | null;
@@ -369,6 +370,8 @@ export interface WalkCoverage {
   placed: number;
   elsewhere: number;
   unplaced: number;
+  other_scan?: number; // placed in this home, in another scan of the building: not on a stop
+  plan_mismatch?: boolean;
   line?: string | null;
 }
 
@@ -382,6 +385,7 @@ export interface TourDirector {
 // GET /cases/{id}/walk: the plan with the case's placed photos, and its locate result.
 export interface WalkResponse {
   plan: TourPlan;
+  model_id?: string | null; // the scan the walk was built from
   locate?: LocateResult | null;
 }
 
@@ -397,6 +401,9 @@ export interface TourPlan {
   aerial?: { source: DataSource; captured_on?: string | null; has_image: boolean } | null;
   stops: TourStop[];
   links: { tour_prep: string; tour_prep_api: string; tour_draft_hint: string };
+  up_axis?: "y" | "z"; // which model axis is vertical in the stops' positions
+  mode?: "claimed" | "elsewhere"; // "elsewhere": the building the ad's photos were taken in
+  mode_line?: string | null;
   coverage?: WalkCoverage | null;
   director?: TourDirector | null;
   scan_date_line?: string | null; // "Scanned Mar 2026 (Matterport)" or "Scan date not on record"

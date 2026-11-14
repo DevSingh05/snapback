@@ -25,7 +25,7 @@ vi.mock("../twin/useReducedMotion", () => ({ usePrefersReducedMotion: () => redu
 
 import { TwinView } from "../twin/TwinPage";
 import { FIXTURE_TOUR } from "./fixtureTour";
-import { AUTOPLAY_MS, TourView, evenStops } from "./TourPage";
+import { AUTOPLAY_MS, TourView } from "./TourPage";
 
 beforeEach(() => {
   fakeSdk.Sweep.moveTo.mockClear();
@@ -64,7 +64,7 @@ describe("TourView in fixture mode (no SDK)", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
     expect(title()).toBe("Kitchen");
     expect(screen.getByRole("button", { name: "Kitchen" })).toHaveAttribute("aria-current", "step");
-    expect(screen.getByText(/Your ad photo photo-1 was placed in this room/)).toBeInTheDocument();
+    expect(screen.getByText("The photo you sent, taken here.")).toBeInTheDocument();
     expect(screen.getByText(/automatic labels/)).toBeInTheDocument();
   });
 
@@ -147,54 +147,56 @@ describe("TourView with a mocked Showcase SDK", () => {
     expect(fakeSdk.Sweep.moveTo).not.toHaveBeenCalledWith("fx-sweep-03", expect.anything());
   });
 
-  it("walks the model's own sweeps, unlabelled, when none of the plan's sweeps are in it", async () => {
+  it("shows the placeholder and says so when the loaded model holds none of the plan's sweeps", async () => {
     sweepIds.current = ["real-1", "real-2", "real-3", "real-4"];
     render(<TourView plan={FIXTURE_TOUR} sdkKey="k" modelId="m" />);
-    await screen.findByRole("button", { name: "Stop 1" });
-    expect(screen.queryByRole("button", { name: "Kitchen" })).toBeNull();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Front door" }));
-    expect(screen.getByText("Start of the 3D scan")).toBeInTheDocument();
-    expect(screen.getByText(/Rooms are not labelled/)).toBeInTheDocument();
+    expect(await screen.findByTestId("wrong-model")).toHaveTextContent(
+      "The 3D view here is not this home's scan",
+    );
+    expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
+    expect(screen.getByTitle("Matterport 3D view")).not.toBeVisible();
+    // Never another home's sweeps in its place: no numbered stops, no flights.
+    expect(screen.queryByRole("button", { name: "Stop 1" })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Kitchen" }));
+    expect(fakeSdk.Sweep.moveTo).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("photo-overlay")).toBeNull();
   });
 });
 
-const withClaims = (): typeof FIXTURE_TOUR => ({
+describe("links to the tour", () => {
+  it("the twin page links to the claimed building's tour with its case", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(screen.getByTestId("walk-it-first-link")).toHaveAttribute(
+      "href",
+      "/tour/fx-prop-1?case=fx-7Q2M",
+    );
+  });
+});
+
+describe("link to where the photos were taken", () => {
+  it("the twin page offers it only when a photo was verified in another building", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} demo="copied" />);
+    const link = screen.getByTestId("where-photos-link");
+    expect(link.getAttribute("href")).toMatch(/^\/tour\/.+\?case=fx-7Q2M&where=photos$/);
+  });
+});
+
+const withScanDate = (): typeof FIXTURE_TOUR => ({
   ...FIXTURE_TOUR,
   scan_date_line: "Scanned Mar 2026 (Matterport)",
   scan_age_note: "Things can change after a scan: check finishes in person.",
-  stops: FIXTURE_TOUR.stops.map((s) =>
-    s.kind === "arrive"
-      ? {
-          ...s,
-          claims: [
-            {
-              text: "The ad says a 2-car garage. CoStar's record shows 2 parking spaces. Look for it as you arrive (as of CoStar's last research).",
-              source: "CoStar record",
-            },
-          ],
-        }
-      : s,
-  ),
 });
 
 describe("Arrive and door (W4)", () => {
-  it("shows the aerial with its capture date and the ad's outside claims as things to look for", () => {
-    render(<TourView plan={withClaims()} />);
-    expect(screen.getByText(/Aerial photo captured Mar 2, 2025 \(fixture tile\)/)).toBeVisible();
-    const list = screen.getByRole("list", { name: "What the ad says, to look for as you arrive" });
-    expect(list).toHaveTextContent("Look for it as you arrive (as of CoStar's last research)");
-    expect(list).toHaveTextContent("CoStar record");
-  });
-
-  it("shows no claims list when the ad made no outside claim", () => {
+  it("shows the aerial with its capture date, labelled as a fixture tile in fixture mode", () => {
     render(<TourView plan={FIXTURE_TOUR} />);
-    expect(screen.queryByRole("list", { name: /look for as you arrive/ })).toBeNull();
+    expect(screen.getByRole("region", { name: "Aerial view" })).toBeInTheDocument();
+    expect(screen.getByText(/Aerial photo captured Mar 2, 2025 \(fixture tile\)/)).toBeVisible();
   });
 
   it("the door stop names the kind of scan, its date and the age note", async () => {
-    render(<TourView plan={withClaims()} />);
+    render(<TourView plan={withScanDate()} />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
-    expect(title()).toBe("Front door");
     const door = screen.getByTestId("tour-door-scan");
     expect(door).toHaveTextContent("a 3D scan in this building");
     expect(door).toHaveTextContent("Scanned Mar 2026 (Matterport)");
@@ -208,7 +210,7 @@ describe("Arrive and door (W4)", () => {
   });
 
   it("the arrive stop has no door scan block", () => {
-    render(<TourView plan={withClaims()} />);
+    render(<TourView plan={withScanDate()} />);
     expect(screen.queryByTestId("tour-door-scan")).toBeNull();
   });
 });
@@ -253,18 +255,6 @@ describe("Summary (W5)", () => {
     render(<TourView plan={FIXTURE_TOUR} />);
     await toEnd();
     expect(screen.queryByRole("region", { name: "What you now know" })).toBeNull();
-  });
-});
-
-describe("evenStops", () => {
-  it("starts at the scan start and spaces the rest evenly, capped at 8", () => {
-    const ids = Array.from({ length: 30 }, (_, i) => `s${i}`);
-    const stops = evenStops(ids);
-    expect(stops).toHaveLength(9);
-    expect(stops[0]).toMatchObject({ kind: "door", sweep_id: "s0" });
-    expect(stops[1]!.sweep_id).toBe("s1");
-    expect(stops.at(-1)!.sweep_id).toBe("s29");
-    expect(evenStops([])).toEqual([]);
   });
 });
 
