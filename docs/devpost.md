@@ -1,8 +1,9 @@
 # SNAPBACK: Devpost draft
 
 > Draft for the HackPrinceton Fall 2026 Devpost page. Every number carries its n and whether it
-> is LIVE (the CoStar kit) or FIXTURE (synthetic, team-made). Lines marked **TODO** need a fact
-> from a teammate before submitting. Sources: the README, the PRs on `main` and the team board.
+> is LIVE (the CoStar kit) or FIXTURE (synthetic, team-made). Sources: the README, the PRs on
+> `main` and the team board. Not yet on `main`, so not claimed here: MCP (#241), the one box
+> (#243) and the Stories page.
 
 ## Tagline
 
@@ -13,12 +14,12 @@ the home's own record before you pay anyone.
 
 In February 2025, a renter near Houston found a house on Craigslist. The poster said he was the
 landlord and gave her a door code. She paid $2,200 for rent and a deposit and moved in. Two days
-later the real owner, a rental company, told her the poster did not own the house
-([ABC13, Feb 15 2025](https://abc13.com/post/conroe-woman-loses-2200-fears-homelessness-renting-home-landlord-did-not-own-property/15907951/)).
+later the real owner, a rental company, told her the poster did not own the house (ABC13 Houston,
+Feb 15 2025).
 
 She did nothing careless. The photos were of a real house, and she even got inside. The FTC
-counted nearly 65,000 rental-scam reports from January 2020 to June 2025, and about half began
-with a fake ad on Facebook
+counted nearly 65,000 rental-scam reports from January 2020 to June 2025, and about half of the
+reports in the 12 months ending June 2025 began with a fake ad on Facebook
 ([FTC Data Spotlight, Dec 2025](https://www.ftc.gov/news-events/data-visualizations/data-spotlight/2025/12/rental-scams-hit-home-65-million-reported-losses)).
 
 These scams work because real photos pass. The person and the offer are what's fake, and the
@@ -33,8 +34,8 @@ SNAPBACK runs a set of checks, each reading one source and writing one sourced l
 - **Photos taken in this home:** the ad's photos are matched against the building's Matterport 3D
   scan. "Taken in this building (3 of 3 photos)" or "Taken in a different building. Red flag."
 - **For sale, posted as a rental:** the Homes.com listings in the CoStar kit.
-- **Owner of record:** the county owner roll for Houston houses. "Owner of record: Invitation
-  Homes, not the poster", quoted with that owner's own published rule on where it takes
+- **Owner of record:** the county owner roll for Houston houses. "Owner of record: a large rental
+  company, not the poster", quoted with that owner's own published rule on where it takes
   applications.
 - **Agent license:** Texas Real Estate Commission public data.
 - **Contact, unit and rent against the record:** the CoStar property record's leasing office
@@ -64,7 +65,8 @@ or sends anything for you.
   LightGlue matching (kornia) with RANSAC verification and a spatial-spread check.
 - **Data adapters:** the CoStar kit (property records, Homes.com listings), Matterport scans,
   Vexcel aerial imagery, Harris County owner records and TREC license data. The kit stays in a
-  git-ignored folder, and nothing from it goes to an outside model.
+  git-ignored folder. Only derived yes/no facts reach a model, never kit rows, photos, addresses
+  or prices, as CoStar allowed for the event.
 - **Intake:** local OCR (RapidOCR on ONNX Runtime) for screenshots, listing-field extraction and
   a prompt-injection guard.
 - **Front end:** Vite, React and TypeScript, with a MapLibre 3D city map, an isometric 3D house
@@ -82,13 +84,13 @@ or sends anything for you.
 
 ## Results (with n, LIVE or FIXTURE)
 
-- **Locate gate, on renders of our scans (not phone photos):** of n = 20 claimed-building views and
+- **Locate gate, LIVE scans, renders (not photos):** of n = 20 claimed-building views and
   10 other-building views, from unseen directions, 20 of 20 were placed in the right building with
   0 false placements (held-out seed, #28).
 - **Photo accuracy on real listing photos, LIVE (A8, #72; CoStar OK'd sharing totals):** of
-  n = 78 photos (48 from the indexed homes, 30 decoys from other homes), 43 of 48 were placed in
-  the right home, 0 were placed in a wrong one, and 5 could not be placed. Right room was not
-  measured. **TODO:** confirm the decoy outcome (30 not placed?) with Dev before submitting.
+  n = 78 photos (48 from the indexed homes, 30 decoys), 43 of 48 were placed in the right home,
+  0 were placed in a wrong one, and 5 could not be placed; 0 of 30 decoys fooled it. Right room
+  was not measured.
 - **Forensics, SYNTHETIC/FIXTURE corpus:** on n = 301 ads with 4 seeded rings (57 ring ads), it
   recovered 4 of 4 rings, found 57 of 57 ring ads and flagged 0 of 244 honest ads. A keyword
   baseline recovered 0 of 4 rings. On 10 held-out seeds (about 300 ads each) it averaged ring
@@ -108,8 +110,8 @@ or sends anything for you.
   on name classifiers, we changed what the card shows instead. A private owner is "a private
   owner", and a company is named only when it matches one we already know. Each privacy gate is
   tested on its own by turning it off.
-- **Sponsor data rules.** No kit data in git, in a log or in an outside model, with a hygiene guard
-  in CI to hold the line.
+- **Sponsor data rules.** No kit data in git or in a log, and only derived yes/no facts to a
+  model, with a hygiene guard in CI to hold the line.
 - **Real-world plumbing:** door codes that pass a presence check, iMessage photos that arrive as
   grouped messages, Windows tooling quirks, and a reconnecting event stream that must never text
   the same alert twice.
@@ -120,7 +122,8 @@ or sends anything for you.
   where its fact came from.
 - A real iMessage round trip from a phone: text an ad and get the card back in the thread.
 - The news case we started from replays end to end and stops at **Hold off** before the $2,200
-  goes out. The card shows the owner of record and that owner's own rule.
+  goes out. The card shows that a large rental company, not the poster, is the owner of record,
+  with that company's own rule.
 
 ## What we learned
 
@@ -139,6 +142,11 @@ or sends anything for you.
 - **More cities, more languages** (English and Spanish today), and measured accuracy on real ad
   photos at scale.
 
+## Data and terms
+
+Data used during HackPrinceton under the sponsor's terms and deleted after Sun Nov 15 16:00; the
+public build shows FIXTURE data.
+
 ## Built with
 
 Python, FastAPI, pydantic, uv, PyTorch, DINOv2, kornia (DISK, LightGlue), FAISS, OpenCV,
@@ -150,18 +158,14 @@ Actions.
 
 - **CoStar:** checks every ad against CoStar's own property records, the Homes.com listings, the
   Matterport scans and the Vexcel aerial imagery, then turns that data into a safer search. The
-  kit never leaves the machine or goes to a model.
-- **Amazon Practical AI:** **TODO (Dev):** name the Amazon service we used and what it does in
-  SNAPBACK. Nothing in the repo uses an Amazon service yet, so we can't claim this track until
-  something does.
+  kit stays on the machine. Only derived yes/no facts reach a model, never kit rows, photos,
+  addresses or prices, as CoStar allowed for the event.
 - **Photon (+ Best Voice Agent):** the iMessage sidecar is live on Photon's Spectrum SDK: text an
   ad and get the card back. Watch alerts text a linked Finder search at most 3 times a day, and
-  "stop" ends them. Voice memos in and spoken replies out are in progress (**TODO:** update when
-  the voice PR lands).
+  "stop" ends them. Voice memos in and spoken replies out are in progress.
 - **Arlequin:** the investigator view finds rental-scam rings across many ads, with evidence for
   every link, on a SYNTHETIC/FIXTURE corpus (numbers above).
-- **GoDaddy domain:** **TODO:** the domain Vidyut picks (snapback.rent or trustthehome) once
-  registered.
+- **GoDaddy domain:** TBD.
 
 ## Team
 
