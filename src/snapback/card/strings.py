@@ -157,6 +157,13 @@ EN: dict[str, str] = {
     "contact.office_confirmed": (
         "Confirmed through {domain}, the website CoStar has on record for this office."
     ),
+    "contact.office_declined": (
+        "Not confirmed. Someone at {domain}, the website CoStar has on record for this "
+        "office, said the office does not recognise this ad."
+    ),
+    "reason.office_declined": (
+        "The office at {domain}, the website CoStar has on record, did not recognise this ad."
+    ),
     "office.call_yourself": (
         "No website for this office is on record, so it cannot be confirmed here. Call the "
         "office on a number you look up yourself."
@@ -602,6 +609,14 @@ ES: dict[str, str] = {
     "contact.office_confirmed": (
         "Confirmado a través de {domain}, el sitio web que CoStar tiene registrado para esta "
         "oficina."
+    ),
+    "contact.office_declined": (
+        "No confirmado. Alguien en {domain}, el sitio web que CoStar tiene registrado para "
+        "esta oficina, dijo que la oficina no reconoce este anuncio."
+    ),
+    "reason.office_declined": (
+        "La oficina en {domain}, el sitio web que CoStar tiene registrado, no reconoció este "
+        "anuncio."
     ),
     "office.call_yourself": (
         "No hay un sitio web registrado para esta oficina, así que no se puede confirmar aquí. "

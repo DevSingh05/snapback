@@ -48,6 +48,14 @@ def new_case(client, property_id="fx-prop-4"):
     return made.json()
 
 
+def answer(client, token, decision="yes"):
+    return client.post("/office/answer", json={"token": token, "decision": decision})
+
+
+def peek(client, token):
+    return client.post("/office/peek", json={"token": token})
+
+
 def write(case):
     return {"X-Case-Token": case["token"]}
 
@@ -57,7 +65,7 @@ def outbox_files(tmp_path):
 
 
 def token_in(path: Path) -> str:
-    return re.search(r"/confirm/([A-Za-z0-9_\-]+)", path.read_text()).group(1)
+    return re.search(r"/confirm#([A-Za-z0-9_\-]+)", path.read_text()).group(1)
 
 
 # --- proofs, unit level -------------------------------------------------------------------
@@ -106,6 +114,17 @@ def test_an_unknown_token_is_unknown_and_a_new_request_voids_the_old_token(tmp_p
     assert store.redeem(old).outcome is not Outcome.CONFIRMED
 
 
+def test_an_old_token_does_not_survive_a_new_request_after_quiet_sweeps(tmp_path):
+    store, clock = proofs(tmp_path)
+    store.request("CASE1", "a@" + DOMAIN, DOMAIN)
+    old = token_in(next((tmp_path / "outbox").glob("CASE1-*.txt")))
+    clock.now += 16 * 60
+    store.request("CASE2", "a@" + DOMAIN, DOMAIN)  # a sweep runs with CASE1 quiet for 16 min
+    clock.now += 60
+    store.request("CASE1", "b@" + DOMAIN, DOMAIN)  # t = 17 min, the old token is still live
+    assert store.redeem(old).outcome is not Outcome.CONFIRMED
+
+
 def test_requests_are_rate_limited_per_case(tmp_path):
     store, clock = proofs(tmp_path)
     for _ in range(3):
@@ -125,7 +144,7 @@ def test_the_outbox_file_is_written_private_and_names_no_phone(tmp_path):
     body = file.read_text()
     assert "To: leasing@" + DOMAIN in body
     assert "FIXTURE" in body and "not sent" in body.lower()
-    assert not PHONE.search(re.sub(r"/confirm/\S+", "", body))
+    assert not PHONE.search(re.sub(r"/confirm#\S+", "", body))
 
 
 def test_an_unsafe_case_id_cannot_escape_the_outbox_folder(tmp_path):
@@ -230,15 +249,14 @@ def test_the_full_flow_writes_the_outbox_then_the_link_confirms_once(client, tmp
     before = client.get(f"/cases/{case['case_id']}/office", headers=read).json()
     assert before["confirmed"] is False
 
-    ok = client.post(f"/confirm/{token}")
-    assert ok.status_code == 200 and DOMAIN in ok.text
+    ok = answer(client, token)
+    assert ok.status_code == 200 and DOMAIN in ok.json()["message"]
     after = client.get(f"/cases/{case['case_id']}/office", headers=read).json()
     assert after["confirmed"] is True and after["confirmed_domain"] == DOMAIN
 
-    again = client.post(f"/confirm/{token}")
-    assert again.status_code == 410 and "already" in again.text.lower()
-    nope = client.post("/confirm/not-a-token")
-    assert nope.status_code == 404
+    again = answer(client, token)
+    assert again.status_code == 410 and "already" in again.json()["detail"].lower()
+    assert answer(client, "not-a-token").status_code == 404
 
 
 def test_an_expired_link_says_so(tmp_path):
@@ -254,8 +272,8 @@ def test_an_expired_link_says_so(tmp_path):
     )
     token = token_in(outbox_files(tmp_path)[0])
     clock.now += timedelta(minutes=31).total_seconds()
-    gone = client.post(f"/confirm/{token}")
-    assert gone.status_code == 410 and "expired" in gone.text.lower()
+    gone = answer(client, token)
+    assert gone.status_code == 410 and "expired" in gone.json()["detail"].lower()
     read = {"Authorization": f"Bearer {case['read_token']}"}
     assert client.get(f"/cases/{case['case_id']}/office", headers=read).json()["confirmed"] is False
 
@@ -277,7 +295,7 @@ def test_confirming_adds_the_card_line_and_leaves_the_verdict_alone(client, tmp_
     client.post(
         f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
     )
-    client.post(f"/confirm/{token_in(outbox_files(tmp_path)[0])}")
+    answer(client, token_in(outbox_files(tmp_path)[0]))
     card_after = client.get(f"/cases/{cid}/card").json()
     texts = [line["text"] for row in card_after["rows"] for line in row["lines"]]
     assert f"Confirmed through {DOMAIN}, the website CoStar has on record for this office." in texts
@@ -319,13 +337,13 @@ def test_the_case_status_and_the_card_agree_after_the_confirmation(client, tmp_p
     client.post(
         f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
     )
-    client.post(f"/confirm/{token_in(outbox_files(tmp_path)[0])}")
+    answer(client, token_in(outbox_files(tmp_path)[0]))
     status = client.get(f"/cases/{cid}", headers=read).json()
     card = client.get(f"/cases/{cid}/card").json()
     assert status["state"] in (None, card["state"])
 
 
-def test_a_get_changes_nothing_and_only_the_post_burns_the_token(client, tmp_path):
+def test_peeking_changes_nothing_and_only_an_answer_burns_the_token(client, tmp_path):
     case = new_case(client)
     cid = case["case_id"]
     read = {"Authorization": f"Bearer {case['read_token']}"}
@@ -333,14 +351,129 @@ def test_a_get_changes_nothing_and_only_the_post_burns_the_token(client, tmp_pat
         f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
     )
     token = token_in(outbox_files(tmp_path)[0])
-    for _ in range(3):  # a mail scanner opening the link, again and again
-        page = client.get(f"/confirm/{token}")
-        assert page.status_code == 200 and "<form" in page.text and 'method="post"' in page.text
-        assert f'action="/confirm/{token}"' in page.text and DOMAIN in page.text
+    for _ in range(3):  # a mail scanner opening the page, again and again
+        page = peek(client, token)
+        assert page.status_code == 200 and page.json()["domain"] == DOMAIN
     assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is False
-    done = client.post(f"/confirm/{token}")
-    assert done.status_code == 200 and "Confirmed" in done.text
+    assert answer(client, token).status_code == 200
     assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is True
-    assert client.post(f"/confirm/{token}").status_code == 410
-    assert client.get(f"/confirm/{token}").status_code == 410  # used: no button any more
-    assert "<form" not in client.get(f"/confirm/{token}").text
+    assert answer(client, token).status_code == 410
+    assert peek(client, token).status_code == 410  # used
+
+
+def test_the_tokens_are_never_in_an_address(client, tmp_path):
+    # The link carries the token in the fragment (never sent to a server), and the API takes
+    # it in a body, so no access log line holds one.
+    case = new_case(client)
+    client.post(
+        f"/cases/{case['case_id']}/confirm-office",
+        json={"address": "a@" + DOMAIN},
+        headers=write(case),
+    )
+    token = token_in(outbox_files(tmp_path)[0])
+    assert f"/confirm#{token}" in outbox_files(tmp_path)[0].read_text()
+    assert client.get(f"/confirm/{token}").status_code in (404, 405)
+    assert client.post(f"/confirm/{token}").status_code in (404, 405)
+
+
+def test_the_page_and_the_email_say_which_ad_it_is(client, tmp_path):
+    text = (
+        "Unit 204, $1,500 a month. Managed by Fixture Living LLC, email "
+        "leasing@fixture-rentals.example or visit fixture-rentals.example"
+    )
+    made = client.post("/cases", data={"text": text, "property_id": "fx-prop-4"}).json()
+    client.post(
+        f"/cases/{made['case_id']}/confirm-office",
+        json={"address": "a@" + DOMAIN},
+        headers=write(made),
+    )
+    file = outbox_files(tmp_path)[0]
+    mail = file.read_text()
+    for needed in (
+        "Fixture Living Lofts",
+        "100 Fixture Way, Fixture City, TX 00000",
+        "204",
+        "$1,500 a month",
+        "Posted by: Fixture Living LLC",
+        "leasing@fixture-rentals.example",
+        "Not ours",
+    ):
+        assert needed in mail, needed
+    shown = peek(client, token_in(file)).json()["listing"]
+    assert shown["building"] == "Fixture Living Lofts"
+    assert shown["address"] == "100 Fixture Way, Fixture City, TX 00000"
+    assert shown["unit"] == "204" and shown["rent"] == 1500
+    assert shown["poster"] == "Fixture Living LLC"
+    assert "leasing@fixture-rentals.example" in shown["emails"]
+
+
+def test_not_ours_never_confirms_and_the_card_says_the_office_did_not_recognise_the_ad(
+    client, tmp_path
+):
+    case = new_case(client)
+    cid = case["case_id"]
+    read = {"Authorization": f"Bearer {case['read_token']}"}
+    client.post(
+        f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
+    )
+    token = token_in(outbox_files(tmp_path)[0])
+    result = answer(client, token, "no")
+    assert result.status_code == 200 and result.json()["decision"] == "no"
+    assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is False
+    card = client.get(f"/cases/{cid}/card").json()
+    texts = [line["text"] for row in card["rows"] for line in row["lines"]]
+    assert any("does not recognise this ad" in t for t in texts)
+    assert not any("Confirmed through" in t for t in texts)
+    assert card["state"] != "verified"
+    assert answer(client, token, "yes").status_code == 410  # the token is spent
+    assert client.get(f"/cases/{cid}/office", headers=read).json()["confirmed"] is False
+
+
+def test_the_answer_must_be_yes_or_no(client, tmp_path):
+    assert (
+        client.post("/office/answer", json={"token": "x", "decision": "maybe"}).status_code == 422
+    )
+
+
+class MemoryRegistry:
+    def __init__(self):
+        self.cases: dict[str, list[str]] = {}
+
+    def register_case(self, case_id: str, renter_id: str) -> None:
+        self.cases.setdefault(renter_id, []).append(case_id)
+
+    def cases_of(self, renter_id: str) -> list[str]:
+        return list(self.cases.get(renter_id, []))
+
+
+def test_a_deleted_case_cannot_be_answered(tmp_path):
+    settings = Settings(_env_file=None, snapback_data_dir=tmp_path)
+    registry = MemoryRegistry()
+    client = TestClient(
+        create_app(settings, lookups=KitLookups(DataSource.FIXTURE), registry=registry)
+    )
+    case = new_case(client)
+    client.post(
+        f"/cases/{case['case_id']}/confirm-office",
+        json={"address": "a@" + DOMAIN},
+        headers=write(case),
+    )
+    token = token_in(outbox_files(tmp_path)[0])
+    assert peek(client, token).status_code == 200
+    registry.cases.clear()  # the renter deleted everything
+    assert peek(client, token).status_code == 404
+    assert answer(client, token).status_code == 404
+
+
+def test_an_answer_adds_a_verdict_event_to_the_trace(client, tmp_path):
+    case = new_case(client)
+    cid = case["case_id"]
+    client.post(
+        f"/cases/{cid}/confirm-office", json={"address": "a@" + DOMAIN}, headers=write(case)
+    )
+    answer(client, token_in(outbox_files(tmp_path)[0]), "no")
+    read = {"Authorization": f"Bearer {case['read_token']}"}
+    stream = client.get(f"/cases/{cid}/trace", headers=read).text
+    # The trace ends with a verdict event for the new answer, so it matches the card.
+    last = stream.strip().split("event: trace")[-1]
+    assert '"kind":"verdict"' in last.replace(" ", "")

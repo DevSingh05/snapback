@@ -69,6 +69,20 @@ def test_the_domain_never_comes_from_the_ad():
         "someone.godaddysites.com",
         "rentcafe.com",
         "someone.github.io",
+        # Property-management software vendors host many unrelated offices' sites.
+        "appfolio.com",
+        "acme.appfolio.com",
+        "prospectportal.com",
+        "rentmanager.com",
+        "managebuilding.com",
+        "tenantturner.com",
+        "rentcafewebsite.com",
+        "securecafe.com",
+        "entrata.com",
+        "realpage.com",
+        "rently.com",
+        "buildium.com",
+        "showmojo.com",
     ],
 )
 def test_free_mail_and_platform_hosts_are_never_an_official_domain(host):
@@ -92,6 +106,9 @@ def test_free_mail_and_platform_hosts_are_never_an_official_domain(host):
         "-camden.com",
         "camden-.com",
         "a" * 64 + ".com",
+        "oakcourt.co.xx",  # an ending we do not know that starts with a generic label
+        "oakcourt.com.xx",
+        "oakcourt.org.zz",
         "",
     ],
 )
@@ -106,7 +123,7 @@ def test_lookalike_and_malformed_hosts_are_rejected(host):
         ("leasing@camdenliving.com", True),
         ("Anyone@CAMDENLIVING.com", True),
         ("a.b+c@camdenliving.com", True),
-        ("agent@mail.camdenliving.com", True),  # a subdomain of the official domain
+        ("agent@mail.camdenliving.com", False),  # exact domain only (decision 183)
         ("agent@camdenliving.com.evil.com", False),
         ("agent@evilcamdenliving.com", False),
         ("agent@camdenliving.co", False),
@@ -141,3 +158,11 @@ def test_no_network_client_is_imported_by_the_domain_code():
 def test_record_json_shape_is_unchanged_by_this_feature():
     # PropertyRecord gained no field: the website host is all the domain rule reads.
     assert "website_host" in PropertyRecord.model_fields
+
+
+def test_a_private_ending_like_us_com_is_part_of_the_ending_not_the_name():
+    assert official_domain(record(website_host="www.oakcourt.us.com")) == "oakcourt.us.com"
+    assert accepts_address("me@oakcourt.us.com", "oakcourt.us.com") is True
+    assert accepts_address("me@evil.us.com", "oakcourt.us.com") is False
+    assert accepts_address("me@evil.us.com", "us.com") is False
+    assert official_domain(record(website_host="us.com")) is None

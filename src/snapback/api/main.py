@@ -28,14 +28,13 @@ import asyncio
 import re
 import secrets
 from collections.abc import AsyncIterator, Callable
-from html import escape
 from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
@@ -78,9 +77,19 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.office.context import listing_context
 from snapback.office.domain import accepts_address, official_domain
-from snapback.office.models import OfficeRequest, OfficeRequested, OfficeStatus
-from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited
+from snapback.office.models import (
+    ListingContext,
+    OfficeAnswer,
+    OfficeAnswered,
+    OfficePeek,
+    OfficeRequest,
+    OfficeRequested,
+    OfficeStatus,
+    OfficeTokenBody,
+)
+from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
 from snapback.preferences import merge as merge_preferences
 from snapback.safety.paths import resolve_data_dir
 from snapback.search import AmbiguousPlace, NoOfficeOnRecord, draft_tour_request, place_for
@@ -123,36 +132,6 @@ class Answer(BaseModel):
     """The renter's answer to the license question. Blank means they have no number."""
 
     text: str | None = Field(default=None, max_length=500)
-
-
-def _outcome_page(outcome: Outcome) -> HTMLResponse:
-    if outcome is Outcome.USED:
-        return _confirm_page(410, "Already used.", "This link was already used. It works once.")
-    if outcome is Outcome.EXPIRED:
-        return _confirm_page(
-            410, "This link expired.", "Links last 30 minutes. Ask the renter for a new one."
-        )
-    return _confirm_page(404, "Link not found.", "This link is not one we issued.")
-
-
-def _confirm_page(status: int, title: str, message: str, action: str | None = None) -> HTMLResponse:
-    page = (
-        '<!doctype html><html lang="en"><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        f"<title>{escape(title)}</title>"
-        '<body style="font:16px system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem">'
-        f"<h1>{escape(title)}</h1><p>{escape(message)}</p>"
-        + (
-            f'<form method="post" action="{escape(action, quote=True)}">'
-            '<button type="submit" style="font:inherit;padding:.6rem 1.2rem">Confirm</button>'
-            "</form>"
-            if action
-            else ""
-        )
-        + "<p><small>SNAPBACK. A confirmation is information for the renter, not a guarantee."
-        "</small></p></body></html>"
-    )
-    return HTMLResponse(page, status_code=status, headers={"Cache-Control": "no-store"})
 
 
 def _after(last_event_id: str | None) -> int:
@@ -745,7 +724,12 @@ def create_app(
                 "office. Ask the poster for one that is.",
             )
         try:
-            office.request(case.case_id, body.address, state.domain)
+            office.request(
+                case.case_id,
+                body.address,
+                state.domain,
+                listing_context(case.office_record, case.listing),
+            )
         except RateLimited:
             raise HTTPException(
                 status_code=429, detail="Too many requests for this case. Try again in a while."
@@ -758,38 +742,58 @@ def create_app(
             detail="A one-time link was written to the outbox (nothing is sent in this demo).",
         )
 
-    @app.get("/confirm/{token}", response_class=HTMLResponse)
-    def get_confirm(token: str) -> HTMLResponse:
-        """The page the one-time link opens. It changes nothing (a mail scanner may open
-        it): it shows a Confirm button that POSTs to the same address."""
+    def office_token_state(token: str) -> tuple[SessionCase, Redeemed]:
+        """The case and token state for a one-time token, without using it. Raises the plain
+        HTTP errors for an unknown, used or expired token and for a case that is gone."""
         seen = office.peek(token)
-        if seen.outcome is Outcome.CONFIRMED:
-            return _confirm_page(
-                200,
-                "Confirm this listing?",
-                f"Someone asked SNAPBACK to check a rental listing for the property whose "
-                f"website on record is {seen.domain}. Press Confirm if you work at that "
-                "office and this listing is yours.",
-                action=f"/confirm/{token}",
+        if seen.outcome is Outcome.UNKNOWN:
+            raise HTTPException(status_code=404, detail="This link is not one we issued.")
+        if seen.outcome is Outcome.USED:
+            raise HTTPException(
+                status_code=410, detail="This link was already used. It works once."
             )
-        return _outcome_page(seen.outcome)
+        if seen.outcome is Outcome.EXPIRED:
+            raise HTTPException(
+                status_code=410, detail="This link expired. Ask the renter for a new one."
+            )
+        case = find(seen.case_id or "")  # 404 for a case the renter deleted
+        if not isinstance(case, SessionCase):
+            raise HTTPException(status_code=404, detail="This case is gone.")
+        return case, seen
 
-    @app.post("/confirm/{token}", response_class=HTMLResponse)
-    def post_confirm(token: str) -> HTMLResponse:
-        """The Confirm button. The first valid use marks the case confirmed; it works once."""
-        redeemed = office.redeem(token)
-        if redeemed.outcome is Outcome.CONFIRMED:
-            found = store.get(redeemed.case_id or "")
-            if found is None or not isinstance(found, SessionCase):
-                return _confirm_page(404, "This case is gone.", "")
-            found.confirm_office(redeemed.domain or "")
-            return _confirm_page(
-                200,
-                "Confirmed.",
-                f"Thank you. This listing is now confirmed through {redeemed.domain}, the "
-                "website on record for this office. You can close this page.",
+    @app.post("/office/peek")
+    def post_office_peek(body: OfficeTokenBody) -> OfficePeek:
+        """What the confirm page shows the office: which ad it is asked about. Changes nothing,
+        so a mail scanner opening the link does no harm. The token travels in the body, never
+        in an address, so it stays out of access logs."""
+        case, seen = office_token_state(body.token)
+        return OfficePeek(
+            domain=seen.domain or "",
+            source=case.evidence.source,
+            listing=seen.context or ListingContext(),
+        )
+
+    @app.post("/office/answer")
+    def post_office_answer(body: OfficeAnswer) -> OfficeAnswered:
+        """ "Yes, ours" confirms the case; "Not ours" never does and records that the office did
+        not recognise the ad. Either answer uses the token."""
+        case, _ = office_token_state(body.token)
+        redeemed = office.redeem(body.token)
+        if redeemed.outcome is not Outcome.CONFIRMED:  # another answer got there first
+            raise HTTPException(
+                status_code=410, detail="This link was already used. It works once."
             )
-        return _outcome_page(redeemed.outcome)
+        domain = redeemed.domain or ""
+        if body.decision == "yes":
+            case.confirm_office(domain)
+            message = (
+                f"Thank you. This ad is now confirmed through {domain}, the website on record "
+                "for this office. You can close this page."
+            )
+        else:
+            case.decline_office(domain)
+            message = "Thank you. We recorded that this ad is not yours. You can close this page."
+        return OfficeAnswered(decision=body.decision, domain=domain, message=message)
 
     @app.get("/cases/{case_id}/alternatives")
     def get_alternatives(

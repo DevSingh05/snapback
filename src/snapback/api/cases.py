@@ -279,9 +279,14 @@ class SessionCase:
         return self.session.evidence.office_confirmed_domain
 
     def confirm_office(self, domain: str) -> None:
-        """Someone at the office's own domain on record opened the one-time link."""
+        """Someone at the office's own domain on record answered "Yes, ours"."""
         with self._lock:
             self.session.confirm_office(domain)
+
+    def decline_office(self, domain: str) -> None:
+        """Someone at the office's own domain on record answered "Not ours"."""
+        with self._lock:
+            self.session.decline_office(domain)
 
     def approve(self, decision: str, text: str | None) -> None:
         with self._lock:

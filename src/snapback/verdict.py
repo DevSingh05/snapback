@@ -174,6 +174,7 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
         ),
         owner_flag=_owner_is_not_the_poster(modules),
         office_confirmed_domain=modules.office_confirmed_domain,
+        office_declined_domain=modules.office_declined_domain,
     )
 
 
@@ -192,6 +193,7 @@ REASON_ORDER = (
     "reason.authority_matches",
     "reason.authority_matches_brokerage",
     "reason.office_confirmed",
+    "reason.office_declined",
     "reason.authority_unknown",
     "reason.phone_not_confirmed",
     "reason.phone_not_confirmed_brokerage",
@@ -326,7 +328,9 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             reasons = [proof]
         else:
             ordered = sorted(dict.fromkeys(keys), key=_REASON_RANK.__getitem__)
-            reasons = [strings.text(key, lang, **values) for key in ordered]
+            # {domain} is only in the office reasons; the declined one is the default.
+            fill = {"domain": evidence.office_declined_domain or "", **values}
+            reasons = [strings.text(key, lang, **fill) for key in ordered]
         return Verdict(
             case_id=evidence.case_id, state=state, reasons=reasons, source=evidence.source
         )
@@ -367,6 +371,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
         # confirmed and HOLD, never a red flag, and never in a report pack.
         unconfirmed = [*unconfirmed, "reason.license_not_found_given"]
+    if evidence.office_declined_domain:
+        # The office at the website on record said this ad is not theirs. Not confirmed, and
+        # it holds the case; it is an answer, not proof, so never a red flag.
+        unconfirmed = [*unconfirmed, "reason.office_declined"]
     if evidence.owner_flag:
         # A19 (#125): the poster says they own it and the owner of record is someone else.
         # Not confirmed, like any name that does not match (ruling, Sat 01:20): owners rent
@@ -849,6 +857,15 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
 
 
+def _office_declined_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    domain = modules.office_declined_domain
+    if not domain:
+        return []
+    return [
+        _line(lang, "label.office", CardTone.NOT_SHOWN, "contact.office_declined", domain=domain)
+    ]
+
+
 def _office_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     """Someone at the office's own website domain on record confirmed this case (info line).
 
@@ -870,6 +887,7 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
                     _allowed_line(modules, lang),
                     *_contact_lines(modules, lang),
                     *_office_lines(modules, lang),
+                    *_office_declined_lines(modules, lang),
                 ],
             ),
             # Not from the record: the licence list is the state's, and public.

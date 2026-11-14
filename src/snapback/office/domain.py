@@ -38,8 +38,30 @@ TWO_PART_ENDINGS = frozenset(
         "com.hk",
         "com.tr",
         "com.cn",
+        # Private endings that sell names under a country label (evil.us.com is not us.com).
+        "us.com",
+        "uk.com",
+        "eu.com",
+        "gb.com",
+        "co.com",
+        "uk.net",
+        "gb.net",
+        "se.net",
+        "za.com",
+        "br.com",
+        "cn.com",
+        "de.com",
+        "jpn.com",
+        "ru.com",
+        "sa.com",
+        "qc.com",
+        "kr.com",
+        "in.net",
     }
 )
+# A label that is part of an ending, not a name. "oakcourt.co.xx" under an ending we do not
+# know would read as the name "co" on "xx", so such a host is refused rather than guessed.
+GENERIC_LABELS = frozenset({"com", "co", "net", "org", "gov", "edu", "ac"})
 
 # Free mail: anyone can open one, so it proves nothing about an office.
 FREE_MAIL = frozenset(
@@ -132,6 +154,19 @@ PLATFORMS = frozenset(
         "vercel.app",
         "herokuapp.com",
         "pages.dev",
+        # Property-management software vendors host many unrelated offices' sites.
+        "appfolio.com",
+        "prospectportal.com",
+        "rentmanager.com",
+        "managebuilding.com",
+        "tenantturner.com",
+        "rentcafewebsite.com",
+        "securecafe.com",
+        "entrata.com",
+        "realpage.com",
+        "rently.com",
+        "buildium.com",
+        "showmojo.com",
     }
 )
 
@@ -153,7 +188,10 @@ def registrable_domain(host: str | None) -> str | None:
         return None
     if any(label.startswith("xn--") for label in labels) or not _TLD.fullmatch(labels[-1]):
         return None
-    keep = 3 if ".".join(labels[-2:]) in TWO_PART_ENDINGS else 2
+    known_ending = ".".join(labels[-2:]) in TWO_PART_ENDINGS
+    if not known_ending and labels[-2] in GENERIC_LABELS:
+        return None  # "x.co.xx": an ending we do not know; never guess a name from it
+    keep = 3 if known_ending else 2
     if len(labels) < keep:
         return None
     return ".".join(labels[-keep:])
@@ -189,10 +227,10 @@ _ADDRESS = re.compile(r"^([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64})@([A-Za-z0-9.-]{
 
 
 def accepts_address(address: str | None, official: str | None) -> bool:
-    """Is this email address at the office's official domain, or a subdomain of it?
+    """Is this email address at exactly the office's official domain (decision 183)?
 
     Any local part is fine: we never learn who the office's people are. The domain is
-    compared exactly, after lower-casing; punycode and non-ASCII are refused.
+    compared exactly, after lower-casing: a subdomain, punycode and non-ASCII are refused.
     """
     if official is None or not isinstance(address, str):
         return False
@@ -200,4 +238,4 @@ def accepts_address(address: str | None, official: str | None) -> bool:
     if found is None:
         return False
     domain = found.group(2).lower()
-    return registrable_domain(domain) == official
+    return domain == official and registrable_domain(domain) == official

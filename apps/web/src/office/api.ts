@@ -49,3 +49,44 @@ export async function requestOfficeLink(caseId: string, address: string): Promis
     throw new Error(typeof body.detail === "string" ? body.detail : "That did not work.");
   return body as OfficeRequested;
 }
+
+export interface ListingContext {
+  building: string | null;
+  address: string | null;
+  unit: string | null;
+  rent: number | null;
+  poster: string | null;
+  phones: string[];
+  emails: string[];
+  links: string[];
+}
+
+export interface OfficePeek {
+  domain: string;
+  source: DataSource;
+  listing: ListingContext;
+}
+
+export interface OfficeAnswered {
+  decision: "yes" | "no";
+  domain: string;
+  message: string;
+}
+
+async function postToken<T>(path: string, body: object): Promise<T> {
+  // The token travels in the body, never in an address, so no server log holds it.
+  const res = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { detail?: string };
+  if (!res.ok)
+    throw new Error(typeof data.detail === "string" ? data.detail : "That did not work.");
+  return data as T;
+}
+
+export const peekOffice = (token: string) => postToken<OfficePeek>("/office/peek", { token });
+
+export const answerOffice = (token: string, decision: "yes" | "no") =>
+  postToken<OfficeAnswered>("/office/answer", { token, decision });

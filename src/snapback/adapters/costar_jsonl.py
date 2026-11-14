@@ -377,6 +377,29 @@ def _building_facts(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _text(value: Any) -> str | None:
+    """A short plain string from the kit, or None."""
+    return " ".join(value.split())[:120] or None if isinstance(value, str) else None
+
+
+def _street_address(address: Any) -> str | None:
+    """ "100 Fixture Way, Houston, TX 77002" from the record's primary address, if it has one.
+
+    Used only to tell the office which building an ad is about (never on the card)."""
+    if not isinstance(address, dict):
+        return None
+
+    def part(key: str) -> str:
+        return " ".join(str(address.get(key) or "").split())
+
+    street = " ".join(
+        p for p in (part("streetNumber"), part("streetName"), part("streetType")) if p
+    )
+    state = " ".join(p for p in (part("state"), part("postcode")) if p)
+    text = ", ".join(p for p in (street, part("city"), state) if p)
+    return text[:160] or None
+
+
 def parse_record(
     record: dict[str, Any],
     source: DataSource,
@@ -405,6 +428,8 @@ def parse_record(
         "lon": _as_float(_get_any(record, FIELDS["lon"])),
         "model_ids": _model_ids(record),
         "website_host": _host(_first(record, FIELDS["website"])),
+        "building_name": _text(record.get("buildingName")),
+        "street_address": _street_address(record.get("primaryAddress")),
         "units": _property_units(record),
     }
     fields.update(_building_facts(record))

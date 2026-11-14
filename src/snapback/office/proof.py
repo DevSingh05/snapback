@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from snapback.office.models import ListingContext
+
 TOKEN_TTL_SECONDS = 30 * 60
 REQUESTS_PER_WINDOW = 3
 WINDOW_SECONDS = 15 * 60
@@ -45,6 +47,7 @@ class Redeemed:
     outcome: Outcome
     case_id: str | None = None
     domain: str | None = None
+    context: ListingContext | None = None
 
 
 @dataclass
@@ -52,6 +55,7 @@ class _Entry:
     case_id: str
     domain: str
     expires_at: float
+    context: ListingContext
     used: bool = False
 
 
@@ -75,7 +79,9 @@ class OfficeProofs:
         self._lock = threading.Lock()
         self._count = 0
 
-    def request(self, case_id: str, address: str, domain: str) -> Path:
+    def request(
+        self, case_id: str, address: str, domain: str, context: ListingContext | None = None
+    ) -> Path:
         """Make a token for this case and write the message to the outbox.
 
         The caller has already checked that `address` is at `domain`. Raises `RateLimited`.
@@ -92,11 +98,13 @@ class OfficeProofs:
             for old in self._by_case.get(case_id, []):
                 self._entries.pop(old, None)  # one live token per case
             digest = _hash(token)
-            self._entries[digest] = _Entry(case_id, domain, now + TOKEN_TTL_SECONDS)
+            self._entries[digest] = _Entry(
+                case_id, domain, now + TOKEN_TTL_SECONDS, context or ListingContext()
+            )
             self._by_case[case_id] = [digest]
             self._count += 1
             number = self._count
-        return self._write(case_id, number, address, domain, token)
+        return self._write(case_id, number, address, domain, token, context or ListingContext())
 
     def peek(self, token: str) -> Redeemed:
         """What redeeming this token would do now, without using it (for the GET page)."""
@@ -105,10 +113,10 @@ class OfficeProofs:
             if entry is None:
                 return Redeemed(Outcome.UNKNOWN)
             if entry.used:
-                return Redeemed(Outcome.USED, entry.case_id, entry.domain)
+                return Redeemed(Outcome.USED, entry.case_id, entry.domain, entry.context)
             if self._clock() >= entry.expires_at:
-                return Redeemed(Outcome.EXPIRED, entry.case_id, entry.domain)
-            return Redeemed(Outcome.CONFIRMED, entry.case_id, entry.domain)
+                return Redeemed(Outcome.EXPIRED, entry.case_id, entry.domain, entry.context)
+            return Redeemed(Outcome.CONFIRMED, entry.case_id, entry.domain, entry.context)
 
     def redeem(self, token: str) -> Redeemed:
         """Use a token once. The first valid use confirms; every later use says it was used."""
@@ -118,11 +126,11 @@ class OfficeProofs:
             if entry is None:
                 return Redeemed(Outcome.UNKNOWN)
             if entry.used:
-                return Redeemed(Outcome.USED, entry.case_id, entry.domain)
+                return Redeemed(Outcome.USED, entry.case_id, entry.domain, entry.context)
             if self._clock() >= entry.expires_at:
-                return Redeemed(Outcome.EXPIRED, entry.case_id, entry.domain)
+                return Redeemed(Outcome.EXPIRED, entry.case_id, entry.domain, entry.context)
             entry.used = True
-            return Redeemed(Outcome.CONFIRMED, entry.case_id, entry.domain)
+            return Redeemed(Outcome.CONFIRMED, entry.case_id, entry.domain, entry.context)
 
     def _sweep(self, now: float) -> None:
         """Forget long-dead tokens and quiet cases, and cap what is held."""
@@ -136,25 +144,59 @@ class OfficeProofs:
             c for c, times in self._requests.items() if all(now - t > WINDOW_SECONDS for t in times)
         ]:
             self._requests.pop(case_id, None)
-            self._by_case.pop(case_id, None)
+        # A case keeps its token list for as long as any of its tokens is still held: dropping
+        # it earlier would let an old token survive a new request (it would not be voided).
+        for case_id in list(self._by_case):
+            live = [h for h in self._by_case[case_id] if h in self._entries]
+            if live:
+                self._by_case[case_id] = live
+            else:
+                del self._by_case[case_id]
 
-    def _write(self, case_id: str, number: int, address: str, domain: str, token: str) -> Path:
+    def _write(
+        self,
+        case_id: str,
+        number: int,
+        address: str,
+        domain: str,
+        token: str,
+        context: ListingContext,
+    ) -> Path:
         self._outbox.mkdir(parents=True, exist_ok=True)
         name = _SAFE_NAME.sub("_", case_id)[:40] or "case"
         path = self._outbox / f"{name}-{number:04d}.txt"
         body = (
             "FIXTURE OUTBOX: this message was not sent. A person would send it.\n"
             f"To: {address}\n"
-            "Subject: Please confirm a listing at your property\n"
+            "Subject: Is this rental ad yours?\n"
             "\n"
-            f"Someone asked SNAPBACK to check a rental listing for a property whose website "
-            f"on record is {domain}. If you work at that office and this listing is yours, "
-            f"open this link within 30 minutes to confirm it. It works once.\n"
-            f"{self._base}/confirm/{token}\n"
-            "If you do not know this listing, ignore this message.\n"
+            f"Someone asked SNAPBACK to check a rental ad for a property whose website on "
+            f"record is {domain}. Please tell us whether this ad is yours.\n\n"
+            f"{describe(context)}\n\n"
+            "Open this link within 30 minutes and press 'Yes, ours' or 'Not ours'. It works "
+            "once, and only your answer is recorded.\n"
+            f"{self._base}/confirm#{token}\n"
+            "If you do not know this ad, press 'Not ours' or ignore this message.\n"
         )
         # Created new, owner-only: the file holds a live link. Never overwritten.
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as handle:
             handle.write(body)
         return path
+
+
+def describe(context: ListingContext) -> str:
+    """The ad in a few plain lines, for the office to recognise (or not)."""
+    lines = []
+    if context.building or context.address:
+        where = ", ".join(part for part in (context.building, context.address) if part)
+        lines.append(f"Property on record: {where}")
+    if context.unit:
+        lines.append(f"Unit in the ad: {context.unit}")
+    if context.rent:
+        lines.append(f"Rent in the ad: ${context.rent:,} a month")
+    lines.append(f"Posted by: {context.poster or '(the ad names no company)'}")
+    contacts = [*context.phones, *context.emails, *context.links]
+    if contacts:
+        lines.append("Contacts in the ad: " + ", ".join(contacts))
+    return "\n".join(lines)

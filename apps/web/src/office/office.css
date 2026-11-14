@@ -24,3 +24,21 @@
   flex-direction: column;
   gap: 12px;
 }
+.of-ad {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+.of-ad dt {
+  color: var(--muted);
+}
+.of-ad dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.of-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

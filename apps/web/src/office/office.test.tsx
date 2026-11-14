@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { saveCaseReadToken, saveCaseToken } from "../api";
+import { matchRoute } from "../App";
+import { ConfirmPage } from "./ConfirmPage";
 import { OfficeConfirm } from "./OfficeConfirm";
 import type { OfficeStatus } from "./api";
 
@@ -133,5 +135,86 @@ describe("OfficeConfirm", () => {
     expect(await screen.findByTestId("office-confirmed")).toHaveTextContent(
       "Confirmed through camdenliving.com, the website CoStar has on record for this office.",
     );
+  });
+});
+
+describe("ConfirmPage", () => {
+  const peeked = {
+    domain: "camdenliving.com",
+    source: "fixture",
+    listing: {
+      building: "Camden Lofts",
+      address: "100 Fixture Way, Fixture City, TX 00000",
+      unit: "204",
+      rent: 1500,
+      poster: "Fixture Living LLC",
+      phones: [],
+      emails: ["leasing@x.example"],
+      links: [],
+    },
+  };
+
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/confirm#tok123");
+  });
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("reads the token from the fragment, shows the ad and sends the token only in a body", async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+      JSON.parse(String(init?.body)).decision
+        ? json({ decision: "yes", domain: "camdenliving.com", message: "Thank you. Confirmed." })
+        : json(peeked),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ConfirmPage />);
+    const ad = await screen.findByTestId("confirm-ad");
+    expect(ad).toHaveTextContent("Camden Lofts, 100 Fixture Way");
+    expect(ad).toHaveTextContent("204");
+    expect(ad).toHaveTextContent("$1,500 a month");
+    expect(ad).toHaveTextContent("Fixture Living LLC");
+    expect(screen.getByText(/is this ad, posted by fixture living llc/i)).toBeInTheDocument();
+    expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    // The token is gone from the address bar.
+    expect(window.location.hash).toBe("");
+    // Looking changed nothing: one call, a peek.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Yes, ours" }));
+    expect(await screen.findByTestId("confirm-done")).toHaveTextContent(/confirmed/i);
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
+    expect(calls.map((c) => c[0])).toEqual(["/api/office/peek", "/api/office/answer"]);
+    expect(calls.every((c) => !c[0].includes("tok123"))).toBe(true);
+    expect(JSON.parse(String(calls[1]![1].body))).toEqual({ token: "tok123", decision: "yes" });
+  });
+
+  it("'Not ours' sends the no decision", async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+      JSON.parse(String(init?.body)).decision
+        ? json({ decision: "no", domain: "camdenliving.com", message: "Recorded: not yours." })
+        : json(peeked),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ConfirmPage />);
+    await user.click(await screen.findByRole("button", { name: "Not ours" }));
+    expect(await screen.findByTestId("confirm-done")).toHaveTextContent(/not yours/i);
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
+    expect(JSON.parse(String(calls[1]![1].body)).decision).toBe("no");
+  });
+
+  it("shows the API's plain message for a used or expired link", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json({ detail: "This link was already used." }, 410)),
+    );
+    render(<ConfirmPage />);
+    expect(await screen.findByTestId("confirm-error")).toHaveTextContent(/already used/i);
+  });
+
+  it("is reached by the /confirm route", () => {
+    expect(matchRoute("/confirm")).toEqual({ name: "confirm" });
+    expect(matchRoute("/confirm/")).toEqual({ name: "confirm" });
   });
 });

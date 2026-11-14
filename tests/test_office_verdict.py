@@ -213,3 +213,45 @@ def test_no_phone_digits_or_names_in_the_new_lines():
     person = next(row for row in card.rows if row.kind is CardRowKind.PERSON)
     new = " ".join(line.text for line in person.lines if "Confirmed through" in line.text)
     assert not re.search(r"\d{3}", new)
+
+
+DECLINED_EN = (
+    "Not confirmed. Someone at fixtureliving.example, the website CoStar has on record for "
+    "this office, said the office does not recognise this ad."
+)
+
+
+def test_not_ours_holds_the_case_with_a_reason_and_never_verifies_or_accuses():
+    verified = base(office_confirmed_domain=DOMAIN)
+    assert state(verified) is VerdictState.VERIFIED
+    declined = base(office_declined_domain=DOMAIN)
+    verdict = decide(to_evidence(declined))
+    assert verdict.state is VerdictState.HOLD  # never DONT_PAY: an answer, not proof
+    assert any("did not recognise this ad" in r for r in verdict.reasons)
+    # Even a phone that matches the office cannot lift a "not ours".
+    phone = base(
+        office_declined_domain=DOMAIN,
+        authority={
+            "status": "matches_record",
+            "manager_on_record": "Fixture Living LLC",
+            "office_phone_match": "yes",
+        },
+    )
+    assert state(phone) is VerdictState.HOLD
+
+
+def test_the_declined_card_line_is_not_confirmed_in_both_languages():
+    modules = base(office_declined_domain=DOMAIN)
+    card = build_card(modules, checked_at=CHECKED_AT)
+    person = next(row for row in card.rows if row.kind is CardRowKind.PERSON)
+    lines = [line for line in person.lines if "does not recognise" in line.text]
+    assert [line.text for line in lines] == [DECLINED_EN] and lines[0].tone is CardTone.NOT_SHOWN
+    es = build_card(modules, checked_at=CHECKED_AT, lang="es")
+    assert "no reconoce este anuncio" in es.model_dump_json()
+    assert "Confirmed through" not in card.model_dump_json()
+
+
+def test_the_declined_reason_has_a_place_and_both_languages():
+    assert "reason.office_declined" in REASON_ORDER
+    for key in ("contact.office_declined", "reason.office_declined"):
+        assert strings.has(key, "en") and strings.has(key, "es")
