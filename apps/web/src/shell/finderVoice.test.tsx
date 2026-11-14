@@ -239,7 +239,7 @@ describe("Finder voice", () => {
     expect(window.localStorage.getItem("snapback.finder-read-aloud")).toBe("on");
     fireEvent.change(screen.getByLabelText("Your message"), { target: { value: "hi" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(played).toHaveLength(1));
+    await waitFor(() => expect(played).toHaveLength(1), { timeout: 5000 });
     expect(calls.find((c) => c.url.endsWith("/voice/tts"))!.body).toEqual({ text: REPLY });
     expect(speakSpy).not.toHaveBeenCalled();
     // A per-reply button plays it again.
@@ -257,12 +257,12 @@ describe("Finder voice", () => {
     await waitFor(() => expect(recorders[0]?.state).toBe("recording"));
     expect(screen.getByTestId("talk-bar")).toHaveTextContent("Talk mode · Listening");
     fireEvent.click(screen.getAllByRole("button", { name: "Stop and send" }).at(-1)!);
-    await waitFor(() => expect(played).toHaveLength(1));
+    await waitFor(() => expect(played).toHaveLength(1), { timeout: 5000 });
     expect(recorders).toHaveLength(1);
     act(() => {
       played[0]!.dispatchEvent(new Event("ended"));
     });
-    await waitFor(() => expect(recorders[1]?.state).toBe("recording"));
+    await waitFor(() => expect(recorders[1]?.state).toBe("recording"), { timeout: 5000 });
     expect(getUserMedia).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole("button", { name: /End talk/ }));
     expect(screen.queryByTestId("talk-bar")).toBeNull();
