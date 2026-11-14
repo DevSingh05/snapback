@@ -612,3 +612,7 @@
 .rs-here-cone {
   fill: color-mix(in srgb, var(--act) 26%, transparent);
 }
+/* In the corner window the drawing is a thumbnail: the marker and its cone stay, the words go. */
+.sv-pane[data-role="corner"] .rs-here :is(rect, text) {
+  display: none;
+}

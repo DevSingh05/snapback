@@ -78,9 +78,9 @@ function HereMarker({ placed }: { placed: boolean }) {
       )}
       <rect
         className="rs-photo-tag"
-        x={x - (placed ? 44 : 76)}
+        x={x - (placed ? 44 : 96)}
         y={y - 34}
-        width={placed ? 88 : 152}
+        width={placed ? 88 : 192}
         height={18}
         rx={3}
       />

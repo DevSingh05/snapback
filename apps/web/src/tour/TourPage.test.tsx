@@ -165,9 +165,15 @@ describe("TourView with a mocked Showcase SDK", () => {
   it("shows the placeholder and says so when the loaded model holds none of the plan's sweeps", async () => {
     sweepIds.current = ["real-1", "real-2", "real-3", "real-4"];
     render(<TourView plan={FIXTURE_TOUR} sdkKey="k" modelId="m" />);
-    expect(await screen.findByTestId("wrong-model")).toHaveTextContent(
-      "The 3D view here is not this home's scan",
+    // No warning box over the walk: the drawing stays the walk, and the scan is offered whole.
+    expect(await screen.findByTestId("scan-offer")).toHaveTextContent(
+      "See a real 3D scan of this building",
     );
+    expect(screen.queryByTestId("wrong-model")).toBeNull();
+    expect(screen.queryByTitle("A real 3D scan")).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Open the scan" }));
+    expect(screen.getByTitle("A real 3D scan")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Close the scan" }));
     expect(screen.getByTestId("tour-placeholder")).toBeInTheDocument();
     expect(screen.getByTitle("Matterport 3D view")).not.toBeVisible();
     // Never another home's sweeps in its place: no numbered stops, no flights.

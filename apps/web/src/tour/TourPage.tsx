@@ -15,6 +15,7 @@ import { StageCaption, StopStage } from "../walk/StopStage";
 import { useNarrow } from "../walk/useNarrow";
 import { seeingLine, waysOut } from "../walk/seeing";
 import { WalkPlayer, buildChapters, totalMs } from "../walk/player";
+import { ScanOffer } from "./ScanOffer";
 import { WalkMap } from "../walk/WalkMap";
 import { useWalkLive } from "../walk/useWalkLive";
 import { photoAt, walkLook } from "../walk/walkLook";
@@ -315,31 +316,11 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
             onPhoto={setShowPhoto}
             endAction={{ label: "Tour prep: what to ask", href: plan.links.tour_prep }}
           />
-          {wrongModel && (
-            <p className="tour-wrong-model" data-testid="wrong-model" role="status">
-              The 3D view here is not this home&apos;s scan
-            </p>
-          )}
           <StageCaption
             stop={stop}
             photoAlias={stop.photos.length > 0 ? photoAlias : null}
             unshown={unshown}
           />
-          {look.evidence && firstAlias && !drawer && (
-            <button
-              type="button"
-              className="tour-how"
-              data-testid="how-we-know"
-              onClick={() => setDrawer(firstAlias)}
-            >
-              How we know
-            </button>
-          )}
-          {look.evidence && !firstAlias && inRoom && !drawer && (
-            <span className="tour-how tour-how-none" data-testid="how-we-know-none">
-              No ad photo for this room
-            </span>
-          )}
           {look.evidence && drawer && (
             <EvidenceDrawer
               file={look.evidence}
@@ -352,9 +333,26 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
           )}
         </section>
         <aside className="tour-panel" aria-live="polite">
-          <p className="mono tour-count">
-            Step {Math.min(index, last) + 1} of {plan.stops.length}
-          </p>
+          <div className="tour-panel-top">
+            <p className="mono tour-count">
+              Step {Math.min(index, last) + 1} of {plan.stops.length}
+            </p>
+            {look.evidence && firstAlias && !drawer && (
+              <button
+                type="button"
+                className="tour-how"
+                data-testid="how-we-know"
+                onClick={() => setDrawer(firstAlias)}
+              >
+                How we know
+              </button>
+            )}
+            {look.evidence && !firstAlias && inRoom && (
+              <span className="tour-how-none" data-testid="how-we-know-none">
+                No ad photo for this room
+              </span>
+            )}
+          </div>
           {/* The name is on the view and in the chapter row; here it is for screen readers only. */}
           <h1 className="sr-only">{stop.title}</h1>
           <p className="tour-seeing" data-testid="tour-seeing">
@@ -414,6 +412,9 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail, notice }:
           />
         )}
       </div>
+      {wrongModel && modelId && sdkKey && (
+        <ScanOffer modelId={modelId} sdkKey={sdkKey} source={plan.source} />
+      )}
       <ListingPhotos photos={[]} site="" asOf={plan.as_of} />
       <nav className="tour-cover" aria-label="Tour progress">
         {plan.coverage?.line && (
