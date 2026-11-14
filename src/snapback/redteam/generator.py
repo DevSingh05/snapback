@@ -5,7 +5,7 @@ Each source photo yields one case per attack type:
 - paste: the code digitally pasted onto the photo (no paper in the room).
 - screen: the photo as if shot off a laptop or phone screen (pixel grid, moire, glare, tilt).
 - print: the photo as if shot off a printout (fewer colours, paper tone, grain, softness).
-- crop_reencode: a crop and low-quality re-encode, the way a reused listing photo arrives.
+- copy_crop: a crop and low-quality re-encode, the way a reused listing photo arrives.
 - injection: a pasted code plus instructions written on the "paper" (must never change a state).
 
 Every row is labelled `synthetic=True` and reported apart from real team captures. Output goes
@@ -22,7 +22,15 @@ import random
 from enum import StrEnum
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
+from PIL import (
+    Image,
+    ImageDraw,
+    ImageEnhance,
+    ImageFilter,
+    ImageFont,
+    ImageOps,
+    UnidentifiedImageError,
+)
 from pydantic import BaseModel
 
 from snapback.contracts import RecaptureLabel
@@ -40,7 +48,7 @@ class AttackType(StrEnum):
     PASTE = "paste"
     SCREEN = "screen"
     PRINT = "print"
-    CROP_REENCODE = "crop_reencode"
+    COPY_CROP = "copy_crop"
     INJECTION = "injection"
 
 
@@ -50,7 +58,7 @@ LABELS = {
     AttackType.PASTE: RecaptureLabel.PASTE,
     AttackType.SCREEN: RecaptureLabel.SCREEN,
     AttackType.PRINT: RecaptureLabel.PRINT,
-    AttackType.CROP_REENCODE: RecaptureLabel.UNKNOWN,  # a copy: memory/ catches it, not recapture
+    AttackType.COPY_CROP: RecaptureLabel.UNKNOWN,  # a copy: memory/ catches it, not recapture
     AttackType.INJECTION: RecaptureLabel.PASTE,
 }
 
@@ -182,23 +190,34 @@ def _make(
         return _screen(_paper(img, rng, [code]), rng), code, None
     if attack is AttackType.PRINT:
         return _print(_paper(img, rng, [code]), rng), code, None
-    if attack is AttackType.CROP_REENCODE:
+    if attack is AttackType.COPY_CROP:
         return _crop(img, rng), code, None
     text = rng.choice(INJECTIONS)
     return _paper(img, rng, [code, text]), code, text
 
 
-def generate(sources: list[Path], out_dir: Path, seed: int) -> list[CaseRow]:
-    """One case per (source photo, attack type), in a stable order."""
+def generate(
+    sources: list[Path], out_dir: Path, seed: int, skipped: list[str] | None = None
+) -> list[CaseRow]:
+    """One case per (source photo, attack type), in a stable order.
+
+    A photo Pillow cannot decode (HEIC without a decoder, a broken file) is skipped and its
+    file name appended to `skipped`; one bad file never stops the run.
+    """
     rows: list[CaseRow] = []
     for src in sorted(sources, key=lambda p: p.name):
         photo_id = src.stem
-        with Image.open(src) as opened:
-            base = ImageOps.exif_transpose(opened).convert("RGB")
+        try:
+            with Image.open(src) as opened:
+                base = ImageOps.exif_transpose(opened).convert("RGB")
+        except (UnidentifiedImageError, OSError):
+            if skipped is not None:
+                skipped.append(src.name)
+            continue
         for attack in ATTACKS:
             rng = _rng(seed, photo_id, attack)
             img, code, text = _make(attack, base, rng)
-            quality = rng.randint(35, 60) if attack is AttackType.CROP_REENCODE else 88
+            quality = rng.randint(35, 60) if attack is AttackType.COPY_CROP else 88
             case_id = f"rt-s{seed}-{photo_id}-{attack.value}"
             path = out_dir / attack.value / f"{case_id}.jpg"
             path.parent.mkdir(parents=True, exist_ok=True)

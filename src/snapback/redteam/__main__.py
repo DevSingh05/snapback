@@ -16,9 +16,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1)
     args = parser.parse_args()
     sources = sorted(p for p in args.src.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
-    rows = generate(sources, args.out, seed=args.seed)
+    skipped: list[str] = []
+    rows = generate(sources, args.out, seed=args.seed, skipped=skipped)
     manifest = write_manifest(rows, args.out / "manifest.csv")
     print(f"sources: {len(sources)}  cases: {len(rows)}  manifest: {manifest}")
+    if skipped:
+        print(f"skipped {len(skipped)} unreadable photo(s), convert HEIC to JPEG: {skipped}")
     for attack, n in sorted(Counter(r.attack.value for r in rows).items()):
         print(f"{attack}: {n}")
 

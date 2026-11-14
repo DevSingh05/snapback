@@ -54,7 +54,7 @@ def test_labels_match_the_recapture_classes(sources, tmp_path):
     assert rows[AttackType.SCREEN].label is RecaptureLabel.SCREEN
     assert rows[AttackType.PRINT].label is RecaptureLabel.PRINT
     # A crop of a listing photo is a copy for memory/, not a recapture class.
-    assert rows[AttackType.CROP_REENCODE].label is RecaptureLabel.UNKNOWN
+    assert rows[AttackType.COPY_CROP].label is RecaptureLabel.UNKNOWN
     assert all(r.expect_presence == "forged" for r in rows.values())
 
 
@@ -78,3 +78,16 @@ def test_manifest_round_trips_as_csv_with_counts(sources, tmp_path):
     assert len(read) == len(rows)
     assert {r["synthetic"] for r in read} == {"1"}
     assert sum(r["attack"] == "screen" for r in read) == len(sources)
+
+
+def test_an_unreadable_photo_is_skipped_and_reported_not_fatal(sources, tmp_path):
+    heic = sources[0].parent / "fx-team-iphone.heic"
+    heic.write_bytes(b"\x00\x00\x00\x18ftypheic not decodable here")
+    skipped: list[str] = []
+    rows = generate([*sources, heic], tmp_path / "out", seed=1, skipped=skipped)
+    assert skipped == ["fx-team-iphone.heic"]
+    assert len(rows) == len(sources) * len(ATTACKS)
+
+
+def test_the_copy_attack_is_named_for_the_harness_copy_prefix():
+    assert AttackType.COPY_CROP.value.startswith("copy")
