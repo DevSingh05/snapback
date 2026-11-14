@@ -217,7 +217,16 @@ class PlaceDesk:
         row = self.rows[self.photo_of[alias]]
         options: list[SearchOption] = []
         if len(self.scans) >= 2:
-            for scan_alias, model_id in self.scans.items():
+            # "Another scan": the base search spread its faces over every scan of the home, and
+            # the placed photos matched in some of them. Focus on a scan none of them used; if
+            # every scan was used, any other scan than the photo's own is still a new look.
+            used = {
+                r.location.model_id
+                for r in self.rows.values()
+                if r.location.status is LocateStatus.LOCATED_IN_CLAIMED
+            }
+            others = {a: m for a, m in self.scans.items() if m not in used} or self.scans
+            for scan_alias, model_id in others.items():
                 if model_id != row.location.model_id:
                     options.append(SearchOption("focus_scan", scan_alias, model_id))
         options += [SearchOption("wider_index"), SearchOption("deeper_claimed")]
