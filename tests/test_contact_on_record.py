@@ -478,9 +478,17 @@ def test_with_no_property_record_the_brokerages_on_record_are_still_compared():
 
     silent = check_authority(ContactClaims(), None, SALT, offices)
     assert (silent.status, silent.manager_on_record) == (AuthorityStatus.UNKNOWN, None)
-    # With nothing on record at all, nothing is claimed, as before.
+    # Each of those was a comparison with brokerages alone, and says so.
+    assert named.brokerage_only and other.brokerage_only and silent.brokerage_only
+    # With nothing on record at all, nothing is claimed and nothing was compared, as before.
     nothing = check_authority(ContactClaims(company="Fixture Realty Group"), None, SALT)
     assert (nothing.status, nothing.manager_on_record) == (AuthorityStatus.UNKNOWN, None)
+    assert nothing.brokerage_only is False
+    # And a home with a record is never "brokerages alone", whoever else is on record.
+    with_record = check_authority(
+        ContactClaims(company="Fixture Realty Group"), record(), SALT, offices
+    )
+    assert with_record.brokerage_only is False
     blank = check_authority(ContactClaims(company="Fixture Realty Group"), None, SALT, ["", " "])
     assert blank.status is AuthorityStatus.UNKNOWN
 

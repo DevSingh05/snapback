@@ -117,3 +117,55 @@ def test_the_trace_says_the_listing_office_was_checked():
     # No name from the listing or the record is in what the plan says.
     said = " ".join(event.reason for event in case.trace.events)
     assert "Fixture Realty" not in said and "Somebody Else" not in said
+
+
+def test_who_is_on_record_alone_is_not_a_home_record_when_the_sale_is_active():
+    # Review of #174: with an ACTIVE listing, no rent band and only the brokerage finding,
+    # there is no home record to read. The record step is skipped and says why; the
+    # brokerage step still brings the finding.
+    from snapback.agent.planner import Plan
+    from snapback.contracts import AuthorityResult, ForSaleMatch
+
+    class Bare:
+        def price(self, case_id):
+            return None
+
+        def authority(self, case_id):
+            return AuthorityResult(status=AuthorityStatus.MATCHES_RECORD, brokerage_only=True)
+
+        def for_sale(self, case_id):
+            return ForSaleMatch(status=ForSaleStatus.ACTIVE, offices=["Fixture Realty Group"])
+
+    plan = Plan(Bare(), "fx-1")
+    assert plan.open_options() == [PlanKind.BROKERAGE]
+    assert [(skip.kind, skip.reason) for skip in plan.skipped()][0] == (
+        PlanKind.RECORD,
+        "plan.skip.record",
+    )
+    assert plan.facts()["home_record_found"] is False
+    found = plan.run(PlanKind.BROKERAGE)
+    assert found["authority"].status is AuthorityStatus.MATCHES_RECORD
+
+    # The same answers with no listing active are a home record, as before.
+    class NotForSale(Bare):
+        def for_sale(self, case_id):
+            return None
+
+    assert Plan(NotForSale(), "fx-1").open_options() == [PlanKind.RECORD]
+
+
+def test_the_record_step_does_not_promise_who_is_on_record_when_the_brokerage_step_brings_it():
+    from snapback.card import strings
+
+    case = case_for(f"{FOR_SALE_HOME} Listed by Fixture Realty Group.")
+    at_the_plan(case)
+    offer = case.offer()
+    assert offer.default == RECORD
+    assert offer.default_reason == strings.text("plan.pick.record_rent")
+    assert "who is on record" not in offer.default_reason
+    # With no listing active the record step does bring it, and says so.
+    rented = case_for(f"{RENTED_HOME} Listed by Fixture Realty Group.")
+    at_the_plan(rented)
+    assert rented.offer().default_reason == strings.text("plan.pick.record")
+    for lang in ("en", "es"):
+        assert strings.text("plan.pick.record_rent", lang)

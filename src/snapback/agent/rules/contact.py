@@ -301,6 +301,9 @@ def check_authority(
             status=status,
             manager_on_record=matched,
             poster_said=claims.company,
+            # True when there was a brokerage to compare with. The card and the reasons then
+            # speak of the listing brokerage, never of a manager or a leasing office.
+            brokerage_only=bool(on_record),
         )
 
     return AuthorityResult(

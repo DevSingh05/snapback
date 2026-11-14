@@ -153,6 +153,7 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             modules.authority is not None and modules.authority.office_phone_match is PhoneMatch.NO
         ),
         phone_confirmed=_the_ad_is_the_office_s(modules),
+        brokerage_only=modules.authority is not None and modules.authority.brokerage_only,
         lookalike_link_flag=(
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
@@ -175,8 +176,10 @@ REASON_ORDER = (
     # Who: authority first, then the poster's contact, the licence they claim, and the
     # owner of record.
     "reason.authority_matches",
+    "reason.authority_matches_brokerage",
     "reason.authority_unknown",
     "reason.phone_not_confirmed",
+    "reason.phone_not_confirmed_brokerage",
     "reason.phone_flag",
     "reason.lookalike_link",
     "reason.license_not_found",
@@ -338,15 +341,18 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # the leasing office and a listing brokerage may all market a home.
     matches = evidence.authority is AuthorityStatus.MATCHES_RECORD
     proven = evidence.presence is PresenceStatus.PROVEN
+    # A15: on a home for sale with no property record, who is on record is a listing
+    # brokerage. The reasons then say "brokerage", never "manager" or "leasing office".
+    by_brokerage = "_brokerage" if evidence.brokerage_only else ""
     # H1: the name matches and the ad's contact was not shown to be the office. Said so the
     # hold has a reason. (A phone that is NOT the office's already has its own.)
     contact = []
     if matches and not evidence.phone_confirmed and not evidence.phone_flag:
-        contact = ["reason.phone_not_confirmed"]
+        contact = [f"reason.phone_not_confirmed{by_brokerage}"]
     return verdict(
         VerdictState.HOLD,
         "reason.located",
-        "reason.authority_matches" if matches else "reason.authority_unknown",
+        f"reason.authority_matches{by_brokerage}" if matches else "reason.authority_unknown",
         *contact,
         "reason.presence_proven_not_authority" if proven else "reason.presence_missing",
         *red_flags,
@@ -612,7 +618,12 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     elif authority.status is AuthorityStatus.MATCHES_RECORD:
         # H1: the name matches and there was no phone to compare. "Checks passed" needs the
         # ad's contact to be the office's, so the card says this was not checked.
-        lines.append(_line(lang, "label.contact", CardTone.NOT_CHECKED, "contact.phone_unchecked"))
+        # A15: on a home for sale with no property record the reason is different, and must
+        # be said as it is. Whatever the ad says, we hold no phone for the brokerage.
+        key = (
+            "contact.no_brokerage_phone" if authority.brokerage_only else "contact.phone_unchecked"
+        )
+        lines.append(_line(lang, "label.contact", CardTone.NOT_CHECKED, key))
     if authority.link_domain is LinkDomain.LOOKALIKE:
         lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
     return lines

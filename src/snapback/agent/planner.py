@@ -139,6 +139,15 @@ class Plan:
 
     # --- reading the plan ------------------------------------------------------------------
 
+    def pick_key(self, kind: PlanKind) -> str:
+        """The `plan.pick.*` key for why `kind` is worth running now.
+
+        With a listing active, who is on record is the brokerage step's finding (A15), so
+        the record step promises the rent band and no more."""
+        if kind is PlanKind.RECORD and self._active_sale:
+            return "plan.pick.record_rent"
+        return PICK_KEY[kind]
+
     def open_options(self) -> list[PlanKind]:
         """The options that can run now, in the fixed order."""
         return [kind for kind in ORDER if self._pending(kind)]

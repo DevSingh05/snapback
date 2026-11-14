@@ -549,6 +549,68 @@ def test_a_listing_that_names_the_listing_brokerage_matches_and_is_still_for_sal
     assert card["state"] != "verified" and card["state"] != "dont_pay"
 
 
+@pytest.mark.parametrize(
+    "contact",
+    ["", " Call (555) 010-0142.", " Text 555-010-0177 or see fixturerealty.example."],
+)
+def test_the_contact_line_says_we_hold_no_phone_for_the_brokerage(tmp_path, contact):
+    # Review of #174: with no property record there is no office phone on record at all. The
+    # card must not say "no phone in the listing could be compared" when the ad has one; what
+    # is true is that we hold none for the brokerage. Said the same with or without a phone.
+    client = client_for(tmp_path)
+    form = {"text": f"{FOR_SALE_HOME} Listed by Fixture Realty Group.{contact}"}
+    card = finish(client, form)
+    said = said_on(card)
+    assert said["Contact on record"]["tone"] == "not_checked"
+    assert said["Contact on record"]["text"] == (
+        "Not checked (we hold no phone for the listing brokerage)."
+    )
+    # One "call" on the row: the "Allowed to rent it" line names who to call.
+    assert "Call Fixture Realty Group" in said["Allowed to rent it"]["text"]
+    everything = " ".join(line["text"] for row in card["rows"] for line in row["lines"])
+    assert "leasing office" not in everything and "manager" not in everything
+    spanish = finish(client_for(tmp_path / "es"), form)  # the same listing, a fresh server
+    assert spanish["state"] == card["state"]
+
+
+def test_the_reasons_call_a_brokerage_a_brokerage(tmp_path):
+    from snapback.agent.intake import read_listing as read
+    from snapback.card import strings
+
+    listing = read(f"{FOR_SALE_HOME} Listed by Fixture Realty Group.")
+    modules = JoinedModules(
+        stand_in=FixtureModules(),
+        listing=listing,
+        record=None,
+        for_sale=KitLookups(DataSource.FIXTURE).for_sale(listing.text),
+        salt=FIXTURE_PHONE_SALT,
+        record_source=DataSource.FIXTURE,
+    )
+    verdict, card, case = run(modules)
+    assert case.evidence.authority.brokerage_only is True
+    for lang in ("en", "es"):
+        assert strings.text("reason.authority_matches_brokerage", lang)
+        assert strings.text("reason.phone_not_confirmed_brokerage", lang)
+    assert strings.text("reason.authority_matches_brokerage") in verdict.reasons
+    assert strings.text("reason.phone_not_confirmed_brokerage") in verdict.reasons
+    said = " ".join(verdict.reasons)
+    assert "manager" not in said and "leasing office" not in said
+    assert verdict.state is VerdictState.HOLD
+
+
+def test_a_home_with_a_record_keeps_the_leasing_office_wording(tmp_path):
+    # The manager on record is named and the listing has no phone: nothing changes here.
+    record = contact_record(source=DataSource.FIXTURE)
+    modules = joined("Unit 204, 2 bed, $1,700 a month. Managed by Fixture Living LLC.", record)
+    verdict, card, case = run(modules)
+    assert case.evidence.authority.brokerage_only is False
+    assert lines(card)["Contact on record"].text == (
+        "Not checked (no phone number in the listing could be compared with the leasing "
+        "office on record)."
+    )
+    assert "The ad names the manager on record. Anyone can type that name." in verdict.reasons
+
+
 def test_a_listing_that_names_someone_else_reads_not_confirmed_never_a_red_flag(tmp_path):
     client = client_for(tmp_path)
     card = finish(client, {"text": f"{FOR_SALE_HOME} Listed by Somebody Else Realty."})
