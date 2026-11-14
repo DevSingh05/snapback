@@ -663,7 +663,8 @@ class CreateCaseResponse(BaseModel):
     case_id: str  # short public id, for display and for reading the case
     source: DataSource
     token: str  # write secret for this case; send it on every write, in a header only
-    # Read-only secret: opens the trace and the challenge text, and may ride in `?token=`.
+    # Read-only secret: opens the trace, the challenge text, the report and the aerial proof.
+    # Header only, like the write secret; never in the address (locked, Sat 02:27).
     read_token: str | None = None
     status: CaseProgress
     state: VerdictState | None = None  # set once the case is done
