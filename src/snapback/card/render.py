@@ -30,6 +30,9 @@ from snapback.card import strings
 from snapback.contracts import Card, CardTone, DataSource, VerdictState
 
 WIDTH = 1080
+# Raise this whenever the drawing changes. It is part of each picture's cache key and ETag,
+# so a picture drawn by an older renderer is never served or kept as "unchanged".
+RENDER_VERSION = "2"
 MARGIN = 56
 CONTENT = WIDTH - 2 * MARGIN
 ICON = 48

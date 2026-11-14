@@ -35,6 +35,7 @@ from starlette.datastructures import UploadFile
 
 from snapback.agent.intake import read_listing
 from snapback.agent.join import KitMissing, Lookups
+from snapback.api.card_cache import CardPictures
 from snapback.api.cases import (
     CaseStatus,
     CaseStore,
@@ -47,7 +48,6 @@ from snapback.api.eval_results import NotTheAgreedCsv, read_results
 from snapback.api.limits import DailyLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
-from snapback.card.render import render_card_png
 from snapback.contracts import Card, CreateCaseResponse, Evidence, Verdict
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
@@ -136,6 +136,8 @@ def create_app(
     per_address = DailyLimit(settings.snapback_daily_limit_per_address)
     max_photo_bytes = settings.snapback_max_photo_mb * MB
     limit_reached = f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow."
+
+    pictures = CardPictures()
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -363,10 +365,22 @@ def create_app(
         return find(case_id).card(settings.snapback_public_base_url, lang)
 
     @app.get("/cases/{case_id}/card.png")
-    def get_card_png(case_id: str, lang: Language = "en") -> Response:
-        """The same card drawn as a PNG, with the verify link as a QR code."""
+    def get_card_png(
+        case_id: str,
+        lang: Language = "en",
+        if_none_match: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """The same card drawn as a PNG, with the verify link as a QR code.
+
+        Each distinct card is drawn once and kept. The reply carries an `ETag`; send it back
+        as `If-None-Match` and an unchanged picture comes back as 304 with no body.
+        """
         card = find(case_id).card(settings.snapback_public_base_url, lang)
-        return Response(content=render_card_png(card), media_type="image/png")
+        tag = f'"{pictures.etag(card)}"'
+        headers = {"ETag": tag, "Cache-Control": "no-cache"}
+        if if_none_match is not None and tag in if_none_match:
+            return Response(status_code=304, headers=headers)
+        return Response(content=pictures.png(card), media_type="image/png", headers=headers)
 
     @app.get("/cases/{case_id}/trace")
     def get_trace(
