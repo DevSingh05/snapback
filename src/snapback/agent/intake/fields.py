@@ -57,6 +57,28 @@ _SAYS_OWNER = re.compile(
     r")"
 )
 
+# The same claim in Spanish: "soy el dueño", "somos los propietarios", "se renta por dueño",
+# "trato directo con el dueño", "dueño directo", "es mi casa". Not "no soy el dueño", "el
+# agente del dueño", "dueño de un perro", "vendido por el dueño", "el dueño anterior", "como
+# en mi casa". "Dueno" without the ñ is how it is often typed.
+_DUENO = r"(?:due[ñn][oa]s?|propietari[oa]s?)"
+_CASA = r"(?:casa|propiedad|vivienda|condominio|d[úu]plex|townhouse)"
+_SAYS_OWNER_ES = re.compile(
+    r"(?i:"
+    r"(?<!no )\b(?:soy|somos)\s{1,3}(?:(?:el|la|los|las)\s{1,3})?" + _DUENO + r"\b"
+    r"(?!\s{1,3}de\s{1,3}(?:(?:un|una|mi|mis|dos|tres)\s{1,3})?(?:perr|gat|mascota))"
+    r"|(?<!vendido )(?<!vendida )\bpor\s{1,3}(?:(?:el|la|su|los)\s{1,3})?" + _DUENO + r"\b"
+    r"(?!\s{1,3}(?:anterior|pasad))"
+    r"|\btrato\s{1,3}directo\s{1,3}con\s{1,3}(?:(?:el|la)\s{1,3})?" + _DUENO + r"\b"
+    r"|\b" + _DUENO + r"\s{1,3}direct[oa]\b"
+    r"|(?<!no es )(?<!como )(?<!como en )(?<!cerca de )\bmi\s{1,3}(?:propia\s{1,3})?"
+    + _CASA
+    + r"\b"
+    # "Mi casa es su casa" is a welcome, not a claim.
+    r"(?!\s{1,3}es\s{1,3}(?:su|tu)\s{1,3}casa)"
+    r")"
+)
+
 # A link as written: with a scheme or "www.", or a bare name ending in a common ending. The
 # bare form does not start inside an email address or a longer name.
 _LINK = re.compile(r"(?:https?://|\bwww\.)([^\s/?#]{1,253})", re.IGNORECASE)
@@ -150,5 +172,7 @@ def extract_contacts(text: str) -> ContactClaims:
         phones=[match.group(0).strip() for match in _PHONE.finditer(text)],
         emails=[match.group(0).rstrip(".") for match in _EMAIL.finditer(text)],
         links=_links(text),
-        says_owner=_SAYS_OWNER.search(text) is not None,
+        says_owner=(
+            _SAYS_OWNER.search(text) is not None or _SAYS_OWNER_ES.search(text) is not None
+        ),
     )

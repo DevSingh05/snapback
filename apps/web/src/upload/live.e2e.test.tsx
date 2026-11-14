@@ -66,6 +66,11 @@ function installServer(opts: { challenge: string | null }) {
       status = "done";
       return json({ case_id: "7Q2M", source: "live", status, state: "hold" });
     }
+    if (method === "GET" && path === "/api/cases/7Q2M/trace") {
+      return new Response(new ReadableStream({ start() {} }), {
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }
     if (method === "GET" && path === "/api/cases/7Q2M") {
       return json({ case_id: "7Q2M", source: "live", status, state: null });
     }
@@ -76,20 +81,8 @@ function installServer(opts: { challenge: string | null }) {
   return calls;
 }
 
-class FakeEventSource {
-  static urls: string[] = [];
-  readyState = 1;
-  constructor(url: string) {
-    FakeEventSource.urls.push(url);
-  }
-  addEventListener() {}
-  close() {}
-}
-
 beforeEach(() => {
   vi.stubEnv("VITE_API_URL", "/api");
-  vi.stubGlobal("EventSource", FakeEventSource);
-  FakeEventSource.urls = [];
   window.sessionStorage.clear();
 });
 
@@ -133,9 +126,10 @@ describe("web against the API route shapes", () => {
     expect(approve.headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
     expect(JSON.parse(approve.body as string)).toEqual({ decision: "send" });
     // The page followed the real case: the trace stream and the status poll.
-    // EventSource cannot send headers, so the trace carries the secret as ?token= (API PR #60).
-    expect(FakeEventSource.urls).toContain(`/api/cases/7Q2M/trace?token=${READ_TOKEN}`);
-    expect(FakeEventSource.urls.some((u) => u.includes(TOKEN))).toBe(false);
+    // The trace is read with fetch and the read token in a header, never in the address.
+    const trace = calls.find((c) => c.path === "/api/cases/7Q2M/trace")!;
+    expect(trace.headers.get("Authorization")).toBe(`Bearer ${READ_TOKEN}`);
+    expect(calls.some((c) => c.path.includes("token="))).toBe(false);
     const poll = calls.find((c) => c.method === "GET" && c.path === "/api/cases/7Q2M")!;
     expect(poll.headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
   });
