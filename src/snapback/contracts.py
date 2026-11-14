@@ -84,7 +84,8 @@ class Evidence(BaseModel):
     brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
-    license_flag: bool = False  # claims a real estate license; no active one holds that name
+    license_flag: bool = False  # the ad prints a license number that is not an active license
+    license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
 
 
@@ -322,8 +323,9 @@ class LicenseResult(BaseModel):
     sponsor_broker: str | None = None  # LICENSED only, and only when the sponsor is a company
     state: str = "TX"
     # Where the number that was looked up came from: "ad" (the listing printed it), "renter"
-    # (the renter typed it when asked, A24 stretch), or None (no number was looked up: a name
-    # lookup). Never the number. Same field as #177, so the two merge cleanly.
+    # (the renter typed it when asked, A24 stretch), or None (no number was looked up, so with
+    # a claim and no number we may ask). Never the number. A renter's typed number is the
+    # renter's own thread: it never reaches the report pack and never reads as a fact about the ad.
     number_from: Literal["ad", "renter"] | None = None
 
 
@@ -644,6 +646,8 @@ class CaseProgress(StrEnum):
     # A14: the challenge was sent and the poster's reply photo has not come, or another is
     # asked for. The card reads HOLD meanwhile: no reply is never a failure.
     WAITING_FOR_REPLY = "waiting_for_reply"
+    # A24 stretch: the agent asked the renter for the license number the ad did not give.
+    WAITING_FOR_ANSWER = "waiting_for_answer"
     DONE = "done"
 
 

@@ -102,6 +102,8 @@ def test_a_case_with_no_other_reason_still_holds_not_verified():
     [
         {"status": "not_checked"},  # not LICENSED, even with a sponsor on the result
         {"status": "not_found"},
+        {"status": "not_found", "number_from": "renter"},  # the renter's number is no licence
+        {"status": "not_checked", "number_from": "renter"},  # holder is not the claimed name
         {"number_from": None},  # a name-only lookup
         {"sponsor_broker": "Other Holdings Inc"},  # sponsor is not the brokerage on record
         {"sponsor_broker": None},  # sponsor is not a company
@@ -179,3 +181,12 @@ def test_the_owner_line_is_identical():
 def test_a_phone_that_really_matches_is_unchanged():
     modules = evidence(authority=OFFICE | {"office_phone_match": "yes"}, license=LICENSED)
     assert contact(modules)[0] is CardTone.OK
+
+
+def test_a_renter_number_that_is_not_found_adds_no_second_contact_line():
+    modules = evidence(
+        authority=DIFFERS, license=LICENSED | {"status": "not_found", "number_from": "renter"}
+    )
+    card = build_card(modules, checked_at=CHECKED_AT)
+    lines = [item for row in card.rows for item in row.lines if item.label == "Contact on record"]
+    assert len(lines) == 1 and lines[0].text.startswith(NOT_CONFIRMED_START)

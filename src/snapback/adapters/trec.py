@@ -388,12 +388,20 @@ def _lookup_person(claim: Claim, client: httpx.Client, deadline: float) -> Answe
 def _lookup_number(
     number: str, claim: Claim | None, client: httpx.Client, deadline: float
 ) -> Answer:
-    """The ad gives a license number (zeros stripped). No row, or only ended ones: NOT_FOUND.
-    Active under another name: NOT_CHECKED, since a mismatch (maiden name, nickname, a typo)
-    accuses no one."""
+    """The license number (zeros stripped) goes to the state list. See `answer_for_number`."""
     rows = _get_rows(f"upper(license_number) like '{_soql(number)}%'", client, deadline)
     if rows is None or len(rows) > MAX_ROWS:
         return _NOT_CHECKED
+    return answer_for_number(number, rows, claim)
+
+
+def answer_for_number(number: str, rows: list[dict], claim: Claim | None) -> Answer:
+    """What the rows the state returned for a license number say (D10).
+
+    No row, or only ended ones: NOT_FOUND. Active under another name, or with no name claimed
+    to compare: NOT_CHECKED, since a mismatch (maiden name, nickname, a typo) accuses no one.
+    Active under the claimed name: LICENSED. Public, so a fixture stand-in for the list
+    applies exactly this rule."""
     mine = [
         r
         for r in rows
@@ -484,7 +492,7 @@ def check_license(
     number = _license_number(text)
     if number is not None:
         if not number:
-            return _result(_NOT_CHECKED, claim, "ad")  # all zeros: not a license number
+            return _result(_NOT_CHECKED, claim, "ad")  # all zeros: not a number
         # the number decides; never cached; a mismatch is final, with no name lookup after it
         answer = _lookup_number(number, claim, http or _client(), deadline)
         return _result(answer, claim, "ad")
@@ -509,6 +517,36 @@ def check_license(
         if answer[0] is LicenseStatus.LICENSED:
             _write_cache(cached, answer)  # only a LICENSED answer is kept
     return _result(answer, claim)
+
+
+def check_license_number(
+    number: str, ad_text: str, *, client: httpx.Client | None = None
+) -> LicenseResult | None:
+    """The same D10 check, for a license number the renter typed when the agent asked (A24).
+
+    The number is taken directly, so it is looked up whatever the length of the ad (the ad's
+    own words are read only for the name the poster claims, as `check_license` does). The
+    rules are the ad's rules: a number with no active row is NOT_FOUND, one active under
+    another name is NOT_CHECKED. The result says the number came from the renter, so the card
+    words it as "the number you gave", and it never goes in a report pack.
+
+    None when nothing was looked up: not a number, or the state did not answer (a timeout, an
+    error status, bad JSON). A lookup that did not happen must not read as one that did."""
+    digits = number.strip()
+    if not digits.isascii() or not digits.isdigit():
+        return None
+    digits = digits.lstrip("0")
+    if not digits:
+        return None  # all zeros: not a number, nothing to look up
+    claim = detect_claim(ad_text)
+    deadline = _monotonic() + TIMEOUT_S
+    rows = _get_rows(
+        f"upper(license_number) like '{_soql(digits)}%'", client or _client(), deadline
+    )
+    if rows is None:
+        return None
+    answer = answer_for_number(digits, rows, claim) if len(rows) <= MAX_ROWS else _NOT_CHECKED
+    return _result(answer, claim, "renter")
 
 
 def _result(

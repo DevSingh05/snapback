@@ -163,7 +163,10 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
         unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
-        license_flag=_license(modules) is LicenseStatus.NOT_FOUND,
+        license_flag=_license(modules) is LicenseStatus.NOT_FOUND and not _renter_number(modules),
+        license_given_flag=(
+            _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
+        ),
         owner_flag=_owner_is_not_the_poster(modules),
     )
 
@@ -188,6 +191,7 @@ REASON_ORDER = (
     "reason.phone_flag",
     "reason.lookalike_link",
     "reason.license_not_found",
+    "reason.license_not_found_given",
     "reason.owner_not_poster",
     # Availability: is the home for rent at all?
     "reason.for_sale",
@@ -215,6 +219,11 @@ def _for_sale(modules: ModuleEvidence) -> ForSaleStatus:
 def _license(modules: ModuleEvidence) -> LicenseStatus | None:
     """What the licence lookup (D10) found, or None when it never ran for this case."""
     return modules.license.status if modules.license else None
+
+
+def _renter_number(modules: ModuleEvidence) -> bool:
+    """The licence number that was looked up is the one the renter typed (A24 stretch)."""
+    return modules.license is not None and modules.license.number_from == "renter"
 
 
 def _owner_is_not_the_poster(modules: ModuleEvidence) -> bool:
@@ -335,6 +344,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     # D10: a licence we could not confirm is no reason to call the number a red flag, so a
     # phone that is not the office's stays "not confirmed" whatever the licence list says.
     unconfirmed = ["reason.phone_flag"] if evidence.phone_flag else []
+    if evidence.license_given_flag:
+        # A24 stretch (ruling, Sat 07:14): a number the renter typed may be a typo. Not
+        # confirmed and HOLD, never a red flag, and never in a report pack.
+        unconfirmed = [*unconfirmed, "reason.license_not_found_given"]
     if evidence.owner_flag:
         # A19 (#125): the poster says they own it and the owner of record is someone else.
         # Not confirmed, like any name that does not match (ruling, Sat 01:20): owners rent
@@ -698,7 +711,11 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     if found is None:
         return []  # never looked up for this case: no line, as with any module that is absent
     label = "label.license"
+    renter = found.number_from == "renter"
     if found.status is LicenseStatus.NOT_FOUND:
+        if renter:
+            # a typed number may be a typo: Not confirmed (HOLD tone), never a red flag
+            return [_line(lang, label, CardTone.HOLD, "license.not_found_given")]
         return [_line(lang, label, CardTone.RED_FLAG, "license.not_found")]
     if found.status is LicenseStatus.LICENSED:
         sponsor = " ".join((found.sponsor_broker or "").split())[:MAX_SPONSOR_CHARS]
@@ -706,7 +723,8 @@ def _license_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             return [_line(lang, label, CardTone.OK, "license.licensed_sponsored", broker=sponsor)]
         return [_line(lang, label, CardTone.OK, "license.licensed")]
     if found.claimed_role:
-        return [_line(lang, label, CardTone.NOT_CHECKED, "license.not_checked_claimed")]
+        key = "license.not_checked_given" if renter else "license.not_checked_claimed"
+        return [_line(lang, label, CardTone.NOT_CHECKED, key)]
     return []  # no claim, so nothing to say
 
 
