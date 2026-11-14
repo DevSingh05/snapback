@@ -913,6 +913,47 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
     return CardRow(kind=CardRowKind.PRICE, lines=[*lines, *_rent_lines(modules, lang)])
 
 
+def _join_words(words: list[str], lang: str) -> str:
+    return strings.text("list.and", lang).join(strings.text(f"kind.{word}", lang) for word in words)
+
+
+def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """Ad vs record: one line per note, as facts turned into the table's words. Information
+    only: `decide` never reads these, and a note the table has no words for is not shown."""
+    lines = []
+    for note in modules.ad_notes:
+        if not strings.has(f"claims.{note.key}", lang):
+            continue
+        claim_key = note.claim
+        if note.claim == "beds" and note.ad_value == "0":
+            claim_key = "beds_studio"
+        claim = strings.text(
+            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
+        )
+        label = "label.ad_claim"
+        if note.pretext:
+            label = "label.ad_pretext"
+        elif note.key == "aerial_date":
+            label = "label.aerial"
+        tone = CardTone.OK if note.matches else CardTone.NOT_SHOWN
+        lines.append(
+            CardLine(
+                label=strings.text(label, lang),
+                text=strings.text(
+                    f"claims.{note.key}",
+                    lang,
+                    claim=claim,
+                    record=_join_words(note.record, lang),
+                    year=note.year if note.year is not None else "",
+                    ad_value=note.ad_value or "",
+                    record_value=note.record_value or "",
+                ),
+                tone=tone,
+            )
+        )
+    return _from_record(modules, lines)
+
+
 def build_card(
     modules: ModuleEvidence,
     *,
@@ -939,17 +980,22 @@ def build_card(
     if verify_base_url:
         verify_url = f"{verify_base_url.rstrip('/')}/c/{public_id}"
 
+    rows = [
+        _place_row(modules, lang),
+        _person_row(modules, lang, checked.tzinfo),
+        _price_row(modules, lang),
+    ]
+    claims = _claims_lines(modules, lang)
+    if claims:  # only when there is something to say; the three rows above are always there
+        rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
+
     return Card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
         checked_at=checked,
         expires_at=checked + CARD_TTL,
-        rows=[
-            _place_row(modules, lang),
-            _person_row(modules, lang, checked.tzinfo),
-            _price_row(modules, lang),
-        ],
+        rows=rows,
         not_checked=[
             strings.text("not_checked.id", lang),
             strings.text("not_checked.lease", lang),

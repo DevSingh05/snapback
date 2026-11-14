@@ -2,7 +2,7 @@
 
 export type DataSource = "live" | "fixture";
 export type VerdictState = "verified" | "hold" | "dont_pay" | "unverified";
-export type CardRowKind = "place" | "person" | "price";
+export type CardRowKind = "place" | "person" | "price" | "claims"; // claims: ad vs record, only when it has lines
 export type CardTone = "ok" | "hold" | "red_flag" | "not_shown" | "not_checked";
 
 export interface CardLine {

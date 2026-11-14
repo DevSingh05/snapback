@@ -9,6 +9,10 @@ in a fixed order and works out, from evidence it already holds, which of them ca
   property record, and the listing brokerages are then who is on record);
 - `TREC license`: the license the ad names, looked up with the state (D10);
 - `owner of record`: the public owner file (D12) and how the poster compares (A19);
+- `compare the ad's claims with the record`: what the ad says (floors, laundry, pool, "new
+  management", "just sold") held against what CoStar's record shows (ad vs record). Offered only
+  when the ad makes a claim the record clearly answers; information lines only, no verdict reads
+  them;
 - `ask renter for license number`: offered only when the ad claims a license or a role but gives
   no number (A24 stretch). The renter is asked for it; their answer re-runs the license lookup
   by number and nothing else;
@@ -31,6 +35,7 @@ from typing import Any, Literal
 
 from snapback.agent.trace import clean_reason
 from snapback.contracts import (
+    AdNote,
     AuthorityResult,
     ForSaleMatch,
     ForSaleStatus,
@@ -48,6 +53,7 @@ class PlanKind(StrEnum):
     BROKERAGE = "listing brokerage"
     LICENSE = "TREC license"
     OWNER = "owner of record"
+    CLAIMS = "compare the ad's claims with the record"
     ASK = "ask renter for license number"
     REPORT = "report pack"
 
@@ -57,6 +63,7 @@ ORDER = (
     PlanKind.BROKERAGE,
     PlanKind.LICENSE,
     PlanKind.OWNER,
+    PlanKind.CLAIMS,
     PlanKind.ASK,
     PlanKind.REPORT,
 )
@@ -86,6 +93,7 @@ PICK_KEY: dict[PlanKind, str] = {
     PlanKind.BROKERAGE: "plan.pick.brokerage",
     PlanKind.LICENSE: "plan.pick.license",
     PlanKind.OWNER: "plan.pick.owner",
+    PlanKind.CLAIMS: "plan.pick.claims",
     PlanKind.ASK: "plan.pick.ask",
     PlanKind.REPORT: "plan.pick.report",
 }
@@ -118,6 +126,16 @@ class Plan:
         self._owner_offered = callable(owner_fn)
         self._license: LicenseResult | None = license_fn(case_id) if callable(license_fn) else None
         self._owner: OwnerResult | None = owner_fn(case_id) if callable(owner_fn) else None
+        # Ad vs record: the notes are worked out once, here. A compare that broke is a compare
+        # that did not happen: the option is simply not offered.
+        claims_fn = getattr(modules, "ad_notes", None)
+        self._claims_offered = callable(claims_fn)
+        self._ad_notes: list[AdNote] = []
+        if callable(claims_fn):
+            try:
+                self._ad_notes = list(claims_fn(case_id) or [])
+            except Exception:
+                self._ad_notes = []
         by_number = getattr(modules, "license_by_number", None)
         self._ask_offered = ask_enabled and callable(by_number)
         self.number_given = False  # the renter's answer held a license number (a yes/no fact)
@@ -183,6 +201,10 @@ class Plan:
             if not self._owner_offered:
                 return "plan.skip.owner_off"
             return None if self._owner is not None else "plan.skip.owner_none"
+        if kind is PlanKind.CLAIMS:
+            if not self._claims_offered:
+                return "plan.skip.claims_off"
+            return None if self._ad_notes else "plan.skip.claims_none"
         if kind is PlanKind.ASK:
             if not self._ask_offered:
                 return "plan.skip.ask_off"
@@ -216,6 +238,8 @@ class Plan:
         out = []
         for kind in ORDER[:-1]:
             reason = self._skip_reason(kind)
+            if kind is PlanKind.CLAIMS:
+                continue  # an ad with nothing the record can answer is not worth a trace line
             if kind is PlanKind.ASK and not (self._ask_offered and self._names_a_license):
                 continue  # asking is off, or there is no claim: the license skip line says it
             if reason is not None and kind not in self.ran:
@@ -259,6 +283,8 @@ class Plan:
             return {"license": self._license}
         if kind is PlanKind.OWNER:
             return {"owner": self._owner}
+        if kind is PlanKind.CLAIMS:
+            return {"ad_notes": self._ad_notes}
         if kind is PlanKind.ASK:
             raise ValueError("the question is asked by the session; the answer comes to answer()")
         return {}
