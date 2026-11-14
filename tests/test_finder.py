@@ -600,3 +600,11 @@ def test_clean_words_folds_fullwidth_and_drops_format_characters():
     assert all(ch not in flipped for ch in "‮​⁦⁩")
     assert "near the park" in flipped
     assert finder.clean_words("call ７１３-555-0142") == "call [removed]"
+
+
+def test_a_phone_next_to_a_street_is_removed_whole():
+    """A street pattern that ran first left "713-555-" behind; phones go first now."""
+    from snapback.agent.finder import clean_words
+
+    out = clean_words("Text me at 713-555-0142 or 12 Main Street")
+    assert "713" not in out and "555" not in out and "Main Street" not in out

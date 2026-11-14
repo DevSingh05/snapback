@@ -367,7 +367,7 @@ def clean_words(text: str | None) -> str:
         if unicodedata.category(ch) != "Cf"
     )
     out = _CONTROL.sub(" ", out)
-    for pattern in (_EMAIL, _URL, _STREET, _PHONE, _LONG_DIGITS, _UNIT, _AMOUNT):
+    for pattern in (_EMAIL, _URL, _PHONE, _STREET, _LONG_DIGITS, _UNIT, _AMOUNT):
         out = pattern.sub(REMOVED, out)
     out = " ".join(out.split())
     if len(out) > MAX_WORDS:
