@@ -11,6 +11,12 @@ decoys (photos of other buildings, claimed to be this one), and count.
              k of m placed in another building (for a decoy that is the right answer, when
              its own building is indexed; counted beside, not against)
 
+A photo the locator never ran on is not a pass. If the claimed building has no twin in the
+index, or the time ran out, or the file could not be read, the photo is "not tested": it is
+written as its own count (`photo_not_tested`, `decoy_not_tested`) and left out of the counts
+whose target is 0, so "0 placed in the wrong building" can only ever mean the locator looked
+and placed none there. An untested photo still counts as not placed in `right_building`.
+
 What is written is totals only, with a Wilson 95% interval, in the same columns as
 `eval/results.csv`, so the Lab panel reads it as it is. No photo, file name, building or
 floor plan is written or printed: the manifest and the photos stay under `data/`.
@@ -75,6 +81,9 @@ class Placement(BaseModel):
     status: LocateStatus
     floor_plan: str | None = None
     thresholds_version: str | None = None  # which thresholds the locator used, when it says
+    # False when the locator never ran on the photo (it ran out of time, say). "Not indexed"
+    # is never tested, whatever this says.
+    tested: bool = True
 
 
 Locator = Callable[[Path, str], Placement]
@@ -91,7 +100,9 @@ class LocateRealResult(BaseModel):
     decoys: int = 0
     decoy_false_placements: int = 0  # a decoy placed in the claimed building: "taken here"
     decoys_placed_elsewhere: int = 0  # a decoy placed in some other building
-    failed: int = 0  # photos the locator raised on; counted as not placed
+    photos_not_tested: int = 0  # own photos the locator never ran on
+    decoys_not_tested: int = 0  # decoys the locator never ran on
+    failed: int = 0  # photos the locator raised on; not tested, and counted as not placed
     thresholds_versions: list[str] = Field(default_factory=list)  # as the locator named them
 
 
@@ -126,9 +137,11 @@ def score(rows: Sequence[tuple[Path, ManifestRow]], locate: Locator) -> LocateRe
         try:
             placement = locate(photo, row.claimed_property_id)
         except Exception:
-            # One unreadable photo must not stop the run. It was not placed.
-            placement = Placement(status=LocateStatus.NOT_LOCATED)
+            # One unreadable photo must not stop the run. It was not placed, and not tested.
+            placement = Placement(status=LocateStatus.NOT_LOCATED, tested=False)
             result.failed += 1
+        # No twin to look in, no time, or no readable file: the locator did not run on it.
+        tested = placement.tested and placement.status is not LocateStatus.NOT_INDEXED
 
         version = placement.thresholds_version
         if version and version not in result.thresholds_versions:
@@ -140,11 +153,13 @@ def score(rows: Sequence[tuple[Path, ManifestRow]], locate: Locator) -> LocateRe
             # A decoy read as "taken here" is the false placement. Placed in another
             # building is what locate should say about a photo of another building.
             result.decoys += 1
+            result.decoys_not_tested += not tested
             result.decoy_false_placements += in_claimed
             result.decoys_placed_elsewhere += elsewhere
             continue
 
         result.photos += 1
+        result.photos_not_tested += not tested
         result.right_building += in_claimed
         result.wrong_building += elsewhere
         if row.floor_plan is not None:
@@ -154,13 +169,21 @@ def score(rows: Sequence[tuple[Path, ManifestRow]], locate: Locator) -> LocateRe
 
 
 def _counts(result: LocateRealResult) -> list[tuple[str, int, int]]:
-    """(metric, k, n) for each count that has something under it."""
+    """(metric, k, n) for each count that has something under it.
+
+    The counts whose target is 0 are over the photos the locator actually ran on. A photo it
+    never ran on cannot have been placed wrongly, and must not make those counts look good.
+    """
+    photos_tested = result.photos - result.photos_not_tested
+    decoys_tested = result.decoys - result.decoys_not_tested
     counts = [
         ("right_building", result.right_building, result.photos),
         ("right_floor_plan", result.right_floor_plan, result.photos_with_floor_plan),
-        ("wrong_building", result.wrong_building, result.photos),
-        ("decoy_false_placement", result.decoy_false_placements, result.decoys),
-        ("decoy_placed_elsewhere", result.decoys_placed_elsewhere, result.decoys),
+        ("wrong_building", result.wrong_building, photos_tested),
+        ("photo_not_tested", result.photos_not_tested, result.photos),
+        ("decoy_false_placement", result.decoy_false_placements, decoys_tested),
+        ("decoy_placed_elsewhere", result.decoys_placed_elsewhere, decoys_tested),
+        ("decoy_not_tested", result.decoys_not_tested, result.decoys),
     ]
     return [count for count in counts if count[2] > 0]
 
@@ -175,6 +198,8 @@ def write_csv(result: LocateRealResult, path: Path, *, source: str, frozen_at: s
         f"# {source.upper()}: locate over the buildings' own listing photos, and decoys.",
         "# k of n photos placed. decoy_false_placement: k of n decoys read as taken in the "
         "claimed building (target 0).",
+        "# wrong_building and the decoy counts are over photos the locator ran on. "
+        "photo_not_tested and decoy_not_tested: how many it never ran on.",
     ]
     if result.thresholds_versions:
         # Which bars the matches had to clear, by lane V's own name for them. Not a number.
@@ -192,6 +217,11 @@ def write_csv(result: LocateRealResult, path: Path, *, source: str, frozen_at: s
 
 
 # --- the product's own locator -------------------------------------------------------------
+
+
+# What lane A's live locate (A22) names the thresholds of a photo it ran out of time on. A
+# test runs with no time at all and holds this to what `LiveLocate` really says.
+_OUT_OF_TIME = "live-budget"
 
 
 class _FreshLiveLocate(LiveLocate):
@@ -237,14 +267,17 @@ def product_locator(live: LiveLocate) -> Locator:
     def locate(photo: Path, claimed_property_id: str) -> Placement:
         outcome = live.locate("eval", [photo.read_bytes()], claimed_property_id)
         if outcome is None or not outcome.result.photos:
-            return Placement(status=LocateStatus.NOT_INDEXED)
+            return Placement(status=LocateStatus.NOT_INDEXED, tested=False)
         placed = outcome.result.photos[0]
         chosen = outcome.result.chosen
         in_claimed = placed.status is LocateStatus.LOCATED_IN_CLAIMED
+        version = outcome.result.thresholds_version
+        ran_out_of_time = version == _OUT_OF_TIME
         return Placement(
             status=placed.status,
             floor_plan=chosen.floor_plan if in_claimed and chosen is not None else None,
-            thresholds_version=outcome.result.thresholds_version,
+            thresholds_version=None if ran_out_of_time else version,
+            tested=not ran_out_of_time,
         )
 
     return locate
@@ -317,6 +350,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{metric}: {k} of {n} (95% interval {low:.2f} to {high:.2f})")
     if result.failed:
         print(f"{result.failed} photos could not be read and count as not placed")
+    if result.photos_not_tested or result.decoys_not_tested:
+        print(
+            f"NOT TESTED: the locator never ran on {result.photos_not_tested} photos and "
+            f"{result.decoys_not_tested} decoys (no twin in the index, out of time, or "
+            "unreadable). They are not counted as passes. Fix the manifest or the index, or "
+            "give it more time, before quoting this."
+        )
     print(f"wrote {args.out}")
     return 0
 

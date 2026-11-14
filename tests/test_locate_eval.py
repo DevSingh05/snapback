@@ -2,6 +2,7 @@
 
 import io
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import replace
@@ -24,6 +25,7 @@ from snapback.agent.locate_eval import (
     wilson,
     write_csv,
 )
+from snapback.agent.locate_live import LiveLocate
 from snapback.api.eval_results import RESULTS_COLUMNS, read_results
 from snapback.api.main import create_app
 from snapback.contracts import DataSource, LocateStatus, PropertyRecord
@@ -168,8 +170,11 @@ def test_the_csv_is_the_lab_panels_format_and_holds_only_totals(tmp_path):
         "locate_real,right_building,4,6,0.6667,0.3000,0.9032,FIXTURE",
         "locate_real,right_floor_plan,2,4,0.5000,0.1500,0.8500,FIXTURE",
         "locate_real,wrong_building,1,6,0.1667,0.0301,0.5635,FIXTURE",
-        "locate_real,decoy_false_placement,1,3,0.3333,0.0615,0.7923,FIXTURE",
-        "locate_real,decoy_placed_elsewhere,0,3,0.0000,0.0000,0.5615,FIXTURE",
+        "locate_real,photo_not_tested,0,6,0.0000,0.0000,0.3903,FIXTURE",
+        # One decoy came back "not indexed", so the decoy counts are over the other two.
+        "locate_real,decoy_false_placement,1,2,0.5000,0.0945,0.9055,FIXTURE",
+        "locate_real,decoy_placed_elsewhere,0,2,0.0000,0.0000,0.6576,FIXTURE",
+        "locate_real,decoy_not_tested,1,3,0.3333,0.0615,0.7923,FIXTURE",
     ]
     # Totals only: no photo, no building, no floor plan.
     for secret in ("p1", "d2", ".jpg", "fx-prop-1", "2 bed"):
@@ -183,7 +188,7 @@ def test_a_count_with_nothing_under_it_is_left_out_not_written_as_zero_of_zero(t
     write_csv(result, out, source="fixture", frozen_at="FIXTURE")
     rows_written = [line for line in out.read_text().splitlines() if not line.startswith("#")]
     metrics = [line.split(",")[1] for line in rows_written[1:]]
-    assert metrics == ["right_building", "wrong_building"]
+    assert metrics == ["right_building", "wrong_building", "photo_not_tested"]
 
 
 def test_the_file_is_swapped_in_whole(tmp_path):
@@ -205,7 +210,8 @@ def test_the_command_writes_the_file_with_a_named_locator(tmp_path, capsys):
     code = main(["--manifest", str(path), "--out", str(out), "--locator", "test_locate_eval:demo"])
     assert code == 0 and out.is_file()
     said = capsys.readouterr().out
-    assert "4 of 6" in said and "1 of 3" in said
+    assert "right_building: 4 of 6" in said
+    assert "decoy_false_placement: 1 of 2" in said and "decoy_not_tested: 1 of 3" in said
     assert ".jpg" not in said and "fx-prop-1" not in said  # the summary is totals too
 
 
@@ -371,6 +377,148 @@ def test_the_run_measures_the_locator_and_never_the_product_s_answer_cache(world
     assert locate(own, "fx-prop-1").status is IN_CLAIMED
     assert CountingMatcher.calls > first
     assert not (data_dir / "locate").exists()
+
+
+def test_a_saved_answer_that_is_wrong_is_never_read_by_the_run(world, tmp_path):
+    # The product saves an answer for a set of photos and reads it back before running the
+    # model. Here that saved answer is made wrong on purpose. The product reads it; the eval
+    # must not, or it would score what an earlier run stored.
+    data_dir, sweeps, adapter = world
+    own_data = tmp_path / "data"
+    shutil.copytree(data_dir / "index", own_data / "index")
+    settings = Settings(_env_file=None, snapback_data_dir=own_data)
+    options = {
+        "records": lambda: RECORDS,
+        "sweeps_for": adapter.sweeps,
+        "matcher_factory": PatchMatcher,
+        "thresholds": RELAXED,
+    }
+    own = photo_file(tmp_path, "own.jpg", sweeps, "fx-model-a", 2, 1)
+
+    product = LiveLocate(
+        data_dir=own_data,
+        index_name=settings.snapback_locate_index,
+        budget_s=settings.snapback_locate_budget_s,
+        **options,
+    )
+    first = product.locate("fx-case", [own.read_bytes()], "fx-prop-1")
+    assert first.result.photos[0].status is IN_CLAIMED and not first.from_cache
+    [saved] = list((own_data / "locate").glob("*.json"))
+    entry = json.loads(saved.read_text())
+    assert entry["source"] == "live"
+    entry["result"]["photos"][0]["status"] = "located_elsewhere"  # the wrong answer
+    saved.write_text(json.dumps(entry))
+    poisoned = product.locate("fx-case", [own.read_bytes()], "fx-prop-1")
+    assert poisoned.from_cache and poisoned.result.photos[0].status is ELSEWHERE
+
+    fresh = product_locator(live_for_eval(settings, **options))
+    assert fresh(own, "fx-prop-1").status is IN_CLAIMED  # the model's answer, not the file's
+    # And the run leaves the saved answers as it found them.
+    assert json.loads(saved.read_text()) == entry
+    assert list((own_data / "locate").glob("*.json")) == [saved]
+
+
+# --- a photo the locator never ran on is not a pass ----------------------------------------
+
+
+def write_rows(tmp_path: Path, sweeps) -> Path:
+    """Four of the building's own photos and two decoys from another indexed building."""
+    folder = tmp_path / "data" / "eval"
+    rows = []
+    for number, (sweep, face) in enumerate([(0, 3), (1, 2), (2, 1), (3, 0)]):
+        photo_file(folder, f"own{number}.jpg", sweeps, "fx-model-a", sweep, face)
+        rows.append({"photo": f"own{number}.jpg", "claimed_property_id": "fx-prop-1"})
+    for number, (sweep, face) in enumerate([(0, 1), (2, 3)]):
+        photo_file(folder, f"decoy{number}.jpg", sweeps, "fx-model-b", sweep, face)
+        rows.append(
+            {"photo": f"decoy{number}.jpg", "claimed_property_id": "fx-prop-1", "decoy": True}
+        )
+    return manifest(tmp_path, rows)
+
+
+def metrics_in(path: Path) -> dict[str, tuple[int, int]]:
+    rows = [line.split(",") for line in path.read_text().splitlines() if "," in line]
+    return {row[1]: (int(row[2]), int(row[3])) for row in rows if row[0] == "locate_real"}
+
+
+def test_a_run_that_ran_out_of_time_does_not_read_as_no_false_placements(world, tmp_path):
+    # With no time at all nothing is placed. That is not "0 of 4 placed in the wrong
+    # building" and "0 of 2 decoys read as taken here": the locator never ran on them.
+    data_dir, sweeps, adapter = world
+    settings = Settings(_env_file=None, snapback_data_dir=data_dir, snapback_locate_budget_s=1e-9)
+    live = live_for_eval(
+        settings,
+        records=lambda: RECORDS,
+        sweeps_for=adapter.sweeps,
+        matcher_factory=PatchMatcher,
+        thresholds=RELAXED,
+    )
+    result = score(read_manifest(write_rows(tmp_path, sweeps)), product_locator(live))
+    assert (result.photos, result.photos_not_tested) == (4, 4)
+    assert (result.decoys, result.decoys_not_tested) == (2, 2)
+    assert result.right_building == 0  # nothing was placed, and that is counted as it is
+
+    out = tmp_path / "locate_real.csv"
+    write_csv(result, out, source="fixture", frozen_at="FIXTURE")
+    written = metrics_in(out)
+    assert written["photo_not_tested"] == (4, 4) and written["decoy_not_tested"] == (2, 2)
+    assert written["right_building"] == (0, 4)
+    # The two counts whose target is 0 have nothing under them, so they are not written.
+    assert "wrong_building" not in written and "decoy_false_placement" not in written
+    assert "decoy_placed_elsewhere" not in written
+    assert read_results(out) is not None
+
+
+def test_a_decoy_claimed_against_a_building_with_no_twin_is_not_tested(world, tmp_path):
+    _, sweeps, _ = world
+    folder = tmp_path / "data" / "eval"
+    photo_file(folder, "decoy.jpg", sweeps, "fx-model-b", 0, 1)
+    photo_file(folder, "own.jpg", sweeps, "fx-model-a", 2, 1)
+    path = manifest(
+        tmp_path,
+        [
+            # fx-prop-3 is on record and has no twin in the index: locate cannot be wrong
+            # about it, and cannot be right either.
+            {"photo": "decoy.jpg", "claimed_property_id": "fx-prop-3", "decoy": True},
+            {"photo": "own.jpg", "claimed_property_id": "fx-prop-3"},
+            {"photo": "own.jpg", "claimed_property_id": "fx-prop-1"},
+        ],
+    )
+    result = score(read_manifest(path), product_locator(fixture_live(world)))
+    assert (result.decoys, result.decoys_not_tested, result.decoy_false_placements) == (1, 1, 0)
+    assert (result.photos, result.photos_not_tested, result.right_building) == (2, 1, 1)
+
+    out = tmp_path / "locate_real.csv"
+    write_csv(result, out, source="fixture", frozen_at="FIXTURE")
+    written = metrics_in(out)
+    assert written["decoy_not_tested"] == (1, 1) and written["photo_not_tested"] == (1, 2)
+    assert "decoy_false_placement" not in written  # 0 of 0 is never written as a pass
+    assert written["wrong_building"] == (0, 1)  # only the photo the locator ran on
+
+
+def test_a_photo_the_locator_failed_on_is_written_as_not_tested(tmp_path):
+    def broken(photo: Path, claimed_property_id: str) -> Placement:
+        raise RuntimeError("could not read the image")
+
+    result = score(read_manifest(manifest(tmp_path, ROWS)), broken)
+    assert result.failed == len(ROWS)
+    assert (result.photos_not_tested, result.decoys_not_tested) == (6, 3)
+    out = tmp_path / "locate_real.csv"
+    write_csv(result, out, source="fixture", frozen_at="FIXTURE")
+    written = metrics_in(out)
+    assert written["photo_not_tested"] == (6, 6) and written["decoy_not_tested"] == (3, 3)
+    assert "decoy_false_placement" not in written and "wrong_building" not in written
+
+
+def test_the_command_says_out_loud_when_photos_were_not_tested(tmp_path, capsys):
+    path = manifest(tmp_path, ROWS)
+    out = tmp_path / "eval" / "locate_real.csv"
+    code = main(["--manifest", str(path), "--out", str(out), "--locator", "test_locate_eval:demo"])
+    assert code == 0
+    said = capsys.readouterr().out
+    # d3 came back "not indexed": one decoy the locator did not run on.
+    assert "decoy_not_tested: 1 of 3" in said
+    assert "NOT TESTED" in said
 
 
 def test_the_thresholds_are_the_ones_in_the_config_file_not_ours(world, tmp_path):
