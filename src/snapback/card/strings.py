@@ -97,14 +97,15 @@ EN: dict[str, str] = {
     "contact.phone_match": (
         "The phone matches the leasing office on record. Call it yourself to confirm."
     ),
-    # The poster's own contact not matching the record is a real red flag (ruling, Sat 01:20).
+    # Not a red flag (ruling, Sat 02:10, #121): agents and locators often post with their own
+    # number. The line is Not confirmed, and it says who to call.
     "contact.phone_mismatch": (
-        "The phone in the listing is not the leasing office on record. "
-        "Call {manager} yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own, so check it with the office."
     ),
     "contact.phone_mismatch_unnamed": (
-        "The phone in the listing is not the leasing office on record. "
-        "Call the office on record yourself. Red flag."
+        "Not confirmed. This number is not the leasing office's on record. "
+        "Agents often use their own. Call the office on record yourself to confirm."
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
@@ -369,12 +370,13 @@ ES: dict[str, str] = {
         "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_mismatch": (
-        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a {manager}. Señal de alerta."
+        "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
+        "registro. Los agentes suelen usar el suyo, así que confírmelo con la oficina."
     ),
     "contact.phone_mismatch_unnamed": (
-        "El teléfono del anuncio no es el de la oficina de alquiler que figura en el registro. "
-        "Llame usted mismo a la oficina que figura en el registro. Señal de alerta."
+        "Sin confirmar. Este número no es el de la oficina de alquiler que figura en el "
+        "registro. Los agentes suelen usar el suyo. Llame usted mismo a la oficina que figura "
+        "en el registro para confirmarlo."
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."

@@ -460,7 +460,7 @@ def test_a_live_case_still_runs_the_record_rules_and_the_whole_card_is_live(tmp_
     card = live_card(tmp_path, record, form, for_sale=ForSaleMatch(status="active"))
     said = said_on(card)
     assert said["For sale"]["tone"] == "red_flag"
-    assert said["Contact on record"]["tone"] == "red_flag"
+    assert said["Contact on record"]["tone"] == "not_shown"
     assert said["Link"]["tone"] == "red_flag"
     assert said["Unit on record"]["tone"] == "hold"
     assert said["Rent vs record"]["tone"] == "hold"
