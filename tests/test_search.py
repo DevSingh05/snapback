@@ -34,6 +34,7 @@ from snapback.contracts import (
     RenterBrief,
 )
 from snapback.search import (
+    AmbiguousPlace,
     NoOfficeOnRecord,
     alternatives_for,
     draft_tour_request,
@@ -352,7 +353,8 @@ def _all_text(kit, brief: RenterBrief) -> str:
         parts += [m.price_text, m.availability_text, m.scan_text or "", m.floor_plan or ""]
         parts += [line.text for line in m.must_haves]
         if m.office_on_record:
-            parts.append(draft_tour_request(m, brief).text)
+            # An office's proper name is quoted, not our wording: it is not word-checked.
+            parts.append(draft_tour_request(m, brief).text.replace(m.office_on_record, "OFFICE"))
     return "\n".join(parts).lower()
 
 
@@ -572,3 +574,59 @@ def test_the_search_module_has_no_model_or_network_import():
     source = Path(search_module.__file__).read_text()
     for name in ("anthropic", "openai", "requests", "httpx", "langchain"):
         assert name not in source
+
+
+# --- review round 1 ----------------------------------------------------------------------------
+
+
+def same_label_building():
+    return building(
+        "fx-twin",
+        [plan(lo=1000, hi=1100), plan(lo=1900, hi=2100)],
+        manager_company="Twin Plans Co",
+    )
+
+
+def test_two_same_label_plans_each_have_their_own_key_and_the_draft_quotes_the_picked_one():
+    lookups = Fake([same_label_building()])
+    cheap, dear = sorted(search_places(RenterBrief(), lookups), key=lambda m: m.rent_min)
+    assert cheap.plan_key != dear.plan_key
+    for picked in (cheap, dear):
+        place = place_for("fx-twin", picked.floor_plan, lookups, plan_key_=picked.plan_key)
+        assert place is not None and place.price_text == picked.price_text
+        assert picked.price_text.split(" a month")[0] in draft_tour_request(place).text
+
+
+def test_a_label_alone_is_refused_when_it_is_not_unique():
+    with pytest.raises(AmbiguousPlace):
+        place_for("fx-twin", "1 bed / 1 bath", Fake([same_label_building()]))
+    one = Fake([building("fx-one", [plan(lo=1000, hi=1100)])])
+    assert place_for("fx-one", "1 bed / 1 bath", one) is not None
+
+
+def test_price_text_sorts_its_ends():
+    assert price_text(1600, 1400) == "$1,400 to $1,600 a month as of CoStar's last research"
+
+
+def test_tradeoffs_count_buildings_over_the_whole_kit_not_the_callers_list():
+    records = [
+        building(f"fx-{i}", [plan(lo=1000, hi=1100), plan("2 bed / 2 bath", 2, lo=1050, hi=1100)])
+        for i in range(6)
+    ]
+    records += [building(f"fx-hi{i}", [plan(lo=1200, hi=1300)]) for i in range(3)]
+    lookups = Fake(records)
+    brief = RenterBrief(max_rent_month=1150, max_results=2)
+    cut = search_places(brief, lookups)  # only 2 of 12 plans, as a screen would hold
+    options = {t.key: t for t in tradeoffs_for(brief, lookups, cut)}
+    assert options["budget"].extra_places == 3  # three new buildings, not plans or list length
+    assert "3 more places" in options["budget"].question
+
+
+def test_a_parking_need_never_makes_a_trade_off_question():
+    brief = RenterBrief(max_rent_month=1500, needs_parking=True)
+    records = [
+        building("fx-a", [plan(lo=1000, hi=1100)], parking_ratio=1.0),
+        building("fx-b", [plan(lo=900, hi=1000)]),
+    ]
+    keys = {t.key for t in tradeoffs_for(brief, Fake(records))}
+    assert "parking" not in keys

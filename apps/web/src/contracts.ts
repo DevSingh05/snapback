@@ -219,6 +219,7 @@ export interface PlaceMatch {
   property_id: string;
   kind: "apartment" | "house";
   floor_plan?: string | null;
+  plan_key?: string | null; // pick a plan by this, not by the label: many share one
   beds?: number | null;
   baths?: number | null;
   rent_min?: number | null; // the asking price as reported
@@ -252,6 +253,7 @@ export interface AlternativesResponse {
 export interface TourDraftRequest {
   property_id: string;
   floor_plan?: string | null;
+  plan_key?: string | null;
   brief?: RenterBrief | null;
 }
 

@@ -52,7 +52,7 @@ from snapback.api.cases import (
     UnknownProperty,
 )
 from snapback.api.eval_results import NotTheAgreedCsv, read_results
-from snapback.api.limits import DailyLimit
+from snapback.api.limits import DailyLimit, PerMinuteLimit
 from snapback.api.registry import CaseRegistry, SafetyRegistry
 from snapback.api.report import build_report
 from snapback.api.uploads import FORM_OVERHEAD, MB, UploadSizeGuard, parse_form, read_images
@@ -75,6 +75,7 @@ from snapback.contracts import (
 )
 from snapback.safety.paths import resolve_data_dir
 from snapback.search import (
+    AmbiguousPlace,
     NoOfficeOnRecord,
     alternatives_for,
     draft_tour_request,
@@ -88,6 +89,8 @@ POLL_SECONDS = 0.1
 KEEP_ALIVE_SECONDS = 15.0
 CLIENT_COOKIE = "snapback_client"
 # Our ids for records: short, and nothing that could be a path or a sentence.
+SEARCH_MAX_BODY = 4096  # bytes: a RenterBrief is a few hundred
+SEARCH_PER_MINUTE = 30  # searches one address may make in a minute
 PROPERTY_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
 # What the sidecar sends: "imsg-" and a keyed hash of the thread (apps/sidecar renterId).
 # Nothing else is accepted, so a raw phone number or a name can never be stored as one.
@@ -185,6 +188,7 @@ def create_app(
     limit_reached = f"Limit reached: {per_client.per_day} checks per day. Try again tomorrow."
 
     pictures = CardPictures()
+    search_limit = PerMinuteLimit(SEARCH_PER_MINUTE)
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
@@ -192,6 +196,7 @@ def create_app(
     app.add_middleware(
         UploadSizeGuard,
         max_body_bytes=settings.snapback_max_photos * max_photo_bytes + FORM_OVERHEAD,
+        small_posts={"/search": SEARCH_MAX_BODY},
     )
     app.add_middleware(
         CORSMiddleware,
@@ -605,12 +610,16 @@ def create_app(
         )
 
     @app.post("/search")
-    def post_search(brief: RenterBrief) -> SearchResponse:
+    def post_search(brief: RenterBrief, request: Request) -> SearchResponse:
         """CoStar's researched places that fit a renter's brief, in code order.
 
         The budget is compared with the asking price as reported, never a band. Every price and
         availability line says "as of CoStar's last research". The response carries LIVE or
-        FIXTURE and the counts. No model is involved."""
+        FIXTURE and the counts. No model is involved. A brief is a few hundred bytes (413 above
+        `SEARCH_MAX_BODY`); one address gets `SEARCH_PER_MINUTE` searches a minute (429)."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
         try:
             return run_search(brief, lookups)
         except KitMissing as missing:
@@ -651,7 +660,12 @@ def create_app(
         case = find(case_id)
         check_write(case, _bearer(authorization, x_case_token))
         try:
-            place = place_for(body.property_id, body.floor_plan, lookups, body.brief)
+            place = place_for(body.property_id, body.floor_plan, lookups, body.brief, body.plan_key)
+        except AmbiguousPlace:
+            raise HTTPException(
+                status_code=422,
+                detail="Several floor plans share that label. Send the plan_key you picked.",
+            ) from None
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
         if place is None:

@@ -92,3 +92,23 @@ def test_tour_draft_errors_are_plain(client):
     no_office = client.post(url, json={"property_id": "880002"}, headers=headers)
     assert no_office.status_code == 422 and "no leasing office" in no_office.json()["detail"]
     assert client.post(url, json={}, headers=headers).status_code == 422
+
+
+def test_tour_draft_quotes_the_picked_plan_by_plan_key(client):
+    case = new_case(client)
+    found = client.post("/search", json={"max_rent_month": 5000, "max_results": 50}).json()
+    plans = [m for m in found["matches"] if m["property_id"] == "fx-prop-3"]
+    assert len(plans) >= 2 and len({m["plan_key"] for m in plans}) == len(plans)
+    url = f"/cases/{case['case_id']}/tour-draft"
+    headers = {"X-Case-Token": case["token"]}
+    for m in plans:
+        body = {"property_id": m["property_id"], "plan_key": m["plan_key"]}
+        draft = client.post(url, json=body, headers=headers).json()
+        assert m["price_text"].split(" a month")[0] in draft["text"]
+
+
+def test_search_has_a_body_cap_and_a_per_address_rate_limit(client):
+    big = client.post("/search", content=b" " * 5000, headers={"Content-Type": "application/json"})
+    assert big.status_code == 413
+    codes = [client.post("/search", json={}).status_code for _ in range(40)]
+    assert codes[:30] == [200] * 30 and 429 in codes[30:]

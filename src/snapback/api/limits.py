@@ -10,6 +10,7 @@ failure costs nobody their allowance.
 """
 
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 
@@ -42,3 +43,24 @@ class DailyLimit:
             used = self._counts.get(slot, 0)
             if used > 0:
                 self._counts[slot] = used - 1
+
+
+class PerMinuteLimit:
+    """A sliding one-minute allowance per key, in memory (resets on restart)."""
+
+    def __init__(self, per_minute: int, clock: Callable[[], float] = time.monotonic) -> None:
+        self.per_minute = per_minute
+        self._clock = clock
+        self._hits: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        now = self._clock()
+        with self._lock:
+            recent = [t for t in self._hits.get(key, []) if now - t < 60.0]
+            if len(recent) >= self.per_minute:
+                self._hits[key] = recent
+                return False
+            recent.append(now)
+            self._hits[key] = recent
+            return True

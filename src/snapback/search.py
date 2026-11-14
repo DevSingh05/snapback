@@ -50,6 +50,10 @@ NO_FULL_PRICE = "No full price on record"
 MAX_ALTERNATIVES = 10
 
 
+class AmbiguousPlace(Exception):
+    """Several plans share the label asked for and no plan_key says which one."""
+
+
 class NoOfficeOnRecord(Exception):
     """The place has no leasing office on record, so no request can be addressed."""
 
@@ -77,6 +81,13 @@ class _Raw:
     has_scan: bool = False
 
 
+def plan_key(raw: _Raw) -> str:
+    """Stable within a building: label, both price ends and units reported available."""
+    if raw.kind == "house":
+        return "house"
+    return f"{raw.floor_plan}|{raw.rent_min}|{raw.rent_max}|{raw.units_available}"
+
+
 def _money(n: int) -> str:
     return f"${n:,}"
 
@@ -85,6 +96,7 @@ def price_text(rent_min: int | None, rent_max: int | None) -> str:
     """ "$1,450 to $1,600 a month as of CoStar's last research", or the no-full-price line."""
     if rent_min is None or rent_max is None:
         return f"{NO_FULL_PRICE} {AS_OF}"
+    rent_min, rent_max = min(rent_min, rent_max), max(rent_min, rent_max)
     if rent_min == rent_max:
         return f"{_money(rent_min)} a month {AS_OF}"
     return f"{_money(rent_min)} to {_money(rent_max)} a month {AS_OF}"
@@ -306,6 +318,7 @@ def _match(raw: _Raw, brief: RenterBrief, source: DataSource) -> PlaceMatch | No
         property_id=raw.property_id,
         kind="apartment" if raw.kind == "apartment" else "house",
         floor_plan=raw.floor_plan,
+        plan_key=plan_key(raw),
         beds=raw.beds,
         baths=raw.baths,
         rent_min=raw.rent_min,
@@ -370,9 +383,14 @@ def search(brief: RenterBrief, lookups: Any) -> SearchResponse:
 
 
 def place_for(
-    property_id: str, floor_plan: str | None, lookups: Any, brief: RenterBrief | None = None
+    property_id: str,
+    floor_plan: str | None,
+    lookups: Any,
+    brief: RenterBrief | None = None,
+    plan_key_: str | None = None,
 ) -> PlaceMatch | None:
-    """One place by id (and floor plan label), whatever the budget: the renter picked it."""
+    """One place by id, whatever the budget: the renter picked it. A plan is found by its
+    `plan_key`; with only a label it must be unique in the building, else `AmbiguousPlace`."""
     source = _source_of(lookups)
     # Only the renter's stated needs shape the must-have lines; no budget or size removes it.
     needs = brief or RenterBrief()
@@ -380,9 +398,13 @@ def place_for(
     found = [
         m
         for raw in _supply(lookups)
-        if raw.property_id == property_id and (floor_plan is None or raw.floor_plan == floor_plan)
+        if raw.property_id == property_id
+        and (plan_key_ is None or plan_key(raw) == plan_key_)
+        and (floor_plan is None or raw.floor_plan == floor_plan)
         if (m := _match(raw, open_brief, source)) is not None
     ]
+    if plan_key_ is None and len({m.plan_key for m in found}) > 1 and floor_plan is not None:
+        raise AmbiguousPlace(property_id)
     found.sort(key=order_key)
     return found[0] if found else None
 

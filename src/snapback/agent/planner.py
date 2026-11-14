@@ -525,20 +525,29 @@ def plan_search(
     return SearchPlan(targets, question, steps)
 
 
-def tradeoffs_for(brief: RenterBrief, lookups: Any, matches: list[PlaceMatch]) -> list[TradeOff]:
+def tradeoffs_for(
+    brief: RenterBrief, lookups: Any, matches: list[PlaceMatch] | None = None
+) -> list[TradeOff]:
     """Questions code can ask, each computed from a second search with one need relaxed.
-    Only a question that would change the list (more places or a lower price) is offered."""
+
+    The base list is computed here from the whole kit, never from a caller's cut-down list, and
+    "places" are distinct buildings (a building has many floor plans). Only a question that
+    would change the list (a lower price or more places) is offered. A parking need never
+    removes a place (an unknown stays in), so there is no parking question."""
     from snapback.search import _all_matches
 
     def cheapest(items: list[PlaceMatch]) -> int | None:
-        lows = [p for m in items for p in (m.rent_min,) if p is not None]
+        lows = [m.rent_min for m in items if m.rent_min is not None]
         return min(lows) if lows else None
 
-    base = cheapest(matches)
+    def buildings(items: list[PlaceMatch]) -> set[str]:
+        return {m.property_id for m in items}
+
+    _, base_all = _all_matches(brief, lookups)
+    base = cheapest(base_all)
     out: list[TradeOff] = []
-    wide = brief.model_copy(update={"max_results": 50})
     if brief.needs_no_walkup:
-        _, relaxed = _all_matches(wide.model_copy(update={"needs_no_walkup": False}), lookups)
+        _, relaxed = _all_matches(brief.model_copy(update={"needs_no_walkup": False}), lookups)
         walkups = [
             m
             for m in relaxed
@@ -554,32 +563,15 @@ def tradeoffs_for(brief: RenterBrief, lookups: Any, matches: list[PlaceMatch]) -
                     "walkup",
                     f"${base - low:,} a month less with a walk-up building. OK with stairs?",
                     base - low,
-                    len(walkups),
-                )
-            )
-    if brief.needs_parking:
-        _, relaxed = _all_matches(wide.model_copy(update={"needs_parking": False}), lookups)
-        extra = [
-            m
-            for m in relaxed
-            if m.musts_met == 0 and _place_key(m) not in {_place_key(x) for x in matches}
-        ]
-        low = cheapest(extra)
-        if extra and low is not None and base is not None and low < base:
-            out.append(
-                TradeOff(
-                    "parking",
-                    f"${base - low:,} a month less if parking is not on record. OK without it?",
-                    base - low,
-                    len(extra),
+                    len(buildings(walkups)),
                 )
             )
     if brief.max_rent_month:
         step = max(50, round(brief.max_rent_month * 0.1 / 50) * 50)
         _, higher = _all_matches(
-            wide.model_copy(update={"max_rent_month": brief.max_rent_month + step}), lookups
+            brief.model_copy(update={"max_rent_month": brief.max_rent_month + step}), lookups
         )
-        more = len(higher) - len(matches)
+        more = len(buildings(higher)) - len(buildings(base_all))
         if more > 0:
             out.append(
                 TradeOff(

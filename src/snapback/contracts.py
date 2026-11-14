@@ -782,6 +782,9 @@ class PlaceMatch(BaseModel):
     property_id: str
     kind: Literal["apartment", "house"]
     floor_plan: str | None = None  # "2 bed / 2 bath" for an apartment, None for a house
+    # Stable id of this plan within its building (label, price ends, units): many plans share a
+    # label, so a pick is made by this key, never by the label alone.
+    plan_key: str | None = None
     beds: int | None = None
     baths: float | None = None
     rent_min: int | None = None  # the asking price as reported, for code to compare
@@ -815,6 +818,7 @@ class AlternativesResponse(BaseModel):
 class TourDraftRequest(BaseModel):
     property_id: str = Field(min_length=1, max_length=64)
     floor_plan: str | None = Field(default=None, max_length=64)
+    plan_key: str | None = Field(default=None, max_length=128)
     brief: RenterBrief | None = None
 
 
