@@ -560,6 +560,10 @@ def test_only_a_trec_number_counts_as_a_license_number(tmp_path):
         "driver's license 1234567",
         "license plate 1234567",
         "TREC 12345",
+        "Business license #5550123",
+        "Insurance license #5550123",
+        "TREC IABS. MLS# 5550123",
+        "Fxjane Fxdoe, insurance agent. Insurance license #5550123. House for lease.",
     ):
         _check(text, _client([], seen=seen), tmp_path)
     assert seen == []
@@ -616,6 +620,7 @@ def test_the_httpx_logger_never_carries_the_last_name(tmp_path, caplog):
 def test_a_not_checked_answer_is_never_cached(tmp_path):
     seen: list = []
     _check(CLAIM, _client(status=500, seen=seen), tmp_path)
+    assert list(tmp_path.glob("*.json")) == []  # nothing written after the failed call
     again = _check(CLAIM, _client([_row("Active")], seen=seen), tmp_path)
     assert again.status is LicenseStatus.LICENSED  # not served from a cached NOT_CHECKED
     assert not any(
@@ -666,3 +671,64 @@ def test_round_2_sentences_never_give_not_found(tmp_path):
         for variant, rows in (("empty", []), ("acme", [acme])):
             result = _check(text, _client(rows), tmp_path / f"{key}{variant}")
             assert result.status is not LicenseStatus.NOT_FOUND, key
+
+
+def test_a_cache_file_that_is_not_licensed_is_never_trusted(tmp_path):
+    import hashlib
+
+    key = hashlib.sha256(b"v3|person|FXNAME|FXPERSON").hexdigest()[:32] + ".json"
+    for i, status in enumerate(("not_found", "not_checked")):
+        folder = tmp_path / str(i)
+        folder.mkdir()
+        (folder / key).write_text(json.dumps({"status": status, "sponsor": None}))
+        result = _check(CLAIM, _client([_row("Active")]), folder)
+        assert result.status is LicenseStatus.LICENSED, status  # asked again, not read back
+
+
+def test_a_license_number_written_with_a_leading_zero_matches_the_stored_one(tmp_path):
+    ad = "I'm Fxjane Fxdoe, a licensed realtor. TREC License #0612345"
+    seen: list = []
+    rows = _number_db(number="612345-SA")
+    result = _check(ad, _client(rows, seen=seen), tmp_path)
+    assert result.status is LicenseStatus.LICENSED
+    assert "'612345%'" in seen[0].url.params["$where"]
+    # not on file after stripping: still NOT_FOUND, never a false hit on the zero-padded text
+    assert _check(ad, _client([]), tmp_path / "b").status is LicenseStatus.NOT_FOUND
+    # all zeros is no license number at all
+    zero_seen: list = []
+    zeros = _check("TREC License #0000000", _client([], seen=zero_seen), tmp_path / "c")
+    assert zeros.status is LicenseStatus.NOT_CHECKED and zero_seen == []
+
+
+def test_a_number_active_under_another_name_is_final_not_checked(tmp_path):
+    db = [
+        _p("FXJOHN", "FXDOE", number="111111-SA"),
+        _p("FXALICE", "FXKING", number="333333-SA"),
+        _p("FXJOHN", "FXROE", number="222222-SA"),  # the claimed person IS licensed...
+    ]
+    seen: list = []
+    a = _check(
+        "Hi, I'm Fxjohn Fxroe, a licensed realtor. TREC #111111", _client(db, seen=seen), tmp_path
+    )
+    assert a.status is LicenseStatus.NOT_CHECKED  # ...but the number is another agent's
+    assert len(seen) == 1  # no fall-through to a name lookup
+    b = _check(
+        "Hi, I'm Fxjohn Fxroe, a licensed realtor. TREC #333333", _client(db), tmp_path / "b"
+    )
+    assert b.status is LicenseStatus.NOT_CHECKED
+    # one shared first name is not enough; the last name is
+    c = _check("I'm Fxjohn Fxroe, a licensed realtor. TREC #111111", _client(db), tmp_path / "c")
+    assert c.status is LicenseStatus.NOT_CHECKED
+    d = _check("I'm Fxjane Fxdoe, a licensed realtor. TREC #111111", _client(db), tmp_path / "d")
+    assert d.status is LicenseStatus.LICENSED  # the last name matches
+
+
+def test_a_license_next_to_a_role_word_counts_as_a_license_number(tmp_path):
+    ad = "Fxjane Fxdoe, realtor. License 123456. Call anytime."
+    assert _check(ad, _client([]), tmp_path).status is LicenseStatus.NOT_FOUND
+    rows = _number_db()
+    assert _check(ad, _client(rows), tmp_path / "b").status is LicenseStatus.LICENSED
+    # the same number with nothing real-estate near it is just a number
+    assert _check("Pool license 123456", _client([]), tmp_path / "c").status is (
+        LicenseStatus.NOT_CHECKED
+    )

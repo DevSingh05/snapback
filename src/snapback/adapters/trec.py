@@ -14,9 +14,12 @@ NAME never gives NOT_FOUND: it gives LICENSED (supporting) or NOT_CHECKED.
     name, in any order. The sponsor is named only when the fitting rows have exactly one
     distinct Broker Company sponsor. Anything looser is NOT_CHECKED.
   - A TREC license number the ad itself gives (6 or 7 digits after "TREC", "license" or "lic.")
-    is looked up by `license_number`. No row, or no active one: NOT_FOUND. Active, but no token
-    of the row's name is in the claimed name: NOT_CHECKED (a name mismatch accuses no one).
-    Active and a token matches: LICENSED. TREC stores "860257-SA", "673442-B", "9017462-BB".
+    is looked up by `license_number`, leading zeros stripped (ads write 0123456, TREC stores
+    123456-SA). No active row: NOT_FOUND. Active, and the claimed last name (or every claimed
+    token) is in the row's name: LICENSED. Active under any other name: NOT_CHECKED, final, with
+    no fall-through to a name lookup (ruling 04:42). A number counts only next to "TREC" or a
+    real-estate role word, never next to MLS, business, insurance or driver.
+    TREC stores "123456-SA", "234567-B" and "3456789-BB".
   - A brokerage the poster names ("listed by Fxample Realty") is looked up among Broker Company
     licenses: an active exact match is LICENSED, anything else NOT_CHECKED.
 
@@ -104,7 +107,10 @@ _COMPANY = re.compile(
 
 # "TREC license # 860257-SA", "Lic. 0123456": the digits only, never an MLS or unit "#"
 _LIC_NUMBER = re.compile(r"(?i:\btrec\b|\blic(?:ense|ence)?\b)[^\d\n]{0,25}?\b(\d{6,7})\b(?!\d)")
-_NOT_TREC = re.compile(r"(?i:driver|plate|vehicle|permit|marriage)")
+_NOT_TREC = re.compile(
+    r"(?i:driver|plate|vehicle|permit|marriage|insurance|business|\bmls\b|\bid\b)"
+)
+_ROLE_WORD = re.compile(r"(?i:\b(?:agent|broker|realtor|real[ \t]+estate|salesperson)\b)")
 
 # Words that start labels and slogans, never a person's name
 _STOPWORDS = {
@@ -356,28 +362,33 @@ def _lookup_person(claim: Claim, client: httpx.Client, deadline: float) -> Answe
 def _lookup_number(
     number: str, claim: Claim | None, client: httpx.Client, deadline: float
 ) -> Answer:
-    """The ad gives a license number. Not on file or not active: NOT_FOUND. Active but under
-    a different name: NOT_CHECKED, since a mismatch (maiden name, a typo) accuses no one."""
+    """The ad gives a license number (zeros stripped). No active row: NOT_FOUND. Active under
+    another name: NOT_CHECKED, since a mismatch (maiden name, nickname, a typo) accuses no one."""
     rows = _get_rows(f"upper(license_number) like '{_soql(number)}%'", client, deadline)
     if rows is None or len(rows) > MAX_ROWS:
         return _NOT_CHECKED
     mine = [
-        r for r in rows if str(r.get("license_number", "")).strip().upper().split("-")[0] == number
+        r
+        for r in rows
+        if str(r.get("license_number", "")).strip().upper().split("-")[0].lstrip("0") == number
     ]
     active = [r for r in mine if _active(str(r.get("status", "")))]
     if not active:
         return LicenseStatus.NOT_FOUND, None
     if claim is None:
         return _NOT_CHECKED
-    named = _tokens(claim.first or "", claim.last or "", _company_key(claim.company or ""))
-    fits = [
-        r
-        for r in active
-        if named
-        & _tokens(
+    last = _tokens(claim.last or "")
+    named = _tokens(claim.first or "", claim.last or "") or _tokens(
+        _company_key(claim.company or "")
+    )
+    fits = []
+    for r in active:
+        row = _tokens(
             *(str(r.get(k, "")) for k in ("full_name", "first_name", "middle_name", "last_name"))
         )
-    ]
+        # one shared first name is not enough: the last name, or every claimed word, must match
+        if (last and last <= row) or (named and named <= row):
+            fits.append(r)
     return _licensed(fits) if fits else _NOT_CHECKED
 
 
@@ -440,11 +451,11 @@ def check_license(
     deadline = _monotonic() + TIMEOUT_S
     http = client
     number = _license_number(text)
-    if number:
-        http = http or _client()
-        found = _lookup_number(number, claim, http, deadline)  # never cached: it is the number
-        if found[0] is not LicenseStatus.NOT_CHECKED:
-            return _result(found, claim)
+    if number is not None:
+        if not number:
+            return _result(_NOT_CHECKED, claim)  # all zeros: not a license number
+        # the number decides; never cached; a mismatch is final, with no name lookup after it
+        return _result(_lookup_number(number, claim, http or _client(), deadline), claim)
     if claim is None:
         return LicenseResult(status=LicenseStatus.NOT_CHECKED)
     if claim.company is None and (not claim.first or not claim.last):
@@ -478,8 +489,14 @@ def _result(answer: Answer, claim: Claim | None) -> LicenseResult:
 
 
 def _license_number(text: str) -> str | None:
-    """The first TREC license number the ad gives (digits only), or None."""
-    for m in _LIC_NUMBER.finditer(text[:MAX_TEXT]):
-        if not _NOT_TREC.search(text[max(0, m.start() - 14) : m.start(1)]):
-            return m.group(1)
+    """The first TREC license number the ad gives, leading zeros stripped ("" when it is all
+    zeros), or None. It counts only next to "TREC" or a real-estate role word, and not when
+    the words around it say MLS, business, insurance, a driver, a plate and the like."""
+    text = text[:MAX_TEXT]
+    for m in _LIC_NUMBER.finditer(text):
+        if _NOT_TREC.search(text[max(0, m.start() - 14) : m.start(1)]):
+            continue
+        near = text[max(0, m.start() - 40) : m.end() + 20]
+        if m.group(0).upper().startswith("TREC") or _ROLE_WORD.search(near):
+            return m.group(1).lstrip("0")
     return None

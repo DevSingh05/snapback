@@ -291,7 +291,7 @@ class ForSaleMatch(BaseModel):
 
 class LicenseStatus(StrEnum):
     LICENSED = "licensed"  # an active TREC license under the claimed name
-    NOT_FOUND = "not_found"  # claims to be an agent/broker/locator; no ACTIVE license has that name
+    NOT_FOUND = "not_found"  # the license number in the ad is not an active Texas license
     NOT_CHECKED = "not_checked"  # no claim, no name, an owner's own home, or the lookup failed
 
 
