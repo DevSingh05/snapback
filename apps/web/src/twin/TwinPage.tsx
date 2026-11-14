@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import { SourceChip } from "../components/SourceChip";
+import { Wordmark } from "../components/HouseGlyph";
 import type { LocateResult } from "../contracts";
 import { TracePanel } from "../trace";
 import { AerialProof, type AerialSide } from "./AerialProof";
@@ -207,7 +208,7 @@ function TwinViewInner({
   return (
     <div className="twin-page">
       <header className="twin-head">
-        <span className="wordmark">SNAPBACK</span>
+        <Wordmark />
         <span className="mono">Model</span>
         {live && sdkFailed ? (
           <span className="chip chip-fixture" data-testid="source-chip">
