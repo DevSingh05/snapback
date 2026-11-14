@@ -39,7 +39,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
-from snapback.adapters.vexcel import aerial_proof, aerial_side
+from snapback.adapters.vexcel import aerial_proof, aerial_side, known_capture_date
 from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
@@ -79,6 +79,8 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.events import EventBus
+from snapback.events.bus import seq_of
 from snapback.office.context import listing_context
 from snapback.office.domain import accepts_address, official_domain
 from snapback.office.models import (
@@ -92,6 +94,7 @@ from snapback.office.models import (
     OfficeTokenBody,
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
+from snapback.pack import TourPrepPack, build_tour_prep
 from snapback.places_map import (
     PlaceSheet,
     PlacesIndex,
@@ -106,7 +109,13 @@ from snapback.preferences import merge as merge_preferences
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
-from snapback.search import AmbiguousPlace, NoOfficeOnRecord, draft_tour_request, place_for
+from snapback.search import (
+    AmbiguousPlace,
+    NoOfficeOnRecord,
+    draft_tour_request,
+    place_and_raw_for,
+    place_for,
+)
 from snapback.settings import Settings, get_settings
 from snapback.verdict import decide
 
@@ -167,6 +176,27 @@ def _bearer(authorization: str | None, case_token: str | None) -> str | None:
     return case_token
 
 
+async def _event_stream(events: EventBus, after: int, follow: bool) -> AsyncIterator[str]:
+    """Each event numbered above `after`, once and in order. With `follow`, more as they are
+    published, with a keep-alive when it is quiet; without, the stream ends when caught up."""
+    sent = after
+    quiet = 0.0
+    while True:
+        fresh = events.after(sent)
+        for event in fresh:
+            yield f"id: {event.id}\nevent: event\ndata: {event.model_dump_json()}\n\n"
+            sent = seq_of(event.id)
+            quiet = 0.0
+        if not follow:
+            return
+        if not fresh:
+            await asyncio.sleep(POLL_SECONDS)
+            quiet += POLL_SECONDS
+            if quiet >= KEEP_ALIVE_SECONDS:
+                yield ": keep-alive\n\n"
+                quiet = 0.0
+
+
 async def _trace_stream(
     case: RecordedCase | SessionCase, after: int, pace: float
 ) -> AsyncIterator[str]:
@@ -221,6 +251,9 @@ def create_app(
 
     app = FastAPI(title="SNAPBACK API", version="0.0.1")
     app.state.store = store
+    # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
+    events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
+    app.state.events = events
 
     app.add_middleware(
         UploadSizeGuard,
@@ -753,6 +786,36 @@ def create_app(
             )
         raise HTTPException(status_code=404, detail=NO_TILE)
 
+    @app.get("/events/stream")
+    def get_events(
+        request: Request,
+        follow: bool = True,
+        last_event_id: Annotated[str | None, Header()] = None,
+        authorization: Annotated[str | None, Header()] = None,
+        x_events_token: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        """Server-sent events: `event: event`, `id` is the event's own id, `data` is an Event.
+
+        Needs the events token (`SNAPBACK_EVENTS_TOKEN`) as `Authorization: Bearer` or
+        `X-Events-Token`, never in the address: a `token` there is answered 401. With no
+        token configured the stream is closed to everyone. Send `Last-Event-ID` to resume
+        after that event. `follow=false` sends what there is and ends.
+        """
+        no_token_in_the_address(request)
+        sent = _bearer(authorization, x_events_token)
+        if not sent:
+            raise HTTPException(status_code=401, detail="This needs the events token.")
+        expected = settings.snapback_events_token
+        if expected is None or not secrets.compare_digest(
+            sent.encode(), expected.get_secret_value().encode()
+        ):
+            raise HTTPException(status_code=403, detail="That token does not open the events.")
+        return StreamingResponse(
+            _event_stream(events, seq_of(last_event_id), follow),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     @app.get("/cases/{case_id}/notes", response_model=CaseNotes)
     def get_notes(
         case_id: str,
@@ -984,6 +1047,88 @@ def create_app(
         with case._lock:  # two writes at once must both land
             case.preferences = merge_preferences(case.preferences, body)
             return case.preferences
+
+    def capture_date_of(record):
+        """The aerial capture date when already known (never a fetch), else None."""
+        if record is None:
+            return None
+        return known_capture_date(record, source=record.source, data_dir=settings.snapback_data_dir)
+
+    @app.get("/cases/{case_id}/tour-prep")
+    def get_tour_prep(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> TourPrepPack:
+        """The tour-prep pack for a checked ad: what the record says, questions to ask, and
+        steps before paying. Built by code from fixed text, EN or ES. Needs the case's read
+        token in a header (a token in the address is refused with 401); the owner of record
+        and licence lines come from the case."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        evidence = case.evidence
+        record = None
+        if case.property_id:
+            try:
+                record = lookups.record(case.property_id)
+            except KitMissing:
+                record = None
+        photos = evidence.locate.photos if evidence.locate else []
+        # A fixture case is FIXTURE even beside a live record: the label never overstates.
+        live = evidence.source is DataSource.LIVE and (
+            record is None or record.source is DataSource.LIVE
+        )
+        return build_tour_prep(
+            source=DataSource.LIVE if live else DataSource.FIXTURE,
+            lang=lang,
+            record=record,
+            owner=evidence.owner,
+            licence=evidence.license,
+            room_labels=[
+                p.room_label
+                for p in photos
+                if p.room_label and p.status is LocateStatus.LOCATED_IN_CLAIMED
+            ],
+            aerial_on=capture_date_of(record),
+        )
+
+    @app.get("/places/{property_id}/tour-prep")
+    def get_place_tour_prep(
+        property_id: str,
+        request: Request,
+        plan_key: Annotated[str | None, Query(max_length=128)] = None,
+        lang: Language = "en",
+    ) -> TourPrepPack:
+        """The tour-prep pack for a researched place. Public, and built only from the place's own
+        record (no owner, licence or case data). 404 for a place we do not hold, 422 when a
+        building has several floor plans and no `plan_key` was sent."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            found = place_and_raw_for(property_id, None, lookups, None, plan_key)
+            record = lookups.record(property_id)
+        except AmbiguousPlace:
+            raise HTTPException(
+                status_code=422,
+                detail="Several floor plans share that building. Send the plan_key you picked.",
+            ) from None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if found is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        place, raw = found
+        return build_tour_prep(
+            source=place.source,
+            lang=lang,
+            place=place,
+            raw=raw,
+            record=record,
+            aerial_on=capture_date_of(record),
+        )
 
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(

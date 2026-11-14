@@ -40,6 +40,8 @@ EN: dict[str, str] = {
         "Taken in this building, in the {floor_plan} floor plan ({located} of {total} photos)."
     ),
     "place.located": "Taken in this building ({located} of {total} photos).",
+    # A house is a home, not a building.
+    "place.located_home": "Taken in this home ({located} of {total} photos).",
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
@@ -225,6 +227,16 @@ EN: dict[str, str] = {
     ),
     # --- PRICE: what are they asking for, and does the rent fit? ---------------------------
     "payment.none": "No risky payment ask found in the text you sent.",
+    # The ad asks you to pay rent or a deposit before move-in. Honest listings do too, so it is
+    # never a red flag; the line just must not read "Matches" (conductor, Sat 10:03).
+    "payment.before_move_in": (
+        "The ad asks you to pay rent or a deposit before move-in. "
+        "We could not confirm who it would go to."
+    ),
+    "payment.before_move_in_not_owner": (
+        "The ad asks you to pay rent or a deposit before move-in, "
+        "and the owner of record is not the poster."
+    ),
     # One entry per red-flag rule in agent/rules/table.py, keyed by its rule id.
     "rule.payment.zelle_before_viewing": "Zelle before a viewing. Red flag.",
     "rule.payment.wire_before_viewing": "Wire transfer before a viewing. Red flag.",
@@ -519,6 +531,7 @@ ES: dict[str, str] = {
         "Tomadas en este edificio, en el plano de {floor_plan} ({located} de {total} fotos)."
     ),
     "place.located": "Tomadas en este edificio ({located} de {total} fotos).",
+    "place.located_home": "Tomadas en esta vivienda ({located} de {total} fotos).",
     "place.elsewhere": "Tomadas en otro edificio ({elsewhere} de {total} fotos). Señal de alerta.",
     "place.not_located": (
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
@@ -701,6 +714,13 @@ ES: dict[str, str] = {
         '{company}, el propietario registrado, dice: "{rule}" ({source}, leído el {date}).'
     ),
     "payment.none": "No se encontró ningún pedido de pago riesgoso en el texto que envió.",
+    "payment.before_move_in": (
+        "El anuncio pide renta o depósito antes de la mudanza. No pudimos confirmar a quién iría."
+    ),
+    "payment.before_move_in_not_owner": (
+        "El anuncio pide renta o depósito antes de la mudanza, "
+        "y el propietario registrado no es quien publica."
+    ),
     "rule.payment.zelle_before_viewing": "Zelle antes de una visita. Señal de alerta.",
     "rule.payment.wire_before_viewing": (
         "Transferencia bancaria antes de una visita. Señal de alerta."
