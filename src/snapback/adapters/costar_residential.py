@@ -1,21 +1,23 @@
 """For-sale hijack lookup (lane D, D7): is a home posted as a rental for sale, or just rented?
 
-Reads `residential-listings.jsonl` (Homes.com records in the CoStar kit) and decodes status and
-history through the kit's `schemas/enums.json` (`TransactionType`, `ForRentStatus`,
-`ListingUpdateType`). Returns the contract's `ForSaleMatch`:
+Reads `residential-listings.jsonl` (Homes.com records in the CoStar kit) and decodes codes through
+the kit's `schemas/enums.json`. Records not public on Homes.com (`permissionLevels.homes` != 10)
+are never read. Returns the contract's `ForSaleMatch`:
 
-- ACTIVE: the matching home is on Homes.com for sale right now.
+- ACTIVE: `listingStatus` is Active (1) and the listing is for sale.
 - RECENTLY_RENTED: the record shows it was rented within the last 180 days.
 - NONE: looked up, and neither (including no address match).
 - None (no object): the kit has no residential file, so nothing was looked up.
 
 Matching is on the street address the renter's listing text carries, normalised (suffixes and unit
-words folded). Addresses stay in memory: never logged, printed or put on the card. Field paths
-not yet confirmed on the kit are candidates (first present wins), as in `costar_jsonl`.
+words folded); a zip in the text must agree with the record's; optional lat/lon match within 40 m.
+Addresses stay in memory: never logged, printed or put on the card. Key paths are the ones the XO
+read off the real kit (#95 review), listed first; older candidates stay behind them.
 """
 
 from __future__ import annotations
 
+import math
 import re
 from datetime import date, timedelta
 from pathlib import Path
@@ -39,8 +41,13 @@ RECENT_DAYS = 180
 SITE = "Homes.com"
 
 RESIDENTIAL_FIELDS: dict[str, list[str]] = {
-    "street": ["address.streetAddress", "address.line1", "streetAddress", "address.street"],
-    "unit": ["address.unitNumber", "address.unit", "unitNumber", "unit"],
+    "street": ["property.address.fullStreetAddress", "address.fullStreetAddress"],
+    "unit": ["property.address.unitNumber", "address.unitNumber"],
+    "zip": ["property.address.zipCode", "property.address.postalCode", "property.address.zip"],
+    "lat": ["property.address.latitude", "property.location.latitude", "property.latitude"],
+    "lon": ["property.address.longitude", "property.location.longitude", "property.longitude"],
+    "listing_status": ["listingStatus"],
+    "permission": ["permissionLevels.homes"],
     "transaction": ["transactionType", "listingTransactionType"],
     "for_rent_status": ["forRentStatus"],
     "listed_on": ["listedDate", "listingDate", "listDate"],
@@ -52,6 +59,9 @@ HISTORY_FIELDS: dict[str, list[str]] = {
     "date": ["date", "updateDate", "eventDate"],
     "type": ["listingUpdateType", "updateType", "type"],
 }
+PUBLIC_ON_HOMES = 10
+ACTIVE_CODE = 1
+NEAR_M = 40.0
 SUFFIXES = {
     "street": "st",
     "avenue": "ave",
@@ -71,22 +81,32 @@ SUFFIXES = {
     "east": "e",
     "west": "w",
 }
-UNIT_WORDS = {"apt", "apartment", "unit", "suite", "ste", "no"}
-OFF_MARKET = ("sold", "withdrawn", "expired", "off market", "cancel", "rented", "leased")
+UNIT_WORDS = {"apt", "apartment", "unit", "suite", "ste"}
+ZIP = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
 
 
 def normalize_address(text: str) -> str:
     """Lowercase words with suffixes and unit words folded: '100 Fixture Ln., Apt #2' and
-    '100 fixture lane unit 2' both become '100 fixture ln unit 2'."""
+    '100 fixture lane unit 2' both become '100 fixture ln unit 2'. 'no' is a unit word only
+    before a number ('No. 2'), so 'no pets' stays as it is."""
     text = text.lower().replace("#", " unit ")
     words = re.findall(r"[a-z0-9]+", text)
     out: list[str] = []
-    for w in words:
-        w = "unit" if w in UNIT_WORDS else SUFFIXES.get(w, w)
+    for i, w in enumerate(words):
+        nxt = words[i + 1] if i + 1 < len(words) else ""
+        if w in UNIT_WORDS or (w == "no" and any(ch.isdigit() for ch in nxt)):
+            w = "unit"
+        else:
+            w = SUFFIXES.get(w, w)
         if out and out[-1] == "unit" and w == "unit":
             continue
         out.append(w)
     return " ".join(out)
+
+
+def _label(enums: dict[str, dict[str, str]], enum: str, value: Any) -> str:
+    """Decoded label folded to lowercase letters: 'OffMarket' and 'off market' both 'offmarket'."""
+    return re.sub(r"[^a-z]", "", (decode(enums, enum, value) or "").lower())
 
 
 def _date(value: Any) -> date | None:
@@ -109,6 +129,22 @@ def _unit_after(text: str, street: str) -> str | None:
     return None
 
 
+def _metres(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lon2 - lon1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * 6_371_000 * math.asin(math.sqrt(h))
+
+
+def _public(rec: dict[str, Any]) -> bool:
+    """Only records Homes.com shows publicly (`permissionLevels.homes` == 10) are ever used."""
+    level = _get_any(rec, RESIDENTIAL_FIELDS["permission"])
+    try:
+        return int(level) == PUBLIC_ON_HOMES
+    except (TypeError, ValueError):
+        return False
+
+
 def _status(
     rec: dict[str, Any], enums: dict[str, dict[str, str]], today: date
 ) -> tuple[ForSaleStatus, date | None, date | None]:
@@ -116,28 +152,28 @@ def _status(
     for h in _first(rec, RESIDENTIAL_FIELDS["history"]) or []:
         if isinstance(h, dict):
             when = _date(_first(h, HISTORY_FIELDS["date"]))
-            label = decode(enums, "ListingUpdateType", _get_any(h, HISTORY_FIELDS["type"]))
+            label = _label(enums, "ListingUpdateType", _get_any(h, HISTORY_FIELDS["type"]))
             if when is not None:
-                history.append((when, (label or "").lower()))
+                history.append((when, label))
     history.sort()
     listed_on = _date(_first(rec, RESIDENTIAL_FIELDS["listed_on"])) or (
         history[0][0] if history else None
     )
     changed_on, last = history[-1] if history else (listed_on, "")
 
-    rent_status = (
-        decode(enums, "ForRentStatus", _first(rec, RESIDENTIAL_FIELDS["for_rent_status"])) or ""
-    ).lower()
-    rented = "rented" in last or "leased" in last or rent_status == "rented"
-    if rented:
+    rent_status = _label(enums, "ForRentStatus", _first(rec, RESIDENTIAL_FIELDS["for_rent_status"]))
+    if last in ("rented", "leased") or rent_status == "rented":
         recent = changed_on is not None and today - changed_on <= timedelta(days=RECENT_DAYS)
         status = ForSaleStatus.RECENTLY_RENTED if recent else ForSaleStatus.NONE
         return status, listed_on, changed_on
 
-    transaction = (
-        decode(enums, "TransactionType", _first(rec, RESIDENTIAL_FIELDS["transaction"])) or ""
-    ).lower()
-    if "sale" in transaction and not any(word in last for word in OFF_MARKET):
+    # Active comes from listingStatus alone (filled on every kit record); history labels such as
+    # OffMarket or Removed never make a home active or inactive on their own.
+    code = _get_any(rec, RESIDENTIAL_FIELDS["listing_status"])
+    active = _label(enums, "ListingStatus", code) == "active" or str(code) == str(ACTIVE_CODE)
+    transaction = _label(enums, "TransactionType", _first(rec, RESIDENTIAL_FIELDS["transaction"]))
+    for_sale = not transaction or "sale" in transaction
+    if active and for_sale:
         return ForSaleStatus.ACTIVE, listed_on, changed_on
     return ForSaleStatus.NONE, listed_on, changed_on
 
@@ -153,13 +189,41 @@ def _offices(rec: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def _matches(
+    rec: dict[str, Any], text: str, zip_in_text: str | None, lat: float | None, lon: float | None
+) -> bool:
+    street_raw = _first(rec, RESIDENTIAL_FIELDS["street"])
+    street = normalize_address(street_raw) if isinstance(street_raw, str) else ""
+    if street and f" {street} " in f" {text} ":
+        record_zip = _first(rec, RESIDENTIAL_FIELDS["zip"])
+        if zip_in_text and record_zip and str(record_zip)[:5] != zip_in_text:
+            return False  # same street text, a different town
+        unit = _first(rec, RESIDENTIAL_FIELDS["unit"])
+        asked = _unit_after(text, street)
+        return not (
+            unit is not None and asked is not None and normalize_address(str(unit)) != asked
+        )
+    if lat is None or lon is None:
+        return False
+    rlat, rlon = _get_any(rec, RESIDENTIAL_FIELDS["lat"]), _get_any(rec, RESIDENTIAL_FIELDS["lon"])
+    try:
+        return _metres(lat, lon, float(rlat), float(rlon)) <= NEAR_M
+    except (TypeError, ValueError):
+        return False
+
+
 def for_sale_lookup(
     listing_text: str,
     source: DataSource | None = None,
     kit_dir: Path | None = None,
     today: date | None = None,
+    lat: float | None = None,
+    lon: float | None = None,
 ) -> ForSaleMatch | None:
-    """Look the renter's listing text up in the for-sale and recently-rented homes we hold."""
+    """Look the renter's listing up in the public for-sale and recently-rented homes we hold.
+
+    Matches on the street address in the text (and its zip, when the text has one), or, when
+    `lat`/`lon` are given, on any home within 40 m of that point."""
     source = source or get_settings().snapback_data_source
     kit = kit_dir or (FIXTURE_KIT if source == DataSource.FIXTURE else DEFAULT_KIT)
     path = _find(kit, RESIDENTIAL_FILE)
@@ -168,20 +232,14 @@ def for_sale_lookup(
     today = today or date.today()
     enums = _load_enums(kit)
     text = normalize_address(listing_text)
+    zip_match = ZIP.search(listing_text)
+    zip_in_text = zip_match.group(1) if zip_match else None
 
     best: ForSaleMatch | None = None
     rank = {ForSaleStatus.ACTIVE: 2, ForSaleStatus.RECENTLY_RENTED: 1, ForSaleStatus.NONE: 0}
     for rec in _iter_jsonl(path):
-        street_raw = _first(rec, RESIDENTIAL_FIELDS["street"])
-        if not isinstance(street_raw, str):
+        if not _public(rec) or not _matches(rec, text, zip_in_text, lat, lon):
             continue
-        street = normalize_address(street_raw)
-        if not street or f" {street} " not in f" {text} ":
-            continue
-        unit = _first(rec, RESIDENTIAL_FIELDS["unit"])
-        asked = _unit_after(text, street)
-        if unit is not None and asked is not None and normalize_address(str(unit)) != asked:
-            continue  # same building, a different unit
         status, listed_on, changed_on = _status(rec, enums, today)
         match = ForSaleMatch(
             status=status,
@@ -202,14 +260,15 @@ def coverage_residential(kit_dir: Path) -> dict[str, Any]:
     if path is None:
         return {"residential_records": 0}
     fields = {name: dict.fromkeys(paths, 0) for name, paths in RESIDENTIAL_FIELDS.items()}
-    codes: dict[str, dict[str, int]] = {"transaction": {}, "for_rent_status": {}, "update": {}}
+    keys = ("listing_status", "permission", "transaction", "for_rent_status")
+    codes: dict[str, dict[str, int]] = {key: {} for key in (*keys, "update")}
     records = 0
     for rec in _iter_jsonl(path):
         records += 1
         for name, paths in RESIDENTIAL_FIELDS.items():
             for p in paths:
                 fields[name][p] += _get_any(rec, [p]) is not None
-        for key in ("transaction", "for_rent_status"):
+        for key in keys:
             code = str(_get_any(rec, RESIDENTIAL_FIELDS[key]))
             codes[key][code] = codes[key].get(code, 0) + 1
         for h in _first(rec, RESIDENTIAL_FIELDS["history"]) or []:

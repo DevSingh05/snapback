@@ -51,6 +51,7 @@ FIELDS: dict[str, list[str]] = {
     "property_type": ["propertyType"],
     "site_phone": ["propertyApartment.sitePhoneNumber", "sitePhoneNumber"],
     "website": [
+        "propertyWebsiteUrl",  # filled on 2,139 kit records (#95 review)
         "propertyApartment.websiteUrl",
         "propertyApartment.webSiteUrl",
         "websiteUrl",
@@ -258,6 +259,27 @@ def _floor_plan_rents(
     return out
 
 
+def _property_units(record: dict[str, Any]) -> list[UnitOnRecord]:
+    """Units on the commercial record: `propertyApartment.models[].units[].unitNumber`, with the
+    model's beds and floor plan."""
+    out = []
+    for model in _get(record, "propertyApartment.models") or []:
+        if not isinstance(model, dict):
+            continue
+        beds = _as_float(_get_any(model, MODEL_FIELDS["beds"]))
+        plan = _floor_plan(model)
+        for u in model.get("units") or []:
+            name = _first(u, UNIT_FIELDS["unit"]) if isinstance(u, dict) else None
+            if name is None:
+                continue
+            out.append(
+                UnitOnRecord(
+                    unit=str(name), beds=int(beds) if beds is not None else None, floor_plan=plan
+                )
+            )
+    return out
+
+
 def _units(listing: dict[str, Any]) -> list[UnitOnRecord]:
     out = []
     for u in _first(listing, LISTING_FIELDS["units"]) or []:
@@ -292,7 +314,7 @@ def _apply_listing(
     listing_per_bed = _per_bed(_first(listing, LISTING_FIELDS["rent_pricing"]), enums)
     bands = _floor_plan_rents(models, listing_per_bed, enums)
     fields["floor_plan_rents"] = bands
-    fields["units"] = _units(listing)
+    fields["units"] = fields.get("units") or _units(listing)  # the commercial record wins
 
     # The building's rent range is whole-unit rent only: a per-bed price is never mixed in.
     whole = [b for b in bands if not b.per_bed]
@@ -336,6 +358,7 @@ def parse_record(
         "lon": _as_float(_get_any(record, FIELDS["lon"])),
         "model_ids": _model_ids(record),
         "website_host": _host(_first(record, FIELDS["website"])),
+        "units": _property_units(record),
     }
     # The leasing office's phone is kept only as a keyed hash; the digits never leave here.
     phone = _first(record, FIELDS["site_phone"])
