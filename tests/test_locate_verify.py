@@ -702,8 +702,9 @@ def _scripted(per_model):
 @pytest.mark.parametrize(
     ("claimed", "other", "expected"),
     [
-        # One planar object in the claimed building, the real building clearly elsewhere.
-        ((70, 0.018), (119, 0.218), LocateStatus.LOCATED_ELSEWHERE),
+        # One planar object in the claimed building, another building clearly elsewhere: the
+        # floor must not open a new route to DON'T PAY, so this is could-not-place.
+        ((70, 0.018), (119, 0.218), LocateStatus.NOT_LOCATED),
         # Same tight claimed match, nothing elsewhere: could not place (never DON'T PAY).
         ((70, 0.018), (0, 0.0), LocateStatus.NOT_LOCATED),
         # An ordinary claimed match spread over the photo still places it.

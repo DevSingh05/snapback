@@ -241,6 +241,15 @@ class Locator:
 
         placed = self._best(photo, claimed_hits, claimed_ok)
         if placed is None:
+            # A claimed match that clears inliers and ratio but fails only the spread floor is
+            # doubtful, not absent: could not place, and never search elsewhere (no new route to
+            # DON'T PAY; ruling 07:43, #28).
+            if self._best(
+                photo,
+                claimed_hits,
+                lambda c: c.inliers >= t.min_inliers and c.ratio >= t.min_inlier_ratio,
+            ):
+                return None
             return self._best(photo, other_hits, strict)
         # Ambiguity (ruling 03:46): another building far stronger than the claimed match means
         # the photo is placed nowhere. No false pass, and no false DON'T PAY either.
