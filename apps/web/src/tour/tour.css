@@ -418,3 +418,8 @@
     }
   }
 }
+.tour-photo-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}

@@ -120,3 +120,15 @@ def test_elsewhere_route_needs_the_token_and_404s_when_no_photo_was_placed_elsew
     assert ok.status_code == 404
     assert client.get("/cases/fx-7Q2M/walk?mode=elsewhere").status_code == 404
     assert client.get("/cases/fx-7Q2M/walk?mode=nope").status_code == 422
+
+
+def test_elsewhere_photos_keep_their_case_alias_not_a_renumbered_one():
+    plan, _ = map_elsewhere(other_plan(), CASE_B, "other", None)
+    kitchen = next(s for s in plan.stops if s.title == "Kitchen")
+    assert [p.alias for p in kitchen.photos] == ["P1"]
+    case = locate(
+        photo("x", L.NOT_LOCATED, None),
+        photo("y", L.LOCATED_ELSEWHERE, "fx-sweep-03", "other"),
+    )
+    plan, _ = map_elsewhere(other_plan(), case, "other", None)
+    assert [p.alias for s in plan.stops for p in s.photos] == ["P2"]

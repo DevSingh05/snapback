@@ -86,6 +86,7 @@ export const FIXTURE_TOUR: TourPlan = {
       photos: [
         {
           photo_id: "photo-1",
+          alias: "P1",
           sweep_id: "fx-sweep-03",
           position: [8, 1.4, -2],
           rotation_quat: Q,

@@ -108,6 +108,9 @@ class TourPhoto(BaseModel):
     stop: the design that shows "your photo, taken here" fills it from the case's locate result."""
 
     photo_id: str
+    # P1, P2... in the case's photo order: the key of `GET /cases/{id}/evidence/{alias}/photo.jpg`
+    # (the ad's own picture, header token). None for a photo not in a case.
+    alias: str | None = None
     sweep_id: str | None = None
     position: tuple[float, float, float] | None = None
     rotation_quat: tuple[float, float, float, float] | None = None
@@ -668,6 +671,7 @@ def map_locate(
     *,
     scan_plan: str | None = None,
     ad_plan: str | None = None,
+    alias_order: dict[str, int] | None = None,
 ) -> tuple[TourPlan, dict[str, PhotoWalkFields]]:
     """Put the ad's placed photos on the stops that hold their sweep, set each stop's `ad_view`,
     and count coverage. Only `located_in_claimed` photos ever enter a room: a photo taken in
@@ -683,6 +687,7 @@ def map_locate(
     unplaced = len(status) - len(placed_ids) - elsewhere
     all_placed = bool(status) and len(placed_ids) == len(status)
 
+    order_of = alias_order or {p.photo_id: i for i, p in enumerate(locate.photos, start=1)}
     by_stop: dict[str, list[TourPhoto]] = {}
     where: dict[str, str] = {}  # photo id -> stop key
     for photo in locate.photos:
@@ -698,6 +703,7 @@ def map_locate(
         by_stop.setdefault(stop.key, []).append(
             TourPhoto(
                 photo_id=photo.photo_id,
+                alias=f"P{order_of[photo.photo_id]}",
                 sweep_id=sweep,
                 position=tuple(pose.position) if pose else None,
                 rotation_quat=tuple(pose.rotation_quat) if pose else None,
@@ -1113,7 +1119,9 @@ def map_elsewhere(
         if p.status is LocateStatus.LOCATED_ELSEWHERE and p.matched_property_id == property_id
     ]
     shadow = locate.model_copy(update={"photos": mine})
-    out, fields = map_locate(plan, shadow)
+    out, fields = map_locate(
+        plan, shadow, alias_order={p.photo_id: i for i, p in enumerate(locate.photos, start=1)}
+    )
     stops = [
         s.model_copy(update={"ad_view": "unknown"}) if s.ad_view == "none_placed" else s
         for s in out.stops

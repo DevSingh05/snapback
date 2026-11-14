@@ -8,6 +8,7 @@ import { useLiveAerial, canGoLive } from "../twin/useLiveAerial";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { fetchTour, type TourTarget } from "./api";
 import { RoomStop, landingOfStop } from "./RoomStop";
+import { useAdPhoto } from "./useAdPhoto";
 import { stopMove } from "./walkMove";
 import "./tour.css";
 
@@ -175,6 +176,13 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
   const pause = () => setAutoplay(false);
 
   const landing = landingOfStop(stop);
+  // The ad's real photo when this browser can read it; else the labelled placeholder.
+  const realPhoto = useAdPhoto(caseId, stop.photos[0]?.alias);
+  const photoNote = realPhoto
+    ? null
+    : live
+      ? "Placeholder: the ad's own photo could not be loaded here."
+      : "Placeholder photo (fixture).";
   const showAerial = stop.kind === "arrive" && aerial.status === "ready" && aerial.claimed.imageUrl;
   return (
     <div
@@ -231,7 +239,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
           {landing && (
             <PhotoLanding
               state={landing}
-              photoSrc={PLACEHOLDER_PHOTO}
+              photoSrc={realPhoto ?? PLACEHOLDER_PHOTO}
               opacity={showPhoto ? LANDED_OPACITY : 0}
               phase="landed"
               sdk={live && sdk ? "ready" : "unavailable"}
@@ -250,6 +258,7 @@ export function TourView({ plan: given, sdkKey, modelId, caseId, rail }: ViewPro
             dwell={Boolean(plan.director?.dwell.includes(stop.key))}
             showingPhoto={showPhoto}
             onToggle={() => setShowPhoto((v) => !v)}
+            photoNote={photoNote}
             rail={rail}
           />
           {stop.kind === "outro" && (

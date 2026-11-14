@@ -166,3 +166,12 @@ def test_walk_route_for_the_recorded_case_carries_coverage_and_photo_fields():
     body = client.get("/cases/fx-7Q2M/walk").json()
     assert body["plan"]["source"] == "fixture" and body["plan"]["coverage"] is not None
     assert set(body["photos"]) == {p["photo_id"] for p in body["locate"]["photos"]}
+
+
+def test_each_placed_photo_carries_its_evidence_alias_in_the_case_photo_order():
+    plan, _ = map_locate(
+        base_plan(),
+        locate(photo("a", L.NOT_LOCATED), photo("b", L.LOCATED_IN_CLAIMED, "fx-sweep-03")),
+    )
+    kitchen = next(s for s in plan.stops if s.title == "Kitchen")
+    assert [p.alias for p in kitchen.photos] == ["P2"]  # second photo of the case
