@@ -246,7 +246,11 @@ def _known_company(on_roll: str, known: Iterable[str]) -> str | None:
 
 
 def owner(
-    listing_text: str, subset: Path, salt: str, known: Iterable[str] = ()
+    listing_text: str,
+    subset: Path,
+    salt: str,
+    known: Iterable[str] = (),
+    poster_company: str | None = None,
 ) -> OwnerResult | None:
     if not subset.is_file():
         return None
@@ -262,9 +266,17 @@ def owner(
         return None  # no match, or two accounts / two kit streets: never pick one at random
     entry = found[0]
     if entry.get("kind") == OwnerKind.COMPANY.value:
-        name = _known_company((entry.get("company") or "").strip(), known)
-        # any other company is "a company owner": its name is never sent
-        return OwnerResult(kind=OwnerKind.COMPANY, company=name, company_known=name is not None)
+        on_roll = (entry.get("company") or "").strip()
+        name = _known_company(on_roll, known)
+        if name is not None:
+            return OwnerResult(kind=OwnerKind.COMPANY, company=name, company_known=True)
+        # any other company is "a company owner": its name is never sent. The company the
+        # poster names is compared with the roll here, where the name is, as for a person
+        # (round 6 on #160), so "I am the owner, managed by <another company>" still holds.
+        from snapback.agent.rules.owner import company_match
+
+        matches = company_match(poster_company, on_roll) if on_roll else OwnerMatch.NOT_CHECKED
+        return OwnerResult(kind=OwnerKind.COMPANY, poster_matches=matches)
     name = _poster_name(text)
     if name is None or fingerprint != _salt_fingerprint(salt):
         # no name to compare, or the lookup was keyed with another salt: never a false NO
@@ -282,7 +294,9 @@ def owner(
     return OwnerResult(kind=OwnerKind.PERSON, poster_matches=matches)
 
 
-def lookup_owner(listing_text: str, known: Iterable[str] = ()) -> OwnerResult | None:
+def lookup_owner(
+    listing_text: str, known: Iterable[str] = (), poster_company: str | None = None
+) -> OwnerResult | None:
     """The entry point lane A's `KitLookups.owner` calls: the lookup under SNAPBACK_DATA_DIR and
     the shared phone salt (set SNAPBACK_PHONE_SALT so the lookup and the check agree). `known`
     is the kit's offices on record for the home, the companies besides the table we can name."""
@@ -291,7 +305,7 @@ def lookup_owner(listing_text: str, known: Iterable[str] = ()) -> OwnerResult | 
     from snapback.settings import get_settings
 
     subset = resolve_data_dir(get_settings().snapback_data_dir) / SUBSET
-    return owner(listing_text, subset, phone_salt(), known)
+    return owner(listing_text, subset, phone_salt(), known, poster_company)
 
 
 def main(argv: list[str] | None = None) -> None:

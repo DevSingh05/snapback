@@ -104,15 +104,19 @@ def check_owner(
         )
 
     if not owner.company_known or not " ".join((owner.company or "").split()):
-        # A company we do not know: its name is never kept or shown ("a company owner"). The
-        # poster's company cannot be compared with it, but "I am the owner" with no company
-        # named is still a no: a company owns the home.
-        unnamed_claim = says_owner and not claims.company
+        # A company we do not know: its name is never kept or shown ("a company owner").
+        # "I am the owner" with no company named is a no: a company owns the home. A company
+        # the poster names was compared with the roll by lane D, where the name is (round 6
+        # on #160); its answer is kept.
+        if claims.company:
+            matches = owner.poster_matches
+        else:
+            matches = OwnerMatch.NO if says_owner else OwnerMatch.NOT_CHECKED
         return owner.model_copy(
             update={
                 "company": None,
                 "company_known": False,
-                "poster_matches": OwnerMatch.NO if unnamed_claim else OwnerMatch.NOT_CHECKED,
+                "poster_matches": matches,
                 "poster_says_owner": says_owner,
                 "published_rule": None,
             }

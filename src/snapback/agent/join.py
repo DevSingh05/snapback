@@ -184,10 +184,13 @@ class KitLookups:
         # Lane A fills poster_says_owner and published_rule; a person's name never comes back.
         # A company is named only when we know it: a row in the published-rule table, or an
         # office on record in the kit for this home (ruling, round 5 on #160).
+        # The company the poster names is compared with the roll inside the adapter (round 6).
         from snapback.adapters.hcad import lookup_owner
+        from snapback.agent.intake.fields import extract_contacts
 
         match = self.for_sale(listing_text)
-        return lookup_owner(listing_text, getattr(match, "offices", None) or ())
+        offices = getattr(match, "offices", None) or ()
+        return lookup_owner(listing_text, offices, extract_contacts(listing_text).company)
 
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""

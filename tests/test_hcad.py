@@ -360,3 +360,37 @@ def test_a_signature_never_gives_no(tmp_path, text):
 def test_a_signature_can_still_say_yes(tmp_path):
     result = owner("200 Sample St, call me. - Fxname Fxperson", _subset(tmp_path), salt="fx-salt")
     assert result.poster_matches is OwnerMatch.YES
+
+
+def test_the_poster_s_company_is_compared_with_the_roll_inside_the_adapter(tmp_path):
+    # round 6 on #160: the roll name never leaves, but the comparison still happens
+    subset = _subset(tmp_path)
+    text = "2 bed at 100 Fixture Ln. I am the owner."
+    wrong = owner(text, subset, salt="fx-salt", poster_company="Other Fxco")
+    assert (wrong.company, wrong.poster_matches) == (None, OwnerMatch.NO)
+    right = owner(text, subset, salt="fx-salt", poster_company="Fxample Homes")
+    assert (right.company, right.poster_matches) == (None, OwnerMatch.YES)
+    none = owner(text, subset, salt="fx-salt")
+    assert none.poster_matches is OwnerMatch.NOT_CHECKED
+
+
+def test_kit_lookups_owner_passes_the_kit_offices_and_the_poster_s_company(tmp_path, monkeypatch):
+    from snapback.agent.join import KitLookups
+    from snapback.contracts import DataSource, ForSaleMatch
+    from snapback.settings import get_settings
+
+    monkeypatch.setenv("SNAPBACK_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr("snapback.agent.rules.contact.phone_salt", lambda *a, **k: "fx-salt")
+    get_settings.cache_clear()
+    try:
+        _subset(tmp_path)
+        lookups = KitLookups(DataSource.LIVE)
+        office = ForSaleMatch.model_construct(offices=["Fxample Homes"])
+        monkeypatch.setattr(lookups, "for_sale", lambda text: office)
+        known = lookups.owner("2 bed at 100 Fixture Ln. Listed by Fxample Homes.")
+        assert (known.company, known.company_known) == ("Fxample Homes", True)
+        monkeypatch.setattr(lookups, "for_sale", lambda text: None)
+        unknown = lookups.owner("2 bed at 100 Fixture Ln. Managed by Other Fxco. I am the owner.")
+        assert (unknown.company, unknown.poster_matches) == (None, OwnerMatch.NO)
+    finally:
+        get_settings.cache_clear()

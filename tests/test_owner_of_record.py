@@ -266,10 +266,28 @@ def test_the_card_never_prints_a_company_name_that_is_not_known():
     )
 
 
-def test_an_unknown_company_the_poster_names_is_not_checked_and_does_not_hold():
-    # the poster names a company, and we cannot say which company owns it: no comparison
-    found = check_owner(ContactClaims(company="Fixture Homes", says_owner=True), UNNAMED)
-    assert found.poster_matches is OwnerMatch.NOT_CHECKED
+def test_an_unknown_company_the_poster_names_wrongly_still_holds():
+    # round 6: lane D compares the poster's company with the roll inside its adapter (the roll
+    # name never leaves it) and sends NO; lane A keeps that NO, so the case still holds
+    sent = UNNAMED.model_copy(update={"poster_matches": OwnerMatch.NO})
+    found = check_owner(ContactClaims(company="Other Fxco", says_owner=True), sent)
+    assert (found.poster_matches, found.company) == (OwnerMatch.NO, None)
+    modules = passing(found)
+    assert decide(to_evidence(modules)).state is VerdictState.HOLD
+    assert owner_line(modules) == (
+        CardTone.NOT_SHOWN,
+        "Not confirmed. Owner of record: a company owner, not the poster.",
+    )
+    assert owner_line(modules, "es") == (
+        CardTone.NOT_SHOWN,
+        "Sin confirmar. Propietario registrado: una empresa, no quien publica.",
+    )
+
+
+def test_an_unknown_company_the_poster_names_rightly_is_not_held():
+    sent = UNNAMED.model_copy(update={"poster_matches": OwnerMatch.YES})
+    found = check_owner(ContactClaims(company="Fxample Homes", says_owner=True), sent)
+    assert found.poster_matches is OwnerMatch.YES
     assert state(passing(found)) is VerdictState.VERIFIED
 
 
