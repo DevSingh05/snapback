@@ -85,6 +85,7 @@ from snapback.tour import (
     WalkResponse,
     build_tour,
     cached_sweeps,
+    choose_walk,
     fixture_sweeps,
     map_locate,
 )
@@ -773,7 +774,7 @@ def create_app(
             return plan, None, {}
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(plan, locate, scan_plan=scan_plan, ad_plan=None)
-        return plan, locate, fields
+        return choose_walk(plan), locate, fields
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(

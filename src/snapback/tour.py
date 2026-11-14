@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
 
@@ -758,3 +758,199 @@ def map_locate(
             covers_unshown_room=bool(label and label in unshown),
         )
     return plan.model_copy(update={"stops": stops, "coverage": coverage}), fields
+
+
+# --- the tour director: choices among options code wrote (W6) ------------------------------------
+#
+# Code builds the walk and every line. The only things a model may pick are WHICH stops open
+# expanded (at most three) and WHICH checks lead the summary and the tour request, each from a
+# short list of options code wrote. An off-list pick, a failed chooser or a menu of one gets the
+# code policy, and the step is stamped `model` or `policy`. The chooser sees stop aliases (S1..),
+# room kind words, counts and yes/no flags: never an id, an address, a record row or an image.
+
+MAX_DWELL = 3
+MAX_LEAD = 5
+# The only facts a chooser may be shown. Values are whole numbers (counts).
+WALK_FACT_KEYS = frozenset(
+    {"stops", "hidden", "contradicted", "must_have", "photographed", "unplaced_photos", "options"}
+)
+NOT_CONFIRMED = "Not confirmed"
+
+
+@dataclass(frozen=True)
+class WalkOffer:
+    """One open walk choice. Same shape as `planner.SearchOffer`, so any `Chooser` can take it."""
+
+    kind: Literal["dwell", "lead"]
+    options: tuple[str, ...]
+    aliases: tuple[str, ...]
+    facts: dict[str, int]
+    default: str
+    default_reason: str
+    # Not shown to a chooser: the stop keys each option means, keyed by option label.
+    payload: dict[str, list[str]] = field(default_factory=dict, compare=False, repr=False)
+
+    def resolve(self, pick: object) -> str | None:
+        wanted = str(pick or "").strip().casefold()
+        for label, alias in zip(self.options, self.aliases, strict=True):
+            if wanted in (label.casefold(), alias.casefold()):
+                return label
+        return None
+
+    def for_chooser(self) -> WalkOffer:
+        """The offer without its payload, and with only allow-listed facts."""
+        facts = {k: v for k, v in self.facts.items() if k in WALK_FACT_KEYS}
+        return WalkOffer(
+            self.kind, self.options, self.aliases, facts, self.default, self.default_reason
+        )
+
+
+def _kind_word(stop: TourStop) -> str:
+    return _kind_of(stop.room_label) or "room"
+
+
+def _contradicted(stop: TourStop) -> bool:
+    return any(c.text.startswith(NOT_CONFIRMED) for c in stop.claims)
+
+
+def _names(stops: Sequence[TourStop], alias: dict[str, str]) -> str:
+    return ", ".join(f"{alias[s.key]} {_kind_word(s)}" for s in stops)
+
+
+def walk_offers(plan: TourPlan, must_have_kinds: Sequence[str] = ()) -> list[WalkOffer]:
+    """The choices open for this walk: which stops to dwell on and which checks lead. A choice
+    with fewer than two distinct options is not offered (a menu of one is policy)."""
+    alias = stop_aliases(plan)
+    walked = [s for s in plan.stops if s.kind in WALKED]
+    want = {k.lower() for k in must_have_kinds}
+    sets: list[tuple[str, str, list[TourStop]]] = [
+        (
+            "contradicted",
+            "Rooms with a claim the record does not confirm",
+            [s for s in walked if _contradicted(s)],
+        ),
+        (
+            "hidden",
+            "Rooms the ad showed no photo of",
+            [s for s in walked if s.ad_view == "none_placed"],
+        ),
+        (
+            "must_have",
+            "Rooms your must-haves live in",
+            [s for s in walked if _kind_word(s) in want],
+        ),
+        ("photographed", "Rooms the ad photographed", [s for s in walked if s.ad_view == "placed"]),
+    ]
+    facts = {
+        "stops": len(walked),
+        "hidden": len(sets[1][2]),
+        "contradicted": len(sets[0][2]),
+        "must_have": len(sets[2][2]),
+        "photographed": len(sets[3][2]),
+        "unplaced_photos": plan.coverage.unplaced if plan.coverage else 0,
+    }
+    offers: list[WalkOffer] = []
+
+    dwell: dict[str, list[str]] = {}
+    seen: list[tuple[str, ...]] = []
+    first = None
+    for _key, label, stops in sets:
+        keys = tuple(s.key for s in stops[:MAX_DWELL])
+        if not keys or keys in seen:
+            continue
+        seen.append(keys)
+        text = f"{label}: {_names(stops[:MAX_DWELL], alias)}"
+        dwell[text] = list(keys)
+        first = first or text
+    if len(dwell) >= 2 and first:
+        labels = tuple(dwell)
+        offers.append(
+            WalkOffer(
+                "dwell",
+                labels,
+                tuple(f"D{i}" for i in range(1, len(labels) + 1)),
+                {**facts, "options": len(labels)},
+                first,
+                "Claims the record does not confirm first, then rooms the ad hid, then must-haves.",
+                dwell,
+            )
+        )
+
+    def lead_keys(order: Sequence[TourStop]) -> list[str]:
+        return [s.key for s in order if s.tip or s.claims][:MAX_LEAD]
+
+    orders: list[tuple[str, list[TourStop]]] = [
+        (
+            "Claims the record does not confirm first",
+            sorted(walked, key=lambda s: not _contradicted(s)),
+        ),
+        (
+            "Rooms the ad showed no photo of first",
+            sorted(walked, key=lambda s: s.ad_view != "none_placed"),
+        ),
+        ("Walking order", list(walked)),
+    ]
+    lead: dict[str, list[str]] = {}
+    seen_lead: list[list[str]] = []
+    for label, order in orders:
+        keys = lead_keys(order)
+        if keys and keys not in seen_lead:
+            seen_lead.append(keys)
+            lead[label] = keys
+    if len(lead) >= 2:
+        labels = tuple(lead)
+        offers.append(
+            WalkOffer(
+                "lead",
+                labels,
+                tuple(f"L{i}" for i in range(1, len(labels) + 1)),
+                {**facts, "options": len(labels)},
+                labels[0],
+                "Code priority: unconfirmed claims, then hidden rooms, then walking order.",
+                lead,
+            )
+        )
+    return offers
+
+
+def policy_director(plan: TourPlan, must_have_kinds: Sequence[str] = ()) -> TourDirector:
+    """The director with every pick left to the code policy (what runs with the model off)."""
+    return choose_walk(plan, None, must_have_kinds).director or TourDirector()
+
+
+def choose_walk(
+    plan: TourPlan, chooser: object | None = None, must_have_kinds: Sequence[str] = ()
+) -> TourPlan:
+    """Fill `plan.director`. A chooser (anything with `choose(offer) -> (pick, reason)` and a
+    `chosen_by`) is asked only when an offer has two or more options and sees only the
+    `for_chooser()` offer; code applies a pick only if it is on the list. Facts, stops and
+    coverage are never touched: only the director field changes."""
+    offers = {o.kind: o for o in walk_offers(plan, must_have_kinds)}
+    stamp: Literal["model", "policy"] = "policy"
+    reasons: list[str] = []
+    picked: dict[str, list[str]] = {}
+    for kind in ("dwell", "lead"):
+        offer = offers.get(kind)
+        if offer is None:
+            continue
+        label, why, by = offer.default, offer.default_reason, "policy"
+        if chooser is not None:
+            try:
+                raw, said = chooser.choose(offer.for_chooser())  # type: ignore[attr-defined]
+            except Exception:  # a chooser that broke did not choose
+                raw, said = None, ""
+            resolved = offer.resolve(raw)
+            if resolved is not None:
+                label, by = resolved, getattr(chooser, "chosen_by", "policy")
+                why = str(said or "").strip()[:200] or why
+        picked[kind] = offer.payload[label]
+        if by == "model":
+            stamp = "model"
+        reasons.append(why)
+    director = TourDirector(
+        dwell=picked.get("dwell", []),
+        lead_checks=picked.get("lead", []),
+        stamp=stamp,
+        reason=" ".join(reasons) or None,
+    )
+    return plan.model_copy(update={"director": director})
