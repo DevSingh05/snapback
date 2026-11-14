@@ -8,7 +8,9 @@
 # features are kept on disk (a cached match is 0.12 s, extraction 0.54 s). Held-out: other seeds.
 
 [retrieve]
-top_k = 6              # candidate views verified per photo, over every indexed building
+top_k = 12             # candidate views verified per photo, over every indexed building
+# (6 -> 12, Sat 10:20: more of the right building's views get verified; no bar changes.
+# Gate, renders: other building placed elsewhere 13/20 -> 14/20 on seeds 6 and 8, 0 false.)
 top_k_claimed = 48     # plus this many side faces of the claimed property's twins
 
 [verify]
