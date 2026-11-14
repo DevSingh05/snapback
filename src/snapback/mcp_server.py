@@ -97,9 +97,12 @@ def label(source: Any) -> str:
 
 
 # Ranges `is_global` lets through on Python 3.12 that still reach a private or local address:
-# NAT64 (64:ff9b::/96), 6to4 (2002::/16, which embeds any IPv4 address) and the old
-# IPv4-compatible block (::/96).
-UNSAFE_V6 = tuple(ipaddress.ip_network(n) for n in ("64:ff9b::/96", "2002::/16", "::/96"))
+# NAT64 (64:ff9b::/96 and the local-use 64:ff9b:1::/48), 6to4 (2002::/16, which embeds any
+# IPv4 address), the old IPv4-compatible block (::/96) and site-local (fec0::/10).
+UNSAFE_V6 = tuple(
+    ipaddress.ip_network(n)
+    for n in ("64:ff9b::/96", "64:ff9b:1::/48", "2002::/16", "::/96", "fec0::/10")
+)
 
 
 def unsafe(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -220,7 +223,10 @@ class Snapback:
                 port = parts.port or (443 if parts.scheme == "https" else 80)
             except ValueError:
                 raise SnapbackError(f"Photo {n} is not an http or https link.") from None
-            host = parts.hostname
+            try:  # an international name goes out in its ASCII (punycode) form
+                host = parts.hostname.encode("idna").decode("ascii")
+            except UnicodeError:
+                raise SnapbackError(f"Photo {n} is not an http or https link.") from None
             address = self.resolve(host, port)
             if address is None:
                 raise SnapbackError(f"Photo {n} points at a private or unknown address.")
@@ -696,8 +702,19 @@ class BearerGate:
 def make_app(settings: McpSettings | None = None) -> Snapback:
     settings = settings or McpSettings()
     api = httpx.Client(base_url=settings.snapback_api_url, timeout=API_TIMEOUT_S)
-    web = httpx.Client(follow_redirects=False, headers={"User-Agent": "snapback-mcp"})
-    return Snapback(api, web, settings.snapback_public_base_url)
+    return Snapback(api, photo_client(), settings.snapback_public_base_url)
+
+
+def photo_client(verify: Any = True) -> httpx.Client:
+    """The client for the renter's photo links. No connection is kept for reuse: httpcore pools
+    by address and port, so a kept TLS session for one name would be reused for another name on
+    the same address without checking that name's certificate."""
+    return httpx.Client(
+        follow_redirects=False,
+        headers={"User-Agent": "snapback-mcp"},
+        limits=httpx.Limits(max_keepalive_connections=0),
+        verify=verify,
+    )
 
 
 def main(argv: list[str] | None = None) -> None:

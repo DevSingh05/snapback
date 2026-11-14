@@ -15,7 +15,7 @@ import httpx
 import pytest
 from mcp import Client
 
-from snapback.mcp_server import TOKEN_HELD, Snapback, build_server, vetted_address
+from snapback.mcp_server import TOKEN_HELD, Snapback, build_server, photo_client, vetted_address
 
 WRITE = "write-secret-0123456789abcdef"
 READ = "read-secret-0123456789abcdef"
@@ -626,6 +626,8 @@ def test_each_redirect_hop_is_resolved_and_vetted_again(monkeypatch) -> None:
         "64:ff9b::7f00:1",  # NAT64 of 127.0.0.1
         "2002:7f00:1::1",  # 6to4 of 127.0.0.1
         "::7f00:1",  # IPv4-compatible 127.0.0.1
+        "64:ff9b:1::7f00:1",  # local-use NAT64
+        "fec0::1",  # site-local
     ],
 )
 def test_private_and_tunnelled_addresses_are_refused(monkeypatch, address: str) -> None:
@@ -649,3 +651,127 @@ def test_a_public_address_is_kept(monkeypatch) -> None:
     lookup, _ = answers("2606:2800:220:1:248:1893:25c8:1946")
     monkeypatch.setattr(socket, "getaddrinfo", lookup)
     assert vetted_address("photos.example", 443) == "2606:2800:220:1:248:1893:25c8:1946"
+
+
+def recording_app(seen: list[httpx.Request], address: str) -> Snapback:
+    def host(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=JPEG)
+
+    return Snapback(
+        httpx.Client(base_url="http://api.test", transport=httpx.MockTransport(FakeApi())),
+        httpx.Client(transport=httpx.MockTransport(host)),
+        "http://localhost:5173",
+        resolve=lambda name, port: address,
+    )
+
+
+def test_an_ipv6_address_is_bracketed_and_the_name_kept() -> None:
+    seen: list[httpx.Request] = []
+    recording_app(seen, "2606:4700::1").fetch_photo("https://photos.example/a.jpg", 1)
+    [request] = seen
+    assert str(request.url) == "https://[2606:4700::1]/a.jpg"
+    assert request.headers["host"] == "photos.example"
+    assert request.extensions["sni_hostname"] == "photos.example"
+
+
+def test_an_international_name_goes_out_as_punycode() -> None:
+    seen: list[httpx.Request] = []
+    asked: list[str] = []
+    app = recording_app(seen, "93.184.216.34")
+    app.resolve = lambda name, port: asked.append(name) or "93.184.216.34"
+    app.fetch_photo("https://bücher.test:8443/a.jpg", 1)
+    [request] = seen
+    assert asked == ["xn--bcher-kva.test"]
+    assert request.headers["host"] == "xn--bcher-kva.test:8443"
+    assert request.extensions["sni_hostname"] == "xn--bcher-kva.test"
+
+
+def test_a_name_idna_cannot_encode_is_a_plain_refusal() -> None:
+    app = recording_app([], "93.184.216.34")
+    with pytest.raises(Exception, match="not an http or https link"):
+        app.fetch_photo("https://" + "a" * 70 + ".test/a.jpg", 1)  # a label over 63 characters
+
+
+def test_two_names_on_one_address_never_share_a_tls_connection(tmp_path) -> None:
+    """A keep-alive HTTP/1.1 TLS server on 127.0.0.1 with a certificate for photos.test only.
+    The second name must open its own connection and fail its own certificate check."""
+    import datetime
+    import ssl
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    pytest.importorskip("cryptography")
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "photos.test")])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(hours=1))
+        .add_extension(x509.SubjectAlternativeName([x509.DNSName("photos.test")]), False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), True)
+        .sign(key, hashes.SHA256())
+    )
+    cert_file, key_file = tmp_path / "cert.pem", tmp_path / "key.pem"
+    cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_file.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+
+    class Photo(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"  # keep-alive by default
+
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(JPEG)))
+            self.end_headers()
+            self.wfile.write(JPEG)
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    connections: list[Any] = []
+
+    class Server(ThreadingHTTPServer):
+        daemon_threads = True
+
+        def get_request(self) -> Any:
+            sock, address = self.socket.accept()
+            connections.append(address)  # counted before the handshake, which may fail
+            return context.wrap_socket(sock, server_side=True), address
+
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.load_cert_chain(cert_file, key_file)
+    server = Server(("127.0.0.1", 0), Photo)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_address[1]
+    try:
+        trust = ssl.create_default_context(cafile=str(cert_file))
+        app = Snapback(
+            httpx.Client(base_url="http://api.test", transport=httpx.MockTransport(FakeApi())),
+            photo_client(verify=trust),
+            "http://localhost:5173",
+            resolve=lambda host, p: "127.0.0.1",
+        )
+        assert app.fetch_photo(f"https://photos.test:{port}/a.jpg", 1)[1] == JPEG
+        with pytest.raises(Exception, match="could not be downloaded"):
+            app.fetch_photo(f"https://wrong.test:{port}/a.jpg", 2)
+        assert len(connections) == 2  # the first, verified session was not reused
+    finally:
+        server.shutdown()
+        server.server_close()
