@@ -418,13 +418,41 @@ def test_the_read_only_secret_cannot_approve(client):
 
 def test_the_write_secret_is_refused_in_a_query_string(client):
     # Servers log the path and query of every request. The secret that approves a challenge
-    # must never be put there, so reads from the query take the read-only secret and no other.
+    # must never be put there. The trace stream alone still takes the read-only secret in
+    # the address, because a browser's EventSource cannot send a header.
     case = create(client)
     approve(client, case)
     url = f"/cases/{case['case_id']}"
     assert client.get(f"{url}/trace", params={"token": case["token"]}).status_code == 403
-    assert client.get(url, params={"token": case["token"]}).status_code == 403
+    assert client.get(url, params={"token": case["token"]}).status_code == 401
     assert client.get(f"{url}/trace", params={"token": case["read_token"]}).status_code == 200
+
+
+def test_the_case_status_takes_no_token_in_the_address_not_even_the_right_one(client):
+    # Locked ruling, Sat 02:27: the read token goes in a header only. An address is what
+    # servers and proxies log, so a token found in one is refused, valid or not.
+    case = create(client)
+    url = f"/cases/{case['case_id']}"
+    for secret in (case["read_token"], case["token"], "nope"):
+        refused = client.get(url, params={"token": secret})
+        assert refused.status_code == 401
+        assert "header" in refused.json()["detail"].lower()
+        assert case["challenge_text"] not in refused.text and secret not in refused.text
+    # Even beside a good header: the address must not carry one at all.
+    both = client.get(
+        url,
+        params={"token": case["read_token"]},
+        headers={"Authorization": f"Bearer {case['read_token']}"},
+    )
+    assert both.status_code == 401
+    # An empty one is still one.
+    assert client.get(f"{url}?token=").status_code == 401
+    # With no token anywhere the public summary is still there, and still says nothing.
+    summary = client.get(url)
+    assert summary.status_code == 200 and summary.json()["challenge_text"] is None
+    # And a header still works.
+    with_header = client.get(url, headers={"Authorization": f"Bearer {case['read_token']}"})
+    assert with_header.json()["challenge_text"] == case["challenge_text"]
 
 
 def test_the_secret_can_also_travel_in_its_own_header(client):
@@ -459,11 +487,14 @@ def test_the_challenge_text_needs_a_case_secret(client):
     # Whoever may write may also read, as long as the secret travels in a header.
     with_write = client.get(url, headers={"Authorization": f"Bearer {case['token']}"}).json()
     with_read = client.get(url, headers={"X-Case-Token": case["read_token"]}).json()
-    with_query = client.get(url, params={"token": case["read_token"]}).json()
-    for body in (with_write, with_read, with_query):
+    for body in (with_write, with_read):
         assert body["challenge_text"] == case["challenge_text"]
     assert client.get(url, headers={"Authorization": "Bearer nope"}).status_code == 403
-    assert client.get(url, params={"token": other["read_token"]}).status_code == 403
+    other_header = {"Authorization": f"Bearer {other['read_token']}"}
+    assert client.get(url, headers=other_header).status_code == 403
+    # Never from the address (locked ruling, Sat 02:27), whoever's token it is.
+    assert client.get(url, params={"token": case["read_token"]}).status_code == 401
+    assert client.get(url, params={"token": other["read_token"]}).status_code == 401
 
 
 def test_the_trace_stream_needs_the_case_secret(client):
@@ -499,6 +530,29 @@ def test_each_browser_has_its_own_daily_allowance(tmp_path):
     # Another browser on the same network is not locked out by the first one.
     assert second.post("/cases", data={"text": "x"}).status_code == 201
     assert "snapback_client" in first.cookies
+
+
+@pytest.mark.parametrize(
+    ("base_url", "secure"),
+    [
+        ("http://localhost:5173", False),  # local development has no TLS to send it over
+        ("https://snapback.example", True),
+        ("HTTPS://snapback.example", True),
+    ],
+)
+def test_the_client_cookie_is_marked_secure_when_the_site_is_served_over_https(
+    tmp_path, base_url, secure
+):
+    settings = Settings(
+        _env_file=None, snapback_data_dir=tmp_path, snapback_public_base_url=base_url
+    )
+    made = TestClient(create_app(settings)).post("/cases", data={"text": "x"})
+    assert made.status_code == 201
+    cookie = made.headers["set-cookie"]
+    assert cookie.startswith("snapback_client=")
+    flags = [part.strip().lower() for part in cookie.split(";")[1:]]
+    assert ("secure" in flags) is secure
+    assert "httponly" in flags and "samesite=lax" in flags
 
 
 def test_one_address_cannot_start_checks_without_end(tmp_path):

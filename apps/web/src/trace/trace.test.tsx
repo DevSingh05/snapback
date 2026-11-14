@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import traceRaw from "../../../../fixtures/contracts/trace_events.jsonl?raw";
 import type { TraceEvent } from "../contracts";
 import { mergeEvent, parseFixtureLines, parseTraceEvent } from "./parse";
-import { openLiveTrace, openReplayTrace, replayDelay } from "./stream";
+import {
+  createSseParser,
+  openLiveTrace,
+  openReplayTrace,
+  replayDelay,
+  type SseMessage,
+} from "./stream";
 import { TracePanel } from "./TracePanel";
 
 const events = parseFixtureLines(traceRaw);
@@ -154,70 +160,206 @@ describe("fixture replay timing", () => {
   });
 });
 
-class FakeES {
-  static last: FakeES;
-  listeners: Record<string, ((e: MessageEvent) => void)[]> = {};
-  readyState = 0;
-  closed = false;
-  constructor(public url: string) {
-    FakeES.last = this;
-  }
-  addEventListener(t: string, f: (e: MessageEvent) => void) {
-    (this.listeners[t] ??= []).push(f);
-  }
-  emit(t: string, data?: string) {
-    for (const f of this.listeners[t] ?? []) f({ data } as MessageEvent);
-  }
-  close() {
-    this.closed = true;
-    this.readyState = 2;
-  }
+const enc = new TextEncoder();
+const frame = (i: number) => `id: ${i}\nevent: trace\ndata: ${JSON.stringify(at(i))}\n\n`;
+
+// A controllable text/event-stream response: push() sends a chunk, end() closes it.
+function sseResponse(status = 200) {
+  let ctl!: ReadableStreamDefaultController<Uint8Array>;
+  const body = new ReadableStream<Uint8Array>({
+    start(c) {
+      ctl = c;
+    },
+  });
+  return {
+    res: new Response(status === 200 ? body : null, {
+      status,
+      headers: { "Content-Type": "text/event-stream" },
+    }),
+    push: (t: string) => ctl.enqueue(enc.encode(t)),
+    end: () => ctl.close(),
+  };
 }
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe("sse parser", () => {
+  const run = (chunks: string[]) => {
+    const out: SseMessage[] = [];
+    const feed = createSseParser((m) => out.push(m));
+    chunks.forEach(feed);
+    return out;
+  };
+  it("joins an event split across chunks, even mid-line", () => {
+    const out = run(["id: 3\nev", "ent: trace\nda", 'ta: {"a":1}\n', "\n"]);
+    expect(out).toEqual([{ event: "trace", data: '{"a":1}', id: "3" }]);
+  });
+  it("joins multi-line data with newlines and defaults the event name", () => {
+    expect(run(["data: a\ndata: b\n\n"])).toEqual([
+      { event: "message", data: "a\nb", id: undefined },
+    ]);
+  });
+  it("skips comments and keeps CRLF and a split CR LF pair", () => {
+    const out = run([": hi\r\nid: 1\r", "\ndata: x\r\n\r\n", "data: y\r\r"]);
+    expect(out.map((m) => m.data)).toEqual(["x", "y"]);
+  });
+  it("does not emit an event with no blank line yet, or a comment-only block", () => {
+    expect(run(["data: x\n"])).toEqual([]);
+    expect(run([": keepalive\n\n"])).toEqual([]);
+  });
+});
 
 describe("live stream", () => {
-  beforeEach(() => vi.stubGlobal("EventSource", FakeES));
-  afterEach(() => vi.unstubAllGlobals());
-
-  it("opens /cases/{id}/trace and parses each trace event", () => {
-    const got: number[] = [];
-    openLiveTrace(
-      "http://api/",
-      "fx-7Q2M",
-      (e) => got.push(e.seq),
-      () => {},
-    );
-    expect(FakeES.last.url).toBe("http://api/cases/fx-7Q2M/trace");
-    FakeES.last.emit("trace", JSON.stringify(at(0)));
-    FakeES.last.emit("trace", "garbage");
-    FakeES.last.emit("trace", JSON.stringify(at(1)));
-    expect(got).toEqual([0, 1]);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
-  it("closes itself after the verdict line and on close()", () => {
+  const stub = (...responses: Response[]) => {
+    const f = vi.fn(async (...args: [string, RequestInit?]) => {
+      void args;
+      const r = responses.shift();
+      if (!r) return new Promise<Response>(() => {});
+      return r;
+    });
+    vi.stubGlobal("fetch", f);
+    return f;
+  };
+  const noop = () => {};
+
+  it("sends the read token in a header, never in the URL, and parses split events", async () => {
+    const s = sseResponse();
+    const f = stub(s.res);
+    const got: number[] = [];
+    const close = openLiveTrace("http://api/", "fx-7Q2M", (e) => got.push(e.seq), noop, "RTOK");
+    await tick();
+    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://api/cases/fx-7Q2M/trace");
+    expect(url).not.toContain("RTOK");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer RTOK");
+    const a = frame(0);
+    s.push(a.slice(0, 20));
+    s.push(a.slice(20) + ": ping\n\n" + "event: trace\ndata: garbage\n\n" + frame(1));
+    await tick();
+    expect(got).toEqual([0, 1]);
+    close();
+  });
+  it("sends no Authorization header for a fixture case without a token", async () => {
+    const f = stub(sseResponse().res);
+    const close = openLiveTrace("http://api", "x", noop, noop);
+    await tick();
+    expect((f.mock.calls[0]![1]!.headers as Record<string, string>).Authorization).toBeUndefined();
+    close();
+  });
+  it("closes after the verdict line and reports done", async () => {
+    const s = sseResponse();
+    stub(s.res);
     const status: string[] = [];
+    openLiveTrace("http://api", "x", noop, (st) => status.push(st), "T");
+    await tick();
+    s.push(frame(6));
+    await tick();
+    expect(status.at(-1)).toBe("done");
+  });
+  it("abort stops reading and sends no more events", async () => {
+    const s = sseResponse();
+    const f = stub(s.res);
+    const got: number[] = [];
+    const close = openLiveTrace("http://api", "x", (e) => got.push(e.seq), noop, "T");
+    await tick();
+    const signal = (f.mock.calls[0]![1] as RequestInit).signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    close();
+    expect(signal.aborted).toBe(true);
+    try {
+      s.push(frame(0));
+    } catch {
+      // the stream is already torn down
+    }
+    await tick();
+    expect(got).toEqual([]);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+  it("shows locked on 401 and 403, lost on 404, and does not retry", async () => {
+    for (const [code, want] of [
+      [401, "locked"],
+      [403, "locked"],
+      [404, "lost"],
+    ] as const) {
+      const f = stub(sseResponse(code).res);
+      const status: string[] = [];
+      openLiveTrace("http://api", "x", noop, (st) => status.push(st), "T");
+      await tick();
+      expect(status.at(-1)).toBe(want);
+      expect(f).toHaveBeenCalledTimes(1);
+    }
+  });
+  it("retries a dropped stream with Last-Event-ID and says reconnecting", async () => {
+    const first = sseResponse();
+    const second = sseResponse();
+    const f = stub(first.res, second.res);
+    const status: string[] = [];
+    const got: number[] = [];
     const close = openLiveTrace(
       "http://api",
       "x",
-      () => {},
+      (e) => got.push(e.seq),
       (s) => status.push(s),
+      "T",
     );
-    FakeES.last.emit("trace", JSON.stringify(at(6)));
-    expect(FakeES.last.closed).toBe(true);
-    expect(status.at(-1)).toBe("done");
+    await tick();
+    first.push(frame(0) + frame(1));
+    first.end();
+    await tick();
+    expect(status.at(-1)).toBe("reconnecting");
+    await new Promise((r) => setTimeout(r, 600));
+    expect(f).toHaveBeenCalledTimes(2);
+    const h = (f.mock.calls[1]![1] as RequestInit).headers as Record<string, string>;
+    expect(h["Last-Event-ID"]).toBe("1");
+    expect(h.Authorization).toBe("Bearer T");
+    second.push(frame(2));
+    await tick();
+    expect(got).toEqual([0, 1, 2]);
     close();
   });
-  it("reports reconnecting on a transient error and lost when the source is closed", () => {
+  it("never gives up while each reconnect opens and delivers, even when reads error", async () => {
+    vi.useFakeTimers();
+    let n = 0;
+    const f = vi.fn(async () => {
+      const i = n++;
+      let c!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start(ctl) {
+          c = ctl;
+        },
+      });
+      c.enqueue(enc.encode(frame(0).replace(/id: 0/, `id: ${i}`)));
+      queueMicrotask(() => c.error(new Error("reset")));
+      return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
+    });
+    vi.stubGlobal("fetch", f);
     const status: string[] = [];
-    openLiveTrace(
-      "http://api",
-      "x",
-      () => {},
-      (s) => status.push(s),
-    );
-    FakeES.last.readyState = 0;
-    FakeES.last.emit("error");
-    expect(status.at(-1)).toBe("reconnecting");
-    FakeES.last.readyState = 2;
-    FakeES.last.emit("error");
+    const close = openLiveTrace("http://api", "x", noop, (s) => status.push(s), "T");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(f.mock.calls.length).toBeGreaterThan(12);
+    expect(status).not.toContain("lost");
+    close();
+  });
+  it("treats a 200 that is not an event stream as lost, without retrying", async () => {
+    const f = stub(new Response("<html></html>", { headers: { "Content-Type": "text/html" } }));
+    const status: string[] = [];
+    openLiveTrace("http://api", "x", noop, (s) => status.push(s), "T");
+    await tick();
+    expect(status.at(-1)).toBe("lost");
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+  it("retries a 503 and gives up as lost after the retry limit", async () => {
+    vi.useFakeTimers();
+    const f = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal("fetch", f);
+    const status: string[] = [];
+    openLiveTrace("http://api", "x", noop, (s) => status.push(s), "T");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(f.mock.calls.length).toBeGreaterThan(2);
+    expect(status).toContain("reconnecting");
     expect(status.at(-1)).toBe("lost");
   });
 });
