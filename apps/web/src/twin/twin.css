@@ -163,6 +163,11 @@
   opacity: 1 !important;
   clip-path: inset(0 50% 0 0);
 }
+/* The stage's own notes sit where the two labels go, so they step aside in this view. */
+.twin-stage:has(.landing[data-split="yes"]) .twin-placeholder,
+.landing[data-split="yes"] .landing-note {
+  visibility: hidden;
+}
 .landing-split {
   position: absolute;
   inset: 0;

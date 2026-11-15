@@ -99,6 +99,9 @@ function TwinViewInner({
   const [fadeMs, setFadeMs] = useState(0);
   const [split, setSplit] = useState(false);
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The person pressed a control since this landing began: their choice stands, the landing
+  // does not bring the photo back and no auto fade starts.
+  const userChose = useRef(false);
   const stopAutoFade = useCallback(() => {
     if (fadeTimer.current !== null) clearTimeout(fadeTimer.current);
     fadeTimer.current = null;
@@ -159,6 +162,7 @@ function TwinViewInner({
     async (id: string) => {
       const mine = ++run.current;
       stopAutoFade();
+      userChose.current = false;
       setPhotoId(id);
       setFadeMs(0);
       setSplit(false);
@@ -219,6 +223,7 @@ function TwinViewInner({
       }
       if (!alive.current || run.current !== mine) return;
       setPhase("landed");
+      if (userChose.current) return;
       if (reduced) {
         setOpacity(FADED_OPACITY);
         return;
@@ -234,9 +239,12 @@ function TwinViewInner({
     [locate, roomLabels, reduced, sdk, sdkStatus, sweeps, poseIsLive, stopAutoFade],
   );
 
+  // Nothing reads as chosen while the photo is still flying in.
+  const landed = phase === "landed";
   // The person's own choice: it ends the auto fade and leaves side by side.
   const show = (value: number, ms: number) => {
     stopAutoFade();
+    userChose.current = true;
     setSplit(false);
     setFadeMs(reduced ? 0 : ms);
     setOpacity(value);
@@ -327,7 +335,7 @@ function TwinViewInner({
               <button
                 type="button"
                 className="twin-fade-btn"
-                aria-pressed={!split && opacity === 1}
+                aria-pressed={landed && !split && opacity === 1}
                 onClick={() => show(1, SWAP_MS)}
               >
                 Show ad photo
@@ -335,7 +343,7 @@ function TwinViewInner({
               <button
                 type="button"
                 className="twin-fade-btn"
-                aria-pressed={!split && opacity === 0}
+                aria-pressed={landed && !split && opacity === 0}
                 onClick={() => show(0, SWAP_MS)}
               >
                 Show 3D scan
@@ -343,9 +351,10 @@ function TwinViewInner({
               <button
                 type="button"
                 className="twin-fade-btn"
-                aria-pressed={split}
+                aria-pressed={landed && split}
                 onClick={() => {
                   stopAutoFade();
+                  userChose.current = true;
                   setSplit((on) => !on);
                 }}
               >

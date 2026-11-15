@@ -70,6 +70,25 @@ describe("TwinView photo fade", () => {
     expect(scan).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("a press during the flight wins: the landing does not bring the photo back or start the fade", async () => {
+    stubReducedMotion(false);
+    render(view());
+    await tick(300);
+    const scan = screen.getByRole("button", { name: "Show 3D scan" });
+    // Nothing reads as chosen while the photo is still flying.
+    expect(scan).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(scan);
+    expect(scan).toHaveAttribute("aria-pressed", "false");
+    await tick(3700);
+    expect(screen.getByTestId("photo-landing")).toHaveAttribute("data-phase", "landed");
+    expect(photo()).toHaveStyle({ opacity: "0" });
+    expect(scan).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Show ad photo" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   it("keeps the slider as an extra, with a plain label", async () => {
     stubReducedMotion(true);
     render(view());
