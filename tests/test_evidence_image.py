@@ -14,7 +14,7 @@ from snapback.api.casefiles import CaseFiles
 from snapback.api.main import create_app
 from snapback.contracts import DataSource, EvidenceFile, EvidencePhoto, EvidencePoints, LocateStatus
 from snapback.settings import Settings
-from snapback.vision.evidence_image import HEIGHT, WIDTH, caption, render
+from snapback.vision.evidence_image import HEIGHT, MIN_SIDE, WIDTH, caption, footprint, render
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE_PNG = ROOT / "fixtures" / "evidence" / "evidence_image_P1.png"
@@ -117,3 +117,24 @@ def test_the_committed_fixture_png_is_the_contract_shape(tmp_path):
     )
     with Image.open(io.BytesIO(fresh)) as image:
         assert image.size == (WIDTH, HEIGHT)
+
+
+def test_the_scan_panel_is_cropped_to_where_the_photo_lands():
+    """Eye check (#10): the whole 90-degree face beside a photo that covers part of it reads as
+    "not the same place". The box holds every matched point and has the photo's shape."""
+    pts = EvidencePoints(n_total=4, sampled=[(0.1, 0.1, 0.6, 0.5), (0.9, 0.9, 0.9, 0.8)])
+    left, top, right, bottom = footprint(pts, aspect=4 / 3)
+    assert 0 <= left < right <= 1 and 0 <= top < bottom <= 1
+    for _, _, u, v in pts.sampled:
+        assert left <= u <= right and top <= v <= bottom
+    assert (right - left) / (bottom - top) == pytest.approx(4 / 3, rel=0.02)
+    assert right - left < 1  # cropped, not the whole face
+
+
+def test_the_crop_never_shrinks_below_the_floor_or_leaves_the_frame():
+    one = EvidencePoints(n_total=1, sampled=[(0.5, 0.5, 0.99, 0.01)])
+    left, top, right, bottom = footprint(one, aspect=1.0)
+    assert right - left >= MIN_SIDE - 1e-9 and bottom - top >= MIN_SIDE - 1e-9
+    assert left >= 0 and right <= 1 and top >= 0 and bottom <= 1
+    assert footprint(None, 1.5) == (0.0, 0.0, 1.0, 1.0)
+    assert footprint(EvidencePoints(n_total=0), 1.5) == (0.0, 0.0, 1.0, 1.0)

@@ -82,16 +82,60 @@ def _font(size: int) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
+MARGIN = 0.12  # share of the footprint's size kept around it on each side
+MIN_SIDE = 0.35  # never crop the scan view to less than this share of its width or height
+
+
+def footprint(points: EvidencePoints | None, aspect: float) -> tuple[float, float, float, float]:
+    """The part of the scan view the ad photo covers, normalised (left, top, right, bottom).
+
+    The scan view is one fixed 90-degree face; the photo usually covers only part of it, so a
+    person comparing the two whole frames sees different pictures (eye check, #10: 3 of 8 exact
+    matches read as "not the same place"). The box holds every matched point plus a margin,
+    widened to the ad photo's aspect ratio, never below MIN_SIDE and never past the frame. No
+    points: the whole frame."""
+    if not points or not points.sampled:
+        return 0.0, 0.0, 1.0, 1.0
+    us = [u for _, _, u, _ in points.sampled]
+    vs = [v for _, _, _, v in points.sampled]
+    cx, cy = (min(us) + max(us)) / 2, (min(vs) + max(vs)) / 2
+    w = max((max(us) - min(us)) * (1 + 2 * MARGIN), MIN_SIDE)
+    h = max((max(vs) - min(vs)) * (1 + 2 * MARGIN), MIN_SIDE)
+    if w / h < aspect:  # widen or heighten to the photo's shape (the face itself is square)
+        w = h * aspect
+    else:
+        h = w / aspect
+    w, h = min(w, 1.0), min(h, 1.0)
+    left = min(max(cx - w / 2, 0.0), 1.0 - w)
+    top = min(max(cy - h / 2, 0.0), 1.0 - h)
+    return left, top, left + w, top + h
+
+
 def render(
     ad_photo: bytes,
     scan_view: bytes,
     points: EvidencePoints | None,
     line: str,
 ) -> bytes:
-    """The evidence image as PNG bytes: ad photo left, scan view right, matched pairs joined."""
+    """The evidence image as PNG bytes: ad photo left, the part of the scan view it covers
+    right, matched pairs joined."""
     with Image.open(io.BytesIO(ad_photo)) as a, Image.open(io.BytesIO(scan_view)) as b:
+        box = footprint(points, a.width / a.height if a.height else 1.0)
+        bw, bh = b.size
+        crop = b.crop(
+            (round(box[0] * bw), round(box[1] * bh), round(box[2] * bw), round(box[3] * bh))
+        )
         left, (lx, ly) = _fit(a)
-        right, (rx, ry) = _fit(b)
+        right, (rx, ry) = _fit(crop)
+    if points and box != (0.0, 0.0, 1.0, 1.0):
+        sx, sy = box[2] - box[0], box[3] - box[1]
+        points = points.model_copy(
+            update={
+                "sampled": [
+                    (x, y, (u - box[0]) / sx, (v - box[1]) / sy) for x, y, u, v in points.sampled
+                ]
+            }
+        )
     canvas = Image.new("RGB", (WIDTH, HEIGHT), BG)
     ox_left, ox_right, oy = GAP, 2 * GAP + PANEL_W, GAP
     canvas.paste(left, (ox_left + lx, oy + ly))
