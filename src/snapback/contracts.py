@@ -731,7 +731,9 @@ class RealListing(BaseModel):
     provenance: str | None = None  # "N of M of the ad's photos are in CoStar's own scan..."
     phone_line: str | None = None
     cta_label: str | None = None  # "See the real listing"
-    cta_url: str | None = None  # the availability link, else https://<website_host>; with figures
+    cta_url: str | None = (
+        None  # the availability link, else https://<website_host>; shown with figures on or off
+    )
 
 
 class CopyAlert(BaseModel):
