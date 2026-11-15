@@ -322,7 +322,7 @@ def test_the_advisory_agent_chooses_a_follow_up_and_the_trace_shows_plan_pick_ru
     assert drafted.chosen_by == "model" and drafted.reason.startswith("Planner drafted")
 
 
-# --- the next step: drafted for the renter, never sent 
+# --- the next step: drafted for the renter, never sent
 
 
 def test_the_planner_drafts_one_next_step_for_a_gap_and_the_verdict_does_not_move():
@@ -367,7 +367,7 @@ def test_the_recorded_run_drafts_the_same_next_step_every_time():
     assert picks[0] == picks[1] == picks[2]
 
 
-# --- the plan follows the ad 
+# --- the plan follows the ad
 
 
 def test_two_ads_get_two_plans():
@@ -399,7 +399,7 @@ def test_the_planner_trace_card_names_the_pick_from_the_menu_only():
     assert odd == "Picked one of the choices code offered"
 
 
-# --- FIXTURE end to end: no model key, two ads, two plans --------------------------------------------
+# --- FIXTURE end to end: no model key, two ads, two plans
 
 
 def test_with_no_model_two_fixture_ads_get_their_own_recorded_picks(tmp_path, monkeypatch):
