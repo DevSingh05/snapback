@@ -35,9 +35,18 @@ type Route =
   | { name: "investigate" }
   | { name: "replays" }
   | { name: "stories" }
+  | { name: "proof-room" }
   | { name: "home" };
 
+// /proof-room?case=<id> is the stable address for "watch your check team" (iMessage links to
+// it). The team works beside the 3D twin, so it lands there; with no case it lands on Home.
+export function proofRoomTarget(search: string): string {
+  const id = new URLSearchParams(search).get("case") ?? "";
+  return /^[A-Za-z0-9_-]+$/.test(id) ? `/case/${id}/twin` : "/";
+}
+
 export function matchRoute(path: string): Route {
+  if (/^\/proof-room\/?$/.test(path)) return { name: "proof-room" };
   if (/^\/map\/?$/.test(path)) return { name: "map" };
   if (/^\/listings\/?$/.test(path)) return { name: "listings" };
   if (/^\/finder\/?$/.test(path)) return { name: "finder" };
@@ -82,6 +91,10 @@ export default function App() {
     if (window.location.pathname === "/" && first !== "home")
       window.location.replace(tabOf(first).href);
   }, []);
+  const toTwin = route.name === "proof-room";
+  useEffect(() => {
+    if (toTwin) window.location.replace(proofRoomTarget(window.location.search));
+  }, [toTwin]);
   const section: Section | "stories" | null =
     route.name === "home"
       ? "home"
@@ -106,6 +119,7 @@ export default function App() {
         : route.name === "result" || route.name === "verify"
           ? { label: "Report", href: here }
           : null;
+  if (toTwin) return null;
   if (route.name === "map") {
     return (
       <AppShell section="map">

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import { SourceChip } from "../components/SourceChip";
 import type { LocateResult } from "../contracts";
+import { TeamPanel } from "../proofroom/TeamPanel";
 import { TracePanel } from "../trace";
 import { Photo } from "../ui/Photo";
 import { PathRail } from "../ui/PathRail";
@@ -48,6 +49,8 @@ interface ViewProps {
   claimedAerial?: AerialSide;
   /** Fixture scenario: "copied" runs a fixture photo that was taken in a different building. */
   demo?: "copied";
+  /** "Your check team", open beside the twin (below it on a phone). */
+  team?: ReactNode;
 }
 
 function TwinViewInner({
@@ -60,6 +63,7 @@ function TwinViewInner({
   matchedAerial = FIXTURE_MATCHED,
   claimedAerial = FIXTURE_CLAIMED,
   demo,
+  team,
 }: ViewProps) {
   const fixtureBase = demo === "copied" ? COPIED_LOCATE : fixtureLocate;
   const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
@@ -252,7 +256,7 @@ function TwinViewInner({
           </a>
         )}
       </nav>
-      <div className="twin-body">
+      <div className={team ? "twin-body twin-with-team" : "twin-body"}>
         <section className="twin-stage" aria-label="3D view" ref={stageRef}>
           {live && sdkKey && modelId ? (
             <iframe
@@ -275,6 +279,7 @@ function TwinViewInner({
             from={from}
           />
         </section>
+        {team}
         <TwinOnStop photoId={photoId} state={state} src={PLACEHOLDER_PHOTO} sample />
         <aside className="twin-side">
           <figure className="listing-card" ref={cardRef}>
@@ -348,6 +353,7 @@ export function TwinPage({ caseId }: { caseId: string }) {
       modelId={import.meta.env.VITE_DEMO_MODEL_ID}
       liveLocate={import.meta.env.VITE_LIVE_LOCATE === "1"}
       demo={demoFromSearch(window.location.search)}
+      team={<TeamPanel caseId={caseId} />}
     />
   );
 }
