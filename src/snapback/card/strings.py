@@ -49,6 +49,12 @@ EN: dict[str, str] = {
     "place.located_home": "Taken in this home ({located} of {total} photos).",
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
+    "label.loose": "Loose match",
+    "place.loose": (
+        "{loose} of {total} photos match a building's 3D scan only loosely: many of their details "
+        "do not line up. They may be edited or AI-made. Ask for a live video walkthrough before "
+        "you pay."
+    ),
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
     "place.not_indexed_yet": "Not checked (this building's scan is not indexed yet).",
     "place.no_photos": "Not checked (no listing photos were sent).",
@@ -602,6 +608,12 @@ ES: dict[str, str] = {
     "place.elsewhere": "Tomadas en otro edificio ({elsewhere} de {total} fotos). Señal de alerta.",
     "place.not_located": (
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
+    ),
+    "label.loose": "Coincidencia débil",
+    "place.loose": (
+        "{loose} de {total} fotos coinciden solo débilmente con el escaneo 3D de un edificio: "
+        "muchos detalles no encajan. Pueden estar editadas o hechas con IA. Pida un recorrido en "
+        "video en vivo antes de pagar."
     ),
     "place.not_indexed": "No comprobado (no tenemos un escaneo 3D de este edificio).",
     "place.not_indexed_yet": (

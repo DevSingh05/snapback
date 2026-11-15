@@ -221,6 +221,17 @@ def passes_strict(c: Verification, t: Thresholds) -> bool:
     )
 
 
+def loose(c: Verification, t: Thresholds) -> bool:
+    """A near miss on the strict bar: enough inliers and spread to name a building, but fewer
+    than elsewhere_min_ratio of the matches consistent (and at least the claimed ratio). The
+    photo is not placed; it is reported as matching only loosely."""
+    return (
+        c.inliers >= t.elsewhere_min_inliers
+        and c.spread >= t.elsewhere_min_spread
+        and t.min_inlier_ratio <= c.ratio < t.elsewhere_min_ratio
+    )
+
+
 def _failed_bar(top: Verification | None, t: Thresholds) -> str:
     """Which claimed bar the strongest candidate missed (a photo that placed nowhere)."""
     if top is None or top.inliers < t.min_inliers:
@@ -459,7 +470,11 @@ class Locator:
         return _PlaceOutcome(placed, None, ratio)
 
     def _identify(
-        self, photo: Image.Image, t: Thresholds | None = None, extra: list | None = None
+        self,
+        photo: Image.Image,
+        t: Thresholds | None = None,
+        extra: list | None = None,
+        near: list[Verification] | None = None,
     ) -> tuple[_Placement | None, bool]:
         """The ad names no home. Verify EVERY candidate on the strict bar, with no early stop, so
         the answer never depends on index order. Returns (best placement, ambiguous): ambiguous
@@ -471,6 +486,8 @@ class Locator:
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
             check = self._verify(photo, face, t)
             if not passes_strict(check, t):
+                if near is not None and loose(check, t):
+                    near.append(check)
                 continue
             homes.add(self.catalog.property_of(entry.model_id))
             if best is None or check.inliers > best.check.inliers:
@@ -640,9 +657,13 @@ class Locator:
                 continue
             photo = image.convert("RGB")
             if identify:
-                placed, ambiguous = self._identify(photo, t)
+                near: list[Verification] = []
+                placed, ambiguous = self._identify(photo, t, near=near)
                 tangled = tangled or ambiguous
-                bars[photo_id] = "ambiguity" if ambiguous else (None if placed else "inliers")
+                # "ratio": enough matched points to name a building, too few of them consistent.
+                # A regenerated (AI-edited) photo looks like this (#10); the card says so.
+                failed = "ratio" if near else "inliers"
+                bars[photo_id] = "ambiguity" if ambiguous else (None if placed else failed)
             else:
                 outcome = self._place_detail(photo, claimed_models, t, None, claimed_search)
                 placed = outcome.placed
