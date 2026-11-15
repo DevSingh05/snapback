@@ -65,7 +65,7 @@ describe("ReplayPage", () => {
     expect("source" in fixture).toBe(false);
   });
 
-  it("labels a real replay as re-created from a public report, with source link and date", () => {
+  it("labels a real replay as re-created from a public report, with the source named in plain text and its date", () => {
     const real: Replay = {
       ...(fixture as Replay),
       slug: "real-case",
@@ -78,10 +78,10 @@ describe("ReplayPage", () => {
     };
     render(<ReplayPage slug="real-case" replay={real} />);
     expect(screen.getByText("Re-created from a public report")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Example Gazette" })).toHaveAttribute(
-      "href",
-      "https://example.org/story",
-    );
+    // Named in plain text, never linked: a public report can print a renter's name.
+    expect(screen.getByTestId("source-name")).toHaveTextContent("Example Gazette");
+    expect(screen.queryByRole("link", { name: "Example Gazette" })).toBeNull();
+    expect(document.querySelector('a[href="https://example.org/story"]')).toBeNull();
     expect(screen.getByTestId("source-date")).toHaveTextContent("Feb 3, 2025");
   });
 

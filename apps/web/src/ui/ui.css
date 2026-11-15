@@ -1,0 +1,527 @@
+/* The shared primitives (design v4 ticket 0). Every value is a token. Class prefix ui-. */
+
+.ui-mono,
+.ui-tag,
+.ui-record,
+.ui-stamp,
+.ui-chapters {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+/* Anything on a matte band or a photograph takes the matte accent. */
+.ui-on-matte {
+  --focus: var(--act-matte);
+  --mark-act: var(--act-matte);
+  --mark-cut: var(--matte);
+  --ui-accent: var(--act-matte);
+  --ui-rule: var(--matte-line);
+  color: var(--on-matte);
+}
+
+/* ---------- the mark ---------- */
+.ui-mark {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+.ui-mark-l {
+  fill: currentColor;
+}
+.ui-mark-r {
+  fill: var(--mark-act);
+}
+.ui-mark-off .ui-mark-r {
+  fill: var(--mark-off);
+}
+.ui-mark-b path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+.ui-mark-b .ui-mark-r {
+  stroke: var(--mark-act);
+}
+.ui-mark-b.ui-mark-off .ui-mark-r {
+  stroke: var(--mark-off);
+}
+.ui-mark-cut {
+  fill: none;
+  stroke: var(--mark-cut);
+  stroke-width: 2.6;
+  stroke-linecap: square;
+}
+.ui-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.875rem;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  text-decoration: none;
+}
+/* The snap: on hover the two halves of the offset house slide level. */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-mark-a path {
+    transition: transform 250ms var(--ease-out);
+  }
+}
+:is(a, button, .ui-lockup):hover .ui-mark-a .ui-mark-l {
+  transform: translateY(-1.25px);
+}
+:is(a, button, .ui-lockup):hover .ui-mark-a .ui-mark-r {
+  transform: translateY(1.25px);
+}
+
+/* ---------- LIVE / FIXTURE ---------- */
+.ui-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ui-on-matte .ui-tag,
+.ui-tag.ui-on-matte {
+  color: var(--on-matte-muted);
+}
+.ui-tag::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--st-unchecked);
+}
+.ui-tag-live::before {
+  background: var(--st-ok);
+}
+
+/* ---------- state word ---------- */
+.ui-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ui-state::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--st-unchecked);
+}
+.ui-state-ok::before {
+  background: var(--st-ok);
+}
+.ui-state-mismatch::before {
+  background: var(--st-mismatch);
+}
+.ui-state-warn::before {
+  background: var(--st-warn);
+}
+.ui-state-unconfirmed::before {
+  background: var(--st-unconfirmed);
+}
+
+/* ---------- the record line ---------- */
+.ui-record {
+  display: block;
+  color: var(--muted);
+}
+.ui-on-matte .ui-record {
+  color: var(--on-matte-muted);
+}
+
+/* ---------- photo ---------- */
+.ui-photo {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--matte);
+}
+.ui-photo img,
+.ui-photo-none {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: var(--photo-filter);
+}
+.ui-photo-hero img {
+  filter: var(--hero-filter);
+}
+.ui-photo-none {
+  background: linear-gradient(160deg, var(--match-stage-2), var(--matte));
+}
+.ui-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  opacity: 0.07;
+  pointer-events: none;
+}
+.ui-photo-hero::after {
+  opacity: 0.09;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-photo img {
+    transition: transform 500ms var(--ease-out);
+  }
+  :is(a, button):hover .ui-photo img {
+    transform: scale(1.03);
+  }
+}
+.ui-stamp {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 5px 9px;
+  background: var(--photo-stamp);
+  color: var(--on-photo-stamp);
+  font-size: 0.625rem;
+}
+.ui-stamp-top {
+  top: 0;
+  bottom: auto;
+}
+.ui-stamp i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--v-ok);
+}
+.ui-pin {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  background: var(--on-matte);
+  color: var(--matte);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  box-shadow: 0 0 0 2px var(--pin-ring);
+}
+
+/* ---------- the path rail ---------- */
+.ui-rail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.ui-rail ol {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-rail li {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ui-rail li + li::before {
+  content: "";
+  width: 44px;
+  height: 1px;
+  margin-inline: var(--sp-4);
+  background: var(--line);
+}
+.ui-rail li > :is(a, span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  color: inherit;
+  text-decoration: none;
+}
+.ui-rail b {
+  padding-block: 4px;
+  font-weight: 600;
+}
+.ui-rail .ui-rail-done {
+  color: var(--ink);
+}
+.ui-rail .ui-rail-next {
+  color: var(--act);
+}
+.ui-rail .ui-rail-next b {
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--act);
+}
+.ui-rail-end {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- the chapter strip ---------- */
+.ui-chapters {
+  --ui-accent: var(--act);
+  --ui-rule: var(--line);
+  display: grid;
+  grid-template-columns: var(--ui-chapters);
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+}
+.ui-chapters.ui-on-matte {
+  --ui-accent: var(--act-matte);
+  --ui-rule: var(--matte-line);
+  color: var(--on-matte-muted);
+}
+.ui-chapters li {
+  min-width: 0;
+}
+.ui-chapters :is(button, span) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 6px 9px;
+  border: 0;
+  border-top: 3px solid var(--ui-rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-chapters button {
+  cursor: pointer;
+}
+.ui-chapters span {
+  min-height: 0;
+}
+.ui-chapters button:hover {
+  color: var(--ink);
+}
+.ui-chapters.ui-on-matte button:hover {
+  color: var(--on-matte);
+}
+.ui-chapters .ui-chapter-on :is(button, span) {
+  border-top-color: var(--ui-accent);
+  color: var(--ink);
+}
+.ui-chapters.ui-on-matte .ui-chapter-on :is(button, span) {
+  color: var(--on-matte);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-chapters :is(button, span) {
+    transition: border-color 300ms var(--ease-out);
+  }
+}
+
+/* ---------- planes ---------- */
+/* A sheet the renter reads or types into: paper on plaster, edged by a hairline and, at Dusk,
+   a top highlight. Never a sheet inside a sheet. */
+.ui-sheet {
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 var(--hi),
+    0 0 0 1px var(--line);
+}
+/* The matte band: photos, the verdict, the walk. Closed top and bottom by a rule, because at
+   Dusk it sits only a small step under the ground. */
+.ui-band {
+  background: var(--matte);
+  color: var(--on-matte);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  --focus: var(--act-matte);
+  --mark-act: var(--act-matte);
+  --mark-cut: var(--matte);
+}
+/* A photo on plaster takes a 1px frame so a light wall does not melt into the page. */
+.ui-photo-framed {
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* ---------- quiet action ---------- */
+.ui-btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  background: var(--layer-2);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ui-btn-quiet:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--edge),
+    inset 0 -2px 0 var(--ink);
+}
+
+/* A quiet field: the same edge as a quiet button, in both themes. */
+.ui-field {
+  min-height: 48px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  background: var(--layer-2);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  color: var(--ink);
+  font: inherit;
+}
+
+/* ---------- empty, loading, problem ---------- */
+.ui-empty,
+.ui-problem,
+.ui-loading {
+  display: grid;
+  justify-items: start;
+  gap: var(--sp-3);
+  padding-block: var(--sp-4);
+}
+.ui-empty-msg,
+.ui-problem p,
+.ui-loading-label {
+  margin: 0;
+  max-width: 34em;
+}
+.ui-empty-msg,
+.ui-loading-label {
+  color: var(--muted);
+}
+.ui-empty-rows {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-empty-rows li {
+  border-top: 1px solid var(--line);
+}
+.ui-empty-rows li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.ui-empty-rows :is(button, span) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+}
+.ui-empty-rows button {
+  cursor: pointer;
+}
+.ui-empty-rows button:hover {
+  color: var(--ink);
+}
+.ui-loading-shape {
+  display: grid;
+  gap: var(--sp-2);
+  width: 100%;
+}
+.ui-loading-row {
+  display: block;
+  height: 48px;
+  background: var(--layer-2);
+}
+.ui-loading-row:nth-child(even) {
+  width: 82%;
+}
+.ui-loading-block {
+  display: block;
+  background: var(--layer-2);
+}
+.ui-loading-photo .ui-loading-block {
+  aspect-ratio: 4 / 3;
+}
+.ui-loading-band .ui-loading-block {
+  height: 220px;
+  background: var(--matte);
+}
+/* Content that lands after a load fades in once; nothing loops. */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-landed {
+    animation: ui-land 400ms var(--ease-out) backwards;
+  }
+  @keyframes ui-land {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+@media (max-width: 760px) {
+  /* The rail keeps the numbers and names only the step in hand: "01 02 Walk it first". */
+  .ui-rail ol {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .ui-rail li.ui-rail-later {
+    display: none;
+  }
+  .ui-rail li.ui-rail-done:not(:last-child) b {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .ui-rail li + li::before {
+    width: 12px;
+    margin-inline: 8px;
+  }
+  .ui-rail-end {
+    flex: none;
+  }
+  /* The strip scrolls sideways inside itself instead of cutting room names short. */
+  .ui-chapters {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(max-content, 1fr);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}

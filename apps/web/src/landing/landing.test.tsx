@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
@@ -6,30 +6,64 @@ import { WalkMap, walkCells } from "../walk/WalkMap";
 import { HeroStreet } from "./HeroStreet";
 import { HowItWorks } from "./HowItWorks";
 
-describe("the first screen's drawings", () => {
-  it("the street scene is decoration only: hidden from readers, no text, no outside file", () => {
-    const { container } = render(<HeroStreet />);
-    const svg = container.querySelector("svg")!;
-    expect(svg).toHaveAttribute("aria-hidden", "true");
-    expect(svg.textContent).toBe("");
-    expect(container.innerHTML).not.toMatch(/href|url\(|<image|<use/);
-    // One lit home, with three photos traced to it.
-    expect(container.querySelectorAll(".hs-lit")).toHaveLength(1);
-    expect(container.querySelectorAll(".hs-photo")).toHaveLength(3);
-    expect(container.querySelectorAll(".hs-trace")).toHaveLength(3);
+describe("Home's photographs", () => {
+  it("the hero is one real daylight photograph, described and stamped as a sample", () => {
+    render(<HeroStreet />);
+    const day = screen.getByTestId("hero-photo");
+    expect(screen.queryByTestId("hero-photo-dusk")).toBeNull();
+    expect(day).toHaveAttribute("alt", expect.stringMatching(/apartment building.*daylight/i));
+    // Stock, never passed off as a listed home or as Houston.
+    const hero = screen.getByTestId("hero-street");
+    expect(hero).toHaveTextContent("Sample photo · Unsplash");
+    expect(day.getAttribute("alt")).not.toMatch(/houston|listed/i);
   });
 
-  it("how it works is three real steps in order, each with a drawing", () => {
+  it("collapsed behind the thread it keeps the photographs and drops the stamp line", () => {
+    render(<HeroStreet strip />);
+    expect(screen.getByTestId("hero-street")).toHaveClass("hs-strip");
+    expect(screen.getByTestId("hero-photo")).toBeInTheDocument();
+    expect(screen.getByTestId("hero-street")).not.toHaveTextContent("Sample photo");
+  });
+
+  it("the path is four steps in order, each with a stamped sample photo", () => {
     render(<HowItWorks />);
-    const steps = screen.getAllByRole("listitem");
-    expect(steps.map((s) => s.querySelector("h3")!.textContent)).toEqual([
-      "Paste the ad",
-      "We check it against the record",
-      "Walk it, then contact the office on record",
+    const steps = screen.getAllByRole("listitem").filter((li) => li.classList.contains("hiw-step"));
+    expect(steps.map((s) => s.querySelector(".hiw-step-title")!.textContent)).toEqual([
+      "Check the ad",
+      "Walk it first",
+      "Find safer places",
+      "Ask for a tour",
     ]);
-    for (const step of steps) expect(step.querySelector("svg")).not.toBeNull();
+    for (const step of steps) {
+      const photo = step.querySelector(".ui-photo")!;
+      expect(photo).toHaveAttribute("data-stamp", "sample");
+      expect(photo).toHaveTextContent("SAMPLE PHOTO");
+      expect(within(step as HTMLElement).getByRole("img")).toHaveAttribute(
+        "alt",
+        expect.stringMatching(/\w/),
+      );
+    }
+    // Walk it first reads as a player: the rooms, as a strip.
+    const rooms = within(steps[1] as HTMLElement).getByRole("list", { name: "Rooms in the walk" });
+    expect(
+      within(rooms)
+        .getAllByRole("listitem")
+        .map((r) => r.textContent),
+    ).toEqual(["Living room", "Kitchen", "Bedroom", "Bath"]);
+    // No number that is not measured, no sales words, no dashes.
     const copy = screen.getByTestId("how-it-works").textContent ?? "";
+    expect(copy.replace(/0[1-4]|3D/g, "")).not.toMatch(/\d/);
     expect(copy).not.toMatch(/available|book now|guarantee|[–—]/i);
+  });
+
+  it("a step runs only when the page gives it something to run", () => {
+    const check = vi.fn();
+    render(<HowItWorks actions={{ check }} />);
+    const buttons = within(screen.getByTestId("how-it-works")).getAllByRole("button");
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]!);
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(buttons[0]).toHaveTextContent("Check the ad");
   });
 });
 

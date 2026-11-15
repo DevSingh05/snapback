@@ -100,9 +100,9 @@
   font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--on-photo-stamp);
   padding: 3px var(--sp-2);
-  background: var(--glass);
+  background: var(--photo-stamp);
 }
 @media (hover: hover) {
   .sv-swap:hover .sv-label {
@@ -172,12 +172,10 @@
 }
 .rs-shadow {
   fill: var(--h-shade);
-  filter: blur(16px);
 }
-/* The same teal light the map puts under a researched place. */
+/* No glow under the room: the stage is matte. */
 .rs-glow {
-  fill: color-mix(in srgb, var(--map-glow, var(--act)) 34%, transparent);
-  filter: blur(26px);
+  display: none;
 }
 
 /* ---------- The walk map: the stops as a small lit model ---------- */
@@ -205,9 +203,6 @@
 }
 .wm-room[data-state="here"] .dk-teal {
   --c: var(--map-col, var(--act));
-}
-.wm-room[data-state="here"] {
-  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--map-glow, var(--act)) 75%, transparent));
 }
 .wm-caption {
   display: flex;
@@ -380,9 +375,9 @@
   font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--on-photo-stamp);
   padding: 3px var(--sp-2);
-  background: var(--glass);
+  background: var(--photo-stamp);
 }
 
 .rs-caption {
@@ -396,17 +391,17 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--layer-1);
-  box-shadow: var(--shadow);
-  border-left: 6px solid var(--act);
+  background: color-mix(in srgb, var(--matte) 88%, transparent);
+  color: var(--on-matte);
+  box-shadow: inset 4px 0 0 var(--act-matte);
   font-size: var(--fs-sm);
 }
 .rs-caption strong {
-  font-size: var(--fs-lg);
-  line-height: 1.2;
+  font-size: 1.05rem;
+  line-height: 1.3;
 }
 .rs-caption span {
-  color: var(--muted);
+  color: var(--on-matte-muted);
 }
 .rs-caption-unshown {
   border-left: 0;
@@ -418,7 +413,7 @@
   top: 0;
   bottom: 0;
   width: 6px;
-  background: repeating-linear-gradient(180deg, var(--ink) 0 8px, transparent 8px 14px);
+  background: repeating-linear-gradient(180deg, var(--on-matte) 0 8px, transparent 8px 14px);
 }
 
 /* ---------- The agent rail: a relay, led by what was measured ---------- */
