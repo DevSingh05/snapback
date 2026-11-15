@@ -265,6 +265,40 @@ export function TeamPanel({
     setFocus(id);
   };
 
+  // The Decider's stamp. On Live it sits under the scene, so the scene starts high enough to
+  // fit one screen and the stamp lands below the desk it came from; on the other tabs it stays
+  // in the header. It is one element, in one place at a time.
+  const decider = (
+    <div
+      className="pr-decider"
+      data-stamped={floor.verdict ? "yes" : "no"}
+      data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
+      data-testid="team-decider"
+    >
+      <p className="pr-who ui-mono">
+        {floor.desks.find((d) => d.card.team === "decider")?.card.name}
+      </p>
+      {/* The slot is already as tall as the stamp will be, so the stamp lands in place. */}
+      <div className="pr-stamp-slot">
+        {floor.verdict ? (
+          <p className="pr-stamp" data-testid="team-verdict">
+            {floor.verdict.headline}
+          </p>
+        ) : (
+          <>
+            {ending ? (
+              <p className="pr-stamp pr-held" aria-hidden="true">
+                {ending.headline}
+              </p>
+            ) : null}
+            <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
+          </>
+        )}
+      </div>
+      <p className="pr-rule">{w.deciderRule}</p>
+    </div>
+  );
+
   return (
     <section
       className="pr-panel"
@@ -285,34 +319,7 @@ export function TeamPanel({
         <div className="pr-bar" aria-hidden="true">
           <span style={{ transform: `scaleX(${floor.progress})` }} />
         </div>
-        <div
-          className="pr-decider"
-          data-stamped={floor.verdict ? "yes" : "no"}
-          data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
-          data-testid="team-decider"
-        >
-          <p className="pr-who ui-mono">
-            {floor.desks.find((d) => d.card.team === "decider")?.card.name}
-          </p>
-          {/* The slot is already as tall as the stamp will be, so the stamp lands in place. */}
-          <div className="pr-stamp-slot">
-            {floor.verdict ? (
-              <p className="pr-stamp" data-testid="team-verdict">
-                {floor.verdict.headline}
-              </p>
-            ) : (
-              <>
-                {ending ? (
-                  <p className="pr-stamp pr-held" aria-hidden="true">
-                    {ending.headline}
-                  </p>
-                ) : null}
-                <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
-              </>
-            )}
-          </div>
-          <p className="pr-rule">{w.deciderRule}</p>
-        </div>
+        {tab === "live" ? null : decider}
       </header>
 
       <div className="pr-tabs" role="tablist" aria-label={w.team}>
@@ -357,19 +364,6 @@ export function TeamPanel({
         className="pr-pane"
         hidden={tab !== "live"}
       >
-        <div className="pr-view" role="group" aria-label={w.view}>
-          {(["crew", "diagram"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              className="pr-btn pr-btn-quiet"
-              aria-pressed={view === v}
-              onClick={() => setView(v)}
-            >
-              {v === "crew" ? w.crewView : w.diagramView}
-            </button>
-          ))}
-        </div>
         {view === "crew" ? (
           <CrewScene
             floor={floor}
@@ -396,6 +390,20 @@ export function TeamPanel({
             ) : null}
           </>
         )}
+        {tab === "live" ? decider : null}
+        <div className="pr-view" role="group" aria-label={w.view}>
+          {(["crew", "diagram"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className="pr-btn pr-btn-quiet"
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+            >
+              {v === "crew" ? w.crewView : w.diagramView}
+            </button>
+          ))}
+        </div>
         {run.timeline ? (
           <div className="pr-controls">
             <button
