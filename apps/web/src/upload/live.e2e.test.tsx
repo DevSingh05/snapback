@@ -33,7 +33,8 @@ function installServer(opts: { challenge: string | null }) {
       headers: { "Content-Type": "application/json" },
     });
   const mock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const path = String(url);
+    // The card read names its language (?lang=); the route shape is the path.
+    const path = String(url).replace(/\?lang=(en|es)$/, "");
     const method = init?.method ?? "GET";
     calls.push({
       method,
