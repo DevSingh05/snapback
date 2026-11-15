@@ -89,23 +89,30 @@ NOTHING_ES = (
     "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
     "que están dentro y confirme con la oficina que figura en el registro."
 )
-# What a LIVE record gives (#259): nobody on record could be matched, the phone is not
-# confirmed either way, and nothing is a red flag.
+NO_OFFICE_EN = (
+    "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+    "they're inside, and confirm with an office you look up yourself."
+)
+NO_OFFICE_ES = (
+    "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+    "que están dentro y confirme con una oficina que usted mismo busque."
+)
+# What a LIVE record gives (#259): the phone is not confirmed either way, and nothing is a red
+# flag. With no manager on record there is no "office on record" to confirm with (XO, #263).
 LIVE_SHAPED = [
-    {"authority": {"status": "unknown", "manager_on_record": None}},
-    {"authority": MATCHES | {"office_phone_match": "no"}},
-    {"authority": MATCHES | {"office_phone_match": "not_checked"}},
+    ({"authority": {"status": "unknown", "manager_on_record": None}}, NO_OFFICE_EN, NO_OFFICE_ES),
+    ({"authority": MATCHES | {"office_phone_match": "not_checked"}}, NOTHING_EN, NOTHING_ES),
 ]
 
 
-@pytest.mark.parametrize("sections", LIVE_SHAPED)
-def test_a_live_shaped_hold_with_no_red_flag_says_nothing_goes_against_the_record(sections):
+@pytest.mark.parametrize(("sections", "en", "es"), LIVE_SHAPED)
+def test_a_live_shaped_hold_with_no_red_flag_says_nothing_goes_against_the_record(sections, en, es):
     made = card(honest(**sections))
     assert made.state is VerdictState.HOLD
     words = {line.tone for row in made.rows for line in row.lines}
     assert CardTone.RED_FLAG not in words
-    assert made.headline == NOTHING_EN
-    assert card(honest(**sections), "es").headline == NOTHING_ES
+    assert made.headline == en
+    assert card(honest(**sections), "es").headline == es
     # It is not the stronger line: this case would not pass even with presence proven.
     proven = to_evidence(honest(**sections)).model_copy(update={"presence": PresenceStatus.PROVEN})
     assert decide(proven).state is not VerdictState.VERIFIED
@@ -139,14 +146,65 @@ def test_a_warning_outside_the_person_row_keeps_the_plain_headline():
 
 
 def test_no_reply_yet_is_not_a_warning_about_anyone():
-    # Presence asked for and still awaited: the PERSON row's hold reads "Not confirmed".
+    # Presence asked for and still awaited (a spot revealed, no reply): the PERSON row's hold
+    # reads "Not confirmed", and that is not something against the ad.
     raw = json.loads((CONTRACTS / "module_evidence_hold.json").read_text())
+    spot = raw["challenge"]["spots"][0] | {
+        "replied_at": None,
+        "reply_photo_id": None,
+        "code_read": False,
+        "located": False,
+        "inliers": 0,
+    }
+    challenge = raw["challenge"] | {"spots": [spot], "presence": "waiting"}
     waiting = ModuleEvidence.model_validate(
-        raw | {"authority": MATCHES, "rules": [], "price": None}
+        raw | {"authority": MATCHES, "rules": [], "price": None, "challenge": challenge}
     )
-    if to_evidence(waiting).presence is PresenceStatus.WAITING:
-        made = card(waiting)
-        assert made.state is VerdictState.HOLD and made.headline in (CLEAN_EN, NOTHING_EN)
+    assert to_evidence(waiting).presence is PresenceStatus.WAITING
+    made = card(waiting)
+    assert made.state is VerdictState.HOLD
+    assert made.headline == NOTHING_EN
+
+
+# Contradictions the card shows without a red flag (XO review of #263): each one is something
+# against the ad, so the reassuring headline stays off and the plain one shows.
+CONTRADICTIONS = {
+    "the office on record says the ad is not theirs": {"office_declined_domain": "fixture.example"},
+    "the ad's bedrooms differ from the record": {
+        "ad_notes": [{"key": "beds_differ", "claim": "beds", "ad_value": "3", "record_value": "2"}]
+    },
+    "says they are the owner, the owner of record is someone else": {
+        "owner": {"kind": "company", "poster_says_owner": True, "poster_matches": "no"}
+    },
+    "the poster is not the manager on record": {
+        "authority": {"status": "mismatch", "manager_on_record": "Fixture Living LLC"}
+    },
+    "the phone is not the office's": {"authority": MATCHES | {"office_phone_match": "no"}},
+}
+
+
+@pytest.mark.parametrize("sections", CONTRADICTIONS.values(), ids=CONTRADICTIONS.keys())
+def test_a_contradiction_on_the_card_keeps_the_plain_headline(sections):
+    made = card(honest(**sections))
+    assert made.state is VerdictState.HOLD
+    assert made.headline is None
+    assert headline_text(made) == strings.text("state.hold")
+
+
+@pytest.mark.parametrize(
+    "note",
+    [
+        {
+            "key": "aerial_date",
+            "claim": "yard",
+            "ad_value": "2025-06-01",
+        },  # information, not a claim
+        {"key": "sale_none", "claim": "just_sold", "pretext": True},  # the ad's own excuse
+        {"key": "beds_same", "claim": "beds", "matches": True},  # a confirming line
+    ],
+)
+def test_notes_that_are_not_a_mismatch_leave_the_headline_on(note):
+    assert card(honest(ad_notes=[note])).headline == CLEAN_EN
 
 
 def test_other_states_never_get_it():

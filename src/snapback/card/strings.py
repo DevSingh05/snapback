@@ -540,6 +540,11 @@ EN: dict[str, str] = {
         "Nothing in this ad goes against the record. Before you pay: ask them to prove "
         "they're inside, and confirm with the office on record."
     ),
+    # The same, when the record names no manager: there is no office on record to call.
+    "state.hold_nothing_against_no_office": (
+        "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+        "they're inside, and confirm with an office you look up yourself."
+    ),
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -1111,6 +1116,10 @@ ES: dict[str, str] = {
     "state.hold_nothing_against": (
         "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
         "que están dentro y confirme con la oficina que figura en el registro."
+    ),
+    "state.hold_nothing_against_no_office": (
+        "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+        "que están dentro y confirme con una oficina que usted mismo busque."
     ),
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
