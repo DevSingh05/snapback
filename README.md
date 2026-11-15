@@ -172,6 +172,12 @@ keys. Every screen, card and number says LIVE or FIXTURE.
 3. Unzip the kit under `data/`, for example `data/raw/costar/costar-hackathon-kit/`.
 4. Run `python3 scripts/probe_kit.py`. It prints field names and counts only, never record values.
 
+### Integrations
+
+- **MCP server.** Any AI assistant (Claude Desktop, Claude Code, others) can call SNAPBACK to
+  check a rental ad, ask why, and get what to do next, with the verdict set by code and a link
+  back to the real listing. Setup and a demo script: [docs/mcp.md](docs/mcp.md).
+
 ## Architecture
 
 | Path                        | What it is                                                                 | Lane |
