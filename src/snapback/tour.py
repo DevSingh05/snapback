@@ -1253,10 +1253,7 @@ def claim_text(note: AdNote, lang: str = "en") -> str | None:
 
     if not strings.has(f"claims.{note.key}", lang):
         return None
-    claim_key = "beds_studio" if note.claim == "beds" and note.ad_value == "0" else note.claim
-    claim = strings.text(
-        f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
-    )
+    claim = strings.claim_word(note.claim, note.ad_value, lang)
     record = strings.text("list.and", lang).join(
         strings.text(f"kind.{w}", lang) for w in note.record
     )

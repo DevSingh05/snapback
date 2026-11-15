@@ -18,6 +18,7 @@ from snapback.agent.intake import read_listing
 from snapback.agent.join import JoinedModules, KitLookups, KitMissing
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT, phone_hash
 from snapback.api.main import create_app
+from snapback.card import strings
 from snapback.contracts import (
     AuthorityStatus,
     CardRowKind,
@@ -690,3 +691,95 @@ def test_an_ordinary_listing_is_looked_up_and_nothing_is_found(tmp_path):
     card = finish(client, {"text": "2 bed near the park, $1,700 a month."})
     labels = [line["label"] for row in card["rows"] for line in row["lines"]]
     assert "For sale" not in labels and "Rental history" not in labels
+
+
+def test_a_credit_check_at_the_records_own_site_stays_quiet_end_to_end():
+    record = contact_record(website_host="fixtureliving.example")
+    text = "Run your credit check at fixtureliving.example/residents."
+    assert "link.affiliate_credit_check" in [h.rule_id for h in read_listing(text).rule_hits]
+    own = joined(text, record=record, source=DataSource.LIVE).rules("fx-JOIN")
+    assert "link.affiliate_credit_check" not in [h.rule_id for h in own]
+    other = joined(
+        "Run your credit check at scorecheckfast.example/residents.",
+        record=record,
+        source=DataSource.LIVE,
+    ).rules("fx-JOIN")
+    assert "link.affiliate_credit_check" in [h.rule_id for h in other]
+
+
+# --- issue #10: Jeffrey's live dry run ---------------------------------------------------------
+
+MATCHES = {
+    "en": "Matches. This is the leasing office's number on record. Call it yourself to confirm.",
+    "es": (
+        "Coincide. Es el número de la oficina de alquiler que figura en el registro. "
+        "Llame usted mismo para confirmarlo."
+    ),
+}
+
+
+@pytest.mark.parametrize("written", [OFFICE, "5550100142"])
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_the_office_number_in_the_ad_gives_a_green_contact_line(tmp_path, written, lang):
+    # Ad 5: the ad used the office number as the record keeps it (ten bare digits) and the
+    # card had no Contact line at all. The digits are never shown.
+    record = contact_record()
+    client = client_for(
+        tmp_path,
+        Injected(record),
+        snapback_data_source="live",
+        snapback_phone_salt=FIXTURE_PHONE_SALT,
+    )
+    form = {"text": f"Unit 204, 2 bed, $1,700 a month. Call {written}."}
+    made = client.post("/cases", data=form | {"property_id": record.property_id})
+    assert made.status_code == 201, made.text
+    case_id = made.json()["case_id"]
+    card = client.get(f"/cases/{case_id}/card", params={"lang": lang}).json()
+    contact = [
+        line
+        for row in card["rows"]
+        for line in row["lines"]
+        if line["label"] == strings.text("label.contact", lang)
+    ]
+    assert [(line["tone"], line["text"]) for line in contact] == [("ok", MATCHES[lang])]
+    assert "0142" not in str(card)
+
+
+class ByPosition(Injected):
+    """Lane D's lookups with a for-sale answer only by position, as a home with no street."""
+
+    def __init__(self, record: PropertyRecord, found: ForSaleMatch):
+        super().__init__(record, ForSaleMatch(status="none"))
+        self._found = found
+        self.at: list[tuple[float, float]] = []
+
+    def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
+        self.at.append((lat, lon))
+        return self._found
+
+
+def test_a_named_home_is_looked_up_for_sale_by_its_position_too(tmp_path):
+    # Ad 3: no street in the ad, so the text lookup finds nothing; the record's position does.
+    record = contact_record(lat=29.76, lon=-95.37)
+    lookups = ByPosition(record, ForSaleMatch(status="active"))
+    client = client_for(tmp_path, lookups, snapback_data_source="live")
+    made = client.post(
+        "/cases", data={"text": "3 bed house, $1,400 a month.", "property_id": record.property_id}
+    )
+    assert made.status_code == 201, made.text
+    card = client.get(f"/cases/{made.json()['case_id']}/card").json()
+    assert lookups.at == [(29.76, -95.37)]
+    assert said_on(card)["For sale"]["tone"] == "hold"
+    assert card["state"] == "hold"
+
+
+def test_a_position_lookup_that_finds_nothing_never_undoes_a_text_match(tmp_path):
+    record = contact_record(lat=29.76, lon=-95.37)
+    lookups = ByPosition(record, ForSaleMatch(status="none"))
+    lookups._for_sale = ForSaleMatch(status="active")
+    client = client_for(tmp_path, lookups, snapback_data_source="live")
+    made = client.post(
+        "/cases", data={"text": "3 bed house, $1,400 a month.", "property_id": record.property_id}
+    )
+    card = client.get(f"/cases/{made.json()['case_id']}/card").json()
+    assert said_on(card)["For sale"]["tone"] == "hold"

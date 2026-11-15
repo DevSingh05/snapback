@@ -147,10 +147,10 @@ or sends anything for you.
     below the building's lowest rent, so honest discounts pass.
   - Cropped photos still match (14 of 18; 4 of 4). Mirrored photos mostly stop matching (4 of 18
     placed) and were never placed in a wrong home.
-- **Batch run, FIXTURE (composed ads, n per type):** cloned phone 9 of 9 held; another
-  building's photos 6 of 6 "Don't pay"; price cut 9 of 9 held; a for-sale home listed as a
-  rental 3 of 3 held; clean ads 6 of 6 cleared; clean messages 17 of 17 cleared; messages with
-  money asks 26 of 32 caught. Overall 76 of 82.
+- **Batch run, FIXTURE (composed ads, n per type, re-measured after the new rules):** cloned
+  phone 9 of 9 held; another building's photos 6 of 6 "Don't pay"; price cut 9 of 9 held; a
+  for-sale home listed as a rental 3 of 3 held; clean ads 6 of 6 cleared; clean messages 43 of 43
+  cleared; messages with money asks 41 of 47 caught. Overall 117 of 123.
 - **CoStar record coverage, LIVE kit (counts):** 3,339 records; 2,139 have the building's
   website; 1,747 have floor-plan rents; 708 have an availability page. The locate index on the
   demo machine holds 21 scans.
@@ -209,11 +209,11 @@ or sends anything for you.
 
 Built, not yet on `main`, so not claimed above:
 
-- **The real listing:** a panel that shows the home's real listing, a hand-off link back to it on
-  Apartments.com, and an alert when an ad looks copied from it (#250).
-- **New rules,** and a **batch run** over many ads at once.
-- The **Stories** page.
-- **Voice in iMessage:** merged in the sidecar (#245); the live round trip from a phone is next.
+- **The report page** that shows the real listing beside the ad, with its hand-off link to
+  Apartments.com (#265). The real-listing API behind it is on `main` (#250).
+- **Adaptive memory in iMessage:** it learns the renter's language, budget and beds, and "show
+  me safer homes" uses them (#264).
+- The **Stories** page (#265).
 
 ## What's next
 
@@ -239,18 +239,94 @@ Actions.
 
 ## Tracks
 
-- **CoStar:** checks every ad against CoStar's own property records, the Homes.com listings, the
-  Matterport scans and the Vexcel aerial imagery, then turns that data into a safer search. The
-  kit stays on the machine. Only derived yes/no facts reach a model, never kit rows, photos,
-  addresses or prices, as CoStar allowed for the event.
-- **Photon (+ Best Voice Agent):** the iMessage sidecar is live on Photon's Spectrum SDK: text an
-  ad and get the card back. Watch alerts text a linked Finder search at most 3 times a day, and
-  "stop" ends them. Voice memos in and spoken replies out are built (#245): a memo is written down
-  by our speech-to-text and checked like a typed ad, and the answer comes back as text plus a voice
-  memo. The live round trip from a phone is next.
-- **Arlequin:** the investigator view finds rental-scam rings across many ads, with evidence for
-  every link, on a SYNTHETIC/FIXTURE corpus (numbers above).
-- **GoDaddy domain:** TBD.
+Main track: **Business and Enterprise.** Sponsor tracks: **CoStar**, **Amazon Best Practical
+AI**, **LangChain deepagents**, **Arlequin Track 1** and **Photon** (+ Best Voice Agent). Each
+section answers that sponsor's own criteria.
+
+### Business and Enterprise
+
+- **Who pays today:** the renter, with a median loss of $1,000 (FTC, Dec 22 2025), and the
+  listing businesses whose real listings are copied to bait them.
+- **Who it serves:** the renter about to pay, the leasing office whose listing is copied, CoStar
+  and Apartments.com (the renter is handed back to the real listing), and the public. Free for
+  renters.
+- **How it fits a business:** every check reads a record the business already keeps (the
+  property record, its office, its website, its floor-plan rents, its 3D scan). CoStar could ship
+  this beside its listings.
+
+### CoStar
+
+- **Uses the record, not guesses:** each ad is checked against CoStar's own record of the
+  building. In the event kit: 3,339 records; 2,139 with the building's website; 1,747 with
+  floor-plan rents; 708 with an availability page (LIVE kit, counts).
+- **Measured on CoStar's own data (LIVE):** "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it." In the live tamper test, a changed phone,
+  "send the deposit by Zelle before the tour" and a lookalike website link were each caught 6 of
+  6 (real photos) and 2 of 2 (scan renders).
+- **Sends renters back to CoStar:** the report ends with the real listing on Apartments.com.
+- **Respects the data:** the kit stays on the machine and is deleted after Sun Nov 15 16:00.
+  Only derived yes/no facts reach a model, never kit rows, photos, addresses or prices.
+
+### Amazon Best Practical AI
+
+- **Creativity:** the renter checks an ad by texting it, in the same thread where the scam
+  arrives, and the answer is a report built from the home's own record.
+- **Usefulness:** it answers the one question that matters before money moves, "is this the real
+  listing, and who do I call?". Batch run (FIXTURE): 117 of 123 ads and messages handled as
+  expected, including 43 of 43 clean messages cleared.
+- **Technical work:** code sets every verdict; a model only picks the order of checks and writes
+  explanations, through deepagents. Photo placement uses DINOv2 retrieval and DISK + LightGlue
+  matching over Matterport scans (LIVE): "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it."
+- **UX:** one text in, one short report out: the verdict, "Before you pay:" with the top two
+  reasons, one next step and the full report. Text-only checks take about 1 s, and checks with
+  photos about 19 to 26 s (LIVE).
+- **Adaptive:**
+  - Follow-ups ("why?", "who do I call?", "is it safe?") answer from the renter's own case, without
+    a new check.
+  - The Finder learns preferences by consent (#238).
+  - In iMessage, adaptive memory learns the renter's language, budget and beds, and "show me safer
+    homes" uses them. This is in review (#264), so it's listed under In progress.
+- **AWS:** nothing in the repo uses AWS yet. This is what we'd run on it: the API on a container
+  service, the photo index on a GPU instance, and the per-renter memory in a managed key-value
+  store.
+
+### LangChain deepagents
+
+- **A planner, not a verdict:** the main agent plans with `write_todos` and hands each check family
+  to its own sub-agent. Each sub-agent gets one read-only tool, a narrow prompt and permission to
+  write one file.
+- **Findings as files:** sub-agents leave notes in the deepagents file system under /case/<id>/.
+  The main agent reads them and writes the explanation and tour questions.
+- **Bounded choices:** the model gets four tools and can only pick from options code wrote.
+  Sending the challenge is gated by the harness's human-in-the-loop interrupt.
+- **The Finder crew (#238) and the place and walk sub-agents with a retry budget (#222)** run on
+  the same harness.
+- **Safe by construction:** whatever the model does, the driver finishes the case with the code
+  policy, and the verdict is still `decide()` on the evidence. No note is read by `decide()`.
+
+### Arlequin Track 1
+
+- **One renter's check answers one ad; an investigator needs the ring behind many.** The
+  investigator view links ads by reworded text, shared photos, numbers and wordings, finds
+  communities, and builds each ring's timeline. Every finding carries its evidence.
+- **Measured, SYNTHETIC/FIXTURE:** on n = 301 ads with 4 seeded rings (57 ring ads): 4 of 4 rings
+  recovered, 57 of 57 ring ads found, 0 of 244 honest ads flagged. A keyword baseline recovered 0
+  of 4. On 10 held-out seeds (about 300 ads each): ring precision 0.88, recall 0.93. The corpus
+  and method were built together, so this is not an accuracy claim for real listings.
+
+### Photon (+ Best Voice Agent)
+
+- **Built on Photon:** the sidecar runs on Photon's Spectrum SDK (`spectrum-ts`) and is live on
+  iMessage. A real round trip from a phone works.
+- **The messaging is essential:** renters don't download an app in the middle of a scam. They
+  forward the message, and SNAPBACK answers in the same thread.
+- **In the thread:**
+  - a "checking" reply, then a short report and the card picture (#255);
+  - "why?", "what should I do?", "who do I call?" and "is it safe?" answered from the same case;
+  - watch alerts at most 3 a day, with "stop" to end them (#232).
+- **Voice:** a voice memo is written down by our speech-to-text and checked like a typed ad. The
+  answer comes back as text plus a voice memo, sent as a native voice bubble (#245).
+- **Safe by design:** only allowlisted threads, never texts first, no case token and no phone
+  digits in any reply.
 
 ## Team
 

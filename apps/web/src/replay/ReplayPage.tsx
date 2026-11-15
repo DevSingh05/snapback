@@ -150,10 +150,8 @@ export function ReplayView({
         <h1>{replay.title}</h1>
         {replay.source && !replay.fictional ? (
           <p className="replay-source">
-            {t.source}:{" "}
-            <a href={replay.source.url} rel="noopener noreferrer" target="_blank">
-              {replay.source.name}
-            </a>
+            {/* Plain text, no link: a public report can print a renter's name (decisions 17:23). */}
+            {t.source}: <span data-testid="source-name">{replay.source.name}</span>
             {", "}
             <span data-testid="source-date">{shortDate(replay.source.published_on, lang)}</span>
           </p>
@@ -242,10 +240,7 @@ export function ReplayView({
       <footer className="replay-foot">
         {replay.source && !replay.fictional ? (
           <p data-testid="replay-footer">
-            {t.footer(replay.source.name, shortDate(replay.source.published_on, lang))}{" "}
-            <a href={replay.source.url} rel="noopener noreferrer" target="_blank">
-              {t.source}
-            </a>
+            {t.footer(replay.source.name, shortDate(replay.source.published_on, lang))}
           </p>
         ) : null}
         <p>SNAPBACK never texts first and never asks for money.</p>

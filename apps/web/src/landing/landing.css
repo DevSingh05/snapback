@@ -1,250 +1,196 @@
-/* The first screen's scene (hs) and the three-step strip (hiw). Kit drawings, tokens only.
-   The lit home shares the map's teal: its tokens are used when the map's set is present. */
+/* Home's hero photograph and the four-step path (design v4 ticket 2). Every colour is a token
+   (tokens.css); corners are sharp and nothing is boxed. */
+
+/* ---------- The hero photograph: one daylight picture ---------- */
 .hs {
-  display: block;
-  width: 100%;
-  height: auto;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   overflow: hidden;
-  --lit: var(--map-col, color-mix(in srgb, var(--act) 68%, var(--h-unlit)));
+  background: var(--matte);
 }
-.upload-intro:has(.hs) {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 44%);
-  grid-template-areas: "eyebrow scene" "title scene" "lead scene";
-  align-content: center;
-  column-gap: clamp(12px, 3vw, 32px);
-  padding-right: 0;
-  padding-block: 0;
+.hs-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 62% 38%;
+  filter: var(--hero-filter);
 }
-.upload-intro:has(.hs) .upload-eyebrow {
-  margin-top: clamp(20px, 3vw, 30px);
-  grid-area: eyebrow;
-  justify-self: start;
-  align-self: end;
+/* The matte scrim: two flat ink gradients, heavier on the left where the words sit and at the
+   top and bottom edges. */
+.hs-scrim {
+  position: absolute;
+  inset: 0;
+  opacity: var(--scrim-o);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--matte) 90%, transparent) 0%,
+      color-mix(in srgb, var(--matte) 72%, transparent) 38%,
+      color-mix(in srgb, var(--matte) 30%, transparent) 72%,
+      color-mix(in srgb, var(--matte) 42%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--matte) 55%, transparent) 0%,
+      transparent 22%,
+      transparent 62%,
+      color-mix(in srgb, var(--matte) 70%, transparent) 100%
+    );
 }
-.upload-intro:has(.hs) h1 {
-  grid-area: title;
+.hs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  opacity: 0.09;
+  pointer-events: none;
 }
-.upload-intro:has(.hs) .upload-lead {
-  grid-area: lead;
-  align-self: start;
-  padding-bottom: clamp(20px, 3vw, 30px);
+.hs-stamp {
+  position: absolute;
+  top: calc(var(--bar-h, 64px) + var(--sp-4));
+  right: var(--gutter);
+  margin: 0;
+  color: var(--on-hero-muted);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
 }
-.upload-intro .hs {
-  grid-area: scene;
-  align-self: end;
-}
-.hs-lot {
-  fill: color-mix(in srgb, var(--lit) 22%, var(--h-lawn));
-  stroke: var(--lit);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--map-glow, var(--act)) 70%, transparent));
-}
-/* The lit roof: the one home the ad's photos lead to. */
-.hs-lit .dk-teal {
-  --c: var(--lit);
-}
-.hs-lit [data-part="roof"] {
-  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--map-glow, var(--act)) 60%, transparent));
-}
-.hs-mat {
-  fill: var(--surface);
-  filter: drop-shadow(0 5px 8px var(--h-shade));
-}
-.hs-pic {
-  fill: var(--h-unlit);
-}
-.hs-pic-floor {
-  fill: var(--h-path);
-}
-.hs-pic-thing {
-  fill: var(--h-roof);
-}
-.hs-trace {
-  stroke: var(--lit);
-  stroke-width: 1.6;
-  stroke-dasharray: 1;
-  fill: none;
-}
-.hs-pin {
-  fill: var(--lit);
-  stroke: var(--surface);
-  stroke-width: 1.5;
+/* Collapsed behind the thread: the same photograph under a flat, heavier matte. */
+.hs-strip .hs-scrim {
+  opacity: 1;
+  background: color-mix(in srgb, var(--matte) 74%, transparent);
 }
 
+/* ---------- The four-step path ---------- */
 .hiw {
-  padding: clamp(18px, 3vw, 28px) 0 4px;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
 }
 .hiw-title {
-  font-size: var(--fs-lg);
+  max-width: 15em;
+  font-size: clamp(1.6rem, 2.7vw, 2.1rem);
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: -0.015em;
+}
+.hiw-sub {
+  margin: var(--sp-3) 0 0;
+  color: var(--muted);
 }
 .hiw-steps {
   list-style: none;
-  margin: 0;
+  margin: var(--sp-7) 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-3);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.62fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-6) 28px;
 }
-.hiw-step {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px var(--sp-3);
-  align-content: start;
-  padding: 0 0 var(--sp-4);
-  background: var(--layer-2);
-}
-.hiw-art {
-  grid-column: 1 / -1;
-  height: 132px;
-  display: grid;
-  place-items: center;
-  margin-bottom: var(--sp-3);
-  background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
-  overflow: hidden;
-}
-.hiw-art svg {
-  height: 118px;
-  width: auto;
-  max-width: 100%;
-}
-.hiw-thumb {
-  fill: var(--h-wall-shade);
-}
-.hiw-text {
-  margin: 0;
-}
-polygon.hiw-text {
-  fill: color-mix(in srgb, var(--muted) 50%, var(--h-wall));
-}
-.hiw-n {
-  grid-row: span 2;
-  margin: 0 0 0 var(--sp-4);
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  background: var(--act);
-  color: var(--on-act);
-  font-weight: 700;
-  font-size: var(--fs-sm);
-}
-.hiw-step-title {
-  margin: 0;
-  padding-right: var(--sp-4);
-  font-size: var(--fs-md);
-  line-height: 1.25;
-}
-p.hiw-text {
-  padding-right: var(--sp-4);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--muted);
-}
-
-/* The ad box leads the form: it is the one thing to do here. */
-.upload-body > .upload-label[for="listing"] {
-  font-size: var(--fs-lg);
-}
-.upload-body > #listing {
-  min-height: 7.5rem;
-  border-left: 6px solid var(--act);
-}
-
-@media (max-width: 760px) {
-  .upload-intro:has(.hs) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "scene" "eyebrow" "title" "lead";
-    padding-top: 0;
-    padding-inline: 0;
-  }
-  .upload-intro:has(.hs) > :not(.hs) {
-    margin-inline: clamp(18px, 4vw, 36px);
-  }
-  .upload-intro:has(.hs) .upload-eyebrow {
-    margin-top: var(--sp-4);
-  }
-  .hiw-steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .hiw-step {
-    grid-template-columns: 110px auto minmax(0, 1fr);
-    padding: 0;
-    align-items: start;
-  }
-  .hiw-art {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    height: 100%;
-    min-height: 104px;
-    margin: 0;
-  }
-  .hiw-art svg {
-    height: 84px;
-  }
-  .hiw-n {
-    margin: var(--sp-3) 0 0 2px;
-  }
-  .hiw-step-title {
-    padding-top: var(--sp-3);
-  }
-  p.hiw-text {
-    grid-column: 2 / -1;
-    padding-bottom: var(--sp-3);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .hs-photo {
-    animation: hs-drop 0.5s var(--ease-out) backwards;
-  }
-  @keyframes hs-drop {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-  }
-  .hs-trace {
-    animation: hs-draw 0.6s ease-out backwards;
-  }
-  @keyframes hs-draw {
-    from {
-      stroke-dashoffset: 1;
-    }
-  }
-}
-
-/* ---------- Home inside the app shell ---------- */
-/* The bar carries the mark, so the form's own header keeps only the data label. */
-.home .upload .masthead .wordmark {
-  display: none;
-}
-.home .upload .masthead {
-  justify-content: flex-end;
-}
-.home .card-page {
-  max-width: none;
-  background: var(--layer-1);
-}
-.home .upload-intro {
-  background: linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
-}
-.home .upload-input,
-.home .upload-drop,
-.home .pf-budget {
-  background: var(--layer-2);
-}
-/* The data label sits as a quiet footer line under the form, not as an empty header. */
-.home .upload {
+.hiw-go {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-top: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
 }
-.home .upload .masthead {
-  order: 9;
-  justify-content: flex-start;
+button.hiw-go {
+  cursor: pointer;
+}
+.hiw-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
   padding-block: var(--sp-3);
-  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+.hiw-photo {
+  height: 236px;
+  box-shadow: 0 0 0 1px var(--home-line);
+}
+.hiw-rooms {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  background: var(--photo-stamp);
+  font-size: 0.625rem;
+  text-transform: uppercase;
+}
+.hiw-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-4);
+}
+.hiw-step-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: var(--lh-tight);
+}
+.hiw-arrow {
+  font-weight: 400;
+}
+.hiw-line {
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--muted);
+}
+@media (hover: hover) {
+  button.hiw-go:hover .hiw-step-title {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+/* Narrow: the steps become rows, a thumb and the words. */
+@media (max-width: 900px) {
+  .hiw-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin-top: var(--sp-5);
+  }
+  .hiw-go {
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: var(--sp-4);
+    padding-block: var(--sp-4);
+    border-top-color: var(--home-line);
+  }
+  .hiw-step:first-child .hiw-go {
+    border-top-color: var(--ink);
+  }
+  .hiw-meta {
+    grid-column: 2;
+    padding-block: 0 var(--sp-1);
+  }
+  .hiw-meta span:last-child {
+    display: none;
+  }
+  .hiw-photo {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    height: 96px;
+  }
+  .hiw-rooms {
+    display: none;
+  }
+  .hiw-text {
+    grid-column: 2;
+    padding-top: 0;
+  }
+}
+@media (max-width: 640px) {
+  .hs-stamp {
+    top: calc(var(--bar-h, 56px) + var(--sp-3));
+  }
 }

@@ -308,6 +308,8 @@ class AuthorityResult(BaseModel):
     # A15: the comparison was with the listing brokerages alone. The home has no property
     # record, so there is no manager, office phone or website on record to compare with.
     brokerage_only: bool = False
+    # The lookalike came from a sender address alone; no link in the listing imitates the site.
+    lookalike_sender_only: bool = False
 
 
 class ForSaleStatus(StrEnum):
@@ -479,6 +481,9 @@ class CardLine(BaseModel):
     # card can hold lines from a real record beside stand-ins for the twin and the challenge.
     # None means "the same as the card".
     source: DataSource | None = None
+    # The label's table key ("label.payment_ask"), so a page can tell which check a line came
+    # from in any language. None on an older card.
+    key: str | None = None
 
 
 class CardRow(BaseModel):
@@ -503,6 +508,15 @@ class Card(BaseModel):
     # A7 (#67): set when the home is listed for sale or was rented recently, so the web can
     # draw the dates as a history strip. The sentence about it is a PLACE line like any other.
     for_sale: ForSaleMatch | None = None
+    # Proof plan 3.2. Built by code in verdict.build_card, no model. All optional; empty means
+    # the card predates them. At most three plain sentences saying why this is (not) a good deal,
+    # then the lines that check out and the lines that do not, each "label: text".
+    summary: list[str] = Field(default_factory=list)
+    checks_out: list[str] = Field(default_factory=list)  # lines with tone OK
+    does_not: list[str] = Field(default_factory=list)  # red flag, hold and not-shown lines
+    # Set only by GET /cases/{id}/card: whether the case has an evidence file to read. None means
+    # not said (an older server); the page then asks, as it always did.
+    has_evidence: bool | None = None
 
 
 class ChoiceKind(StrEnum):
@@ -587,6 +601,9 @@ class FloorPlanRent(BaseModel):
     per_bed: bool = False  # priced per bed: never compare with a whole-unit rent
     baths: float | None = None  # search (council 4): bathrooms on the floor plan
     units_available: int | None = None  # units CoStar reported available at its last research
+    # The plan's availability page on the record. LIVE local only: never in a fixture contract
+    # file, card.png, the report pack, the MCP output or the iMessage text.
+    availability_url: str | None = None
 
 
 class UnitOnRecord(BaseModel):
@@ -619,6 +636,8 @@ class PropertyRecord(BaseModel):
     # snapback.agent.rules.contact.phone_hash(number, phone_salt()), a keyed hash.
     site_phone_hash: str | None = None
     website_host: str | None = None  # the building's own site, host only: "oakcourt.example"
+    # One availability page on the record (a model's, else a unit's). LIVE local only.
+    availability_url: str | None = None
     # Shown only to the office, in the confirm email and page, so it can tell which ad this is.
     building_name: str | None = None
     street_address: str | None = None
@@ -678,6 +697,83 @@ class AerialProofResponse(BaseModel):
 # ---------------------------------------------------------------------------------------------
 # The "Report this copy" pack (A20): what a listing agent takes to the platform.
 # ---------------------------------------------------------------------------------------------
+
+
+class RealListingPlan(BaseModel):
+    """One floor plan on the record, as the real-listing panel shows it. The rent band and the
+    unit count are record figures: they are None unless `RealListing.figures_shown`."""
+
+    name: str | None = None  # "2 bed / 2 bath"
+    beds: int | None = None  # 0 is a studio
+    baths: float | None = None
+    rent_min: int | None = None  # whole dollars a month, as of CoStar's last research
+    rent_max: int | None = None
+    units_available: int | None = None  # units reported available at that research
+    availability_host: str | None = None  # host only: where the plan's availability page sits
+
+
+class RealListing(BaseModel):
+    """The ad's building as CoStar's record has it (GET /cases/{id}/real-listing).
+
+    Never a phone number or a street address. `which` says whose record this is: the building
+    the photos were placed in when that was not the claimed one, else the claimed one. In a LIVE
+    case the record figures show only when SNAPBACK_SHOW_RECORD_FIGURES is on (local demo)."""
+
+    case_id: str
+    source: DataSource
+    property_id: str
+    which: Literal["claimed", "matched"]
+    building_name: str | None = None  # only with figures_shown
+    manager_company: str | None = None  # company name only
+    website_host: str | None = None  # host only
+    plans: list[RealListingPlan] = Field(default_factory=list)  # narrowed to the ad's beds
+    photos_in_scan: int = 0  # ad photos placed in this building's scan
+    photos_total: int = 0
+    ad_rent: int | None = None  # what the ad asked, whole dollars a month
+    ad_asks_irreversible: bool = False  # a payment that cannot be taken back, before a viewing
+    phone_is_office: PhoneMatch = PhoneMatch.NOT_CHECKED  # only ever yes / no, never digits
+    figures_shown: bool = False
+    as_of: str = ""  # "as of CoStar's last research", in the asked language
+    # Words, built by code from card/strings.py (real.*), in the asked language.
+    headline: str = ""  # what the ad says against what the record says
+    provenance: str | None = None  # "N of M of the ad's photos are in CoStar's own scan..."
+    phone_line: str | None = None
+    cta_label: str | None = None  # "See the real listing"
+    cta_url: str | None = (
+        None  # the availability link, else https://<website_host>; shown with figures on or off
+    )
+
+
+class CopyAlert(BaseModel):
+    """`GET /cases/{case_id}/copy-alert`: a DRAFT note for the leasing office on record when a
+    check placed the ad's photos in that office's building. Nothing is ever sent: the renter or
+    the office decides what to do with the text. Only proof or record facts: photos placed in
+    the building's scan, and the ad's number not being the office's. No phone digits, no street
+    address, no person named, no record rent figure (the percent only)."""
+
+    case_id: str
+    source: DataSource
+    fires: bool  # False: nothing to draft; `why_not` says why
+    why_not: (
+        Literal["no_record", "no_photos_in_scan", "phone_not_checked", "phone_is_office"] | None
+    ) = None
+    which: Literal["claimed", "matched"] | None = None
+    property_id: str | None = None
+    manager_company: str | None = None  # company only: who the note is for
+    website_host: str | None = None
+    photos_in_scan: int = 0
+    photos_total: int = 0
+    phone_is_office: PhoneMatch = PhoneMatch.NOT_CHECKED  # "no" when it fires on the claimed one
+    rent_percent_under: int | None = None  # the ad's rent under the listed plan, percent only
+    draft_only: bool = True  # always: this API has no way to send
+    sent: bool = False  # always False
+    draft_subject: str | None = None
+    draft_body: str | None = None
+    # The existing "Report this copy" pack for this case (GET /cases/{id}/report). Its steps
+    # are handed out only when `report_ready` (proof, or a home the record shows for sale).
+    report_url: str | None = None
+    report_ready: bool = False
+    as_of: str = ""
 
 
 class ReportPlatform(StrEnum):
@@ -748,6 +844,15 @@ class CaseProgress(StrEnum):
     # A24 stretch: the agent asked the renter for the license number the ad did not give.
     WAITING_FOR_ANSWER = "waiting_for_answer"
     DONE = "done"
+
+
+class StillChecking(BaseModel):
+    """The body of a 202 from the report's reads (evidence, real-listing, copy-alert, report,
+    alternatives) while the check is still running: not ready, not failed. Ask again after
+    `retry_after_ms` (the Retry-After header says the same in seconds)."""
+
+    status: CaseProgress
+    retry_after_ms: int
 
 
 class CreateCaseRequest(BaseModel):
@@ -894,6 +999,11 @@ class PlaceMatch(BaseModel):
     # record, so it is the same for the same place whoever chose it.
     checked: bool = False
     check_line: str | None = None
+    # Proof plan 3.3: where the renter goes to see this place's real listing. The plan's
+    # availability page on CoStar's record, else https://<the building's own website host>, else
+    # None. A LIVE place gets one only when SNAPBACK_SHOW_RECORD_FIGURES is on (local demo).
+    handoff_url: str | None = None
+    handoff_label: str | None = None  # "Its listing on Apartments.com" or "The building's own site"
     source: DataSource
 
 

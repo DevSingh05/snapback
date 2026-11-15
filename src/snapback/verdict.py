@@ -63,6 +63,9 @@ _RULE_LABELS = {
     RuleCategory.PRESSURE: "label.pressure",
 }
 _RULE_LABEL_ORDER = ("label.payment_ask", "label.data_ask", "label.pressure")
+_BOTH_MONEY_RULES = frozenset(
+    {"payment.zelle_before_viewing", "fee.holding_deposit_before_viewing"}
+)
 
 _UNIT_DOES_NOT_FIT = frozenset({UnitStatus.NOT_ON_RECORD, UnitStatus.BEDS_MISMATCH})
 
@@ -298,9 +301,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
        red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
        leasing office's, a unit that does not fit the record and a licence number in the ad that is
        not active are not proof either.
-    2. No photo placed in the claimed property gives UNVERIFIED, with what the record
-       flagged listed among the reasons. One thing outranks it: a home listed for sale is
-       HOLD, with that reason first, whether or not any photo could be placed.
+    2. No photo placed in the claimed property (none sent, or none placed) gives UNVERIFIED,
+       with what the record flagged listed among the reasons. Any red flag outranks it (#10):
+       price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike link,
+       unit or a licence number in the ad that is not active gives HOLD, the verdict the same
+       flags give with photos, whether or not any photo could be placed. Something only "not
+       confirmed" (step 4) does not outrank it.
     3. Presence proven, authority matching the record, the ad's phone being the leasing
        office's on record, and no red flag of any kind gives VERIFIED. The phone is needed
        (red team H1, Sat 03:25): anyone can type the manager's public name, and a door code
@@ -381,16 +387,6 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         # through family, trusts and companies. It holds the case and is never a red flag.
         unconfirmed = [*unconfirmed, "reason.owner_not_poster"]
 
-    if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
-        unplaced = (
-            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
-        )
-        # For sale outranks "could not place" (conductor ruling, Sat 02:00). A home that is
-        # for sale usually has no scan to place photos in, and "we could not check" is the
-        # wrong thing to lead with. Still HOLD, never DONT_PAY: it is not proof.
-        state = VerdictState.HOLD if evidence.for_sale_flag else VerdictState.UNVERIFIED
-        return verdict(state, unplaced, *on_record, *unconfirmed)
-
     red_flags = []
     if evidence.price_flag:
         red_flags.append("reason.price_flag")
@@ -399,6 +395,18 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     elif evidence.rule_flag:
         red_flags.append("reason.rule_flag")
     red_flags.extend(on_record)
+
+    if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
+        unplaced = (
+            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
+        )
+        # A red flag outranks "could not place" (conductor ruling, Sat 02:00, for sale; issue
+        # #10, every red flag): no photos, or none placed, does not soften a lookalike link, a
+        # payment by app or a fee before a viewing. The verdict is the one the same flags give
+        # with photos, HOLD, never DONT_PAY: none of it is proof. "Not confirmed" alone is not
+        # a red flag and still reads UNVERIFIED here.
+        state = VerdictState.HOLD if red_flags else VerdictState.UNVERIFIED
+        return verdict(state, unplaced, *red_flags, *unconfirmed)
 
     if (
         evidence.presence is PresenceStatus.PROVEN
@@ -470,7 +478,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
 
 def _line(lang: str, label_key: str, tone: CardTone, text_key: str, **values: object) -> CardLine:
     return CardLine(
-        label=strings.text(label_key, lang), text=strings.text(text_key, lang, **values), tone=tone
+        label=strings.text(label_key, lang),
+        text=strings.text(text_key, lang, **values),
+        tone=tone,
+        key=label_key,
     )
 
 
@@ -794,7 +805,12 @@ def _contact_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         )
         lines.append(_line(lang, "label.contact", CardTone.NOT_CHECKED, key))
     if authority.link_domain is LinkDomain.LOOKALIKE:
-        lines.append(_line(lang, "label.link", CardTone.RED_FLAG, "contact.lookalike_link"))
+        key = (
+            "contact.lookalike_sender"
+            if authority.lookalike_sender_only
+            else "contact.lookalike_link"
+        )
+        lines.append(_line(lang, "label.link", CardTone.RED_FLAG, key))
     return lines
 
 
@@ -911,7 +927,7 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     # what the rule speaks to), and here otherwise.
     if owner.published_rule is not None and not _rule_sits_beside_payment(modules):
         text = f"{text} {_quoted_rule(owner.published_rule, lang, 'owner.rule')}"
-    return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
+    return [CardLine(label=strings.text(label, lang), text=text, tone=tone, key=label)]
 
 
 def _office_declined_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
@@ -978,6 +994,20 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             key = f"rule_category.{hit.category.value}"
         label = _RULE_LABELS[hit.category]
         by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
+    if shown >= _BOTH_MONEY_RULES:
+        # Zelle and a deposit or holding fee before a viewing are one ask to the renter: one
+        # line that names both, standing where the first of the two stood.
+        asks = by_label["label.payment_ask"]
+        both = {strings.text(f"rule.{rule_id}", lang) for rule_id in _BOTH_MONEY_RULES}
+        at = next(i for i, line in enumerate(asks) if line.text in both)
+        merged = _line(
+            lang,
+            "label.payment_ask",
+            CardTone.RED_FLAG,
+            "rule.payment.zelle_and_deposit_before_viewing",
+        )
+        rest = [line for line in asks if line.text not in both]
+        by_label["label.payment_ask"] = [*rest[:at], merged, *rest[at:]]
     if not by_label["label.payment_ask"]:
         by_label["label.payment_ask"].append(_quiet_payment_line(modules, lang))
     return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
@@ -1063,6 +1093,7 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
             (places[-1] + 1) if places else len(lines),
             CardLine(
                 label=strings.text("label.owner_rule", lang),
+                key="label.owner_rule",
                 text=_quoted_rule(rule, lang, "owner.rule_beside_payment"),
                 tone=CardTone.HOLD,
             ),
@@ -1081,12 +1112,7 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     for note in modules.ad_notes:
         if not strings.has(f"claims.{note.key}", lang):
             continue
-        claim_key = note.claim
-        if note.claim == "beds" and note.ad_value == "0":
-            claim_key = "beds_studio"
-        claim = strings.text(
-            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
-        )
+        claim = strings.claim_word(note.claim, note.ad_value, lang)
         label = "label.ad_claim"
         if note.pretext:
             label = "label.ad_pretext"
@@ -1098,6 +1124,7 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         lines.append(
             CardLine(
                 label=strings.text(label, lang),
+                key=label,
                 text=strings.text(
                     f"claims.{note.key}",
                     lang,
@@ -1114,26 +1141,100 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 
 
 def _clean_hold_headline(
-    verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str
+    verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str, modules: ModuleEvidence
 ) -> str | None:
-    """The headline for a HOLD that has nothing against it, or None.
+    """The headline for a HOLD that has nothing against it, or None. The state stays HOLD.
 
-    "Nothing against it" is asked of `decide` itself, without changing it: the same evidence
-    with presence proven would be VERIFIED. So the one thing holding the case is that nobody
-    has been asked, or has yet answered, to prove they are inside. And no line on the card is a
-    red flag or a warning. The state stays HOLD.
+    Two cases, strongest first. `decide` is asked a what-if and is not changed.
+
+    1. Everything matches: the same evidence with presence proven would be VERIFIED, and no
+       line is a red flag or a warning. Only the presence step is left.
+    2. Nothing goes against the record (#259): no line reads "Doesn't match" or "Warning",
+       though some read "Not confirmed". On a live record "Allowed to rent it" stays not
+       confirmed, so case 1 never fires there; the renter still has two things to do.
     """
     if verdict.state is not VerdictState.HOLD:
         return None
     if evidence.presence not in (PresenceStatus.NOT_REQUESTED, PresenceStatus.WAITING):
         return None
+    if any(_reads_as_against(row, line) for row in rows for line in row.lines):
+        return None
+    if _shows_a_contradiction(modules, evidence):
+        return None
     if_proven = evidence.model_copy(update={"presence": PresenceStatus.PROVEN})
-    if decide(if_proven, lang).state is not VerdictState.VERIFIED:
+    all_hold_free = not any(line.tone is CardTone.HOLD for row in rows for line in row.lines)
+    if all_hold_free and decide(if_proven, lang).state is VerdictState.VERIFIED:
+        return strings.text("state.hold_clean", lang)
+    if modules.authority is None or modules.authority.manager_on_record is None:
+        return strings.text("state.hold_nothing_against_no_office", lang)
+    return strings.text("state.hold_nothing_against", lang)
+
+
+def _shows_a_contradiction(modules: ModuleEvidence, evidence: Evidence) -> bool:
+    """Something on the card goes against the ad though it is no red flag (XO review of #263):
+    the office on record declined it, an ad claim the record contradicts, an owner who is not
+    the poster, a poster who is not the manager on record, or a phone that is not the office's.
+    A changed phone is a tamper we show catching, so it never lands on the reassuring line.
+    The aerial date and the ad's own excuses are information, not a contradiction."""
+    authority = modules.authority
+    return (
+        evidence.office_declined_domain is not None
+        or evidence.owner_flag
+        or any(
+            not note.matches and not note.pretext and note.key != "aerial_date"
+            for note in modules.ad_notes
+        )
+        or (
+            authority is not None
+            and (
+                authority.status is AuthorityStatus.MISMATCH
+                or authority.office_phone_match is PhoneMatch.NO
+            )
+        )
+    )
+
+
+def _reads_as_against(row: CardRow, line: CardLine) -> bool:
+    """The line would be shown as "Doesn't match" or "Warning": a red flag anywhere, or a
+    warning outside the PERSON row (there a hold reads "Not confirmed", e.g. no reply yet)."""
+    if line.tone is CardTone.RED_FLAG:
+        return True
+    return line.tone is CardTone.HOLD and row.kind is not CardRowKind.PERSON
+
+
+def _red_flag_headline(verdict: Verdict, rows: list[CardRow], lang: str) -> str | None:
+    """The headline for a HOLD that carries a red-flag line, or None.
+
+    The state stays HOLD (decide is untouched); only the words say why, so a red-flag ad does
+    not read like an honest one. Money is named before papers, and papers before pressure.
+    """
+    if verdict.state is not VerdictState.HOLD:
         return None
-    tones = {line.tone for row in rows for line in row.lines}
-    if tones & {CardTone.RED_FLAG, CardTone.HOLD}:
+    red = [line for row in rows for line in row.lines if line.tone is CardTone.RED_FLAG]
+    if not red:
         return None
-    return strings.text("state.hold_clean", lang)
+    labels = {line.label for line in red}
+    for label, key in (
+        ("label.payment_ask", "state.hold_red_money"),
+        ("label.data_ask", "state.hold_red_papers"),
+        ("label.pressure", "state.hold_red_pressure"),
+    ):
+        if strings.text(label, lang) in labels:
+            return strings.text(key, lang)
+    return strings.text("state.hold_red", lang)
+
+
+def _no_photos_headline(verdict: Verdict, modules: ModuleEvidence, lang: str) -> str | None:
+    """The plain hold line for an UNVERIFIED case where no listing photo was sent, or None.
+
+    "Could not place these photos" is for photos that were sent and did not place. With none
+    sent, the card must not talk about placing them (the state word stays UNVERIFIED).
+    """
+    if verdict.state is not VerdictState.UNVERIFIED:
+        return None
+    if modules.locate is not None and modules.locate.photos:
+        return None
+    return strings.text("state.hold", lang)
 
 
 def headline_text(card: Card) -> str:
@@ -1178,11 +1279,15 @@ def build_card(
     if claims:  # only when there is something to say; the three rows above are always there
         rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
 
+    summary, checks_out, does_not = _summary(modules, verdict, rows, lang)
+
     return Card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
-        headline=_clean_hold_headline(verdict, evidence, rows, lang),
+        headline=_clean_hold_headline(verdict, evidence, rows, lang, modules)
+        or _red_flag_headline(verdict, rows, lang)
+        or _no_photos_headline(verdict, modules, lang),
         checked_at=checked,
         expires_at=checked + CARD_TTL,
         rows=rows,
@@ -1199,7 +1304,106 @@ def build_card(
         verify_url=verify_url,
         lang=lang,
         for_sale=_for_sale_finding(modules),
+        summary=summary,
+        checks_out=checks_out,
+        does_not=does_not,
     )
+
+
+SUMMARY_SENTENCES = 3
+_DOES_NOT_TONES = (CardTone.RED_FLAG, CardTone.HOLD, CardTone.NOT_SHOWN)
+
+
+def _price_gap(modules: ModuleEvidence, lang: str) -> str | None:
+    """How far under the building's own listing the asked rent is. The percent is ours; the
+    record's rents stay off the card."""
+    price = modules.price
+    if price is None or price.status is not PriceStatus.BELOW_RANGE:
+        return None
+    if not (price.record_min and price.listed_rent):
+        return None
+    percent = round(100 * (price.record_min - price.listed_rent) / price.record_min)
+    if percent <= 0:
+        return None
+    if price.compared_beds is None:
+        return strings.text("summary.price_gap_any", lang, percent=percent)
+    beds = price.compared_beds
+    plan = (
+        strings.text("rent.plan.studio", lang)
+        if beds == 0
+        else strings.text("rent.plan.beds", lang, beds=beds)
+    )
+    return strings.text("summary.price_gap", lang, percent=percent, plan=plan)
+
+
+# What each of decide()'s reasons is worth to a renter, for ordering the short why: a red flag
+# or proof (rank 0), something not confirmed (1), or good news (2). The reasons arrive as text,
+# so they are matched back to their keys; a blank in one ({n}, {domain}) matches anything.
+_RED_REASONS = (
+    "reason.forged",
+    "reason.forged_copy",
+    "reason.forged_copy_unknown",
+    "reason.photo_elsewhere",
+    "reason.price_flag",
+    "reason.payment_flag",
+    "reason.rule_flag",
+    "reason.for_sale",
+    "reason.lookalike_link",
+    "reason.unit_flag",
+    "reason.license_not_found",
+)
+_GOOD_REASONS = (
+    "reason.located",
+    "reason.authority_matches",
+    "reason.authority_matches_brokerage",
+    "reason.presence_proven",
+    "reason.office_confirmed",
+)
+
+
+def _is_reason(sentence: str, key: str, lang: str) -> bool:
+    blank = "\x00"
+    head, _, tail = strings.text(key, lang, n=blank, domain=blank).partition(blank)
+    return sentence.startswith(head) and sentence.endswith(tail or "")
+
+
+def _reason_rank(sentence: str, lang: str) -> int:
+    """0 red flag or proof, 1 not confirmed, 2 good news."""
+    if any(_is_reason(sentence, key, lang) for key in _RED_REASONS):
+        return 0
+    if any(_is_reason(sentence, key, lang) for key in _GOOD_REASONS):
+        return 2
+    return 1
+
+
+def _summary(
+    modules: ModuleEvidence, verdict: Verdict, rows: list[CardRow], lang: str
+) -> tuple[list[str], list[str], list[str]]:
+    """Proof plan 3.2: the short why, what checks out, what does not. Code only, deterministic.
+
+    The sentences are decide()'s own reasons. Under a result that did not pass they lead with
+    the red flags (the measured rent gap first, standing in for the generic price reason), then
+    what is not confirmed, and never include good news: "why this is not a good deal" does not
+    list what is fine. A result that passed keeps decide()'s order. Nothing here chooses a
+    state, and no sentence names a person."""
+    gap = _price_gap(modules, lang)
+    reasons = list(verdict.reasons)
+    if gap:
+        generic_price = strings.text("reason.price_flag", lang)
+        reasons = [gap if r == generic_price else r for r in reasons]
+    if verdict.state is VerdictState.VERIFIED:
+        sentences = reasons[:SUMMARY_SENTENCES]
+    else:
+        # sorted() is stable, so decide()'s order holds inside each rank.
+        ranked = sorted(
+            (r for r in reasons if r == gap or _reason_rank(r, lang) < 2),
+            key=lambda r: -1 if r == gap else _reason_rank(r, lang),
+        )
+        sentences = (ranked or reasons)[:SUMMARY_SENTENCES]
+    lines = [line for row in rows for line in row.lines]
+    checks_out = [f"{ln.label}: {ln.text}" for ln in lines if ln.tone is CardTone.OK]
+    does_not = [f"{ln.label}: {ln.text}" for ln in lines if ln.tone in _DOES_NOT_TONES]
+    return sentences, checks_out, does_not
 
 
 def _ownership_item(lang: str) -> str:

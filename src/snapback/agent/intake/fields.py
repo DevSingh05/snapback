@@ -27,6 +27,18 @@ _RENT_PATTERNS = [
 ]
 
 _PHONE = re.compile(r"(?<![\d$])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]\d{4}(?!\d)")
+# Ten bare digits are a phone too: CoStar's record keeps the office phone that way, and an ad
+# that pastes it must still be compared with it (issue #10). But a bare run is also what an id
+# looks like, and a second "phone" turns a real office's line into "not confirmed" (review of
+# #257). So it counts only standing alone: no letter, digit, "/", "=", "#", "." or "$" touching
+# it (a sentence's closing full stop is fine), and not straight after a word that names an id.
+_BARE_PHONE = re.compile(r"(?<![\w/=#.$+])(?:\+?1)?\d{10}(?![\w/=#]|\.\w)")
+_NAMES_AN_ID = re.compile(
+    r"(?:\b(?:id|mls|no|nos|ref|acct|account|listing|invoice|order|post|unit|apt)\.?:?|#)\s{0,3}$",
+    re.IGNORECASE,
+)
+# Where a link is written, up to the next space: digits in its path are never a phone.
+_LINK_SPAN = re.compile(r"\S{1,1000}")
 # The name part starts where a name can start, so a long run of letters with no "@" is tried
 # once, not once per letter.
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,8}")
@@ -204,12 +216,36 @@ def _links(text: str) -> list[str]:
     return hosts
 
 
+def _without_links(text: str) -> str:
+    """The text with every link blanked out to the next space, the length unchanged."""
+    spans = [m.start() for m in _LINK.finditer(text)]
+    spans += [m.start(1) for m in _BARE_LINK.finditer(text)]
+    chars = list(text)
+    for start in spans:
+        end = _LINK_SPAN.match(text, start)
+        for at in range(start, end.end() if end else start):
+            chars[at] = " "
+    return "".join(chars)
+
+
+def _phones(text: str) -> list[str]:
+    """The phone numbers written in the text, in order. Never one inside a link or an id."""
+    text = _without_links(text)
+    found = [(m.start(), m.group(0).strip()) for m in _PHONE.finditer(text)]
+    found += [
+        (m.start(), m.group(0))
+        for m in _BARE_PHONE.finditer(text)
+        if not _NAMES_AN_ID.search(text[max(0, m.start() - 16) : m.start()])
+    ]
+    return [written for _, written in sorted(found)]
+
+
 def extract_contacts(text: str) -> ContactClaims:
     text = normalise(text)
     company = _COMPANY.search(text) or _COMPANY_FIRST_PERSON.search(text)
     return ContactClaims(
         company=company.group(1).strip() if company else None,
-        phones=[match.group(0).strip() for match in _PHONE.finditer(text)],
+        phones=_phones(text),
         emails=[match.group(0).rstrip(".") for match in _EMAIL.finditer(text)],
         links=_links(text),
         says_owner=(

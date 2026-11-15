@@ -225,7 +225,7 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
         : {}),
     };
     const checking = config.acknowledge
-      ? async () => void (await item.space.send(CHECKING))
+      ? async (text?: string) => void (await item.space.send(text ?? CHECKING))
       : undefined;
     await handleMessage(msg, client, config, checking);
     if (!spoken || !replied || !config.makeVoice) return;

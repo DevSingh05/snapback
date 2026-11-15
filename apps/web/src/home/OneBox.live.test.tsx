@@ -8,6 +8,9 @@ import type { Card } from "../contracts";
 import type { CreateCase } from "../upload/api";
 import { OneBox, VerdictCard } from "./OneBox";
 
+// The box's button names what it will do: it follows the routing of what is typed.
+const SEND = /^(check it|find places|ask)$/i;
+
 // A mocked API with the route shapes the one box calls in live mode.
 interface Call {
   method: string;
@@ -41,7 +44,17 @@ const state = {
   trace: [],
 };
 
-function server(evidence: { alias: string; status: string }[] = []) {
+// A result with nothing against it, so the verdict keeps its walk card.
+const cleanCard: Card = {
+  ...(cardHold as Card),
+  state: "verified",
+  rows: (cardHold as Card).rows.map((r) => ({
+    ...r,
+    lines: r.lines.map((l) => ({ ...l, tone: "ok" as const })),
+  })),
+};
+
+function server(evidence: { alias: string; status: string }[] = [], card: Card = cardHold as Card) {
   const calls: Call[] = [];
   const json = (body: unknown, code = 200) =>
     new Response(JSON.stringify(body), {
@@ -69,7 +82,7 @@ function server(evidence: { alias: string; status: string }[] = []) {
           picks: [],
           as_of: "",
         });
-      if (path === "/api/cases/7Q2M/card") return json({ ...(cardHold as Card), source: "live" });
+      if (path === "/api/cases/7Q2M/card") return json({ ...card, source: "live" });
       if (path === "/api/cases/7Q2M/evidence")
         return json({ case_id: "7Q2M", source: "live", photos: evidence });
       if (/\/api\/cases\/7Q2M\/evidence\/\w+\/scan\.jpg$/.test(path))
@@ -87,7 +100,7 @@ const box = () => screen.getByLabelText(/paste an ad, a link, or say what you ne
 async function paste(user: ReturnType<typeof userEvent.setup>, words: string) {
   await user.click(box());
   await user.paste(words);
-  await user.click(screen.getByRole("button", { name: /^send$/i }));
+  await user.click(screen.getByRole("button", { name: SEND }));
 }
 
 const AD =
@@ -105,10 +118,13 @@ afterEach(() => {
 
 describe("the walk card reads the real scan view at run time", () => {
   it("takes the photo located in the claimed home, with the read token, and frees it after", async () => {
-    const calls = server([
-      { alias: "P1", status: "located_elsewhere" },
-      { alias: "P2", status: "located_in_claimed" },
-    ]);
+    const calls = server(
+      [
+        { alias: "P1", status: "located_elsewhere" },
+        { alias: "P2", status: "located_in_claimed" },
+      ],
+      cleanCard,
+    );
     const create = vi.fn(() => "blob:scan-p2");
     const revoke = vi.fn();
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke }));
@@ -131,10 +147,13 @@ describe("the walk card reads the real scan view at run time", () => {
   });
 
   it("with no photo placed in the claimed home it keeps the stamped sample", async () => {
-    const calls = server([
-      { alias: "P1", status: "located_elsewhere" },
-      { alias: "P2", status: "not_located" },
-    ]);
+    const calls = server(
+      [
+        { alias: "P1", status: "located_elsewhere" },
+        { alias: "P2", status: "not_located" },
+      ],
+      cleanCard,
+    );
     saveCaseReadToken("7Q2M", READ);
     render(<VerdictCard caseId="7Q2M" source="live" />);
     const walk = await screen.findByTestId("ob-walk");
@@ -143,6 +162,26 @@ describe("the walk card reads the real scan view at run time", () => {
     );
     expect(within(walk).getByTestId("sample-photo")).toHaveTextContent("Sample photo");
     expect(calls.some((c) => c.path.endsWith("/scan.jpg"))).toBe(false);
+  });
+});
+
+describe("the scan lookup", () => {
+  it("is not made for an ad with no photos, so no 404 is logged", async () => {
+    const calls = server([], cleanCard);
+    saveCaseReadToken("7Q2M", READ);
+    render(<VerdictCard caseId="7Q2M" source="live" scanLookup={false} />);
+    const walk = await screen.findByTestId("ob-walk");
+    expect(within(walk).getByTestId("sample-photo")).toHaveTextContent("Sample photo");
+    expect(calls.some((c) => c.path.includes("/evidence"))).toBe(false);
+  });
+
+  it("is not made for a red flag or a hold, which has no walk card", async () => {
+    const calls = server([]);
+    saveCaseReadToken("7Q2M", READ);
+    render(<VerdictCard caseId="7Q2M" source="live" />);
+    await screen.findByTestId("ob-verdict");
+    expect(screen.queryByTestId("ob-walk")).not.toBeInTheDocument();
+    expect(calls.some((c) => c.path.includes("/evidence"))).toBe(false);
   });
 });
 
@@ -159,7 +198,7 @@ describe("a Facebook address never leaves the browser", () => {
     );
   });
 
-  it("switching a Facebook ad to the Finder sends the words without the address", async () => {
+  it("a pasted Facebook ad is checked on its words alone and offers no way into the Finder", async () => {
     const calls = server();
     const user = userEvent.setup();
     const createCase: CreateCase = vi.fn(async () => ({
@@ -173,17 +212,10 @@ describe("a Facebook address never leaves the browser", () => {
     await waitFor(() =>
       expect(createCase).toHaveBeenCalledWith(expect.objectContaining({ link: null, text: AD })),
     );
-    await user.click(screen.getByTestId("ob-switch"));
-    await waitFor(() =>
-      expect(calls.some((c) => c.path === "/api/finder/fs-1/message")).toBe(true),
-    );
-    const sent = calls
-      .filter((c) => c.path === "/api/finder/fs-1/message")
-      .map((c) => String(c.body));
-    expect(sent.join(" ")).not.toMatch(/facebook/i);
-    // The offer it made carries the data chip.
-    const offer = await screen.findByTestId("ob-offer");
-    expect(within(offer).getByTestId("source-chip")).toHaveTextContent("LIVE");
+    await screen.findByTestId("ob-verdict");
+    expect(screen.queryByTestId("ob-switch")).not.toBeInTheDocument();
+    expect(calls.some((c) => c.path.startsWith("/api/finder"))).toBe(false);
+    expect(calls.some((c) => /facebook/i.test(String(c.body)))).toBe(false);
   });
 });
 
@@ -197,15 +229,19 @@ describe("chips on every sample", () => {
         screen.getAllByTestId("source-chip").some((c) => /LIVE/.test(c.textContent ?? "")),
       ).toBe(true),
     );
-    const tile = screen.getByRole("button", { name: /check an ad/i });
-    expect(within(tile).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+    const sample = screen.getByTestId("ob-sample");
+    expect(sample).toHaveTextContent("Sample report 7Q2M");
+    expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
   });
 
-  it("the Find tile sends the budget its picture shows", async () => {
+  // The Find tile left Home with the front cut; the same words typed in the box still carry
+  // their budget, so nothing asks for it again.
+  it("a typed search sends the budget it names", async () => {
     server();
     const user = userEvent.setup();
     render(<OneBox mode="live" />);
-    await user.click(screen.getByRole("button", { name: /find a place/i }));
+    await user.type(screen.getByRole("textbox"), "Find me a 1 bed under $1,500 near downtown");
+    await user.click(screen.getByRole("button", { name: "Find places" }));
     expect(screen.getByTestId("ob-you")).toHaveTextContent(
       "Find me a 1 bed under $1,500 near downtown",
     );

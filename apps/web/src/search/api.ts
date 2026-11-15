@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchRead, dataMode } from "../api";
+import { apiFetch, apiFetchReadWhenReady, dataMode } from "../api";
 import { AS_OF } from "../contracts";
 import type {
   AlternativesResponse,
@@ -140,15 +140,21 @@ export async function searchPlaces(brief: RenterBrief, signal?: AbortSignal): Pr
 }
 
 // GET /cases/{id}/alternatives, with the case's read token in the Authorization header.
-export async function fetchAlternatives(caseId: string, signal?: AbortSignal): Promise<Places> {
+export async function fetchAlternatives(
+  caseId: string,
+  signal?: AbortSignal,
+  onWaiting?: (waiting: boolean) => void,
+): Promise<Places> {
   if (dataMode() === "fixture") return fixturePlaces(null);
-  const pending = apiFetchRead(`/cases/${encodeURIComponent(caseId)}/alternatives`, caseId, {
-    signal,
-  });
-  if (!pending)
+  const res = await apiFetchReadWhenReady(
+    `/cases/${encodeURIComponent(caseId)}/alternatives`,
+    caseId,
+    { signal },
+    onWaiting,
+  );
+  if (!res)
     throw new NoReadToken("This browser does not hold the key to read places for this case.");
-  const res = await pending;
-  if (!res.ok) throw await failure(res);
+  if (!res.ok || res.status === 202) throw await failure(res);
   const body = (await res.json()) as AlternativesResponse & { tradeoff_question?: string | null };
   return {
     source: body.source,

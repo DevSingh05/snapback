@@ -3,11 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>SNAPBACK: Trust the home, not the ad.</title>
     <meta
       name="description"
       content="Trust the home, not the ad. Paste any rental ad you found. We check it against the home's own records, and show you researched places that fit your budget."
     />
+    <script>
+      // tour.css opts pages in to view transitions. When the page we came from has not opted in,
+      // the browser skips the transition and reports "Transition was skipped" as a page error.
+      // That is not a fault of the page: keep it out of the console.
+      const SKIPPED = /^Transition was (skipped|aborted because of invalid state)/;
+      window.addEventListener(
+        "error",
+        (e) =>
+          SKIPPED.test(e.message.replace(/^(Uncaught )?(InvalidStateError: )?/, "")) &&
+          e.preventDefault(),
+      );
+      window.addEventListener(
+        "unhandledrejection",
+        (e) =>
+          e.reason?.name === "InvalidStateError" &&
+          SKIPPED.test(e.reason.message || "") &&
+          e.preventDefault(),
+      );
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -292,8 +292,9 @@ def compose(source: DataSource) -> list[Ad]:
 
 
 def compose_messages(source: DataSource) -> list[Ad]:
-    """The 49 labelled messages, each sent under a clean ad for a kit building (the office's
-    own phone and site), so the message is the only thing that can change the verdict."""
+    """Every labelled message in fixtures/rules/cases.json, each sent under a clean ad for a kit
+    building (the office's own phone and site), so the message is the only thing
+    that can change the verdict."""
     buildings = _buildings(source)
     cases = json.loads(CASES_FILE.read_text())
     ads: list[Ad] = []

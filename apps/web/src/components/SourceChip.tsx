@@ -1,15 +1,7 @@
 import type { DataSource } from "../contracts";
+import { Tag } from "../ui/Tag";
 
-// Hard rule 5: every screen shows whether its data is LIVE or FIXTURE.
+// Hard rule 5: every screen shows whether its data is LIVE or FIXTURE. Drawn by ui/Tag.
 export function SourceChip({ source }: { source: DataSource }) {
-  const label = source === "live" ? "LIVE" : "FIXTURE";
-  const hint =
-    source === "live" ? "Real data from a real check" : "Synthetic sample data made by the team";
-  return (
-    <span className={`chip chip-${source}`} data-testid="source-chip" title={hint}>
-      <span className="chip-dot" aria-hidden="true" />
-      {label}
-      <span className="sr-only">. {hint}</span>
-    </span>
-  );
+  return <Tag source={source} className={`chip chip-${source}`} testId="source-chip" />;
 }

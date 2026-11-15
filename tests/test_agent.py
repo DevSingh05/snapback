@@ -402,7 +402,9 @@ def test_skipping_the_twin_still_reads_the_text_and_challenges():
     assert case.evidence.locate is None
     assert case.evidence.rules  # the Zelle ask in the fixture
     assert all(e.pick != "locate" for e in case.trace.events if e.kind is TraceKind.TOOL)
-    assert verdict.state is VerdictState.UNVERIFIED  # no photo was placed, so no pass
+    # No photo was placed, so no pass; the Zelle ask is a red flag, which outranks "could not
+    # place" (issue #10), so the case is held.
+    assert verdict.state is VerdictState.HOLD
 
 
 def test_no_twin_still_reads_the_text():
@@ -414,7 +416,7 @@ def test_no_twin_still_reads_the_text():
     checks = next(e for e in case.trace.events if e.choice is ChoiceKind.WHICH_CHECKS)
     assert checks.options == ["rules only"] and checks.chosen_by == "policy"
     assert case.evidence.rules
-    assert verdict.state is VerdictState.UNVERIFIED
+    assert verdict.state is VerdictState.HOLD  # the Zelle ask outranks "no twin" (issue #10)
     assert all(e.kind is not TraceKind.HITL for e in case.trace.events)
 
 
