@@ -368,6 +368,28 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
             "Researched places that fit the budget and the trade-offs between them.",
         ),
     ]
+    if case.web_facts is not None:
+
+        def read_web_facts() -> str:
+            """The web checks for this case: the building's own site, the ad's link, and the same
+            home posted elsewhere. One fact per line with its source. Counts only, no names."""
+            fn = case.web_facts
+            if fn is None:
+                return "No web check is available for this case."
+            try:
+                return fn()
+            except Exception:
+                return "The web checks could not run for this case."
+
+        families.append(
+            (
+                casework.WEB,
+                "web",
+                tool(read_web_facts),
+                "The web: the building's own site, the ad's link, and the same home elsewhere "
+                "(counts only). Evidence only; code sets the result.",
+            )
+        )
     for stem, name, family_tool, description in families:
         path = casework.note_path(case.case_id, stem)
         specs.append(

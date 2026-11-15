@@ -1,0 +1,27 @@
+{
+  "_note": "Recorded fixture for W1 tests. Synthetic pages and search results made by the team: .example hosts, 555 numbers, no real listing, poster or address.",
+  "pages": {
+    "https://oakcourt.example": "<html><head><title>Oak Court Apartments</title></head><body><h1>Oak Court</h1><h2>Floor plans</h2><ul><li>1 Bed / 1 Bath</li><li>2 Bed / 2 Bath</li></ul><p>Leasing office: (713) 555-0100</p></body></html>",
+    "https://oakcourrt.example": "<html><head><title>Oak Court Apartments - Apply Now</title></head><body><h1>Oak Court</h1><p>Reserve today. Send your deposit to hold the unit.</p></body></html>"
+  },
+  "searches": {
+    "\"Spacious 2 bed 2 bath at Oak Court with a balcony and a pool\"": [
+      {
+        "url": "https://listings-one.example/rent/123",
+        "title": "Fx Listing One",
+        "snippet": "Spacious 2 bed 2 bath at Oak Court with a balcony and a pool. $1,650/mo."
+      },
+      {
+        "url": "https://classifieds-two.example/ad/456",
+        "title": "Fx Classified Two",
+        "snippet": "Spacious 2 bed 2 bath at Oak Court with a balcony and a pool. $1,150 a month."
+      },
+      {
+        "url": "https://rentals-three.example/p/789",
+        "title": "Fx Rentals Three",
+        "snippet": "Spacious 2 bed 2 bath at Oak Court with a balcony and a pool. $1,600 per month."
+      }
+    ],
+    "\"A quiet 1 bed with a garden view and parking near the park\"": []
+  }
+}

@@ -38,6 +38,7 @@ STEMS = (RECORD, OFFICE, OWNER, PLACE, PLACES)
 # The main agent's own notes, written after it has read the others.
 # The walk note exists only for a case that has a walk plan (the T lane's tour).
 WALK = "walk"
+WEB = "web"  # W1: the web sub-agent's note
 EXPLANATION, TOUR_PREP = "explanation", "tour_prep"
 MAIN_STEMS = (EXPLANATION, TOUR_PREP)
 
@@ -132,7 +133,7 @@ def stem_of(case_id: str, path: str) -> str | None:
     if not path.startswith(prefix) or not path.endswith(".md"):
         return None
     stem = path[len(prefix) : -3]
-    return stem if stem in (*STEMS, WALK, *MAIN_STEMS) else None
+    return stem if stem in (*STEMS, WALK, WEB, *MAIN_STEMS) else None
 
 
 def clean_note(text: object) -> str:

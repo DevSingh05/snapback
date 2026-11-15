@@ -478,6 +478,35 @@ class CaseStore:
     def get(self, case_id: str) -> RecordedCase | SessionCase | None:
         return self._cases.get(public_id(case_id))
 
+    def _web_facts_for(
+        self, session: CaseSession, listing: Listing, record: PropertyRecord | None
+    ) -> Callable[[], str] | None:
+        """W1: start the web checks with the case when a web key is set (BRIGHTDATA_API_KEY in
+        .env), so the text answer is never held up. Each web line goes into the trace as it
+        finishes; the web sub-agent reads them. None when no key is set."""
+        from snapback.agent.web_check import BrightDataFetcher, WebInputs, WebJob
+
+        fetcher = BrightDataFetcher()
+        if not fetcher.configured:
+            return None
+        contacts = getattr(listing, "contacts", None)
+        inputs = WebInputs(
+            website_host=getattr(record, "website_host", None),
+            site_phone_hash=getattr(record, "site_phone_hash", None),
+            salt=phone_salt(self._settings),
+            building_name=getattr(record, "building_name", None),
+            ad_hosts=list(getattr(contacts, "links", []) or []),
+            ad_text=listing.text or "",
+            ad_rent=getattr(listing, "listed_rent", None),
+            ad_beds=getattr(listing, "beds", None),
+        )
+        job = WebJob(
+            inputs,
+            fetcher,
+            on_line=lambda line: session.trace.emit(TraceKind.TOOL, line.text, pick="web"),
+        )
+        return job.start().text
+
     def _search_text_for(self, case: SessionCase) -> Callable[[], str]:
         """The search sub-agent's source: the #195 planner over places near the checked ad, as
         text. The chooser is the model when the agent setting says so, else the code policy."""
@@ -625,6 +654,7 @@ class CaseStore:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.injection"))
             case = SessionCase(short_id, session, listing, self._runner, self._zone_of(record))
             session.search_places = self._search_text_for(case)
+            session.web_facts = self._web_facts_for(session, listing, record)
             case.staged = demo is not None
             case.demo_case_id = demo.case_id if demo is not None else None
             case.property_id = property_id  # the building the listing claims, if it named one

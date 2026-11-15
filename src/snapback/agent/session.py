@@ -146,6 +146,9 @@ class CaseSession:
         # Set by the API: researched places near the ad, as text. `search_places()` uses the code
         # policy (code notes); `search_places(use_model=True)` is the search sub-agent's call.
         self.search_places: Callable[..., str] | None = None
+        # W1: the web checks for this case, as text (web_check.WebJob.text). None (the default)
+        # means no web key is set: there is no web sub-agent and no web line.
+        self.web_facts: Callable[[], str] | None = None
         # E1: a retry search for unplaced photos. None (the default) means no retry: the base
         # search stands. `place_scans` maps a scan alias (S1) to its model id, searcher-side only.
         self.place_searcher: PlaceSearcher | None = None
