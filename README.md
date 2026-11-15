@@ -268,6 +268,20 @@ money-before-move-in rule alone is not enough: it fires on honest wording such a
 lease signing", so the pipeline needs a second signal (shared wording, numbers or photos) before it
 calls anything a ring.
 
+**Rings over time (the top of `/investigate`, API: `GET /forensics/stream`).** The same finder is
+run once per day on a SYNTHETIC 90-day stream (3,039 ads, 10 seeded rings, seed 20261115;
+`uv run python -m snapback.forensics.detect` writes `fixtures/forensics/stream_timeline.json`,
+about two minutes). A day slider with Play shows ads arriving and links forming; each group has
+its time to detect (first ad to first flag), the shared signals that link its ads with the
+finder's weight for each, and a case file to export (JSON, and a printable summary). Measured on
+that stream, FIXTURE: 10 of 10 seeded rings flagged (at least 4 of the ring's ads in a reported
+group), median 3 days after the ring's first ad (n = 10); 329 of 355 ring ads flagged; 0 of 2,684
+honest ads flagged. The limit, shown on the screen: the finder reports 6 groups for the 10 rings
+and separates 0 of 10 by the 70 percent rule above, because rings that share wording blend into
+one group at this size. Per group as reported, the median is 5 days (n = 6). "Renters who saw the
+ads before the flag" is an estimate (ad-days times an assumed 30 renters per ad per day), labelled
+as such wherever it appears.
+
 ## Data and privacy
 
 The full account is in [DATA_USE.md](DATA_USE.md).
