@@ -538,6 +538,9 @@ async function saferHomes(
 const AD_CUES =
   /zelle|deposit|dep[oó]sito|venmo|cash ?app|wire|for rent|se renta|tenant|inquilino|text me|call me|av[ai]lable|disponible|move[- ]in|\bbath|ba[nñ]o|\$\s?\d{3,5}\s*(a|per|\/)\s*(month|mo)/i;
 const A_LINK = /https?:|www\./i;
+const MONEY = /\$\s?\d/;
+const BEDS =
+  /\b\d{1,2}\s*(?:-|\s)?(?:beds?|bedrooms?|br|bd|rec[aá]maras?|habitaciones?|cuartos?)\b/i;
 
 /** A message that only tells us about the renter (budget, beds, city), not an ad to check: no ad
  * wording, no phone-like digits, no link, and it states something about them. */
@@ -545,6 +548,10 @@ function onlyAboutThem(text: string, learned: Profile): boolean {
   if (text.length > 160 || AD_CUES.test(text) || PHONE_LIKE.test(text) || A_LINK.test(text)) {
     return false;
   }
+  // A price or "2 bed" is an ad's unless the renter said it about themselves ("my budget is",
+  // "I need 2 beds"); a city alone never makes a message theirs.
+  if (MONEY.test(text) && learned.budget === undefined) return false;
+  if (BEDS.test(text) && learned.beds === undefined) return false;
   return learned.budget !== undefined || learned.beds !== undefined || learned.city !== undefined;
 }
 

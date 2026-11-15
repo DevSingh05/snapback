@@ -259,3 +259,41 @@ test("[High] a phone-like number makes a short message an ad to check, not a pro
   assert.equal(posts(calls).length, 1);
   assert.equal(cfg.profiles.get(KEY), null);
 });
+
+// --- XO review of #264, round 2: a city alone never makes an ad profile-only ----------------------
+
+for (const ad of [
+  "3 bedroom house, $1200 monthly, pay first month to get the keys, living in Houston is great",
+  "Spacious 1 bed in a quiet complex. Enjoy living in Houston!",
+  "Casa de 2 recamaras en Houston, 900 al mes, solo efectivo",
+]) {
+  test(`[Med] an ad that names a city is checked and teaches nothing: ${ad.slice(0, 40)}…`, async () => {
+    const calls: Call[] = [];
+    const cfg = config(calls);
+    await handleMessage(said(ad), client(), cfg);
+    assert.equal(posts(calls).length, 1);
+    assert.equal(cfg.profiles.get(KEY), null);
+  });
+}
+
+test("[Med] a first-person city is still remembered", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("I'm moving to Houston in January"), client(), cfg);
+  assert.equal(posts(calls).length, 0);
+  assert.equal(cfg.profiles.get(KEY)?.city, "Houston");
+});
+
+for (const [why, text] of [
+  ["a price without 'my budget'", "$900, I'm moving to Houston"],
+  ["beds without 'I need'", "2 beds near the park, I'm moving to Houston"],
+  ["a bare 'living in' city", "Enjoy living in Houston!"],
+] as const) {
+  test(`[Med] ${why} is checked, never remembered`, async () => {
+    const calls: Call[] = [];
+    const cfg = config(calls);
+    await handleMessage(said(text), client(), cfg);
+    assert.equal(posts(calls).length, 1, text);
+    assert.equal(cfg.profiles.get(KEY), null, text);
+  });
+}

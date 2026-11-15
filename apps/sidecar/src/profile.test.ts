@@ -38,7 +38,7 @@ test("budget and beds are learned only from the renter's own words, never an ad'
 
 test("a city is learned when the renter says where they are moving or looking", () => {
   assert.equal(learnFrom("I'm moving to Houston in January").city, "Houston");
-  assert.equal(learnFrom("looking in Dallas").city, "Dallas");
+  assert.equal(learnFrom("I'm looking in Dallas").city, "Dallas");
   assert.equal(
     learnFrom("Houston apartment for rent, 2 bed").city,
     undefined,
@@ -107,7 +107,7 @@ test("a missing or broken file starts empty, never crashes", () => {
 
 test("'what do you remember?' lists what is kept, in the renter's language", () => {
   const store = new ProfileStore();
-  store.learn(KEY, "My budget is $1,500 and I need 2 beds, moving to Houston");
+  store.learn(KEY, "My budget is $1,500 and I need 2 beds, I'm moving to Houston");
   const said = profileCommand("What do you remember?", KEY, store)?.text;
   assert.match(said ?? "", /budget: \$1,500/);
   assert.match(said ?? "", /beds: 2/);

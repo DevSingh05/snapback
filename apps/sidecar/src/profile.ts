@@ -69,7 +69,7 @@ export function learnFrom(text: string): Profile {
 
   for (const city of CITIES) {
     const where = new RegExp(
-      String.raw`\b(?:moving to|move to|relocating to|looking in|looking for a place in|living in|me mudo a|busco en|en)\s+${city}\b`,
+      String.raw`\b(?:i'?m moving to|i am moving to|we'?re moving to|i'?m relocating to|i am relocating to|i live in|we live in|i'?m looking in|i am looking in|i'?m looking for a place in|me mudo a|nos mudamos a|vivo en|busco en)\s+${city}\b`,
       "i",
     );
     if (where.test(said)) {
