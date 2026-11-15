@@ -503,3 +503,17 @@ details summary {
 .inv-page-stream {
   padding-bottom: 8px;
 }
+
+.inv-robust {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.inv-robust-head {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-weight: 600;
+}

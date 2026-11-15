@@ -23,10 +23,10 @@ class Analysis:
         return next((r for r in self.rings if ad_id in r.ad_ids), None)
 
 
-def analyze(corpus: Corpus) -> Analysis:
+def analyze(corpus: Corpus, *, hop: bool = False) -> Analysis:
     facts = extract_all(corpus.ads)
     graph = build_graph(corpus.ads, facts)
-    return Analysis(corpus=corpus, facts=facts, graph=graph, rings=find_rings(graph))
+    return Analysis(corpus=corpus, facts=facts, graph=graph, rings=find_rings(graph, hop=hop))
 
 
 @lru_cache(maxsize=1)

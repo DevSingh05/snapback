@@ -503,11 +503,60 @@ function StreamSection() {
   return <StreamView data={data} initialPos={start.pos} initialRing={start.ring} />;
 }
 
+export type ParaphraseResults = {
+  n_ads: number;
+  n_rings: number;
+  n_honest: number;
+  variants: Record<
+    string,
+    Record<"pipeline" | "pipeline_hop" | "keyword_baseline", { rings_found: number; honest_flagged: number }>
+  >;
+};
+
+// The reworded-ads attack (`snapback.forensics.paraphrase`): every number is SYNTHETIC and carries n.
+export function robustnessText(r: ParaphraseResults) {
+  const para = r.variants.paraphrased;
+  const n = r.n_rings;
+  return {
+    headline: `Holds up when ads are reworded: ${para.pipeline.rings_found} of ${n} rings (synthetic, n=${n} rings, ${r.n_ads.toLocaleString("en-US")} ads)`,
+    detail:
+      `Original wording: ${r.variants.original.pipeline.rings_found} of ${n}. ` +
+      `Keyword search on the reworded ads: ${para.keyword_baseline.rings_found} of ${n}. ` +
+      `With the phone and photo-copy fallback: ${para.pipeline_hop.rings_found} of ${n}. ` +
+      `Honest ads flagged: ${para.pipeline.honest_flagged} of ${r.n_honest}.`,
+  };
+}
+
+export function RobustnessLine({ results }: { results: ParaphraseResults }) {
+  const t = robustnessText(results);
+  return (
+    <section className="inv-robust" aria-label="Robustness to reworded ads">
+      <p className="inv-robust-head">{t.headline}</p>
+      <p className="inv-sub">{t.detail}</p>
+    </section>
+  );
+}
+
+function RobustnessSection() {
+  const [data, setData] = useState<ParaphraseResults | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import("../../../../eval/forensics/paraphrase_results.json").then((m) => {
+      if (live) setData(m.default as unknown as ParaphraseResults);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return data ? <RobustnessLine results={data} /> : null;
+}
+
 export function InvestigatePage() {
   return (
     <>
       <div className="inv-page inv-page-stream">
         <StreamSection />
+        <RobustnessSection />
       </div>
       <RingsSection />
     </>

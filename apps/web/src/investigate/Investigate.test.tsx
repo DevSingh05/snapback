@@ -2,7 +2,15 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 
 import { matchRoute } from "../App";
-import { InvestigateView, RingGraph, TimelineStrip, percent } from "./InvestigatePage";
+import {
+  InvestigateView,
+  RingGraph,
+  RobustnessLine,
+  TimelineStrip,
+  percent,
+  robustnessText,
+} from "./InvestigatePage";
+import real from "../../../../eval/forensics/paraphrase_results.json";
 import { layoutGraph, timeScale } from "./layout";
 import type { Answer, RingResponse, RingsResponse } from "./types";
 
@@ -297,5 +305,41 @@ describe("graph and timeline", () => {
     expect(container.querySelectorAll(".inv-phone-mark").length).toBe(2);
     fireEvent.click(container.querySelectorAll(".inv-tick")[1]!);
     expect(onPick).toHaveBeenCalledWith(9);
+  });
+});
+
+describe("robustness line", () => {
+  const made = {
+    n_ads: 3039,
+    n_rings: 10,
+    n_honest: 2684,
+    variants: {
+      original: {
+        pipeline: { rings_found: 10, honest_flagged: 0 },
+        pipeline_hop: { rings_found: 10, honest_flagged: 0 },
+        keyword_baseline: { rings_found: 1, honest_flagged: 0 },
+      },
+      paraphrased: {
+        pipeline: { rings_found: 7, honest_flagged: 0 },
+        pipeline_hop: { rings_found: 9, honest_flagged: 0 },
+        keyword_baseline: { rings_found: 0, honest_flagged: 0 },
+      },
+    },
+  };
+
+  it("states k of n, the synthetic label and the sample sizes", () => {
+    render(<RobustnessLine results={made} />);
+    expect(
+      screen.getByText(
+        "Holds up when ads are reworded: 7 of 10 rings (synthetic, n=10 rings, 3,039 ads)",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/Keyword search on the reworded ads: 0 of 10/)).toBeTruthy();
+    expect(screen.getByText(/Honest ads flagged: 0 of 2684/)).toBeTruthy();
+  });
+
+  it("reads the committed eval file", () => {
+    const t = robustnessText(real as unknown as Parameters<typeof robustnessText>[0]);
+    expect(t.headline).toMatch(/^Holds up when ads are reworded: \d+ of 10 rings \(synthetic, n=10 rings/);
   });
 });

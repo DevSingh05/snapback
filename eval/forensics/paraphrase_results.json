@@ -1,0 +1,146 @@
+{
+ "found_means": "a ring is found when at least 4 of its ads are in reported groups",
+ "label": "SYNTHETIC DATA",
+ "live": null,
+ "n_ads": 3039,
+ "n_honest": 2684,
+ "n_ring_ads": 355,
+ "n_rings": 10,
+ "seed": 20261115,
+ "source": "stream.generate_stream (SYNTHETIC), deterministic paraphrase",
+ "synthetic": true,
+ "variants": {
+  "original": {
+   "keyword_baseline": {
+    "groups_reported": 1,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 5,
+    "rings_found": 1,
+    "rings_told_apart": 0
+   },
+   "pipeline": {
+    "groups_reported": 6,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 329,
+    "rings_found": 10,
+    "rings_told_apart": 0
+   },
+   "pipeline_hop": {
+    "groups_reported": 6,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 354,
+    "rings_found": 10,
+    "rings_told_apart": 0
+   },
+   "same_ask_pairs_in_ring": 0.063
+  },
+  "paraphrased": {
+   "keyword_baseline": {
+    "groups_reported": 0,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 0,
+    "rings_found": 0,
+    "rings_told_apart": 0
+   },
+   "pipeline": {
+    "groups_reported": 10,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 70,
+    "rings_found": 7,
+    "rings_told_apart": 0
+   },
+   "pipeline_hop": {
+    "groups_reported": 13,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 171,
+    "rings_found": 9,
+    "rings_told_apart": 1
+   },
+   "same_ask_pairs_in_ring": 0.0
+  },
+  "paraphrased_photos_reshot": {
+   "keyword_baseline": {
+    "groups_reported": 0,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 0,
+    "rings_found": 0,
+    "rings_told_apart": 0
+   },
+   "pipeline": {
+    "groups_reported": 2,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 8,
+    "rings_found": 1,
+    "rings_told_apart": 0
+   },
+   "pipeline_hop": {
+    "groups_reported": 10,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 57,
+    "rings_found": 7,
+    "rings_told_apart": 0
+   },
+   "same_ask_pairs_in_ring": 0.0
+  },
+  "paraphrased_wording_only": {
+   "keyword_baseline": {
+    "groups_reported": 0,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 0,
+    "rings_found": 0,
+    "rings_told_apart": 0
+   },
+   "pipeline": {
+    "groups_reported": 0,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 0,
+    "rings_found": 0,
+    "rings_told_apart": 0
+   },
+   "pipeline_hop": {
+    "groups_reported": 0,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 0,
+    "rings_found": 0,
+    "rings_told_apart": 0
+   },
+   "same_ask_pairs_in_ring": 0.0
+  }
+ }
+}
