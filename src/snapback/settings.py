@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     # Sponsor credentials. SecretStr keeps them out of logs and reprs.
     matterport_api_key: SecretStr | None = None
     matterport_api_token: SecretStr | None = None
+    # W1 web sub-agent (#8, Vidyut 20:10). A missing key means "not checked", never a failure.
+    brightdata_api_token: SecretStr | None = None
+    apify_token: SecretStr | None = None
+    browser_use_api_key: SecretStr | None = None
     vexcel_api_key: SecretStr | None = None
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None
