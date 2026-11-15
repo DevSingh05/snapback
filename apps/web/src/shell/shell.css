@@ -505,8 +505,11 @@
   }
 }
 
-/* The site footer: one quiet link to /reviews. */
+/* The site footer: quiet links to /reviews and /under-the-hood. */
 .app-sitefoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-5);
   padding: var(--sp-3) var(--page-pad);
   background: var(--layer-0);
   font-size: var(--fs-sm);

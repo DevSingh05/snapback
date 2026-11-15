@@ -1,0 +1,336 @@
+/* /under-the-hood. Tokens only, sharp corners, no outline boxes. Each sponsor is one row:
+   who (plaster), what we used (plaster), and a matte slab holding the numbers and the button,
+   so the eye lands on the proof. Under 900px the row stacks in that order. */
+.uh {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-bottom: var(--sp-7);
+}
+.uh-head {
+  display: grid;
+  gap: var(--sp-4);
+  padding-block: var(--sp-5) var(--sp-6);
+}
+.uh-title {
+  margin: 0;
+  font-size: clamp(2.4rem, 6vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.uh-lede {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--fs-lg);
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* The small mark: two letters on a matte square. Text, never a logo. */
+.uh-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  background: var(--matte);
+  color: var(--act-matte);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.uh-mark-sm {
+  width: 28px;
+  height: 28px;
+  font-size: var(--fs-xs);
+}
+
+.uh-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.uh-jump a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 var(--sp-4) 0 var(--sp-2);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--edge);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+.uh-jump a:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--edge),
+    inset 0 -2px 0 var(--ink);
+}
+
+.uh-key {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.uh-key li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+/* LIVE, FIXTURE or SYNTHETIC: the shared mono tag, with a square that reads on plaster and on
+   matte. Green is real, grey is team-made sample data, khaki is generated. */
+.uh-tag::before {
+  background: var(--st-unchecked);
+}
+.uh-tag[data-label="LIVE"]::before {
+  background: var(--st-ok);
+}
+.uh-tag[data-label="SYNTHETIC"]::before {
+  background: var(--st-warn);
+}
+.ui-on-matte .uh-tag::before {
+  background: var(--v-slate);
+}
+.ui-on-matte .uh-tag[data-label="LIVE"]::before {
+  background: var(--v-ok);
+}
+.ui-on-matte .uh-tag[data-label="SYNTHETIC"]::before {
+  background: var(--v-hold);
+}
+
+/* ---------- one sponsor ---------- */
+.uh-panel {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.62fr) minmax(0, 1.9fr) minmax(340px, 1.5fr);
+  background: var(--surface);
+  margin-top: var(--sp-4);
+  scroll-margin-top: var(--sp-8);
+}
+.uh-who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--pad);
+}
+.uh-sponsor {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+}
+.uh-track {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.uh-what {
+  padding: var(--pad) var(--pad) var(--pad) 0;
+}
+.uh-does {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.uh-used {
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--sp-2);
+}
+.uh-used li {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding-top: var(--sp-2);
+  box-shadow: inset 0 1px 0 var(--line);
+  line-height: 1.4;
+}
+.uh-used strong {
+  font-weight: 700;
+}
+.uh-used span {
+  color: var(--muted);
+}
+
+/* ---------- the proof slab ---------- */
+.uh-proof {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: var(--pad);
+  background: var(--matte);
+}
+.uh-nums {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-4);
+}
+.uh-num {
+  display: flex;
+  flex-direction: column;
+}
+.uh-num dd {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-matte);
+  white-space: nowrap;
+}
+.uh-num dt {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+  color: var(--on-matte-muted);
+}
+.uh-n {
+  margin: var(--sp-2) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--on-matte-muted);
+}
+.uh-n .ui-mono {
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+}
+
+.uh-show {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 60px;
+  padding: 0 var(--sp-5);
+  background: var(--act-matte);
+  color: var(--on-act-matte);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1.15;
+  text-decoration: none;
+}
+.uh-arrow {
+  flex: none;
+  transition: transform 160ms var(--ease-out);
+}
+.uh-show:hover .uh-arrow {
+  transform: translateX(4px);
+}
+.uh-show:focus-visible {
+  outline: 3px solid var(--on-matte);
+  outline-offset: 2px;
+}
+.uh-opens {
+  margin: var(--sp-2) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  color: var(--on-matte-muted);
+}
+.uh-path {
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+.uh-more {
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+.uh-more li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--sp-3);
+  min-height: 44px;
+  box-shadow: inset 0 1px 0 var(--matte-line);
+}
+.uh-more a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--on-matte);
+  font-weight: 700;
+}
+.uh-aside {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--on-matte-muted);
+}
+/* A panel with nothing measured yet says where to see it live, in the numbers' place. */
+.uh-live {
+  margin: 0;
+  max-width: 16ch;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--on-matte);
+}
+.uh-foot {
+  margin: var(--sp-5) 0 0;
+  max-width: 70ch;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+@media (max-width: 1100px) {
+  .uh-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.8fr);
+  }
+  .uh-who {
+    grid-column: 1;
+    flex-direction: row;
+    align-items: center;
+    padding-bottom: 0;
+  }
+  .uh-what {
+    grid-column: 1;
+    padding-left: var(--pad);
+  }
+  .uh-proof {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+@media (max-width: 760px) {
+  .uh-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .uh-proof {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .uh-used li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uh-arrow {
+    transition: none;
+  }
+}

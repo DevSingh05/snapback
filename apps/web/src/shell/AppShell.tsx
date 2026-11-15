@@ -8,7 +8,7 @@ export type { Section };
 
 interface Props {
   /** Which main tab the page belongs to. Null: none (a result, a walk). */
-  section: Section | "stories" | "reviews" | null;
+  section: Section | "stories" | "reviews" | "hood" | null;
   /** The tabs in the bar. Left out: the ones flagged for the bar (Home), then Stories. */
   tabs?: Tab[];
   /** A tab for where you are inside a place, shown only while you are there. */
@@ -200,6 +200,9 @@ export function AppShell({ section, context, bar, tabs = NAV_TABS, children }: P
         <footer className="app-sitefoot">
           <a href="/reviews" aria-current={section === "reviews" ? "page" : undefined}>
             Reviews
+          </a>
+          <a href="/under-the-hood" aria-current={section === "hood" ? "page" : undefined}>
+            Under the hood
           </a>
         </footer>
       )}

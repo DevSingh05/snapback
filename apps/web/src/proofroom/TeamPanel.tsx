@@ -36,6 +36,13 @@ import { useRoster, useRun, type Run } from "./useRun";
 import { WORDS, type RoomWords } from "./words";
 
 /** Where "See how they got this" goes: the report's "How we got this answer". */
+/** `?team=trace` opens the panel on "How they got this"; `?team=meet` on Meet the team. A page
+ *  that explains the app (Under the hood) links straight to the tab it is talking about. */
+export function teamTabFromSearch(search: string): "live" | "trace" | "team" {
+  const asked = new URLSearchParams(search).get("team");
+  return asked === "trace" ? "trace" : asked === "meet" ? "team" : "live";
+}
+
 export const answerHref = (caseId: string) =>
   `/case/${encodeURIComponent(caseId)}#case-answer-title`;
 
@@ -233,7 +240,9 @@ export function TeamPanel({
   });
   const team = teamView(floor, whole);
   const ending = floor.verdict ?? (whole.phase === "done" ? whole.verdict : null);
-  const [tab, setTab] = useState<"live" | "trace" | "team">("live");
+  const [tab, setTab] = useState<"live" | "trace" | "team">(() =>
+    teamTabFromSearch(window.location.search),
+  );
   // The crew is the Live view; the diagram of the same run stays one press away.
   const [view, setView] = useState<"crew" | "diagram">("crew");
   const [focus, setFocus] = useState<string | null>(null);
