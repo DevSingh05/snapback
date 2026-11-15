@@ -29,10 +29,14 @@
   padding-block: 0 var(--sp-6);
   color: var(--ink);
   isolation: isolate;
-  /* The page's one depth: a hairline under the edge and a short, soft drop. Sharp corners. */
-  --ob-edge: color-mix(in srgb, var(--ink) 13%, transparent);
+  /* The page's one depth: three soft layers, no hard edge. */
+  --ob-edge: color-mix(in srgb, var(--ink) 7%, transparent);
   --ob-lift:
-    0 1px 0 var(--ob-edge), 0 10px 22px -14px color-mix(in srgb, var(--ink) 46%, transparent);
+    0 0 0 1px var(--ob-edge), 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent),
+    0 8px 18px -6px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 22px 44px -22px color-mix(in srgb, var(--ink) 18%, transparent);
+  --ob-glow: color-mix(in srgb, var(--act) 20%, transparent);
+  --ob-glow-far: color-mix(in srgb, var(--act) 7%, transparent);
   --ob-shine: inset 0 1px 0 color-mix(in srgb, var(--surface) 92%, transparent);
 }
 .ob[data-empty] {
@@ -1184,15 +1188,8 @@
   font-weight: 400;
 }
 @media (hover: hover) {
-  .ob-example:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
   .ob-example:hover::before {
     color: var(--act);
-  }
-  .ob-replies button:hover {
-    background: var(--home-raised);
   }
   .ob-tool:hover,
   .ob-quiet:hover {
@@ -1661,4 +1658,199 @@
   justify-self: end;
   min-width: 20px;
   text-align: right;
+}
+
+/* ---------- Soft pass: one radius, a pill, layered shadows, quiet pulses ---------- */
+.ob-box,
+.ob-bot,
+.ob-you,
+.ob-card,
+.ob-sample,
+.ob-walk,
+.ob-problems,
+.ob-walk .ob-photo {
+  border-radius: var(--radius);
+}
+.ob-sample {
+  overflow: hidden;
+  box-shadow: var(--ob-lift);
+}
+.ob-card {
+  box-shadow: var(--ob-lift);
+}
+.ob-example,
+.ob-replies button,
+.ob-send,
+.ob-tool,
+.ob-icon,
+.ob-files li,
+.ob-files button,
+.ob-mic .fd-mic,
+.ob-primary,
+.ob-secondary,
+.ob-pick-go,
+.ob-more,
+.ob-quiet {
+  border-radius: var(--radius-pill);
+}
+.ob-example {
+  padding-inline: var(--sp-4) var(--sp-5);
+}
+/* The box: glass, a soft ring instead of a ruled edge, and the accent as a glow while in use. */
+.ob-box,
+.ob-box[data-big] {
+  box-shadow: var(--ob-shine), var(--ob-lift);
+}
+.ob-box:is(:focus-within, [data-dragging], :has(.ob-listen)),
+.ob-box[data-big]:is(:focus-within, [data-dragging], :has(.ob-listen)) {
+  box-shadow:
+    var(--ob-shine),
+    0 0 0 1.5px var(--act),
+    var(--ob-lift);
+}
+.ob-box[data-big] .ob-bar {
+  padding-bottom: var(--sp-3);
+}
+.ob-box[data-big] .ob-send {
+  margin-right: var(--sp-1);
+}
+/* Rows fill softly under the pointer; the rule belongs to the list item, so it stays straight. */
+.ob-ways-list > li,
+.ob-next-list > li {
+  border-bottom: 1px solid var(--home-line);
+}
+.ob-way {
+  margin-inline: calc(-1 * var(--sp-3));
+  padding-inline: var(--sp-3);
+  border-bottom: 0;
+  border-radius: var(--radius);
+  transition: background-color 0.2s var(--ease-out);
+}
+.ob-next-row {
+  width: calc(100% + 2 * var(--sp-3));
+}
+@media (hover: hover) {
+  .ob-way:hover {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+  }
+}
+/* Live marks are round and breathe: the route mark, and the dot beside each check in flight. */
+.ob-route-mark {
+  border-radius: var(--radius-pill);
+}
+.ob-rail-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink);
+}
+.ob-rail-wait::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--act);
+}
+/* The glow lives on its own layer, so breathing only changes opacity. */
+.ob-box {
+  position: relative;
+  caret-color: var(--act);
+}
+.ob-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 6px var(--ob-glow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s var(--ease-out);
+}
+.ob-box:is(:focus-within, [data-dragging], :has(.ob-listen))::after {
+  opacity: 1;
+}
+.ob ::selection {
+  background: color-mix(in srgb, var(--act) 24%, transparent);
+}
+/* The live dot: a still centre and a ring that grows out of it and fades. */
+.ob-rail-wait::before {
+  position: relative;
+  z-index: 1;
+}
+.ob-rail-wait {
+  position: relative;
+}
+.ob-rail-wait::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: var(--radius-pill);
+  background: var(--act);
+  opacity: 0;
+}
+.ob-way-go {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ob-way,
+.ob-next-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.ob-example::before {
+  content: none;
+}
+.ob-example {
+  padding-inline: var(--sp-5);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ob-box:is(:focus-within, [data-dragging], :has(.ob-listen))::after {
+    animation: ob-breathe 3.2s ease-in-out 0.25s infinite;
+  }
+  .ob-rail-wait {
+    animation: none;
+  }
+  .ob-rail-wait::after {
+    animation: ob-ping 1.6s var(--ease-out) infinite;
+  }
+  .ob-rail-rows li:nth-child(2) .ob-rail-wait::after {
+    animation-delay: 0.25s;
+  }
+  .ob-rail-rows li:nth-child(3) .ob-rail-wait::after {
+    animation-delay: 0.5s;
+  }
+  @keyframes ob-breathe {
+    50% {
+      opacity: 0.4;
+    }
+  }
+  @keyframes ob-ping {
+    0% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+    80%,
+    100% {
+      opacity: 0;
+      transform: scale(3.2);
+    }
+  }
+}
+
+/* The check team's tiles inside a card take the same soft corner. Each already says its state
+   with a square, a tint and a word, so the edge stripe is dropped here. */
+.ob .pr-strip-item > :is(button, a),
+.ob .pr-strip-in {
+  border-left: 0;
+  border-radius: var(--radius);
 }

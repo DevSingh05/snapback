@@ -823,6 +823,15 @@ export const WAYS = [
   },
 ] as const;
 
+/** The arrow at the end of a row: drawn, one stroke, the same everywhere. */
+function GoArrow() {
+  return (
+    <svg className="ob-way-go" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <path d="M3.5 10h12M11 5.5l4.5 4.5-4.5 4.5" />
+    </svg>
+  );
+}
+
 // The ways in, as an index of rows on hairlines: no tiles. Checking an ad stays the one filled
 // action on the page; these are ink links. Your recent checks sit in their own block below.
 function WaysIn() {
@@ -834,7 +843,7 @@ function WaysIn() {
         </h2>
       </header>
       <ul className="ob-ways-list">
-        {WAYS.map((w, i) => (
+        {WAYS.map((w) => (
           <li key={w.href} data-lead={w.lead || undefined}>
             {/* Stories keeps the short name other pages and tests know it by. */}
             <a
@@ -842,14 +851,11 @@ function WaysIn() {
               href={w.href}
               aria-label={w.href === "/stories" ? w.title : undefined}
             >
-              <span className="ob-way-n ui-mono">{`0${i + 1}`}</span>
               <span className="ob-way-main">
                 <span className="ob-way-title">{w.title}</span>
                 <span className="ob-way-text">{w.text}</span>
               </span>
-              <span className="ob-way-go" aria-hidden="true">
-                →
-              </span>
+              <GoArrow />
             </a>
           </li>
         ))}
@@ -935,9 +941,7 @@ function NextMoves({ hasCase, onAsk }: { hasCase: boolean; onAsk: (words: string
                 <span className="ob-way-title">{a.title}</span>
                 <span className="ob-way-text">{a.text}</span>
               </span>
-              <span className="ob-way-go" aria-hidden="true">
-                →
-              </span>
+              <GoArrow />
             </button>
           </li>
         ))}
@@ -948,9 +952,7 @@ function NextMoves({ hasCase, onAsk }: { hasCase: boolean; onAsk: (words: string
                 <span className="ob-way-title">{w.title}</span>
                 <span className="ob-way-text">{w.text}</span>
               </span>
-              <span className="ob-way-go" aria-hidden="true">
-                →
-              </span>
+              <GoArrow />
             </a>
           </li>
         ))}
