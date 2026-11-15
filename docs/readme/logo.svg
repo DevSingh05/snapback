@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 48" width="300" height="48">
+  <style>
+    .l { fill: #161a1b; }
+    .r { fill: #0d6672; }
+    .t { fill: #161a1b; font: 700 28px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; letter-spacing: 6px; }
+    @media (prefers-color-scheme: dark) {
+      .l, .t { fill: #f0ebe1; }
+      .r { fill: #86d3d1; }
+    }
+  </style>
+  <g transform="translate(0 2) scale(1.8)">
+    <path class="l" d="M2 11.6 11.25 4.2V22.5H2z" />
+    <path class="r" d="M12.75 1.5 22 8.9v11.1h-9.25z" />
+  </g>
+  <text class="t" x="56" y="36">SNAPBACK</text>
+</svg>
