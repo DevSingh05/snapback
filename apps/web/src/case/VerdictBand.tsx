@@ -27,6 +27,8 @@ interface VerdictBandProps {
   // of `why`, under `reasonsTitle`.
   reasons?: string[];
   reasonsTitle?: string | null;
+  // The one missing fact that would settle an unsure card, from missingFact(card).
+  settles?: string | null;
   // A plain paragraph in place of the actions (the verify page).
   summary?: ReactNode;
   // The page's one primary button, and one text link beside it.
@@ -46,6 +48,7 @@ export function VerdictBand({
   why = [],
   reasons = [],
   reasonsTitle = null,
+  settles,
   summary,
   primary,
   link,
@@ -84,6 +87,11 @@ export function VerdictBand({
                   {why.length - 1} more below, with the proof for each.
                 </span>
               ) : null}
+            </p>
+          ) : null}
+          {settles ? (
+            <p className="case-settle" data-testid="case-settle">
+              <b>Would settle it:</b> {settles}
             </p>
           ) : null}
           {summary ? (

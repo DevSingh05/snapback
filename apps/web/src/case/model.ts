@@ -150,6 +150,58 @@ export function couldNotDo(card: Card): string[] {
   return [...standing, ...lines];
 }
 
+// The one missing fact that would settle an unsure card. Each rule names a family of card lines
+// by the label key the API sends; the first rule with an unsure line wins. No new data source:
+// this only reads the card's own Not checked and Not confirmed lines.
+const SETTLE: { keys: string[]; fact: string }[] = [
+  {
+    keys: ["label.contact", "label.office", "label.allowed", "label.license"],
+    fact: "the office confirms this number",
+  },
+  {
+    keys: ["label.real", "label.matched_home", "label.loose", "label.mirrored"],
+    fact: "the photos placed in this building's scan",
+  },
+  {
+    keys: ["label.owner", "label.owner_rule"],
+    fact: "the owner of record confirms who posted this ad",
+  },
+  {
+    keys: ["label.rent_vs_record", "label.rent_vs_hud"],
+    fact: "a rent on record for this home to compare with",
+  },
+  { keys: ["label.link_domain", "label.link"], fact: "the office confirms this link is theirs" },
+  { keys: ["label.address"], fact: "this street address found on a public record" },
+];
+// When a line carries no key, its row says what kind of fact is missing.
+const SETTLE_BY_ROW: Partial<Record<CardRowKind, string>> = {
+  person: "the office confirms this number",
+  place: "the photos placed in this building's scan",
+  price: "a rent on record for this home to compare with",
+};
+
+/** For a card that is unsure (Hold off, or could not place the photos): the ONE fact that would
+ *  settle it, as a phrase to follow "Would settle it:". It comes from the card's own Not
+ *  confirmed and Not checked lines. Null for a clear result, a Don't pay, or a card with no such
+ *  line. */
+export function missingFact(card: Card): string | null {
+  if (card.state !== "hold" && card.state !== "unverified") return null;
+  const unsure = card.rows.flatMap((row) =>
+    row.lines
+      .filter((l) => l.tone === "not_shown" || l.tone === "not_checked")
+      .map((l) => ({ key: l.key ?? null, kind: row.kind })),
+  );
+  if (unsure.length === 0) return null;
+  for (const rule of SETTLE) {
+    if (unsure.some((u) => u.key !== null && rule.keys.includes(u.key))) return rule.fact;
+  }
+  for (const u of unsure) {
+    const fact = SETTLE_BY_ROW[u.kind];
+    if (fact) return fact;
+  }
+  return null;
+}
+
 // A run of digits shaped like a phone number. The API never sends one in a draft; this keeps
 // it true on the page even if a draft ever carried one.
 const PHONE_DIGITS = /\(?\+?(?:\d[\s().-]*){9,}\d/g;

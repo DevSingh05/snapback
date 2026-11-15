@@ -21,6 +21,7 @@ export {
   type ProofPin,
   type ProofShot,
   couldNotDo,
+  missingFact,
   withoutPhoneDigits,
   type CopyAlert,
   type RealListing as RealListingData,
