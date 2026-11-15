@@ -927,7 +927,10 @@ def next_step_tools(case: CaseSession) -> list[Any]:
     def next_step_choose(step: str, gap: str, reason: str) -> str:
         """Choose one next step for one gap (G1, G2, ...), with one plain sentence of reason."""
         with _turn(case) as live:
-            return followups.choose_next_step(case, step, gap, reason) if live else STOPPED
+            if not live:
+                return STOPPED
+        # Outside the gate: the pick takes the case's evidence lock, never both at once.
+        return followups.choose_next_step(case, step, gap, reason)
 
     return [next_step_open_choice, next_step_choose]
 

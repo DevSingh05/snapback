@@ -441,3 +441,68 @@ def test_with_no_model_two_fixture_ads_get_their_own_recorded_picks(tmp_path, mo
     assert photos != plain
     lines = [ln for row in photo_card["rows"] for ln in row["lines"]]
     assert any(ln.get("source_name") == "Google Lens" for ln in lines)
+
+
+# --- the case's evidence lock --------------------------------------------------------------------
+
+
+def test_a_pick_waits_for_the_evidence_lock_and_an_office_decline_written_meanwhile_survives():
+    case = _case()
+    case.evidence_lock = threading.RLock()  # the API's case lock (api/cases.py)
+    here = _gap(case, "label.here_now")
+    state_before = build_card(case.evidence, checked_at=None).state
+    held, release = threading.Event(), threading.Event()
+
+    def office_answers():
+        with case.evidence_lock:
+            held.set()
+            release.wait(5)
+            case.decline_office("example-office.test")
+
+    office = threading.Thread(target=office_answers)
+    office.start()
+    held.wait(5)
+    picker = threading.Thread(
+        target=lambda: fu.desk_of(case).choose("lens", here, "The photos are unconfirmed.")
+    )
+    picker.start()
+    picker.join(0.3)
+    assert picker.is_alive()  # it waits for the lock before it writes
+    assert case.evidence.followups == []
+    release.set()
+    office.join(5)
+    picker.join(5)
+    assert not picker.is_alive()
+    assert case.evidence.office_declined_domain == "example-office.test"
+    assert [f.check for f in case.evidence.followups] == ["lens"]
+    after = build_card(case.evidence, checked_at=None)
+    assert after.state == decide(to_evidence(case.evidence)).state
+    assert after.state == state_before or after.state.value == "hold"
+
+
+def test_two_next_step_picks_at_once_only_one_wins(monkeypatch):
+    case = _case()
+    case.evidence_lock = threading.RLock()
+    allowed = _gap(case, "label.allowed")
+    real_gaps = fu.card_gaps
+
+    def slow_gaps(c):  # widen the window between the check and the set
+        time.sleep(0.05)
+        return real_gaps(c)
+
+    monkeypatch.setattr(fu, "card_gaps", slow_gaps)
+    start = threading.Barrier(8)
+    said: list[str] = []
+
+    def pick(step):
+        start.wait(5)
+        said.append(fu.choose_next_step(case, step, allowed, "The poster is not confirmed."))
+
+    steps = ["ask_licence", "call_office", "ask_poster", "ask_licence"] * 2
+    threads = [threading.Thread(target=pick, args=(s,)) for s in steps]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(5)
+    assert sum(1 for s in said if s.startswith("Drafted")) == 1
+    assert len([e for e in case.trace.events if e.pick in fu.NEXT_STEPS]) == 1

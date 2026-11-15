@@ -823,10 +823,11 @@ class CaseSession:
         self._office_answer({"office_confirmed_domain": None, "office_declined_domain": domain})
 
     def _office_answer(self, update: dict[str, str | None]) -> None:
-        self.evidence = self.evidence.model_copy(update=update)
-        if self.verdict is not None:
-            self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
-            self._emit_verdict()
+        with self.evidence_lock:  # an agent's follow-up written meanwhile cannot erase it
+            self.evidence = self.evidence.model_copy(update=update)
+            if self.verdict is not None:
+                self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
+                self._emit_verdict()
 
     def add_evidence(self, update: Mapping[str, Any]) -> bool:
         """More evidence from outside the choice flow, e.g. an extra check the deep agent ran

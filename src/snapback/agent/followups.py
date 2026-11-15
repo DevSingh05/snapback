@@ -281,8 +281,24 @@ def result_words(line: FollowUpLine, lang: str = strings.DEFAULT_LANG) -> str:
     return strings.text("followup.result", lang, text=text, source=line.source_name)
 
 
+def evidence_lock_of(case: Any) -> Any:
+    """The case's own evidence lock (the API's case RLock), so a follow-up written from the
+    agent's thread never erases evidence the case wrote meanwhile (an office's answer, a reply).
+    A session with none gets one of its own."""
+    lock = getattr(case, "evidence_lock", None)
+    if lock is None:
+        lock = case.__dict__.setdefault("_followup_lock", threading.RLock())
+    return lock
+
+
 def _keep(case: Any, line: FollowUpLine, item: MenuItem, gap: Gap) -> None:
-    """The pick and its result go into the trace, the evidence (card info line) and the note."""
+    """The pick and its result go into the trace, the evidence (card info line) and the note.
+    All under the case's evidence lock: read, copy and assign are one step."""
+    with evidence_lock_of(case):
+        _keep_locked(case, line, item, gap)
+
+
+def _keep_locked(case: Any, line: FollowUpLine, item: MenuItem, gap: Gap) -> None:
     lang = case.lang
     reason = line.reason
     if line.chosen_by == "fixture":
@@ -436,7 +452,13 @@ def next_step_offer(case: Any) -> dict[str, Any]:
 
 def choose_next_step(case: Any, step: str, gap: str, reason: str, *, by: By = "model") -> str:
     """Pick the one next step for the renter, for one gap, with a reason. Code writes the draft;
-    it goes to the trace and the next-step note, and is never sent."""
+    it goes to the trace and the next-step note, and is never sent. Check and set are one step
+    under the case's evidence lock, so two calls in one turn cannot both pass."""
+    with evidence_lock_of(case):
+        return _choose_next_step(case, step, gap, reason, by)
+
+
+def _choose_next_step(case: Any, step: str, gap: str, reason: str, by: By) -> str:
     if case.__dict__.get("_next_step") is not None:
         return "Refused: the next step is already chosen."
     item = NEXT_STEPS.get(str(step).strip())
