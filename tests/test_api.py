@@ -360,7 +360,9 @@ def test_a_screenshot_is_read_as_part_of_the_listing(client):
     case = made.json()
     assert (case["screenshots"], case["photos"]) == (1, 0)
     card = finish(client, case)
-    assert "Zelle before a viewing. Red flag." in [line.text for line in card.rows[2].lines]
+    assert "Zelle and a deposit or holding fee before a viewing. Red flag." in [
+        line.text for line in card.rows[2].lines
+    ]
 
 
 def test_case_ids_are_short_and_differ(client):
