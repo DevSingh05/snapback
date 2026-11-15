@@ -635,7 +635,7 @@ export function mountHouse(
       const vv = w.o > 0.02;
       w.ms.forEach((m) => (m.visible = vv));
     });
-    const lit = Math.floor(now / 2600) % 3;
+    const lit = reduced ? 1 : Math.floor(now / 2600) % 3;
     Ls.forEach((l, k) => (l.intensity = 0.3 + 0.45 * (st.open > 0.9 && k === lit ? 1 : 0)));
     sg.rotation.y = Math.PI / 4 - yw;
     const a = 0.75;

@@ -35,7 +35,7 @@ describe("SNAPBACK Worlds front door", () => {
   it("states the measured number with its n and label, and nothing stronger", () => {
     render(<WorldsLanding />);
     const line = screen.getByTestId("wl-measured");
-    expect(line).toHaveTextContent("MEASURED");
+    expect(line).toHaveTextContent("LIVE, re-measured Nov 15");
     expect(line).toHaveTextContent(LANDING_MEASURED);
     expect(LANDING_MEASURED).toContain("43 of 48");
     expect(LANDING_MEASURED).toContain("78 real listing photos");

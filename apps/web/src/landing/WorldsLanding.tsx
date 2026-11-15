@@ -264,7 +264,7 @@ function TakenHere() {
           </div>
         </div>
         <p className="wl-measured ui-mono" data-testid="wl-measured">
-          MEASURED, re-measured Nov 15 · {LANDING_MEASURED}
+          LIVE, re-measured Nov 15 · {LANDING_MEASURED}
         </p>
         <p className="wl-fine">
           Both pictures are stock stand-ins for the sample, and say so. In the app the pair comes
