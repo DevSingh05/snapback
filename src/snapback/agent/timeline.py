@@ -21,6 +21,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from snapback.agent.planner import PlanKind
+from snapback.agent.session import UPDATED
 from snapback.card import strings
 from snapback.contracts import (
     ChoiceKind,
@@ -59,6 +60,7 @@ class CaseTimeline(BaseModel):
     source: DataSource
     mode: Literal["policy", "deepagents"]
     fell_back: bool  # the agent stopped (error or time limit) and code finished the case
+    running: bool = False  # the deep agent is still working this case in the background
     steps: list[TimelineStep]
     todos: list[TimelineTodo] = Field(default_factory=list)  # the agent's last todo list
     plan: list[str] = Field(default_factory=list)  # sub-agents handed work, in order
@@ -204,8 +206,11 @@ def build_timeline(
     events: Sequence[TraceEvent],
     evidence: ModuleEvidence,
     lang: str = strings.DEFAULT_LANG,
+    *,
+    running: bool = False,
 ) -> CaseTimeline:
-    """The case's steps in trace order. Reads only; never changes the case."""
+    """The case's steps in trace order. Reads only; never changes the case. `running` says the
+    deep agent is still at work on it (SNAPBACK_AGENT=deepagents_async)."""
     b = _Builder(source, evidence, lang)
     events = sorted(events, key=lambda e: e.seq)
     t0 = events[0].at if events else None
@@ -275,6 +280,8 @@ def build_timeline(
                 )
         elif event.kind is TraceKind.TOOL:
             b.add(_TOOL_KEYS.get(event.pick or "", "timeline.tool"), at, event.reason, "code")
+        elif event.kind is TraceKind.STATUS and event.pick == UPDATED:
+            b.add("timeline.updated", at, event.reason, "code")
         elif event.kind is TraceKind.STATUS and event.pick in _CHECK_KEYS:
             # a check the plan skipped: say which, and why
             skip_key = _CHECK_KEYS[event.pick].replace("timeline.", "timeline.skip.")
@@ -320,8 +327,9 @@ def build_timeline(
     return CaseTimeline(
         case_id=case_id,
         source=source,
-        mode="deepagents" if ran_agent else "policy",
+        mode="deepagents" if ran_agent or running else "policy",
         fell_back=fell_back,
+        running=running,
         steps=[
             TimelineStep(step=i, **{k: v for k, v in step.items() if k != "derived"})
             for i, step in enumerate(b.steps)

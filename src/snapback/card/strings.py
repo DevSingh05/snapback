@@ -1410,6 +1410,9 @@ ES.update(
 EN.update(
     {
         "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "trace.updated": 'More checks changed the result from "{old}" to "{new}": {reason}',
+        "trace.updated.short": "More checks changed the result.",
+        "timeline.updated": "Updated after more checks",
         "timeline.read_ad": "Read the ad",
         "timeline.which_checks": "Chose which checks to run",
         "timeline.locate": "Placed {placed} of {total} photos in its 3D scan",
@@ -1537,6 +1540,11 @@ ES.update(
         "trace.error.model_timeout": (
             "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
         ),
+        "trace.updated": (
+            'Más comprobaciones cambiaron el resultado de "{old}" a "{new}": {reason}'
+        ),
+        "trace.updated.short": "Más comprobaciones cambiaron el resultado.",
+        "timeline.updated": "Actualizado tras más comprobaciones",
         "timeline.read_ad": "Leyó el anuncio",
         "timeline.which_checks": "Eligió qué comprobaciones hacer",
         "timeline.locate": "Ubicó {placed} de {total} fotos en su escaneo 3D",

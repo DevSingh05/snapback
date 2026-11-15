@@ -29,6 +29,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
+from snapback.agent.background import BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
@@ -115,6 +116,7 @@ class RecordedCase:
     read_token = None
     # What the renter rejected; a recorded case is read-only, so this stays empty.
     preferences = CasePreferences()
+    agent_running = False  # no agent works a recorded case
 
     def __init__(
         self,
@@ -213,6 +215,13 @@ class SessionCase:
         self.files: CaseFiles | None = None  # evidence file, notes and pictures (E3 serves them)
         self._checked_at: datetime | None = None
         self._lock = threading.Lock()
+        session.evidence_lock = self._lock  # evidence an agent adds waits for the policy's turn
+        self.agents: BackgroundAgents | None = None  # set when the agent runs in the background
+
+    @property
+    def agent_running(self) -> bool:
+        """The deep agent is still working this case in the background (queued or running)."""
+        return self.agents is not None and self.agents.running(self.case_id)
 
     @property
     def listing(self) -> Listing:
@@ -366,6 +375,60 @@ def _policy_runner(session: CaseSession) -> object:
         refresh_policy_notes(session)  # the same notes, written by code
 
 
+def _setup_langsmith(settings: Settings) -> None:
+    """Trace with LangSmith when a key is set (settings or the environment). Only the project name
+    is set here; each run's metadata is the case id and the mode, nothing from the ad."""
+    try:
+        from snapback.agent.graph import enable_langsmith
+
+        key = settings.langsmith_api_key
+        enable_langsmith(key.get_secret_value() if key else None, settings.langsmith_project)
+    except Exception:
+        log.warning("LangSmith tracing could not be set up; carrying on without it")
+
+
+def _background_job(
+    case: "SessionCase", settings: Settings, model_factory: Callable[[], object] | None
+) -> Callable[[], None]:
+    """What one background run does: build the advisory agent (main model for the plan, the small
+    one for the sub-agents) and run it within the time limit. Any failure is a trace line, never
+    an exception, and never touches the result."""
+
+    def model(name: str, max_tokens: int) -> object:
+        if model_factory is not None:
+            return model_factory()
+        from snapback.agent.graph import build_model
+
+        key = settings.anthropic_api_key
+        if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError("no model key")
+        return build_model(
+            key.get_secret_value() if key else None,
+            name,
+            settings.snapback_agent_timeout_s,
+            max_tokens,
+        )
+
+    def run() -> None:
+        session = case.session
+        try:
+            from snapback.agent.graph import build_advisory_agent, run_advisory
+
+            agent = build_advisory_agent(
+                session,
+                model(settings.snapback_agent_model, 2048),
+                subagent_model=model(settings.snapback_subagent_model, 1024),
+            )
+        except Exception:
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
+            return
+        run_advisory(session, agent, deadline_s=settings.snapback_agent_timeout_s)
+
+    return run
+
+
 def _deepagents_runner(
     settings: Settings | None = None, model_factory: Callable[[], object] | None = None
 ) -> Callable[[CaseSession], object]:
@@ -379,13 +442,7 @@ def _deepagents_runner(
     agents: dict[str, object] = {}
     timeout_s = settings.snapback_agent_timeout_s if settings is not None else None
     if settings is not None:
-        try:
-            from snapback.agent.graph import enable_langsmith
-
-            key = settings.langsmith_api_key
-            enable_langsmith(key.get_secret_value() if key else None, settings.langsmith_project)
-        except Exception:
-            log.warning("LangSmith tracing could not be set up; carrying on without it")
+        _setup_langsmith(settings)
 
     def make_model() -> object:
         if model_factory is not None:
@@ -453,6 +510,13 @@ class CaseStore:
             if settings.snapback_agent == "deepagents"
             else _policy_runner
         )
+        # deepagents_async: the answer comes from the policy at once; the agent follows on its
+        # own thread (see `_start_agent`), at most N at a time.
+        self._agent_model = agent_model
+        self._background: BackgroundAgents | None = None
+        if settings.snapback_agent == "deepagents_async":
+            _setup_langsmith(settings)
+            self._background = BackgroundAgents(settings.snapback_agent_max_concurrent)
         if settings.snapback_data_source is DataSource.FIXTURE:
             self._add_recorded_fixture()
         elif settings.demo_case:
@@ -655,4 +719,23 @@ class CaseStore:
             case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()
+        self._start_agent(case)
         return case
+
+    def _start_agent(self, case: SessionCase) -> None:
+        """Queue the deep agent on this case, once (SNAPBACK_AGENT=deepagents_async). The request
+        has its answer already and does not wait for this."""
+        if self._background is None:
+            return
+        case.agents = self._background
+        self._background.submit(
+            case.case_id, _background_job(case, self._settings, self._agent_model)
+        )
+
+    def wait_for_agents(self, timeout: float = 30.0) -> None:
+        """Block until every background run has ended. For tests and scripts, never a request."""
+        if self._background is None:
+            return
+        for case in list(self._cases.values()):
+            if isinstance(case, SessionCase):
+                self._background.wait(case.case_id, timeout)
