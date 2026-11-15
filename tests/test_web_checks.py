@@ -336,6 +336,8 @@ def test_browser_use_is_asked_to_cap_its_spend():
         "https://user:pw@ok.example/x",
         "https://ok.example\\x",
         "https://m.me/someone",
+        "https://face%62ook.com/x",
+        "https://xn--facebook.com/x",
     ],
 )
 def test_a_link_we_must_not_open_is_not_checked_and_no_call_is_made(link):
@@ -492,3 +494,13 @@ def test_browser_use_is_told_to_stop_on_a_blocked_page():
     for host in ("facebook.com", "fb.com", "apartments.com"):
         assert host in task
     assert "stop" in task
+
+
+@pytest.mark.parametrize(
+    "link",
+    ["https://oakcourt.example/apply", "https://xn--80ak6aa92e.example/", "https://OAK.example/"],
+)
+def test_a_plain_link_may_still_be_opened(link):
+    from snapback.agent.web.run import may_open
+
+    assert may_open(link)
