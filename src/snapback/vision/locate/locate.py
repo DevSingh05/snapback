@@ -213,6 +213,18 @@ class _PlaceOutcome:
     rival_ratio: float | None  # best rival building's inliers over the claimed match's
 
 
+def passes_strict(c: Verification, t: Thresholds) -> bool:
+    """The strict bar: what naming a home from the photos alone, or placing a photo in another
+    building (a route to DON'T PAY), needs. More inliers and spread than the claimed bar, and its
+    own inlier ratio: a regenerated (AI-edited) photo can clear the counts with half its matches
+    inconsistent, and named the wrong building that way (#10)."""
+    return (
+        c.inliers >= t.elsewhere_min_inliers
+        and c.ratio >= max(t.min_inlier_ratio, t.elsewhere_min_ratio)
+        and c.spread >= t.elsewhere_min_spread
+    )
+
+
 def _failed_bar(top: Verification | None, t: Thresholds) -> str:
     """Which claimed bar the strongest candidate missed (a photo that placed nowhere)."""
     if top is None or top.inliers < t.min_inliers:
@@ -406,11 +418,7 @@ class Locator:
         ]
 
         def strict(c: Verification) -> bool:
-            return (
-                c.inliers >= t.elsewhere_min_inliers
-                and c.ratio >= t.min_inlier_ratio
-                and c.spread >= t.elsewhere_min_spread
-            )
+            return passes_strict(c, t)
 
         def claimed_ok(c: Verification) -> bool:
             return (
@@ -466,11 +474,7 @@ class Locator:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
             check = self._verify(photo, face, t)
-            if not (
-                check.inliers >= t.elsewhere_min_inliers
-                and check.ratio >= t.min_inlier_ratio
-                and check.spread >= t.elsewhere_min_spread
-            ):
+            if not passes_strict(check, t):
                 continue
             homes.add(self.catalog.property_of(entry.model_id))
             if best is None or check.inliers > best.check.inliers:

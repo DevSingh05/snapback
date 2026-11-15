@@ -5,6 +5,7 @@ import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { WalkMap, walkCells } from "../walk/WalkMap";
 import { HeroStreet } from "./HeroStreet";
 import { HowItWorks } from "./HowItWorks";
+import { RealtorQuote } from "./RealtorQuote";
 
 describe("Home's photographs", () => {
   it("the hero is one real daylight photograph, described and stamped as a sample", () => {
@@ -109,5 +110,28 @@ describe("the walk map", () => {
       <WalkMap stops={stops.slice(0, 2)} current={0} onPick={() => {}} />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("The realtor's words", () => {
+  const QUOTE =
+    "If he can add in additional safety features for preventing further scams and financial scams, I think this would be a very good app to have in the marketplace.";
+
+  it("shows the context line, his quote word for word and the attribution", () => {
+    render(<RealtorQuote lang="en" />);
+    const box = screen.getByTestId("realtor-quote");
+    expect(box).toHaveTextContent("Rental tour prep, with scam safety built in.");
+    expect(within(box).getByText(`“${QUOTE}”`)).toBeInTheDocument();
+    expect(box).toHaveTextContent("Ashwin Veeravalli, Realtor, The Agency, Los Gatos CA");
+    expect(screen.queryByTestId("realtor-quote-es")).toBeNull();
+  });
+
+  it("in Spanish the context line is translated, the quote stays English with a translation under it", () => {
+    render(<RealtorQuote lang="es" />);
+    const box = screen.getByTestId("realtor-quote");
+    expect(box).toHaveTextContent("Preparación de visitas a alquileres");
+    expect(within(box).getByText(`“${QUOTE}”`)).toBeInTheDocument();
+    expect(screen.getByTestId("realtor-quote-es")).toHaveTextContent(/fraudes financieros/);
+    expect(box).toHaveTextContent("Ashwin Veeravalli");
   });
 });

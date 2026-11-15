@@ -194,3 +194,48 @@ button.hiw-go {
     top: calc(var(--bar-h, 56px) + var(--sp-3));
   }
 }
+
+/* ---------- The realtor's words ---------- */
+.rq {
+  margin: 0;
+  padding: var(--sp-5) 0 0;
+  border-top: 1px solid var(--ink);
+  max-width: 44rem;
+}
+.rq-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+.rq-context {
+  margin: var(--sp-2) 0 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: var(--lh-tight);
+}
+.rq-quote {
+  margin: var(--sp-4) 0 0;
+  padding: 0 0 0 var(--sp-4);
+  border-left: 3px solid var(--ink);
+}
+.rq-quote p {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.rq-quote .rq-es {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--muted);
+}
+.rq-by {
+  margin: var(--sp-3) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.rq-by strong {
+  color: var(--ink);
+}

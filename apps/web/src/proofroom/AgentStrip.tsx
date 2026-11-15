@@ -2,6 +2,7 @@
 // its finding's colour when done, always with its name and state in words. Used on the report
 // and on Home while a check runs; the Proof Room shows the same desks in full.
 import "./proofroom.css";
+import { Badge } from "./Badge";
 import type { Desk, Lang } from "./model";
 import { WORDS } from "./words";
 
@@ -42,6 +43,7 @@ export function AgentStrip({
         const body = (
           <>
             <span className="pr-strip-light" aria-hidden="true" />
+            <Badge id={desk.card.id} size={22} />
             <span className="pr-strip-name">{desk.card.name}</span>
             <span className="pr-strip-state ui-mono">
               {desk.state === "unused" ? (

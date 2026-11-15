@@ -475,7 +475,9 @@ export interface TeamView {
 export function teamView(now: Floor, whole: Floor): TeamView {
   if (whole.phase !== "done") return { shown: now.desks, notNeeded: [] };
   const unneeded = new Set(whole.desks.filter((d) => d.state === "unused").map((d) => d.card.id));
-  const rank = (d: Desk) => (d.card.team === "decider" ? Infinity : d.order);
+  // The Planner heads the team and the Decider closes it, whenever their own steps fell.
+  const rank = (d: Desk) =>
+    d.card.team === "decider" ? Infinity : d.card.team === "planner" ? -1 : d.order;
   const orderOf = new Map(whole.desks.map((d, i) => [d.card.id, [rank(d), i] as const]));
   const shown = now.desks
     .filter((d) => !unneeded.has(d.card.id))

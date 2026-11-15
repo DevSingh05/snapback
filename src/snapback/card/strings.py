@@ -37,6 +37,24 @@ EN: dict[str, str] = {
     "label.office": "Office confirmation",
     "label.link": "Link",
     "label.license": "License",
+    "label.src_comptroller": "Texas Comptroller",
+    "label.src_hud": "HUD record",
+    "label.src_houston": "City of Houston",
+    "records.comptroller_active": (
+        "Texas Comptroller: {company} is an active Texas company since {year}."
+    ),
+    "records.comptroller_inactive": (
+        "Texas Comptroller: {company} is on the list but not as an active company."
+    ),
+    "records.comptroller_none": (
+        "Texas Comptroller: {company} is not found in the Comptroller list "
+        "(sole proprietors aren't listed)."
+    ),
+    "records.hud_manager": "HUD's record lists the manager as {company}.",
+    "records.hud_phone_differs": "The ad's phone isn't the manager's number on HUD's record.",
+    "records.address_point": (
+        "City of Houston: this street address is on the city's address points (ZIP {zip_code})."
+    ),
     "label.owner": "Owner of record",
     "label.owner_rule": "Owner's rule",
     "label.unit": "Unit on record",
@@ -596,6 +614,27 @@ ES: dict[str, str] = {
     "label.office": "Confirmación de la oficina",
     "label.link": "Enlace",
     "label.license": "Licencia",
+    "label.src_comptroller": "Contralor de Texas",
+    "label.src_hud": "Registro de HUD",
+    "label.src_houston": "Ciudad de Houston",
+    "records.comptroller_active": (
+        "Contralor de Texas: {company} es una empresa activa de Texas desde {year}."
+    ),
+    "records.comptroller_inactive": (
+        "Contralor de Texas: {company} está en la lista, pero no como empresa activa."
+    ),
+    "records.comptroller_none": (
+        "Contralor de Texas: {company} no aparece en la lista del Contralor "
+        "(los propietarios individuales no figuran)."
+    ),
+    "records.hud_manager": "El registro de HUD indica que el administrador es {company}.",
+    "records.hud_phone_differs": (
+        "El teléfono del anuncio no es el número del administrador en el registro de HUD."
+    ),
+    "records.address_point": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad "
+        "(código postal {zip_code})."
+    ),
     "label.owner": "Propietario registrado",
     "label.owner_rule": "Regla del propietario",
     "label.unit": "Unidad en el registro",
@@ -1455,9 +1494,40 @@ ES.update(
 EN.update(
     {
         "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "trace.error.model_nokey": "No model key is set, so code finished the checks.",
+        "trace.error.model_busy": (
+            "The agent waited too long behind other checks, so code finished the checks."
+        ),
+        "trace.error.model_stuck": "The agent stopped answering, so code finished the checks.",
+        "timeline.fallback.timeout": "it ran out of time",
+        "timeline.fallback.failed": "the model could not be used",
+        "timeline.fallback.nokey": "no model key is set",
+        "timeline.fallback.busy": "it waited too long behind other checks",
+        "timeline.fallback.stuck": "it stopped answering",
         "trace.updated": 'More checks changed the result from "{old}" to "{new}": {reason}',
         "trace.updated.short": "More checks changed the result.",
         "timeline.updated": "Updated after more checks",
+        "worklog.tool.record": "Read the facts on CoStar's record of the building",
+        "worklog.tool.office": "Read how the ad's contact compares with the leasing office",
+        "worklog.tool.owner": "Read the county's owner of record",
+        "worklog.tool.place": "Read where the photos were placed in the 3D scan",
+        "worklog.tool.search": "Searched CoStar's record for places that fit",
+        "worklog.tool.todos": "Updated its to-do list",
+        "worklog.tool.write": "Wrote its working note",
+        "worklog.tool.read": "Read a working note",
+        "worklog.tool.open": "Looked at the choices code offered",
+        "worklog.tool.choose": "Picked one of the choices code offered",
+        "worklog.tool.spot": "Asked code to draw a spot for the photo",
+        "worklog.tool.challenge": "Asked code to draft the message for the poster",
+        "worklog.tool.task": "Handed work to: {name}",
+        "worklog.tool.task_other": "Handed work to another helper",
+        "worklog.tool.other": "Used one of its tools",
+        "worklog.result.done": "Done.",
+        "worklog.result.running": "Still working.",
+        "worklog.result.saved": "Saved. Derived text only; no result in it.",
+        "worklog.result.todos": "{done} of {count} steps done.",
+        "worklog.asked.fallback": "Check your part of this ad and write a short note.",
+        "worklog.said.fallback": "Handed back its findings in a note.",
         "timeline.read_ad": "Read the ad",
         "timeline.which_checks": "Chose which checks to run",
         "timeline.locate": "Placed {placed} of {total} photos in its 3D scan",
@@ -1492,7 +1562,7 @@ EN.update(
         "timeline.delegate": "Handed the {name} checks to a sub-agent",
         "timeline.note": "Wrote a working note",
         "timeline.unsure": "Flagged a close call",
-        "timeline.fallback": "The agent stopped, so code finished the checks",
+        "timeline.fallback": "The deep agent stopped: {reason}; code set the verdict",
         "timeline.error": "Code used its own pick",
         "timeline.verdict": "Code worked out the result",
         "timeline.result.done": "Done.",
@@ -1585,11 +1655,47 @@ ES.update(
         "trace.error.model_timeout": (
             "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
         ),
+        "trace.error.model_nokey": (
+            "No hay clave del modelo, así que el código terminó las comprobaciones."
+        ),
+        "trace.error.model_busy": (
+            "El agente esperó demasiado detrás de otras comprobaciones, así que el código las"
+            " terminó."
+        ),
+        "trace.error.model_stuck": (
+            "El agente dejó de responder, así que el código terminó las comprobaciones."
+        ),
+        "timeline.fallback.timeout": "se le acabó el tiempo",
+        "timeline.fallback.failed": "no se pudo usar el modelo",
+        "timeline.fallback.nokey": "no hay clave del modelo",
+        "timeline.fallback.busy": "esperó demasiado detrás de otras comprobaciones",
+        "timeline.fallback.stuck": "dejó de responder",
         "trace.updated": (
             'Más comprobaciones cambiaron el resultado de "{old}" a "{new}": {reason}'
         ),
         "trace.updated.short": "Más comprobaciones cambiaron el resultado.",
         "timeline.updated": "Actualizado tras más comprobaciones",
+        "worklog.tool.record": "Leyó los datos del registro de CoStar sobre el edificio",
+        "worklog.tool.office": "Leyó cómo se compara el contacto con la oficina de arrendamiento",
+        "worklog.tool.owner": "Leyó el propietario registrado en el condado",
+        "worklog.tool.place": "Leyó dónde se ubicaron las fotos en el escaneo 3D",
+        "worklog.tool.search": "Buscó lugares que encajan en el registro de CoStar",
+        "worklog.tool.todos": "Actualizó su lista de tareas",
+        "worklog.tool.write": "Escribió su nota de trabajo",
+        "worklog.tool.read": "Leyó una nota de trabajo",
+        "worklog.tool.open": "Miró las opciones que ofreció el código",
+        "worklog.tool.choose": "Eligió una de las opciones que ofreció el código",
+        "worklog.tool.spot": "Pidió al código un punto para la foto",
+        "worklog.tool.challenge": "Pidió al código el borrador del mensaje",
+        "worklog.tool.task": "Pasó trabajo a: {name}",
+        "worklog.tool.task_other": "Pasó trabajo a otro ayudante",
+        "worklog.tool.other": "Usó una de sus herramientas",
+        "worklog.result.done": "Hecho.",
+        "worklog.result.running": "Sigue trabajando.",
+        "worklog.result.saved": "Guardado. Solo texto derivado; sin resultado.",
+        "worklog.result.todos": "{done} de {count} pasos hechos.",
+        "worklog.asked.fallback": "Revisa tu parte de este anuncio y escribe una nota breve.",
+        "worklog.said.fallback": "Devolvió lo que encontró en una nota.",
         "timeline.read_ad": "Leyó el anuncio",
         "timeline.which_checks": "Eligió qué comprobaciones hacer",
         "timeline.locate": "Ubicó {placed} de {total} fotos en su escaneo 3D",
@@ -1624,7 +1730,7 @@ ES.update(
         "timeline.delegate": "Pasó las comprobaciones de {name} a un subagente",
         "timeline.note": "Escribió una nota de trabajo",
         "timeline.unsure": "Marcó un caso dudoso",
-        "timeline.fallback": "El agente se detuvo, así que el código terminó las comprobaciones",
+        "timeline.fallback": "El agente profundo se detuvo: {reason}; el código fijó el resultado",
         "timeline.error": "El código usó su propia opción",
         "timeline.verdict": "El código calculó el resultado",
         "timeline.result.done": "Hecho.",

@@ -42,6 +42,23 @@ def hamming(a: str, b: str) -> int:
     return bin(int(a[3:], 16) ^ int(b[3:], 16)).count("1")
 
 
+def _near_pairs(photos: list[str], chunk: int = 512) -> list[tuple[str, str]]:
+    """Every pair of photo ids within `PHOTO_HAMMING` bits, the same pairs as `hamming` on each
+    pair in turn. Done in numpy blocks: the 90-day stream has about 12,000 photos, and the ring
+    finder is run once per day on it."""
+    if len(photos) < 2:
+        return []
+    bits = np.array([int(p[3:], 16) for p in photos], dtype=np.uint64)
+    pairs: list[tuple[str, str]] = []
+    for start in range(0, len(bits), chunk):
+        block = bits[start : start + chunk]
+        near = np.bitwise_count(block[:, None] ^ bits[None, :]) <= PHOTO_HAMMING
+        for i, j in zip(*np.nonzero(near), strict=True):
+            if start + i < j:
+                pairs.append((photos[start + int(i)], photos[int(j)]))
+    return pairs
+
+
 @dataclass
 class PhraseLink:
     node: str
@@ -82,10 +99,8 @@ def build_graph(ads: list[Ad], facts: dict[int, AdFacts]) -> LinkGraph:
     by_id = {ad.id: ad for ad in ads}
     photos = sorted({p for ad in ads for p in ad.photos})
     union = _Union(photos)
-    for i, a in enumerate(photos):
-        for b in photos[i + 1 :]:
-            if hamming(a, b) <= PHOTO_HAMMING:
-                union.join(a, b)
+    for a, b in _near_pairs(photos):
+        union.join(a, b)
     photo_node = {p: f"photo-{union.find(p)[3:11]}" for p in photos}
     graph = LinkGraph(ads=by_id, facts=facts, photo_node=photo_node)
     for ad in ads:

@@ -163,7 +163,8 @@ def test_with_no_model_key_the_case_route_falls_back_to_the_policy_and_says_so(
     body = timeline(client, case)
     assert body["fell_back"] is True
     assert any(
-        s["label"] == "The agent stopped, so code finished the checks" for s in body["steps"]
+        s["label"] == "The deep agent stopped: the model could not be used; code set the verdict"
+        for s in body["steps"]
     )
 
 
