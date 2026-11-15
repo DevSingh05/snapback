@@ -4,6 +4,7 @@ import { CaseAttachmentPage } from "./investigate/CaseFile";
 import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
 import { HoodPage } from "./hood/HoodPage";
+import { SpotPage } from "./spot/SpotPage";
 import { OneBox } from "./home/OneBox";
 import { CardPage } from "./pages/CardPage";
 import { ReviewsPage } from "./reviews/ReviewsPage";
@@ -43,6 +44,7 @@ type Route =
   | { name: "stories" }
   | { name: "reviews" }
   | { name: "hood" }
+  | { name: "spot" }
   | { name: "proof-room" }
   | { name: "home" };
 
@@ -62,6 +64,7 @@ export function matchRoute(path: string): Route {
   if (/^\/stories\/?$/.test(path)) return { name: "stories" };
   if (/^\/reviews\/?$/.test(path)) return { name: "reviews" };
   if (/^\/under-the-hood\/?$/.test(path)) return { name: "hood" };
+  if (/^\/spot\/?$/.test(path)) return { name: "spot" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
   const invCase = /^\/investigate\/case\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (invCase?.[1]) return { name: "investigate-case", ringId: invCase[1] };
@@ -163,6 +166,8 @@ export default function App() {
           <ReviewsPage />
         ) : route.name === "hood" ? (
           <HoodPage />
+        ) : route.name === "spot" ? (
+          <SpotPage />
         ) : route.name === "confirm" ? (
           <ConfirmPage />
         ) : route.name === "investigate" ? (
