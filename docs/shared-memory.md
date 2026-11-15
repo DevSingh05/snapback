@@ -27,14 +27,14 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (Sat 22:09)
+## Who is doing what (Sat 22:16)
 
-Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Main 812da1d GREEN (CI run 43670005141, 22:05).
+Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Main a655edc (#286 check team panel, 22:10); CI on a655edc NOT CHECKED this tick.
 
-- **Dev (DevSingh05, A):** #274 ff8af90 PASS (percent-host + punycode probes), #277 53c4fea PASS, #282 abee6fa PASS (test only). All 3 must merge main 812da1d, then merge in order 282 -> 274 -> 277. Bright Data key: Vidyut sends it privately (#8). Video C06/C08/C09. Owns demo-laptop .env and LangSmith. Vercel redeploy asked 21:55 (#8).
-- **Vidyut + conductor (vs-githjk, T):** video (VO FINAL, storyboard v3 approved except sc15), Devpost, business plan; #286 check team panel in fixes.
-- **Jeffrey (jeffrey-g05, V):** #272 still a8f8098 (no spread-bar fix pushed); #283 PASS, waits #272; rubric read on #41 OVERDUE (was due 22:00); live Photon test on his laptop (sidecar d/photon-v2 847ec84, API :8020); Vexcel feasibility **22:45**.
-- **Rishit (RishitRai, D):** #264 92004d0 node RED: 3 Spanish tests, because #280's red-flag headlines (strings.py:554-557 / :1137-1140) are not in HEADLINES_ES (FIX #11). Then 275 -> 276 -> 281 (deltas PASS). C19 clips by AirDrop **22:30**.
+- **Dev (DevSingh05, A):** #274 ff8af90 PASS (python+node red on old base, 9 behind main), #277 53c4fea PASS (base a/8-web-subagent), #282 abee6fa PASS (3 green but 3 behind main). Asked 22:08 and 22:11 (#8) to merge main into all 3 and redeploy Vercel from latest main (covers #284 + #286); no reply yet. Order 282 -> 274 -> 277.
+- **Vidyut + conductor (vs-githjk, T):** video v2 (114.5 s), #287 graph view (separate reviewer), Devpost, business plan.
+- **Jeffrey (jeffrey-g05, V):** silent since 22:08 asks. #272 still a8f8098 (no spread-bar fix); #283 waits #272; rubric read on #41 OVERDUE (due 22:00); C07 orbit clip **22:30**; ElevenLabs voice test results on #10 (asked ~22:03); Vexcel feasibility **22:45**.
+- **Rishit (RishitRai, D):** Spanish red-flag fix 0498c12 PASS (matches strings.py:554-557/:1137-1140). Stack #264 0498c12, #275 8407067, #276 028c80f, #281 bd265eb all review PASS but 2 behind main (a655edc); asked 22:16 on #11 to merge main and post heads. C19 clips **22:30**.
 
 ## Open questions
 
@@ -45,9 +45,9 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 
 ## Live facts
 
-- **main = aa09acb** (#280, 21:2x): **node CI FAILED**, python in progress (21:35). **Merge freeze until main is green**; a fix-forward builder owns it. Previous main 17e04be (#273).
-- Merged Sat evening: #250 #257 #263 #265-#271 #273 #278 #280.
-- **Which build is live on Vercel:** last reported by Dev 20:17 as bf5b574; **stale**, master-guardian owns `plan/live.json`. Dev told to hold redeploy until main is green.
+- **main = a655edc** (#286, 22:10). 812da1d (#284) was GREEN (run 43670005141). Freeze lifted after #285.
+- Merged Sat evening: #250 #257 #263 #265-#271 #273 #278 #280 #284 #285 #286.
+- **Which build is live on Vercel:** last reported by Dev 20:17 as bf5b574; **stale**, master-guardian owns `plan/live.json`. Dev asked 22:11 (#8) to redeploy from latest main; no sha posted yet.
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only). Timeline, copy-alert, evidence-image all read the token from a header.
 
 ## Gates
