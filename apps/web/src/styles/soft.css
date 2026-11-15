@@ -172,13 +172,12 @@
   :root .twin-stage {
     height: min(46vh, 400px);
   }
-  /* the report's "tell someone" links and the map's credits are finger sized */
+  /* the report's "tell someone" links and the map's credits are finger sized: the padding
+     widens the touch area without moving the line they sit in */
   :root .case-file-where a,
   :root .case-file-agencies a,
   :root .attribution a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
+    padding-block: 12px;
   }
 }
 
