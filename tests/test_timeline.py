@@ -308,3 +308,40 @@ def test_record_rent_and_phone_steps_carry_the_records_own_source():
     assert by_label["Checked the phone against the leasing office"] is DataSource.LIVE
     assert by_label["Read the ad"] is DataSource.FIXTURE
     assert by_label["Code worked out the result"] is DataSource.FIXTURE
+
+
+def test_each_check_step_names_its_module_so_a_page_can_link_a_reason_to_it():
+    events = [
+        ev(0, 0, TraceKind.CHOICE, "Has a twin.", choice=ChoiceKind.WHICH_CHECKS, pick="x"),
+        ev(1, 40, TraceKind.TOOL, "Placing 3 listing photos in the twin.", pick="locate"),
+        ev(2, 340, TraceKind.CHOICE, "Only one.", choice=ChoiceKind.NEXT_CHECK, pick="home record"),
+        ev(
+            3, 500, TraceKind.CHOICE, "Owner.", choice=ChoiceKind.NEXT_CHECK, pick="owner of record"
+        ),
+        ev(4, 600, TraceKind.AGENT, "handed", pick="sub-agent: place", chosen_by="model"),
+        ev(5, 1000, TraceKind.VERDICT, "Hold.", pick="hold"),
+    ]
+    ev_ = evidence(
+        locate=placed(3, 3),
+        price=PriceResult(status=PriceStatus.WITHIN_RANGE, listed_rent=1450, n_floor_plans=37),
+    )
+    tl = build_timeline("c1", DataSource.FIXTURE, events, ev_)
+    kinds = [(s.kind) for s in tl.steps]
+    assert kinds == [None, None, "locate", "record", "rent", "owner", "place", None]
+
+
+def test_a_skipped_check_is_marked_and_a_run_check_is_not():
+    events = [
+        ev(
+            0,
+            0,
+            TraceKind.STATUS,
+            "Skipped owner of record: none on record.",
+            pick="owner of record",
+        ),
+        ev(1, 50, TraceKind.CHOICE, "Only one.", choice=ChoiceKind.NEXT_CHECK, pick="home record"),
+    ]
+    tl = build_timeline("c1", DataSource.FIXTURE, events, evidence())
+    owner = next(s for s in tl.steps if s.kind == "owner")
+    record = next(s for s in tl.steps if s.kind == "record")
+    assert owner.skipped is True and record.skipped is False

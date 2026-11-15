@@ -8,9 +8,17 @@ import type { ReactNode } from "react";
 import "../ui/ui.css";
 import "./case.css";
 import { headlineOf, historySteps, shortDate } from "../cardStrings";
-import type { Card, CardLine, CardRowKind, CopyAlert, ReportPack } from "../contracts";
+import type {
+  Card,
+  CardLine,
+  CardRowKind,
+  CaseTimeline,
+  CopyAlert,
+  ReportPack,
+} from "../contracts";
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
+import { AnswerPanel } from "./AnswerPanel";
 import { Checks } from "./Checks";
 import { Ledger } from "./Ledger";
 import {
@@ -54,6 +62,8 @@ export interface CaseResultProps {
   copyAlert?: CopyAlert | null;
   // GET /cases/{id}/report: the pack behind "File this report".
   reportPack?: ReportPack | null;
+  // GET /cases/{id}/timeline: the "How we got this answer" panel. Left out or empty: no panel.
+  timeline?: CaseTimeline | null;
   // Where "Find me safer places like this" goes. Left out: the tiles below, else the Finder.
   saferHref?: string;
   // Anything the page adds under the next steps (the safer places, the office check).
@@ -74,6 +84,7 @@ export function CaseResult({
   saferPlaces: safer_places = [],
   copyAlert = null,
   reportPack = null,
+  timeline = null,
   saferHref: saferTo,
   children,
 }: CaseResultProps) {
@@ -155,6 +166,10 @@ export function CaseResult({
         source={card.source}
         titleId={`case-checks-title${key}`}
       />
+
+      {own ? (
+        <AnswerPanel card={card} timeline={timeline} realListing={realListing} idSuffix={key} />
+      ) : null}
 
       {own && !passed ? (
         <WhatNext
