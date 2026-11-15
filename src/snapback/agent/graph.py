@@ -172,6 +172,7 @@ def build_model(
     name: str | None = None,
     timeout_s: float | None = None,
     max_tokens: int = 4096,
+    effort: str | None = None,
 ) -> Any:
     """Claude through langchain. The key comes from the environment or the caller (settings,
     which read it from the environment); it is never printed or stored. `timeout_s` bounds each
@@ -181,6 +182,8 @@ def build_model(
     kwargs: dict[str, Any] = {"model": name or DEFAULT_MODEL, "max_tokens": max_tokens}
     if api_key:
         kwargs["api_key"] = api_key
+    if effort:
+        kwargs["reasoning_effort"] = effort  # low: plans and notes need little thinking
     if timeout_s is not None:
         kwargs["timeout"] = timeout_s
         kwargs["max_retries"] = 1

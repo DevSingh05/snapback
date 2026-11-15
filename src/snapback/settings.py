@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     # America/Chicago.
     snapback_card_timezone: str = "America/Chicago"
 
+    @property
+    def agent_timeout_s(self) -> float:
+        """The deep agent's time limit for this mode: the explicit SNAPBACK_AGENT_TIMEOUT_S if one
+        was set, else 25 s on the request path and the longer budget for the background."""
+        if "snapback_agent_timeout_s" in self.model_fields_set:
+            return self.snapback_agent_timeout_s
+        if self.snapback_agent == "deepagents_async":
+            return self.snapback_agent_async_default_timeout_s
+        return self.snapback_agent_timeout_s
+
     @field_validator("snapback_card_timezone")
     @classmethod
     def _a_known_time_zone(cls, value: str) -> str:
@@ -69,6 +79,9 @@ class Settings(BaseSettings):
     # The deep agent's time per run (seconds) before code finishes the case, and which Claude
     # model it uses (None: the graph's default). The key is ANTHROPIC_API_KEY, from the env.
     snapback_agent_timeout_s: float = 25.0
+    # deepagents_async has no request waiting on it, so unless SNAPBACK_AGENT_TIMEOUT_S is set
+    # explicitly its default is this longer budget (measured: a full run takes about 25 s).
+    snapback_agent_async_default_timeout_s: float = 60.0
     snapback_agent_model: str = "claude-sonnet-5-5"
     # The sub-agents (one per check family) read a few facts and write a note: a small, fast model.
     snapback_subagent_model: str = "claude-haiku-5-5"

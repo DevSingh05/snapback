@@ -409,13 +409,23 @@ def test_defaults_are_sonnet_for_the_agent_and_haiku_for_the_sub_agents():
     assert s.snapback_agent_max_concurrent == 2
 
 
+def test_the_background_agent_gets_a_longer_budget_unless_the_limit_is_set_explicitly():
+    assert Settings(_env_file=None).agent_timeout_s == 25.0  # on the request path: unchanged
+    assert Settings(_env_file=None, snapback_agent="deepagents").agent_timeout_s == 25.0
+    assert Settings(_env_file=None, snapback_agent="deepagents_async").agent_timeout_s == 60.0
+    explicit = Settings(
+        _env_file=None, snapback_agent="deepagents_async", snapback_agent_timeout_s=9
+    )
+    assert explicit.agent_timeout_s == 9.0
+
+
 def test_the_main_agent_and_the_sub_agents_get_their_own_models(tmp_path, monkeypatch):
     import snapback.agent.graph as graph
 
     built: list[tuple] = []
 
-    def fake_build_model(api_key=None, name=None, timeout_s=None, max_tokens=4096):
-        built.append((name, max_tokens))
+    def fake_build_model(api_key=None, name=None, timeout_s=None, max_tokens=4096, effort=None):
+        built.append((name, max_tokens, effort))
         return Crew()
 
     monkeypatch.setattr(graph, "build_model", fake_build_model)
@@ -429,7 +439,10 @@ def test_the_main_agent_and_the_sub_agents_get_their_own_models(tmp_path, monkey
     client = TestClient(create_app(s, lookups=KitLookups(DataSource.FIXTURE)))
     case = start(client)
     client.app.state.store.wait_for_agents()
-    assert [name for name, _ in built] == ["claude-sonnet-5-5", "claude-haiku-5-5"]
+    assert [(n, e) for n, _, e in built] == [
+        ("claude-sonnet-5-5", "low"),
+        ("claude-haiku-5-5", "low"),
+    ]
     assert read(client, case)["fell_back"] is False
 
 

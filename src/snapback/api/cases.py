@@ -405,8 +405,9 @@ def _background_job(
         return build_model(
             key.get_secret_value() if key else None,
             name,
-            settings.snapback_agent_timeout_s,
+            settings.agent_timeout_s,
             max_tokens,
+            "low",
         )
 
     def run() -> None:
@@ -424,7 +425,7 @@ def _background_job(
                 TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
             )
             return
-        run_advisory(session, agent, deadline_s=settings.snapback_agent_timeout_s)
+        run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
 
     return run
 
@@ -440,7 +441,7 @@ def _deepagents_runner(
     policy from then on. `model_factory` makes the chat model (tests); by default Claude, with
     the key from settings (read from the environment), never printed."""
     agents: dict[str, object] = {}
-    timeout_s = settings.snapback_agent_timeout_s if settings is not None else None
+    timeout_s = settings.agent_timeout_s if settings is not None else None
     if settings is not None:
         _setup_langsmith(settings)
 
