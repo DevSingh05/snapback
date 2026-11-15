@@ -89,16 +89,16 @@ export function AppShell({ section, context, bar, tabs = NAV_TABS, children }: P
       Customize
     </button>
   );
-  const siteLink = SITE_URL ? (
-    <a className="app-site" href={SITE_URL}>
+  const siteLink = (
+    <a className="app-site" href={SITE_URL || "/"}>
       About SNAPBACK
     </a>
-  ) : null;
+  );
 
   return (
     <div className="app" data-section={section ?? "none"} data-bar={bar}>
       <header className="app-bar">
-        <a className="app-mark" href="/home" aria-label="SNAPBACK home">
+        <a className="app-mark" href="/" aria-label="SNAPBACK intro">
           <Lockup />
         </a>
         <nav className="app-tabs" aria-label="Main">
