@@ -7,7 +7,7 @@
 **Real photos, fake landlord. Send SNAPBACK the ad: it checks the real home's 3D scan and property record, and tells you who to call before you pay.**
 
 [Live site](https://snapback-navy.vercel.app) · [Demo video](https://youtu.be/XN3aK8T2BJo) ·
-[Devpost](DEVPOST_URL) · [Spot the scam](https://snapback-navy.vercel.app/spot)
+[Spot the scam](https://snapback-navy.vercel.app/spot)
 
 [![CI](https://github.com/DevSingh05/snapback/actions/workflows/ci.yml/badge.svg)](https://github.com/DevSingh05/snapback/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
