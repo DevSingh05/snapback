@@ -34,6 +34,7 @@ from snapback.settings import Settings
 MAX_RENTALS = 25  # items asked of each Apify search
 # Never opened or fetched, whatever the ad links to (sponsor and platform terms, #8).
 NEVER_OPEN = ("facebook.com", "fb.com", "fb.me", "m.me", "apartments.com")
+_PLAIN_HOST = re.compile(r"[a-z0-9.-]+")
 _PLAIN_LINK = re.compile(r"https?://[^\s\"'<>`]+", re.I)
 
 
@@ -44,12 +45,15 @@ def may_open(link: str | None) -> bool:
         return False
     try:
         url = httpx.URL(link)
-    except (httpx.InvalidURL, ValueError):
+        url.host  # noqa: B018 - decoding checks the IDNA labels; an invalid xn-- label raises
+        host = url.raw_host.decode("ascii").lower().rstrip(".")  # punycode stays ASCII
+    except Exception:  # httpx.InvalidURL, ValueError, idna errors: never open what we can't read
         return False
     if url.userinfo:  # "https://x@facebook.com/..." really goes to facebook.com
         return False
-    host = url.host.lower().rstrip(".")
-    if not host:
+    # ASCII letters, digits, dots and hyphens only (punycode xn-- is ASCII): a percent-encoded
+    # host such as face%62ook.com decodes to facebook.com in a browser.
+    if not host or not _PLAIN_HOST.fullmatch(host):
         return False
     return not any(host == bad or host.endswith("." + bad) for bad in NEVER_OPEN)
 
