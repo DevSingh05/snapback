@@ -504,16 +504,3 @@
     overflow-y: auto;
   }
 }
-
-/* The site footer: one quiet link to /reviews. */
-.app-sitefoot {
-  padding: var(--sp-3) var(--page-pad);
-  background: var(--layer-0);
-  font-size: var(--fs-sm);
-}
-.app-sitefoot a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--muted);
-}

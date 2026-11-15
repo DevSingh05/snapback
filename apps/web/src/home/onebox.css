@@ -28,6 +28,12 @@
   gap: var(--sp-4);
   padding-block: 0 var(--sp-6);
   color: var(--ink);
+  isolation: isolate;
+  /* The page's one depth: a hairline under the edge and a short, soft drop. Sharp corners. */
+  --ob-edge: color-mix(in srgb, var(--ink) 13%, transparent);
+  --ob-lift:
+    0 1px 0 var(--ob-edge), 0 10px 22px -14px color-mix(in srgb, var(--ink) 46%, transparent);
+  --ob-shine: inset 0 1px 0 color-mix(in srgb, var(--surface) 92%, transparent);
 }
 .ob[data-empty] {
   max-width: none;
@@ -265,13 +271,16 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4);
-  background: var(--home-raised);
+  background: var(--home-surface);
   color: var(--ink);
   font-size: var(--fs-md);
   font-weight: 700;
   line-height: 1.3;
   text-align: left;
-  transition: background-color 0.15s linear;
+  box-shadow: var(--ob-shine), var(--ob-lift);
+  transition:
+    transform 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
 }
 .ob-example::before {
   content: "\2192";
@@ -280,8 +289,10 @@
   transition: transform 0.25s var(--ease-out);
 }
 @media (hover: hover) {
-  .ob-example:hover {
-    background: color-mix(in srgb, var(--ink) 9%, var(--home-raised));
+  .ob-example:hover,
+  .ob-replies button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ob-shine), var(--shadow);
   }
   .ob-example:hover::before {
     transform: translateX(3px);
@@ -681,13 +692,16 @@
   display: flex;
   flex-direction: column;
   padding-inline: var(--sp-4);
-  background: var(--home-surface);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
   color: var(--ink);
   box-shadow:
-    inset 0 1px 0 var(--hi),
+    var(--ob-shine),
     inset 0 0 0 1px var(--home-line),
-    inset 0 -2px 0 transparent;
-  transition: box-shadow 0.15s linear;
+    inset 0 -2px 0 transparent,
+    var(--ob-lift);
+  transition: box-shadow 0.2s var(--ease-out);
 }
 .ob-box[data-big] {
   padding-inline: 22px;
@@ -701,8 +715,10 @@
 .ob-box[data-dragging],
 .ob-box:has(.ob-listen) {
   box-shadow:
+    var(--ob-shine),
     inset 0 0 0 1px var(--home-line),
-    inset 0 -2px 0 var(--act);
+    inset 0 -2px 0 var(--act),
+    var(--ob-lift);
 }
 .ob-box[data-big]:is(:focus-within, [data-dragging], :has(.ob-listen)) {
   box-shadow:
@@ -888,8 +904,9 @@
   max-width: min(560px, 88%);
   margin-top: var(--sp-4);
   padding: var(--sp-3) var(--sp-4);
-  background: var(--home-surface);
-  color: var(--ink);
+  background: var(--matte);
+  color: var(--on-matte);
+  box-shadow: var(--ob-lift);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -899,7 +916,7 @@
 .ob-you .ob-you-files {
   margin-top: var(--sp-1);
   font-size: var(--fs-sm);
-  color: var(--muted);
+  color: var(--on-matte-muted);
 }
 .ob-you:first-child {
   margin-top: 0;
@@ -928,16 +945,25 @@
   text-underline-offset: 3px;
 }
 .ob-bot {
-  max-width: 62ch;
+  max-width: 66ch;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--home-surface);
+  box-shadow: var(--ob-shine), var(--ob-lift);
 }
 .ob-bot p {
   margin: 0;
-  font-size: var(--fs-md);
+  font-size: 1.0625rem;
   line-height: var(--lh-body);
+}
+.ob-bot > .ob-stamp {
+  align-self: stretch;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--home-line);
+  text-transform: uppercase;
 }
 .ob-bot-error p {
   color: var(--coral);
@@ -1005,9 +1031,13 @@
 .ob-replies button {
   min-height: 48px;
   padding: var(--sp-2) var(--sp-4);
-  background: var(--home-surface);
+  background: var(--home-raised);
   color: var(--ink);
   font-size: var(--fs-md);
+  font-weight: 700;
+  transition:
+    transform 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
 }
 .ob-working {
   display: flex;
@@ -1051,8 +1081,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  padding-block: var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
-  background: var(--home-ground);
+  padding-block: var(--sp-5) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(transparent, var(--home-ground) var(--sp-5));
 }
 .ob-learned {
   margin: 0;
@@ -1452,4 +1482,183 @@
   .ob-box[data-big] .ob-input {
     min-height: 148px;
   }
+}
+
+/* ---------- A conversation: the field stays, the drawing moves to a rail ---------- */
+/* The same drafting grid as Home, fixed behind the thread and strongest behind the rail. */
+.ob:not([data-empty])::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  --grid: color-mix(in srgb, var(--ink) 7%, transparent);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(90% 100% at 92% 30%, black 0%, transparent 68%);
+  mask-image: radial-gradient(90% 100% at 92% 30%, black 0%, transparent 68%);
+}
+.ob-rail {
+  display: none;
+}
+@media (min-width: 1180px) {
+  .ob:not([data-empty]) {
+    max-width: 1184px;
+    display: grid;
+    grid-template-columns: minmax(0, 760px) minmax(0, 344px);
+    justify-content: space-between;
+    align-content: start;
+    column-gap: var(--sp-8);
+  }
+  .ob:not([data-empty]) > * {
+    grid-column: 1;
+  }
+  .ob:not([data-empty]) > .ob-rail {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    position: sticky;
+    top: calc(var(--bar-h, 64px) + var(--sp-4));
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--sp-4);
+  }
+}
+.ob-rail-title {
+  margin: var(--sp-5) 0 0;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+.ob-rail-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ob-rail-rows li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-height: 64px;
+  padding-block: var(--sp-3);
+  border-bottom: 1px solid var(--home-line);
+}
+.ob-rail-n {
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+.ob-rail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ob-rail-main b {
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+.ob-rail-ask {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.ob-rail-state .ui-state {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.ob-rail-wait {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+
+/* What to do next: rows on rules under the last answer, each one whole tap target. */
+.ob-next {
+  margin-top: var(--sp-5);
+}
+.ob-next-title {
+  display: block;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--ink);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+.ob-next-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ob-next-row {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ob-next-row .ob-way-title {
+  min-width: 12.5rem;
+}
+@media (max-width: 640px) {
+  .ob-next-row .ob-way-title {
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Each check ticks while its card is on the way, then its state lands one after another. */
+  .ob-rail-wait {
+    animation: ob-dot 1.2s ease-in-out infinite;
+  }
+  .ob-rail-rows li:nth-child(2) .ob-rail-wait {
+    animation-delay: 0.2s;
+  }
+  .ob-rail-rows li:nth-child(3) .ob-rail-wait {
+    animation-delay: 0.4s;
+  }
+  .ob-rail-state {
+    animation: ob-arrive 0.4s var(--ease-out) backwards;
+  }
+  .ob-rail-rows li:nth-child(2) .ob-rail-state {
+    animation-delay: 0.18s;
+  }
+  .ob-rail-rows li:nth-child(3) .ob-rail-state {
+    animation-delay: 0.36s;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-example,
+  .ob-replies button,
+  .ob-way-go {
+    transition: none;
+  }
+}
+
+/* The state sits on the name's line; the question runs the full width under both. */
+.ob-rail-main {
+  display: contents;
+}
+.ob-rail-main b {
+  grid-column: 2;
+  grid-row: 1;
+}
+.ob-rail-ask {
+  grid-column: 2 / -1;
+  grid-row: 2;
+}
+.ob-rail-state,
+.ob-rail-wait {
+  grid-column: 3;
+  grid-row: 1;
+}
+.ob-way-go {
+  justify-self: end;
+  min-width: 20px;
+  text-align: right;
 }

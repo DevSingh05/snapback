@@ -27,7 +27,7 @@ const tabs = () =>
 describe("the app shell", () => {
   it("the front cut: the bar is Home and Stories, and nothing else has a front door", () => {
     render(<AppShell section="home">page</AppShell>);
-    expect(tabs()).toEqual(["Home", "Stories"]);
+    expect(tabs()).toEqual(["Home", "Stories", "Reviews"]);
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
     for (const name of ["Listings", "Map", "Finder", "Replays", "Investigate"])
@@ -49,7 +49,7 @@ describe("the app shell", () => {
 
   it("a hidden page still renders in the shell, with no tab marked for it", () => {
     render(<AppShell section="listings">page</AppShell>);
-    expect(tabs()).toEqual(["Home", "Stories"]);
+    expect(tabs()).toEqual(["Home", "Stories", "Reviews"]);
     expect(document.querySelector("[aria-current='page']")).toBeNull();
     expect(screen.getByTestId("page-purpose")).toHaveTextContent(PURPOSE.listings!);
   });
@@ -66,7 +66,7 @@ describe("the app shell", () => {
         page
       </AppShell>,
     );
-    expect(tabs()).toEqual(["Home", "Stories", "Report"]);
+    expect(tabs()).toEqual(["Home", "Stories", "Reviews", "Report"]);
     expect(screen.getByRole("link", { name: "Report" })).toHaveAttribute("aria-current", "page");
   });
 
@@ -76,7 +76,7 @@ describe("the app shell", () => {
         page
       </AppShell>,
     );
-    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories"]);
+    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories", "Reviews"]);
     expect(screen.getByRole("link", { name: "Listings" })).toHaveAttribute("aria-current", "page");
   });
 
@@ -115,7 +115,7 @@ describe("the app shell", () => {
     );
     expect(order.slice(0, 1)).toEqual(["SNAPBACK home"]);
     expect(order.slice(1, 6)).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
-    expect(order.slice(6, 8)).toEqual(["Stories", "Customize"]);
+    expect(order.slice(6, 9)).toEqual(["Stories", "Reviews", "Customize"]);
   });
 
   it("on a phone there is no theme button, and Customize is in the footer", () => {
@@ -139,7 +139,15 @@ describe("the app shell", () => {
           name: "Customize",
         }),
       ).toBeInTheDocument();
-      expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories"]);
+      expect(tabs()).toEqual([
+        "Home",
+        "Listings",
+        "Map",
+        "Finder",
+        "Replays",
+        "Stories",
+        "Reviews",
+      ]);
     } finally {
       window.matchMedia = real;
     }
@@ -171,7 +179,7 @@ describe("the app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Customize" }));
     const panel = screen.getByTestId("customize");
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Replays" }));
-    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Stories"]);
+    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Stories", "Reviews"]);
     const firsts = within(panel).getAllByRole("radio", { name: "Opens first" });
     fireEvent.click(firsts[2]!); // Map
     // The hidden tab is kept. Map is not in the bar, so the site still opens on Home.

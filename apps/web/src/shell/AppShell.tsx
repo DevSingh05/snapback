@@ -121,6 +121,14 @@ export function AppShell({ section, context, bar, tabs = NAV_TABS, children }: P
           >
             Stories
           </a>
+          <a
+            className="app-tab app-stories"
+            href="/reviews"
+            aria-current={section === "reviews" ? "page" : undefined}
+            data-in={section === "reviews" ? "true" : undefined}
+          >
+            Reviews
+          </a>
           {context && (
             <a className="app-tab app-tab-context" href={context.href} aria-current="page">
               {context.label}
@@ -196,13 +204,6 @@ export function AppShell({ section, context, bar, tabs = NAV_TABS, children }: P
           </p>
         )}
       {children}
-      {section !== "map" && (
-        <footer className="app-sitefoot">
-          <a href="/reviews" aria-current={section === "reviews" ? "page" : undefined}>
-            Reviews
-          </a>
-        </footer>
-      )}
       {phone && section !== "map" && (canCustomize || siteLink) && (
         <footer className="app-foot">
           {canCustomize && customizeButton}

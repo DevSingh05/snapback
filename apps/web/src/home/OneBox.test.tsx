@@ -537,3 +537,57 @@ describe("the docked box leaves room under the thread", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("a conversation keeps the drawing, the three checks and the next moves", () => {
+  it("before any check: what a check looks at, and the sample ad, the map and the Finder", async () => {
+    const user = userEvent.setup();
+    render(<OneBox mode="fixture" />);
+    await user.click(screen.getByRole("button", { name: "Is this landlord real?" }));
+    const rail = screen.getByTestId("ob-rail");
+    expect(within(rail).getByTestId("ob-elevation")).toBeInTheDocument();
+    expect(rail).toHaveTextContent("What a check looks at");
+    expect(
+      within(rail)
+        .getAllByRole("listitem")
+        .map((li) => li.querySelector("b")!.textContent),
+    ).toEqual(["Place", "Person", "Price"]);
+    expect(within(rail).queryByText("Checking")).toBeNull();
+    const next = screen.getByTestId("ob-next");
+    expect(within(next).getByRole("button", { name: /^Try the sample ad/ })).toBeInTheDocument();
+    expect(
+      within(next)
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href")),
+    ).toEqual(["/map", "/finder"]);
+  });
+
+  it("after a check: each of the three carries the card's own state word, then what to ask", async () => {
+    const user = userEvent.setup();
+    render(<OneBox mode="fixture" createCase={made()} checkingMs={0} />);
+    await say(user, AD);
+    await screen.findByTestId("ob-verdict");
+    const rail = screen.getByTestId("ob-rail");
+    await waitFor(() => expect(rail).toHaveTextContent("Case 7Q2M: what the check found"));
+    const rows = within(rail).getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent("Matches");
+    expect(rows[2]).toHaveTextContent("Warning");
+    expect(within(rail).queryByText("Checking")).toBeNull();
+    const next = screen.getByTestId("ob-next");
+    expect(within(next).getByRole("button", { name: /^Is this a real listing\?/ })).toBeEnabled();
+    expect(within(next).getByRole("button", { name: /^Who do I call\?/ })).toBeEnabled();
+  });
+
+  it("a check that fails stops the rail from saying it is still checking", async () => {
+    const user = userEvent.setup();
+    const createCase: CreateCase = vi.fn(async () => {
+      throw new Error("The check could not start.");
+    });
+    render(<OneBox mode="fixture" createCase={createCase} checkingMs={0} />);
+    await say(user, AD);
+    await screen.findByTestId("ob-check-error");
+    await waitFor(() =>
+      expect(screen.getByTestId("ob-rail")).toHaveTextContent("What a check looks at"),
+    );
+    expect(screen.getByTestId("ob-next")).toBeInTheDocument();
+  });
+});
