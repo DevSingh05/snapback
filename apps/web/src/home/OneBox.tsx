@@ -17,7 +17,6 @@ import type {
   PlaceMatch,
   RenterBrief,
 } from "../contracts";
-import { HERO_PHOTOS, HeroStreet } from "../landing/HeroStreet";
 import { searchPlaces } from "../search/api";
 import {
   decide,
@@ -39,6 +38,8 @@ import { useVoiceInput, voiceStatus } from "../shell/voice";
 import { YourChecks } from "../shell/YourChecks";
 import { HomeTeam } from "../proofroom/HomeTeam";
 import { PhotoPin, State, type StateKind } from "../ui";
+import { Tag } from "../ui/Tag";
+import { Elevation } from "./Elevation";
 import {
   MODE,
   approveChallenge as defaultApprove,
@@ -181,6 +182,8 @@ export function OneBox(props: Props) {
   const cardsRef = useRef<Record<string, Card>>({});
   const adRef = useRef<Record<string, string>>({});
   const [landed, setLanded] = useState(0);
+  // Checks that ended without a card (the server refused, or the card never came).
+  const [checksFailed, setChecksFailed] = useState(0);
 
   useEffect(() => {
     if (mode !== "live") return;
@@ -506,6 +509,12 @@ export function OneBox(props: Props) {
   const kept = fs?.proposals.filter((p) => p.status === "accepted") ?? [];
   const lines = fs ? learnedLines(fs.learned) : [];
 
+  // The rail beside the thread: the newest case, and whether its card is still on the way.
+  const lastCase = cases[cases.length - 1];
+  const railCard = lastCase ? (cardsRef.current[lastCase] ?? null) : null;
+  const checksAsked = items.filter((it) => it.type === "check").length;
+  const checking = checksAsked > Object.keys(cardsRef.current).length + checksFailed;
+
   const composer = (
     <Composer
       text={text}
@@ -531,8 +540,7 @@ export function OneBox(props: Props) {
   return (
     <div className="ob" ref={root} data-empty={empty || undefined} data-testid="one-box">
       {!empty && (
-        <div className="ob-top ui-on-matte">
-          <HeroStreet strip />
+        <div className="ob-top">
           <SourceChip source={shownMode} />
           <div className="ob-top-acts">
             <button
@@ -551,19 +559,22 @@ export function OneBox(props: Props) {
           </div>
         </div>
       )}
+      {!empty && <ThreadRail card={checking ? null : railCard} checking={checking} />}
 
       {empty ? (
         <section className="ob-start" aria-labelledby="ob-title">
-          <div className="ob-hero" data-bar="photo">
-            <HeroStreet />
+          <div className="ob-hero">
+            <div className="ob-field" aria-hidden="true" />
             <div className="ob-hero-in">
-              <div className="ob-hero-main">
-                <h1 id="ob-title" className="ob-title">
-                  <span>Send a rental ad before you pay.</span>{" "}
-                  <span className="ob-title-ask">
-                    Get a report: is this the real listing, and who do you call?
-                  </span>
-                </h1>
+              <h1 id="ob-title" className="ob-title">
+                <span>Send a rental ad before you pay.</span>{" "}
+                <span className="ob-title-ask">
+                  Get a report: is this the real listing, and who do you call?
+                </span>
+              </h1>
+              <aside className="ob-side" aria-label="How it works">
+                <Elevation />
+                <p className="ob-side-note ui-mono">A drawing, not a photo. No real address.</p>
                 <ol className="ob-how" aria-label="How it works" data-testid="ob-how">
                   {HOW.map((step, i) => (
                     <li key={step.title}>
@@ -573,6 +584,8 @@ export function OneBox(props: Props) {
                     </li>
                   ))}
                 </ol>
+              </aside>
+              <div className="ob-ask">
                 {composer}
                 {(error || fileErrors.length > 0) && (
                   <Problems error={error} fileErrors={fileErrors} />
@@ -586,25 +599,31 @@ export function OneBox(props: Props) {
                     </li>
                   ))}
                 </ul>
-                <p className="ob-measured ui-mono" data-testid="ob-measured">
-                  {MEASURED}
-                </p>
+                <div className="ob-measured-row">
+                  <p className="ob-measured ui-mono" data-testid="ob-measured">
+                    {MEASURED}
+                  </p>
+                  <Tag source="live" />
+                </div>
               </div>
-              <SampleCase onOpen={() => submit(SAMPLE_AD, [])} />
             </div>
           </div>
           <div className="ob-below">
             <div className="ob-cols">
-              <YourChecks />
-              <SeeItHappen />
+              <WaysIn />
+              <SampleCase onOpen={() => submit(SAMPLE_AD, [])} />
             </div>
-            <RealtorQuote />
+            <div className="ob-cols ob-cols-even">
+              <YourChecks />
+              <RealtorQuote />
+            </div>
             <footer className="ob-foot">
               <p className="ob-honest">
                 <SourceChip source={shownMode} />
                 <span>
                   SNAPBACK never messages anyone for you and never asks for money. Code sets every
-                  verdict; a model only explains it.
+                  verdict. A model, the Planner, picks up to 2 extra checks for what the card could
+                  not confirm and drafts a next step it never sends. It never sets the verdict.
                 </span>
               </p>
               <p className="ob-credits">
@@ -634,6 +653,7 @@ export function OneBox(props: Props) {
                   adRef.current[id] = ad;
                   setCases((c) => (c.includes(id) ? c : [...c, id]));
                 }}
+                onFail={() => setChecksFailed((n) => n + 1)}
                 onCard={(card) => {
                   cardsRef.current[card.case_id] = card;
                   setLanded((n) => n + 1);
@@ -675,6 +695,9 @@ export function OneBox(props: Props) {
                 {busy}…
               </li>
             )}
+            {!busy && !checking && (
+              <NextMoves hasCase={railCard !== null} onAsk={(words) => submit(words, [])} />
+            )}
           </ol>
           <div ref={end} />
           <div className="ob-dock" ref={dock}>
@@ -696,8 +719,6 @@ export const SAMPLE_AD =
 const SAMPLE_CARD = cardHold as Card;
 
 const PHOTO_CREDITS = [
-  HERO_PHOTOS.day.credit,
-  HERO_PHOTOS.dusk.credit,
   "Minh Pham",
   "Collov Home Design",
   "Raphael (Ajani Kamali Akio)",
@@ -769,45 +790,175 @@ function SampleCase({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-const STORIES = [
+/** Where the app opens up from the box. Two lead rows (the map, the Finder), then the rest. */
+export const WAYS = [
   {
-    photo: HERO_PHOTOS.dusk,
-    line: "Imagine Sascha, a week from moving, and a 2 bed priced well under the block.",
+    href: "/map",
+    title: "The map",
+    text: "Every researched place, by where it is. Tap one to see what the record says.",
+    lead: true,
   },
   {
-    photo: HERO_PHOTOS.day,
-    line: "Imagine a master's student landing in Houston on Friday, renting from abroad.",
+    href: "/finder",
+    title: "The Finder",
+    text: "Say what you need. It ranks places, shows why, and keeps only what you say yes to.",
+    lead: true,
+  },
+  {
+    href: "/listings",
+    title: "Listings and tour prep",
+    text: "Browse the researched places and get ready to visit one.",
+    lead: false,
+  },
+  {
+    href: "/stories",
+    title: "All stories",
+    text: "Imagined renters, played out step by step.",
+    lead: false,
+  },
+  {
+    href: "/reviews",
+    title: "Reviews and reports",
+    text: "What people who tried SNAPBACK said, counted.",
+    lead: false,
   },
 ] as const;
 
-// See it happen: the stories, as rows. Each is told as "imagine", never as a real person's case.
-function SeeItHappen() {
+/** The arrow at the end of a row: drawn, one stroke, the same everywhere. */
+function GoArrow() {
   return (
-    <section className="ob-see" aria-labelledby="ob-see-title">
+    <svg className="ob-way-go" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+      <path d="M3.5 10h12M11 5.5l4.5 4.5-4.5 4.5" />
+    </svg>
+  );
+}
+
+// The ways in, as an index of rows on hairlines: no tiles. Checking an ad stays the one filled
+// action on the page; these are ink links. Your recent checks sit in their own block below.
+function WaysIn() {
+  return (
+    <nav className="ob-ways" aria-labelledby="ob-ways-title" data-testid="ob-ways">
       <header className="yc-head">
-        <h2 id="ob-see-title" className="yc-title">
-          See it happen
+        <h2 id="ob-ways-title" className="yc-title">
+          Or start somewhere else
         </h2>
-        <a className="yc-new" href="/stories">
-          All stories
-        </a>
       </header>
-      <ul className="ob-see-list">
-        {STORIES.map((st) => (
-          <li key={st.line}>
-            <a className="ob-see-row" href="/stories">
-              <span className="ob-photo ob-see-thumb">
-                <img src={st.photo.src} alt="" loading="lazy" />
+      <ul className="ob-ways-list">
+        {WAYS.map((w) => (
+          <li key={w.href} data-lead={w.lead || undefined}>
+            {/* Stories keeps the short name other pages and tests know it by. */}
+            <a
+              className="ob-way"
+              href={w.href}
+              aria-label={w.href === "/stories" ? w.title : undefined}
+            >
+              <span className="ob-way-main">
+                <span className="ob-way-title">{w.title}</span>
+                <span className="ob-way-text">{w.text}</span>
               </span>
-              <span className="ob-see-text">
-                <span className="ob-see-line">{st.line}</span>
-                <span className="ob-see-note">A story played out step by step. Sample photo.</span>
-              </span>
+              <GoArrow />
             </a>
           </li>
         ))}
       </ul>
-    </section>
+    </nav>
+  );
+}
+
+/** The three things a check looks at, numbered as on the drawing. */
+export const RAIL = [
+  { kind: "place", n: "01", name: "Place", ask: "Is the home where the ad says it is?" },
+  { kind: "person", n: "02", name: "Person", ask: "Who posted it, against the office on record." },
+  { kind: "price", n: "03", name: "Price", ask: "The rent, against the building's record." },
+] as const;
+
+// Beside the thread on a wide screen: the drawing stays, and under it the three checks. Before
+// a check they say what will be looked at; during one they tick; after it each carries the
+// state word of its most serious line on the card (the card's own words, set by code).
+function ThreadRail({ card, checking }: { card: Card | null; checking: boolean }) {
+  const order = (t: string) => ({ red_flag: 0, hold: 1, not_shown: 1, ok: 2 })[t] ?? 3;
+  return (
+    <aside className="ob-rail" aria-label="What is being checked" data-testid="ob-rail">
+      <Elevation />
+      <p className="ob-side-note ui-mono">A drawing, not a photo. No real address.</p>
+      <h2 className="ob-rail-title ui-mono">
+        {card
+          ? `Case ${card.case_id}: what the check found`
+          : checking
+            ? "Checking now"
+            : "What a check looks at"}
+      </h2>
+      <ol className="ob-rail-rows" data-checking={checking || undefined}>
+        {RAIL.map((r) => {
+          const row = card?.rows.find((x) => x.kind === r.kind);
+          const worst = row && [...row.lines].sort((a, b) => order(a.tone) - order(b.tone))[0];
+          const word = worst ? toneWord(worst.tone, r.kind) : null;
+          return (
+            <li key={r.kind}>
+              <span className="ob-rail-n ui-mono">{r.n}</span>
+              <span className="ob-rail-main">
+                <b>{r.name}</b>
+                <span className="ob-rail-ask">{r.ask}</span>
+              </span>
+              {word ? (
+                <span className="ob-rail-state">
+                  <State kind={(WORD_TONE[word] ?? "unchecked") as StateKind}>{word}</State>
+                </span>
+              ) : checking ? (
+                <span className="ob-rail-wait ui-mono">Checking</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </aside>
+  );
+}
+
+// What to do next, as rows under the last answer: two things to ask, then the map and the
+// Finder. Asking goes through the box's own routing, exactly as typed words would.
+function NextMoves({ hasCase, onAsk }: { hasCase: boolean; onAsk: (words: string) => void }) {
+  const asks = hasCase
+    ? [
+        { say: NEXT_REAL, title: NEXT_REAL, text: "The short answer, from the checks above." },
+        { say: WHO_LABEL, title: WHO_LABEL, text: "The office on record, and where to report it." },
+      ]
+    : [
+        {
+          say: SAMPLE_AD,
+          title: "Try the sample ad",
+          text: "A made-up ad with the red flags a real one carries. See the full report.",
+        },
+      ];
+  const links = WAYS.filter((w) => w.lead);
+  return (
+    <li className="ob-next" data-testid="ob-next">
+      <span className="ob-next-title ui-mono">Next</span>
+      <ul className="ob-next-list">
+        {asks.map((a) => (
+          <li key={a.title}>
+            <button type="button" className="ob-way ob-next-row" onClick={() => onAsk(a.say)}>
+              <span className="ob-way-main">
+                <span className="ob-way-title">{a.title}</span>
+                <span className="ob-way-text">{a.text}</span>
+              </span>
+              <GoArrow />
+            </button>
+          </li>
+        ))}
+        {links.map((w) => (
+          <li key={w.href}>
+            <a className="ob-way ob-next-row" href={w.href}>
+              <span className="ob-way-main">
+                <span className="ob-way-title">{w.title}</span>
+                <span className="ob-way-text">{w.text}</span>
+              </span>
+              <GoArrow />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </li>
   );
 }
 
@@ -1138,6 +1289,7 @@ export function ThreadItem({
   onReply,
   onCase,
   onCard,
+  onFail,
   onFollow,
   onDecided,
 }: {
@@ -1148,6 +1300,7 @@ export function ThreadItem({
   onReply: (reply: string, kind: "rent" | "send" | "unsure") => void;
   onCase: (id: string, adText: string) => void;
   onCard?: (card: Card) => void;
+  onFail?: () => void;
   onFollow: (words: string) => void;
   onDecided: (p: FinderProposal, yes: boolean) => Promise<void>;
 }) {
@@ -1221,6 +1374,7 @@ export function ThreadItem({
             props={props}
             onCase={onCase}
             onCard={onCard}
+            onFail={onFail}
             onFollow={onFollow}
           />
         </li>
@@ -1263,6 +1417,7 @@ export function ThreadItem({
 /** The label of the verdict's button for safer homes; Home turns it into the ad's own filter. */
 export const SAFER_LABEL = "Find safer homes";
 const WHO_LABEL = "Who do I call?";
+export const NEXT_REAL = "Is this a real listing?";
 
 /** A reply about the case on screen: the card's own lines, with a short lead-in from code. */
 function AnswerItem({ answer }: { answer: CaseAnswer }) {
@@ -1313,6 +1468,7 @@ function CheckRun({
   props,
   onCase,
   onCard,
+  onFail,
   onFollow,
 }: {
   input: { link: string | null; text: string | null; files: File[] };
@@ -1320,6 +1476,7 @@ function CheckRun({
   props: Props;
   onCase: (id: string, adText: string) => void;
   onCard?: (card: Card) => void;
+  onFail?: () => void;
   onFollow: (words: string) => void;
 }) {
   const {
@@ -1332,6 +1489,15 @@ function CheckRun({
   const deciding = useRef(false);
   // The drafted message, kept for after the verdict (the reducer drops it once the result is in).
   const [challenge, setChallenge] = useState<string | null>(null);
+  // Tell Home once if this check ends in an error, so the rail stops saying "Checking".
+  const failTold = useRef(onFail);
+  useEffect(() => {
+    failTold.current = onFail;
+  });
+  const failed = state.step === "error";
+  useEffect(() => {
+    if (failed) failTold.current?.();
+  }, [failed]);
 
   useEffect(() => {
     if (started.current) return;

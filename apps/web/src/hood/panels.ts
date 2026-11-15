@@ -353,7 +353,7 @@ export const PANELS: Panel[] = [
     used: [
       {
         tech: "Agents that act",
-        text: "a team checks the place, the person and the price. Code sets the verdict; the model only explains it.",
+        text: "a team checks the place, the person and the price. Code sets every verdict; the Planner, a model, picks up to 2 extra checks and drafts a next step it never sends.",
       },
       {
         tech: "It adapts",
