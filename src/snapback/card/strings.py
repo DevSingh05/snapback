@@ -129,8 +129,9 @@ EN: dict[str, str] = {
     "allowed.call_office": "Not confirmed. Call the office on record yourself.",
     # Contact on record. The phone number itself and the record's web address are never shown.
     # A match is a supporting line only. It never counts as matching the record by itself.
+    # Issue #10: said as plainly as the "Not confirmed" line beside it. Never the digits.
     "contact.phone_match": (
-        "The phone matches the leasing office on record. Call it yourself to confirm."
+        "Matches. This is the leasing office's number on record. Call it yourself to confirm."
     ),
     # H1: the name matches the record and there was no phone to compare with the office's.
     "contact.phone_unchecked": (
@@ -640,7 +641,7 @@ ES: dict[str, str] = {
         "Sin confirmar. Llame usted mismo a la oficina que figura en el registro."
     ),
     "contact.phone_match": (
-        "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
+        "Coincide. Es el número de la oficina de alquiler que figura en el registro. "
         "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_unchecked": (

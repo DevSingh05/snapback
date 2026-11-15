@@ -26,7 +26,10 @@ _RENT_PATTERNS = [
     re.compile(rf"\b{_AMOUNT}\s{{0,3}}(?:{_PER_MONTH})", re.IGNORECASE),
 ]
 
-_PHONE = re.compile(r"(?<![\d$])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]\d{4}(?!\d)")
+# Separators are optional: CoStar's record keeps the office phone as ten bare digits, and an ad
+# that pastes it that way must still be compared with it (issue #10). A run of more digits is
+# not a phone.
+_PHONE = re.compile(r"(?<![\d$])(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
 # The name part starts where a name can start, so a long run of letters with no "@" is tried
 # once, not once per letter.
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,8}")
