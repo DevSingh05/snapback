@@ -34,6 +34,7 @@ from snapback.search import (
     alternatives_brief,
     alternatives_for,
     apply_deep_checks,
+    with_handoff,
 )
 
 log = logging.getLogger("snapback.search_agent")
@@ -150,8 +151,10 @@ def agentic_alternatives(
     n: int,
     prefs: CasePreferences | None,
     source: Any,
+    show_live_links: bool = False,
 ) -> AlternativesResponse:
-    """`GET /cases/{id}/alternatives`: the same plan over places near the checked ad."""
+    """`GET /cases/{id}/alternatives`: the same plan over places near the checked ad. Each place
+    carries its hand-off link (`with_handoff`); a LIVE one only when `show_live_links`."""
     brief = apply_to_brief(RenterBrief(), prefs)
     avoided = list(prefs.avoid_property_ids) if prefs else []
     matches: list[PlaceMatch] = alternatives_for(case, brief, lookups, n, exclude=avoided)
@@ -165,7 +168,11 @@ def agentic_alternatives(
     return AlternativesResponse(
         case_id=case.case_id,
         source=source,
-        matches=apply_deep_checks(matches, plan.deep_check, lookups),
+        matches=with_handoff(
+            apply_deep_checks(matches, plan.deep_check, lookups),
+            lookups,
+            show_live_links=show_live_links,
+        ),
         decisions=_decisions(plan),
         question=plan.question,
         ask_first=plan.ask_first,
