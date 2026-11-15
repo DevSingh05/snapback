@@ -91,14 +91,17 @@ test("'forget me' wipes the profile, in memory and on disk", () => {
 test("the file holds only the keyed hash and the learned fields, never words or numbers of a phone", () => {
   const dir = mkdtempSync(join(tmpdir(), "snapback-profile-"));
   const file = join(dir, "profiles.json");
-  const store = new ProfileStore(file);
+  // A fixed clock: the file stores a millisecond timestamp, and about 1 in 100 real ones contain
+  // "555", which made this test fail by chance (main c236f0b).
+  const at = Date.parse("2026-11-14T12:00:00Z");
+  const store = new ProfileStore(file, () => at);
   store.learn(KEY, "My budget is $1,500");
   store.learn(KEY, "Call me at 555-0142, I'm moving to Houston");
   const saved = readFileSync(file, "utf8");
   assert.ok(saved.includes(KEY));
-  assert.doesNotMatch(saved, /555|Call me/);
+  assert.doesNotMatch(saved, /555-?0142|0142|Call me/);
   // a new store reads it back
-  assert.equal(new ProfileStore(file).get(KEY)?.budget, 1500);
+  assert.equal(new ProfileStore(file, () => at).get(KEY)?.budget, 1500);
 });
 
 test("a missing or broken file starts empty, never crashes", () => {

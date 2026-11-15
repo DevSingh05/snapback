@@ -59,7 +59,7 @@ def place_lines(modules: ModuleEvidence, lang: str):
 @pytest.mark.parametrize("lang", ["en", "es"])
 def test_a_loose_photo_gets_a_hold_line_with_counts(lang):
     modules = modules_for(
-        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="ratio"),
+        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="loose"),
         PhotoLocation(photo_id="p2", status=LocateStatus.NOT_LOCATED, bar_failed="inliers"),
     )
     lines = [line for line in place_lines(modules, lang) if line.label == LABEL[lang]]
@@ -79,7 +79,7 @@ def test_no_loose_photo_no_line(lang):
 def test_the_line_never_changes_the_verdict():
     """Code sets the verdict from the evidence; the loose line only explains a non-placement."""
     loose_case = modules_for(
-        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="ratio")
+        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="loose")
     )
     plain_case = modules_for(
         PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="inliers")
@@ -91,6 +91,18 @@ def test_the_line_never_changes_the_verdict():
 def test_with_nothing_placed_the_loose_match_leads_the_row(lang):
     """The iMessage reply shows a row's first line; the reason has to be that line."""
     modules = modules_for(
-        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="ratio")
+        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="loose")
     )
     assert place_lines(modules, lang)[0].label == LABEL[lang]
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_an_honest_low_ratio_photo_does_not_get_the_edited_line(lang):
+    """An ad that gives its address checks the claimed home, where a plain ratio miss sets "ratio".
+    That is an honest photo that just fell short; it must never read 'may be edited or AI-made'."""
+    modules = modules_for(
+        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="ratio")
+    )
+    lines = place_lines(modules, lang)
+    assert not any(line.label == LABEL[lang] for line in lines)
+    assert not any("AI" in line.text or "IA" in line.text for line in lines)

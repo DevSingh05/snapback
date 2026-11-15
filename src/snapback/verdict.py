@@ -586,7 +586,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     # A near miss (#10): enough matched points to name a building, too few of them consistent.
     # An AI-edited or regenerated photo looked like this; the photo is not placed, and says why.
     loose = sum(
-        photo.status is LocateStatus.NOT_LOCATED and photo.bar_failed == "ratio" for photo in photos
+        photo.status is LocateStatus.NOT_LOCATED and photo.bar_failed == "loose" for photo in photos
     )
     loosely = (
         [_line(lang, "label.loose", CardTone.HOLD, "place.loose", loose=loose, total=total)]
@@ -597,6 +597,25 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         # Nothing placed: the loose match is the reason, so it leads the row (and the iMessage
         # reply, which shows a row's first line) instead of the plain "could not be placed".
         main, loosely = loosely[0], []
+
+    # "Match this building": only photos placed in it. A flipped photo placed in another building
+    # already carries the red "different building" line.
+    flipped = sum(
+        photo.flipped is True and photo.status is LocateStatus.LOCATED_IN_CLAIMED
+        for photo in photos
+    )
+    mirrored = []
+    if flipped:
+        mirrored = [
+            _line(
+                lang,
+                "label.mirrored",
+                CardTone.HOLD,
+                "place.mirrored",
+                flipped=flipped,
+                total=total,
+            )
+        ]
 
     matched = []
     if elsewhere and modules.matched_office:
@@ -614,6 +633,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         lines=[
             main,
             *loosely,
+            *mirrored,
             *_from_record(modules, matched),
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_record_lines(modules, lang, place=True),
@@ -1287,6 +1307,28 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     return _from_record(modules, lines)
 
 
+FOLLOWUP_LABEL = "label.followup"  # the same key as agent/followups.py
+
+
+def _followup_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """The Planner's follow-up checks, one neutral line each naming its source. Information
+    only: `decide` never reads them, and none counts as a finding either way."""
+    return [
+        CardLine(
+            label=strings.text(FOLLOWUP_LABEL, lang),
+            key=FOLLOWUP_LABEL,
+            text=strings.text(
+                f"followup.{line.check}.{line.status.value}", lang, count=line.count or 0
+            ),
+            tone=CardTone.NOT_CHECKED,
+            source=line.data_source,
+            source_name=line.source_name,
+        )
+        for line in modules.followups
+        if strings.has(f"followup.{line.check}.{line.status.value}", lang)
+    ]
+
+
 def _clean_hold_headline(
     verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str, modules: ModuleEvidence
 ) -> str | None:
@@ -1422,7 +1464,7 @@ def build_card(
         _person_row(modules, lang, checked.tzinfo),
         _price_row(modules, lang),
     ]
-    claims = _claims_lines(modules, lang)
+    claims = [*_claims_lines(modules, lang), *_followup_lines(modules, lang)]
     if claims:  # only when there is something to say; the three rows above are always there
         rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
 

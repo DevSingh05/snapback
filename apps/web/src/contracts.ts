@@ -148,7 +148,9 @@ export type ChoiceKind =
   | "next_search"
   | "which_photo"
   | "dwell_rooms"
-  | "lead_checks";
+  | "lead_checks"
+  | "follow_up"
+  | "next_step";
 
 // Who made a trace step happen: a language model picking from code-written options, or the
 // code policy (also every fallback, random draw and tool code ran).

@@ -258,7 +258,8 @@ const INTENTS: [Intent, RegExp][] = [
   [
     "safe",
     new RegExp(
-      String.raw`^\s*(is (it|this|that) (safe|real|legit|a scam|ok|okay)|can i (pay|trust (it|this)))` +
+      // "is this real / a real listing / a legit place / a scam", "is the listing real", "can I pay"
+      String.raw`^\s*(is (it|this|that) (a |the )?(safe|real|legit|ok|okay)( (listing|place|ad|apartment|home|house))?|is (it|this|that) a scam|is the (listing|place|ad|apartment|home|house) (real|legit|safe)|can i (pay|trust (it|this)))` +
         TAIL,
       "i",
     ),
@@ -269,7 +270,10 @@ const SPANISH_INTENTS: [Intent, RegExp][] = [
   ["why", /^\s*por\s*qu[eé]\s*[?.!]*\s*$/i],
   ["now", /^\s*(qu[eé] (hago|debo hacer|puedo hacer)( ahora)?)\s*[?.!]*\s*$/i],
   ["call", /^\s*(a qui[eé]n (llamo|le llamo|contacto))\s*[?.!]*\s*$/i],
-  ["safe", /^\s*(es (seguro|real|una estafa|confiable))\s*[?.!]*\s*$/i],
+  [
+    "safe",
+    /^\s*(es (seguro|real|una estafa|confiable)|es (un |una )?(anuncio|lugar|departamento|apartamento|casa) real)\s*[?.!]*\s*$/i,
+  ],
 ];
 const HOW =
   /^\s*(how did you (check|know|do that|figure (it|that) out|work (it|that) out)|how do you know|how does (it|this) work|show (me )?your work|c[oó]mo lo (revisaste|revis[oó]|sabes|supiste|hiciste))\s*[?.!]*\s*$/i;

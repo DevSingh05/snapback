@@ -166,6 +166,9 @@ class CaseSession:
         # W1: the web checks, started by whoever opens the case (`agent/web/run.py`). Returns
         # the WebFacts found so far, or None while they run. None (the default): no web checks.
         self.web_facts: Callable[[], Any] | None = None
+        # The Planner's follow-up menu (agent/followups.py): menu id -> a lookup the API bound
+        # to this case. Empty: nothing to follow up on. Results are information lines only.
+        self.followup_runners: dict[str, Callable[[], Any]] = {}
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -820,10 +823,11 @@ class CaseSession:
         self._office_answer({"office_confirmed_domain": None, "office_declined_domain": domain})
 
     def _office_answer(self, update: dict[str, str | None]) -> None:
-        self.evidence = self.evidence.model_copy(update=update)
-        if self.verdict is not None:
-            self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
-            self._emit_verdict()
+        with self.evidence_lock:  # an agent's follow-up written meanwhile cannot erase it
+            self.evidence = self.evidence.model_copy(update=update)
+            if self.verdict is not None:
+                self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
+                self._emit_verdict()
 
     def add_evidence(self, update: Mapping[str, Any]) -> bool:
         """More evidence from outside the choice flow, e.g. an extra check the deep agent ran

@@ -172,6 +172,20 @@ class LiveLocate:
 
         return DiskLightGlue(feature_dir=self._data_dir / "index" / "features")
 
+    def scan_view(self, model_id: str, sweep_id: str, face: int) -> bytes | None:
+        """The matched cube face of a scan point as JPEG bytes, for the evidence image (J1).
+        Read from the local scan cache; never written anywhere."""
+        ready = self._load()
+        if ready is None:
+            return None
+        try:
+            image = ready.locator._face(model_id, sweep_id, face)  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001 - a face that is not cached: no picture
+            return None
+        out = io.BytesIO()
+        image.convert("RGB").save(out, format="JPEG", quality=88)
+        return out.getvalue()
+
     def available(self, claimed_property_id: str | None, claimed_model_ids: list[str]) -> bool:
         """Is there a twin to place photos in? True for a claimed home that is indexed, and
         for no claimed home when the index is not empty."""

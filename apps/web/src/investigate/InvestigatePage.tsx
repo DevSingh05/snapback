@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 
 import { apiBase } from "../api";
+import { CaseFilePanel, CaseStudyView } from "./CaseFile";
 import { layoutGraph, timeScale } from "./layout";
 import { readQuery } from "./stream";
 import type { StreamTimeline } from "./stream";
 import { StreamView } from "./StreamView";
-import type { Answer, Evidence, Finding, RingResponse, RingsResponse, Score } from "./types";
+import type {
+  Answer,
+  CaseFile,
+  CaseStudy,
+  Evidence,
+  Finding,
+  RingResponse,
+  RingsResponse,
+  Score,
+} from "./types";
 import "./investigate.css";
 
 const GRAPH_SIZE = 560;
@@ -371,7 +381,11 @@ export function InvestigateView({
   selected,
   onPick,
   ask,
+  loadCaseFile,
+  loadCaseStudy,
 }: {
+  loadCaseFile?: (id: string) => Promise<CaseFile>;
+  loadCaseStudy?: () => Promise<CaseStudy>;
   rings: RingsResponse;
   ring: RingResponse | null;
   ringId: string;
@@ -381,6 +395,8 @@ export function InvestigateView({
   ask: (q: string) => Promise<Answer>;
 }) {
   const m = rings.metrics;
+  const [mode, setMode] = useState<"rings" | "study">("rings");
+  const [caseOpen, setCaseOpen] = useState(false);
   const pickedAd = ring?.ads.find((a) => a.id === selected) ?? null;
   return (
     <div className="inv-page">
@@ -414,7 +430,18 @@ export function InvestigateView({
         </div>
       </section>
 
-      <nav className="inv-tabs" aria-label="Rings">
+      <div className="inv-modes" role="group" aria-label="View">
+        <button type="button" aria-pressed={mode === "rings"} onClick={() => setMode("rings")}>
+          Rings
+        </button>
+        <button type="button" aria-pressed={mode === "study"} onClick={() => setMode("study")}>
+          Case study
+        </button>
+      </div>
+
+      {mode === "study" ? <CaseStudyView load={loadCaseStudy} /> : null}
+
+      <nav className="inv-tabs" aria-label="Rings" hidden={mode !== "rings"}>
         {rings.rings.map((r) => (
           <button
             key={r.id}
@@ -433,8 +460,19 @@ export function InvestigateView({
         ))}
       </nav>
 
-      {ring ? (
+      {mode === "rings" && ring ? (
         <>
+          <button
+            type="button"
+            className="inv-casebtn"
+            aria-expanded={caseOpen}
+            onClick={() => setCaseOpen((v) => !v)}
+          >
+            {caseOpen ? "Close case file" : "Open case file"}
+          </button>
+          {caseOpen ? (
+            <CaseFilePanel key={ringId} ringId={ringId} onPick={onPick} load={loadCaseFile} />
+          ) : null}
           <div className="inv-grid">
             <RingGraph data={ring} selected={selected} onPick={onPick} />
             <aside className="inv-side" aria-live="polite">
@@ -472,9 +510,9 @@ export function InvestigateView({
             </div>
           </section>
         </>
-      ) : (
+      ) : mode === "rings" ? (
         <p className="inv-sub">Loading the ring.</p>
-      )}
+      ) : null}
 
       <AskPanel examples={rings.example_questions} onPick={onPick} ask={ask} />
       <footer className="inv-foot">
@@ -503,11 +541,65 @@ function StreamSection() {
   return <StreamView data={data} initialPos={start.pos} initialRing={start.ring} />;
 }
 
+type ParaphraseVariant =
+  "original" | "paraphrased" | "paraphrased_photos_reshot" | "paraphrased_wording_only";
+type ParaphraseArm = "pipeline" | "pipeline_wording_seeds" | "keyword_baseline";
+type ParaphraseCount = { rings_found: number; honest_flagged: number };
+
+export type ParaphraseResults = {
+  n_ads: number;
+  n_rings: number;
+  n_honest: number;
+  variants: Partial<Record<ParaphraseVariant, Record<ParaphraseArm, ParaphraseCount>>>;
+};
+
+// The reworded-ads attack (`snapback.forensics.paraphrase`): every number is SYNTHETIC and carries n.
+export function robustnessText(r: ParaphraseResults) {
+  const para = r.variants.paraphrased;
+  const orig = r.variants.original;
+  if (!para || !orig) return null;
+  const n = r.n_rings;
+  return {
+    headline: `Holds up when ads are reworded: ${para.pipeline.rings_found} of ${n} rings (synthetic, n=${n} rings, ${r.n_ads.toLocaleString("en-US")} ads)`,
+    detail:
+      `Original wording: ${orig.pipeline.rings_found} of ${n}. ` +
+      `Keyword search on the reworded ads: ${para.keyword_baseline.rings_found} of ${n}. ` +
+      `Seeded by wording only: ${para.pipeline_wording_seeds.rings_found} of ${n}. ` +
+      `Honest ads flagged: ${para.pipeline.honest_flagged} of ${r.n_honest}.`,
+  };
+}
+
+export function RobustnessLine({ results }: { results: ParaphraseResults }) {
+  const t = robustnessText(results);
+  if (!t) return null;
+  return (
+    <section className="inv-robust" aria-label="Robustness to reworded ads">
+      <p className="inv-robust-head">{t.headline}</p>
+      <p className="inv-sub">{t.detail}</p>
+    </section>
+  );
+}
+
+function RobustnessSection() {
+  const [data, setData] = useState<ParaphraseResults | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import("../../../../eval/forensics/paraphrase_results.json").then((m) => {
+      if (live) setData(m.default as unknown as ParaphraseResults);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return data ? <RobustnessLine results={data} /> : null;
+}
+
 export function InvestigatePage() {
   return (
     <>
       <div className="inv-page inv-page-stream">
         <StreamSection />
+        <RobustnessSection />
       </div>
       <RingsSection />
     </>

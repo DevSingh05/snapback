@@ -1,7 +1,9 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 
+import { CaseAttachmentPage } from "./investigate/CaseFile";
 import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
+import { HoodPage } from "./hood/HoodPage";
 import { OneBox } from "./home/OneBox";
 import { CardPage } from "./pages/CardPage";
 import { ReviewsPage } from "./reviews/ReviewsPage";
@@ -34,9 +36,11 @@ type Route =
   | { name: "prep-place"; propertyId: string }
   | { name: "confirm" }
   | { name: "investigate" }
+  | { name: "investigate-case"; ringId: string }
   | { name: "replays" }
   | { name: "stories" }
   | { name: "reviews" }
+  | { name: "hood" }
   | { name: "proof-room" }
   | { name: "home" };
 
@@ -55,7 +59,10 @@ export function matchRoute(path: string): Route {
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/stories\/?$/.test(path)) return { name: "stories" };
   if (/^\/reviews\/?$/.test(path)) return { name: "reviews" };
+  if (/^\/under-the-hood\/?$/.test(path)) return { name: "hood" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
+  const invCase = /^\/investigate\/case\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (invCase?.[1]) return { name: "investigate-case", ringId: invCase[1] };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
@@ -98,22 +105,24 @@ export default function App() {
   useEffect(() => {
     if (toTwin) window.location.replace(proofRoomTarget(window.location.search));
   }, [toTwin]);
-  const section: Section | "stories" | "reviews" | null =
+  const section: Section | "stories" | "reviews" | "hood" | null =
     route.name === "home"
       ? "home"
       : route.name === "stories"
         ? "stories"
         : route.name === "reviews"
           ? "reviews"
-          : route.name === "map"
-            ? "map"
-            : route.name === "listings"
-              ? "listings"
-              : route.name === "finder"
-                ? "finder"
-                : route.name === "replays" || route.name === "replay"
-                  ? "replays"
-                  : null;
+          : route.name === "hood"
+            ? "hood"
+            : route.name === "map"
+              ? "map"
+              : route.name === "listings"
+                ? "listings"
+                : route.name === "finder"
+                  ? "finder"
+                  : route.name === "replays" || route.name === "replay"
+                    ? "replays"
+                    : null;
   // Inside a place, the bar says where you are.
   const here = window.location.pathname + window.location.search;
   const context =
@@ -149,10 +158,14 @@ export default function App() {
           <StoriesPage />
         ) : route.name === "reviews" ? (
           <ReviewsPage />
+        ) : route.name === "hood" ? (
+          <HoodPage />
         ) : route.name === "confirm" ? (
           <ConfirmPage />
         ) : route.name === "investigate" ? (
           <InvestigatePage />
+        ) : route.name === "investigate-case" ? (
+          <CaseAttachmentPage ringId={route.ringId} />
         ) : route.name === "replays" ? (
           <ReplayIndexPage />
         ) : route.name === "replay" ? (

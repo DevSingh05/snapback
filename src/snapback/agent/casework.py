@@ -39,6 +39,8 @@ STEMS = (RECORD, OFFICE, OWNER, PLACE, PLACES)
 # The walk note exists only for a case that has a walk plan (the T lane's tour).
 WALK = "walk"
 WEB = "web"  # W1: exists only for a case whose web checks were started
+FOLLOWUPS = "followups"  # the Planner's follow-up checks (agent/followups.py), when it chose any
+NEXT_STEP = "next_step"  # the Planner's drafted next step for the renter (never sent)
 EXPLANATION, TOUR_PREP = "explanation", "tour_prep"
 MAIN_STEMS = (EXPLANATION, TOUR_PREP)
 
@@ -134,7 +136,7 @@ def stem_of(case_id: str, path: str) -> str | None:
     if not path.startswith(prefix) or not path.endswith(".md"):
         return None
     stem = path[len(prefix) : -3]
-    return stem if stem in (*STEMS, WALK, WEB, *MAIN_STEMS) else None
+    return stem if stem in (*STEMS, WALK, WEB, FOLLOWUPS, NEXT_STEP, *MAIN_STEMS) else None
 
 
 def clean_note(text: object) -> str:
@@ -410,7 +412,7 @@ def refresh_web_note(case: Any) -> None:
 
 def notes_view(case: Any) -> CaseNotes:
     """What the API serves: the notes in a fixed order, each with who wrote it."""
-    order = (*STEMS, WALK, WEB, *MAIN_STEMS)
+    order = (*STEMS, WALK, WEB, FOLLOWUPS, NEXT_STEP, *MAIN_STEMS)
     kept = [case.notes[s] for s in order if s in case.notes]
     return CaseNotes(
         case_id=case.case_id,

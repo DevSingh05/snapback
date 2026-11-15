@@ -166,6 +166,30 @@ describe("one message per check", () => {
     expect(screen.queryByText(/Placing 3 listing photos/)).toBeNull();
   });
 
+  it("shows the Mirrored line under Photos (V1: a flipped photo matched this building)", () => {
+    const mirrored: Card = {
+      ...card,
+      rows: [
+        {
+          kind: "place",
+          lines: [
+            line("label.real", "Real", "Taken in this building (3 of 3 photos).", "ok"),
+            line(
+              "label.mirrored",
+              "Mirrored",
+              "2 photos match this building only flipped.",
+              "hold",
+            ),
+          ],
+        },
+      ],
+    };
+    render(<AnswerPanel card={mirrored} timeline={timeline()} />);
+    expect(document.getElementById("answer-photos")).toHaveTextContent(
+      "Mirrored: 2 photos match this building only flipped.",
+    );
+  });
+
   it("adds the record line, the provenance and the phone line the real-listing read holds", () => {
     const listing = {
       headline: "Managed by Fixture Living; rent on record $1,400 to $1,900.",
