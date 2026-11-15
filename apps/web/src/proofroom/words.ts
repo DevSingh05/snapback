@@ -122,7 +122,8 @@ export const WORDS: Record<Lang, RoomWords> = {
     meet: "Conoce al equipo",
     deciderWaits: "Esperando las pruebas del equipo",
     notNeeded: "No hizo falta para este anuncio",
-    codePlan: "El código siguió el plan estándar y repartió las comprobaciones.",
+    codePlan:
+      "El código siguió el plan estándar y repartió las comprobaciones. Ningún modelo planeó este caso.",
     team: "Tu equipo de revisión",
     onIt: "Tu equipo de revisión está en ello",
     watch: "Verlos trabajar",

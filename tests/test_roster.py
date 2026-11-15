@@ -94,7 +94,10 @@ def test_only_the_decider_sets_the_verdict_and_it_is_code() -> None:
     assert next(c for c in cards if c.id == "rules").model == "code"
     for card in cards:
         assert card.job and card.role and card.doing and card.tools and card.never, card.id
-        assert len(card.role) <= 24, card.role  # it sits under a small avatar
+    # The role sits under a small mark, about 98 px wide on a phone: both languages must fit.
+    for lang in ("en", "es"):
+        for card in roster.cards(lang):
+            assert 0 < len(card.role) <= 18, (lang, card.role)
 
 
 def models(by: dict) -> dict[str, str]:

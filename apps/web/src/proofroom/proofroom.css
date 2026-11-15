@@ -891,3 +891,36 @@
     animation: pr-in 320ms var(--ease-out) 1 backwards;
   }
 }
+
+/* What ran a member, when a model did: a small ink chip on the corner of its mark (beside the
+   name for the Planner). Code-run members carry none. */
+.pr-node-mark {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+.pr-node-model {
+  padding: 1px 4px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.5625rem;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.pr-node-mark > .pr-node-model {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pr-node-wide .pr-node-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--sp-2);
+}
+.pr-node-wide .pr-node-model {
+  font-size: 0.625rem;
+}

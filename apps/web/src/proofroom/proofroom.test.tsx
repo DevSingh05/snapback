@@ -582,6 +582,41 @@ describe("the graph", () => {
     expect(screen.queryAllByTestId("team-dot")).toHaveLength(0);
   });
 
+  it("shows the model on the Planner and its sub-agents when the deep agent ran, and By code only under the policy", () => {
+    const withModels = {
+      ...roster,
+      agents: roster.agents.map((a) =>
+        a.model === "code"
+          ? a
+          : { ...a, model: a.team === "planner" ? "Claude Sonnet" : "Claude Haiku" },
+      ),
+    };
+    const shownFor = (timeline: CaseTimeline) => {
+      const end = floorAt({ roster: withModels, card, timeline });
+      return teamView(end, end).shown;
+    };
+    const node = (id: string) =>
+      screen.getAllByTestId("team-node").find((n) => n.getAttribute("data-agent") === id)!;
+    render(<TeamGraph desks={shownFor(deepTimeline())} label="t" moving={false} />);
+    expect(within(node("planner")).getByTestId("node-model")).toHaveTextContent("Claude Sonnet");
+    expect(node("planner")).not.toHaveTextContent("By code");
+    expect(within(node("photo")).getByTestId("node-model")).toHaveTextContent("Haiku");
+    // Code ran the rules and sets the verdict: no model chip on either.
+    expect(within(node("rules")).queryByTestId("node-model")).toBeNull();
+    expect(within(node("decider")).queryByTestId("node-model")).toBeNull();
+    cleanup();
+    render(<TeamGraph desks={shownFor(sampleTimeline)} label="t" moving={false} />);
+    expect(node("planner")).toHaveTextContent("By code");
+    expect(screen.queryAllByTestId("node-model")).toHaveLength(0);
+  });
+
+  it("keeps a Spanish name's capital when the word agent is dropped", () => {
+    expect(shortName("Agente de teléfono y oficina")).toBe("Teléfono y oficina");
+    expect(shortName("Agente del registro")).toBe("Registro");
+    expect(shortName("Planificador")).toBe("Planificador");
+    expect(WORDS.es.codePlan).toContain("Ningún modelo planeó este caso.");
+  });
+
   it("every card in the roster has its own mark", () => {
     for (const a of roster.agents) expect(hasGlyph(a.id), a.id).toBe(true);
     expect(shortName("Phone and office agent")).toBe("Phone and office");

@@ -21,8 +21,16 @@ interface Dot {
 }
 
 /** "Phone and office agent" -> "Phone and office": the mark already says it is a member. */
-export const shortName = (name: string) =>
-  name.replace(/ agent$/i, "").replace(/^Agente (de |del )?/i, "");
+export function shortName(name: string): string {
+  const bare = name.replace(/ agent$/i, "").replace(/^Agente (del |de )?/i, "");
+  return bare.charAt(0).toUpperCase() + bare.slice(1);
+}
+
+/** What ran a member, for its chip: nothing for code; else the model, by family on a small mark. */
+export function modelChip(desk: Desk, wide: boolean): string | null {
+  if (desk.model === "code" || desk.state === "unused") return null;
+  return wide ? desk.model : desk.model.replace(/^Claude /, "");
+}
 
 function Node({
   desk,
@@ -43,11 +51,26 @@ function Node({
   const style: CSSProperties = wide
     ? { left: spot.x - AVATAR / 2, top: spot.y }
     : { left: spot.x - width / 2, top: spot.y, width };
+  const chip = modelChip(desk, wide);
   const body = (
     <>
-      <Avatar id={desk.card.id} />
+      <span className="pr-node-mark">
+        <Avatar id={desk.card.id} />
+        {chip && !wide ? (
+          <span className="pr-node-model ui-mono" data-testid="node-model">
+            {chip}
+          </span>
+        ) : null}
+      </span>
       <span className="pr-node-text">
-        <span className="pr-node-name">{shortName(desk.card.name)}</span>
+        <span className="pr-node-name">
+          {shortName(desk.card.name)}
+          {chip && wide ? (
+            <span className="pr-node-model ui-mono" data-testid="node-model">
+              {chip}
+            </span>
+          ) : null}
+        </span>
         <span className="pr-node-role">{desk.card.role}</span>
         <span className="pr-node-state ui-mono" data-testid="node-state">
           {word}

@@ -109,7 +109,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Planificador",
-            "role": "Planea las comprobaciones",
+            "role": "Planea la revisión",
             "job": "Escribe el plan y la lista de tareas, y reparte cada comprobación.",
             "doing": "Escribiendo el plan y repartiendo las comprobaciones",
             "tools": ["Plan de deepagents", "Lista de tareas", "Notas del caso"],
@@ -184,7 +184,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente de teléfono y oficina",
-            "role": "Oficina de arrendamiento",
+            "role": "Oficina de renta",
             "job": "Compara el teléfono del anuncio con la oficina del registro. Solo sí o no.",
             "doing": "Comparando el teléfono con la oficina de arrendamiento",
             "tools": ["Registro de CoStar", "Comparación de teléfono con clave"],
@@ -304,7 +304,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Preparación de visita",
-            "role": "Preguntas de visita",
+            "role": "Para la visita",
             "job": "Planea el recorrido por el escaneo 3D y qué preguntar en una visita.",
             "doing": "Planeando el recorrido por el escaneo 3D",
             "tools": ["Escaneo de Matterport", "Notas del caso"],
