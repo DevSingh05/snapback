@@ -293,7 +293,7 @@ describe("the one fact that would settle an unsure card", () => {
     expect(missingFact(c)).toBe("a rent on record for this home to compare with");
   });
 
-  it("is absent for a clear result, a Don't pay, or a card with nothing unsure", () => {
+  it("is absent for a clear result, a red-flag result, or a card with nothing unsure", () => {
     const unsure = [
       { kind: "person" as const, lines: [line("Allowed", "label.allowed", "not_shown")] },
     ];

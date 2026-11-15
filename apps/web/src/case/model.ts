@@ -182,7 +182,7 @@ const SETTLE_BY_ROW: Partial<Record<CardRowKind, string>> = {
 
 /** For a card that is unsure (Hold off, or could not place the photos): the ONE fact that would
  *  settle it, as a phrase to follow "Would settle it:". It comes from the card's own Not
- *  confirmed and Not checked lines. Null for a clear result, a Don't pay, or a card with no such
+ *  confirmed and Not checked lines. Null for a clear result, a red-flag result, or a card with no such
  *  line. */
 export function missingFact(card: Card): string | null {
   if (card.state !== "hold" && card.state !== "unverified") return null;
