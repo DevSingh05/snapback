@@ -133,6 +133,9 @@ class Settings(BaseSettings):
     apify_craigslist_actor: str | None = None
     # The three checks share one limit; past it a check reads "timed out" and the case goes on.
     snapback_web_limit_s: float = 20.0  # Apify's search measured 8.9 to 14.2 s (n=3, LIVE)
+    # Run the web checks on LIVE cases. Off by default so tests, CI and a public host never call
+    # out; set SNAPBACK_WEB_CHECKS=1 in the demo laptop's .env with the three keys.
+    snapback_web_checks: bool = False
     # Browser Use spend cap per link check, in dollars (the account has little credit).
     browser_use_max_cost_usd: float = 0.10
     # At most this many cases start web checks in any rolling hour (each case starts them once).
