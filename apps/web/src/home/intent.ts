@@ -11,10 +11,13 @@ export type Intent =
   | { kind: "check-ask" } // wants a check but gave nothing to check yet
   | { kind: "check-fb" } // a Facebook link alone: it sits behind a login, so ask for the text
   | { kind: "find" } // a wish or a budget: the Finder
-  | { kind: "ask" } // a question about the case on screen: the Finder answers
+  | { kind: "ask"; topic: CaseTopic } // a question about the case on screen: the card answers
   | { kind: "open"; view: View } // "show me on the map", "replay a real case"
   | { kind: "unsure" } // could be either: two chips, one tap
   | { kind: "rules" }; // a question about paying: the two rules, written by code
+
+/** What a question about the case on screen is after. Each is answered from the card itself. */
+export type CaseTopic = "why" | "who" | "next" | "safe" | "other";
 
 export interface Submission {
   text: string;
@@ -86,6 +89,24 @@ const CHECK_WORDS =
 const PAYING =
   /\b(pay|paying|zelle|venmo|cash ?app|wire|western union|gift ?cards?|deposit|holding fee|crypto|bitcoin)\b/i;
 const QUESTION = /\?\s*$|^\s*(is|are|does|do|did|should|can|could|what|why|how|who|when|will)\b/i;
+
+const ASK_WHO =
+  /\bwho\b.*\b(call|contact|report|tell|reach|phone|ring)\b|\bwhere\b.*\b(report|call|complain)\b|\bwho to (call|contact|report)\b/i;
+const ASK_NEXT =
+  /\bwhat (now|next)\b|\bnow what\b|\bnext steps?\b|\bwhat (should|do|can|would|will) (i|we) do\b|\bwhat do i do\b/i;
+const ASK_WHY =
+  /\bwhy\b|\bwhat('?s| is) (wrong|the (problem|issue|reason))\b|\bhow (do|did) you (know|get)\b|\bexplain\b|\breasons?\b/i;
+const ASK_SAFE =
+  /\bis (it|this|that)( \w+)? (safe|legit|real|ok|okay|fine|a scam|fake|trustworthy)\b|\bsafe\b|\bshould i (pay|trust|send|wire|go|visit|rent|sign|worry)\b|\bcan i (trust|pay)\b|\b(legit|scam)\b/i;
+
+/** What a question about the case on screen is after, read from the words. */
+export function caseTopic(text: string): CaseTopic {
+  if (ASK_WHO.test(text)) return "who";
+  if (ASK_NEXT.test(text)) return "next";
+  if (ASK_WHY.test(text)) return "why";
+  if (ASK_SAFE.test(text)) return "safe";
+  return "other";
+}
 
 /** A command to open a view, read from the words. Null: not a command. */
 export function viewFrom(text: string): View | null {
@@ -159,23 +180,28 @@ export function route(s: Submission): Intent {
   const payOrPhone = PAY_OR_PHONE.some((r) => r.test(text));
   if (wish && ((payOrPhone && (signs >= 2 || text.length >= 80)) || signs >= 3))
     return { kind: "check" };
+  // With a case on screen, a short follow-up (why, who do I call, what now, is it safe) is about
+  // that case and is answered from its card, never by the Finder.
+  if (s.caseOnScreen && !wish && !view && text.length < 140 && caseTopic(text) !== "other")
+    return { kind: "ask", topic: caseTopic(text) };
   if (view && text.length < 120) return { kind: "open", view };
   if (wish) return { kind: "find" };
   if (CHECK_WORDS.test(text) && text.length < 120)
-    return s.caseOnScreen && QUESTION.test(text) ? { kind: "ask" } : { kind: "check-ask" };
-  if (s.caseOnScreen && QUESTION.test(text)) return { kind: "ask" };
+    return s.caseOnScreen && QUESTION.test(text)
+      ? { kind: "ask", topic: caseTopic(text) }
+      : { kind: "check-ask" };
+  if (s.caseOnScreen && QUESTION.test(text)) return { kind: "ask", topic: caseTopic(text) };
   if (question && PAYING.test(text)) return { kind: "rules" };
   if (question && (strong || signs > 0)) return { kind: "unsure" };
   if (WISH_WORDS.test(text) && !strong) return { kind: "find" };
-  return s.caseOnScreen ? { kind: "ask" } : { kind: "unsure" };
+  return s.caseOnScreen ? { kind: "ask", topic: caseTopic(text) } : { kind: "unsure" };
 }
 
 /** The other reading of the same words, offered as a one-tap switch. Null: none fits. */
 export function switchOf(intent: Intent): Intent | null {
-  if (intent.kind === "check") return { kind: "find" };
-  if (intent.kind === "find" || intent.kind === "ask" || intent.kind === "open")
-    return { kind: "check" };
-  return null; // "unsure" asks with two chips; "rules" answers from code
+  // A pasted ad is not offered back as a wish, and a follow-up about the case is not an ad.
+  if (intent.kind === "find" || intent.kind === "open") return { kind: "check" };
+  return null; // "check" and "ask" stand; "unsure" asks with two chips; "rules" answers from code
 }
 
 export const SWITCH_LABEL: Record<Intent["kind"], string> = {
@@ -211,6 +237,27 @@ export function rentFrom(text: string): number | null {
     }
   }
   return null;
+}
+
+/** The monthly rent an ad states: an amount followed by "a month", else the first rent in it. */
+export function adRentFrom(ad: string): number | null {
+  const m =
+    /\$\s?(\d[\d,]{2,5})(?:\.\d+)?\s*(?:\/\s*mo\b|\/\s*month|a month|per month|monthly)/i.exec(ad);
+  if (m) {
+    const n = Number(m[1]!.replace(/,/g, ""));
+    if (n >= 300 && n <= 20000) return n;
+  }
+  return rentFrom(ad);
+}
+
+/** The Finder wish for "safer homes" after a case: the ad's own beds and rent are the filter. */
+export function saferWords(ad: string): string {
+  const brief = briefFromWords(ad);
+  const rent = adRentFrom(ad);
+  const bits = ["Find me safer places like this"];
+  if (brief.beds_min != null) bits.push(brief.beds_min === 0 ? "studio" : `${brief.beds_min} bed`);
+  if (rent) bits.push(`under $${rent.toLocaleString("en-US")}`);
+  return bits.join(", ");
 }
 
 export function briefFromWords(text: string): RenterBrief {
