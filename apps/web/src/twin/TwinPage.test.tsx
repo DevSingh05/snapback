@@ -50,7 +50,7 @@ describe("TwinView photo landing", () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
     expect(screen.getByTestId("photo-landing")).toHaveAttribute("data-motion", "reduced");
     await waitFor(() =>
-      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.6" }),
+      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.45" }),
     );
     expect(screen.getByTestId("photo-overlay")).not.toHaveAttribute("data-flying");
   });
@@ -63,7 +63,7 @@ describe("TwinView photo landing", () => {
       </StrictMode>,
     );
     await waitFor(() =>
-      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.6" }),
+      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.45" }),
     );
     expect(screen.getByTestId("photo-landing")).toHaveAttribute("data-phase", "landed");
   });

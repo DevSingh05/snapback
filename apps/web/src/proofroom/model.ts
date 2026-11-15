@@ -364,7 +364,11 @@ export function floorAt({
   };
   steps.forEach((s, i) => {
     if (!started(i)) return;
-    const owner = deskOfKind(roster, s.kind) ?? (s.by === "agent" && deep ? planner : null);
+    // A follow-up or a drafted next step is the Planner's own choice (by its model, or the
+    // recorded FIXTURE pick), so it shows on the Planner's desk either way.
+    const owner =
+      deskOfKind(roster, s.kind) ??
+      ((s.by === "agent" && deep) || s.kind === "followup" ? planner : null);
     log.push({
       step: s.step,
       deskId: owner?.id ?? null,
