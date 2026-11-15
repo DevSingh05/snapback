@@ -189,9 +189,6 @@
   border-left: 3px solid var(--surface);
   height: 100%;
 }
-.landing-split span + span::before {
-  content: "";
-}
 .twin-fade {
   display: grid;
   gap: var(--sp-3);
@@ -212,8 +209,8 @@
   flex: 1 1 150px;
   min-height: 48px;
   padding: 0 var(--sp-4);
-  border: 2px solid var(--ink);
-  background: var(--surface);
+  border: 0;
+  background: var(--layer-2);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-md);
@@ -221,7 +218,6 @@
   cursor: pointer;
 }
 .twin-fade-btn[aria-pressed="true"] {
-  border-color: var(--act);
   background: var(--act);
   color: var(--on-act);
 }
@@ -252,5 +248,16 @@
 @media (hover: hover) {
   .twin-fade-btn:hover {
     box-shadow: inset 0 -3px 0 var(--scan);
+  }
+}
+
+/* Beside the twin the team's panel spans every row of the page's left column. The spare height
+   goes to a last, empty row, so the fade controls stay right under the 3D view. */
+@media (min-width: 1180px) {
+  .twin-body.twin-with-team {
+    grid-template-rows: repeat(4, auto) 1fr;
+  }
+  .twin-body.twin-with-team > .pr-panel {
+    grid-row: 1 / span 5;
   }
 }
