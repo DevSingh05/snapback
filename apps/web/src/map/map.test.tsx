@@ -19,7 +19,8 @@ describe("the map route", () => {
   it("matches /map and leaves the home route alone", () => {
     expect(matchRoute("/map")).toEqual({ name: "map" });
     expect(matchRoute("/map/")).toEqual({ name: "map" });
-    expect(matchRoute("/")).toEqual({ name: "home" });
+    expect(matchRoute("/")).toEqual({ name: "landing" });
+    expect(matchRoute("/home")).toEqual({ name: "home" });
   });
 });
 

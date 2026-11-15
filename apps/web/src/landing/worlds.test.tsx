@@ -1,0 +1,82 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { matchRoute } from "../App";
+import WorldsLanding, { LANDING_MEASURED } from "./WorldsLanding";
+
+describe("SNAPBACK Worlds front door", () => {
+  it("is the page at / and the app moved to /home", () => {
+    expect(matchRoute("/")).toEqual({ name: "landing" });
+    expect(matchRoute("/home")).toEqual({ name: "home" });
+    expect(matchRoute("/case/7Q2M")).toEqual({ name: "result", id: "7Q2M" });
+  });
+
+  it("has one clear way into the app and a Stories link in the bar", () => {
+    render(<WorldsLanding />);
+    const bar = document.querySelector<HTMLElement>(".wl-bar")!;
+    expect(within(bar).getByRole("link", { name: "Open SNAPBACK" })).toHaveAttribute(
+      "href",
+      "/home",
+    );
+    expect(within(bar).getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
+    expect(screen.getByRole("link", { name: "Check an ad" })).toHaveAttribute("href", "/home");
+  });
+
+  it("draws the 3D hero first, then the labelled sample verdict", () => {
+    render(<WorldsLanding />);
+    const canvas = screen.getByTestId("wl-canvas");
+    const verdict = screen.getByTestId("wl-verdict");
+    expect(canvas.compareDocumentPosition(verdict) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(verdict).toHaveTextContent("Hold off: it asks for money before you’ve seen the place");
+    expect(verdict).toHaveTextContent("SYNTHETIC");
+    expect(canvas).toHaveAttribute("aria-label", expect.stringMatching(/drawing, not a real home/));
+  });
+
+  it("states the measured number with its n and label, and nothing stronger", () => {
+    render(<WorldsLanding />);
+    const line = screen.getByTestId("wl-measured");
+    expect(line).toHaveTextContent("MEASURED");
+    expect(line).toHaveTextContent(LANDING_MEASURED);
+    expect(LANDING_MEASURED).toContain("43 of 48");
+    expect(LANDING_MEASURED).toContain("78 real listing photos");
+  });
+
+  it("ends in the three-way row, with the realtor quote under the reviews", () => {
+    render(<WorldsLanding />);
+    const stories = screen.getByTestId("wl-col-stories");
+    const reviews = screen.getByTestId("wl-col-reviews");
+    expect(within(stories).getByRole("link")).toHaveAttribute("href", "/stories");
+    expect(within(reviews).getByRole("link", { name: "Read the reviews" })).toHaveAttribute(
+      "href",
+      "/reviews",
+    );
+    expect(within(reviews).getByRole("link", { name: "Open a sample report" })).toHaveAttribute(
+      "href",
+      "/case/7Q2M",
+    );
+    expect(within(reviews).getByTestId("realtor-quote")).toHaveTextContent("Ashwin Veeravalli");
+    expect(within(reviews).getByTestId("realtor-quote")).toHaveTextContent("The Agency, Los Gatos");
+  });
+
+  it("keeps copy honest: no AWS claim, no Apartments.com detection claim, no em dashes", () => {
+    const { container } = render(<WorldsLanding />);
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/aws|amazon web/i);
+    expect(text).not.toMatch(/apartments\.com/i);
+    expect(text).not.toMatch(/[–—]/);
+  });
+
+  it("switches Day and Dusk on its own page and remembers the choice", () => {
+    window.localStorage.clear();
+    const { unmount } = render(<WorldsLanding />);
+    const page = screen.getByTestId("worlds-landing");
+    expect(page).toHaveAttribute("data-theme", "light");
+    fireEvent.click(screen.getByRole("button", { name: "Dusk" }));
+    expect(page).toHaveAttribute("data-theme", "dark");
+    expect(window.localStorage.getItem("sb-theme")).toBe("dark");
+    unmount();
+    render(<WorldsLanding />);
+    expect(screen.getByTestId("worlds-landing")).toHaveAttribute("data-theme", "dark");
+    window.localStorage.clear();
+  });
+});

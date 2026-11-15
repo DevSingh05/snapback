@@ -238,9 +238,10 @@
 
 /* The map at night (design v4 1.1, values from plan/theme-refs.md): a deep blue-slate ground,
    lifted surfaces edged by a hairline and a top highlight, bone ink far above a blue-grey muted,
-   1px edges on quiet controls. Scoped to the map wrapper, so nothing else can turn dark. The
+   1px edges on quiet controls. Scoped to the map wrapper and the front-door page (.wl, its own Day / Dusk switch), so nothing else can turn dark. The
    night band sits close to the ground, so always close it with a --line rule. The ONLY place a
    dark value is written. */
+.wl[data-theme="dark"],
 .city[data-theme="dark"] {
   color-scheme: dark;
 

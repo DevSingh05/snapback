@@ -341,7 +341,7 @@ export function EndScene({
         <p className="st-end-kicker ui-mono">What SNAPBACK did</p>
         <p className="st-end-line">{line}</p>
         <div className="st-end-acts">
-          <a className="st-btn st-btn-primary" href="/">
+          <a className="st-btn st-btn-primary" href="/home">
             Check your own ad
           </a>
           {next && (

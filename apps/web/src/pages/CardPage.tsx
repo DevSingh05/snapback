@@ -174,7 +174,7 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
         }
         action={
           load.status === "missing"
-            ? { label: "Check an ad", href: "/" }
+            ? { label: "Check an ad", href: "/home" }
             : { label: "Try again", onClick: () => setAttempt((n) => n + 1) }
         }
       />
