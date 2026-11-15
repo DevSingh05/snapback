@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta, tzinfo
 
 from snapback.card import strings
 from snapback.contracts import (
+    AerialStatus,
     AuthorityStatus,
     Card,
     CardLine,
@@ -37,13 +38,17 @@ from snapback.contracts import (
     OwnerMatch,
     PhoneMatch,
     PresenceStatus,
+    PriceResult,
     PriceStatus,
+    PublicStatus,
     PublishedRule,
+    RecordLine,
     RuleCategory,
     UnitStatus,
     Verdict,
     VerdictState,
 )
+from snapback.settings import get_settings
 
 CARD_TTL = timedelta(hours=24)
 FIXTURE_ID_PREFIX = "fx-"
@@ -171,6 +176,11 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
         unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
+        aerial_wrong_building_flag=(
+            get_settings().snapback_vexcel_in_verdict
+            and modules.aerial is not None
+            and modules.aerial.status is AerialStatus.WRONG_BUILDING
+        ),
         license_flag=_license(modules) is LicenseStatus.NOT_FOUND and not _renter_number(modules),
         license_given_flag=(
             _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
@@ -216,6 +226,7 @@ REASON_ORDER = (
     "reason.not_located",
     "reason.not_indexed",
     "reason.unit_flag",
+    "reason.aerial_wrong_building",
     # Price, and what the renter's own text raised.
     "reason.price_flag",
     "reason.payment_flag",
@@ -357,6 +368,8 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             ("reason.for_sale", evidence.for_sale_flag),
             ("reason.lookalike_link", evidence.lookalike_link_flag),
             ("reason.unit_flag", evidence.unit_flag),
+            # Behind SNAPBACK_VEXCEL_IN_VERDICT: holds, is not proof, never clears.
+            ("reason.aerial_wrong_building", evidence.aerial_wrong_building_flag),
             # A18 (#124): the ad gives a licence number that is not an active Texas licence.
             ("reason.license_not_found", evidence.license_flag),
         )
@@ -609,6 +622,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_record_lines(modules, lang, place=True),
             *_seen_before_lines(modules, lang, replies=False),
+            *_place_check_lines(modules, lang),
         ],
     )
 
@@ -620,9 +634,56 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
     as a whole then stays FIXTURE, and these lines say for themselves that they are LIVE.
     """
     source = modules.record_source
+    lines = _named(lines, "CoStar record")
     if source is None or source is modules.source:
         return lines
     return [line.model_copy(update={"source": source}) for line in lines]
+
+
+def _named(lines: list[CardLine], name: str) -> list[CardLine]:
+    """Say which source answered each line (every evidence line names its source)."""
+    return [
+        line if line.source_name else line.model_copy(update={"source_name": name})
+        for line in lines
+    ]
+
+
+def _place_check_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """The Census Geocoder's answer about the ad's address. Evidence only: a miss or a failure
+    is an information line (tone not-checked), never a flag, and a match is not presence."""
+    found = modules.place_check
+    if found is None:
+        return []
+    if found.status is PublicStatus.FOUND:
+        if found.zip and found.county:
+            key, values = "place.census_found", {"zip": found.zip, "county": found.county}
+        else:
+            key, values = "place.census_found_bare", {}
+        tone = CardTone.OK
+    elif found.status is PublicStatus.NO_MATCH:
+        key, values, tone = "place.census_no_match", {}, CardTone.NOT_CHECKED
+    else:
+        key, values, tone = "place.census_not_checked", {}, CardTone.NOT_CHECKED
+    line = _line(lang, "label.address", tone, key, **values)
+    return [line.model_copy(update={"source": found.source, "source_name": "Census"})]
+
+
+def _domain_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """RDAP: the age of a link's domain. A new domain is the `link.new_domain` red flag in the
+    rule lines, so this line is for an older domain or a lookup that could not answer."""
+    found = modules.domain_check
+    if found is None or any(hit.rule_id == "link.new_domain" for hit in modules.rules):
+        return []
+    if found.status is PublicStatus.FOUND and found.age_days is not None:
+        years = found.age_days // 365
+        key = "link.domain_age"
+        values: dict[str, object] = {"years": max(years, 1)} if years >= 1 else {}
+        if years < 1:
+            key, values = "link.domain_age_months", {"days": found.age_days}
+    else:
+        key, values = "link.domain_not_checked", {}
+    line = _line(lang, "label.link_domain", CardTone.NOT_CHECKED, key, **values)
+    return [line.model_copy(update={"source": found.source, "source_name": "RDAP"})]
 
 
 MAX_BROKERAGE_CHARS = 80
@@ -660,7 +721,10 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             key = "place.for_sale_office"
             return [_line(lang, "label.for_sale", CardTone.NOT_SHOWN, key, record=record)]
         key = "place.for_sale" if brokerage is not None else "place.for_sale_ask_listing"
-        return [_line(lang, "label.for_sale", CardTone.HOLD, key, record=record)]
+        line = _line(lang, "label.for_sale", CardTone.HOLD, key, record=record)
+        if found.source_name:  # found by a reverse image search, not CoStar's listings
+            line = line.model_copy(update={"source_name": found.source_name})
+        return [line]
     if status is ForSaleStatus.RECENTLY_RENTED:
         rented_on = modules.for_sale.changed_on if modules.for_sale else None
         # Information, not a flag: we do not know whether it is rented now.
@@ -974,9 +1038,9 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
                 ],
             ),
             # Not from the record: the licence list is the state's, and public.
-            *_license_lines(modules, lang),
+            *_named(_license_lines(modules, lang), "TREC"),
             # Nor this: the owner roll is the county's, and public.
-            *_owner_lines(modules, lang),
+            *_named(_owner_lines(modules, lang), "HCAD"),
             *_record_lines(modules, lang, place=False),
             *_seen_before_lines(modules, lang, replies=True),
         ],
@@ -990,6 +1054,16 @@ _RECORD_SOURCE_LABEL = {
 }
 
 
+def _record_copy_key(record: RecordLine) -> str:
+    """The wording for a record line. A fact we lack is left out of the sentence, never printed
+    as a blank: no founding year drops "since", a missing or odd ZIP drops the ZIP."""
+    if record.key == "comptroller_active" and not record.year:
+        return "comptroller_active_no_year"
+    if record.key == "address_point" and not re.fullmatch(r"\d{5}", record.zip_code or ""):
+        return "address_point_no_zip"
+    return record.key
+
+
 def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[CardLine]:
     """Texas public records, one neutral line each, labelled with the registry it came from.
     Information only: `decide` never reads them, and none counts as a finding either way.
@@ -1001,11 +1075,12 @@ def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[Ca
             continue
         if not strings.has(f"records.{record.key}", lang):
             continue
+        key = f"records.{_record_copy_key(record)}"
         lines.append(
             CardLine(
                 label=strings.text(label, lang),
                 text=strings.text(
-                    f"records.{record.key}",
+                    key,
                     lang,
                     company=_one_line(record.company, MAX_COMPANY_CHARS),
                     year=record.year or "",
@@ -1014,6 +1089,7 @@ def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[Ca
                 tone=CardTone.NOT_CHECKED,
                 source=record.data_source,
                 key=label,
+                source_name=record.source,
             )
         )
     return lines
@@ -1031,7 +1107,12 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         if not strings.has(key, lang):
             key = f"rule_category.{hit.category.value}"
         label = _RULE_LABELS[hit.category]
-        by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
+        line = _line(lang, label, CardTone.RED_FLAG, key)
+        if hit.rule_id == "link.new_domain" and modules.domain_check is not None:
+            line = line.model_copy(
+                update={"source": modules.domain_check.source, "source_name": "RDAP"}
+            )
+        by_label[label].append(line)
     if shown >= _BOTH_MONEY_RULES:
         # Zelle and a deposit or holding fee before a viewing are one ask to the renter: one
         # line that names both, standing where the first of the two stood.
@@ -1072,6 +1153,8 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     # Only how the asked rent compares. The record's own figures are sponsor data and stay off
     # the card.
     status = modules.price.status if modules.price else PriceStatus.NOT_CHECKED
+    if modules.price is not None and modules.price.baseline_source == "hud_safmr":
+        return _hud_rent_line(modules.price, lang)
     if modules.price is not None and modules.price.per_bed:
         return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.per_bed")
     if status is PriceStatus.WITHIN_RANGE:
@@ -1098,11 +1181,38 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
 
 
+def _hud_rent_line(price: PriceResult, lang: str) -> CardLine:
+    """The rent against HUD's public typical rent for the ZIP and size (the home has no CoStar
+    rent). HUD's figures are public, so the card shows them and names HUD as the source."""
+    beds = price.baseline_beds or 0
+    size = (
+        strings.text("rent.hud_size.studio", lang)
+        if price.baseline_beds == 0
+        else strings.text("rent.hud_size.beds", lang, beds=beds)
+    )
+    typical = price.baseline_rent or 0
+    values = {"zip": price.baseline_zip, "size": size, "rent": f"${typical:,}"}
+    if price.status is PriceStatus.BELOW_RANGE and price.listed_rent and typical:
+        percent = round(100 * (typical - price.listed_rent) / typical)
+        line = _line(
+            lang, "label.rent_vs_record", CardTone.HOLD, "rent.hud_below", percent=percent, **values
+        )
+    else:
+        line = _line(lang, "label.rent_vs_record", CardTone.OK, "rent.hud_within", **values)
+    # Its own label, so it never reads like #301's "HUD record" (the manager on HUD's list). The
+    # key stays the rent comparison's, which the web keys off.
+    return line.model_copy(
+        update={"source_name": "HUD", "label": strings.text("label.rent_vs_hud", lang)}
+    )
+
+
 def _rent_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     line = _rent_line(modules, lang)
     price = modules.price
     # A rent line that compared nothing says nothing about the record.
     compared = price is not None and (price.status is not PriceStatus.NOT_CHECKED or price.per_bed)
+    if price is not None and price.baseline_source == "hud_safmr":
+        return [line]  # HUD is public data, not the building's record: no record source mark
     return _from_record(modules, [line]) if compared else [line]
 
 
@@ -1136,7 +1246,10 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
                 tone=CardTone.HOLD,
             ),
         )
-    return CardRow(kind=CardRowKind.PRICE, lines=[*lines, *_rent_lines(modules, lang)])
+    return CardRow(
+        kind=CardRowKind.PRICE,
+        lines=[*lines, *_domain_lines(modules, lang), *_rent_lines(modules, lang)],
+    )
 
 
 def _join_words(words: list[str], lang: str) -> str:
@@ -1176,6 +1289,28 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             )
         )
     return _from_record(modules, lines)
+
+
+FOLLOWUP_LABEL = "label.followup"  # the same key as agent/followups.py
+
+
+def _followup_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """The Planner's follow-up checks, one neutral line each naming its source. Information
+    only: `decide` never reads them, and none counts as a finding either way."""
+    return [
+        CardLine(
+            label=strings.text(FOLLOWUP_LABEL, lang),
+            key=FOLLOWUP_LABEL,
+            text=strings.text(
+                f"followup.{line.check}.{line.status.value}", lang, count=line.count or 0
+            ),
+            tone=CardTone.NOT_CHECKED,
+            source=line.data_source,
+            source_name=line.source_name,
+        )
+        for line in modules.followups
+        if strings.has(f"followup.{line.check}.{line.status.value}", lang)
+    ]
 
 
 def _clean_hold_headline(
@@ -1313,7 +1448,7 @@ def build_card(
         _person_row(modules, lang, checked.tzinfo),
         _price_row(modules, lang),
     ]
-    claims = _claims_lines(modules, lang)
+    claims = [*_claims_lines(modules, lang), *_followup_lines(modules, lang)]
     if claims:  # only when there is something to say; the three rows above are always there
         rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
 
@@ -1388,6 +1523,7 @@ _RED_REASONS = (
     "reason.for_sale",
     "reason.lookalike_link",
     "reason.unit_flag",
+    "reason.aerial_wrong_building",
     "reason.license_not_found",
 )
 _GOOD_REASONS = (

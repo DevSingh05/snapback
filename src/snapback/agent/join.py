@@ -31,6 +31,7 @@ from snapback.contracts import (
     AdNote,
     AuthorityResult,
     DataSource,
+    DomainCheck,
     FloorPlanCandidate,
     ForSaleMatch,
     ForSaleStatus,
@@ -39,8 +40,11 @@ from snapback.contracts import (
     LocateStatus,
     OwnerResult,
     PhotoLocation,
+    PlaceCheck,
     PriceResult,
+    PriceStatus,
     PropertyRecord,
+    PublicStatus,
     RecordLine,
     RentalHouse,
     RuleHit,
@@ -111,6 +115,45 @@ def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
     except Exception as error:
         log.warning("owner lookup failed (%s); treated as not looked up", type(error).__name__)
         return None
+
+
+def owner_of_county(
+    lookups: object, listing_text: str, place: PlaceCheck | None
+) -> OwnerResult | None:
+    """The owner of record, asked only about a Harris County address (HCAD's roll is keyed by
+    street alone, so another county's street must never be matched against a Harris one)."""
+    from snapback.public.census import in_harris_county
+
+    if not in_harris_county(listing_text, place):
+        return None
+    return owner_of(lookups, listing_text)  # type: ignore[arg-type]
+
+
+def public_checks_of(
+    lookups: object, listing_text: str
+) -> tuple[PlaceCheck | None, DomainCheck | None]:
+    """The Census address check and the RDAP link-domain age for this listing, run side by side
+    under the public-data time limit. Either is None when not looked up (no address or link in
+    the ad, a flag off, or a lookup that broke): a lookup that broke is a lookup that did not
+    happen. No address, domain or name is logged."""
+    place_fn = getattr(lookups, "place_check", None)
+    domain_fn = getattr(lookups, "domain_check", None)
+    if not listing_text or (place_fn is None and domain_fn is None):
+        return None, None
+    from concurrent.futures import ThreadPoolExecutor
+
+    def safe(fn: object) -> object:
+        if fn is None:
+            return None
+        try:
+            return fn(listing_text)  # type: ignore[operator]
+        except Exception as error:
+            log.warning("public lookup failed (%s); treated as not looked up", type(error).__name__)
+            return None
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="public-check") as pool:
+        place, domain = pool.submit(safe, place_fn), pool.submit(safe, domain_fn)
+        return place.result(), domain.result()  # type: ignore[return-value]
 
 
 MAX_OFFICE_CHARS = 80
@@ -255,12 +298,70 @@ class KitLookups:
         offices = getattr(match, "offices", None) or ()
         return lookup_owner(listing_text, offices, extract_contacts(listing_text).company)
 
-    def public_records(self, listing_text: str) -> list[RecordLine]:
+    def public_records(
+        self, listing_text: str, geocoder_hit: bool | None = None
+    ) -> list[RecordLine]:
         """Texas public records (Comptroller, HUD manager, Houston address point): a LIVE run
         with SNAPBACK_TX_RECORDS on only. Information lines; nothing here reaches `decide`."""
         from snapback.adapters import tx_records
 
-        return tx_records.public_records(listing_text, self.source)
+        return tx_records.public_records(listing_text, self.source, geocoder_hit=geocoder_hit)
+
+    def place_check(self, listing_text: str) -> PlaceCheck | None:
+        """Census Geocoder on the address in the ad. A LIVE run calls it; a fixture run reads a
+        recorded answer and, with none recorded, looked nothing up."""
+        from snapback.public import census, fetch
+        from snapback.settings import get_settings
+
+        settings = get_settings()
+        address = census.address_in(listing_text) if settings.snapback_census_geocoder else None
+        if address is None:
+            return None
+        found = census.check(
+            address, fetch.fetcher_for(self.source), settings.snapback_public_timeout_s
+        )
+        if found.status is PublicStatus.NOT_CHECKED and self.source is not DataSource.LIVE:
+            return None
+        return found
+
+    def domain_check(self, listing_text: str) -> DomainCheck | None:
+        """RDAP age of the first non-platform link's domain. Same LIVE and fixture rules."""
+        from datetime import UTC, datetime
+
+        from snapback.public import fetch, rdap
+        from snapback.settings import get_settings
+
+        settings = get_settings()
+        host = rdap.link_host(listing_text) if settings.snapback_rdap else None
+        if host is None:
+            return None
+        found = rdap.check(
+            host,
+            fetch.fetcher_for(self.source),
+            today=datetime.now(UTC).date(),
+            timeout=settings.snapback_public_timeout_s,
+        )
+        if found.status is PublicStatus.NOT_CHECKED and self.source is not DataSource.LIVE:
+            return None
+        return found
+
+    def lens_for_sale(self, listing_text: str) -> ForSaleMatch | None:
+        """Reverse image search of the ad's own photo links (Google Lens via SerpApi). LIVE only,
+        needs SERPAPI_API_KEY; the caller asks only when CoStar has no scan or for-sale record."""
+        if self.source is not DataSource.LIVE:
+            return None
+        from snapback.public import fetch, lens
+        from snapback.settings import get_settings
+
+        settings = get_settings()
+        if not settings.snapback_lens or settings.serpapi_api_key is None:
+            return None
+        return lens.check(
+            listing_text,
+            fetch.fetcher_for(self.source),
+            settings.serpapi_api_key.get_secret_value(),
+            settings.snapback_lens_timeout_s,
+        )
 
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""
@@ -301,6 +402,8 @@ class JoinedModules:
         record_source: DataSource | None,
         license: LicenseResult | None = None,
         owner: OwnerResult | None = None,
+        place_check: PlaceCheck | None = None,
+        domain_check: DomainCheck | None = None,
         live_locate: LiveLocate | None = None,
         photo_bytes: list[bytes] | None = None,
         lookups: Lookups | None = None,
@@ -312,6 +415,8 @@ class JoinedModules:
         self._for_sale = for_sale
         self._license = license
         self._owner = owner
+        self._place_check = place_check
+        self._domain_check = domain_check
         self._salt = salt
         self._record_source = record_source
         # A22: a live case places the renter's photos in the indexed twins (never a stand-in).
@@ -334,14 +439,51 @@ class JoinedModules:
         # credit-check link that goes to the building's own site is read again as the landlord's.
         self._identify(case_id)
         host = self._record.website_host if self._record is not None else None
-        if host:
-            return apply_rules(self._listing.text, own_host=host)
-        return list(self._listing.rule_hits)
+        hits = (
+            apply_rules(self._listing.text, own_host=host)
+            if host
+            else list(self._listing.rule_hits)
+        )
+        return [*hits, *self._new_domain_hits()]
+
+    def _new_domain_hits(self) -> list[RuleHit]:
+        """`link.new_domain` (RDAP): a link in the ad on a domain registered a few days ago."""
+        from snapback.public import rdap
+        from snapback.settings import get_settings
+
+        if self._domain_check is None:
+            return []
+        hit = rdap.rule_hit(self._domain_check, get_settings().snapback_new_domain_days)
+        return [hit] if hit is not None else []
+
+    def place_check(self, case_id: str) -> PlaceCheck | None:
+        return self._place_check
+
+    def domain_check(self, case_id: str) -> DomainCheck | None:
+        return self._domain_check
 
     def price(self, case_id: str) -> PriceResult | None:
         self._identify(case_id)
         listing = self._listing
-        return check_price(listing.listed_rent, self._record, beds=listing.beds, unit=listing.unit)
+        found = check_price(listing.listed_rent, self._record, beds=listing.beds, unit=listing.unit)
+        if found.status is not PriceStatus.NOT_CHECKED or found.per_bed:
+            return found
+        # CoStar has no rent for this home (a house or condo it does not cover): HUD's typical
+        # rent for the ZIP and size is the baseline, and the card names it.
+        return self._hud_price(found)
+
+    def _hud_price(self, found: PriceResult) -> PriceResult:
+        from snapback.public import hud
+        from snapback.settings import get_settings
+
+        if not get_settings().snapback_hud_baseline:
+            return found
+        listing = self._listing
+        zip_code = hud.zip_in(listing.text)
+        if zip_code is None and self._place_check is not None:
+            zip_code = self._place_check.zip  # the Census Geocoder found it from the address
+        compared = hud.check_price(listing.listed_rent, listing.beds, zip_code)
+        return found if compared is None else compared.model_copy(update={"unit": found.unit})
 
     def authority(self, case_id: str) -> AuthorityResult | None:
         # The listing brokerage on record may market the home as the manager may (ruling,
@@ -370,8 +512,14 @@ class JoinedModules:
         lookup = getattr(self._lookups, "public_records", None)
         if lookup is None or not self._listing.text:
             return []
+        # The Census check already found the address: the Houston address-point fallback runs
+        # only when Census missed, failed or was not asked.
+        hit = self._place_check is not None and self._place_check.status is PublicStatus.FOUND
         try:
-            return list(lookup(self._listing.text) or [])
+            found = (
+                lookup(self._listing.text, geocoder_hit=True) if hit else lookup(self._listing.text)
+            )
+            return list(found or [])
         except Exception as error:  # a lookup that breaks leaves the lines out, never the case
             log.warning("public records not read (%s)", type(error).__name__)
             return []

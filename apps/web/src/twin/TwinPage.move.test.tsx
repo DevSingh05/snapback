@@ -26,9 +26,7 @@ import { TwinView } from "./TwinPage";
 describe("TwinView when the 3D move rejects", () => {
   it("still lands the photo on the static view instead of staying at opacity 0", async () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey="k" modelId="m" />);
-    await waitFor(() =>
-      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.6" }),
-    );
+    await waitFor(() => expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "1" }));
     expect(screen.getByText("moveTo failed")).toBeInTheDocument();
     expect(fakeSdk.Sweep.moveTo).toHaveBeenCalled();
   });

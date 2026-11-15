@@ -169,7 +169,8 @@ SNAPBACK never pays, books or sends anything for you.
   where its fact came from.
 - **Photo placement on real listing photos, LIVE** (CoStar OK'd sharing the totals): "Measured on
   78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys
-  fooled it." The right room is not measured, and we don't claim it.
+  fooled it." Re-measured on the final matcher with the same counts (n=48 photos, n=30 decoys).
+  The right room is not measured, and we don't claim it.
 - **A live tamper test** (LIVE; a real listing and tampered copies of it, nothing posted anywhere):
   - a changed phone number, caught 6 of 6 on real photos and 2 of 2 on scan renders;
   - "send the deposit by Zelle before the tour", caught 6 of 6 and 2 of 2;
@@ -213,3 +214,151 @@ Python, FastAPI, pydantic, uv, PyTorch, DINOv2, kornia (DISK, LightGlue), FAISS,
 ONNX Runtime, LangChain deepagents, TypeScript, React, Vite, MapLibre, Node.js, Photon 2.0
 (Spectrum SDK, iMessage), ElevenLabs, Matterport, CoStar and Homes.com data, Vexcel aerial
 imagery (provided), GitHub Actions.
+
+## Tracks
+
+> **For the reviewer, not for Devpost:**
+>
+> - One section per track. Numbers come only from merged PRs, each with n and LIVE, FIXTURE or
+>   SYNTHETIC.
+> - **The A8 photo line is current.** Dev re-measured it on main `f3d17f0`, after #296's strict
+>   bar (M1, #8), and got the same counts: 43 of 48, 0 of 48 wrong, 0 of 30 decoys.
+> - **Not on `main` yet, so not claimed:**
+>   - the deep agent's per-ad plan, re-planning and next-step draft;
+>   - the Arlequin ring case file, case study and reworded-ads test;
+>   - `/under-the-hood`;
+>   - the loose-match warning (#297) and the evidence image (#283).
+>     Each goes in once it merges.
+
+### CoStar · Inside and Out
+
+**What we built on CoStar's data:** every ad is checked against CoStar's own record of the
+building: its leasing office, its website, its units and its Matterport scan. The report then
+sends the renter back to the real listing.
+
+- **Photos placed in CoStar's 3D scans** (LIVE, re-measured on the final matcher; CoStar OK'd
+  sharing totals): of n=48 real listing photos, 43 were placed in the right home and 0 in a wrong
+  one. Of n=30 decoys, 0 were placed in the claimed building.
+- **Live tamper test (LIVE; a real listing and tampered copies of it, nothing posted):**
+  - a changed phone number, a "Zelle before the tour" ask and a lookalike website link;
+  - each was caught 6 of 6 on real photos and 2 of 2 on scan renders.
+- **Respects the data:** record figures (rents) are off by default. Only derived yes/no facts
+  reach a model, and the kit is deleted after Sun Nov 15 16:00.
+
+**Where to see it:**
+
+- the report at `/case/<id>`: the ad beside the real listing, with "See the real listing" (#250,
+  #299);
+- the photos placed in the 3D scan at `/case/<id>/twin`. Each ad photo fades by itself so the scan
+  shows through behind it, with big "Show ad photo", "Show 3D scan" and "Side by side" buttons
+  (#305);
+- the draft note to the real leasing office, in the report and in iMessage (#250, #276).
+
+### LangChain · deepagents
+
+**What we built on deepagents:**
+
+- A deep agent runs on every case, in the background (#273).
+- It plans with todos and hands each check family to its own sub-agent. Each sub-agent has one
+  read-only tool and writes its findings as notes in the agent file system.
+- It never sets the verdict. It has none of the choice tools, so it can't move a case, and
+  `decide()` in code sets every verdict.
+
+**Measured (FIXTURE backend, real model runs, #273):**
+
+- the case answer returns in 0.03 to 0.09 s, without waiting for the agent (n=6);
+- the agent's first step: median 2.35 s (2.14 to 6.02, n=5);
+- the agent done: median 22.9 s (21.8 to 25.7, n=5), with no fallbacks.
+
+**Where to see it:**
+
+- the check team working beside the 3D scan at `/case/<id>/twin`, also at
+  `/proof-room?case=<id>`;
+- the step-by-step trace at `/case/<id>/trace`;
+- "How did you check?" in iMessage, which answers with one line per agent (#275).
+
+### Arlequin · AI forensics
+
+**What we built:** an investigator view that finds the ring behind many ads. It links ads by
+reworded text, shared photos, numbers and wordings, finds communities, and gives every finding
+its evidence.
+
+**Measured (SYNTHETIC; the corpus and method were built together, so this is not an accuracy
+claim for real listings):**
+
+- **300-ad corpus** (n = 301, 4 seeded rings): 4 of 4 rings recovered, 57 of 57 ring ads found
+  and 0 of 244 honest ads flagged. A keyword baseline recovered 0 of 4. On 10 held-out seeds, ring
+  precision was 0.88 and recall 0.93.
+- **90-day stream** (n = 1 seed, 3,039 ads, 10 rings, #268): ad recall 0.927 and 0 of 2,684
+  honest ads flagged, against a keyword baseline's recall of 0.014. Honest limit: it merges
+  separate rings into larger groups, so 0 of 10 rings were recovered at the 0.7 overlap bar.
+  Splitting them is next.
+
+**Where to see it:** `/investigate`.
+
+### Photon · Build a Messaging Agent (+ Best Voice Agent)
+
+**What we built on Photon 2.0:** SNAPBACK lives in iMessage through the Spectrum SDK.
+
+- **The thread:**
+  - Forward an ad, as text, a screenshot or photos. An instant line says what's happening, then
+    the short report arrives with a picture of the card.
+  - "Why?", "Who do I call?", "Is it safe?" and "How did you check?" are answered from the same
+    case, without a new check.
+  - It remembers the renter's language, budget and beds for 30 days ("forget me" deletes them).
+  - It drafts a note to the real leasing office, which is never sent automatically.
+- **Voice:** a voice memo in gets a native voice bubble out. The spoken reply is 15 s or less:
+  the verdict, the top reason and who to call, and never a phone number, a rent or a link.
+- **Safety:** only allowlisted conversations are answered, it never texts first, and every reply
+  goes to its own thread only.
+
+**Measured:**
+
+- **Server-side reply time** (FIXTURE; the demo laptop, not counting Photon delivery):
+  - a text ad: p50 14 ms, p90 15 ms (n=10, all 10 ok);
+  - a screenshot read by local OCR: p50 862 ms, p90 890 ms (n=10, all 10 ok);
+  - "why?": p50 2 ms (n=20).
+- **Spoken reply** (ElevenLabs, n=3, on the demo laptop): 11.8 to 12.5 s long, made in 1.31 to
+  1.55 s.
+
+**Where to see it:** text the SNAPBACK line from the team phone at our table. Merged in #204,
+#232, #245, #255, #264, #275, #276 and #281.
+
+### Amazon · Best Practical AI
+
+These answer the packet's five focus areas.
+
+- **Agentic behavior:** a planner agent with a sub-agent per check runs on every case, and code
+  sets the verdict (see LangChain above).
+- **Real-world impact:**
+  - The FTC counted nearly 65,000 rental-scam reports since 2020, with a median loss of $1,000.
+  - Batch run (FIXTURE, composed ads): 117 of 123 ads and messages handled as expected,
+    including 43 of 43 clean messages left alone.
+- **Adaptive intelligence:**
+  - Follow-up questions are answered from the renter's own case.
+  - iMessage remembers language, budget and beds (#264), and "show me safer homes" uses them.
+- **User-friendly design:** one box on the web, or one text in iMessage. The short report gives
+  the verdict, the top two reasons and one next step. Text-only checks take about 1 s, and checks
+  with photos about 19 to 26 s (LIVE).
+- **Creative innovation:** the renter checks an ad in the same thread where the scam arrives, and
+  the answer is built from the home's own record and 3D scan.
+
+**Where to see it:** the home page box and the report at `/case/<id>`.
+
+### Best Overall · Business and Enterprise
+
+- **Who pays today:** the renter, with a median loss of $1,000 (FTC, Dec 22 2025), and the
+  listing businesses whose listings are copied to bait them.
+- **Covers the homes CoStar doesn't (#302):** free public sources fill the gaps.
+  - **Sources:** HUD's typical rent by ZIP and bedroom count (3,238 Texas ZIP rows), the Census
+    address check, the county owner of record and the website's domain age.
+  - Each source names itself on the card. The rent cutoff for HUD isn't measured yet (0 Texas
+    ads in our eval bank), so we don't claim its accuracy.
+- **What a realtor said:** see the quote under "What it does" (Ashwin Veeravalli, Realtor, The
+  Agency, Los Gatos CA).
+- **Public ratings:** `/reviews` shows ratings from a public form, with n on every number (#306).
+- **Where to see it:**
+  - tour prep on the home page and `/map`;
+  - the reported cases replayed at `/replay`;
+  - renters' stories at `/stories`;
+  - ratings at `/reviews`.

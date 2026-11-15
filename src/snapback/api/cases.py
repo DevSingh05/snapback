@@ -33,7 +33,14 @@ from snapback.agent.background import BUSY, BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
-from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of, owner_of
+from snapback.agent.join import (
+    JoinedModules,
+    KitLookups,
+    Lookups,
+    license_of,
+    owner_of_county,
+    public_checks_of,
+)
 from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
@@ -439,6 +446,7 @@ def _background_job(
             session.trace.emit(
                 TraceKind.ERROR, strings.text("trace.error.model_nokey", session.lang)
             )
+            _recorded_followups(session)
             return
         except Exception:
             session.trace.emit(
@@ -455,6 +463,17 @@ def _background_job(
             )
 
     return run
+
+
+def _recorded_followups(session: CaseSession) -> None:
+    """With no model, code makes the recorded follow-up picks (labelled FIXTURE). Information
+    lines only; a failure here is logged and changes nothing."""
+    try:
+        from snapback.agent.followups import run_recorded
+
+        run_recorded(session)
+    except Exception:
+        log.exception("recorded follow-ups failed for %s", session.case_id)
 
 
 def _deepagents_runner(
@@ -639,6 +658,16 @@ class CaseStore:
             return by_text
         return nearby
 
+    def _lens_for_sale(self, text: str) -> ForSaleMatch | None:
+        lookup = getattr(self._lookups, "lens_for_sale", None)
+        if lookup is None or not text:
+            return None
+        try:
+            return lookup(text)
+        except Exception as error:  # a lookup that broke is a lookup that did not happen
+            log.warning("lens lookup failed (%s); treated as not looked up", type(error).__name__)
+            return None
+
     def create(
         self,
         listing: Listing,
@@ -684,15 +713,23 @@ class CaseStore:
         # fixtures, on any server: it is a staged example, so it is never a LIVE card and
         # calls no lookup.
         asked_by_name = demo_case is not None
-        for_sale = license = owner = None
+        for_sale = license = owner = place_check = domain_check = None
         if not asked_by_name:
             for_sale = self._lookups.for_sale(listing.text) if listing.text else None
             for_sale = self._for_sale_by_position(listing.text, record, for_sale)
+            if for_sale is None and record is None:
+                # CoStar has no scan or for-sale record for this home: reverse image search of
+                # the ad's own photo links is the fallback. A failure is "not looked up".
+                for_sale = self._lens_for_sale(listing.text)
             # D10: only a live run calls the licence list, and a lookup that breaks is "not
             # looked up". It reads the poster's own claim in the text and keeps no name.
             license = license_of(self._lookups, listing.text)
+            # Public data: the Census address check and the age of a link's domain (RDAP).
+            place_check, domain_check = public_checks_of(self._lookups, listing.text)
             # D12: the owner of record of the home the listing claims, when lane D holds one.
-            owner = owner_of(self._lookups, listing.text)
+            # After the Census check, and only for a Harris County address: the HCAD roll is
+            # keyed by street alone, so another county's street could match a Harris one.
+            owner = owner_of_county(self._lookups, listing.text, place_check)
 
         live = not asked_by_name and (
             self._settings.snapback_data_source is DataSource.LIVE
@@ -717,6 +754,8 @@ class CaseStore:
                     for_sale=for_sale,
                     license=license,
                     owner=owner,
+                    place_check=place_check,
+                    domain_check=domain_check,
                     salt=phone_salt(self._settings),
                     record_source=record.source if record else source,
                     live_locate=self._live_locate if live else None,
@@ -746,6 +785,23 @@ class CaseStore:
                     source=source,
                 )
                 session.web_facts = job.facts
+            if not asked_by_name:
+                # The Planner's follow-up menu for this case (agent/followups.py): existing
+                # lookups only, run if the deep agent picks them. Information lines, never a state.
+                from snapback.agent.followups import build_runners
+
+                try:
+                    session.followup_runners = build_runners(
+                        listing.text,
+                        source,
+                        self._settings,
+                        web_inputs=web_inputs_for(listing, record, phone_salt(self._settings)),
+                        web_ran=session.web_facts is not None,
+                        place_check=place_check,
+                        domain_check=domain_check,
+                    )
+                except Exception:
+                    log.warning("follow-up menu could not be built; the case has none")
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:

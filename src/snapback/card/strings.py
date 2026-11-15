@@ -30,6 +30,9 @@ EN: dict[str, str] = {
     "label.data_ask": "Data ask",
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
+    "label.rent_vs_hud": "Rent vs HUD typical",
+    "label.address": "Address",
+    "label.link_domain": "Link domain",
     "label.seen_before": "Seen before",
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
@@ -43,6 +46,9 @@ EN: dict[str, str] = {
     "records.comptroller_active": (
         "Texas Comptroller: {company} is an active Texas company since {year}."
     ),
+    "records.comptroller_active_no_year": (
+        "Texas Comptroller: {company} is an active Texas company."
+    ),
     "records.comptroller_inactive": (
         "Texas Comptroller: {company} is on the list but not as an active company."
     ),
@@ -54,6 +60,9 @@ EN: dict[str, str] = {
     "records.hud_phone_differs": "The ad's phone isn't the manager's number on HUD's record.",
     "records.address_point": (
         "City of Houston: this street address is on the city's address points (ZIP {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "City of Houston: this street address is on the city's address points."
     ),
     "label.owner": "Owner of record",
     "label.owner_rule": "Owner's rule",
@@ -320,6 +329,35 @@ EN: dict[str, str] = {
     "rent.below_floor_plan": (
         "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
     ),
+    # HUD's Small Area Fair Market Rent, when CoStar has no rent for the home (public baseline).
+    # Census Geocoder: the address check. Evidence only, never a flag.
+    "place.census_found": (
+        "The address is in the Census address list ({county} County, ZIP {zip}). That shows the "
+        "address exists, not who is offering it."
+    ),
+    "place.census_found_bare": (
+        "The address is in the Census address list. That shows the address exists, not who is "
+        "offering it."
+    ),
+    "place.census_no_match": (
+        "The Census address list has no match for this address. New homes are often missing, so "
+        "this is information only."
+    ),
+    "place.census_not_checked": "Not checked (the Census address list did not answer).",
+    # RDAP: how old the domain of a link in the ad is.
+    "rule.link.new_domain": (
+        "A link in the ad is on a domain registered in the last few weeks. Red flag."
+    ),
+    "link.domain_age": "A link in the ad is on a domain registered {years}+ years ago. No flag.",
+    "link.domain_age_months": "A link in the ad is on a domain registered {days} days ago.",
+    "link.domain_not_checked": "Not checked (the domain registry did not answer).",
+    "rent.hud_within": "Not far below the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
+    "rent.hud_below": (
+        "Typical rent here (HUD, ZIP {zip}, {size}): {rent}. This rent is {percent}% under it. "
+        "Ask why; discounts happen."
+    ),
+    "rent.hud_size.studio": "studio",
+    "rent.hud_size.beds": "{beds} bed",
     "rent.plan.studio": "studio",
     "rent.plan.beds": "{beds} bed",
     "rent.per_bed": "Not checked (priced per bed here, so the rent was not compared).",
@@ -521,6 +559,9 @@ EN: dict[str, str] = {
         "The poster says they are the owner, and the owner of record is someone else."
     ),
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
+    "reason.aerial_wrong_building": (
+        "The aerial photo of the address in the listing shows a different building."
+    ),
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
@@ -607,6 +648,9 @@ ES: dict[str, str] = {
     "label.data_ask": "Datos que piden",
     "label.pressure": "Presión",
     "label.rent_vs_record": "Renta frente al registro",
+    "label.rent_vs_hud": "Renta frente a la típica de HUD",
+    "label.address": "Dirección",
+    "label.link_domain": "Dominio del enlace",
     "label.seen_before": "Visto antes",
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
@@ -619,6 +663,9 @@ ES: dict[str, str] = {
     "label.src_houston": "Ciudad de Houston",
     "records.comptroller_active": (
         "Contralor de Texas: {company} es una empresa activa de Texas desde {year}."
+    ),
+    "records.comptroller_active_no_year": (
+        "Contralor de Texas: {company} es una empresa activa de Texas."
     ),
     "records.comptroller_inactive": (
         "Contralor de Texas: {company} está en la lista, pero no como empresa activa."
@@ -634,6 +681,9 @@ ES: dict[str, str] = {
     "records.address_point": (
         "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad "
         "(código postal {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad."
     ),
     "label.owner": "Propietario registrado",
     "label.owner_rule": "Regla del propietario",
@@ -918,6 +968,37 @@ ES: dict[str, str] = {
         "{percent}% por debajo de la renta más baja que figura en el registro de este edificio "
         "para {plan}. Pregunte por qué; hay descuentos."
     ),
+    "place.census_found": (
+        "La dirección está en la lista de direcciones del Censo (condado de {county}, código "
+        "postal {zip}). Eso muestra que la dirección existe, no quién la ofrece."
+    ),
+    "place.census_found_bare": (
+        "La dirección está en la lista de direcciones del Censo. Eso muestra que la dirección "
+        "existe, no quién la ofrece."
+    ),
+    "place.census_no_match": (
+        "La lista de direcciones del Censo no tiene esta dirección. Las casas nuevas suelen "
+        "faltar, así que es solo información."
+    ),
+    "place.census_not_checked": "No comprobado (la lista de direcciones del Censo no respondió).",
+    "rule.link.new_domain": (
+        "Un enlace del anuncio está en un dominio registrado hace pocas semanas. Señal de alerta."
+    ),
+    "link.domain_age": "Un enlace del anuncio está en un dominio registrado hace {years}+ años.",
+    "link.domain_age_months": (
+        "Un enlace del anuncio está en un dominio registrado hace {days} días."
+    ),
+    "link.domain_not_checked": "No comprobado (el registro de dominios no respondió).",
+    "rent.hud_within": (
+        "No muy por debajo de la renta típica de la zona (HUD, código postal {zip}, {size}): "
+        "{rent}."
+    ),
+    "rent.hud_below": (
+        "Renta típica de la zona (HUD, código postal {zip}, {size}): {rent}. Esta renta está "
+        "{percent}% por debajo. Pregunte por qué; hay descuentos."
+    ),
+    "rent.hud_size.studio": "estudio",
+    "rent.hud_size.beds": "{beds} hab.",
     "rent.plan.studio": "un estudio",
     "rent.plan.beds": "{beds} hab.",
     "rent.per_bed": "No comprobado (aquí se cobra por cama, así que la renta no se comparó).",
@@ -1136,6 +1217,9 @@ ES: dict[str, str] = {
         "Quien publica dice ser el propietario, y el propietario registrado es otro."
     ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
+    "reason.aerial_wrong_building": (
+        "La foto aérea de la dirección del anuncio muestra un edificio distinto."
+    ),
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
         "revisar las fotos."
@@ -1522,6 +1606,10 @@ EN.update(
         "worklog.tool.task": "Handed work to: {name}",
         "worklog.tool.task_other": "Handed work to another helper",
         "worklog.tool.other": "Used one of its tools",
+        "worklog.tool.followup_open": "Read the card's open gaps and the follow-up menu",
+        "worklog.tool.next_open": "Looked at the next steps code can draft",
+        "worklog.tool.followup": "Planner chose: {check} because of gap {gap}",
+        "worklog.tool.next": "Planner drafted: {check} for gap {gap}",
         "worklog.result.done": "Done.",
         "worklog.result.running": "Still working.",
         "worklog.result.saved": "Saved. Derived text only; no result in it.",
@@ -1535,6 +1623,9 @@ EN.update(
         "timeline.record": "Found the building on CoStar's record",
         "timeline.record_missing": "Looked for the building on CoStar's record",
         "timeline.rent": "Compared the rent with {n} floor plans",
+        "timeline.rent_hud": "Compared the rent with HUD's typical rent for the ZIP",
+        "timeline.census": "Looked up the address in the Census address list",
+        "timeline.rdap": "Looked up how old a link's domain is",
         "timeline.phone": "Checked the phone against the leasing office",
         "timeline.for_sale": "Looked for a for-sale listing",
         "timeline.license": "Looked up the license the ad names",
@@ -1570,6 +1661,15 @@ EN.update(
         "timeline.result.rent.within_range": "Inside the range on record.",
         "timeline.result.rent.below_range": "Below the range on record.",
         "timeline.result.rent.not_checked": "No rent on record to compare.",
+        "timeline.result.rent_hud.within_range": "Not far under HUD's typical rent.",
+        "timeline.result.rent_hud.below_range": "Far below HUD's typical rent.",
+        "timeline.result.rent_hud.not_checked": "No HUD rent to compare.",
+        "timeline.result.census.found": "The address is in the list.",
+        "timeline.result.census.no_match": "No match (information only).",
+        "timeline.result.census.not_checked": "Not checked.",
+        "timeline.result.rdap.found": "The registry gave the domain's age.",
+        "timeline.result.rdap.no_match": "No match.",
+        "timeline.result.rdap.not_checked": "Not checked.",
         "timeline.result.phone.yes": "It is the office's number.",
         "timeline.result.phone.no": "It is not the office's number.",
         "timeline.result.plan": "One todo per step; the agent keeps it up to date.",
@@ -1690,6 +1790,10 @@ ES.update(
         "worklog.tool.task": "Pasó trabajo a: {name}",
         "worklog.tool.task_other": "Pasó trabajo a otro ayudante",
         "worklog.tool.other": "Usó una de sus herramientas",
+        "worklog.tool.followup_open": "Leyó los huecos de la tarjeta y el menú de seguimiento",
+        "worklog.tool.next_open": "Miró los siguientes pasos que el código puede redactar",
+        "worklog.tool.followup": "El planificador eligió: {check} por el hueco {gap}",
+        "worklog.tool.next": "El planificador redactó: {check} para el hueco {gap}",
         "worklog.result.done": "Hecho.",
         "worklog.result.running": "Sigue trabajando.",
         "worklog.result.saved": "Guardado. Solo texto derivado; sin resultado.",
@@ -1703,6 +1807,9 @@ ES.update(
         "timeline.record": "Encontró el edificio en el registro de CoStar",
         "timeline.record_missing": "Buscó el edificio en el registro de CoStar",
         "timeline.rent": "Comparó la renta con {n} planos",
+        "timeline.rent_hud": "Comparó la renta con la renta típica de HUD para el código postal",
+        "timeline.census": "Buscó la dirección en la lista de direcciones del Censo",
+        "timeline.rdap": "Buscó la antigüedad del dominio de un enlace",
         "timeline.phone": "Comparó el teléfono con el de la oficina de arrendamiento",
         "timeline.for_sale": "Buscó un anuncio de venta",
         "timeline.license": "Buscó la licencia que nombra el anuncio",
@@ -1738,6 +1845,15 @@ ES.update(
         "timeline.result.rent.within_range": "Dentro del rango registrado.",
         "timeline.result.rent.below_range": "Por debajo del rango registrado.",
         "timeline.result.rent.not_checked": "No hay renta registrada para comparar.",
+        "timeline.result.rent_hud.within_range": "No muy por debajo de la renta típica de HUD.",
+        "timeline.result.rent_hud.below_range": "Muy por debajo de la renta típica de HUD.",
+        "timeline.result.rent_hud.not_checked": "No hay renta de HUD para comparar.",
+        "timeline.result.census.found": "La dirección está en la lista.",
+        "timeline.result.census.no_match": "Sin coincidencia (solo información).",
+        "timeline.result.census.not_checked": "No comprobado.",
+        "timeline.result.rdap.found": "El registro dio la antigüedad del dominio.",
+        "timeline.result.rdap.no_match": "Sin coincidencia.",
+        "timeline.result.rdap.not_checked": "No comprobado.",
         "timeline.result.phone.yes": "Es el número de la oficina.",
         "timeline.result.phone.no": "No es el número de la oficina.",
         "timeline.result.plan": "Una tarea por paso; el agente la mantiene al día.",
@@ -1831,6 +1947,128 @@ COSTAR_AFFILIATION_QUOTE = (
     "Claim of affiliation with us. Scammers may impersonate Apartments.com or Apartment Finder "
     "to make it seem like we participate in the lease transaction or transfer of funds."
 )
+
+# The Planner's follow-up checks (agent/followups.py): information lines only, never a finding.
+EN.update(
+    {
+        "label.followup": "Follow-up",
+        "followup.not_checked": "Not checked",
+        "followup.result": "{text} (source: {source})",
+        "followup.lens.found": "The ad's photos were found on a listing page",
+        "followup.lens.no_match": "The ad's photos were not found on a listing page",
+        "followup.lens.not_checked": "The photo search did not finish, so it was not checked",
+        "followup.phrase_search.found": "The ad's own words were found in {count} other posts",
+        "followup.phrase_search.no_match": "The ad's own words were not found anywhere else",
+        "followup.phrase_search.not_checked": (
+            "The web search did not finish, so it was not checked"
+        ),
+        "followup.census.found": "The Census found the ad's address",
+        "followup.census.no_match": "The Census has no such address",
+        "followup.census.not_checked": "The Census check did not finish, so it was not checked",
+        "followup.rdap.found": "The link's domain age was found",
+        "followup.rdap.no_match": "The link's domain has no registration record",
+        "followup.rdap.not_checked": "The domain lookup did not finish, so it was not checked",
+        "followup.reason.lens": ("The photos are the open question, so search the web for them."),
+        "followup.reason.phrase_search": (
+            "The poster is not confirmed, so look for the ad's words posted elsewhere."
+        ),
+        "followup.reason.census": "The address was not checked, so try the Census again.",
+        "followup.reason.rdap": "The link was not checked, so look up its domain again.",
+        "trace.followup.pick": "Planner chose: {check} because {gap}. {reason}",
+        "trace.followup.recorded": "Recorded pick (FIXTURE): {reason}",
+        "trace.followup.ran": "Follow-up {check}: {result}",
+        "timeline.followup": "Planner chose: {check} because {gap}",
+        "timeline.followup_result": "Follow-up check",
+        "trace.next.pick": "Planner drafted the next step: {step} because {gap}. {reason}",
+        "timeline.next_step": "Planner drafted: {step} because {gap}",
+        "next.done": "Drafted for the renter, not sent: {draft}",
+        "next.note": (
+            "Next step (draft, never sent): {step}\nFor: {gap}\nWhy: {reason}\nDraft: {draft}"
+        ),
+        "next.draft.ask_licence": (
+            "Before we go further, what is your Texas real estate licence number, and which "
+            "brokerage sponsors it?"
+        ),
+        "next.draft.call_office": (
+            "Call the leasing office on record, using the number on its own website, not the one "
+            "in the ad, and ask whether this home is theirs to rent."
+        ),
+        "next.draft.tour_questions": (
+            "Bring the tour questions to the viewing, and pay nothing before you have seen the "
+            "home and signed a lease."
+        ),
+        "next.reason.ask_poster": (
+            "Nobody has shown they are at the home, so ask for a photo there."
+        ),
+        "next.reason.ask_licence": "The poster's licence is not confirmed, so ask for its number.",
+        "next.reason.call_office": "The poster is not confirmed, so ask the office on record.",
+        "next.reason.tour_questions": (
+            "The lease is not checked, so take the questions to the tour."
+        ),
+    }
+)
+ES.update(
+    {
+        "label.followup": "Seguimiento",
+        "followup.not_checked": "No comprobado",
+        "followup.result": "{text} (fuente: {source})",
+        "followup.lens.found": "Las fotos del anuncio aparecen en una página de anuncios",
+        "followup.lens.no_match": "Las fotos del anuncio no aparecen en una página de anuncios",
+        "followup.lens.not_checked": "La búsqueda de fotos no terminó; no se comprobó",
+        "followup.phrase_search.found": (
+            "El texto del anuncio aparece en otras {count} publicaciones"
+        ),
+        "followup.phrase_search.no_match": "El texto del anuncio no aparece en ningún otro sitio",
+        "followup.phrase_search.not_checked": "La búsqueda web no terminó; no se comprobó",
+        "followup.census.found": "El Censo encontró la dirección del anuncio",
+        "followup.census.no_match": "El Censo no tiene esa dirección",
+        "followup.census.not_checked": "La consulta al Censo no terminó; no se comprobó",
+        "followup.rdap.found": "Se encontró la antigüedad del dominio del enlace",
+        "followup.rdap.no_match": "El dominio del enlace no tiene registro",
+        "followup.rdap.not_checked": "La consulta del dominio no terminó; no se comprobó",
+        "followup.reason.lens": "Las fotos son la duda, así que se buscan en la web.",
+        "followup.reason.phrase_search": (
+            "La persona no está confirmada, así que se busca el texto del anuncio en otros sitios."
+        ),
+        "followup.reason.census": "La dirección no se comprobó; se consulta otra vez al Censo.",
+        "followup.reason.rdap": "El enlace no se comprobó; se consulta otra vez su dominio.",
+        "trace.followup.pick": "El planificador eligió: {check} porque {gap}. {reason}",
+        "trace.followup.recorded": "Elección grabada (FIXTURE): {reason}",
+        "trace.followup.ran": "Seguimiento {check}: {result}",
+        "timeline.followup": "El planificador eligió: {check} porque {gap}",
+        "timeline.followup_result": "Comprobación de seguimiento",
+        "trace.next.pick": (
+            "El planificador redactó el siguiente paso: {step} porque {gap}. {reason}"
+        ),
+        "timeline.next_step": "El planificador redactó: {step} porque {gap}",
+        "next.done": "Borrador para el inquilino, no enviado: {draft}",
+        "next.note": (
+            "Siguiente paso (borrador, nunca enviado): {step}\nPara: {gap}\nPor qué: {reason}\n"
+            "Borrador: {draft}"
+        ),
+        "next.draft.ask_licence": (
+            "Antes de seguir, ¿cuál es su número de licencia inmobiliaria de Texas y qué "
+            "corredora la patrocina?"
+        ),
+        "next.draft.call_office": (
+            "Llame a la oficina de alquiler que consta en el registro, con el número de su propia "
+            "web y no el del anuncio, y pregunte si esta vivienda es suya para alquilar."
+        ),
+        "next.draft.tour_questions": (
+            "Lleve las preguntas a la visita y no pague nada antes de ver la vivienda y firmar "
+            "un contrato."
+        ),
+        "next.reason.ask_poster": (
+            "Nadie ha mostrado que está en la vivienda; se pide una foto allí."
+        ),
+        "next.reason.ask_licence": "La licencia no está confirmada; se pide su número.",
+        "next.reason.call_office": "La persona no está confirmada; se pregunta a la oficina.",
+        "next.reason.tour_questions": (
+            "El contrato no se comprobó; se llevan preguntas a la visita."
+        ),
+    }
+)
+
 
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
 

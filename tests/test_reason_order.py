@@ -29,7 +29,13 @@ PRESENCE = {
     "reason.presence_proven_not_authority",
     "reason.presence_missing",
 }
-PLACE = {"reason.located", "reason.not_located", "reason.not_indexed", "reason.unit_flag"}
+PLACE = {
+    "reason.located",
+    "reason.not_located",
+    "reason.not_indexed",
+    "reason.unit_flag",
+    "reason.aerial_wrong_building",
+}
 PRICE_AND_REST = {"reason.price_flag", "reason.payment_flag", "reason.rule_flag"}
 GROUPS = [WHO, AVAILABILITY, PRESENCE, PLACE, PRICE_AND_REST]
 

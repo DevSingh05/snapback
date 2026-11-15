@@ -29,7 +29,8 @@
           "label": "Allowed to rent it",
           "text": "NOT SHOWN. Being inside does not mean they may rent it.",
           "tone": "not_shown",
-          "key": "label.allowed"
+          "key": "label.allowed",
+          "source_name": "CoStar record"
         }
       ]
     },

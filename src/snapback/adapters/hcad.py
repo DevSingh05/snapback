@@ -1,10 +1,12 @@
-"""D12 (lane D, #130): owner of record for the kit's Houston houses, from HCAD's public data.
+"""D12 (lane D, #130): owner of record for Harris County homes, from HCAD's public data.
 
 Run once, on the machine that has the kit and HCAD's `Real_acct_owner` files, into the git-ignored
 `data/` folder (cleared on #130, ruling 02:22):
     uv run python -m snapback.adapters.hcad --hcad <folder or zip> --kit <kit>
-It keeps only the HCAD rows whose site address is a kit Houston house, and writes
-`data/hcad/owner_subset.jsonl`. `make purge` deletes it. The local lookup holds:
+With `--all-harris` it keeps every HCAD account (the owner check then covers any Harris County
+address the ad names); with `--kit` it keeps only the rows whose site address is a kit Houston
+house. Either way it writes `data/hcad/owner_subset.jsonl`, sorted by street hash so a lookup is a
+binary search, not a read of the whole file. `make purge` deletes it. The local lookup holds:
 - a hash of the normalised street (never the address, never the parcel id);
 - the owner kind: a company or institution, or a private owner (a family or living trust is a
   private owner, since it carries a person's name);
@@ -35,6 +37,7 @@ import sys
 import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 from snapback.adapters.costar_residential import normalize_address
 from snapback.contracts import OwnerKind, OwnerMatch, OwnerResult
@@ -163,40 +166,100 @@ def probe_columns(source: Path) -> dict[str, list[str]]:
     return out
 
 
-def build_subset(source: Path, kit_streets: Iterable[str], out: Path, salt: str) -> int:
-    """Keep only kit Houston houses; write hashed keys, kinds and company names. Returns rows."""
-    wanted = {_key(s) for s in kit_streets}
+def build_subset(source: Path, kit_streets: Iterable[str] | None, out: Path, salt: str) -> int:
+    """Write hashed keys, kinds and company names, sorted by key. Returns rows.
+
+    `kit_streets` keeps only those Houston houses. None keeps every account in the county's
+    file (any city): the same hashing applies, so no address or private name is written."""
+    wanted = None if kit_streets is None else {_key(s) for s in kit_streets}
     accounts: dict[str, str] = {}
     for row in _rows(source, ACCOUNTS_FILE):
-        city = _col(row, CITY).upper()
-        if city and city != HOUSTON:
+        if wanted is not None:
+            city = _col(row, CITY).upper()
+            if city and city != HOUSTON:
+                continue
+        street = _col(row, STREET)
+        if not street:
             continue
-        key = _key(_col(row, STREET))
-        if key in wanted:
+        key = _key(street)
+        if wanted is None or key in wanted:
             accounts[_col(row, ACCT)] = key
     owners: dict[str, list[str]] = {}
     for row in _rows(source, OWNERS_FILE):
         acct = _col(row, ACCT)
         if acct in accounts:
             owners.setdefault(acct, []).append(_col(row, NAME))
+    entries: list[dict[str, object]] = []
+    for acct, names in owners.items():
+        primary = names[0]
+        kind = classify(primary)
+        entry: dict[str, object] = {"key": accounts[acct], "kind": kind.value}
+        if kind is OwnerKind.COMPANY:
+            entry["company"] = primary
+        else:
+            words = {w for n in names for w in re.findall(r"[A-Z]{2,}", n.upper())}
+            entry["name_words"] = sorted(_token_hash(w, salt) for w in words)
+        entries.append(entry)
+    entries.sort(key=lambda e: str(e["key"]))  # a lookup binary-searches the sorted keys
     out.parent.mkdir(parents=True, exist_ok=True)
-    count = 0
     with out.open("w", encoding="utf-8") as fh:
         # first line: which salt keyed the name hashes, so a server with another salt says
-        # NOT_CHECKED rather than a false NO
-        fh.write(json.dumps({"salt_fingerprint": _salt_fingerprint(salt)}) + "\n")
-        for acct, names in owners.items():
-            primary = names[0]
-            kind = classify(primary)
-            entry: dict[str, object] = {"key": accounts[acct], "kind": kind.value}
-            if kind is OwnerKind.COMPANY:
-                entry["company"] = primary
-            else:
-                words = {w for n in names for w in re.findall(r"[A-Z]{2,}", n.upper())}
-                entry["name_words"] = sorted(_token_hash(w, salt) for w in words)
+        # NOT_CHECKED rather than a false NO; and that the rows are sorted by key
+        header = {"salt_fingerprint": _salt_fingerprint(salt), "sorted": True}
+        fh.write(json.dumps(header) + "\n")
+        for entry in entries:
             fh.write(json.dumps(entry) + "\n")
-            count += 1
-    return count
+    return len(entries)
+
+
+def _line_start_at_or_after(fh: BinaryIO, pos: int, start: int) -> int:
+    if pos <= start:
+        return start
+    fh.seek(pos - 1)
+    fh.readline()  # the rest of the line that holds pos - 1
+    return fh.tell()
+
+
+def _rows_for_key(fh: BinaryIO, key: str, start: int, end: int) -> list[dict]:
+    """Every row with this key in a file sorted by key (binary search over byte offsets)."""
+    lo, hi = start, end
+    while lo < hi:
+        mid = (lo + hi) // 2
+        at = _line_start_at_or_after(fh, mid, start)
+        if at >= hi:
+            hi = mid
+            continue
+        fh.seek(at)
+        line = fh.readline()
+        if json.loads(line).get("key", "") < key:
+            lo = at + len(line)
+        else:
+            hi = at
+    found: list[dict] = []
+    fh.seek(lo)
+    for line in fh:
+        row = json.loads(line)
+        if row.get("key") != key:
+            break
+        found.append(row)
+    return found
+
+
+def _read_subset(subset: Path, keys: set[str]) -> tuple[str | None, bool, list[dict]]:
+    """The salt fingerprint, whether the file was readable, and the rows for these keys."""
+    try:
+        with subset.open("rb") as fh:
+            header = json.loads(fh.readline())
+            if header.get("sorted") is True:
+                start = fh.tell()
+                end = subset.stat().st_size
+                found = [row for key in keys for row in _rows_for_key(fh, key, start, end)]
+                return header.get("salt_fingerprint"), True, found
+            rows = [header, *(json.loads(line) for line in fh)]  # an older, unsorted file
+    except (OSError, ValueError):
+        return None, False, []
+    fingerprint = next((r.get("salt_fingerprint") for r in rows if "salt_fingerprint" in r), None)
+    return fingerprint, True, [r for r in rows if r.get("key") in keys]
 
 
 def _poster_name(text: str) -> tuple[str, str, bool] | None:
@@ -256,12 +319,9 @@ def owner(
         return None
     text = listing_text[:_MAX_TEXT]
     keys = {hashlib.sha256(w.encode()).hexdigest() for w in _street_windows(text)}
-    try:
-        rows = [json.loads(line) for line in subset.read_text(encoding="utf-8").splitlines()]
-    except (OSError, ValueError):
+    fingerprint, readable, found = _read_subset(subset, keys)
+    if not readable:
         return None
-    fingerprint = next((r.get("salt_fingerprint") for r in rows if "salt_fingerprint" in r), None)
-    found = [r for r in rows if r.get("key") in keys]
     if len(found) != 1:
         return None  # no match, or two accounts / two kit streets: never pick one at random
     entry = found[0]
@@ -317,11 +377,22 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="HCAD owner subset for the kit Houston houses.")
     parser.add_argument("--hcad", type=Path, required=True, help="Real_acct_owner folder or zip")
     parser.add_argument("--kit", type=Path, default=DEFAULT_KIT)
+    parser.add_argument(
+        "--all-harris",
+        action="store_true",
+        help="keep every account in the file, not only the kit's houses (the owner check then "
+        "covers any Harris County address)",
+    )
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--probe", action="store_true", help="print column names only")
     args = parser.parse_args(argv)
     if args.probe:
         print(json.dumps(probe_columns(args.hcad), indent=2))
+        return
+    out = resolve_data_dir(args.data) / SUBSET
+    if args.all_harris:
+        kept = build_subset(args.hcad, None, out, phone_salt())
+        print(f"owner subset: {kept} Harris County accounts; written to data/{SUBSET.as_posix()}")
         return
     path = _find(args.kit, RESIDENTIAL_FILE)
     if path is None:
@@ -331,7 +402,6 @@ def main(argv: list[str] | None = None) -> None:
         s for rec in _iter_jsonl(path)
         if isinstance(s := _first(rec, RESIDENTIAL_FIELDS["street"]), str)
     ]  # fmt: skip
-    out = resolve_data_dir(args.data) / SUBSET
     kept = build_subset(args.hcad, streets, out, phone_salt())
     written = f"data/{SUBSET.as_posix()}"
     print(f"owner subset: {kept} houses of {len(streets)} kit addresses; written to {written}")
