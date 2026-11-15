@@ -1,6 +1,6 @@
 // "What to do now": the three steps after a result, as columns on one rule. Every action here is
 // quiet; the page's one primary button lives in the verdict band.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import "../ui/ui.css";
 import "./case.css";
@@ -117,6 +117,7 @@ const DRAFT_WORDS = {
     readyNote: "SNAPBACK never sends it. Copy it and send it yourself.",
     copy: "Copy",
     copied: "Copied",
+    copyFailed: "Couldn't copy, select the text",
     field: "Your next step",
   },
   es: {
@@ -131,6 +132,7 @@ const DRAFT_WORDS = {
     readyNote: "SNAPBACK nunca lo envía. Cópielo y envíelo usted.",
     copy: "Copiar",
     copied: "Copiado",
+    copyFailed: "No se pudo copiar, seleccione el texto",
     field: "Su próximo paso",
   },
 };
@@ -152,14 +154,25 @@ export function DraftedStep({
   const [text, setText] = useState<string | null>(null);
   const [edit, setEdit] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  // Focus follows the task: into the field on Edit, back to the main button after Save or Cancel.
+  const field = useRef<HTMLTextAreaElement>(null);
+  const main = useRef<HTMLButtonElement>(null);
+  const moved = useRef(false);
+  useEffect(() => {
+    if (mode === "edit") field.current?.focus();
+    else if (moved.current) main.current?.focus();
+  }, [mode]);
   if (!step) return null;
   const current = text ?? step.draft ?? "";
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(current);
       setCopied(true);
+      setCopyFailed(false);
     } catch {
       setCopied(false);
+      setCopyFailed(true);
     }
   };
   return (
@@ -174,6 +187,7 @@ export function DraftedStep({
             {w.field}
           </label>
           <textarea
+            ref={field}
             id={`${titleId}-field`}
             className="case-draft-field"
             value={edit}
@@ -188,6 +202,8 @@ export function DraftedStep({
               onClick={() => {
                 setText(edit.trim());
                 setCopied(false);
+                setCopyFailed(false);
+                moved.current = true;
                 setMode("ready");
               }}
             >
@@ -196,7 +212,10 @@ export function DraftedStep({
             <button
               type="button"
               className="ui-btn-quiet"
-              onClick={() => setMode(text ? "ready" : "draft")}
+              onClick={() => {
+                moved.current = true;
+                setMode(text ? "ready" : "draft");
+              }}
             >
               {w.cancel}
             </button>
@@ -209,15 +228,21 @@ export function DraftedStep({
             <div className="case-draft-ready" role="status">
               <p className="case-draft-ready-title">{w.ready}</p>
               <p className="case-draft-ready-note">{w.readyNote}</p>
+              {copyFailed ? <p className="case-draft-ready-note">{w.copyFailed}</p> : null}
             </div>
           ) : null}
           <div className="case-draft-actions">
             {mode === "ready" ? (
-              <button type="button" className="case-draft-primary" onClick={copy}>
+              <button ref={main} type="button" className="case-draft-primary" onClick={copy}>
                 {copied ? w.copied : w.copy}
               </button>
             ) : (
-              <button type="button" className="case-draft-primary" onClick={() => setMode("ready")}>
+              <button
+                ref={main}
+                type="button"
+                className="case-draft-primary"
+                onClick={() => setMode("ready")}
+              >
                 {w.approve}
               </button>
             )}

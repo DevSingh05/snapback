@@ -75,6 +75,25 @@ describe("DraftedStep", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("What is your licence number?"));
   });
 
+  it("moves focus into the field on Edit and to Copy after Save", () => {
+    render(<DraftedStep timeline={withDraft()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Your next step")).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("button", { name: "Copy" })).toHaveFocus();
+  });
+
+  it("says to select the text when the clipboard write fails", async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("no")) },
+    });
+    render(<DraftedStep timeline={withDraft()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(await screen.findByText("Couldn't copy, select the text")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+  });
+
   it("will not save an empty edit, and Cancel keeps the draft", () => {
     render(<DraftedStep timeline={withDraft()} />);
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
