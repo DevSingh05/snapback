@@ -124,10 +124,57 @@ export function heardFailure(fail: "off" | "too_long" | "unheard"): string {
   return fail === "off" ? VOICE_OFF : fail === "too_long" ? VOICE_TOO_LONG : VOICE_UNHEARD;
 }
 
-/** What the voice reply says: the card's locked headline and a pointer to the text. */
+/** P4 (#11): 15 s of speech at about 150 words a minute. */
+export const SPOKEN_MAX_WORDS = 38;
+
+// a phone (separated or not), a rent, any 4+ digit run, or a street address (#281 review)
+const NO_DIGITS =
+  /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]\d{4}|\b\d{3}[-.\s]\d{4}\b|\$\s?\d|\b\d{1,3},\d{3}\b|\d{4,}|\d{2,}\s+\w+\s+(st|ave|rd|dr|blvd|ln|way)\b/i;
+const LINK = /https?:\/\/|\/case\//i;
+const REASONS = /^(Before you pay|Why|Antes de pagar|Por qué):\s*$/i;
+const NEXT = /^(Next|Siguiente):\s*/i;
+const CALL = /^(Call|Llame)\b/;
+const ES = /^(Antes de pagar|Siguiente|Informe completo|Por qué):/m;
+const TAIL = {
+  en: "The details and a link are in the text.",
+  es: "Los detalles y el enlace están en el texto.",
+};
+
+const sentence = (line: string) => `${line.trim().replace(/[.!]*$/, "")}.`;
+const count = (parts: string[]) => parts.join(" ").split(/\s+/).filter(Boolean).length;
+
+/** What the voice reply says (P4): the verdict, the top reason and who to call, all taken from
+ * the text reply (the card's own words), then a pointer to the text. A piece with a phone
+ * number, a rent or a link is never spoken. Pieces that would pass 15 s are left out: the
+ * pointer first, then the reason; the verdict always stays. */
 export function spokenReply(replyText: string): string {
-  const headline = (replyText.split("\n")[0] ?? "").replace(/[.!]*$/, "");
-  return `${headline}. I sent the details and a link as a text.`.slice(0, MAX_TTS_CHARS);
+  const lines = replyText.split("\n").map((l) => l.trim());
+  const safe = (l: string) => l.length > 0 && !NO_DIGITS.test(l) && !LINK.test(l);
+  const headline = lines[0] ?? "";
+  const start = lines.findIndex((l) => REASONS.test(l));
+  const reason =
+    start < 0
+      ? undefined
+      : lines
+          .slice(start + 1)
+          .filter((l) => l.startsWith("- "))
+          .map((l) => l.slice(2))
+          .find(safe);
+  const call = lines
+    .map((l) => l.replace(NEXT, ""))
+    .find((l, i) => i > 0 && CALL.test(l) && safe(l));
+  if (!reason && !call) return safe(headline) ? headline : "";
+
+  const tail = TAIL[ES.test(replyText) ? "es" : "en"];
+  const head = safe(headline) ? [sentence(headline)] : [];
+  const tries = [
+    [...head, ...(reason ? [sentence(reason)] : []), ...(call ? [sentence(call)] : []), tail],
+    [...head, ...(reason ? [sentence(reason)] : []), ...(call ? [sentence(call)] : [])],
+    [...head, ...(call ? [sentence(call)] : [])],
+    head,
+  ];
+  const fits = tries.find((parts) => parts.length > 0 && count(parts) <= SPOKEN_MAX_WORDS) ?? head;
+  return fits.join(" ").slice(0, MAX_TTS_CHARS);
 }
 
 /** The spoken reply as audio from our API, or null if voice is off or the call failed. */

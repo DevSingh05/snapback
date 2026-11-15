@@ -1,0 +1,814 @@
+/* The crew: the check team as characters round the home (CrewScene.tsx), and each member's
+   round badge (Badge.tsx). Drawn with the kit's own classes (draw/draw.css), so the light and
+   the materials are the house's. Each member has one colour, --crew, set from its id; every
+   colour is a token. Motion is transform and opacity only, runs only while a run is playing
+   (data-moving="yes"), and is off under prefers-reduced-motion: the states still change. */
+
+/* ---------- each member's own colour ---------- */
+[data-who] {
+  --crew: var(--crew-other);
+}
+[data-who="planner"] {
+  --crew: var(--crew-planner);
+}
+[data-who="rules"] {
+  --crew: var(--crew-rules);
+}
+[data-who="record"] {
+  --crew: var(--crew-record);
+}
+[data-who="phone_office"] {
+  --crew: var(--crew-phone);
+}
+[data-who="owner_licence"] {
+  --crew: var(--crew-owner);
+}
+[data-who="photo"] {
+  --crew: var(--crew-photo);
+}
+[data-who="web"] {
+  --crew: var(--crew-web);
+}
+[data-who="finder"] {
+  --crew: var(--crew-finder);
+}
+[data-who="tour_prep"] {
+  --crew: var(--crew-tour);
+}
+[data-who="decider"] {
+  --crew: var(--crew-decider);
+}
+
+/* ---------- the badge ---------- */
+.crew-badge {
+  flex: none;
+  display: block;
+}
+.crew-badge .b-disc {
+  fill: color-mix(in srgb, var(--crew) 26%, var(--surface));
+}
+.crew-badge .b-disc-shade {
+  fill: color-mix(in srgb, var(--crew) 16%, transparent);
+}
+.crew-badge .b-ring {
+  fill: none;
+  stroke: var(--crew);
+  stroke-width: 2.4;
+}
+.crew-badge .b-coat,
+.crew-badge .b-own {
+  fill: var(--crew);
+}
+.crew-badge .b-coat-shade {
+  fill: color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.crew-badge .b-head {
+  fill: color-mix(in srgb, var(--h-wall) 78%, var(--h-wood));
+}
+.crew-badge .b-head-shade {
+  fill: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.crew-badge .b-dark,
+.crew-badge .b-hair {
+  fill: color-mix(in srgb, var(--ink) 88%, var(--crew));
+}
+.crew-badge .b-paper {
+  fill: var(--surface);
+}
+.crew-badge .b-wood {
+  fill: var(--h-wood);
+}
+.crew-badge .b-teal {
+  fill: var(--act);
+}
+.crew-badge .b-visor {
+  fill: color-mix(in srgb, var(--crew) 78%, var(--ink));
+}
+.crew-badge .b-glass {
+  fill: color-mix(in srgb, var(--h-unlit) 82%, var(--surface));
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+.crew-badge .b-glass-flat {
+  fill: var(--h-unlit);
+}
+.crew-badge .b-glint,
+.crew-badge .b-line,
+.crew-badge .b-band,
+.crew-badge .b-mic,
+.crew-badge .b-handle,
+.crew-badge .b-route {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linecap: square;
+}
+.crew-badge .b-glint {
+  stroke: var(--surface);
+  stroke-width: 1.4;
+}
+.crew-badge .b-line {
+  stroke-width: 1.1;
+  stroke: color-mix(in srgb, var(--ink) 62%, transparent);
+}
+.crew-badge .b-band {
+  stroke-width: 2.4;
+}
+.crew-badge .b-mic {
+  stroke-width: 1.6;
+}
+.crew-badge .b-handle {
+  stroke-width: 2.6;
+}
+.crew-badge .b-route {
+  stroke: var(--act);
+  stroke-width: 1.6;
+}
+
+/* The cast in one row, over the team's cards. */
+.crew-cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-2);
+  margin: 0;
+  padding: 0 0 var(--sp-2);
+  list-style: none;
+}
+.crew-cast li {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 68px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+.crew-cast li span {
+  border-bottom: 2px solid var(--crew);
+  padding-bottom: 2px;
+}
+
+/* ---------- the stage ---------- */
+.cs {
+  min-width: 0;
+}
+.cs-stage {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky) 0%, var(--paper) 58%);
+}
+.cs-stage {
+  container-type: inline-size;
+}
+.cs-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The kit's tones this scene adds: the member's colour and note paper. */
+.cs .dk-crew {
+  --c: var(--crew);
+}
+.cs .dk-paper {
+  --c: var(--surface);
+}
+.cs .dk-top.dk-crew {
+  fill: color-mix(in srgb, var(--crew) 82%, var(--surface));
+}
+.cs .dk-left.dk-crew {
+  fill: var(--crew);
+}
+.cs .dk-right.dk-crew {
+  fill: color-mix(in srgb, var(--crew) 76%, var(--ink));
+}
+.cs-limb {
+  stroke: color-mix(in srgb, var(--crew) 78%, var(--ink));
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  fill: none;
+}
+.cs-ink {
+  stroke: color-mix(in srgb, var(--ink) 78%, transparent);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  fill: none;
+}
+.cs-band {
+  fill: color-mix(in srgb, var(--surface) 86%, var(--crew));
+}
+.cs-board {
+  fill: color-mix(in srgb, var(--h-wood) 84%, var(--ink));
+}
+.cs-sheet,
+.cs-collar {
+  fill: var(--surface);
+  stroke: color-mix(in srgb, var(--ink) 34%, transparent);
+  stroke-width: 0.6;
+}
+.cs-clip,
+.cs-flag,
+.cs-mic {
+  fill: var(--act);
+}
+.cs-route {
+  stroke: var(--act);
+  stroke-width: 1.6;
+  fill: none;
+}
+.cs-lens {
+  fill: color-mix(in srgb, var(--h-unlit) 70%, transparent);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+}
+.cs-lens-rim {
+  fill: color-mix(in srgb, var(--ink) 86%, var(--h-roof));
+}
+.cs-glint {
+  fill: var(--surface);
+}
+.cs-flash {
+  fill: var(--scan);
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+.cs-visor {
+  fill: color-mix(in srgb, var(--crew) 72%, var(--ink));
+}
+.cs-drawer {
+  fill: color-mix(in srgb, var(--h-roof) 22%, var(--h-wall));
+}
+.cs-pull,
+.cs-cup,
+.cs-hair {
+  fill: color-mix(in srgb, var(--ink) 84%, var(--crew));
+}
+.cs-headband {
+  stroke: color-mix(in srgb, var(--ink) 84%, var(--crew));
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  fill: none;
+}
+.cs-wave {
+  fill: var(--crew);
+}
+.cs-bobble {
+  fill: var(--surface);
+  stroke: color-mix(in srgb, var(--ink) 40%, transparent);
+  stroke-width: 0.7;
+}
+.cs-lid {
+  fill: color-mix(in srgb, var(--ink) 80%, var(--h-roof));
+}
+.cs-screen {
+  fill: var(--h-unlit);
+}
+.cs-code {
+  stroke: var(--act);
+  stroke-width: 1.2;
+  fill: none;
+}
+
+/* The pad a member stands on is its state, always beside the state in words on its tag. */
+.cs-pad {
+  fill: color-mix(in srgb, var(--surface) 46%, transparent);
+  stroke: color-mix(in srgb, var(--ink) 22%, transparent);
+  stroke-width: 1;
+}
+.cs-actor[data-state="working"] .cs-pad {
+  fill: var(--scan);
+  stroke: var(--ink);
+}
+.cs-actor[data-state="done"] .cs-pad {
+  fill: var(--surface);
+  stroke: var(--ink);
+}
+.cs-actor[data-state="done"][data-tone="ok"] .cs-pad {
+  fill: var(--teal-soft);
+  stroke: var(--teal);
+}
+.cs-actor[data-state="done"][data-tone="hold"] .cs-pad,
+.cs-actor[data-state="done"][data-tone="not_shown"] .cs-pad {
+  fill: var(--amber-soft);
+  stroke: var(--amber);
+}
+.cs-actor[data-state="done"][data-tone="red_flag"] .cs-pad {
+  fill: var(--coral-soft);
+  stroke: var(--coral);
+  stroke-width: 1.6;
+}
+.cs-actor[data-state="skipped"] .cs-pad {
+  fill: none;
+  stroke: var(--muted);
+  stroke-dasharray: 3 3;
+}
+.cs-actor[onclick],
+.cs-actor[data-place="ring"],
+.cs-actor[data-place="lead"],
+.cs-actor[data-place="desk"] {
+  cursor: pointer;
+}
+/* Waiting for its turn: there, and quiet. */
+.cs-actor[data-state="idle"] .cs-figure {
+  opacity: 0.72;
+}
+/* Not checked: a dashed outline where the member would have worked. */
+.cs-actor[data-state="skipped"] .cs-figure :is(polygon, circle) {
+  fill: color-mix(in srgb, var(--surface) 70%, transparent);
+  stroke: var(--muted);
+  stroke-width: 0.9;
+  stroke-dasharray: 2.6 2.2;
+}
+.cs-actor[data-state="skipped"] .cs-figure line {
+  stroke: var(--muted);
+  stroke-width: 0.9;
+  stroke-dasharray: 2.6 2.2;
+}
+.cs-actor[data-state="skipped"] .cs-figure .dk-contact {
+  fill: none;
+  stroke: none;
+}
+/* Not needed for this ad: on the bench, greyed. */
+.cs-actor[data-place="bench"] {
+  --crew: var(--unchecked-soft);
+  opacity: 0.6;
+}
+.cs-fx {
+  display: none;
+}
+.cs-actor[data-state="working"] .cs-fx {
+  display: inline;
+}
+.cs-figure,
+.cs-body,
+.cs-prop,
+.cs-fx > * {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* Notes: on the Decider's desk, and in the air. */
+.cs-filed polygon {
+  fill: var(--surface);
+  stroke: color-mix(in srgb, var(--ink) 55%, transparent);
+  stroke-width: 0.7;
+}
+.cs .cs-flagged {
+  fill: var(--coral);
+  stroke: var(--surface);
+  stroke-width: 0.8;
+}
+.cs-note {
+  transform: translate(var(--x1), var(--y1));
+  pointer-events: none;
+}
+.cs-note-paper {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 1.1;
+}
+.cs-note-lines {
+  stroke: color-mix(in srgb, var(--ink) 50%, transparent);
+  stroke-width: 1;
+  fill: none;
+}
+.cs-note-clip {
+  fill: var(--act);
+}
+
+/* ---------- name tags ---------- */
+.cs-tags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-tag {
+  position: absolute;
+  z-index: 1;
+  transform: translateX(-50%);
+  width: max-content;
+}
+.cs-tag[data-at="above"] {
+  transform: translate(-50%, -100%);
+}
+.cs-tag > button,
+.cs-tag-in {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 2px 5px 3px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 0;
+  border-bottom: 2px solid var(--crew);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.1;
+  text-align: center;
+}
+.cs-tag > button {
+  cursor: pointer;
+}
+.cs-tag > button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.cs-tag-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cs-tag-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.5938rem;
+  white-space: nowrap;
+}
+.cs-tag-model {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.cs-tag-state {
+  padding: 1px 4px;
+  background: var(--unchecked-soft);
+  color: var(--unchecked);
+  font-weight: 700;
+}
+.cs-tag[data-state="working"] .cs-tag-state {
+  background: var(--scan);
+  color: var(--on-scan);
+}
+.cs-tag[data-state="done"] .cs-tag-state {
+  background: var(--ink);
+  color: var(--surface);
+}
+.cs-tag[data-state="done"][data-tone="ok"] .cs-tag-state {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.cs-tag[data-state="done"][data-tone="hold"] .cs-tag-state,
+.cs-tag[data-state="done"][data-tone="not_shown"] .cs-tag-state {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.cs-tag[data-state="done"][data-tone="red_flag"] .cs-tag-state {
+  background: var(--coral);
+  color: var(--surface);
+}
+.cs-tag[data-state="skipped"] > button,
+.cs-tag[data-state="skipped"] > .cs-tag-in {
+  border-bottom-style: dashed;
+  border-bottom-color: var(--muted);
+}
+
+/* ---------- speech ---------- */
+.cs-bubble {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px 7px 6px;
+  background: var(--surface);
+  border-left: 4px solid var(--crew);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: 0.6875rem;
+  line-height: 1.24;
+}
+.cs-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: var(--tail, 14px);
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+.cs-bubble[data-side="lead"]::after {
+  bottom: auto;
+  top: 18px;
+  left: -5px;
+  margin-left: 0;
+  background: var(--crew);
+}
+.cs-bubble-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.cs-bubble-who {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.cs-bubble[data-tone="red_flag"] {
+  border-left-color: var(--coral);
+}
+.cs-bubble[data-tone="red_flag"] .cs-bubble-who {
+  color: var(--coral);
+}
+.cs-bubble[data-tone="ok"] .cs-bubble-who {
+  color: var(--teal);
+}
+.cs-bubble[data-tone="hold"] .cs-bubble-who,
+.cs-bubble[data-tone="not_shown"] .cs-bubble-who {
+  color: var(--amber);
+}
+
+/* ---------- the stamp ---------- */
+.cs-verdict {
+  position: absolute;
+  z-index: 3;
+  max-width: 34%;
+  margin: 0;
+  padding: 6px 9px;
+  border-left: 6px solid var(--v-slate);
+  background: var(--v-band);
+  color: var(--on-v-band);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.16;
+  transform: rotate(-3deg);
+  transform-origin: left center;
+}
+.cs-verdict[data-verdict="dont-pay"] {
+  border-left-color: var(--v-dont-pay);
+}
+.cs-verdict[data-verdict="hold"] {
+  border-left-color: var(--v-hold);
+}
+.cs-verdict[data-verdict="ok"] {
+  border-left-color: var(--v-ok);
+}
+
+/* ---------- the bench ---------- */
+.cs-bench {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  max-width: 34%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.625rem;
+  line-height: 1.2;
+}
+.cs-bench-why {
+  display: block;
+  font-weight: 700;
+}
+
+/* ---------- the view switch (TeamPanel) ---------- */
+.pr-view {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+
+/* The badge beside a member's name in the thread, on its card and in the strips. */
+.pr-who:has(> .crew-badge),
+.pr-desk-head h4:has(> .crew-badge) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pr-strip .pr-strip-item > :is(button, a, .pr-strip-in) {
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+.pr-strip-item .crew-badge {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+/* A phone: the stage is narrower than its words were sized for, so they step down. */
+@container (max-width: 380px) {
+  .cs-tag-name {
+    font-size: 0.625rem;
+    gap: 3px;
+  }
+  .cs-tag-name .crew-badge {
+    width: 16px;
+    height: 16px;
+  }
+  .cs-tag-line {
+    font-size: 0.5625rem;
+  }
+  .cs-tag > button,
+  .cs-tag-in {
+    padding: 1px 3px 2px;
+  }
+  .cs-bubble {
+    padding: 4px 6px 5px 5px;
+    font-size: 0.625rem;
+    line-height: 1.2;
+  }
+  .cs-bubble .crew-badge {
+    width: 20px;
+    height: 20px;
+  }
+  .cs-bubble[data-side="ring"] {
+    translate: 0 6px;
+  }
+  .cs-verdict {
+    max-width: 38%;
+    padding: 5px 7px;
+    font-size: 0.6875rem;
+    translate: -10px 0;
+  }
+  .cs-bench {
+    max-width: 25%;
+    font-size: 0.5625rem;
+  }
+}
+
+/* Beside the twin the crew gets a wider column than the diagram needed. */
+@media (min-width: 1280px) {
+  .twin-body.twin-with-team:has(> .pr-panel) {
+    grid-template-columns: minmax(0, 1fr) 500px;
+  }
+}
+
+/* ---------- motion, each tied to a recorded step ---------- */
+@keyframes cs-fly {
+  from {
+    transform: translate(var(--x0), var(--y0));
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--x1), var(--y1));
+    opacity: 0;
+  }
+}
+@keyframes cs-arc {
+  from {
+    transform: translateY(0) rotate(-14deg);
+  }
+  50% {
+    transform: translateY(-34px) rotate(6deg);
+  }
+  to {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+@keyframes cs-bob {
+  to {
+    transform: translateY(-1.6px);
+  }
+}
+@keyframes cs-sweep {
+  from {
+    transform: translate(-5px, 1px);
+  }
+  to {
+    transform: translate(4px, -3px);
+  }
+}
+@keyframes cs-tick {
+  to {
+    transform: translateY(-2.4px) rotate(-3deg);
+  }
+}
+@keyframes cs-lift {
+  to {
+    transform: translateY(-5px);
+  }
+}
+@keyframes cs-press {
+  0%,
+  55% {
+    transform: translateY(-5px);
+  }
+  70%,
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes cs-blink {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@keyframes cs-pop {
+  0%,
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  90% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+}
+@keyframes cs-say {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+  }
+}
+@keyframes cs-slam {
+  0% {
+    opacity: 0;
+    transform: rotate(-9deg) scale(1.5);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+@keyframes cs-arrive {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cs[data-moving="yes"] .cs-note {
+    animation: cs-fly 880ms cubic-bezier(0.45, 0, 0.3, 1) 1 both;
+  }
+  .cs[data-moving="yes"] .cs-note-arc {
+    animation: cs-arc 880ms cubic-bezier(0.3, 0, 0.5, 1) 1 both;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"] .cs-body {
+    animation: cs-bob 520ms ease-in-out infinite alternate;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"] .cs-prop {
+    animation: cs-tick 460ms ease-in-out infinite alternate;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"][data-persona="inspector"] .cs-prop {
+    animation: cs-sweep 900ms ease-in-out infinite alternate;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"][data-persona="clerk"] .cs-prop {
+    animation: cs-lift 700ms ease-in-out infinite alternate;
+  }
+  .cs[data-moving="yes"]
+    .cs-actor[data-state="working"]:is([data-persona="registrar"], [data-persona="judge"])
+    .cs-prop {
+    animation: cs-press 900ms ease-in infinite;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"][data-persona="scout"] .cs-prop {
+    animation: cs-blink 800ms steps(2, jump-none) infinite;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"][data-persona="photographer"] .cs-fx > * {
+    animation: cs-pop 1500ms ease-out infinite;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-state="working"][data-persona="operator"] .cs-fx > * {
+    animation: cs-blink 1100ms ease-in-out infinite;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-persona="operator"] .cs-fx > :nth-child(2) {
+    animation-delay: 180ms;
+  }
+  .cs[data-moving="yes"] .cs-actor[data-persona="operator"] .cs-fx > :nth-child(3) {
+    animation-delay: 360ms;
+  }
+  /* A member that has just reported settles once; nothing loops after that. */
+  .cs[data-moving="yes"] .cs-actor[data-state="done"] .cs-figure {
+    animation: cs-arrive 360ms var(--ease-out) 1;
+  }
+  .cs[data-moving="yes"] .cs-bubble {
+    animation: cs-say 240ms var(--ease-out) 1 backwards;
+  }
+  .cs-verdict[data-stamped="yes"] {
+    animation: cs-slam 460ms var(--ease-out) 1 backwards;
+  }
+}
+@media (hover: hover) {
+  .cs-tag > button:hover .cs-tag-name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}

@@ -17,6 +17,8 @@ import { tookText } from "../case/answer";
 import { VERDICT_TONE } from "../case/model";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { Tag } from "../ui/Tag";
+import { Badge, CastPoster } from "./Badge";
+import { CrewScene } from "./CrewScene";
 import {
   floorAt,
   statusLine,
@@ -27,6 +29,8 @@ import {
   type Roster,
 } from "./model";
 import { TeamGraph } from "./TeamGraph";
+import { traceCards } from "./trace";
+import { TraceTab } from "./TraceTab";
 import { usePlayer, type Speed } from "./usePlayer";
 import { useRoster, useRun, type Run } from "./useRun";
 import { WORDS, type RoomWords } from "./words";
@@ -67,7 +71,10 @@ function DeskCard({
       tabIndex={-1}
     >
       <header className="pr-desk-head">
-        <h4>{card.name}</h4>
+        <h4>
+          <Badge id={card.id} size={36} />
+          {card.name}
+        </h4>
         <span className="pr-model ui-mono" title={w.runsOn}>
           {desk.model === "code" ? w.code : desk.model}
         </span>
@@ -156,6 +163,7 @@ function MeetTheTeam({
 }) {
   return (
     <div className="pr-meet" data-testid="meet-the-team">
+      <CastPoster agents={roster.agents} label={w.team} />
       {roster.teams.map((team) => (
         <section key={team.id} className="pr-team" data-team={team.id}>
           <header className="pr-team-head">
@@ -225,7 +233,9 @@ export function TeamPanel({
   });
   const team = teamView(floor, whole);
   const ending = floor.verdict ?? (whole.phase === "done" ? whole.verdict : null);
-  const [tab, setTab] = useState<"live" | "team">("live");
+  const [tab, setTab] = useState<"live" | "trace" | "team">("live");
+  // The crew is the Live view; the diagram of the same run stays one press away.
+  const [view, setView] = useState<"crew" | "diagram">("crew");
   const [focus, setFocus] = useState<string | null>(null);
   const moving = !reduced && floor.phase === "running";
 
@@ -244,6 +254,12 @@ export function TeamPanel({
         ? w.locked
         : statusLine(floor, w);
   const speeds: Speed[] = [1, 2];
+  // A member's mark opens its trace card; a reason opens its card in Meet the team.
+  const openTrace = (id: string) => {
+    setTab("trace");
+    setFocus(id);
+  };
+  const cards = traceCards(roster, teamView(whole, whole), run.timeline);
   const openDesk = (id: string) => {
     setTab("team");
     setFocus(id);
@@ -313,6 +329,17 @@ export function TeamPanel({
         <button
           type="button"
           role="tab"
+          id="pr-tab-trace"
+          aria-selected={tab === "trace"}
+          aria-controls="pr-pane-trace"
+          onClick={() => setTab("trace")}
+          data-testid="team-tab-trace"
+        >
+          {w.howTab}
+        </button>
+        <button
+          type="button"
+          role="tab"
           id="pr-tab-team"
           aria-selected={tab === "team"}
           aria-controls="pr-pane-team"
@@ -330,18 +357,45 @@ export function TeamPanel({
         className="pr-pane"
         hidden={tab !== "live"}
       >
-        <TeamGraph
-          desks={team.shown}
-          lang={lang}
-          label={w.team}
-          moving={moving}
-          onPick={openDesk}
-        />
-        {team.notNeeded.length > 0 ? (
-          <p className="pr-quiet" data-testid="team-not-needed">
-            {w.notNeeded}: {team.notNeeded.map((a) => a.name).join(", ")}
-          </p>
-        ) : null}
+        <div className="pr-view" role="group" aria-label={w.view}>
+          {(["crew", "diagram"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className="pr-btn pr-btn-quiet"
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+            >
+              {v === "crew" ? w.crewView : w.diagramView}
+            </button>
+          ))}
+        </div>
+        {view === "crew" ? (
+          <CrewScene
+            floor={floor}
+            team={team}
+            w={w}
+            lang={lang}
+            moving={moving}
+            verdictTone={run.card ? VERDICT_TONE[run.card.state] : "slate"}
+            onPick={openTrace}
+          />
+        ) : (
+          <>
+            <TeamGraph
+              desks={team.shown}
+              lang={lang}
+              label={w.team}
+              moving={moving}
+              onPick={openTrace}
+            />
+            {team.notNeeded.length > 0 ? (
+              <p className="pr-quiet" data-testid="team-not-needed">
+                {w.notNeeded}: {team.notNeeded.map((a) => a.name).join(", ")}
+              </p>
+            ) : null}
+          </>
+        )}
         {run.timeline ? (
           <div className="pr-controls">
             <button
@@ -397,7 +451,10 @@ export function TeamPanel({
               data-skipped={line.skipped ? "yes" : "no"}
               data-testid="team-line"
             >
-              <span className="pr-who ui-mono">{line.who}</span>
+              <span className="pr-who ui-mono">
+                {line.deskId ? <Badge id={line.deskId} size={18} /> : null}
+                {line.who}
+              </span>
               <span className="pr-said">{line.text}</span>
               {line.finding ? null : (
                 <span className="pr-foot ui-mono">
@@ -455,6 +512,22 @@ export function TeamPanel({
             </a>
           </div>
         ) : null}
+      </div>
+      <div
+        id="pr-pane-trace"
+        role="tabpanel"
+        aria-labelledby="pr-tab-trace"
+        className="pr-pane"
+        hidden={tab !== "trace"}
+      >
+        <TraceTab
+          cards={cards}
+          lang={lang}
+          w={w}
+          focus={tab === "trace" ? focus : null}
+          traceUrl={run.timeline?.trace_url}
+          reduced={reduced}
+        />
       </div>
       <div
         id="pr-pane-team"

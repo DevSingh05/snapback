@@ -28,6 +28,18 @@ export interface RoomWords extends Words {
   deciderWaits: string;
   notNeeded: string;
   codePlan: string;
+  howTab: string;
+  traceLede: string;
+  traceReplay: string;
+  traceRaw: string;
+  asked: string;
+  said: string;
+  planTitle: string;
+  sentTo: string;
+  noModel: string;
+  noModelCalls: string;
+  modelCalls: (n: number) => string;
+  langsmith: string;
   team: string;
   onIt: string;
   watch: string;
@@ -36,6 +48,9 @@ export interface RoomWords extends Words {
   seeTeam: string;
   runsOn: string;
   code: string;
+  view: string;
+  crewView: string;
+  diagramView: string;
 }
 
 export const WORDS: Record<Lang, RoomWords> = {
@@ -75,6 +90,19 @@ export const WORDS: Record<Lang, RoomWords> = {
     meet: "Meet the team",
     deciderWaits: "Waiting for the team's evidence",
     notNeeded: "Not needed for this ad",
+    howTab: "See how it worked",
+    traceLede:
+      "What each member was asked, the tools it used, and what it said back. Code still sets the verdict; this only explains it.",
+    traceReplay: "Replay",
+    traceRaw: 'Every event is under "Agent trace, raw" at the foot of the page.',
+    asked: "Asked",
+    said: "Said",
+    planTitle: "The plan it wrote",
+    sentTo: "Sent work to",
+    noModel: "No model ran this step: code checked it.",
+    noModelCalls: "no model calls",
+    modelCalls: (n) => (n === 1 ? "1 model call" : `${n} model calls`),
+    langsmith: "LangSmith",
     codePlan: "Code ran the standard plan and handed out the checks. No model planned this case.",
     team: "Your check team",
     onIt: "Your check team is on it",
@@ -85,6 +113,9 @@ export const WORDS: Record<Lang, RoomWords> = {
     seeTeam: "See your check team work",
     runsOn: "Runs on",
     code: "code",
+    view: "View",
+    crewView: "Crew",
+    diagramView: "Diagram",
   },
   es: {
     room: "SALA DE PRUEBAS",
@@ -122,6 +153,19 @@ export const WORDS: Record<Lang, RoomWords> = {
     meet: "Conoce al equipo",
     deciderWaits: "Esperando las pruebas del equipo",
     notNeeded: "No hizo falta para este anuncio",
+    howTab: "Cómo trabajó",
+    traceLede:
+      "Qué se le pidió a cada miembro, qué herramientas usó y qué respondió. El código fija el resultado; esto solo lo explica.",
+    traceReplay: "Repetir",
+    traceRaw: 'Cada evento está en "Agent trace, raw" al pie de la página.',
+    asked: "Se le pidió",
+    said: "Respondió",
+    planTitle: "El plan que escribió",
+    sentTo: "Envió trabajo a",
+    noModel: "Ningún modelo hizo este paso: lo comprobó el código.",
+    noModelCalls: "sin llamadas a modelos",
+    modelCalls: (n) => (n === 1 ? "1 llamada al modelo" : `${n} llamadas al modelo`),
+    langsmith: "LangSmith",
     codePlan:
       "El código siguió el plan estándar y repartió las comprobaciones. Ningún modelo planeó este caso.",
     team: "Tu equipo de revisión",
@@ -133,5 +177,8 @@ export const WORDS: Record<Lang, RoomWords> = {
     seeTeam: "Ver a tu equipo de revisión trabajar",
     runsOn: "Funciona con",
     code: "código",
+    view: "Vista",
+    crewView: "Equipo",
+    diagramView: "Diagrama",
   },
 };

@@ -7,6 +7,12 @@
 // streaming in this browser or behind this proxy, a 5xx, a dropped connection) it falls back to
 // GET /cases/{id}/timeline every second for as long as the agent is running. Either way it stops
 // by itself once a timeline says `running: false`. It only reads; nothing here can change a case.
+//
+// It never waits forever: the server ends every run (time limit, queue wait, a hard cap) with a
+// timeline that says `running: false`, but if that word cannot reach this browser (the feed
+// dropped for good, a proxy that holds the stream, a server that went away) the follower gives up
+// after STALL_MS and shows the run as stopped, with a last step that says why. Code's result is
+// what the page shows either way.
 import { useEffect, useState } from "react";
 
 import { apiBase, apiFetchRead } from "../api";
@@ -17,6 +23,9 @@ export type TimelineFeed = "connecting" | "streaming" | "polling" | "done" | "of
 
 export const POLL_MS = 1000;
 const MAX_POLL_FAILURES = 5;
+// Longest a run may be followed with no step landing before it is shown as stopped. The server's
+// own bounds (queue wait, time limit, grace) (queue wait 60 s, then limit 60 s plus 20 s grace) add up to 140 s, under this.
+export const STALL_MS = 180_000;
 
 /** The GET the hook makes: null when this browser has no API or no read token for the case. */
 export type TimelineGet = (path: string, init: RequestInit) => Promise<Response> | null;
@@ -28,6 +37,7 @@ export interface OpenTimelineOptions {
   onFeed: (f: TimelineFeed) => void;
   get?: TimelineGet;
   pollMs?: number;
+  stallMs?: number;
 }
 
 const langOf = (lang: string | undefined) => (lang === "es" ? "es" : "en");
@@ -44,7 +54,7 @@ function parseTimeline(text: string): CaseTimeline | null {
 
 /** Follow one case's timeline until the agent is done. Returns a function that stops it. */
 export function openTimelineStream(opts: OpenTimelineOptions): () => void {
-  const { caseId, onTimeline, onFeed, pollMs = POLL_MS } = opts;
+  const { caseId, onTimeline, onFeed, pollMs = POLL_MS, stallMs = STALL_MS } = opts;
   const get: TimelineGet =
     opts.get ?? ((path, init) => apiFetchRead(path, caseId, init) as Promise<Response> | null);
   const base = `/cases/${encodeURIComponent(caseId)}/timeline`;
@@ -54,16 +64,64 @@ export function openTimelineStream(opts: OpenTimelineOptions): () => void {
   let stopped = false;
   let lastRunning: boolean | undefined;
 
+  let last: CaseTimeline | undefined;
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+
+  // The agent is shown as stopped when this browser can no longer hear that it ended: one more
+  // step says so in plain words, and `running` goes false so nothing keeps saying "working".
+  const giveUp = (why: string) => {
+    if (stopped || !last || last.running !== true) return;
+    const es = langOf(opts.lang) === "es";
+    const label = es
+      ? `El agente profundo se detuvo: ${why}; el código fijó el resultado`
+      : `The deep agent stopped: ${why}; code set the verdict`;
+    const at = last.steps.reduce((m, s) => Math.max(m, s.started_ms + s.took_ms), 0);
+    accept({
+      ...last,
+      running: false,
+      fell_back: true,
+      steps: [
+        ...last.steps,
+        {
+          step: last.steps.length,
+          label,
+          started_ms: at,
+          took_ms: 0,
+          result: label,
+          source: last.source,
+          by: "code",
+        },
+      ],
+    });
+  };
+
   const stop = (feed: TimelineFeed) => {
     if (stopped) return;
+    if (feed === "off")
+      giveUp(
+        langOf(opts.lang) === "es" ? "se perdió la conexión" : "the connection to it was lost",
+      );
+    if (stopped) return;
     stopped = true;
+    clearTimeout(watchdog);
     controller.abort();
     onFeed(feed);
+  };
+
+  // Restarted whenever the timeline changes (a step landed); running out ends the follow.
+  const rearm = () => {
+    clearTimeout(watchdog);
+    watchdog = setTimeout(
+      () => giveUp(langOf(opts.lang) === "es" ? "dejó de responder" : "it stopped answering"),
+      stallMs,
+    );
   };
 
   const accept = (t: CaseTimeline) => {
     if (stopped) return;
     lastRunning = t.running === true;
+    if (!last || last.steps.length !== t.steps.length || t.running !== true) rearm();
+    last = t;
     onTimeline(t);
     if (!lastRunning) stop("done");
   };
@@ -146,6 +204,7 @@ export function openTimelineStream(opts: OpenTimelineOptions): () => void {
 
   return () => {
     stopped = true;
+    clearTimeout(watchdog);
     controller.abort();
   };
 }

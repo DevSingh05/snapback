@@ -44,6 +44,7 @@ from snapback.contracts import (
     OwnerResult,
     PlaceMatch,
     PriceResult,
+    RecordLine,
     RenterBrief,
 )
 
@@ -136,6 +137,16 @@ class Plan:
                 self._ad_notes = list(claims_fn(case_id) or [])
             except Exception:
                 self._ad_notes = []
+        # Texas public records ride the same option: information lines beside the ad notes. A
+        # lookup that broke is a lookup that did not happen.
+        records_fn = getattr(modules, "public_records", None)
+        self._public_records: list[RecordLine] = []
+        if callable(records_fn):
+            self._claims_offered = True
+            try:
+                self._public_records = list(records_fn(case_id) or [])
+            except Exception:
+                self._public_records = []
         by_number = getattr(modules, "license_by_number", None)
         self._ask_offered = ask_enabled and callable(by_number)
         self.number_given = False  # the renter's answer held a license number (a yes/no fact)
@@ -204,7 +215,7 @@ class Plan:
         if kind is PlanKind.CLAIMS:
             if not self._claims_offered:
                 return "plan.skip.claims_off"
-            return None if self._ad_notes else "plan.skip.claims_none"
+            return None if self._ad_notes or self._public_records else "plan.skip.claims_none"
         if kind is PlanKind.ASK:
             if not self._ask_offered:
                 return "plan.skip.ask_off"
@@ -284,7 +295,10 @@ class Plan:
         if kind is PlanKind.OWNER:
             return {"owner": self._owner}
         if kind is PlanKind.CLAIMS:
-            return {"ad_notes": self._ad_notes}
+            found: dict[str, object] = {"ad_notes": self._ad_notes}
+            if self._public_records:  # only when there is something: the step adds no empty key
+                found["public_records"] = self._public_records
+            return found
         if kind is PlanKind.ASK:
             raise ValueError("the question is asked by the session; the answer comes to answer()")
         return {}

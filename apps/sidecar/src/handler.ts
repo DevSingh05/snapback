@@ -87,6 +87,7 @@ type Remembered = { caseId: string; challenge?: string | null; readToken?: strin
 export class CaseMemory {
   private last = new Map<string, Remembered & { at: number }>();
   private running = new Set<string>();
+  private offers = new Map<string, Lang>(); // D6: a copy-alert draft offered on the last case
 
   constructor(private now: () => number = Date.now) {}
 
@@ -97,6 +98,7 @@ export class CaseMemory {
     readToken?: string | null,
   ): void {
     this.last.set(key, { caseId, challenge, readToken, at: this.now() });
+    this.offers.delete(key); // a new case closes the last one's offer
   }
 
   /** This thread's own case, if it is still fresh. Never another thread's. */
@@ -113,6 +115,19 @@ export class CaseMemory {
   /** "forget me": the thread's remembered case goes too. */
   forget(key: string): void {
     this.last.delete(key);
+    this.offers.delete(key);
+  }
+
+  /** D6: the last check offered to draft a note to the office on record. */
+  offer(key: string, lang: Lang): void {
+    this.offers.set(key, lang);
+  }
+
+  /** The open offer's language, consumed: a second "yes" is not a draft. */
+  takeOffer(key: string): Lang | null {
+    const lang = this.offers.get(key) ?? null;
+    this.offers.delete(key);
+    return lang;
   }
 
   /** A check is running for this thread: a follow-up must not answer from the older case. */
@@ -190,6 +205,29 @@ const WORDS = {
   },
 } as const;
 export const STILL_CHECKING = "Still checking, one moment.";
+
+/** P1 (#11, Photon v2): photos get a line at once that says what the 20 s are for. Text alone
+ * keeps the record line. The count is the photos that will be checked (capped). */
+function checkingText(msg: InboundMessage, config: SidecarConfig, lang: Lang): string {
+  const max = config.maxPhotos ?? MAX_PHOTOS;
+  const n = Math.min((msg.images?.length ?? 0) + msg.imageUrls.length, max);
+  if (n === 0) return WORDS[lang].checking;
+  if ((msg.text ?? "").trim() === "") {
+    // P2: no typed words, so a picture is likely the ad's screenshot (the API reads it locally)
+    if (lang === "es") {
+      return `Recibí ${n} ${n === 1 ? "imagen" : "imágenes"}. Leo el anuncio y reviso dónde se tomaron las fotos, unos 20 segundos.`;
+    }
+    return `Got ${n} ${n === 1 ? "picture" : "pictures"}. Reading the ad and checking where any photos were taken, about 20 seconds.`;
+  }
+  if (lang === "es") {
+    return n === 1
+      ? "Recibí 1 foto. Reviso dónde se tomó, unos 20 segundos."
+      : `Recibí ${n} fotos. Reviso dónde se tomaron, unos 20 segundos.`;
+  }
+  return n === 1
+    ? "Got 1 photo. Checking where it was taken, about 20 seconds."
+    : `Got ${n} photos. Checking where they were taken, about 20 seconds.`;
+}
 
 type Intent = "why" | "now" | "call" | "safe" | "places" | "how";
 const TAIL = String.raw`(\s+(now|then))?\s*[?.!]*\s*$`;
@@ -418,7 +456,13 @@ async function photos(urls: string[], max: number, get: typeof fetch): Promise<B
   return out;
 }
 
-type Checked = { text: string; caseId?: string };
+type Checked = {
+  text: string;
+  caseId?: string;
+  readToken?: string | null;
+  photos?: number;
+  lang?: Lang;
+};
 
 function caseLink(config: SidecarConfig, caseId: string): string {
   return `${config.webUrl.replace(/\/$/, "")}/case/${encodeURIComponent(caseId)}`;
@@ -434,6 +478,10 @@ async function fetchCard(
   const query = lang === "es" ? "?lang=es" : "";
   const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/card${query}`);
   return res.ok ? ((await res.json()) as Card) : null;
+}
+
+function noPhotosIn(msg: InboundMessage): boolean {
+  return (msg.images?.length ?? 0) === 0 && msg.imageUrls.length === 0;
 }
 
 /** The follow-up a message asks, or null when it is an ad (or carries photos). */
@@ -591,6 +639,56 @@ function rememberedText(profile: Profile, lang: Lang): string {
     : `Got it: ${parts.join(", ")}. I'll remember that for 30 days. Text "show me places" for safer homes that fit, or "forget me" to delete it.`;
 }
 
+type CopyAlert = {
+  fires: boolean;
+  manager_company?: string | null;
+  website_host?: string | null;
+  draft_subject?: string | null;
+  draft_body?: string | null;
+};
+
+const OFFER = {
+  en: 'Want me to draft a note to the real leasing office? Reply "draft".',
+  es: '¿Quiere que le redacte una nota a la oficina de arrendamiento real? Responda "borrador".',
+};
+const DRAFT_YES =
+  /^\s*(draft( it| the note)?|yes( please)?|yeah|sure|ok(ay)?|y|borrador|s[ií]( por favor)?|claro|dale)\s*[.!]*\s*$/i;
+
+/** D6: the draft note for the office on record (#250), with the read token in a header. */
+async function fetchCopyAlert(
+  config: SidecarConfig,
+  caseId: string,
+  readToken: string,
+  lang: Lang,
+): Promise<CopyAlert | null> {
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  const query = lang === "es" ? "?lang=es" : "";
+  try {
+    const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/copy-alert${query}`, {
+      headers: { Authorization: `Bearer ${readToken}` },
+    });
+    return res.ok ? ((await res.json()) as CopyAlert) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The draft as the renter gets it: marked as not sent, addressed to the office on record. */
+function draftText(alert: CopyAlert, lang: Lang): string {
+  const es = lang === "es";
+  const to = [alert.manager_company, alert.website_host ? `(${alert.website_host})` : ""]
+    .filter(Boolean)
+    .join(" ");
+  return [
+    es ? "Borrador, no enviado. Usted lo envía." : "Draft, not sent. You send it.",
+    `${es ? "Para" : "To"}: ${to}`,
+    `${es ? "Asunto" : "Subject"}: ${alert.draft_subject ?? ""}`,
+    "",
+    alert.draft_body ?? "",
+  ].join("\n");
+}
+
 /** D5: the case's own timeline (#267), with the read token in a header. Null if it fails. */
 async function fetchTimeline(
   config: SidecarConfig,
@@ -661,7 +759,57 @@ async function check(
   const card = await fetchCard(config, caseId, lang);
   if (!card) return { text: `${HEADLINES.hold}\nSNAPBACK check ${caseId} started.\n${link}` };
   const office = readToken ? await officeOnRecord(config, caseId, readToken) : null;
-  return { text: reportText(card, link, challenge, office, images.length === 0, lang), caseId };
+  let text = reportText(card, link, challenge, office, images.length === 0, lang);
+  const redFlag = card.rows.some((row) => row.lines.some((line) => line.tone === "red_flag"));
+  if (redFlag && readToken && config.memory) {
+    const alert = await fetchCopyAlert(config, caseId, readToken, lang);
+    if (alert?.fires) {
+      config.memory.offer(renterId(msg.threadId, config.renterSalt), lang);
+      text += `\n\n${OFFER[lang]}`;
+    }
+  }
+  return { text, caseId, readToken, photos: images.length, lang };
+}
+
+type EvidencePhoto = { alias: string; status: string };
+
+/** P3: the photo to show, as its 1-based number: the first placed in the claimed home, else the
+ * first placed elsewhere (#10, J1 contract). Null when none was placed. */
+function bestPlaced(photos: EvidencePhoto[]): number | null {
+  const pick =
+    photos.find((p) => p.status === "located_in_claimed") ??
+    photos.find((p) => p.status === "located_elsewhere");
+  const n = pick ? Number(/^P(\d+)$/.exec(pick.alias)?.[1]) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/** P3 (#11): the ad photo beside the scan view it matched (GET /cases/{id}/evidence-image, #283),
+ * read token in a header only. Nothing extra when no photo was placed or the image is a 404. */
+async function sendEvidenceImage(
+  client: MessageClient,
+  msg: InboundMessage,
+  config: SidecarConfig,
+  caseId: string,
+  readToken: string,
+  lang: Lang,
+): Promise<void> {
+  if (!client.image) return;
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  const headers = { Authorization: `Bearer ${readToken}` };
+  const base = `${api}/cases/${encodeURIComponent(caseId)}`;
+  try {
+    const evidence = await get(`${base}/evidence`, { headers });
+    if (!evidence.ok) return;
+    const n = bestPlaced(((await evidence.json()) as { photos?: EvidencePhoto[] }).photos ?? []);
+    if (n === null) return;
+    const res = await get(`${base}/evidence-image?photo=${n}&lang=${lang}`, { headers });
+    if (!res.ok) return;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    await client.image(msg.threadId, bytes, res.headers.get("content-type") ?? "image/png");
+  } catch {
+    // the text reply already went out
+  }
 }
 
 /** The card as a picture, sent after the text. A failure here never undoes the text. */
@@ -716,6 +864,26 @@ export async function handleMessage(
     if (!profile?.lang && learned.lang) profile = { ...(profile ?? {}), lang: learned.lang };
   }
   const lang: Lang = profile?.lang ?? learnFrom(text).lang ?? "en";
+  if (config.memory && noPhotosIn(msg) && DRAFT_YES.test(text)) {
+    // D6: never auto-sent. Only an open offer drafts, and only once; otherwise no check either.
+    const offered = config.memory.takeOffer(key);
+    const last = config.memory.recall(key);
+    let answer: string;
+    if (offered && last?.readToken) {
+      const alert = await fetchCopyAlert(config, last.caseId, last.readToken, offered);
+      answer = alert?.fires ? draftText(alert, offered) : COULD_NOT_CHECK;
+    } else {
+      answer = last
+        ? lang === "es"
+          ? "No hay nada que redactar para esta revisión."
+          : "There's nothing to draft for this check."
+        : lang === "es"
+          ? WORDS.es.adFirst
+          : SEND_THE_AD_FIRST;
+    }
+    await client.reply(msg.threadId, answer);
+    return true;
+  }
   const intent = followUpIntent(msg);
   if (intent !== null) {
     // Ruling (#255 review): a follow-up never creates a case, whatever happens here.
@@ -736,7 +904,7 @@ export async function handleMessage(
   config.memory?.begin(key);
   try {
     try {
-      await onChecking?.(WORDS[lang].checking);
+      await onChecking?.(checkingText(msg, config, lang));
     } catch {
       // a failed "checking" reply never skips the check
     }
@@ -747,6 +915,16 @@ export async function handleMessage(
     config.memory?.end(key);
   }
   await client.reply(msg.threadId, checked.text);
+  if (checked.caseId && checked.readToken && (checked.photos ?? 0) > 0) {
+    await sendEvidenceImage(
+      client,
+      msg,
+      config,
+      checked.caseId,
+      checked.readToken,
+      checked.lang ?? lang,
+    );
+  }
   if (checked.caseId) await sendCardPicture(client, msg, config, checked.caseId);
   return true;
 }

@@ -603,6 +603,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
             *loosely,
             *_from_record(modules, matched),
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
+            *_record_lines(modules, lang, place=True),
             *_seen_before_lines(modules, lang, replies=False),
         ],
     )
@@ -972,9 +973,46 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
             *_license_lines(modules, lang),
             # Nor this: the owner roll is the county's, and public.
             *_owner_lines(modules, lang),
+            *_record_lines(modules, lang, place=False),
             *_seen_before_lines(modules, lang, replies=True),
         ],
     )
+
+
+_RECORD_SOURCE_LABEL = {
+    "Texas Comptroller": "label.src_comptroller",
+    "HUD": "label.src_hud",
+    "City of Houston": "label.src_houston",
+}
+
+
+def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[CardLine]:
+    """Texas public records, one neutral line each, labelled with the registry it came from.
+    Information only: `decide` never reads them, and none counts as a finding either way.
+    The address point is a PLACE line; the Comptroller and HUD lines are PERSON lines."""
+    lines = []
+    for record in modules.public_records:
+        label = _RECORD_SOURCE_LABEL.get(record.source)
+        if label is None or (record.key == "address_point") is not place:
+            continue
+        if not strings.has(f"records.{record.key}", lang):
+            continue
+        lines.append(
+            CardLine(
+                label=strings.text(label, lang),
+                text=strings.text(
+                    f"records.{record.key}",
+                    lang,
+                    company=_one_line(record.company, MAX_COMPANY_CHARS),
+                    year=record.year or "",
+                    zip_code=record.zip_code or "",
+                ),
+                tone=CardTone.NOT_CHECKED,
+                source=record.data_source,
+                key=label,
+            )
+        )
+    return lines
 
 
 def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:

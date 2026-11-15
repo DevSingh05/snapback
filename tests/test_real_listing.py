@@ -344,6 +344,12 @@ def test_a_live_route_hides_the_figures_unless_the_flag_is_on(tmp_path):
         assert got.status_code == 200, got.text
         body = got.json()
         assert body["source"] == "live" and body["figures_shown"] is shown
+        # The hand-off link is not a record figure: it comes back with the switch on or off,
+        # while the rents come back only with it on.
+        assert body["cta_url"].startswith("https://fixtureliving.example")
+        assert body["cta_label"] == "See the real listing"
+        assert any(p["rent_min"] is not None for p in body["plans"]) is shown
+        assert ("2,300" in got.text or "2300" in got.text) is shown
 
 
 def test_a_per_bed_unit_plan_is_not_swapped_for_a_whole_unit_plan_of_the_same_beds():

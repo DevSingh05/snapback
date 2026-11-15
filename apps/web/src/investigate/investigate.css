@@ -28,7 +28,8 @@
   color: var(--blue);
 }
 
-.inv-head h1 {
+.inv-head h1,
+.inv-head .inv-h1 {
   margin: 0 0 8px;
   font-size: clamp(1.9rem, 4vw, 3.1rem);
   line-height: 1.04;
@@ -497,4 +498,8 @@ details summary {
   .inv-tabs button {
     transition: none;
   }
+}
+
+.inv-page-stream {
+  padding-bottom: 8px;
 }

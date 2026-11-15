@@ -55,3 +55,10 @@ def test_a_strict_ratio_below_the_claimed_ratio_is_refused(tmp_path):
     )
     with pytest.raises(ValueError):
         load_thresholds(bad)
+
+
+@pytest.mark.parametrize(("inliers", "passes"), [(59, False), (60, True), (61, True)])
+def test_the_strict_ratio_boundary_is_inclusive(inliers, passes):
+    """At and just under the 60% bar, so a later >= to > change is caught (#296 review)."""
+    check = Verification(matches=100, inliers=inliers, homography=None, spread=0.5)
+    assert passes_strict(check, T) is passes
