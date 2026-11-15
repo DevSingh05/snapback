@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { matchRoute } from "../App";
-import WorldsLanding, { LANDING_MEASURED } from "./WorldsLanding";
+import WorldsLanding, { LANDING_BEATS, LANDING_MEASURED } from "./WorldsLanding";
 
 describe("SNAPBACK Worlds front door", () => {
   it("is the page at / and the app moved to /home", () => {
@@ -30,6 +30,32 @@ describe("SNAPBACK Worlds front door", () => {
     expect(verdict).toHaveTextContent("Hold off: it asks for money before you’ve seen the place");
     expect(verdict).toHaveTextContent("SYNTHETIC");
     expect(canvas).toHaveAttribute("aria-label", expect.stringMatching(/drawing, not a real home/));
+  });
+
+  it("tells the scroll story in three beats over the drawing", () => {
+    render(<WorldsLanding />);
+    const beats = screen.getAllByTestId("wl-beat");
+    expect(beats.map((b) => within(b).getByRole("heading").textContent)).toEqual(
+      LANDING_BEATS.map((b) => b.title),
+    );
+    expect(beats[2]).toHaveTextContent("never an accusation");
+    // the hero's one h1 comes before the beats
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.compareDocumentPosition(beats[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("labels the Taken here drawing as a synthetic sample and offers three photos", () => {
+    render(<WorldsLanding />);
+    const taken = document.querySelector<HTMLElement>("#taken")!;
+    expect(taken).toHaveTextContent("Drawn sample · SYNTHETIC");
+    const picks = within(taken).getAllByRole("button");
+    expect(picks.map((b) => b.textContent)).toEqual(["Photo 1", "Photo 2", "Another home"]);
+    expect(picks[0]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("wl-res")).toHaveTextContent("in this drawn sample");
+    expect(screen.getByTestId("wl-twin")).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/drawn sample, not a real home/),
+    );
   });
 
   it("states the measured number with its n and label, and nothing stronger", () => {
