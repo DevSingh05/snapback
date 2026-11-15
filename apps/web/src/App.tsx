@@ -12,7 +12,6 @@ import { ReplayPage } from "./replay/ReplayPage";
 import { AppShell, type Section } from "./shell/AppShell";
 import { FinderPage } from "./shell/FinderPage";
 import { ListingsPage } from "./shell/ListingsPage";
-import { loadPrefs, tabOf } from "./shell/prefs";
 import { StoriesPage } from "./stories/StoriesPage";
 import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
@@ -21,8 +20,11 @@ import { TwinPage } from "./twin/TwinPage";
 
 // The city map loads on its own route only: its chunk (and MapLibre) never reaches the home page.
 const MapPage = lazy(() => import("./map/MapPage"));
+// The front door ("/") loads on its own too: its chunk (and three.js) never reaches /home or a report.
+const WorldsLanding = lazy(() => import("./landing/WorldsLanding"));
 
 type Route =
+  | { name: "landing" }
   | { name: "map" }
   | { name: "listings" }
   | { name: "finder" }
@@ -48,7 +50,7 @@ type Route =
 // it). The team works beside the 3D twin, so it lands there; with no case it lands on Home.
 export function proofRoomTarget(search: string): string {
   const id = new URLSearchParams(search).get("case") ?? "";
-  return /^[A-Za-z0-9_-]+$/.test(id) ? `/case/${id}/twin` : "/";
+  return /^[A-Za-z0-9_-]+$/.test(id) ? `/case/${id}/twin` : "/home";
 }
 
 export function matchRoute(path: string): Route {
@@ -80,7 +82,8 @@ export function matchRoute(path: string): Route {
   if (result?.[1]) return { name: "result", id: result[1] };
   const verify = /^\/c\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (verify?.[1]) return { name: "verify", id: verify[1] };
-  return { name: "home" };
+  if (/^\/home\/?$/.test(path)) return { name: "home" };
+  return { name: "landing" };
 }
 
 // Two routes and no router library: /case/:id is the renter's result page and /c/:id is the
@@ -94,13 +97,6 @@ export default function App() {
   }, []);
 
   const route = matchRoute(path);
-  // The site's root opens on Home. Only a tab in the bar can open first (prefs.clean), so an
-  // old saved choice never lands anyone on a page the front cut took out of the bar.
-  useEffect(() => {
-    const first = loadPrefs().first;
-    if (window.location.pathname === "/" && first !== "home")
-      window.location.replace(tabOf(first).href);
-  }, []);
   const toTwin = route.name === "proof-room";
   useEffect(() => {
     if (toTwin) window.location.replace(proofRoomTarget(window.location.search));
@@ -134,6 +130,13 @@ export default function App() {
           ? { label: "Report", href: here }
           : null;
   if (toTwin) return null;
+  if (route.name === "landing") {
+    return (
+      <Suspense fallback={<p className="map-wait">Opening SNAPBACK...</p>}>
+        <WorldsLanding />
+      </Suspense>
+    );
+  }
   if (route.name === "map") {
     return (
       <AppShell section="map">
@@ -197,7 +200,7 @@ export default function App() {
               propertyId: route.propertyId,
               planKey: new URLSearchParams(window.location.search).get("plan_key"),
             }}
-            back="/"
+            back="/home"
           />
         ) : route.name === "trace" ? (
           <TracePage key={`trace-${route.id}`} caseId={route.id} />

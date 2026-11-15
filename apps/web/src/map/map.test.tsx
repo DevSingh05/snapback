@@ -19,7 +19,8 @@ describe("the map route", () => {
   it("matches /map and leaves the home route alone", () => {
     expect(matchRoute("/map")).toEqual({ name: "map" });
     expect(matchRoute("/map/")).toEqual({ name: "map" });
-    expect(matchRoute("/")).toEqual({ name: "home" });
+    expect(matchRoute("/")).toEqual({ name: "landing" });
+    expect(matchRoute("/home")).toEqual({ name: "home" });
   });
 });
 
@@ -179,7 +180,7 @@ describe("the map page", () => {
     const walk = within(badge).getByRole("link", { name: "Walk it first" });
     expect(walk.getAttribute("href")).toMatch(/^\/tour\/fx-map-\d+$/);
     const ad = within(sheet).getByRole("link", { name: "Check an ad for this place" });
-    expect(ad.getAttribute("href")).toMatch(/^\/\?place=fx-map-\d+$/);
+    expect(ad.getAttribute("href")).toMatch(/^\/home\?place=fx-map-\d+$/);
     expect(within(sheet).getByText("Drawn stand-in (fixture)")).toBeInTheDocument();
   });
 

@@ -36,7 +36,7 @@ function NotFound() {
       <h1>Replay not found</h1>
       <p>There is no replay at this address.</p>
       <p>
-        <a href="/">Back to SNAPBACK</a>
+        <a href="/home">Back to SNAPBACK</a>
       </p>
     </article>
   );
