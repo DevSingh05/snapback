@@ -519,6 +519,11 @@ EN: dict[str, str] = {
         "Everything we checked matches the record. "
         "One step left before you pay: ask them to prove they're inside."
     ),
+    # A HOLD where nothing goes against the record but something is still not confirmed (#259).
+    "state.hold_nothing_against": (
+        "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+        "they're inside, and confirm with the office on record."
+    ),
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -1061,6 +1066,10 @@ ES: dict[str, str] = {
     "state.hold_clean": (
         "Todo lo que revisamos coincide con el registro. "
         "Falta un paso antes de pagar: pídales que demuestren que están dentro."
+    ),
+    "state.hold_nothing_against": (
+        "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+        "que están dentro y confirme con la oficina que figura en el registro."
     ),
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",

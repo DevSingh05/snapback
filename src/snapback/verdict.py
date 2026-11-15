@@ -1096,24 +1096,35 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 def _clean_hold_headline(
     verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str
 ) -> str | None:
-    """The headline for a HOLD that has nothing against it, or None.
+    """The headline for a HOLD that has nothing against it, or None. The state stays HOLD.
 
-    "Nothing against it" is asked of `decide` itself, without changing it: the same evidence
-    with presence proven would be VERIFIED. So the one thing holding the case is that nobody
-    has been asked, or has yet answered, to prove they are inside. And no line on the card is a
-    red flag or a warning. The state stays HOLD.
+    Two cases, strongest first. `decide` is asked a what-if and is not changed.
+
+    1. Everything matches: the same evidence with presence proven would be VERIFIED, and no
+       line is a red flag or a warning. Only the presence step is left.
+    2. Nothing goes against the record (#259): no line reads "Doesn't match" or "Warning",
+       though some read "Not confirmed". On a live record "Allowed to rent it" stays not
+       confirmed, so case 1 never fires there; the renter still has two things to do.
     """
     if verdict.state is not VerdictState.HOLD:
         return None
     if evidence.presence not in (PresenceStatus.NOT_REQUESTED, PresenceStatus.WAITING):
         return None
+    if any(_reads_as_against(row, line) for row in rows for line in row.lines):
+        return None
     if_proven = evidence.model_copy(update={"presence": PresenceStatus.PROVEN})
-    if decide(if_proven, lang).state is not VerdictState.VERIFIED:
-        return None
-    tones = {line.tone for row in rows for line in row.lines}
-    if tones & {CardTone.RED_FLAG, CardTone.HOLD}:
-        return None
-    return strings.text("state.hold_clean", lang)
+    all_hold_free = not any(line.tone is CardTone.HOLD for row in rows for line in row.lines)
+    if all_hold_free and decide(if_proven, lang).state is VerdictState.VERIFIED:
+        return strings.text("state.hold_clean", lang)
+    return strings.text("state.hold_nothing_against", lang)
+
+
+def _reads_as_against(row: CardRow, line: CardLine) -> bool:
+    """The line would be shown as "Doesn't match" or "Warning": a red flag anywhere, or a
+    warning outside the PERSON row (there a hold reads "Not confirmed", e.g. no reply yet)."""
+    if line.tone is CardTone.RED_FLAG:
+        return True
+    return line.tone is CardTone.HOLD and row.kind is not CardRowKind.PERSON
 
 
 def headline_text(card: Card) -> str:
