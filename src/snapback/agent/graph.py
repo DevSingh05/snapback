@@ -842,15 +842,14 @@ def _stream_within(
         raise AgentTimeout
     failure: list[BaseException] = []
     config = {**config, "callbacks": [*config.get("callbacks", []), _StopGuard(case)]}
+    gate = _gate(case)
 
     def leg() -> None:
         try:
-            stream = agent.stream(payload, config, stream_mode="updates")
-            for chunk in stream:
-                if _gate(case).stopped:
-                    close = getattr(stream, "close", None)
-                    if close is not None:
-                        close()
+            for chunk in agent.stream(payload, config, stream_mode="updates"):
+                if gate.stopped:
+                    # Past the limit: leaving the loop closes the stream, so the agent plans
+                    # no further step. `_StopGuard` covers sub-agents already inside a step.
                     return
                 watch.update(chunk)
             # The stream shows each file as it lands; the final state is the catch-all.
@@ -862,7 +861,6 @@ def _stream_within(
     worker.start()
     worker.join(remaining)
     if worker.is_alive():
-        gate = _gate(case)
         with gate.lock:  # waits for any tool that is mid-change, then shuts the agent out
             gate.stopped = True
         raise AgentTimeout
