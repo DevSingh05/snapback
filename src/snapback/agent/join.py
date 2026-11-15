@@ -44,8 +44,8 @@ from snapback.contracts import (
     PriceResult,
     PriceStatus,
     PropertyRecord,
-    RecordLine,
     PublicStatus,
+    RecordLine,
     RentalHouse,
     RuleHit,
     SpotCandidate,
@@ -286,12 +286,14 @@ class KitLookups:
         offices = getattr(match, "offices", None) or ()
         return lookup_owner(listing_text, offices, extract_contacts(listing_text).company)
 
-    def public_records(self, listing_text: str) -> list[RecordLine]:
+    def public_records(
+        self, listing_text: str, geocoder_hit: bool | None = None
+    ) -> list[RecordLine]:
         """Texas public records (Comptroller, HUD manager, Houston address point): a LIVE run
         with SNAPBACK_TX_RECORDS on only. Information lines; nothing here reaches `decide`."""
         from snapback.adapters import tx_records
 
-        return tx_records.public_records(listing_text, self.source)
+        return tx_records.public_records(listing_text, self.source, geocoder_hit=geocoder_hit)
 
     def place_check(self, listing_text: str) -> PlaceCheck | None:
         """Census Geocoder on the address in the ad. A LIVE run calls it; a fixture run reads a
@@ -498,8 +500,14 @@ class JoinedModules:
         lookup = getattr(self._lookups, "public_records", None)
         if lookup is None or not self._listing.text:
             return []
+        # The Census check already found the address: the Houston address-point fallback runs
+        # only when Census missed, failed or was not asked.
+        hit = self._place_check is not None and self._place_check.status is PublicStatus.FOUND
         try:
-            return list(lookup(self._listing.text) or [])
+            found = (
+                lookup(self._listing.text, geocoder_hit=True) if hit else lookup(self._listing.text)
+            )
+            return list(found or [])
         except Exception as error:  # a lookup that breaks leaves the lines out, never the case
             log.warning("public records not read (%s)", type(error).__name__)
             return []

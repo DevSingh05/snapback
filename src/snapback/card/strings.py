@@ -30,6 +30,7 @@ EN: dict[str, str] = {
     "label.data_ask": "Data ask",
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
+    "label.rent_vs_hud": "Rent vs HUD typical",
     "label.address": "Address",
     "label.link_domain": "Link domain",
     "label.seen_before": "Seen before",
@@ -45,6 +46,9 @@ EN: dict[str, str] = {
     "records.comptroller_active": (
         "Texas Comptroller: {company} is an active Texas company since {year}."
     ),
+    "records.comptroller_active_no_year": (
+        "Texas Comptroller: {company} is an active Texas company."
+    ),
     "records.comptroller_inactive": (
         "Texas Comptroller: {company} is on the list but not as an active company."
     ),
@@ -56,6 +60,9 @@ EN: dict[str, str] = {
     "records.hud_phone_differs": "The ad's phone isn't the manager's number on HUD's record.",
     "records.address_point": (
         "City of Houston: this street address is on the city's address points (ZIP {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "City of Houston: this street address is on the city's address points."
     ),
     "label.owner": "Owner of record",
     "label.owner_rule": "Owner's rule",
@@ -633,6 +640,7 @@ ES: dict[str, str] = {
     "label.data_ask": "Datos que piden",
     "label.pressure": "Presión",
     "label.rent_vs_record": "Renta frente al registro",
+    "label.rent_vs_hud": "Renta frente a la típica de HUD",
     "label.address": "Dirección",
     "label.link_domain": "Dominio del enlace",
     "label.seen_before": "Visto antes",
@@ -648,6 +656,9 @@ ES: dict[str, str] = {
     "records.comptroller_active": (
         "Contralor de Texas: {company} es una empresa activa de Texas desde {year}."
     ),
+    "records.comptroller_active_no_year": (
+        "Contralor de Texas: {company} es una empresa activa de Texas."
+    ),
     "records.comptroller_inactive": (
         "Contralor de Texas: {company} está en la lista, pero no como empresa activa."
     ),
@@ -662,6 +673,9 @@ ES: dict[str, str] = {
     "records.address_point": (
         "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad "
         "(código postal {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad."
     ),
     "label.owner": "Propietario registrado",
     "label.owner_rule": "Regla del propietario",

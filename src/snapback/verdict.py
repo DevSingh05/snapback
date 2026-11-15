@@ -41,6 +41,7 @@ from snapback.contracts import (
     PriceStatus,
     PublicStatus,
     PublishedRule,
+    RecordLine,
     RuleCategory,
     UnitStatus,
     Verdict,
@@ -1023,6 +1024,16 @@ _RECORD_SOURCE_LABEL = {
 }
 
 
+def _record_copy_key(record: RecordLine) -> str:
+    """The wording for a record line. A fact we lack is left out of the sentence, never printed
+    as a blank: no founding year drops "since", a missing or odd ZIP drops the ZIP."""
+    if record.key == "comptroller_active" and not record.year:
+        return "comptroller_active_no_year"
+    if record.key == "address_point" and not re.fullmatch(r"\d{5}", record.zip_code or ""):
+        return "address_point_no_zip"
+    return record.key
+
+
 def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[CardLine]:
     """Texas public records, one neutral line each, labelled with the registry it came from.
     Information only: `decide` never reads them, and none counts as a finding either way.
@@ -1034,11 +1045,12 @@ def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[Ca
             continue
         if not strings.has(f"records.{record.key}", lang):
             continue
+        key = f"records.{_record_copy_key(record)}"
         lines.append(
             CardLine(
                 label=strings.text(label, lang),
                 text=strings.text(
-                    f"records.{record.key}",
+                    key,
                     lang,
                     company=_one_line(record.company, MAX_COMPANY_CHARS),
                     year=record.year or "",
@@ -1047,6 +1059,7 @@ def _record_lines(modules: ModuleEvidence, lang: str, *, place: bool) -> list[Ca
                 tone=CardTone.NOT_CHECKED,
                 source=record.data_source,
                 key=label,
+                source_name=record.source,
             )
         )
     return lines
@@ -1156,7 +1169,11 @@ def _hud_rent_line(price: PriceResult, lang: str) -> CardLine:
         )
     else:
         line = _line(lang, "label.rent_vs_record", CardTone.OK, "rent.hud_within", **values)
-    return line.model_copy(update={"source_name": "HUD"})
+    # Its own label, so it never reads like #301's "HUD record" (the manager on HUD's list). The
+    # key stays the rent comparison's, which the web keys off.
+    return line.model_copy(
+        update={"source_name": "HUD", "label": strings.text("label.rent_vs_hud", lang)}
+    )
 
 
 def _rent_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
