@@ -158,6 +158,9 @@ class CaseSession:
         self.walk_plan: Callable[[], Any] | None = None
         self.walk_desk: Any = None
         self.walk_director: Any = None
+        # W1: the web checks, started by whoever opens the case (`agent/web/run.py`). Returns
+        # the WebFacts found so far, or None while they run. None (the default): no web checks.
+        self.web_facts: Callable[[], Any] | None = None
 
     # --- reading the state -----------------------------------------------------------------
 

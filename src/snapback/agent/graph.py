@@ -436,6 +436,8 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
         )
     if case.walk_plan is not None:
         specs.append(_walk_spec(case))
+    if case.web_facts is not None:
+        specs.append(_web_spec(case))
     # The built-in general-purpose sub-agent would inherit the choice tools. Replace it with one
     # that has none and no way to write anywhere.
     specs.append(
@@ -448,6 +450,44 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
         }
     )
     return specs
+
+
+WEB_PROMPT = """\
+You are the web checker for one rental case inside SNAPBACK. Code has already run three web \
+checks side by side: the building's own site (Bright Data), the ad's own link opened in a real \
+browser (Browser Use), and the same home posted elsewhere (a web search on the ad's words and \
+Apify rental searches). You have one reading tool, `read_web_facts`, and the file tools. Do \
+exactly this: call `read_web_facts` once; then call `write_file` with path `{path}` and a short \
+note: one fact per line, copied from what the tool returned, with its source. A check that says \
+not_checked, timed_out or failed stays that way: never guess what it would have found. Yes/no \
+values and counts only. No names of people, no phone digits, no result for the case: code works \
+that out and nothing you write changes it. Then reply with one sentence."""
+
+
+def _web_spec(case: CaseSession) -> dict[str, Any]:
+    @tool
+    def read_web_facts() -> str:
+        """What the three web checks found: statuses, yes/no values and counts."""
+        try:
+            facts = case.web_facts() if case.web_facts is not None else None
+        except Exception:
+            facts = None
+        return casework.web_text(facts)
+
+    path = casework.note_path(case.case_id, casework.WEB)
+    return {
+        "name": "web",
+        "description": (
+            "The web checks: the building's own site, where the ad's link really goes, and the "
+            "same home posted elsewhere (counts and rent range only)."
+        ),
+        "system_prompt": WEB_PROMPT.format(path=path),
+        "tools": [read_web_facts],
+        "permissions": [
+            FilesystemPermission(operations=["write"], paths=[path], mode="allow"),
+            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+        ],
+    }
 
 
 WALK_PROMPT = """\

@@ -38,6 +38,7 @@ STEMS = (RECORD, OFFICE, OWNER, PLACE, PLACES)
 # The main agent's own notes, written after it has read the others.
 # The walk note exists only for a case that has a walk plan (the T lane's tour).
 WALK = "walk"
+WEB = "web"  # W1: exists only for a case whose web checks were started
 EXPLANATION, TOUR_PREP = "explanation", "tour_prep"
 MAIN_STEMS = (EXPLANATION, TOUR_PREP)
 
@@ -48,6 +49,7 @@ AGENT_NAMES: dict[str, str] = {
     PLACE: "place",
     PLACES: "search",
     WALK: "walk",
+    WEB: "web",
 }
 MAX_NOTE_CHARS = 1500
 MAX_LINE_CHARS = 280
@@ -132,7 +134,7 @@ def stem_of(case_id: str, path: str) -> str | None:
     if not path.startswith(prefix) or not path.endswith(".md"):
         return None
     stem = path[len(prefix) : -3]
-    return stem if stem in (*STEMS, WALK, *MAIN_STEMS) else None
+    return stem if stem in (*STEMS, WALK, WEB, *MAIN_STEMS) else None
 
 
 def clean_note(text: object) -> str:
@@ -308,6 +310,7 @@ def refresh_policy_notes(case: Any) -> None:
     for stem, build in FACTS.items():
         keep_note(case, note_path(case.case_id, stem), build(case.evidence), "policy")
     refresh_walk_note(case)
+    refresh_web_note(case)
     search = getattr(case, "search_places", None)
     held = case.notes.get(PLACES)
     if search is not None and not (held is not None and held.by == "model"):
@@ -338,9 +341,70 @@ def refresh_walk_note(case: Any) -> None:
         return
 
 
+def _yes_no(value: bool | None) -> str:
+    return "unknown" if value is None else ("yes" if value else "no")
+
+
+def web_text(facts: Any) -> str:
+    """The web checks' facts as note lines: statuses, yes/no and counts. No digits of a phone,
+    no name, no page text. `facts` is a WebFacts, or None while the checks run."""
+    if facts is None:
+        return "Source: web checks\nStatus: still running"
+    site, link, other = facts.site, facts.link, facts.elsewhere
+    lines = [f"Source: web checks ({facts.source.value})"]
+    lines.append(
+        f"Building's own site (Bright Data): {site.status.value}"
+        + (
+            f"; host {site.host}; lists the ad's plan or unit: {_yes_no(site.lists_unit)}; "
+            f"shows the office phone on record: {_yes_no(site.phone_matches)}"
+            if site.status.value == "done"
+            else ""
+        )
+    )
+    lines.append(
+        f"The ad's link (Browser Use): {link.status.value}"
+        + (
+            f"; ends at {link.final_host}; that is the building's own site: "
+            f"{_yes_no(link.same_as_record)}; asks for payment on the page: "
+            f"{_yes_no(link.asks_payment_on_page)}"
+            if link.status.value == "done"
+            else ""
+        )
+    )
+    if other.status.value == "done":
+        rents = (
+            f"; asked rent {other.rent_low} to {other.rent_high}"
+            if other.rent_low is not None
+            else ""
+        )
+        sources = ", ".join(f"{n} {name}" for name, n in sorted(other.by_source.items()))
+        lines.append(
+            f"Same home posted elsewhere (Bright Data search, Apify): {other.postings} found "
+            f"({sources}){rents}; another posting has a different phone: "
+            f"{_yes_no(other.poster_differs)}"
+        )
+    else:
+        lines.append(
+            f"Same home posted elsewhere (Bright Data search, Apify): {other.status.value}"
+        )
+    return "\n".join(lines)
+
+
+def refresh_web_note(case: Any) -> None:
+    """The web note from code, unless the web sub-agent wrote one. Never waits on the checks."""
+    facts_fn = getattr(case, "web_facts", None)
+    if facts_fn is None:
+        return
+    try:
+        facts = facts_fn()
+    except Exception:
+        return
+    keep_note(case, note_path(case.case_id, WEB), web_text(facts), "policy")
+
+
 def notes_view(case: Any) -> CaseNotes:
     """What the API serves: the notes in a fixed order, each with who wrote it."""
-    order = (*STEMS, WALK, *MAIN_STEMS)
+    order = (*STEMS, WALK, WEB, *MAIN_STEMS)
     kept = [case.notes[s] for s in order if s in case.notes]
     return CaseNotes(
         case_id=case.case_id,
