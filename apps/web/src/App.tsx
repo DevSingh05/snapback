@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 
+import { CaseAttachmentPage } from "./investigate/CaseFile";
 import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
 import { HoodPage } from "./hood/HoodPage";
@@ -35,6 +36,7 @@ type Route =
   | { name: "prep-place"; propertyId: string }
   | { name: "confirm" }
   | { name: "investigate" }
+  | { name: "investigate-case"; ringId: string }
   | { name: "replays" }
   | { name: "stories" }
   | { name: "reviews" }
@@ -59,6 +61,8 @@ export function matchRoute(path: string): Route {
   if (/^\/reviews\/?$/.test(path)) return { name: "reviews" };
   if (/^\/under-the-hood\/?$/.test(path)) return { name: "hood" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
+  const invCase = /^\/investigate\/case\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (invCase?.[1]) return { name: "investigate-case", ringId: invCase[1] };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (replay?.[1]) return { name: "replay", slug: replay[1] };
@@ -160,6 +164,8 @@ export default function App() {
           <ConfirmPage />
         ) : route.name === "investigate" ? (
           <InvestigatePage />
+        ) : route.name === "investigate-case" ? (
+          <CaseAttachmentPage ringId={route.ringId} />
         ) : route.name === "replays" ? (
           <ReplayIndexPage />
         ) : route.name === "replay" ? (

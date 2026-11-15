@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 
 import { apiBase } from "../api";
+import { CaseFilePanel, CaseStudyView } from "./CaseFile";
 import { layoutGraph, timeScale } from "./layout";
 import { readQuery } from "./stream";
 import type { StreamTimeline } from "./stream";
 import { StreamView } from "./StreamView";
-import type { Answer, Evidence, Finding, RingResponse, RingsResponse, Score } from "./types";
+import type {
+  Answer,
+  CaseFile,
+  CaseStudy,
+  Evidence,
+  Finding,
+  RingResponse,
+  RingsResponse,
+  Score,
+} from "./types";
 import "./investigate.css";
 
 const GRAPH_SIZE = 560;
@@ -371,7 +381,11 @@ export function InvestigateView({
   selected,
   onPick,
   ask,
+  loadCaseFile,
+  loadCaseStudy,
 }: {
+  loadCaseFile?: (id: string) => Promise<CaseFile>;
+  loadCaseStudy?: () => Promise<CaseStudy>;
   rings: RingsResponse;
   ring: RingResponse | null;
   ringId: string;
@@ -381,6 +395,8 @@ export function InvestigateView({
   ask: (q: string) => Promise<Answer>;
 }) {
   const m = rings.metrics;
+  const [mode, setMode] = useState<"rings" | "study">("rings");
+  const [caseOpen, setCaseOpen] = useState(false);
   const pickedAd = ring?.ads.find((a) => a.id === selected) ?? null;
   return (
     <div className="inv-page">
@@ -414,7 +430,18 @@ export function InvestigateView({
         </div>
       </section>
 
-      <nav className="inv-tabs" aria-label="Rings">
+      <div className="inv-modes" role="group" aria-label="View">
+        <button type="button" aria-pressed={mode === "rings"} onClick={() => setMode("rings")}>
+          Rings
+        </button>
+        <button type="button" aria-pressed={mode === "study"} onClick={() => setMode("study")}>
+          Case study
+        </button>
+      </div>
+
+      {mode === "study" ? <CaseStudyView load={loadCaseStudy} /> : null}
+
+      <nav className="inv-tabs" aria-label="Rings" hidden={mode !== "rings"}>
         {rings.rings.map((r) => (
           <button
             key={r.id}
@@ -433,8 +460,19 @@ export function InvestigateView({
         ))}
       </nav>
 
-      {ring ? (
+      {mode === "rings" && ring ? (
         <>
+          <button
+            type="button"
+            className="inv-casebtn"
+            aria-expanded={caseOpen}
+            onClick={() => setCaseOpen((v) => !v)}
+          >
+            {caseOpen ? "Close case file" : "Open case file"}
+          </button>
+          {caseOpen ? (
+            <CaseFilePanel key={ringId} ringId={ringId} onPick={onPick} load={loadCaseFile} />
+          ) : null}
           <div className="inv-grid">
             <RingGraph data={ring} selected={selected} onPick={onPick} />
             <aside className="inv-side" aria-live="polite">
@@ -472,9 +510,9 @@ export function InvestigateView({
             </div>
           </section>
         </>
-      ) : (
+      ) : mode === "rings" ? (
         <p className="inv-sub">Loading the ring.</p>
-      )}
+      ) : null}
 
       <AskPanel examples={rings.example_questions} onPick={onPick} ask={ask} />
       <footer className="inv-foot">

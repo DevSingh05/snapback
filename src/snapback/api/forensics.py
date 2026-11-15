@@ -4,15 +4,20 @@
     GET  /forensics/rings/{id}      one ring in full: findings with evidence, timeline, graph
     POST /forensics/ask             {"question": "..."} -> an answer that cites its evidence
     GET  /forensics/stream          the 90-day stream: groups, shared signals, time to detect
+    GET  /forensics/rings/{id}/case-file   one ring as an exportable case file (JSON)
+    GET  /forensics/case-study      the detector replayed day by day over one ring
 
 Everything here is FIXTURE data (`fixtures/forensics/`), labelled SYNTHETIC in every response.
 The answer comes from the evidence graph in fixture mode; no model is called from this route.
 """
 
+from functools import lru_cache
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from snapback.forensics import SYNTHETIC_LABEL
+from snapback.forensics.casefile import build_case_file, build_case_study
 from snapback.forensics.detect import load_timeline
 from snapback.forensics.evaluate import evaluate
 from snapback.forensics.investigator import EXAMPLES, Answer, ask
@@ -135,3 +140,31 @@ def get_stream() -> dict:
     """The day-by-day run over the SYNTHETIC 90-day stream, computed ahead of time by
     `snapback.forensics.detect` (the finder is run once per day; about two minutes)."""
     return load_timeline()
+
+
+@lru_cache(maxsize=16)
+def _case_file(ring_id: str) -> dict | None:
+    return build_case_file(default_analysis(), ring_id.upper())
+
+
+@router.get("/rings/{ring_id}/case-file")
+def get_case_file(ring_id: str) -> dict:
+    """Everything an investigator needs about one flagged ring, as one document. The replay that
+    finds the flag day runs the ring finder once per posting day, so the first call is slow."""
+    out = _case_file(ring_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="No ring with that id.")
+    return out
+
+
+@lru_cache(maxsize=1)
+def _case_study() -> dict | None:
+    return build_case_study(default_analysis())
+
+
+@router.get("/case-study")
+def get_case_study() -> dict:
+    out = _case_study()
+    if out is None:
+        raise HTTPException(status_code=404, detail="No flagged ring to walk through.")
+    return out
