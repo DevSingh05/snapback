@@ -1199,6 +1199,19 @@ def _red_flag_headline(verdict: Verdict, rows: list[CardRow], lang: str) -> str 
     return strings.text("state.hold_red", lang)
 
 
+def _no_photos_headline(verdict: Verdict, modules: ModuleEvidence, lang: str) -> str | None:
+    """The plain hold line for an UNVERIFIED case where no listing photo was sent, or None.
+
+    "Could not place these photos" is for photos that were sent and did not place. With none
+    sent, the card must not talk about placing them (the state word stays UNVERIFIED).
+    """
+    if verdict.state is not VerdictState.UNVERIFIED:
+        return None
+    if modules.locate is not None and modules.locate.photos:
+        return None
+    return strings.text("state.hold", lang)
+
+
 def headline_text(card: Card) -> str:
     """The words at the top of a card: its own headline when it has one, else its state's.
     The PNG (card/render.py) reads it the same way."""
@@ -1248,7 +1261,8 @@ def build_card(
         source=modules.source,
         state=verdict.state,
         headline=_clean_hold_headline(verdict, evidence, rows, lang, modules)
-        or _red_flag_headline(verdict, rows, lang),
+        or _red_flag_headline(verdict, rows, lang)
+        or _no_photos_headline(verdict, modules, lang),
         checked_at=checked,
         expires_at=checked + CARD_TTL,
         rows=rows,

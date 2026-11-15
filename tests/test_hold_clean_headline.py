@@ -301,3 +301,33 @@ def test_a_dont_pay_card_keeps_its_own_headline_even_with_a_red_flag():
     raw = json.loads((CONTRACTS / "module_evidence_forged.json").read_text())
     forged = card(ModuleEvidence.model_validate(raw | {"rules": ZELLE}))
     assert forged.state is VerdictState.DONT_PAY and forged.headline is None
+
+
+NO_PHOTOS = {"case_id": "fx-0000", "thresholds_version": "v1", "photos": []}
+
+
+def test_no_photos_and_a_zelle_ad_headlines_the_red_flag_never_placing_photos():
+    for lang in ("en", "es"):
+        for locate in (None, NO_PHOTOS):
+            made = card(evidence(locate=locate, rules=ZELLE), lang)
+            assert made.state is VerdictState.HOLD
+            assert made.headline == strings.text("state.hold_red_money", lang)
+            assert "photo" not in headline_text(made).lower()
+            assert "foto" not in headline_text(made).lower()
+
+
+def test_no_photos_and_nothing_flagged_reads_the_plain_hold_line_not_placing_photos():
+    for locate in (None, NO_PHOTOS):
+        made = card(honest(locate=locate))
+        assert made.state is VerdictState.UNVERIFIED
+        assert headline_text(made) == strings.text("state.hold")
+        assert "photo" not in headline_text(made).lower()
+
+
+def test_photos_that_were_sent_and_did_not_place_keep_the_could_not_place_line():
+    raw = json.loads((CONTRACTS / "module_evidence_hold.json").read_text())
+    photos = [p | {"status": "not_located"} for p in raw["locate"]["photos"]]
+    assert photos
+    made = card(honest(locate=raw["locate"] | {"photos": photos, "identified_photos": 0}))
+    assert made.state is VerdictState.UNVERIFIED and made.headline is None
+    assert headline_text(made) == strings.text("state.unverified")
