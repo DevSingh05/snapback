@@ -257,8 +257,7 @@ export const PANELS: Panel[] = [
         n: 10,
         unit: "rings",
         label: "SYNTHETIC",
-        source:
-          "/investigate time view: median time to detect 2.5 days over the 90-day seeded stream (synthetic, n=10) (#293)",
+        source: `${BOARD} Arlequin: "/investigate 90-day view, median_gap_days: 10/10 rings flagged, median 2.5 days (synthetic, n=10) (#293)"`,
       },
       {
         value: "0 of 2,684",
