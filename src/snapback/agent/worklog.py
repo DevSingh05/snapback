@@ -196,6 +196,8 @@ _READ_TOOLS = {
     "place_choose_option": "worklog.tool.choose",
     "walk_open_choice": "worklog.tool.open",
     "walk_choose_option": "worklog.tool.choose",
+    "followup_open_choice": "worklog.tool.followup_open",
+    "next_step_open_choice": "worklog.tool.next_open",
 }
 
 
@@ -208,6 +210,17 @@ def tool_label(tool: str, args: dict[str, Any], lang: str) -> str:
         if card is None:
             return strings.text("worklog.tool.task_other", lang)
         return strings.text("worklog.tool.task", lang, name=card.name)
+    if tool in ("followup_choose", "next_step_choose"):
+        # The Planner's own pick: named from code's menu, never from the model's raw text.
+        from snapback.agent.followups import MENU, NEXT_STEPS
+
+        menu = MENU if tool == "followup_choose" else NEXT_STEPS
+        picked = menu.get(str(args.get("check") or args.get("step") or "").strip())
+        gap = str(args.get("gap") or "").strip().upper()
+        if picked is None or not gap.startswith("G") or not gap[1:].isdigit():
+            return strings.text("worklog.tool.choose", lang)
+        key = "worklog.tool.followup" if tool == "followup_choose" else "worklog.tool.next"
+        return strings.text(key, lang, check=picked.name, gap=gap)
     return strings.text(_READ_TOOLS.get(tool, "worklog.tool.other"), lang)
 
 

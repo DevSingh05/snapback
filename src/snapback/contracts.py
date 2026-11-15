@@ -67,6 +67,23 @@ class PresenceStatus(StrEnum):
     FORGED = "forged"  # the reply was a reused listing photo, a tour screenshot, or similar
 
 
+class AerialStatus(StrEnum):
+    """Does the aerial photo of the claimed address show the building the ad is for?"""
+
+    RIGHT_BUILDING = "right_building"
+    WRONG_BUILDING = "wrong_building"  # the ad's building is a different one nearby
+    NOT_CHECKED = "not_checked"  # no tile or no coordinates: says nothing
+
+
+class AerialResult(BaseModel):
+    """Vexcel aerial check for one case. Read by the verdict only behind
+    SNAPBACK_VEXCEL_IN_VERDICT, and then only to hold, never to fail or to clear."""
+
+    status: AerialStatus = AerialStatus.NOT_CHECKED
+    distance_m: float | None = None
+    hash_diff: int | None = None  # LIVE only: differing bits of 64 between the two tiles
+
+
 class Evidence(BaseModel):
     """Everything the verdict is allowed to look at for one case."""
 
@@ -92,6 +109,9 @@ class Evidence(BaseModel):
     brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
+    # The aerial says the ad's building is not the claimed one. Set only when
+    # SNAPBACK_VEXCEL_IN_VERDICT is on. It holds a case; it is not proof, and it never clears one.
+    aerial_wrong_building_flag: bool = False
     license_flag: bool = False  # the ad prints a license number that is not an active license
     license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
@@ -466,6 +486,23 @@ class DomainCheck(BaseModel):
     source: DataSource
 
 
+class FollowUpLine(BaseModel):
+    """One follow-up check the Planner chose after code ran every check (agent/followups.py).
+
+    Information only: no verdict reads it. `gap` is the card's own words for the open line it
+    was chosen for, `reason` the one sentence given for it (cleaned), `status` what the check
+    came back with ("not_checked" for a timeout or a failure, never a finding)."""
+
+    check: str  # a MENU id: lens | phrase_search | census | rdap
+    gap: str
+    reason: str
+    status: PublicStatus
+    count: int | None = None
+    source_name: str  # "Google Lens", "Web search", "Census", "RDAP"
+    data_source: DataSource
+    chosen_by: Literal["model", "fixture"]
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -479,6 +516,7 @@ class ModuleEvidence(BaseModel):
     price: PriceResult | None = None
     authority: AuthorityResult | None = None
     for_sale: ForSaleMatch | None = None  # D7; None means not looked up
+    aerial: AerialResult | None = None  # Vexcel; None means not looked up
     license: LicenseResult | None = None  # D10; None means not looked up
     # D12 + A19; None means no owner data (LA, an unknown address, or not looked up)
     owner: OwnerResult | None = None
@@ -509,6 +547,8 @@ class ModuleEvidence(BaseModel):
     # Public data for the homes CoStar does not cover. None means not looked up.
     place_check: PlaceCheck | None = None
     domain_check: DomainCheck | None = None
+    # The Planner's follow-up checks (at most two). Information only: no verdict reads it.
+    followups: list[FollowUpLine] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -596,6 +636,8 @@ class ChoiceKind(StrEnum):
     WHICH_PHOTO = "which_photo"  # E1: which unplaced photo gets the short search budget
     DWELL_ROOMS = "dwell_rooms"  # E5: which rooms of the walk open expanded (walk sub-agent, D3)
     LEAD_CHECKS = "lead_checks"  # E5: which checks lead the summary and tour request (D4)
+    FOLLOW_UP = "follow_up"  # the Planner's follow-up check for a gap on the card (info only)
+    NEXT_STEP = "next_step"  # the Planner's drafted next step for the renter (never sent)
 
 
 class TraceKind(StrEnum):
