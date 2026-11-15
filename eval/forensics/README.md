@@ -20,12 +20,12 @@ pairs to 0.0 percent.
 `find_rings(hop=True)`, the default), the same finder seeded by wording only (`hop=False`), and a
 keyword search for payment words grouped by exact phone or photo (the baseline).
 
-| Variant (SYNTHETIC, n = 10 rings) | Shipped finder | Wording-only seeds | Keyword baseline | Honest ads flagged (shipped) |
-|---|---|---|---|---|
-| Original wording | 10 of 10 | 10 of 10 | 1 of 10 | 0 of 2,684 |
-| Reworded | 9 of 10 | 7 of 10 | 0 of 10 | 0 of 2,684 |
-| Reworded, ring photos re-shot (stress) | 7 of 10 | 1 of 10 | 0 of 10 | 0 of 2,684 |
-| Reworded, phones and photos hidden (stress) | 0 of 10 | 0 of 10 | 0 of 10 | 0 of 2,684 |
+| Variant (SYNTHETIC, n = 10 rings)           | Shipped finder | Wording-only seeds | Keyword baseline | Honest ads flagged (shipped) |
+| ------------------------------------------- | -------------- | ------------------ | ---------------- | ---------------------------- |
+| Original wording                            | 10 of 10       | 10 of 10           | 1 of 10          | 0 of 2,684                   |
+| Reworded                                    | 9 of 10        | 7 of 10            | 0 of 10          | 0 of 2,684                   |
+| Reworded, ring photos re-shot (stress)      | 7 of 10        | 1 of 10            | 0 of 10          | 0 of 2,684                   |
+| Reworded, phones and photos hidden (stress) | 0 of 10        | 0 of 10            | 0 of 10          | 0 of 2,684                   |
 
 Read this honestly:
 
