@@ -25,7 +25,7 @@
 | Amazon: Best Practical AI Innovation             | One verdict, the top two reasons and one next step, in the place the ad arrived                                                                 | `/home`                                     | Tampered copies of a real listing caught 6 of 6 for each change (n = 6 photos per change, LIVE)                                               |
 | LangChain: Best use of deepagents                | A Planner with a check team of sub-agents, each with one read-only tool; up to 2 follow-up checks tied to open gaps; a next step behind Approve | `/case/7Q2M/twin` (check team)              | Planner done in a median 22.9 s in the background; the report never waits (n = 5 timed runs, FIXTURE)                                         |
 | Arlequin AI Track 1: AI-Driven Forensics         | A ring finder that links ads by reworded text, photos, phones and wordings, with a case file per group                                          | `/investigate`                              | 10 of 10 seeded rings flagged, median 2.5 days after a ring's first ad; 0 of 2,684 honest ads flagged (n = 3,039 ads over 90 days, SYNTHETIC) |
-| Photon: Build a Messaging Agent using Photon 2.0 | The same check in iMessage on Photon 2.0: send the ad, get the verdict in the thread                                                            | iMessage (allowlisted threads; no web path) | 10 of 11 right, replies in 0.38 to 4.44 s (n = 10 test ads through a test client, FIXTURE)                                                    |
+| Photon: Build a Messaging Agent using Photon 2.0 | The same check in iMessage on Photon 2.0: send the ad, get the verdict in the thread                                                            | iMessage (allowlisted threads; no web path) | 10 of 11 test messages handled, replies in 0.38 to 4.44 s (a test client in place of a phone, LIVE kit data)                                  |
 
 Send SNAPBACK the ad you found, by iMessage or in the one box on the web: a link, its text or
 screenshots. It checks the place, the person and the price against the home's own record, gives you
@@ -140,15 +140,15 @@ Every number comes from merged code and its eval files, with its n. **LIVE** mea
 data or real listing photos. **FIXTURE** means team-made data through the real pipeline.
 **SYNTHETIC** means generated data.
 
-| What                                                                                            | Result                                                                                         | n                          | Label     |
-| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------- | --------- |
-| Real listing photos placed in the right home (`eval/locate_real.csv`, re-measured Nov 15)       | 43 of 48 in the right home, 0 in a wrong home                                                  | 48 photos                  | LIVE      |
-| Decoy photos placed in the claimed building                                                     | 0 of 30                                                                                        | 30 decoys                  | LIVE      |
-| Tampered copies of a real listing: phone changed, "Zelle before the tour" added, lookalike link | Each change caught 6 of 6                                                                      | 6 photos per change        | LIVE      |
-| Ring finder over a 90-day stream of 3,039 ads with 10 seeded rings                              | 10 of 10 rings flagged, median 2.5 days after a ring's first ad; 0 of 2,684 honest ads flagged | 10 rings, 2,684 honest ads | SYNTHETIC |
-| Ring finder on reworded ads                                                                     | 9 of 10 rings flagged, where a keyword search found 0 of 10                                    | 10 rings, 2,684 honest ads | SYNTHETIC |
-| Planner in the background                                                                       | Median 22.9 s, and the report returns without waiting                                          | 5 timed runs               | FIXTURE   |
-| iMessage reply sweep (a test client in place of a phone)                                        | 10 of 11 right, replies in 0.38 to 4.44 s                                                      | 10 test ads                | FIXTURE   |
+| What                                                                                            | Result                                                                                         | n                          | Label         |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------- | ------------- |
+| Real listing photos placed in the right home (`eval/locate_real.csv`, re-measured Nov 15)       | 43 of 48 in the right home, 0 in a wrong home                                                  | 48 photos                  | LIVE          |
+| Decoy photos placed in the claimed building                                                     | 0 of 30                                                                                        | 30 decoys                  | LIVE          |
+| Tampered copies of a real listing: phone changed, "Zelle before the tour" added, lookalike link | Each change caught 6 of 6                                                                      | 6 photos per change        | LIVE          |
+| Ring finder over a 90-day stream of 3,039 ads with 10 seeded rings                              | 10 of 10 rings flagged, median 2.5 days after a ring's first ad; 0 of 2,684 honest ads flagged | 10 rings, 2,684 honest ads | SYNTHETIC     |
+| Ring finder on reworded ads                                                                     | 9 of 10 rings flagged, where a keyword search found 0 of 10                                    | 10 rings, 2,684 honest ads | SYNTHETIC     |
+| Planner in the background                                                                       | Median 22.9 s, and the report returns without waiting                                          | 5 timed runs               | FIXTURE       |
+| iMessage reply sweep (a test client in place of a phone)                                        | 10 of 11 handled, replies in 0.38 to 4.44 s                                                    | 11 test messages           | LIVE kit data |
 
 <details>
 <summary>More measurements</summary>
