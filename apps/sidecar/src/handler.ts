@@ -40,6 +40,7 @@ type Card = {
   rows: { kind: string; lines: CardLine[] }[];
   not_checked: string[];
   footer: string[];
+  headline?: string; // #256: the card's own headline, built by code
   // #250: built by code in verdict.build_card. Optional: a card from before has none.
   summary?: string[];
   checks_out?: string[];
@@ -186,11 +187,14 @@ export function isAllowed(threadId: string, config: SidecarConfig): boolean {
   );
 }
 
+/** The card's own headline (#256: an honest ad reads differently) when set, else the locked
+ * headline for its state. Both are code-owned; the sidecar never writes one. */
+export function headlineOf(card: Card): string {
+  return card.headline?.trim() || (HEADLINES[card.state] ?? HEADLINES.hold);
+}
+
 export function cardText(card: Card, link: string, challenge?: string | null): string {
-  const lines = [
-    HEADLINES[card.state] ?? HEADLINES.hold,
-    `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`,
-  ];
+  const lines = [headlineOf(card), `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`];
   for (const row of card.rows) {
     for (const line of row.lines) lines.push(`${line.label}: ${line.text}`);
   }
@@ -247,10 +251,7 @@ export function reportText(
   office?: OfficeOnRecord | null,
   askPhotos = false,
 ): string {
-  const lines = [
-    HEADLINES[card.state] ?? HEADLINES.hold,
-    `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`,
-  ];
+  const lines = [headlineOf(card), `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`];
   const top = topReasons(card);
   if (top.length) lines.push("", "Before you pay:", ...top.map((line) => `- ${line}`));
   const step = nextStep(card, challenge, office);
@@ -277,7 +278,7 @@ export function onlyAMarketplaceLink(msg: InboundMessage): boolean {
 
 /** "why?": every reason on this case's card, what was not checked, and the link. */
 function whyText(card: Card, link: string): string {
-  const lines = [HEADLINES[card.state] ?? HEADLINES.hold, "", "Why:"];
+  const lines = [headlineOf(card), "", "Why:"];
   lines.push(...reasons(card).map((line) => `- ${line}`));
   if (card.not_checked.length) lines.push("", `Not checked: ${card.not_checked.join(", ")}`);
   lines.push("", `Full report: ${link}`);
@@ -286,7 +287,7 @@ function whyText(card: Card, link: string): string {
 
 /** "what should I do?": the challenge to send (if any), then the card's own footer rules. */
 function whatNowText(card: Card, link: string, challenge?: string | null): string {
-  const lines = [HEADLINES[card.state] ?? HEADLINES.hold, ""];
+  const lines = [headlineOf(card), ""];
   if (challenge) lines.push("Send the poster this message:", challenge, "");
   lines.push(...card.footer, "", `Full report: ${link}`);
   return lines.join("\n");
@@ -344,7 +345,7 @@ async function answerFollowUp(
 
 /** "who do I call?": the office on record and its own site (#250); never a phone number. */
 function whoToCall(card: Card, link: string, office: OfficeOnRecord | null): string {
-  const lines = [HEADLINES[card.state] ?? HEADLINES.hold, ""];
+  const lines = [headlineOf(card), ""];
   if (office?.manager_company && office.website_host) {
     lines.push(
       `Call ${office.manager_company} through ${office.website_host}, not the number in the ad.`,

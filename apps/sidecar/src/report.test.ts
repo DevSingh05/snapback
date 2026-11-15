@@ -517,3 +517,19 @@ test("[M] stage switches: card picture and checking reply are on only when set t
   });
   assert.deepEqual(stageOptions({ SNAPBACK_SEND_CARD_IMAGE: "0" }).sendCardImage, false);
 });
+
+test("the card's own headline (#256) is used when set, in the report and in follow-ups", async () => {
+  const honest = {
+    ...summarised,
+    headline: "Hold off: nothing here is wrong yet, but nobody has proved they are inside.",
+  };
+  assert.equal(reportText(honest, LINK).split("\n")[0], honest.headline);
+  const calls: Call[] = [];
+  const cfg = config(calls, honest);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  const c = client();
+  await handleMessage(ad("why?"), c, cfg);
+  assert.equal((c.texts[0] ?? "").split("\n")[0], honest.headline);
+  // without one, the locked headline for the state
+  assert.equal(reportText(summarised, LINK).split("\n")[0], "Hold off for now");
+});
