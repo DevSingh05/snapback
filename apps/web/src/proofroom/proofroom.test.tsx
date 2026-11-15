@@ -230,6 +230,24 @@ describe("findings come from the card, through the report's mapping", () => {
     expect(mid.some((l) => l.who === "Decider")).toBe(false);
   });
 
+  it("a finding the card holds with no step of its own lights its desk when the ad is read", () => {
+    // The fixture API's text-only run has no claims step, yet the card carries the payment ask.
+    const bare: CaseTimeline = {
+      ...sampleTimeline,
+      steps: sampleTimeline.steps.filter((s) => s.kind !== "claims"),
+    };
+    const first = schedule(bare)[0]!;
+    expect(desk(floor(first.end - 1, bare), "rules").state).toBe("working");
+    const end = floor(END, bare);
+    expect(desk(end, "rules").state).toBe("done");
+    expect(desk(end, "rules").tone).toBe("red_flag");
+    expect(desk(end, "rules").evidence).toEqual(["Read the ad"]);
+    expect(end.verdict?.reasons.at(-1)?.deskId).toBe("rules");
+    expect(end.log[1]).toMatchObject({ who: "Rules agent", finding: true });
+    expect(end.checksDone).toBe(end.checksTotal);
+    expect(end.desks.filter((d) => d.card.id === "rules" && d.state === "unused")).toEqual([]);
+  });
+
   it("when the deep agent ran, the Planner and the sub-agents it handed work to light up", () => {
     const end = floor(END, deepTimeline());
     expect(desk(end, "planner").state).toBe("done");

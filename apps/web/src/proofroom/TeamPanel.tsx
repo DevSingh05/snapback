@@ -319,19 +319,19 @@ export function TeamPanel({
                 </button>
               ))}
             </span>
-            {player.playing ? (
-              <button
-                type="button"
-                className="pr-btn pr-btn-quiet"
-                onClick={player.skip}
-                data-testid="team-skip"
-              >
-                {w.skip}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="pr-btn pr-btn-quiet"
+              onClick={player.skip}
+              disabled={!player.playing}
+              data-testid="team-skip"
+              aria-label={w.skip}
+            >
+              {w.skipShort}
+            </button>
           </div>
         ) : null}
-        {player.playing ? <p className="pr-note">{w.held}</p> : null}
+        {run.timeline ? <p className="pr-note">{w.held}</p> : null}
       </header>
 
       <div className="pr-tabs" role="tablist" aria-label={w.team}>

@@ -4,14 +4,10 @@ import type { DeskState, Lang, Words } from "./model";
 
 export interface RoomWords extends Words {
   room: string;
-  title: string;
-  lede: string;
-  restLink: string;
-  sample: string;
   replay: string;
   skip: string;
+  skipShort: string;
   speed: string;
-  playing: string;
   held: string;
   state: Record<DeskState, string>;
   waiting: string;
@@ -24,12 +20,9 @@ export interface RoomWords extends Words {
   deciderRule: string;
   because: string;
   see: string;
-  report: string;
   locked: string;
   missing: string;
   fellBack: string;
-  plan: string;
-  codePlan: string;
   liveTab: string;
   meet: string;
   deciderWaits: string;
@@ -46,19 +39,15 @@ export interface RoomWords extends Words {
 export const WORDS: Record<Lang, RoomWords> = {
   en: {
     room: "PROOF ROOM",
-    title: "Your check team, gathering the proof",
-    lede: "A small team checks the ad for you before you pay. Each one has one job, and you can see what it used and what it found.",
     rest: "Run a check to watch them work",
-    restLink: "Run a check",
-    sample: "Watch a sample run",
     checks: (done, total) => `${done} of ${total} checks done`,
     setBy: (headline) => `code set the result: ${headline}`,
     starting: "reading the ad",
     replay: "Replay this run",
     skip: "Skip to the result",
+    skipShort: "Skip",
     speed: "Speed",
-    playing: "Replaying the recorded run",
-    held: "Steps quicker than a second are held so you can read them. Times shown are the recorded ones.",
+    held: "A replay holds quick steps for a moment so you can read them. Times shown are the recorded ones.",
     state: {
       idle: "Waiting",
       working: "Working",
@@ -76,13 +65,10 @@ export const WORDS: Record<Lang, RoomWords> = {
     deciderRule: "Code sets the verdict. No model can talk a renter into paying.",
     because: "Because",
     see: "See",
-    report: "Open the full report",
     locked:
       "This run opens only in the browser that started the check. Open it from your report there.",
     missing: "We could not find that case.",
     fellBack: "The agent stopped, so code finished the checks.",
-    plan: "Its to-do list",
-    codePlan: "Code ran the standard plan on this case.",
     liveTab: "Live",
     meet: "Meet the team",
     deciderWaits: "Waiting for the team's evidence",
@@ -98,18 +84,14 @@ export const WORDS: Record<Lang, RoomWords> = {
   },
   es: {
     room: "SALA DE PRUEBAS",
-    title: "Tu equipo de revisión, reuniendo las pruebas",
-    lede: "Un equipo pequeño revisa el anuncio antes de que pagues. Cada uno tiene una tarea, y puedes ver qué usó y qué halló.",
     rest: "Haz una revisión para verlos trabajar",
-    restLink: "Hacer una revisión",
-    sample: "Ver una revisión de muestra",
     checks: (done, total) => `${done} de ${total} comprobaciones hechas`,
     setBy: (headline) => `el código fijó el resultado: ${headline}`,
     starting: "leyendo el anuncio",
     replay: "Repetir esta revisión",
     skip: "Ir al resultado",
+    skipShort: "Saltar",
     speed: "Velocidad",
-    playing: "Repitiendo la revisión grabada",
     held: "Los pasos de menos de un segundo se sostienen para poder leerlos. Los tiempos son los grabados.",
     state: {
       idle: "En espera",
@@ -128,13 +110,10 @@ export const WORDS: Record<Lang, RoomWords> = {
     deciderRule: "El código fija el resultado. Ningún modelo puede convencer a nadie de pagar.",
     because: "Porque",
     see: "Ver",
-    report: "Abrir el informe completo",
     locked:
       "Esta revisión solo se abre en el navegador que la empezó. Ábrela desde tu informe allí.",
     missing: "No encontramos ese caso.",
     fellBack: "El agente se detuvo, así que el código terminó las comprobaciones.",
-    plan: "Su lista de tareas",
-    codePlan: "El código siguió el plan estándar en este caso.",
     liveTab: "En vivo",
     meet: "Conoce al equipo",
     deciderWaits: "Esperando las pruebas del equipo",

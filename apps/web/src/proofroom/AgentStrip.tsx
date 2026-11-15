@@ -15,6 +15,9 @@ export function deskWord(desk: Desk, lang: Lang): string {
   return tone && lang === "en" ? tone : w.state.done;
 }
 
+// The strip keeps every state to one line, so a light changing never moves the row under it.
+const SHORT_UNUSED: Record<Lang, string> = { en: "Not used", es: "No se usó" };
+
 export function AgentStrip({
   desks,
   lang = "en",
@@ -37,7 +40,16 @@ export function AgentStrip({
           <>
             <span className="pr-strip-light" aria-hidden="true" />
             <span className="pr-strip-name">{desk.card.name}</span>
-            <span className="pr-strip-state ui-mono">{deskWord(desk, lang)}</span>
+            <span className="pr-strip-state ui-mono">
+              {desk.state === "unused" ? (
+                <>
+                  <span aria-hidden="true">{SHORT_UNUSED[lang]}</span>
+                  <span className="sr-only">{deskWord(desk, lang)}</span>
+                </>
+              ) : (
+                deskWord(desk, lang)
+              )}
+            </span>
           </>
         );
         return (

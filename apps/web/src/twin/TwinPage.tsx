@@ -279,6 +279,7 @@ function TwinViewInner({
             from={from}
           />
         </section>
+        {team}
         <TwinOnStop photoId={photoId} state={state} src={PLACEHOLDER_PHOTO} sample />
         <aside className="twin-side">
           <figure className="listing-card" ref={cardRef}>
@@ -316,7 +317,6 @@ function TwinViewInner({
             mismatch={mismatch}
           />
         </aside>
-        {team}
       </div>
       <TraceStrip>
         <TracePanel caseId={caseId} />

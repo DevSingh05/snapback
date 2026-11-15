@@ -236,6 +236,25 @@ export function floorAt({
     const bubbles = (view?.bubbles ?? []).filter((b) => agent.checks.includes(b.check));
     const quiet = (view?.notChecked ?? []).filter((n) => agent.checks.includes(n.check));
 
+    if (ran.length === 0 && bubbles.length > 0 && skipped.length === 0) {
+      // The card holds a finding for this desk but the timeline has no step of its own for it
+      // (the rules read the ad as it comes in). It is tied to the first step, reading the ad.
+      if (!started(0)) return desk;
+      desk.startedAt = beats[0]!.start;
+      desk.source = bubbles[0]!.source;
+      if (!ended(0)) {
+        desk.state = "working";
+        return desk;
+      }
+      desk.state = "done";
+      desk.evidence = [steps[0]!.label];
+      desk.findings = bubbles.flatMap((b) => b.findings);
+      desk.tone = bubbles.reduce<CardTone | "none">(
+        (worst, b) => (TONE_RANK[b.tone] < TONE_RANK[worst] ? b.tone : worst),
+        "none",
+      );
+      return desk;
+    }
     if (ran.length === 0) {
       if (skipped.length > 0 || quiet.length > 0) {
         // Skipped shows from the moment the plan said so (or at once when only the card says it).
@@ -277,26 +296,9 @@ export function floorAt({
 
   // The thread: each step as it starts, and a desk's findings the moment its last step is in.
   const log: LogLine[] = [];
-  steps.forEach((s, i) => {
-    if (!started(i)) return;
-    const owner = deskOfKind(roster, s.kind) ?? (s.by === "agent" && deep ? planner : null);
-    log.push({
-      step: s.step,
-      deskId: owner?.id ?? null,
-      who: owner?.name ?? snapback,
-      text: s.label,
-      source: s.source,
-      by: s.by,
-      tookMs: s.took_ms,
-      skipped: s.skipped === true,
-    });
-    const desk = owner ? desks.find((d) => d.card.id === owner.id) : null;
-    if (!desk || desk.state !== "done" || desk.card.team === "planner") return;
-    const last = steps.reduce(
-      (at, t, j) => (!t.skipped && desk.card.kinds.includes(t.kind ?? "") ? j : at),
-      -1,
-    );
-    if (last !== i) return;
+  const lastStepOf = (agent: AgentCard) =>
+    steps.reduce((at, t, j) => (!t.skipped && agent.kinds.includes(t.kind ?? "") ? j : at), -1);
+  const sayFindings = (desk: Desk, s: (typeof steps)[number]) => {
     for (const f of desk.findings) {
       log.push({
         step: s.step,
@@ -311,13 +313,36 @@ export function floorAt({
         tone: desk.tone,
       });
     }
+  };
+  steps.forEach((s, i) => {
+    if (!started(i)) return;
+    const owner = deskOfKind(roster, s.kind) ?? (s.by === "agent" && deep ? planner : null);
+    log.push({
+      step: s.step,
+      deskId: owner?.id ?? null,
+      who: owner?.name ?? snapback,
+      text: s.label,
+      source: s.source,
+      by: s.by,
+      tookMs: s.took_ms,
+      skipped: s.skipped === true,
+    });
+    if (i === 0)
+      for (const d of desks)
+        if (d.state === "done" && d.card.team !== "planner" && lastStepOf(d.card) === -1)
+          sayFindings(d, s);
+    const desk = owner ? desks.find((d) => d.card.id === owner.id) : null;
+    if (!desk || desk.state !== "done" || desk.card.team === "planner") return;
+    if (lastStepOf(desk.card) !== i) return;
+    sayFindings(desk, s);
   });
 
   // "Checks" are the scam-check desks this case reached; the status line counts those.
   const checkDesks = desks.filter(
     (d) =>
       d.card.team === "scam_check" &&
-      steps.some((s) => !s.skipped && d.card.kinds.includes(s.kind ?? "")),
+      (steps.some((s) => !s.skipped && d.card.kinds.includes(s.kind ?? "")) ||
+        (view?.bubbles ?? []).some((b) => d.card.checks.includes(b.check))),
   );
   const working = desks.filter((d) => d.state === "working");
   const nowDesk =
@@ -378,7 +403,10 @@ export function statusLine(floor: Floor, w: Words): string {
   if (floor.phase === "done")
     return floor.verdict ? `${count} · ${w.setBy(floor.verdict.headline)}` : count;
   const now = floor.desks.find((d) => d.card.id === floor.nowDeskId);
-  const doing = now ? now.card.doing.charAt(0).toLowerCase() + now.card.doing.slice(1) : w.starting;
+  // Between desks, the line is the newest step's own label.
+  const last = floor.log.filter((l) => !l.finding).at(-1)?.text ?? w.starting;
+  const said = now ? now.card.doing : last;
+  const doing = said.charAt(0).toLowerCase() + said.slice(1);
   return `${count} · ${doing}`;
 }
 

@@ -84,6 +84,11 @@
   background: var(--layer-2);
   color: var(--ink);
 }
+.pr-btn:disabled {
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
 .pr-btn-quiet[aria-pressed="true"] {
   background: var(--act);
   color: var(--on-act);
@@ -130,6 +135,9 @@
 .pr-tabs button[aria-selected="true"] {
   border-bottom-color: var(--act);
   color: var(--ink);
+}
+.pr-pane[hidden] {
+  display: none;
 }
 .pr-pane {
   display: grid;
@@ -188,6 +196,7 @@
 }
 .pr-strip-state {
   color: var(--muted);
+  white-space: nowrap;
 }
 .pr-strip-item[data-state="idle"] .pr-strip-light,
 .pr-strip-item[data-state="unused"] .pr-strip-light,
@@ -518,6 +527,7 @@
 }
 .pr-report .case-text-link {
   justify-self: start;
+  gap: var(--sp-2);
 }
 
 /* ---------- beside the twin ---------- */
@@ -618,6 +628,7 @@
 }
 .pr-home-link {
   justify-self: start;
+  gap: var(--sp-2);
   display: inline-flex;
   align-items: center;
   min-height: 48px;
@@ -630,4 +641,20 @@
 .pr-home-link:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* ---------- hover: an underline bar in the accent, never a colour swap that hides a state ---------- */
+@media (hover: hover) {
+  .pr-btn:hover:not(:disabled),
+  .pr-strip-item > button:hover,
+  .pr-strip-item > a:hover {
+    box-shadow: inset 0 -3px 0 var(--scan);
+  }
+  .pr-tabs button:hover {
+    color: var(--ink);
+  }
+  .pr-home-link:hover,
+  .pr-evidence summary:hover {
+    color: var(--act);
+  }
 }
