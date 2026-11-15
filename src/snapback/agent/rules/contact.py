@@ -326,6 +326,14 @@ def check_authority(
         status = AuthorityStatus.MATCHES_RECORD if company else AuthorityStatus.MISMATCH
 
     if record is None:
+        # No record, but the ad names one building exactly: only a lookalike of its site
+        # counts. A match or another site stays "not checked", as with no record.
+        named_link = LinkDomain.NOT_CHECKED
+        if named_site and (
+            check_link(claims.links, named_site, getattr(claims, "emails", ()))
+            is LinkDomain.LOOKALIKE
+        ):
+            named_link = LinkDomain.LOOKALIKE
         # Who to call when the poster named a brokerage on record: that brokerage. A company,
         # from the record, never what the poster typed. Nobody is named when they named none.
         matched = next((name for name, same in zip(on_record, answers, strict=True) if same), None)
@@ -336,13 +344,11 @@ def check_authority(
             # True when there was a brokerage to compare with. The card and the reasons then
             # speak of the listing brokerage, never of a manager or a leasing office.
             brokerage_only=bool(on_record),
-            # No record, but the ad names one building exactly: only a lookalike of its site
-            # counts. A match or another site stays "not checked", as with no record.
-            link_domain=LinkDomain.LOOKALIKE
-            if named_site
-            and check_link(claims.links, named_site, getattr(claims, "emails", ()))
-            is LinkDomain.LOOKALIKE
-            else LinkDomain.NOT_CHECKED,
+            link_domain=named_link,
+            lookalike_sender_only=(
+                named_link is LinkDomain.LOOKALIKE
+                and check_link(claims.links, named_site) is not LinkDomain.LOOKALIKE
+            ),
         )
 
     emails = getattr(claims, "emails", ())

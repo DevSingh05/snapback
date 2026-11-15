@@ -125,33 +125,38 @@ def _tokens(text: str) -> list[str]:
 def build_name_index(
     records: Iterable[PropertyRecord],
 ) -> dict[tuple[str, ...], list[PropertyRecord]]:
-    """Records that carry a website, under their building name as lowercase word tokens. A name
-    of one word, or with a word under 3 letters, is too common to name one building."""
+    """Every record under its building name as lowercase word tokens, with or without a
+    website: a name without one still blocks a shorter name inside it. A name of one word, or
+    with a word under 3 letters, is too common to name one building."""
     index: dict[tuple[str, ...], list[PropertyRecord]] = {}
     for record in records:
         name = tuple(_tokens(record.building_name or ""))
         if name[:1] == ("the",):  # "The Oaks" is one word of name
             name = name[1:]
-        if (
-            record.website_host
-            and len(name) >= MIN_NAME_TOKENS
-            and all(len(word) >= MIN_TOKEN_CHARS for word in name)
-        ):
+        if len(name) >= MIN_NAME_TOKENS and all(len(word) >= MIN_TOKEN_CHARS for word in name):
             index.setdefault(name, []).append(record)
     return index
+
+
+def _inside(short: tuple[str, ...], long: tuple[str, ...]) -> bool:
+    return len(short) < len(long) and any(
+        long[i : i + len(short)] == short for i in range(len(long) - len(short) + 1)
+    )
 
 
 def website_for_name(
     listing_text: str, index: dict[tuple[str, ...], list[PropertyRecord]]
 ) -> str | None:
     """The website host of the one building whose whole name the ad contains as whole words, or
-    None (no name, several buildings, or several different names). Exact, never fuzzy."""
+    None (no name, several buildings, several names, or a name that sits inside a longer
+    building's name the ad also gives: "Example Greenbriar Park"). Exact, never fuzzy."""
     words = _tokens(listing_text)
-    found: set[str] = set()
-    for name, records in index.items():
-        size = len(name)
-        if any(tuple(words[i : i + size]) == name for i in range(len(words) - size + 1)):
-            if len(records) != 1:
-                return None
-            found.add(records[0].website_host or "")
-    return found.pop() if len(found) == 1 else None
+    named = [
+        name
+        for name in index
+        if any(tuple(words[i : i + len(name)]) == name for i in range(len(words) - len(name) + 1))
+    ]
+    named = [name for name in named if not any(_inside(name, other) for other in named)]
+    if len(named) != 1 or len(index[named[0]]) != 1:
+        return None
+    return index[named[0]][0].website_host

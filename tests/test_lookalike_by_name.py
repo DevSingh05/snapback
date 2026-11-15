@@ -18,9 +18,13 @@ def _rec(pid, name, host="exampleliving.com"):
 
 
 GREEN = _rec("fx-green", "Example Greenbriar")
+PARK = _rec("fx-park", "Example Greenbriar Park", "examplegreenbriarpark.com")
+NO_SITE = _rec("fx-gardens", "Example Greenbriar Gardens", None)
 INDEX = build_name_index(
     [
         GREEN,
+        PARK,
+        NO_SITE,
         _rec("fx-short", "The Oaks", "oaksliving.com"),
         _rec("fx-d1", "Example Twin"),
         _rec("fx-d2", "Example Twin"),
@@ -85,3 +89,15 @@ def test_a_short_generic_name_never_matches():
 def test_two_buildings_with_one_name_is_no_match():
     assert website_for_name("1 bed at Example Twin", INDEX) is None
     assert website_for_name("1 bed at example greenbriar suites", INDEX) == "exampleliving.com"
+
+
+def test_a_name_inside_a_longer_buildings_name_never_matches():
+    # "Example Greenbriar Park" is its own building: its own site is not a lookalike of ours.
+    assert (
+        website_for_name("1 bed at Example Greenbriar Park", INDEX) == "examplegreenbriarpark.com"
+    )
+    assert _link("https://examplegreenbriarpark.com", name="Example Greenbriar Park") is (
+        LinkDomain.NOT_CHECKED
+    )
+    # A longer building with no website still blocks the shorter name.
+    assert website_for_name("1 bed at Example Greenbriar Gardens", INDEX) is None
