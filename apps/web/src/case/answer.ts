@@ -46,7 +46,7 @@ const LINE_CHECK: Record<string, CheckId> = {
   "label.link": "rules",
   "label.contact": "phone",
   "label.office": "phone",
-  "label.allowed": "owner",
+  "label.allowed": "phone", // from the record's manager and office match, not the owner step
   "label.license": "owner",
   "label.owner": "owner",
   "label.owner_rule": "owner",

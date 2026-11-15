@@ -1169,7 +1169,7 @@
   border-left: 4px solid var(--unchecked);
   background: var(--unchecked-soft);
   overflow-wrap: anywhere;
-  scroll-margin-top: var(--sp-6);
+  scroll-margin-top: 72px;
 }
 .case-bubble[data-tone="red_flag"] {
   border-left-color: var(--coral);

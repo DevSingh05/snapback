@@ -18,6 +18,7 @@ const line = (key: string, label: string, text: string, tone: CardLine["tone"]):
 
 const PAYMENT = "Payment ask: Zelle before a viewing. Red flag.";
 const PHONE = "Contact on record: The phone in the ad is not the office's on record.";
+const LICENCE = "License: No license number in the ad to check.";
 const ALLOWED = "Allowed to rent it: NOT SHOWN. Being inside does not mean they may rent it.";
 
 const card: Card = {
@@ -43,6 +44,7 @@ const card: Card = {
           "NOT SHOWN. Being inside does not mean they may rent it.",
           "not_shown",
         ),
+        line("label.license", "License", "No license number in the ad to check.", "hold"),
       ],
     },
     {
@@ -52,7 +54,7 @@ const card: Card = {
       ],
     },
   ],
-  does_not: [PAYMENT, PHONE, ALLOWED],
+  does_not: [PAYMENT, PHONE, ALLOWED, LICENCE],
   checks_out: ["Real: Taken in this building (3 of 3 photos)."],
 };
 
@@ -129,9 +131,18 @@ describe("one message per check", () => {
     expect(document.getElementById("answer-rules")).toHaveTextContent("Zelle before a viewing");
   });
 
+  it("links the hold finding 'Allowed to rent it' to the office message, which exists", () => {
+    render(<AnswerPanel card={card} timeline={timeline()} />);
+    expect(within(reason("Allowed to rent it")).getByTestId("answer-reason-link")).toHaveAttribute(
+      "href",
+      "#answer-phone",
+    );
+    expect(document.getElementById("answer-phone")).toHaveTextContent("Allowed to rent it");
+  });
+
   it("never links a reason to a skipped check, and says what was not checked in one line", () => {
     render(<AnswerPanel card={card} timeline={timeline()} />);
-    const owner = reason("Allowed to rent it");
+    const owner = reason("License");
     expect(owner).toHaveAttribute("data-linked", "no");
     expect(within(owner).queryByTestId("answer-reason-link")).toBeNull();
     expect(document.getElementById("answer-owner")).toBeNull();
