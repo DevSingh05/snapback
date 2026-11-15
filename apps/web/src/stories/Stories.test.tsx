@@ -200,7 +200,10 @@ describe("the Stories page", () => {
     expect(document.querySelector(".st-hero")).toHaveAttribute("data-bar", "photo");
     goTo("end");
     expect(document.querySelectorAll(".st-btn-primary")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Check your own ad" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Check your own ad" })).toHaveAttribute(
+      "href",
+      "/home",
+    );
     expect(document.querySelector(".st-end .ui-photo")).toHaveAttribute("data-stamp", "sample");
   });
 

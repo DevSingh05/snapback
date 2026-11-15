@@ -164,7 +164,7 @@ export function PlaceSheet({
         ) : null}
 
         <div className="sheet-acts">
-          <a className="btn-line" href={`/?place=${encodeURIComponent(p.pid)}`}>
+          <a className="btn-line" href={`/home?place=${encodeURIComponent(p.pid)}`}>
             {S.checkAd}
           </a>
           <button type="button" className="btn-quiet" onClick={() => onPass(p.pid)}>
