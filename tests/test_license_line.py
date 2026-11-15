@@ -116,7 +116,9 @@ def test_no_licence_is_never_dont_pay_whatever_else_is_true():
     assert state(evidence(license=NOT_FOUND, challenge=None)) is VerdictState.HOLD
     nothing_placed = ModuleEvidence(case_id="fx-1", source="fixture", license=NOT_FOUND)
     verdict = decide(to_evidence(nothing_placed))
-    assert verdict.state is VerdictState.UNVERIFIED
+    # With no photo placed it is still HOLD, not DONT_PAY: a red flag outranks "could not
+    # place" (issue #10), and it is never proof.
+    assert verdict.state is VerdictState.HOLD
     assert strings.text("reason.license_not_found") in verdict.reasons
 
 

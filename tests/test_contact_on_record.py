@@ -187,7 +187,7 @@ def test_a_matching_phone_is_a_supporting_line_and_never_authority():
     person = card_lines(modules, CardRowKind.PERSON)
     assert person["Contact on record"] == (
         CardTone.OK,
-        "The phone matches the leasing office on record. Call it yourself to confirm.",
+        "Matches. This is the leasing office's number on record. Call it yourself to confirm.",
     )
     assert person["Allowed to rent it"] == (
         CardTone.NOT_SHOWN,
@@ -370,18 +370,24 @@ def test_for_sale_holds_a_case_even_when_no_photo_could_be_placed():
     assert state(unplaced) is VerdictState.HOLD
 
 
-def test_for_sale_is_never_dont_pay_and_nothing_else_outranks_could_not_place():
+def test_for_sale_is_never_dont_pay_and_only_red_flags_outrank_could_not_place():
     # DON'T PAY needs proof: a forged reply or a photo taken elsewhere. For sale is neither.
     assert state(evidence(for_sale={"status": "active"}, challenge=None)) is VerdictState.HOLD
     nothing = {"case_id": "fx-1", "source": "fixture"}
+    # Information and "not confirmed" do not outrank "could not place".
     for other in (
         {"for_sale": {"status": "recently_rented"}},
         {"authority": {"status": "unknown", "office_phone_match": "no"}},
+    ):
+        verdict = decide(to_evidence(ModuleEvidence.model_validate(nothing | other)))
+        assert verdict.state is VerdictState.UNVERIFIED, other
+    # A red flag does (issue #10): the verdict is the one it gives with photos, HOLD.
+    for other in (
         {"authority": {"status": "unknown", "link_domain": "lookalike"}},
         {"price": {"status": "not_checked", "unit": "not_on_record"}},
     ):
         verdict = decide(to_evidence(ModuleEvidence.model_validate(nothing | other)))
-        assert verdict.state is VerdictState.UNVERIFIED, other
+        assert verdict.state is VerdictState.HOLD, other
     # A photo taken in another building still outranks everything.
     elsewhere = evidence(
         for_sale={"status": "active"},
