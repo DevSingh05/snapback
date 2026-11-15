@@ -384,14 +384,14 @@ export const PANELS: Panel[] = [
       },
       {
         value: "6.8 s",
-        what: "from a pasted ad to Hold on the live site",
+        what: "from a pasted ad to Hold on the demo laptop (LIVE API)",
         n: 1,
         unit: "run",
         label: "LIVE",
         source: `${BOARD} CoStar: "LIVE HOLD in 6.8 s (n=1)"`,
       },
     ],
-    show: { label: "Show me a check", href: "/home", data: "LIVE" },
+    show: { label: "Show me a check", href: "/home", data: "FIXTURE" },
     more: [{ label: "What people who tried it said", href: "/reviews", data: "LIVE" }],
   },
 ];

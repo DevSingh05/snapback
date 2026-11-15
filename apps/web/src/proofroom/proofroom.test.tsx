@@ -425,9 +425,13 @@ describe("the panel beside the twin", () => {
     expect(light("rules")).toHaveAttribute("data-state", "done");
     expect(screen.queryByTestId("team-verdict")).toBeNull();
     expect(screen.getByTestId("team-status")).toHaveTextContent("placing the photos");
+    // Mid-replay the line names the run's own total (the report's count), not a count climbing from 0.
+    expect(screen.getByTestId("team-status")).toHaveTextContent(/\d+ checks in this run/);
+    expect(screen.getByTestId("team-status")).not.toHaveTextContent("checks done");
     act(() => {
       vi.advanceTimersByTime(runLength(beats) + 500);
     });
+    expect(screen.getByTestId("team-status")).toHaveTextContent(/(\d+) of \1 checks done/);
     expect(light("photo")).toHaveAttribute("data-state", "done");
     expect(screen.getByTestId("team-verdict")).toHaveTextContent(headlineOf(card));
     // "Replay this run" starts it again from the first step.

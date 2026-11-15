@@ -96,6 +96,11 @@ export const RULES_REPLY =
 export const FB_ASK =
   "Facebook keeps listings behind a login. Paste the listing text here and add its photos, and I'll check it.";
 
+/** Shown above the answer card on the public site, which has no live API and answers any ad with
+ * the sample case. Never shown in LIVE mode. */
+export const FIXTURE_NOTE =
+  "This public site shows our sample case for any ad. Live checks run on our demo laptop and in iMessage.";
+
 /** The one measured line on Home (A8, n stated). Locked text: never add to it. */
 export const MEASURED =
   "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it";
@@ -1368,6 +1373,11 @@ export function ThreadItem({
     case "check":
       return (
         <li className="ob-card-row">
+          {mode === "fixture" && (
+            <p className="ob-fixture-note" data-testid="ob-fixture-note">
+              {FIXTURE_NOTE}
+            </p>
+          )}
           <CheckRun
             input={it.input}
             mode={mode}
