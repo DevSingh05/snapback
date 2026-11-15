@@ -69,7 +69,7 @@ describe("the page", () => {
     expect(screen.getByTestId("realtor-quote")).toHaveTextContent("Ashwin Veeravalli");
     expect(screen.getByTestId("realtor-quote")).not.toHaveTextContent(/main focus/);
     expect(
-      screen.getByText("Hallway test tonight: results posted after 08:30 with n"),
+      screen.getByText("Hallway test results are added here, with n, as they come in"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/go up before judging/)).toBeNull();
     expect(screen.getByRole("link", { name: "Rate SNAPBACK (2 minutes)" })).toHaveAttribute(

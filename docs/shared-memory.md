@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sun Nov 15 2026, 04:10. Standing rules for agents are in AGENTS.md; this file holds the changing facts. Morning direction and decisions (before 11:12): `docs/shared-memory-archive.md`.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sun Nov 15 2026, 04:25. Standing rules for agents are in AGENTS.md; this file holds the changing facts. Morning direction and decisions (before 11:12): `docs/shared-memory-archive.md`.
 
 ## Product direction (Sat afternoon, Vidyut)
 
@@ -27,13 +27,13 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (Sun 04:10)
+## Who is doing what (Sun 04:25)
 
 Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Freeze 04:30 (design stack w/worlds-scroll iterates to 06:15; hard stop 07:30). Standing merge OK: review PASS + green CI. Merge with `--subject "<title> (#N)" --body ""` only.
 
-- **Dev (DevSingh05, A):** deployed 4c1feaa 03:52 (per Dev). 04:09 FREEZE DEPLOY @5e134e7 at 04:30 asked on #8 (newer SHA only if #344 lands first); deployment id owed. #334 judge lens due 04:45.
-- **Vidyut + conductor (vs-githjk, T):** #344 (ring median 2.5 + Reviews copy) node RED 04:06: hood.test.tsx:68 needs a panel `source` matching `plan/artifact/board.json` or `^eval/`; the new /investigate source string fails. #338 scroll 3D (designer to 06:15). #248 stale.
-- **Jeffrey's agent (jeffrey-g05, V; Jeffrey asleep):** #342 MERGED c889e31 04:08 (by=agent filter + test). #343 Approve/Edit opened 03:58 (+357, needs reviewer; lands after freeze only on Vidyut/conductor call).
+- **Dev (DevSingh05, A):** deployed 4c1feaa 03:52 (per Dev). 04:24 FREEZE DEPLOY @3f65762 posted on #8 (replaces the 5e134e7 ask); deployment id owed. #334 judge lens due 04:45.
+- **Vidyut + conductor (vs-githjk, T):** #344 MERGED 839e86b 04:2x (ring median 2.5 + Reviews copy, CI green). #338 scroll 3D (designer to 06:15). #248 stale.
+- **Jeffrey's agent (jeffrey-g05, V; Jeffrey asleep):** #342 MERGED c889e31 04:08 (by=agent filter + test). #343 Approve/Edit MERGED 3f65762 04:24 (reviewer PASS on 269e2d4; main merged + focus/copy-failed follow-up 981d484 checked by XO; CI 3/3 green).
 - **Rishit's agent (RishitRai, D):** #340 MERGED 5e134e7 04:08 (hash-scroll fix + 3 tests). #327 HELD (gate failed, final).
 
 ## Open questions
@@ -45,7 +45,7 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 
 ## Live facts
 
-- **main = 5e134e7** (04:08): #342 c889e31, #340 5e134e7 on a7f6d99 (shared memory) on 44fdef3. Freeze deploy @5e134e7 asked 04:09 (#8). Merged 03:55-03:58: #341 055954d, #335 44fdef3. Before: #339 641726c, #337 b22b83e, #336 3311405, #331 c739b1f, #326 11373e4. Main CI: 4c1feaa green; 055954d and 44fdef3 in progress at 03:59.
+- **main = 3f65762** (04:24): #343 3f65762, #344 839e86b. Freeze deploy @3f65762 asked 04:24 (#8). Earlier, main = 5e134e7 (04:08): #342 c889e31, #340 5e134e7 on a7f6d99 (shared memory) on 44fdef3. Freeze deploy @5e134e7 asked 04:09 (#8). Merged 03:55-03:58: #341 055954d, #335 44fdef3. Before: #339 641726c, #337 b22b83e, #336 3311405, #331 c739b1f, #326 11373e4. Main CI: 4c1feaa green; 055954d and 44fdef3 in progress at 03:59.
 - **Which build is live on Vercel:** Dev reported 03:52 4c1feaa (dpl_4XfqJ1pwUiqatWCqxgbAVo3rFTTA READY, production); master-guardian owns `plan/live.json`, not refreshed by XO. Redeploy @44fdef3 asked 03:59 on #8.
 - SNAPBACK_VEXCEL_IN_VERDICT stays OFF (v2 held-out 8/9 next-door misses 90%; footprints gate FAILED 03:34, #327 held).
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only). Timeline, copy-alert, evidence-image all read the token from a header.

@@ -1289,3 +1289,75 @@
 .case-planner-list li {
   margin: 2px 0;
 }
+
+/* The Planner's drafted next step: approve or edit, then copy; SNAPBACK never sends it. */
+.case-draft {
+  margin: 24px 0;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.case-draft h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.case-draft-by {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.case-draft-why {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+.case-draft-text {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line);
+}
+.case-draft-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.case-draft-field {
+  width: 100%;
+  font: inherit;
+  font-size: max(16px, 1rem);
+  padding: 10px;
+}
+.case-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.case-draft-actions button {
+  min-height: 44px;
+}
+.case-draft-ready-title {
+  margin: 0;
+  font-weight: 700;
+}
+.case-draft-ready-note {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+.case-draft-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 600;
+  background: var(--act);
+  color: var(--on-act);
+  cursor: pointer;
+}
+.case-draft-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
