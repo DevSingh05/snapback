@@ -85,6 +85,16 @@ describe("DraftedStep", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("says our rules picked it when code, not a model, chose the step", () => {
+    const t = timeline([
+      step(1, { kind: "followup", label: LABEL, choice: "next_step", draft: DRAFT, by: "code" }),
+    ]);
+    render(<DraftedStep timeline={t} />);
+    const box = screen.getByTestId("drafted-step");
+    expect(box).toHaveTextContent("Picked by our rules · never sent");
+    expect(box).not.toHaveTextContent("Drafted by a model");
+  });
+
   it("is not there without a drafted step that has a code draft", () => {
     expect(draftedStep(timeline([step(0)]))).toBeNull();
     expect(draftedStep(timeline([step(1, { choice: "next_step", draft: null })]))).toBeNull();

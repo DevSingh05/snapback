@@ -108,6 +108,7 @@ const DRAFT_WORDS = {
   en: {
     title: "A next step, drafted for you",
     by: "Drafted by a model · never sent",
+    byCode: "Picked by our rules · never sent",
     approve: "Approve",
     edit: "Edit",
     save: "Save",
@@ -121,6 +122,7 @@ const DRAFT_WORDS = {
   es: {
     title: "Un próximo paso, redactado para usted",
     by: "Redactado por un modelo · nunca enviado",
+    byCode: "Elegido por nuestras reglas · nunca enviado",
     approve: "Aprobar",
     edit: "Editar",
     save: "Guardar",
@@ -163,7 +165,8 @@ export function DraftedStep({
   return (
     <section className="case-draft" aria-labelledby={titleId} data-testid="drafted-step">
       <h2 id={titleId}>{w.title}</h2>
-      <p className="case-draft-by ui-mono">{w.by}</p>
+      {/* Only a model's pick says a model drafted it; the policy or the fixture is "our rules". */}
+      <p className="case-draft-by ui-mono">{step.by === "agent" ? w.by : w.byCode}</p>
       <p className="case-draft-why">{step.label}</p>
       {mode === "edit" ? (
         <>
