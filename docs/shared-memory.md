@@ -27,14 +27,14 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (Sun 05:45)
+## Who is doing what (Sun 05:55)
 
 Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Freeze 04:30 (design stack w/worlds-scroll iterates to 06:15; hard stop 07:30). Standing merge OK: review PASS + green CI. Merge with `--subject "<title> (#N)" --body ""` only.
 
-- **Dev (DevSingh05, A):** DEPLOYED fe2dc89 (+docs 54d65ae) 05:38: dpl_8ZoPGgMhkVj5kqA7Y9xga4WRK7wY READY prod (#8; backend-only, bundle unchanged index-BKTQAK6N.js). Asked on #8: DEPLOY @4c75c4c (05:40, #338) then @8040b77 (05:44, #352+#353); no dpl id for either at 05:45. Smoke every 20 min to 07:00.
-- **Vidyut + conductor (vs-githjk, T):** #338 MERGED 4c75c4c 05:40 (Worlds scroll landing). #353 MERGED 8040b77 05:44 (connector-word follow-up to #351, CI 3/3 green on head 94b01d8). #354 'Investigate: judge-facing words instead of make api' (judge-0445 H2, conductor builder) @2a15efb open 05:44, CI hygiene pass, node/python pending; needs review PASS. #248 stale.
-- **Jeffrey's agent (jeffrey-g05, V; Jeffrey asleep):** #342 MERGED c889e31 04:08 (by=agent filter + test). #343 Approve/Edit MERGED 3f65762 04:24 (reviewer PASS on 269e2d4; main merged + focus/copy-failed follow-up 981d484 checked by XO; CI 3/3 green). #334 phone lens posted 03:31. #348 Twin placeholder copy MERGED 2c16eca 05:06. #10 judging kit DONE 03:3x (comment 6891654208, data/judging_kit/ on his laptop; XO 05:06 'late' was wrong). LIVE iMessage sweep n=10 posted 05:0x (6892688936): 10/11 right, reply 0.38-4.44 s, stand-in client (no Photon/phone). Opened #351 (text-only lookalike link not flagged); fix #352 in review. Re-ran #351 on local main fe2dc89 05:33: both texts still unverified, link not flagged; root cause + suggested connector-word fix posted (#10). Fix = #353 (merged 8040b77); XO posts '#353 LIVE' on #10 once Dev deploys 8040b77, then he re-runs the two texts.
-- **Rishit's agent (RishitRai, D):** #340 MERGED 5e134e7 04:08. #327 HELD (gate failed, final). H2 copy PR never opened; taken over by conductor's #354 (told on #11 05:45, do not duplicate). Next ~06:25: read-only check of every number in plan/devpost-final.md vs its source, OK/WRONG list on #11.
+- **Dev (DevSingh05, A):** DEPLOYED 4e93181 05:51: dpl_28HS5FuzQxqT4f836MK36SuHeq4V READY prod (#8), carries #338 + #352 + #353; demo laptop API on 4e93181. Asked 05:55 on #8: DEPLOY @71ec179 (#354 copy) once python CI is green. Smoke every 20 min to 07:00.
+- **Vidyut + conductor (vs-githjk, T):** #338 MERGED 4c75c4c 05:40. #353 MERGED 8040b77 05:44. #354 MERGED 71ec179 (judge-0445 H2 copy; CI node+hygiene green, python pending 05:54). Open PRs: #327, #248 only, both HELD.
+- **Jeffrey's agent (jeffrey-g05, V):** #351 re-test 05:47 on laptop main 4e93181: FIXED LIVE, both texts give 'Hold off' + Link red_flag (n=1 each, text only). Earlier: #342, #343, #348 merged; judging kit done; iMessage sweep n=10 10/11 right (stand-in client).
+- **Rishit's agent (RishitRai, D):** #327 HELD (gate failed, final). Devpost numbers check CANCELLED 05:55 (plan/devpost-final.md is Mac-only; conductor checked it). Now: read-only README numbers vs eval files on GitHub, PASS or numbered list on #11 by 06:30.
 
 ## Open questions
 
@@ -44,6 +44,8 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 - 10:12 A8 real-photo totals PENDING CoStar c4 (totals on Dev's laptop, photos never committed). (Vidyut)
 
 ## Live facts
+
+- **05:55 LIVE:** dpl_28HS5FuzQxqT4f836MK36SuHeq4V @4e93181 READY prod (Dev #8 05:51, dashboard). XO curl 05:54: / 200, bundle index-4wQJ9c4a.js (was index-BKTQAK6N.js). #338 landing + #352/#353 live; demo laptop API 4e93181. main = 71ec179: #354 NOT live (deploy asked 05:55). plan/live.json updated.
 
 - **05:45 LIVE:** dpl_8ZoPGgMhkVj5kqA7Y9xga4WRK7wY @fe2dc89 (+docs 54d65ae) READY prod (Dev #8 05:38, dashboard). XO curl 05:44: / 200, bundle index-BKTQAK6N.js (unchanged, #352 backend). main = 8040b77: #338 4c75c4c and #353 8040b77 NOT live (deploy asked, no dpl id). plan/live.json updated.
 - **05:35:** prod still serves index-BKTQAK6N.js (= 089b579, dpl_APkWq8...). main = fe2dc89 (#352), CI in progress; fe2dc89 NOT live, no Dev deploy id yet.
