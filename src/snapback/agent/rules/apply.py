@@ -48,6 +48,7 @@ from snapback.contracts import (
     UnitStatus,
 )
 
+_AFFILIATE = "link.affiliate_credit_check"
 MAX_SPAN = 200
 # A long listing is a few thousand characters. Anything past this is not read, and intake
 # says so (`Listing.truncated`).
@@ -358,11 +359,35 @@ def _fires(rule: Rule, clauses: list[_Clause]) -> bool:
     return False
 
 
-def apply_rules(text: str, lang: str = "en") -> list[RuleHit]:
+# A site written in a sentence: the whole dotted name is taken, so "own.example.other.example"
+# is one site, not two. The last part must be letters ("3.5" is not a site).
+_SITE = re.compile(
+    r"(?<![\w.@-])(?:https?://|www\.)?((?:[a-z0-9-]{1,63}\.){1,6}[a-z]{2,24})(?![\w-])",
+    re.IGNORECASE,
+)
+
+
+def _only_own_sites(sentence: str, own_host: str | None) -> bool:
+    """True when the sentence names sites and every one is the building's own (or its subdomain).
+
+    One foreign site anywhere in the sentence keeps the rule on, so naming the real site beside
+    a scam site cannot switch it off.
+    """
+    if not own_host:
+        return False
+    own = own_host.lower().removeprefix("www.")
+    hosts = [m.group(1).lower().removeprefix("www.") for m in _SITE.finditer(sentence)]
+    return bool(hosts) and all(h == own or h.endswith(f".{own}") for h in hosts)
+
+
+def apply_rules(text: str, lang: str = "en", own_host: str | None = None) -> list[RuleHit]:
     """Every rule that fires on `text`, in table order, at most once each.
 
     `text` is the renter's own material: the listing text and the poster's messages. The
     evidence span is the first sentence that fired the rule, so the renter can see why.
+
+    `own_host` is the building's own website host from the record, when the caller has it. A
+    credit-check link that goes to the building's own site is the landlord's, not an affiliate's.
     """
     sentences = _sentences(normalise(text))
     parsed = [_parse(sentence) for sentence in sentences]
@@ -370,6 +395,8 @@ def apply_rules(text: str, lang: str = "en") -> list[RuleHit]:
     for rule in RULES:
         for sentence, clauses in zip(sentences, parsed, strict=True):
             if _fires(rule, clauses):
+                if rule.rule_id == _AFFILIATE and _only_own_sites(sentence, own_host):
+                    continue
                 hits.append(
                     RuleHit(
                         rule_id=rule.rule_id,
