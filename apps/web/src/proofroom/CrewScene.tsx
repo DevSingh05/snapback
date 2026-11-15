@@ -17,7 +17,7 @@
 //
 // With `moving` off (reduced motion, or nothing playing) no note flies and nothing loops: the
 // states, the bubbles and the stamp still change. Nothing here works out a result.
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import "../draw/draw.css";
 import "./crew.css";
@@ -28,8 +28,6 @@ import { Badge } from "./Badge";
 import {
   BUBBLES_MAX,
   HOME,
-  ORIGIN,
-  PLOT,
   VIEW,
   bubbleSlots,
   crewActions,
@@ -40,6 +38,7 @@ import {
 } from "./crew";
 import { DESK_TOP, figure } from "./crewFigure";
 import { crewScenery } from "./crewGround";
+import { BENCH_LINE, SLOTS, STAMP, nameLines, tagLayout, type Box } from "./crewLayout";
 import type { Floor, Lang, TeamView } from "./model";
 import { shortName } from "./TeamGraph";
 import type { RoomWords } from "./words";
@@ -59,8 +58,8 @@ function Prims({ prims }: { prims: Prim[] }) {
 }
 
 // Where the far ground meets the sky, and how far down the haze reaches, in stage units.
-const HORIZON = 86;
-const HAZE_END = 214;
+const HORIZON = 150;
+const HAZE_END = 300;
 // A far line of trees along the horizon: a fixed silhouette, low and uneven.
 const RIDGE = (() => {
   const rise = [6, 11, 8, 14, 9, 5, 12, 16, 10, 7, 13, 9, 6, 11, 15, 8, 5, 10, 13, 7, 9];
@@ -69,14 +68,84 @@ const RIDGE = (() => {
   return `M0 ${HORIZON + 2} L${top} L${VIEW.w} ${HORIZON + 2} Z`;
 })();
 
-/** A member on the far side of the plot, or at its side corner: its name tag goes over its
- *  head, so it never meets the tag of the member in front of it. */
-const isBack = (a: CrewActor) =>
-  a.place === "lead" || (a.place === "ring" && a.sy <= ORIGIN.oy + PLOT / 2 + 1);
 const HOME_DEPTH = HOME.x + HOME.w / 2 + HOME.y + HOME.d / 2;
 const [PILE_X, PILE_Y] = project(DESK_TOP, { ox: 0, oy: 0 });
 const pct = (v: number, of: number) => `${Math.round((v / of) * 10000) / 100}%`;
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** A box of crewLayout.ts as CSS, in parts of the stage. */
+const place = (b: Box): CSSProperties => ({
+  left: pct(b.x, VIEW.w),
+  top: pct(b.y, VIEW.h),
+  width: pct(b.w, VIEW.w),
+  height: pct(b.h, VIEW.h),
+});
+
+interface GradIds {
+  sky: string;
+  sun: string;
+  haze: string;
+  shade: string;
+}
+
+/** Everything that never changes while a run plays: the sky, the streets, the neighbours, the
+ *  lawn. Drawn once; the player's clock does not redraw it. */
+const Setting = memo(function Setting({ ids }: { ids: GradIds }) {
+  const scene = useMemo(crewScenery, []);
+  return (
+    <>
+      <defs>
+        <linearGradient id={ids.sky} x1="0" y1="0" x2="0" y2="1">
+          <stop className="cs-sky-high" offset="0" />
+          <stop className="cs-sky-low" offset="1" />
+        </linearGradient>
+        <radialGradient id={ids.sun} cx="0.1" cy="0.5" r="0.75">
+          <stop className="cs-sun-stop" offset="0" stopOpacity="0.85" />
+          <stop className="cs-sun-stop" offset="1" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={ids.haze} x1="0" y1="0" x2="0" y2="1">
+          <stop className="cs-haze-stop" offset="0" stopOpacity="0" />
+          <stop className="cs-haze-stop" offset="0.5" stopOpacity="0.92" />
+          <stop className="cs-haze-stop" offset="1" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id={ids.shade}>
+          <stop className="cs-shade-stop" offset="0.2" stopOpacity="0.42" />
+          <stop className="cs-shade-stop" offset="1" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <g data-testid="crew-sky" className="cs-sky">
+        <rect width={VIEW.w} height={HORIZON + 4} fill={`url(#${ids.sky})`} />
+        <rect width={VIEW.w} height={HORIZON + 4} fill={`url(#${ids.sun})`} />
+        <path className="cs-ridge" d={RIDGE} />
+        <rect className="cs-verge" y={HORIZON} width={VIEW.w} height={VIEW.h - HORIZON} />
+      </g>
+      <Parts parts={scene.streets} />
+      <g data-testid="crew-backdrop" className="cs-backdrop">
+        <Parts parts={scene.backdrop} />
+      </g>
+      <rect
+        data-testid="crew-haze"
+        className="cs-haze"
+        width={VIEW.w}
+        height={HAZE_END}
+        fill={`url(#${ids.haze})`}
+      />
+      <Parts parts={scene.verge} />
+      <Parts parts={scene.lawn} />
+      <g data-testid="crew-home-shadow" className="cs-soft">
+        <Prims prims={[scene.shadow]} />
+      </g>
+    </>
+  );
+});
+
+/** The home in the ad: it never changes either. */
+const Home = memo(function Home() {
+  const scene = useMemo(crewScenery, []);
+  return (
+    <g data-testid="crew-home" className="cs-home">
+      <Parts parts={scene.home} />
+    </g>
+  );
+});
 
 function Figure({
   actor,
@@ -140,18 +209,6 @@ function Figure({
           <Prims prims={fig.fx} />
         </g>
       </g>
-      {speaking ? (
-        // Beside the head on the member's outer side, under its name tag, its tail toward it.
-        <g
-          className="cs-speaking"
-          transform={actor.side === "left" ? "translate(-25 -47) scale(-1 1)" : "translate(25 -47)"}
-        >
-          <path d="M-11 -9h22v14h-13l-5 6v-6h-4z" />
-          <circle cx="-5" cy="-2" r="1.5" />
-          <circle cx="0" cy="-2" r="1.5" />
-          <circle cx="5" cy="-2" r="1.5" />
-        </g>
-      ) : null}
     </g>
   );
 }
@@ -188,14 +245,28 @@ export function CrewScene({
   const slots = bubbleSlots(bubbles, cast);
   const speakers = new Set(bubbles.map((b) => b.deskId));
   const filed = reported(floor);
-  const scene = useMemo(crewScenery, []);
   const uid = useId().replace(/[^A-Za-z0-9_-]/g, "");
-  const ids = {
-    sky: `cs-sky-${uid}`,
-    sun: `cs-sun-${uid}`,
-    haze: `cs-haze-${uid}`,
-    shade: `cs-shade-${uid}`,
-  };
+  const ids = useMemo<GradIds>(
+    () => ({
+      sky: `cs-sky-${uid}`,
+      sun: `cs-sun-${uid}`,
+      haze: `cs-haze-${uid}`,
+      shade: `cs-shade-${uid}`,
+    }),
+    [uid],
+  );
+  // Where each name tag goes: worked out from who is on stage, so it holds all run.
+  const names = tagged.map((a) => ({
+    id: a.id,
+    name: shortName(a.card.name),
+    model: a.desk!.model === "code" ? w.code : a.desk!.model,
+  }));
+  const layoutKey = names.map((n) => `${n.id}:${n.name}:${n.model}`).join("|");
+  const layout = useMemo(
+    () => tagLayout(cast, new Map(names.map((n) => [n.id, n]))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layoutKey],
+  );
   const spot = (id: string) => cast.find((a) => a.id === id);
   const lead = cast.find((a) => a.place === "lead");
   const judge = cast.find((a) => a.place === "desk");
@@ -250,7 +321,6 @@ export function CrewScene({
     if (!moving) setNotes([]);
   }, [moving]);
 
-  const wingRow = (a: CrewActor) => staged.filter((x) => x.place === "wing").indexOf(a);
   const far = staged.filter((a) => a.depth < HOME_DEPTH);
   const near = staged.filter((a) => a.depth >= HOME_DEPTH);
   const flying = new Set(notes.filter((n) => n.kind === "report").map((n) => n.id));
@@ -271,47 +341,7 @@ export function CrewScene({
           aria-hidden="true"
           focusable="false"
         >
-          <defs>
-            <linearGradient id={ids.sky} x1="0" y1="0" x2="0" y2="1">
-              <stop className="cs-sky-high" offset="0" />
-              <stop className="cs-sky-low" offset="1" />
-            </linearGradient>
-            <radialGradient id={ids.sun} cx="0.1" cy="0.5" r="0.75">
-              <stop className="cs-sun-stop" offset="0" stopOpacity="0.85" />
-              <stop className="cs-sun-stop" offset="1" stopOpacity="0" />
-            </radialGradient>
-            <linearGradient id={ids.haze} x1="0" y1="0" x2="0" y2="1">
-              <stop className="cs-haze-stop" offset="0" stopOpacity="0" />
-              <stop className="cs-haze-stop" offset="0.4" stopOpacity="0.92" />
-              <stop className="cs-haze-stop" offset="1" stopOpacity="0" />
-            </linearGradient>
-            <radialGradient id={ids.shade}>
-              <stop className="cs-shade-stop" offset="0.2" stopOpacity="0.42" />
-              <stop className="cs-shade-stop" offset="1" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <g data-testid="crew-sky" className="cs-sky">
-            <rect width={VIEW.w} height={HORIZON + 4} fill={`url(#${ids.sky})`} />
-            <rect width={VIEW.w} height={HORIZON + 4} fill={`url(#${ids.sun})`} />
-            <path className="cs-ridge" d={RIDGE} />
-            <rect className="cs-verge" y={HORIZON} width={VIEW.w} height={VIEW.h - HORIZON} />
-          </g>
-          <Parts parts={scene.streets} />
-          <g data-testid="crew-backdrop" className="cs-backdrop">
-            <Parts parts={scene.backdrop} />
-          </g>
-          <rect
-            data-testid="crew-haze"
-            className="cs-haze"
-            width={VIEW.w}
-            height={HAZE_END}
-            fill={`url(#${ids.haze})`}
-          />
-          <Parts parts={scene.verge} />
-          <Parts parts={scene.lawn} />
-          <g data-testid="crew-home-shadow" className="cs-soft">
-            <Prims prims={[scene.shadow]} />
-          </g>
+          <Setting ids={ids} />
           {far.map((a) => (
             <Figure
               key={a.id}
@@ -322,9 +352,7 @@ export function CrewScene({
               onPick={onPick}
             />
           ))}
-          <g data-testid="crew-home" className="cs-home">
-            <Parts parts={scene.home} />
-          </g>
+          <Home />
           {near.map((a) => (
             <Figure
               key={a.id}
@@ -372,45 +400,31 @@ export function CrewScene({
             </g>
           ))}
         </svg>
+      </div>
 
+      {/* The words on the stage. Every box comes from crewLayout.ts, so none touches another:
+          one name tag per member, speech in two slots over the sky, the stamp beside the desk,
+          the bench's line. On a phone they leave the stage and sit under it, in that order. */}
+      <div className="cs-over" style={{ aspectRatio: `${VIEW.w} / ${VIEW.h}` }}>
         <ol className="cs-tags" aria-label={w.team}>
           {tagged.map((a) => {
             const desk = a.desk!;
-            const above = isBack(a);
-            const x =
-              a.place === "lead"
-                ? a.sx
-                : a.place === "desk"
-                  ? a.sx - 44
-                  : a.place === "wing"
-                    ? VIEW.w - 62
-                    : above
-                      ? clamp(a.sx + (a.side === "left" ? -10 : 10), 64, VIEW.w - 64)
-                      : // Under its feet and out toward its own side, clear of the Decider's desk.
-                        clamp(a.sx + (a.side === "left" ? -26 : 26), 64, VIEW.w - 64);
-            const y =
-              a.place === "lead"
-                ? a.sy - 66
-                : a.place === "desk"
-                  ? a.sy + 26
-                  : a.place === "wing"
-                    ? VIEW.h - 50 + wingRow(a) * 24
-                    : above
-                      ? a.sy - 64
-                      : a.sy + 13;
+            const box = layout.get(a.id);
             const body = (
               <>
                 <span className="cs-tag-name">
-                  <Badge id={a.id} size={24} />
-                  {shortName(a.card.name)}
+                  <Badge id={a.id} size={22} />
+                  <span>
+                    {nameLines(shortName(a.card.name)).map((line) => (
+                      <span key={line}>{line}</span>
+                    ))}
+                  </span>
                 </span>
-                <span className="cs-tag-line">
-                  <span className="cs-tag-model" title={w.runsOn} data-testid="node-model">
-                    {desk.model === "code" ? w.code : desk.model}
-                  </span>
-                  <span className="cs-tag-state" data-testid="node-state">
-                    {deskWord(desk, lang)}
-                  </span>
+                <span className="cs-tag-model" title={w.runsOn} data-testid="node-model">
+                  {desk.model === "code" ? w.code : desk.model}
+                </span>
+                <span className="cs-tag-state" data-testid="node-state">
+                  {deskWord(desk, lang)}
                 </span>
               </>
             );
@@ -418,13 +432,13 @@ export function CrewScene({
               <li
                 key={a.id}
                 className="cs-tag"
-                style={{ left: pct(x, VIEW.w), top: pct(y, VIEW.h) }}
-                data-at={above ? "above" : "below"}
+                style={box ? place(box) : undefined}
                 data-place={a.place}
                 data-who={a.id}
                 data-agent={a.id}
                 data-state={a.state}
                 data-tone={a.tone}
+                data-speaking={speakers.has(a.id) ? "yes" : "no"}
                 data-testid="team-node"
               >
                 {onPick ? (
@@ -439,59 +453,59 @@ export function CrewScene({
           })}
         </ol>
 
+        {/* The same words are in the thread below, which is the part a screen reader hears. */}
+        <div className="cs-bubbles" aria-hidden="true">
+          {bubbles.map((b, i) => {
+            const a = spot(b.deskId)!;
+            const desk = a.desk!;
+            const slot = SLOTS[slots[i] ?? "left"];
+            return (
+              <p
+                key={`${b.deskId}-${b.kind}`}
+                className="cs-bubble"
+                style={{ ...place(slot), height: undefined, maxHeight: pct(slot.h, VIEW.h) }}
+                data-testid="crew-bubble"
+                data-agent={b.deskId}
+                data-who={b.deskId}
+                data-kind={b.kind}
+                data-tone={b.tone}
+                data-slot={slots[i]}
+              >
+                <span className="cs-bubble-who">
+                  <Badge id={b.deskId} size={24} />
+                  {shortName(a.card.name)}
+                </span>
+                {b.kind === "finding" ? (
+                  <span className="cs-bubble-state">{deskWord(desk, lang)}</span>
+                ) : null}
+                <span className="cs-bubble-text">
+                  {b.text}
+                  {b.kind === "working" ? "…" : ""}
+                </span>
+              </p>
+            );
+          })}
+        </div>
+
         {floor.verdict && judge ? (
           <p
             className="cs-verdict"
-            style={{ left: pct(judge.sx + 46, VIEW.w), top: pct(judge.sy + 12, VIEW.h) }}
+            style={place(STAMP)}
             data-testid="crew-verdict"
             data-verdict={verdictTone}
             data-stamped={stamped ? "yes" : "no"}
             aria-hidden="true"
           >
-            {floor.verdict.headline}
+            <span>{floor.verdict.headline}</span>
           </p>
         ) : null}
 
         {bench.length > 0 ? (
-          <p className="cs-bench" data-testid="team-not-needed">
+          <p className="cs-bench" style={place(BENCH_LINE)} data-testid="team-not-needed">
             <span className="cs-bench-why">{w.notNeeded}: </span>
             {bench.map((a) => a.card.name).join(", ")}
           </p>
         ) : null}
-      </div>
-
-      {/* What the crew says: two slots over the sky, left and right, each on its speaker's side
-          when it can be. Under the stage on a phone. The same words are in the thread below,
-          which is the part a screen reader hears. */}
-      <div className="cs-bubbles" aria-hidden="true">
-        {bubbles.map((b, i) => {
-          const a = spot(b.deskId)!;
-          const desk = a.desk!;
-          return (
-            <p
-              key={`${b.deskId}-${b.kind}`}
-              className="cs-bubble"
-              data-testid="crew-bubble"
-              data-agent={b.deskId}
-              data-who={b.deskId}
-              data-kind={b.kind}
-              data-tone={b.tone}
-              data-slot={slots[i]}
-            >
-              <span className="cs-bubble-who">
-                <Badge id={b.deskId} size={24} />
-                {shortName(a.card.name)}
-              </span>
-              {b.kind === "finding" ? (
-                <span className="cs-bubble-state">{deskWord(desk, lang)}</span>
-              ) : null}
-              <span className="cs-bubble-text">
-                {b.text}
-                {b.kind === "working" ? "…" : ""}
-              </span>
-            </p>
-          );
-        })}
       </div>
     </div>
   );

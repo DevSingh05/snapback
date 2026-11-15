@@ -41,8 +41,8 @@ export const personaOf = (id: string): Persona => PERSONAS[id] ?? "helper";
 // view; scene point (0, 0) is its far corner.
 // The stage is wider than the plot: speech sits in the sky over the two back corners, and the
 // neighbours' street shows behind.
-export const VIEW = { w: 540, h: 446 };
-export const ORIGIN = { ox: 270, oy: 162 };
+export const VIEW = { w: 640, h: 546 };
+export const ORIGIN = { ox: 320, oy: 238 };
 export const PLOT = 220;
 const INSET = 20;
 // The home in the ad, in the middle of the plot.
@@ -128,8 +128,9 @@ export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
         ...base(d),
         place: "wing",
         side: "right",
+        // In the right gutter, under the plot's side corner and over the stamp.
         sx: VIEW.w - 20 - k * 27,
-        sy: VIEW.h - 64,
+        sy: VIEW.h - 150,
         scale: 0.72,
         depth: 9_000 + k,
       });
@@ -207,7 +208,7 @@ export function reported(floor: Floor): { id: string; flag: boolean }[] {
 // ---------- speech ----------
 
 // Three lines of a bubble at its reading size.
-export const SAY_MAX = 60;
+export const SAY_MAX = 54;
 
 /** A line short enough for a speech bubble, cut at a word. */
 export function shortSay(text: string, max = SAY_MAX): string {
