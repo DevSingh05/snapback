@@ -122,3 +122,28 @@ def test_an_identify_case_searches_flipped_too(twins):
     result = locator(twins).locate("c", photos, None)
     assert result.identified_by_scan and result.claimed_property_id == "fx-prop-1"
     assert all(p.flipped is True for p in result.photos)
+
+
+def test_a_reflecting_homography_is_not_a_match():
+    """No real view change mirrors the photo: a reflecting homography gives no inliers."""
+    import numpy as np
+
+    from snapback.vision.locate.verify import reflects
+
+    size = (200, 170)
+    assert not reflects(np.eye(3), size)
+    assert not reflects(np.array([[1.2, 0.1, 5.0], [-0.05, 0.9, 3.0], [1e-4, 0.0, 1.0]]), size)
+    mirror = np.array([[-1.0, 0.0, 200.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    assert reflects(mirror, size)
+
+
+def test_a_mirrored_copy_is_placed_only_through_the_flip(twins):
+    """With the reflection guard, the as-sent search cannot place a mirrored copy; only the
+    flipped search does, so it is always marked flipped."""
+    sweeps, _, _ = twins
+    off = locator(twins, flip_search=False).locate(
+        "c", {"p": crop(sweeps, mirror=True)}, "fx-prop-1"
+    )
+    assert off.photos[0].status is LocateStatus.NOT_LOCATED
+    on = locator(twins).locate("c", {"p": crop(sweeps, mirror=True)}, "fx-prop-1")
+    assert on.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED and on.photos[0].flipped is True
