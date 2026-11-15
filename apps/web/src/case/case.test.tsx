@@ -472,6 +472,24 @@ describe("the real listing", () => {
     expect(screen.getByTestId("case-real").querySelectorAll("a")).toHaveLength(0);
   });
 
+  it("still shows the link, and no rents, when the figures switch is off", () => {
+    render(
+      <RealListing
+        listing={sampleListing({
+          figures_shown: false,
+          building_name: null,
+          headline: "The ad asks $900 a month. Rents from the record are not shown.",
+          plans: [{ name: "2 bed / 2 bath", beds: 2, baths: 2 }],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("real-link")).toHaveAttribute(
+      "href",
+      "https://www.apartments.com/fixture-court/",
+    );
+    expect(screen.getByTestId("case-real")).not.toHaveTextContent(/\$1,[69]00 /);
+  });
+
   it("never links to anything that is not a plain https address", () => {
     expect(realListingLink(sampleListing({ cta_url: "javascript:alert(1)" }))).toBeNull();
     expect(realListingLink(sampleListing({ cta_url: "http://www.apartments.com/x" }))).toBeNull();
