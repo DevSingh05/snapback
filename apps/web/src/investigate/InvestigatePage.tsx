@@ -660,8 +660,8 @@ function RingsSection() {
     return (
       <div className="inv-page">
         <p className="inv-error">
-          The ring-by-ring view below the stream (300 synthetic ads, with questions) needs the API
-          (make api). It could not be reached.
+          The ring-by-ring view (300 synthetic ads, with questions) runs on our demo laptop (live
+          API). This public site shows the sample rings.
         </p>
       </div>
     );

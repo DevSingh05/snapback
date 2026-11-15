@@ -352,7 +352,13 @@ export function CaseAttachmentPage({ ringId }: { ringId: string }) {
       .then(setCf)
       .catch(() => setFailed(true));
   }, [ringId]);
-  if (failed) return <p className="inv-error">The case file needs the API (make api).</p>;
+  if (failed)
+    return (
+      <p className="inv-error">
+        The full case file runs on our demo laptop (live API). This public site shows the sample
+        rings.
+      </p>
+    );
   if (!cf) return <p className="inv-sub">Building the case file.</p>;
   return (
     <div className="cf-print-page">
@@ -414,7 +420,13 @@ export function CaseStudyView({ load = fetchCaseStudy }: { load?: () => Promise<
       live = false;
     };
   }, [load]);
-  if (failed) return <p className="inv-error">The case study needs the API (make api).</p>;
+  if (failed)
+    return (
+      <p className="inv-error">
+        The full case study runs on our demo laptop (live API). This public site shows the sample
+        rings.
+      </p>
+    );
   if (!cs)
     return (
       <p className="inv-sub" role="status">
