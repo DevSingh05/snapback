@@ -35,15 +35,22 @@ export const LANDING_USES = [
   {
     title: "Open the city",
     text: "A map of researched places in your budget, each with its rent range.",
+    href: "/map",
   },
   {
     title: "Walk it first",
     text: "Step room to room through the home's own 3D scan before you spend a day on a visit.",
+    href: "/listings",
   },
-  { title: "Paste an ad, get the verdict", text: "One card: the place, the person and the price." },
+  {
+    title: "Paste an ad, get the verdict",
+    text: "One card: the place, the person and the price.",
+    href: "/home",
+  },
   {
     title: "Photos from another building?",
     text: "If an ad's photos were taken somewhere else, the card says so and shows both.",
+    href: "/case/7Q2M",
   },
 ] as const;
 
@@ -440,13 +447,16 @@ function Uses() {
           <ol className="wl-uses">
             {LANDING_USES.map((u, i) => (
               <li key={u.title}>
-                <b className="wl-use-n" aria-hidden="true">
-                  {i + 1}
-                </b>
-                <span>
-                  <strong>{u.title}</strong>
-                  <span>{u.text}</span>
-                </span>
+                <a className="wl-use" href={u.href}>
+                  <b className="wl-use-n" aria-hidden="true">
+                    {i + 1}
+                  </b>
+                  <span>
+                    <strong>{u.title}</strong>
+                    <span>{u.text}</span>
+                  </span>
+                  <i className="wl-use-go" aria-hidden="true" />
+                </a>
               </li>
             ))}
           </ol>

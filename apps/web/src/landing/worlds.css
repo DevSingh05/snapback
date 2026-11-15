@@ -773,11 +773,36 @@
   gap: 0;
 }
 .wl-uses li {
-  display: grid;
-  grid-template-columns: 2.4rem minmax(0, 1fr);
-  gap: 12px;
-  padding: 16px 0;
   border-top: 1px solid var(--line);
+}
+.wl a.wl-use {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-inline: -14px;
+  padding: 16px 14px;
+  text-decoration: none;
+  border-radius: var(--radius);
+  transition: background-color 0.2s var(--ease-out);
+}
+.wl a.wl-use:hover {
+  background: var(--surface);
+}
+.wl-use-go {
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-top: 2px solid var(--act);
+  border-right: 2px solid var(--act);
+  transform: rotate(45deg);
+  transition: transform 0.2s var(--ease-out);
+}
+.wl a.wl-use:hover .wl-use-go {
+  transform: translate3d(4px, 0, 0) rotate(45deg);
+}
+.wl-use-n {
+  align-self: start;
 }
 .wl-uses li:first-child {
   border-top: 0;
@@ -793,7 +818,7 @@
   font-size: 1.15rem;
   line-height: 1.25;
 }
-.wl-uses li > span > span {
+.wl-use > span > span {
   color: var(--muted);
 }
 
@@ -1239,6 +1264,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .wl-btn,
+  .wl a.wl-use,
+  .wl-use-go,
   .wl-pick button {
     transition: none;
   }
