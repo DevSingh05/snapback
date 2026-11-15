@@ -169,7 +169,8 @@ SNAPBACK never pays, books or sends anything for you.
   where its fact came from.
 - **Photo placement on real listing photos, LIVE** (CoStar OK'd sharing the totals): "Measured on
   78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys
-  fooled it." The right room is not measured, and we don't claim it.
+  fooled it." Re-measured on the final matcher with the same counts (n=48 photos, n=30 decoys).
+  The right room is not measured, and we don't claim it.
 - **A live tamper test** (LIVE; a real listing and tampered copies of it, nothing posted anywhere):
   - a changed phone number, caught 6 of 6 on real photos and 2 of 2 on scan renders;
   - "send the deposit by Zelle before the tour", caught 6 of 6 and 2 of 2;
@@ -220,8 +221,8 @@ imagery (provided), GitHub Actions.
 >
 > - One section per track. Numbers come only from merged PRs, each with n and LIVE, FIXTURE or
 >   SYNTHETIC.
-> - **The A8 photo line (43 of 48) was measured before #296 tightened the strict bar.** Dev is
->   re-running it on main (M1, #8). Update the line here if the new count differs.
+> - **The A8 photo line is current.** Dev re-measured it on main `f3d17f0`, after #296's strict
+>   bar (M1, #8), and got the same counts: 43 of 48, 0 of 48 wrong, 0 of 30 decoys.
 > - **Not on `main` yet, so not claimed:**
 >   - the deep agent's per-ad plan, re-planning and next-step draft;
 >   - the Arlequin ring case file, case study and reworded-ads test;
@@ -236,9 +237,9 @@ imagery (provided), GitHub Actions.
 building: its leasing office, its website, its units and its Matterport scan. The report then
 sends the renter back to the real listing.
 
-- **Photos placed in CoStar's 3D scans (LIVE, A8, #72; CoStar OK'd sharing totals):** "Measured on
-  78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys
-  fooled it."
+- **Photos placed in CoStar's 3D scans** (LIVE, re-measured on the final matcher; CoStar OK'd
+  sharing totals): of n=48 real listing photos, 43 were placed in the right home and 0 in a wrong
+  one. Of n=30 decoys, 0 were placed in the claimed building.
 - **Live tamper test (LIVE; a real listing and tampered copies of it, nothing posted):**
   - a changed phone number, a "Zelle before the tour" ask and a lookalike website link;
   - each was caught 6 of 6 on real photos and 2 of 2 on scan renders.
