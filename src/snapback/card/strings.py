@@ -516,6 +516,9 @@ EN: dict[str, str] = {
         "The poster says they are the owner, and the owner of record is someone else."
     ),
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
+    "reason.aerial_wrong_building": (
+        "The aerial photo of the address in the listing shows a different building."
+    ),
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
@@ -1125,6 +1128,9 @@ ES: dict[str, str] = {
         "Quien publica dice ser el propietario, y el propietario registrado es otro."
     ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
+    "reason.aerial_wrong_building": (
+        "La foto aérea de la dirección del anuncio muestra un edificio distinto."
+    ),
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
         "revisar las fotos."

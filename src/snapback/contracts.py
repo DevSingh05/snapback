@@ -67,6 +67,22 @@ class PresenceStatus(StrEnum):
     FORGED = "forged"  # the reply was a reused listing photo, a tour screenshot, or similar
 
 
+class AerialStatus(StrEnum):
+    """Does the aerial photo of the claimed address show the building the ad is for?"""
+
+    RIGHT_BUILDING = "right_building"
+    WRONG_BUILDING = "wrong_building"  # the ad's building is a different one nearby
+    NOT_CHECKED = "not_checked"  # no tile or no coordinates: says nothing
+
+
+class AerialResult(BaseModel):
+    """Vexcel aerial check for one case. Read by the verdict only behind
+    SNAPBACK_VEXCEL_IN_VERDICT, and then only to hold, never to fail or to clear."""
+
+    status: AerialStatus = AerialStatus.NOT_CHECKED
+    distance_m: float | None = None
+
+
 class Evidence(BaseModel):
     """Everything the verdict is allowed to look at for one case."""
 
@@ -92,6 +108,9 @@ class Evidence(BaseModel):
     brokerage_only: bool = False
     lookalike_link_flag: bool = False  # a link imitates the building's own website
     unit_flag: bool = False  # the unit is not on the record, or its bedrooms do not match
+    # The aerial says the ad's building is not the claimed one. Set only when
+    # SNAPBACK_VEXCEL_IN_VERDICT is on. It holds a case; it is not proof, and it never clears one.
+    aerial_wrong_building_flag: bool = False
     license_flag: bool = False  # the ad prints a license number that is not an active license
     license_given_flag: bool = False  # the number the renter typed is not an active license
     owner_flag: bool = False  # says they are the owner; the owner of record is someone else
@@ -439,6 +458,7 @@ class ModuleEvidence(BaseModel):
     price: PriceResult | None = None
     authority: AuthorityResult | None = None
     for_sale: ForSaleMatch | None = None  # D7; None means not looked up
+    aerial: AerialResult | None = None  # Vexcel; None means not looked up
     license: LicenseResult | None = None  # D10; None means not looked up
     # D12 + A19; None means no owner data (LA, an unknown address, or not looked up)
     owner: OwnerResult | None = None

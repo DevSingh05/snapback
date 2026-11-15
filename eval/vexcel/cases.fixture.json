@@ -1,0 +1,332 @@
+{
+ "_note": "SYNTHETIC: invented points near downtown Houston, not real buildings or CoStar records. Exercises the runner; proves nothing about Vexcel.",
+ "synthetic": true,
+ "properties": {
+  "fx-vx-01": {
+   "address": "100 Fixture Way",
+   "lat": 29.7604,
+   "lon": -95.3698
+  },
+  "fx-vx-02": {
+   "address": "101 Fixture Way",
+   "lat": 29.768485,
+   "lon": -95.358417
+  },
+  "fx-vx-03": {
+   "address": "102 Fixture Way",
+   "lat": 29.77657,
+   "lon": -95.347035
+  },
+  "fx-vx-04": {
+   "address": "103 Fixture Way",
+   "lat": 29.784654,
+   "lon": -95.335652
+  },
+  "fx-vx-05": {
+   "address": "104 Fixture Way",
+   "lat": 29.792739,
+   "lon": -95.3698
+  },
+  "fx-vx-06": {
+   "address": "105 Fixture Way",
+   "lat": 29.800824,
+   "lon": -95.358417
+  },
+  "fx-vx-07": {
+   "address": "106 Fixture Way",
+   "lat": 29.808909,
+   "lon": -95.347035
+  },
+  "fx-vx-08": {
+   "address": "107 Fixture Way",
+   "lat": 29.816994,
+   "lon": -95.335652
+  },
+  "fx-vx-09": {
+   "address": "108 Fixture Way",
+   "lat": 29.825078,
+   "lon": -95.3698
+  },
+  "fx-vx-10": {
+   "address": "109 Fixture Way",
+   "lat": 29.833163,
+   "lon": -95.358417
+  },
+  "fx-vx-11": {
+   "address": "110 Fixture Way",
+   "lat": 29.841248,
+   "lon": -95.347035
+  },
+  "fx-vx-12": {
+   "address": "111 Fixture Way",
+   "lat": 29.849333,
+   "lon": -95.335652
+  },
+  "fx-vx-e01": {
+   "address": "300 Fixture Row",
+   "lat": 29.74962,
+   "lon": -95.3698
+  },
+  "fx-vx-c01": {
+   "address": "400 Fixture Row",
+   "lat": 29.750159,
+   "lon": -95.3698
+  },
+  "fx-vx-e02": {
+   "address": "301 Fixture Row",
+   "lat": 29.741535,
+   "lon": -95.356348
+  },
+  "fx-vx-c02": {
+   "address": "401 Fixture Row",
+   "lat": 29.742434,
+   "lon": -95.356348
+  },
+  "fx-vx-e03": {
+   "address": "302 Fixture Row",
+   "lat": 29.733451,
+   "lon": -95.342895
+  },
+  "fx-vx-c03": {
+   "address": "402 Fixture Row",
+   "lat": 29.734708,
+   "lon": -95.342895
+  },
+  "fx-vx-e04": {
+   "address": "303 Fixture Row",
+   "lat": 29.725366,
+   "lon": -95.329443
+  },
+  "fx-vx-c04": {
+   "address": "403 Fixture Row",
+   "lat": 29.726983,
+   "lon": -95.329443
+  },
+  "fx-vx-e05": {
+   "address": "304 Fixture Row",
+   "lat": 29.717281,
+   "lon": -95.315991
+  },
+  "fx-vx-c05": {
+   "address": "404 Fixture Row",
+   "lat": 29.719257,
+   "lon": -95.315991
+  },
+  "fx-vx-e06": {
+   "address": "305 Fixture Row",
+   "lat": 29.709196,
+   "lon": -95.3698
+  },
+  "fx-vx-c06": {
+   "address": "405 Fixture Row",
+   "lat": 29.711532,
+   "lon": -95.3698
+  },
+  "fx-vx-e07": {
+   "address": "306 Fixture Row",
+   "lat": 29.701111,
+   "lon": -95.356348
+  },
+  "fx-vx-c07": {
+   "address": "406 Fixture Row",
+   "lat": 29.703806,
+   "lon": -95.356348
+  },
+  "fx-vx-e08": {
+   "address": "307 Fixture Row",
+   "lat": 29.693027,
+   "lon": -95.342895
+  },
+  "fx-vx-c08": {
+   "address": "407 Fixture Row",
+   "lat": 29.696081,
+   "lon": -95.342895
+  },
+  "fx-vx-e09": {
+   "address": "308 Fixture Row",
+   "lat": 29.684942,
+   "lon": -95.329443
+  },
+  "fx-vx-c09": {
+   "address": "408 Fixture Row",
+   "lat": 29.688355,
+   "lon": -95.329443
+  },
+  "fx-vx-e10": {
+   "address": "309 Fixture Row",
+   "lat": 29.676857,
+   "lon": -95.315991
+  },
+  "fx-vx-c10": {
+   "address": "409 Fixture Row",
+   "lat": 29.68063,
+   "lon": -95.315991
+  }
+ },
+ "cases": [
+  {
+   "case_id": "vx-r01",
+   "claimed_address": "100 Fixture Way",
+   "claimed_property_id": "fx-vx-01",
+   "expected_property_id": "fx-vx-01",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r02",
+   "claimed_address": "101 Fixture Way",
+   "claimed_property_id": "fx-vx-02",
+   "expected_property_id": "fx-vx-02",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r03",
+   "claimed_address": "102 Fixture Way",
+   "claimed_property_id": "fx-vx-03",
+   "expected_property_id": "fx-vx-03",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r04",
+   "claimed_address": "103 Fixture Way",
+   "claimed_property_id": "fx-vx-04",
+   "expected_property_id": "fx-vx-04",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r05",
+   "claimed_address": "104 Fixture Way",
+   "claimed_property_id": "fx-vx-05",
+   "expected_property_id": "fx-vx-05",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r06",
+   "claimed_address": "105 Fixture Way",
+   "claimed_property_id": "fx-vx-06",
+   "expected_property_id": "fx-vx-06",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r07",
+   "claimed_address": "106 Fixture Way",
+   "claimed_property_id": "fx-vx-07",
+   "expected_property_id": "fx-vx-07",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r08",
+   "claimed_address": "107 Fixture Way",
+   "claimed_property_id": "fx-vx-08",
+   "expected_property_id": "fx-vx-08",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r09",
+   "claimed_address": "108 Fixture Way",
+   "claimed_property_id": "fx-vx-09",
+   "expected_property_id": "fx-vx-09",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r10",
+   "claimed_address": "109 Fixture Way",
+   "claimed_property_id": "fx-vx-10",
+   "expected_property_id": "fx-vx-10",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r11",
+   "claimed_address": "110 Fixture Way",
+   "claimed_property_id": "fx-vx-11",
+   "expected_property_id": "fx-vx-11",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-r12",
+   "claimed_address": "111 Fixture Way",
+   "claimed_property_id": "fx-vx-12",
+   "expected_property_id": "fx-vx-12",
+   "label": "right"
+  },
+  {
+   "case_id": "vx-w01",
+   "claimed_address": "400 Fixture Row",
+   "claimed_property_id": "fx-vx-c01",
+   "expected_property_id": "fx-vx-e01",
+   "label": "wrong",
+   "distance_m": 60
+  },
+  {
+   "case_id": "vx-w02",
+   "claimed_address": "401 Fixture Row",
+   "claimed_property_id": "fx-vx-c02",
+   "expected_property_id": "fx-vx-e02",
+   "label": "wrong",
+   "distance_m": 100
+  },
+  {
+   "case_id": "vx-w03",
+   "claimed_address": "402 Fixture Row",
+   "claimed_property_id": "fx-vx-c03",
+   "expected_property_id": "fx-vx-e03",
+   "label": "wrong",
+   "distance_m": 140
+  },
+  {
+   "case_id": "vx-w04",
+   "claimed_address": "403 Fixture Row",
+   "claimed_property_id": "fx-vx-c04",
+   "expected_property_id": "fx-vx-e04",
+   "label": "wrong",
+   "distance_m": 180
+  },
+  {
+   "case_id": "vx-w05",
+   "claimed_address": "404 Fixture Row",
+   "claimed_property_id": "fx-vx-c05",
+   "expected_property_id": "fx-vx-e05",
+   "label": "wrong",
+   "distance_m": 220
+  },
+  {
+   "case_id": "vx-w06",
+   "claimed_address": "405 Fixture Row",
+   "claimed_property_id": "fx-vx-c06",
+   "expected_property_id": "fx-vx-e06",
+   "label": "wrong",
+   "distance_m": 260
+  },
+  {
+   "case_id": "vx-w07",
+   "claimed_address": "406 Fixture Row",
+   "claimed_property_id": "fx-vx-c07",
+   "expected_property_id": "fx-vx-e07",
+   "label": "wrong",
+   "distance_m": 300
+  },
+  {
+   "case_id": "vx-w08",
+   "claimed_address": "407 Fixture Row",
+   "claimed_property_id": "fx-vx-c08",
+   "expected_property_id": "fx-vx-e08",
+   "label": "wrong",
+   "distance_m": 340
+  },
+  {
+   "case_id": "vx-w09",
+   "claimed_address": "408 Fixture Row",
+   "claimed_property_id": "fx-vx-c09",
+   "expected_property_id": "fx-vx-e09",
+   "label": "wrong",
+   "distance_m": 380
+  },
+  {
+   "case_id": "vx-w10",
+   "claimed_address": "409 Fixture Row",
+   "claimed_property_id": "fx-vx-c10",
+   "expected_property_id": "fx-vx-e10",
+   "label": "wrong",
+   "distance_m": 420
+  }
+ ]
+}

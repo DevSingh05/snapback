@@ -1,0 +1,12 @@
+{
+  "mode": "live",
+  "n": 24,
+  "wrong_building_cases": 10,
+  "hits": 24,
+  "misses": [],
+  "bar": "18 of 20 (at least 20 cases, 90 percent)",
+  "bar_met": true,
+  "gate_open": true,
+  "synthetic_cases": false,
+  "cases_from": "local kit set"
+}
