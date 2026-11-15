@@ -13,6 +13,7 @@ import {
   PANELS,
   shownPanel,
   shownPanels,
+  TRUST,
   type Panel,
   type ShowLink,
   type Switch,
@@ -243,5 +244,54 @@ describe("the way in", () => {
       "aria-current",
       "page",
     );
+  });
+});
+
+describe("Why trust this", () => {
+  it("has an n, a label and a source on every row, and eval files that exist", () => {
+    expect(TRUST.length).toBeGreaterThanOrEqual(5);
+    for (const r of TRUST) {
+      expect(Number.isInteger(r.n) && r.n > 0, r.eval).toBe(true);
+      expect(["LIVE", "FIXTURE", "SYNTHETIC"], r.eval).toContain(r.label);
+      expect(r.source.trim(), r.eval).not.toBe("");
+      if (r.baseline !== null) expect(r.baselineIs, r.eval).toBeTruthy();
+      if (r.evalFile) expect(existsSync(path.join(REPO, r.evalFile)), r.evalFile).toBe(true);
+    }
+  });
+
+  it("every ring row is labelled SYNTHETIC", () => {
+    const rings = TRUST.filter((r) => /ring/i.test(r.eval));
+    expect(rings.length).toBe(3);
+    for (const r of rings) expect(r.label).toBe("SYNTHETIC");
+  });
+
+  it("ring rows match the eval file: ours and the keyword baseline", () => {
+    const res = JSON.parse(
+      readFileSync(path.join(REPO, "eval/forensics/paraphrase_results.json"), "utf8"),
+    );
+    const orig = res.variants.original;
+    const re = res.variants.paraphrased;
+    const byName = (s: string) => TRUST.find((r) => r.eval.includes(s))!;
+    expect(byName("original wording").ours).toContain(`${orig.pipeline.rings_found} of 10`);
+    expect(byName("original wording").baseline).toContain(
+      `${orig.keyword_baseline.rings_found} of 10`,
+    );
+    expect(byName("reworded").ours).toContain(`${re.pipeline.rings_found} of 10`);
+    expect(byName("reworded").baseline).toContain(`${re.keyword_baseline.rings_found} of 10`);
+    expect(orig.pipeline.honest_flagged).toBe(0);
+  });
+
+  it("draws one table row per eval with n and label, and says when there is no baseline", () => {
+    render(<HoodPage />);
+    const rows = screen.getAllByTestId("hood-trust-row");
+    expect(rows.length).toBe(TRUST.length);
+    rows.forEach((row, i) => {
+      expect(row).toHaveTextContent(`n = ${TRUST[i]!.n.toLocaleString("en-US")}`);
+      expect(row).toHaveTextContent(TRUST[i]!.label);
+    });
+    expect(within(screen.getByTestId("hood-trust")).getAllByText("None measured").length).toBe(
+      TRUST.filter((r) => r.baseline === null).length,
+    );
+    expect(screen.getByTestId("hood-trust")).toHaveTextContent(/SYNTHETIC/);
   });
 });

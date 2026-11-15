@@ -10,6 +10,7 @@ import {
   MERGED,
   nText,
   shownPanels,
+  TRUST,
   type DataLabel,
   type Measured,
   type Panel,
@@ -189,6 +190,62 @@ function useHere(ids: string[]): string | null {
   return here;
 }
 
+function TrustTable() {
+  return (
+    <section
+      id="trust"
+      className="uh-trust"
+      aria-labelledby="uh-trust-title"
+      data-testid="hood-trust"
+    >
+      <h2 id="uh-trust-title" className="uh-sponsor">
+        Why trust this
+      </h2>
+      <p className="uh-does">
+        Our method beside a simple baseline, on the same set. The ring sets are SYNTHETIC: rings we
+        seeded ourselves, so they show the method works on rings shaped like these, not how often it
+        is right on real listings. Where no baseline was measured, we say so.
+      </p>
+      <div className="uh-trust-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Test</th>
+              <th scope="col">SNAPBACK</th>
+              <th scope="col">Baseline, same set</th>
+              <th scope="col">n and data</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TRUST.map((r) => (
+              <tr key={r.eval} data-testid="hood-trust-row">
+                <th scope="row">{r.eval}</th>
+                <td>{r.ours}</td>
+                <td>
+                  {r.baseline === null ? (
+                    <span className="uh-none">None measured</span>
+                  ) : (
+                    <>
+                      {r.baseline}
+                      <span className="uh-baseline-is"> ({r.baselineIs})</span>
+                    </>
+                  )}
+                </td>
+                <td>
+                  <span className="ui-mono">
+                    n = {r.n.toLocaleString("en-US")} {r.unit}
+                  </span>{" "}
+                  <DataTag label={r.label} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function HoodPage({ switches = MERGED }: { switches?: Switches } = {}) {
   const panels = shownPanels(switches);
   const here = useHere(panels.map((p) => p.id));
@@ -222,9 +279,11 @@ export function HoodPage({ switches = MERGED }: { switches?: Switches } = {}) {
       {panels.map((p) => (
         <PanelView key={p.id} panel={p} />
       ))}
+      <TrustTable />
       <p className="uh-foot">
         Every figure here was measured by the team, with its n beside it. Nothing from CoStar's
-        record is printed on this page.
+        record is printed on this page. Want to try your own eye first?{" "}
+        <a href="/spot">Spot the scam in 30 seconds</a>.
       </p>
     </div>
   );
