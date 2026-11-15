@@ -444,7 +444,13 @@ async function photos(urls: string[], max: number, get: typeof fetch): Promise<B
   return out;
 }
 
-type Checked = { text: string; caseId?: string };
+type Checked = {
+  text: string;
+  caseId?: string;
+  readToken?: string | null;
+  photos?: number;
+  lang?: Lang;
+};
 
 function caseLink(config: SidecarConfig, caseId: string): string {
   return `${config.webUrl.replace(/\/$/, "")}/case/${encodeURIComponent(caseId)}`;
@@ -750,7 +756,48 @@ async function check(
       text += `\n\n${OFFER[lang]}`;
     }
   }
-  return { text, caseId };
+  return { text, caseId, readToken, photos: images.length, lang };
+}
+
+type EvidencePhoto = { alias: string; status: string };
+
+/** P3: the photo to show, as its 1-based number: the first placed in the claimed home, else the
+ * first placed elsewhere (#10, J1 contract). Null when none was placed. */
+function bestPlaced(photos: EvidencePhoto[]): number | null {
+  const pick =
+    photos.find((p) => p.status === "located_in_claimed") ??
+    photos.find((p) => p.status === "located_elsewhere");
+  const n = pick ? Number(/^P(\d+)$/.exec(pick.alias)?.[1]) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/** P3 (#11): the ad photo beside the scan view it matched (GET /cases/{id}/evidence-image, #283),
+ * read token in a header only. Nothing extra when no photo was placed or the image is a 404. */
+async function sendEvidenceImage(
+  client: MessageClient,
+  msg: InboundMessage,
+  config: SidecarConfig,
+  caseId: string,
+  readToken: string,
+  lang: Lang,
+): Promise<void> {
+  if (!client.image) return;
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  const headers = { Authorization: `Bearer ${readToken}` };
+  const base = `${api}/cases/${encodeURIComponent(caseId)}`;
+  try {
+    const evidence = await get(`${base}/evidence`, { headers });
+    if (!evidence.ok) return;
+    const n = bestPlaced(((await evidence.json()) as { photos?: EvidencePhoto[] }).photos ?? []);
+    if (n === null) return;
+    const res = await get(`${base}/evidence-image?photo=${n}&lang=${lang}`, { headers });
+    if (!res.ok) return;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    await client.image(msg.threadId, bytes, res.headers.get("content-type") ?? "image/png");
+  } catch {
+    // the text reply already went out
+  }
 }
 
 /** The card as a picture, sent after the text. A failure here never undoes the text. */
@@ -856,6 +903,16 @@ export async function handleMessage(
     config.memory?.end(key);
   }
   await client.reply(msg.threadId, checked.text);
+  if (checked.caseId && checked.readToken && (checked.photos ?? 0) > 0) {
+    await sendEvidenceImage(
+      client,
+      msg,
+      config,
+      checked.caseId,
+      checked.readToken,
+      checked.lang ?? lang,
+    );
+  }
   if (checked.caseId) await sendCardPicture(client, msg, config, checked.caseId);
   return true;
 }
