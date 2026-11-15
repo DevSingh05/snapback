@@ -35,6 +35,7 @@ export interface ForSaleMatch {
   listed_on?: string | null; // ISO date
   changed_on?: string | null;
   offices?: string[]; // listing offices on record: brokerage companies, never a person
+  source_name?: string | null; // "Google Lens via SerpApi" when CoStar's record did not find it
 }
 
 export interface FloorPlanRent {

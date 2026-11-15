@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     snapback_census_geocoder: bool = True
     snapback_rdap: bool = True
     snapback_public_timeout_s: float = 2.0
+    # Google Lens via SerpApi (reverse image search of the ad's own public photo links), only
+    # when CoStar has no 3D scan to place the photos in. The key is SERPAPI_API_KEY from the
+    # environment; without it the check is "not checked". Free plan: 250 searches a month.
+    serpapi_api_key: SecretStr | None = None
+    snapback_lens: bool = True
+    snapback_lens_timeout_s: float = 4.0
     # A domain registered fewer days ago than this is a new domain (link.new_domain, HOLD).
     snapback_new_domain_days: int = 30
 

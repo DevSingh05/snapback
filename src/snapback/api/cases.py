@@ -646,6 +646,16 @@ class CaseStore:
             return by_text
         return nearby
 
+    def _lens_for_sale(self, text: str) -> ForSaleMatch | None:
+        lookup = getattr(self._lookups, "lens_for_sale", None)
+        if lookup is None or not text:
+            return None
+        try:
+            return lookup(text)
+        except Exception as error:  # a lookup that broke is a lookup that did not happen
+            log.warning("lens lookup failed (%s); treated as not looked up", type(error).__name__)
+            return None
+
     def create(
         self,
         listing: Listing,
@@ -695,6 +705,10 @@ class CaseStore:
         if not asked_by_name:
             for_sale = self._lookups.for_sale(listing.text) if listing.text else None
             for_sale = self._for_sale_by_position(listing.text, record, for_sale)
+            if for_sale is None and record is None:
+                # CoStar has no scan or for-sale record for this home: reverse image search of
+                # the ad's own photo links is the fallback. A failure is "not looked up".
+                for_sale = self._lens_for_sale(listing.text)
             # D10: only a live run calls the licence list, and a lookup that breaks is "not
             # looked up". It reads the poster's own claim in the text and keeps no name.
             license = license_of(self._lookups, listing.text)

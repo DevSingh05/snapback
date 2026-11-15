@@ -690,7 +690,10 @@ def _for_sale_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             key = "place.for_sale_office"
             return [_line(lang, "label.for_sale", CardTone.NOT_SHOWN, key, record=record)]
         key = "place.for_sale" if brokerage is not None else "place.for_sale_ask_listing"
-        return [_line(lang, "label.for_sale", CardTone.HOLD, key, record=record)]
+        line = _line(lang, "label.for_sale", CardTone.HOLD, key, record=record)
+        if found.source_name:  # found by a reverse image search, not CoStar's listings
+            line = line.model_copy(update={"source_name": found.source_name})
+        return [line]
     if status is ForSaleStatus.RECENTLY_RENTED:
         rented_on = modules.for_sale.changed_on if modules.for_sale else None
         # Information, not a flag: we do not know whether it is rented now.

@@ -334,6 +334,9 @@ class ForSaleMatch(BaseModel):
     # Listing offices on record (brokerage company names, Homes.com `offices[].name`). These
     # count as legitimate marketers. Companies only: an agent's personal name is never kept.
     offices: list[str] = Field(default_factory=list)
+    # Which source found it, when it is not CoStar's for-sale listings ("Google Lens via
+    # SerpApi"). None means CoStar's record.
+    source_name: str | None = None
 
 
 class LicenseStatus(StrEnum):

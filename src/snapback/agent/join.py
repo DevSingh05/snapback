@@ -331,6 +331,24 @@ class KitLookups:
             return None
         return found
 
+    def lens_for_sale(self, listing_text: str) -> ForSaleMatch | None:
+        """Reverse image search of the ad's own photo links (Google Lens via SerpApi). LIVE only,
+        needs SERPAPI_API_KEY; the caller asks only when CoStar has no scan or for-sale record."""
+        if self.source is not DataSource.LIVE:
+            return None
+        from snapback.public import fetch, lens
+        from snapback.settings import get_settings
+
+        settings = get_settings()
+        if not settings.snapback_lens or settings.serpapi_api_key is None:
+            return None
+        return lens.check(
+            listing_text,
+            fetch.fetcher_for(self.source),
+            settings.serpapi_api_key.get_secret_value(),
+            settings.snapback_lens_timeout_s,
+        )
+
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""
         try:
