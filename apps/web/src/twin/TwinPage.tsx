@@ -312,7 +312,9 @@ function TwinViewInner({
               allow="fullscreen; xr-spatial-tracking"
             />
           ) : (
-            <p className="twin-placeholder">3D view needs a Matterport key</p>
+            <p className="twin-placeholder">
+              The live 3D scan opens on our demo laptop. Here you see the sample.
+            </p>
           )}
           <PhotoLanding
             state={state}
