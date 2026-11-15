@@ -70,7 +70,9 @@ export function mountTwin(
   } catch {
     return null;
   }
-  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // phones get a lighter canvas: fewer pixels and a smaller shadow map
+  const small = window.innerWidth < 900;
+  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
   R.shadowMap.enabled = true;
   R.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene(),

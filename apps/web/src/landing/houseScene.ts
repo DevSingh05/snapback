@@ -75,7 +75,9 @@ export function mountHouse(
   const binds: Bind[] = [];
   const recolor = () =>
     binds.forEach((b) => (b[0] as Record<string, THREE.Color>)[b[1]]?.set(PAL[b[2]] ?? "#ffffff"));
-  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // phones get a lighter canvas: fewer pixels and a smaller shadow map
+  const small = window.innerWidth < 900;
+  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
   R.shadowMap.enabled = true;
   R.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene(),
@@ -90,7 +92,7 @@ export function mountHouse(
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffffff, 0.45);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
   sun.shadow.bias = -0.0008;
   sun.shadow.radius = 3;
   const sc = sun.shadow.camera;
@@ -856,7 +858,7 @@ export function mountHouse(
           by = v3.y;
         }
       });
-      put(n, v3.set(bx, by, 0).unproject(cam), 10, -16, st.open > 0.55);
+      put(n, v3.set(bx, by, 0).unproject(cam), 10, 14, st.open > 0.55);
     });
     if (opts.signLabel)
       put(opts.signLabel, f0.localToWorld(v3.set(1.9, 4.4, D + 1.6)), 18, -18, rec > 0.6);
