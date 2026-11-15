@@ -24,7 +24,7 @@ export function usePlayer(
   timeline: CaseTimeline | null,
   { auto, still }: { auto: boolean; still: boolean },
 ): Player {
-  const live = (timeline as (CaseTimeline & { running?: boolean }) | null)?.running === true;
+  const live = timeline?.running === true;
   const length = timeline ? runLength(schedule(timeline)) : 0;
   const key = timeline ? `${timeline.case_id}:${timeline.steps.length}` : "";
   const [at, setAt] = useState(Infinity);

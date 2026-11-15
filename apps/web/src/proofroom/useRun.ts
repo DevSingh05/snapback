@@ -1,7 +1,8 @@
 // What the Proof Room reads: the roster (GET /agents, with the bundled copy until it lands),
 // and for a case its card, timeline and real-listing read. The timeline needs the case's read
-// token, sent in a header by apiFetchRead and never put in an address. While the API says the
-// agent is still running, the timeline is read again every second. Reads only.
+// token, sent in a header and never put in an address. While the agent is still running the
+// timeline arrives live through case/useTimelineStream (a stream, else a read each second).
+// Reads only.
 import { useEffect, useState } from "react";
 
 import {
@@ -13,10 +14,9 @@ import {
   loadCaseReadToken,
 } from "../api";
 import type { Card, CaseTimeline, RealListing } from "../contracts";
+import { openTimelineStream } from "../case/useTimelineStream";
 import { asRoster, bundledRoster, type Roster } from "./model";
 import { SAMPLE_ID, sampleCard, sampleTimeline } from "./sample";
-
-export const POLL_MS = 1000;
 
 export function useRoster(lang: string): Roster {
   const [roster, setRoster] = useState<Roster>(() => bundledRoster(lang));
@@ -51,9 +51,6 @@ export interface Run {
 
 const NONE: Run = { status: "none", card: null, timeline: null, listing: null };
 
-const isRunning = (t: CaseTimeline | null) =>
-  (t as (CaseTimeline & { running?: boolean }) | null)?.running === true;
-
 async function readJson<T>(path: string, caseId: string, signal: AbortSignal): Promise<T | null> {
   const res = await apiFetchRead(path, caseId, { signal });
   return res?.ok ? ((await res.json()) as T) : null;
@@ -74,7 +71,7 @@ export function useRun(caseId: string | null, lang = "en"): Run {
     const { signal } = ctrl;
     const id = encodeURIComponent(caseId);
     const q = `?lang=${lang === "es" ? "es" : "en"}`;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stop: (() => void) | undefined;
     (async () => {
       let card: Card;
       try {
@@ -85,36 +82,42 @@ export function useRun(caseId: string | null, lang = "en"): Run {
         return;
       }
       if (!loadCaseReadToken(caseId)) return setRun({ ...NONE, status: "locked", card });
-      const [timeline, listing] = await Promise.all([
-        readJson<CaseTimeline>(`/cases/${id}/timeline${q}`, caseId, signal).catch(() => null),
-        readJson<RealListing>(`/cases/${id}/real-listing${q}`, caseId, signal).catch(() => null),
-      ]);
+      const listing = await readJson<RealListing>(
+        `/cases/${id}/real-listing${q}`,
+        caseId,
+        signal,
+      ).catch(() => null);
       if (signal.aborted) return;
-      if (!timeline) return setRun({ ...NONE, status: "locked", card });
-      setRun({ status: "ready", card, timeline, listing });
-      // The agent is still at work: read its timeline (and the card it may update) each second.
-      const again = async () => {
-        try {
-          const next = await readJson<CaseTimeline>(`/cases/${id}/timeline${q}`, caseId, signal);
+      // The timeline, live: a stream when the server has one, else a read each second, for as
+      // long as the agent is running (case/useTimelineStream). It stops by itself when done.
+      let wasRunning = false;
+      stop = openTimelineStream({
+        caseId,
+        lang,
+        onTimeline: (timeline) => {
           if (signal.aborted) return;
-          if (next) {
-            const fresh = isRunning(next)
-              ? card
-              : await fetchCard(caseId, signal).catch(() => card);
-            card = fresh;
-            setRun({ status: "ready", card, timeline: next, listing });
-            if (!isRunning(next)) return;
+          setRun({ status: "ready", card, timeline, listing });
+          // The agent's extra checks can change the result: read the card again once it ends.
+          if (wasRunning && timeline.running !== true) {
+            fetchCard(caseId, signal)
+              .then((fresh) => {
+                card = fresh;
+                if (!signal.aborted) setRun({ status: "ready", card, timeline, listing });
+              })
+              .catch(() => {});
           }
-        } catch {
-          if (signal.aborted) return;
-        }
-        timer = setTimeout(again, POLL_MS);
-      };
-      if (isRunning(timeline)) timer = setTimeout(again, POLL_MS);
+          wasRunning = timeline.running === true;
+        },
+        onFeed: (feed) => {
+          if (feed !== "off" || signal.aborted) return;
+          // No timeline could be read at all: the steps stay closed; the card still shows.
+          setRun((now) => (now.timeline ? now : { ...NONE, status: "locked", card }));
+        },
+      });
     })();
     return () => {
       ctrl.abort();
-      if (timer) clearTimeout(timer);
+      stop?.();
     };
   }, [caseId, lang]);
   return run;

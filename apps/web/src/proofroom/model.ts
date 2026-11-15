@@ -209,7 +209,7 @@ export function floorAt({
       source: null,
     };
   }
-  const live = (timeline as CaseTimeline & { running?: boolean }).running === true;
+  const live = timeline.running === true;
   const beats = schedule(timeline);
   const length = runLength(beats);
   const over = !live && at >= length;
