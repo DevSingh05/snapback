@@ -532,5 +532,11 @@
     "category": "data_ask",
     "text": "We need your I-20 to process your application.",
     "expect": []
+  },
+  {
+    "id": "fx-rule-imp-cousin-at-zillow",
+    "category": "pressure",
+    "text": "My cousin at Zillow will hold your deposit.",
+    "expect": ["impersonation.platform_holds_money"]
   }
 ]

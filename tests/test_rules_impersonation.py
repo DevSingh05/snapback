@@ -146,3 +146,23 @@ def test_a_lookalike_found_only_in_the_sender_is_marked_and_a_link_one_is_not():
     link = SimpleNamespace(company=None, phones=[], links=["fixtureliving.pay.example"], emails=[])
     assert check_authority(sender, record, "s").lookalike_sender_only is True
     assert check_authority(link, record, "s").lookalike_sender_only is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Photos at fixtureliving.example; run your credit at freecredit.example, text me.",
+        "Run your credit at freecredit.example/?ref=fixtureliving.example and send me the score.",
+        "Run your credit at fixtureliving.example.freecredit.example now.",
+        "Run your credit at fixtureliving.example/residents or at freecredit.example now.",
+    ],
+)
+def test_naming_the_real_site_does_not_switch_the_affiliate_rule_off(text):
+    hits = [h.rule_id for h in apply_rules(text, own_host="fixtureliving.example")]
+    assert "link.affiliate_credit_check" in hits
+
+
+def test_a_subdomain_of_the_buildings_own_site_is_its_own():
+    text = "Run your credit check at apply.fixtureliving.example/residents."
+    hits = [h.rule_id for h in apply_rules(text, own_host="fixtureliving.example")]
+    assert "link.affiliate_credit_check" not in hits

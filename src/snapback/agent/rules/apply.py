@@ -359,6 +359,27 @@ def _fires(rule: Rule, clauses: list[_Clause]) -> bool:
     return False
 
 
+# A site written in a sentence: the whole dotted name is taken, so "own.example.other.example"
+# is one site, not two. The last part must be letters ("3.5" is not a site).
+_SITE = re.compile(
+    r"(?<![\w.@-])(?:https?://|www\.)?((?:[a-z0-9-]{1,63}\.){1,6}[a-z]{2,24})(?![\w-])",
+    re.IGNORECASE,
+)
+
+
+def _only_own_sites(sentence: str, own_host: str | None) -> bool:
+    """True when the sentence names sites and every one is the building's own (or its subdomain).
+
+    One foreign site anywhere in the sentence keeps the rule on, so naming the real site beside
+    a scam site cannot switch it off.
+    """
+    if not own_host:
+        return False
+    own = own_host.lower().removeprefix("www.")
+    hosts = [m.group(1).lower().removeprefix("www.") for m in _SITE.finditer(sentence)]
+    return bool(hosts) and all(h == own or h.endswith(f".{own}") for h in hosts)
+
+
 def apply_rules(text: str, lang: str = "en", own_host: str | None = None) -> list[RuleHit]:
     """Every rule that fires on `text`, in table order, at most once each.
 
@@ -374,7 +395,7 @@ def apply_rules(text: str, lang: str = "en", own_host: str | None = None) -> lis
     for rule in RULES:
         for sentence, clauses in zip(sentences, parsed, strict=True):
             if _fires(rule, clauses):
-                if rule.rule_id == _AFFILIATE and own_host and own_host.lower() in sentence.lower():
+                if rule.rule_id == _AFFILIATE and _only_own_sites(sentence, own_host):
                     continue
                 hits.append(
                     RuleHit(

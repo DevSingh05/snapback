@@ -78,7 +78,7 @@ _PLATFORMS = (
 )
 # "We", "our" or "us" between the name and the verb means the office does it, not the site.
 _NOT_REFUSED = (
-    r"(?:(?!\bnever\b|\bnot\b|n't\b|\bno\b|\bcannot\b|\bwe\b|\bour\b|\bus\b|\bi\b|\bmy\b)"
+    r"(?:(?!\bnever\b|\bnot\b|n't\b|\bno\b|\bcannot\b|\bwe\b|\bour\b|\bus\b)"
     r"[^.!?])"
 )
 _HOLDS = r"(?:hold|holds|holding|insure|insures|secure|secures|safeguard|safeguards|keep|keeps)"
