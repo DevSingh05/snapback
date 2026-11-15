@@ -28,7 +28,9 @@ export function ReviewsPage({ file = data as ReviewsFile }: { file?: ReviewsFile
       {s.n === 0 ? (
         <section className="rv-empty" data-testid="reviews-empty">
           <RealtorQuote lang="en" />
-          <p className="rv-empty-line">Hallway test tonight: results posted after 08:30 with n</p>
+          <p className="rv-empty-line">
+            Hallway test results are added here, with n, as they come in
+          </p>
           <a
             className="ui-btn-quiet rv-cta"
             href={formUrl || RATE_URL}

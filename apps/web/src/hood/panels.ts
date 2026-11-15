@@ -253,11 +253,11 @@ export const PANELS: Panel[] = [
     numbers: [
       {
         value: "10 of 10",
-        what: "rings flagged, in a median of 3 days",
+        what: "rings flagged, in a median of 2.5 days",
         n: 10,
         unit: "rings",
         label: "SYNTHETIC",
-        source: `${BOARD} Arlequin: "90-day view with time to detect: 10/10 rings flagged, median 3 days (synthetic, n=10) (#293)"`,
+        source: `${BOARD} Arlequin: "/investigate 90-day view, median_gap_days: 10/10 rings flagged, median 2.5 days (synthetic, n=10) (#293)"`,
       },
       {
         value: "0 of 2,684",
