@@ -63,6 +63,9 @@ _RULE_LABELS = {
     RuleCategory.PRESSURE: "label.pressure",
 }
 _RULE_LABEL_ORDER = ("label.payment_ask", "label.data_ask", "label.pressure")
+_BOTH_MONEY_RULES = frozenset(
+    {"payment.zelle_before_viewing", "fee.holding_deposit_before_viewing"}
+)
 
 _UNIT_DOES_NOT_FIT = frozenset({UnitStatus.NOT_ON_RECORD, UnitStatus.BEDS_MISMATCH})
 
@@ -968,6 +971,20 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
             key = f"rule_category.{hit.category.value}"
         label = _RULE_LABELS[hit.category]
         by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
+    if shown >= _BOTH_MONEY_RULES:
+        # Zelle and a deposit or holding fee before a viewing are one ask to the renter: one
+        # line that names both, standing where the first of the two stood.
+        asks = by_label["label.payment_ask"]
+        both = {strings.text(f"rule.{rule_id}", lang) for rule_id in _BOTH_MONEY_RULES}
+        at = next(i for i, line in enumerate(asks) if line.text in both)
+        merged = _line(
+            lang,
+            "label.payment_ask",
+            CardTone.RED_FLAG,
+            "rule.payment.zelle_and_deposit_before_viewing",
+        )
+        rest = [line for line in asks if line.text not in both]
+        by_label["label.payment_ask"] = [*rest[:at], merged, *rest[at:]]
     if not by_label["label.payment_ask"]:
         by_label["label.payment_ask"].append(_quiet_payment_line(modules, lang))
     return [line for label in _RULE_LABEL_ORDER for line in by_label[label]]
@@ -1160,6 +1177,28 @@ def _reads_as_against(row: CardRow, line: CardLine) -> bool:
     return line.tone is CardTone.HOLD and row.kind is not CardRowKind.PERSON
 
 
+def _red_flag_headline(verdict: Verdict, rows: list[CardRow], lang: str) -> str | None:
+    """The headline for a HOLD that carries a red-flag line, or None.
+
+    The state stays HOLD (decide is untouched); only the words say why, so a red-flag ad does
+    not read like an honest one. Money is named before papers, and papers before pressure.
+    """
+    if verdict.state is not VerdictState.HOLD:
+        return None
+    red = [line for row in rows for line in row.lines if line.tone is CardTone.RED_FLAG]
+    if not red:
+        return None
+    labels = {line.label for line in red}
+    for label, key in (
+        ("label.payment_ask", "state.hold_red_money"),
+        ("label.data_ask", "state.hold_red_papers"),
+        ("label.pressure", "state.hold_red_pressure"),
+    ):
+        if strings.text(label, lang) in labels:
+            return strings.text(key, lang)
+    return strings.text("state.hold_red", lang)
+
+
 def headline_text(card: Card) -> str:
     """The words at the top of a card: its own headline when it has one, else its state's.
     The PNG (card/render.py) reads it the same way."""
@@ -1208,7 +1247,8 @@ def build_card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
-        headline=_clean_hold_headline(verdict, evidence, rows, lang, modules),
+        headline=_clean_hold_headline(verdict, evidence, rows, lang, modules)
+        or _red_flag_headline(verdict, rows, lang),
         checked_at=checked,
         expires_at=checked + CARD_TTL,
         rows=rows,
@@ -1257,23 +1297,70 @@ def _price_gap(modules: ModuleEvidence, lang: str) -> str | None:
     return strings.text("summary.price_gap", lang, percent=percent, plan=plan)
 
 
+# What each of decide()'s reasons is worth to a renter, for ordering the short why: a red flag
+# or proof (rank 0), something not confirmed (1), or good news (2). The reasons arrive as text,
+# so they are matched back to their keys; a blank in one ({n}, {domain}) matches anything.
+_RED_REASONS = (
+    "reason.forged",
+    "reason.forged_copy",
+    "reason.forged_copy_unknown",
+    "reason.photo_elsewhere",
+    "reason.price_flag",
+    "reason.payment_flag",
+    "reason.rule_flag",
+    "reason.for_sale",
+    "reason.lookalike_link",
+    "reason.unit_flag",
+    "reason.license_not_found",
+)
+_GOOD_REASONS = (
+    "reason.located",
+    "reason.authority_matches",
+    "reason.authority_matches_brokerage",
+    "reason.presence_proven",
+    "reason.office_confirmed",
+)
+
+
+def _is_reason(sentence: str, key: str, lang: str) -> bool:
+    blank = "\x00"
+    head, _, tail = strings.text(key, lang, n=blank, domain=blank).partition(blank)
+    return sentence.startswith(head) and sentence.endswith(tail or "")
+
+
+def _reason_rank(sentence: str, lang: str) -> int:
+    """0 red flag or proof, 1 not confirmed, 2 good news."""
+    if any(_is_reason(sentence, key, lang) for key in _RED_REASONS):
+        return 0
+    if any(_is_reason(sentence, key, lang) for key in _GOOD_REASONS):
+        return 2
+    return 1
+
+
 def _summary(
     modules: ModuleEvidence, verdict: Verdict, rows: list[CardRow], lang: str
 ) -> tuple[list[str], list[str], list[str]]:
     """Proof plan 3.2: the short why, what checks out, what does not. Code only, deterministic.
 
-    The sentences are decide()'s own reasons in its order (proof first), with the generic
-    "rent is far below" reason swapped for the measured gap, kept last, when there is one.
-    Nothing here chooses a state, and no sentence names a person."""
+    The sentences are decide()'s own reasons. Under a result that did not pass they lead with
+    the red flags (the measured rent gap first, standing in for the generic price reason), then
+    what is not confirmed, and never include good news: "why this is not a good deal" does not
+    list what is fine. A result that passed keeps decide()'s order. Nothing here chooses a
+    state, and no sentence names a person."""
     gap = _price_gap(modules, lang)
+    reasons = list(verdict.reasons)
     if gap:
-        # The measured gap is the strongest "not a good deal" fact, so it always makes the cut:
-        # decide()'s first two reasons, then the gap (it stands in for the generic price reason).
         generic_price = strings.text("reason.price_flag", lang)
-        kept = [r for r in verdict.reasons if r != generic_price]
-        sentences = [*kept[: SUMMARY_SENTENCES - 1], gap]
+        reasons = [gap if r == generic_price else r for r in reasons]
+    if verdict.state is VerdictState.VERIFIED:
+        sentences = reasons[:SUMMARY_SENTENCES]
     else:
-        sentences = verdict.reasons[:SUMMARY_SENTENCES]
+        # sorted() is stable, so decide()'s order holds inside each rank.
+        ranked = sorted(
+            (r for r in reasons if r == gap or _reason_rank(r, lang) < 2),
+            key=lambda r: -1 if r == gap else _reason_rank(r, lang),
+        )
+        sentences = (ranked or reasons)[:SUMMARY_SENTENCES]
     lines = [line for row in rows for line in row.lines]
     checks_out = [f"{ln.label}: {ln.text}" for ln in lines if ln.tone is CardTone.OK]
     does_not = [f"{ln.label}: {ln.text}" for ln in lines if ln.tone in _DOES_NOT_TONES]
