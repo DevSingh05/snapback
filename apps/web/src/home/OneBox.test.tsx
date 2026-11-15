@@ -481,6 +481,10 @@ describe("the docked box leaves room under the thread", () => {
     height = 201.4;
     notify();
     expect(host.style.getPropertyValue("--ob-dock-h")).toBe("202px");
+    // On a phone the box is pinned above the tab bar: that offset is covered room too.
+    (document.querySelector(".ob-dock") as HTMLElement).style.bottom = "56px";
+    notify();
+    expect(host.style.getPropertyValue("--ob-dock-h")).toBe("258px");
     rect.mockRestore();
     vi.unstubAllGlobals();
   });

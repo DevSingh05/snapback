@@ -201,8 +201,15 @@ export function OneBox(props: Props) {
     const el = dock.current;
     const host = root.current;
     if (!el || !host) return;
-    const measure = () =>
-      host.style.setProperty("--ob-dock-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    // The box is pinned a little above the bottom edge on a phone (the tab bar sits under it),
+    // so what it covers is its height plus that offset.
+    const measure = () => {
+      const lift = Number.parseFloat(getComputedStyle(el).bottom) || 0;
+      host.style.setProperty(
+        "--ob-dock-h",
+        `${Math.ceil(el.getBoundingClientRect().height + lift)}px`,
+      );
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const watch = new ResizeObserver(measure);
