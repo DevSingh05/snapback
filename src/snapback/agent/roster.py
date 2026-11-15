@@ -1,4 +1,4 @@
-"""SNAPBACK's team of agents, as one roster (GET /agents, and the War Room page).
+"""SNAPBACK's team of agents, as one roster (GET /agents, and the Proof Room page).
 
 One card per agent: its name, its team, its job in one plain line, the tools and data it uses,
 what runs it (a Claude model, or code) and what it never does. `kinds` ties a card to the
@@ -11,7 +11,7 @@ result: `snapback.verdict.decide` is the only place a verdict is chosen, and the
 says so.
 
 `uv run python -m snapback.agent.roster` prints the copy the web app ships for the static
-front end (apps/web/src/warroom/roster.json).
+front end (apps/web/src/proofroom/roster.json).
 """
 
 import json
@@ -313,9 +313,7 @@ def roster(lang: str = "en") -> Roster:
     use: Lang = "es" if lang == "es" else "en"
     return Roster(
         lang=use,
-        teams=[
-            TeamInfo(id=t, name=_TEAMS[t][use][0], about=_TEAMS[t][use][1]) for t in TEAM_ORDER
-        ],
+        teams=[TeamInfo(id=t, name=_TEAMS[t][use][0], about=_TEAMS[t][use][1]) for t in TEAM_ORDER],
         agents=cards(use),
     )
 

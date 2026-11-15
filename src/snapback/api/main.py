@@ -50,8 +50,8 @@ from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
-from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.agent.roster import Roster, roster
+from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.agent.timeline import CaseTimeline, build_timeline
 from snapback.api.card_cache import CardPictures
 from snapback.api.casefiles import ALIAS, CaseFiles

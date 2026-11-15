@@ -17,7 +17,7 @@ from snapback.contracts import DataSource
 from snapback.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
-WEB_COPY = ROOT / "apps" / "web" / "src" / "warroom" / "roster.json"
+WEB_COPY = ROOT / "apps" / "web" / "src" / "proofroom" / "roster.json"
 # The report's checks (apps/web/src/case/answer.ts CHECK_ORDER); the page lights a desk per check.
 ANSWER_TS = ROOT / "apps" / "web" / "src" / "case" / "answer.ts"
 

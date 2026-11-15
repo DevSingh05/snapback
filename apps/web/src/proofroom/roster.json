@@ -29,16 +29,9 @@
         "name": "Planner",
         "team": "planner",
         "job": "Writes the plan and the to-do list, then hands each check to its agent.",
-        "tools": [
-          "deepagents plan",
-          "To-do list",
-          "Case notes"
-        ],
+        "tools": ["deepagents plan", "To-do list", "Case notes"],
         "model": "Claude Sonnet",
-        "never": [
-          "Sets the verdict",
-          "Changes a fact a check found"
-        ],
+        "never": ["Sets the verdict", "Changes a fact a check found"],
         "availability": null,
         "kinds": [],
         "checks": []
@@ -48,140 +41,71 @@
         "name": "Rules agent",
         "team": "scam_check",
         "job": "Reads the ad for payment asks, pressure and claims that do not fit the record.",
-        "tools": [
-          "Rules table",
-          "Ad claims vs the record",
-          "Vexcel aerial date"
-        ],
+        "tools": ["Rules table", "Ad claims vs the record", "Vexcel aerial date"],
         "model": "code",
-        "never": [
-          "Guesses: a rule fires or it does not",
-          "Calls a named person a scammer"
-        ],
+        "never": ["Guesses: a rule fires or it does not", "Calls a named person a scammer"],
         "availability": null,
-        "kinds": [
-          "claims"
-        ],
-        "checks": [
-          "rules"
-        ]
+        "kinds": ["claims"],
+        "checks": ["rules"]
       },
       {
         "id": "record",
         "name": "Record agent",
         "team": "scam_check",
         "job": "Finds the building on CoStar's record: office, manager, website and rents.",
-        "tools": [
-          "CoStar record",
-          "Floor-plan rents",
-          "For-sale listings"
-        ],
+        "tools": ["CoStar record", "Floor-plan rents", "For-sale listings"],
         "model": "Claude Haiku",
-        "never": [
-          "Copies a raw record row into a note",
-          "Guesses when the record is silent"
-        ],
+        "never": ["Copies a raw record row into a note", "Guesses when the record is silent"],
         "availability": null,
-        "kinds": [
-          "record",
-          "rent",
-          "for_sale"
-        ],
-        "checks": [
-          "record",
-          "forsale"
-        ]
+        "kinds": ["record", "rent", "for_sale"],
+        "checks": ["record", "forsale"]
       },
       {
         "id": "phone_office",
         "name": "Phone and office agent",
         "team": "scam_check",
         "job": "Checks the ad's phone against the leasing office on record. Yes or no only.",
-        "tools": [
-          "CoStar record",
-          "Keyed phone match"
-        ],
+        "tools": ["CoStar record", "Keyed phone match"],
         "model": "Claude Haiku",
-        "never": [
-          "Shows or stores phone digits",
-          "Names a person"
-        ],
+        "never": ["Shows or stores phone digits", "Names a person"],
         "availability": null,
-        "kinds": [
-          "phone",
-          "office-and-licence"
-        ],
-        "checks": [
-          "phone"
-        ]
+        "kinds": ["phone", "office-and-licence"],
+        "checks": ["phone"]
       },
       {
         "id": "owner_licence",
         "name": "Owner and licence agent",
         "team": "scam_check",
         "job": "Looks up the county's owner of record and the licence the ad names.",
-        "tools": [
-          "County owner of record",
-          "TREC licence lookup"
-        ],
+        "tools": ["County owner of record", "TREC licence lookup"],
         "model": "Claude Haiku",
-        "never": [
-          "Names a person in its note",
-          "Keeps a licence number"
-        ],
+        "never": ["Names a person in its note", "Keeps a licence number"],
         "availability": null,
-        "kinds": [
-          "owner",
-          "license",
-          "ask_license"
-        ],
-        "checks": [
-          "owner"
-        ]
+        "kinds": ["owner", "license", "ask_license"],
+        "checks": ["owner"]
       },
       {
         "id": "photo",
         "name": "Photo agent",
         "team": "scam_check",
         "job": "Places the ad's photos in the building's 3D scan, and says which it could not.",
-        "tools": [
-          "Matterport scan",
-          "Photo match"
-        ],
+        "tools": ["Matterport scan", "Photo match"],
         "model": "Claude Haiku",
-        "never": [
-          "Sends a photo to an outside model",
-          "Places a photo it cannot match"
-        ],
+        "never": ["Sends a photo to an outside model", "Places a photo it cannot match"],
         "availability": null,
-        "kinds": [
-          "locate",
-          "place",
-          "reply"
-        ],
-        "checks": [
-          "photos"
-        ]
+        "kinds": ["locate", "place", "reply"],
+        "checks": ["photos"]
       },
       {
         "id": "web",
         "name": "Web agent",
         "team": "scam_check",
         "job": "Checks the building's own site, the ad's link and other listings on the web.",
-        "tools": [
-          "Bright Data",
-          "Apify",
-          "Browser Use"
-        ],
+        "tools": ["Bright Data", "Apify", "Browser Use"],
         "model": "Claude Haiku",
-        "never": [
-          "Opens a page behind a login",
-          "Scrapes Facebook Marketplace"
-        ],
+        "never": ["Opens a page behind a login", "Scrapes Facebook Marketplace"],
         "availability": "Available when the web checks are on",
-        "kinds": [
-          "web"
-        ],
+        "kinds": ["web"],
         "checks": []
       },
       {
@@ -189,18 +113,11 @@
         "name": "Finder",
         "team": "listing_help",
         "job": "Searches CoStar's record for safer homes that fit the budget.",
-        "tools": [
-          "CoStar record search",
-          "Apartments.com hand-off"
-        ],
+        "tools": ["CoStar record search", "Apartments.com hand-off"],
         "model": "Claude Haiku",
-        "never": [
-          "Lists a home that is not on the record"
-        ],
+        "never": ["Lists a home that is not on the record"],
         "availability": null,
-        "kinds": [
-          "search"
-        ],
+        "kinds": ["search"],
         "checks": []
       },
       {
@@ -208,18 +125,11 @@
         "name": "Tour prep",
         "team": "listing_help",
         "job": "Plans the walk through the 3D scan and what to ask on a tour.",
-        "tools": [
-          "Matterport scan",
-          "Case notes"
-        ],
+        "tools": ["Matterport scan", "Case notes"],
         "model": "Claude Haiku",
-        "never": [
-          "Changes a fact, a stop or a result"
-        ],
+        "never": ["Changes a fact, a stop or a result"],
         "availability": null,
-        "kinds": [
-          "walk"
-        ],
+        "kinds": ["walk"],
         "checks": []
       },
       {
@@ -227,20 +137,11 @@
         "name": "Decider",
         "team": "decider",
         "job": "Works out the verdict from the evidence. The only one that sets the verdict.",
-        "tools": [
-          "decide() in code",
-          "Evidence from every desk",
-          "Report pack"
-        ],
+        "tools": ["decide() in code", "Evidence from every desk", "Report pack"],
         "model": "code",
-        "never": [
-          "Uses a language model",
-          "Calls a home safe without proof"
-        ],
+        "never": ["Uses a language model", "Calls a home safe without proof"],
         "availability": null,
-        "kinds": [
-          "report"
-        ],
+        "kinds": ["report"],
         "checks": []
       }
     ]
@@ -275,16 +176,9 @@
         "name": "Planificador",
         "team": "planner",
         "job": "Escribe el plan y la lista de tareas, y reparte cada comprobación.",
-        "tools": [
-          "Plan de deepagents",
-          "Lista de tareas",
-          "Notas del caso"
-        ],
+        "tools": ["Plan de deepagents", "Lista de tareas", "Notas del caso"],
         "model": "Claude Sonnet",
-        "never": [
-          "Fija el resultado",
-          "Cambia un dato que halló una comprobación"
-        ],
+        "never": ["Fija el resultado", "Cambia un dato que halló una comprobación"],
         "availability": null,
         "kinds": [],
         "checks": []
@@ -294,140 +188,74 @@
         "name": "Agente de reglas",
         "team": "scam_check",
         "job": "Busca en el anuncio pagos, presión y datos que no encajan con el registro.",
-        "tools": [
-          "Tabla de reglas",
-          "Anuncio frente al registro",
-          "Fecha aérea de Vexcel"
-        ],
+        "tools": ["Tabla de reglas", "Anuncio frente al registro", "Fecha aérea de Vexcel"],
         "model": "code",
-        "never": [
-          "Adivina: una regla se cumple o no",
-          "Llama estafador a una persona con nombre"
-        ],
+        "never": ["Adivina: una regla se cumple o no", "Llama estafador a una persona con nombre"],
         "availability": null,
-        "kinds": [
-          "claims"
-        ],
-        "checks": [
-          "rules"
-        ]
+        "kinds": ["claims"],
+        "checks": ["rules"]
       },
       {
         "id": "record",
         "name": "Agente del registro",
         "team": "scam_check",
         "job": "Busca el edificio en el registro de CoStar: oficina, gestor, web y rentas.",
-        "tools": [
-          "Registro de CoStar",
-          "Rentas por plano",
-          "Anuncios de venta"
-        ],
+        "tools": ["Registro de CoStar", "Rentas por plano", "Anuncios de venta"],
         "model": "Claude Haiku",
         "never": [
           "Copia una fila del registro en una nota",
           "Adivina cuando el registro no dice nada"
         ],
         "availability": null,
-        "kinds": [
-          "record",
-          "rent",
-          "for_sale"
-        ],
-        "checks": [
-          "record",
-          "forsale"
-        ]
+        "kinds": ["record", "rent", "for_sale"],
+        "checks": ["record", "forsale"]
       },
       {
         "id": "phone_office",
         "name": "Agente de teléfono y oficina",
         "team": "scam_check",
         "job": "Compara el teléfono del anuncio con la oficina del registro. Solo sí o no.",
-        "tools": [
-          "Registro de CoStar",
-          "Comparación de teléfono con clave"
-        ],
+        "tools": ["Registro de CoStar", "Comparación de teléfono con clave"],
         "model": "Claude Haiku",
-        "never": [
-          "Muestra o guarda dígitos de teléfono",
-          "Nombra a una persona"
-        ],
+        "never": ["Muestra o guarda dígitos de teléfono", "Nombra a una persona"],
         "availability": null,
-        "kinds": [
-          "phone",
-          "office-and-licence"
-        ],
-        "checks": [
-          "phone"
-        ]
+        "kinds": ["phone", "office-and-licence"],
+        "checks": ["phone"]
       },
       {
         "id": "owner_licence",
         "name": "Agente de propietario y licencia",
         "team": "scam_check",
         "job": "Busca el propietario registrado en el condado y la licencia del anuncio.",
-        "tools": [
-          "Propietario registrado en el condado",
-          "Consulta de licencia TREC"
-        ],
+        "tools": ["Propietario registrado en el condado", "Consulta de licencia TREC"],
         "model": "Claude Haiku",
-        "never": [
-          "Nombra a una persona en su nota",
-          "Guarda un número de licencia"
-        ],
+        "never": ["Nombra a una persona en su nota", "Guarda un número de licencia"],
         "availability": null,
-        "kinds": [
-          "owner",
-          "license",
-          "ask_license"
-        ],
-        "checks": [
-          "owner"
-        ]
+        "kinds": ["owner", "license", "ask_license"],
+        "checks": ["owner"]
       },
       {
         "id": "photo",
         "name": "Agente de fotos",
         "team": "scam_check",
         "job": "Ubica las fotos del anuncio en el escaneo 3D del edificio, y dice cuáles no.",
-        "tools": [
-          "Escaneo de Matterport",
-          "Comparación de fotos"
-        ],
+        "tools": ["Escaneo de Matterport", "Comparación de fotos"],
         "model": "Claude Haiku",
-        "never": [
-          "Envía una foto a un modelo externo",
-          "Ubica una foto que no puede comparar"
-        ],
+        "never": ["Envía una foto a un modelo externo", "Ubica una foto que no puede comparar"],
         "availability": null,
-        "kinds": [
-          "locate",
-          "place",
-          "reply"
-        ],
-        "checks": [
-          "photos"
-        ]
+        "kinds": ["locate", "place", "reply"],
+        "checks": ["photos"]
       },
       {
         "id": "web",
         "name": "Agente web",
         "team": "scam_check",
         "job": "Revisa la web del edificio, el enlace del anuncio y otros anuncios en la red.",
-        "tools": [
-          "Bright Data",
-          "Apify",
-          "Browser Use"
-        ],
+        "tools": ["Bright Data", "Apify", "Browser Use"],
         "model": "Claude Haiku",
-        "never": [
-          "Abre una página con inicio de sesión",
-          "Extrae Facebook Marketplace"
-        ],
+        "never": ["Abre una página con inicio de sesión", "Extrae Facebook Marketplace"],
         "availability": "Disponible cuando las comprobaciones web están activas",
-        "kinds": [
-          "web"
-        ],
+        "kinds": ["web"],
         "checks": []
       },
       {
@@ -435,18 +263,11 @@
         "name": "Buscador",
         "team": "listing_help",
         "job": "Busca en el registro de CoStar casas más seguras dentro del presupuesto.",
-        "tools": [
-          "Búsqueda en el registro de CoStar",
-          "Paso a Apartments.com"
-        ],
+        "tools": ["Búsqueda en el registro de CoStar", "Paso a Apartments.com"],
         "model": "Claude Haiku",
-        "never": [
-          "Muestra una casa que no está en el registro"
-        ],
+        "never": ["Muestra una casa que no está en el registro"],
         "availability": null,
-        "kinds": [
-          "search"
-        ],
+        "kinds": ["search"],
         "checks": []
       },
       {
@@ -454,18 +275,11 @@
         "name": "Preparación de visita",
         "team": "listing_help",
         "job": "Planea el recorrido por el escaneo 3D y qué preguntar en una visita.",
-        "tools": [
-          "Escaneo de Matterport",
-          "Notas del caso"
-        ],
+        "tools": ["Escaneo de Matterport", "Notas del caso"],
         "model": "Claude Haiku",
-        "never": [
-          "Cambia un dato, una parada o un resultado"
-        ],
+        "never": ["Cambia un dato, una parada o un resultado"],
         "availability": null,
-        "kinds": [
-          "walk"
-        ],
+        "kinds": ["walk"],
         "checks": []
       },
       {
@@ -473,20 +287,11 @@
         "name": "Decisor",
         "team": "decider",
         "job": "Calcula el resultado a partir de las pruebas. El único que lo fija.",
-        "tools": [
-          "decide() en código",
-          "Pruebas de cada puesto",
-          "Informe"
-        ],
+        "tools": ["decide() en código", "Pruebas de cada puesto", "Informe"],
         "model": "code",
-        "never": [
-          "Usa un modelo de lenguaje",
-          "Da una casa por segura sin pruebas"
-        ],
+        "never": ["Usa un modelo de lenguaje", "Da una casa por segura sin pruebas"],
         "availability": null,
-        "kinds": [
-          "report"
-        ],
+        "kinds": ["report"],
         "checks": []
       }
     ]
