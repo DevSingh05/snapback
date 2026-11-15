@@ -57,7 +57,7 @@ export const WORDS: Record<Lang, RoomWords> = {
   en: {
     room: "PROOF ROOM",
     rest: "Run a check to watch them work",
-    checks: (done, total) => `${done} of ${total} checks done`,
+    checks: (done, total) => `${done} of ${total} steps done`,
     setBy: "code set the result",
     starting: "reading the ad",
     replay: "Replay this run",

@@ -204,14 +204,16 @@ function TwinViewInner({
           setStatus(
             result
               ? result.stand
-                ? "Flew to a stand-in sweep (fixture pose does not exist in this model)"
-                : "Flew to the photo pose"
-              : "Model has no sweeps",
+                ? "Showing the nearest spot in this scan. The sample photo's own spot is not in this model."
+                : "Moved to where the photo was taken"
+              : "This scan has no spots to stand in",
           );
         });
       } else {
         setStatus(
-          sdkStatus === "unavailable" ? "3D view unavailable: showing the static plan" : "",
+          sdkStatus === "unavailable"
+            ? "The 3D scan could not load here, so this shows a drawn plan"
+            : "",
         );
       }
       try {
@@ -312,7 +314,7 @@ function TwinViewInner({
               allow="fullscreen; xr-spatial-tracking"
             />
           ) : (
-            <p className="twin-placeholder">3D view needs a Matterport key</p>
+            <p className="twin-placeholder">The 3D scan is not connected on this copy</p>
           )}
           <PhotoLanding
             state={state}

@@ -163,13 +163,13 @@ describe("desk states on a replay", () => {
   it("the status line counts the checks done and names the one under way", () => {
     const during = floor(beatOf("locate").start + 10);
     expect(statusLine(during, w)).toBe(
-      `${during.checksDone} of ${during.checksTotal} checks done · placing the photos in the building's 3D scan`,
+      `${during.checksDone} of ${during.checksTotal} steps done · placing the photos in the building's 3D scan`,
     );
     expect(during.checksDone).toBeLessThan(during.checksTotal);
     const end = floor();
     expect(end.checksDone).toBe(end.checksTotal);
     expect(statusLine(end, w)).toBe(
-      `${end.checksTotal} of ${end.checksTotal} checks done · code set the result`,
+      `${end.checksTotal} of ${end.checksTotal} steps done · code set the result`,
     );
     expect(end.progress).toBe(1);
     expect(during.progress).toBeGreaterThan(0);

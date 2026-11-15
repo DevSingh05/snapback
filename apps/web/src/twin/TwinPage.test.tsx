@@ -10,7 +10,7 @@ import { TwinView, demoFromSearch } from "./TwinPage";
 describe("TwinView without a Matterport key", () => {
   it("shows the placeholder and a FIXTURE chip, and still mounts the trace slot", () => {
     render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
-    expect(screen.getByText(/3D view needs a Matterport key/)).toBeInTheDocument();
+    expect(screen.getByText(/The 3D scan is not connected on this copy/)).toBeInTheDocument();
     expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("FIXTURE");
     expect(screen.getByTestId("trace-slot")).toBeInTheDocument();
   });

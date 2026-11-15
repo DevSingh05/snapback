@@ -1785,12 +1785,17 @@ export function VerdictView({
   );
   // Answer first: the lines that most need attention, then the rest one tap below.
   const order = (t: string) => ({ red_flag: 0, hold: 1, not_shown: 1, ok: 2 })[t] ?? 3;
+  const ranked = [...allLines].sort((a, b) => order(a.line.tone) - order(b.line.tone));
+  const firstLines = ranked.slice(0, FIRST_LINES);
+  // Every part of the check shows at least once (place, person, price), so a quiet "Matches"
+  // on the place is never hidden behind the warnings.
+  for (const row of card.rows) {
+    const one = ranked.find((l) => l.kind === row.kind);
+    if (one && !firstLines.some((l) => l.kind === row.kind)) firstLines.push(one);
+  }
   const shownLines = all
     ? allLines
-    : [...allLines]
-        .sort((a, b) => order(a.line.tone) - order(b.line.tone))
-        .slice(0, FIRST_LINES)
-        .map((l, i, list) => ({ ...l, first: i === 0 || list[i - 1]!.kind !== l.kind }));
+    : firstLines.map((l, i, list) => ({ ...l, first: i === 0 || list[i - 1]!.kind !== l.kind }));
   return (
     <article
       className="ob-card ob-verdict"
@@ -1824,7 +1829,7 @@ export function VerdictView({
           );
         })}
       </dl>
-      {allLines.length > FIRST_LINES && (
+      {allLines.length > firstLines.length && (
         <button type="button" className="ob-more" aria-expanded={all} onClick={() => setAll(!all)}>
           {all ? "Show fewer" : `How we know: all ${allLines.length} checks`}
         </button>
