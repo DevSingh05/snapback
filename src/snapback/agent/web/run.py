@@ -15,6 +15,7 @@ from typing import Any
 
 import httpx
 
+from snapback.agent.rules.contact import host_of
 from snapback.agent.web import clients
 from snapback.agent.web.facts import (
     CheckStatus,
@@ -32,6 +33,22 @@ from snapback.contracts import DataSource, TraceKind
 from snapback.settings import Settings
 
 MAX_RENTALS = 25  # items asked of each Apify search
+# Never opened or fetched, whatever the ad links to (sponsor and platform terms, #8).
+NEVER_OPEN = ("facebook.com", "fb.com", "fb.me", "apartments.com")
+_PLAIN_LINK = re.compile(r"https?://[^\s\"'<>`]+", re.I)
+
+
+def may_open(link: str | None) -> bool:
+    """A link we may hand to a browser or fetch: http(s) only, no whitespace or quotes (it goes
+    into an agent's task text), and never a host we must not open."""
+    if not link or not _PLAIN_LINK.fullmatch(link):
+        return False
+    host = (host_of(link) or "").lower().rstrip(".")
+    if not host:
+        return False
+    return not any(host == bad or host.endswith("." + bad) for bad in NEVER_OPEN)
+
+
 _URL_OR_PHONE = re.compile(r"https?://\S+|\S+@\S+|\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")
 
 
@@ -47,17 +64,21 @@ def _site(
     inputs: WebInputs, settings: Settings, http: httpx.Client, salt: str, limit: float
 ) -> SiteCheck:
     token = settings.brightdata_api_token
-    if token is None or not inputs.website_host:
+    url = f"https://{inputs.website_host}/" if inputs.website_host else None
+    if url is None or not may_open(url):
         return SiteCheck(host=inputs.website_host)
-    raw = clients.unlock(
-        http, token, settings.brightdata_unlocker_zone, f"https://{inputs.website_host}/", limit
-    )
+    if token is not None:
+        raw = clients.unlock(http, token, settings.brightdata_unlocker_zone, url, limit)
+    elif settings.snapback_web_direct_fetch:
+        raw = clients.fetch_page(http, url, limit, may_open)
+    else:
+        return SiteCheck(host=inputs.website_host)
     return site_facts(raw, inputs, salt)
 
 
 def _link(inputs: WebInputs, settings: Settings, http: httpx.Client, limit: float) -> LinkCheck:
     key = settings.browser_use_api_key
-    if key is None or not inputs.ad_link:
+    if key is None or not may_open(inputs.ad_link):
         return LinkCheck()
     final, asks, cost = clients.open_link(
         http, key, inputs.ad_link, max_cost_usd=settings.browser_use_max_cost_usd, timeout=limit
@@ -70,11 +91,14 @@ def _elsewhere(
     inputs: WebInputs, settings: Settings, http: httpx.Client, salt: str, limit: float
 ) -> ElsewhereCheck:
     token, apify = settings.brightdata_api_token, settings.apify_token
-    hits: list[str] | None = None
+    hits = None
     rentals: dict[str, list[dict[str, Any]]] = {}
-    if token is not None and inputs.ad_phrase:
+    if inputs.ad_phrase and (token is not None or apify is not None):
         query = f'"{inputs.ad_phrase}"' + (f" {inputs.city}" if inputs.city else "")
-        answer = clients.serp(http, token, settings.brightdata_serp_zone, query, limit)
+        if token is not None:
+            answer = clients.serp(http, token, settings.brightdata_serp_zone, query, limit)
+        else:  # no Bright Data zones: the same search through Apify's Google actor
+            answer = clients.apify_search(http, apify, query, limit)  # type: ignore[arg-type]
         hits = search_hits(answer, inputs.website_host)
     if apify is not None and inputs.center is not None:
         actors = {
@@ -157,10 +181,34 @@ def run_web_checks(
 
 
 STEP_WORDS = {
-    "site": "Read the building's own site through Bright Data",
+    "site": "Read the building's own site",
     "link": "Opened the ad's link in Browser Use",
-    "elsewhere": "Searched for the same home posted elsewhere (Bright Data search, Apify)",
+    "elsewhere": "Searched for the ad's words elsewhere and rentals this size nearby",
 }
+
+
+CAP_WORDS = "Web checks skipped: the hourly limit on web checks is reached."
+
+
+class HourlyCap:
+    """At most `n` starts in any rolling hour, across all cases. Thread-safe."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._starts: list[float] = []
+        self._lock = threading.Lock()
+
+    def take(self, n: int) -> bool:
+        with self._lock:
+            now = self._clock()
+            self._starts = [t for t in self._starts if now - t < 3600]
+            if len(self._starts) >= n:
+                return False
+            self._starts.append(now)
+            return True
+
+
+WEB_CAP = HourlyCap()
 
 
 class WebJob:
@@ -191,10 +239,18 @@ def start_web_checks(
     trace: Any = None,
     source: DataSource = DataSource.LIVE,
     http: httpx.Client | None = None,
+    cap: HourlyCap | None = None,
 ) -> WebJob:
     """Start the checks on a daemon thread and return at once, so the text answer is not held
-    up. Set `case.web_facts = job.facts` to give the web sub-agent and the notes the result."""
+    up. Set `case.web_facts = job.facts` to give the web sub-agent and the notes the result.
+    Past `settings.snapback_web_max_per_hour` starts in the last hour, nothing is called and
+    every check reads "not checked"."""
     job = WebJob()
+    if not (cap or WEB_CAP).take(settings.snapback_web_max_per_hour):
+        if trace is not None:
+            trace.emit(TraceKind.STATUS, CAP_WORDS, pick="web.cap")
+        job._finish(WebFacts(source=source))
+        return job
 
     def step(name: str, result: Any) -> None:
         if trace is None:

@@ -109,12 +109,17 @@ class Settings(BaseSettings):
     apify_zillow_actor: str | None = "maxcopell~zillow-scraper"
     apify_craigslist_actor: str | None = None
     # The three checks share one limit; past it a check reads "timed out" and the case goes on.
-    snapback_web_limit_s: float = 15.0
+    snapback_web_limit_s: float = 20.0  # Apify's search measured 8.9 to 14.2 s (n=3, LIVE)
     # Run the web checks on LIVE cases. Off by default so tests, CI and a public host never call
     # out; set SNAPBACK_WEB_CHECKS=1 in the demo laptop's .env with the three keys.
     snapback_web_checks: bool = False
     # Browser Use spend cap per link check, in dollars (the account has little credit).
     browser_use_max_cost_usd: float = 0.10
+    # At most this many cases start web checks in any rolling hour (each case starts them once).
+    snapback_web_max_per_hour: int = 30
+    # Without Bright Data zones, read the building's own site with a plain direct fetch (free).
+    # Off by default so a case with no keys makes no call; the demo laptop turns it on.
+    snapback_web_direct_fetch: bool = False
     vexcel_api_key: SecretStr | None = None
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None

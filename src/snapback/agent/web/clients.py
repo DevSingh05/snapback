@@ -8,7 +8,7 @@ words (never the service's body, which can echo the request) when the service fa
 
 import json
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 from urllib.parse import quote, quote_plus
 
@@ -67,6 +67,56 @@ def serp(
     return data
 
 
+# --- free stand-ins (no Bright Data zones) -----------------------------------------------------
+
+APIFY_SEARCH_ACTOR = "apify~google-search-scraper"
+PAGE_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; SNAPBACK listing check)"}
+MAX_HOPS = 3
+
+
+def fetch_page(
+    http: httpx.Client, url: str, timeout: float, may_open: Callable[[str], bool]
+) -> str:
+    """A page fetched directly, following at most 3 redirects, each one checked with
+    `may_open` first, so a redirect can never take us to a host we must not open."""
+    for _ in range(MAX_HOPS + 1):
+        if not may_open(url):
+            raise WebError("the page redirected somewhere we do not open")
+        res = http.get(url, headers=PAGE_HEADERS, timeout=timeout, follow_redirects=False)
+        if res.is_redirect and res.headers.get("location"):
+            url = str(res.url.join(res.headers["location"]))
+            continue
+        return _ok(res, "The building's site").text
+    raise WebError("too many redirects")
+
+
+def apify_search(
+    http: httpx.Client, token: SecretStr, query: str, timeout: float
+) -> dict[str, Any]:
+    """Google results through Apify's search actor, shaped like Bright Data's parsed answer
+    ({"organic": [{"link", "title", "description"}]}) so the same reader handles both."""
+    pages = run_actor(
+        http,
+        token,
+        APIFY_SEARCH_ACTOR,
+        {"queries": query, "maxPagesPerQuery": 1, "resultsPerPage": 20, "countryCode": "us"},
+        max_items=None,  # one query, one page: the actor returns one item
+        timeout=timeout,
+    )
+    organic: list[dict[str, Any]] = []
+    for page in pages:
+        for row in page.get("organicResults") or []:
+            if isinstance(row, Mapping) and isinstance(row.get("url"), str):
+                organic.append(
+                    {
+                        "link": row["url"],
+                        "title": row.get("title") or "",
+                        "description": row.get("description") or "",
+                    }
+                )
+    return {"organic": organic}
+
+
 # --- Apify ------------------------------------------------------------------------------------
 
 
@@ -76,14 +126,19 @@ def run_actor(
     actor: str,
     actor_input: Mapping[str, Any],
     *,
-    max_items: int,
+    max_items: int | None,
     timeout: float,
 ) -> list[dict[str, Any]]:
-    """Run an Apify actor and wait for its dataset items (`run-sync-get-dataset-items`)."""
+    """Run an Apify actor and wait for its dataset items (`run-sync-get-dataset-items`).
+    `max_items` None sends no item cap: on a pay-per-event actor a small `maxItems` sets a
+    cost cap under Apify's $0.50 minimum and the run is refused (400)."""
+    params: dict[str, Any] = {"timeout": int(timeout), "format": "json", "clean": 1}
+    if max_items is not None:
+        params["maxItems"] = max_items
     res = http.post(
         APIFY_URL.format(actor=actor),
         headers={"Authorization": f"Bearer {token.get_secret_value()}"},
-        params={"timeout": int(timeout), "maxItems": max_items, "format": "json", "clean": 1},
+        params=params,
         json=dict(actor_input),
         timeout=timeout + 5,
     )
@@ -95,7 +150,8 @@ def run_actor(
         raise WebError("Apify answer was not JSON") from e
     if not isinstance(items, list):
         raise WebError("Apify answer was not a list")
-    return [item for item in items if isinstance(item, dict)][:max_items]
+    kept = [item for item in items if isinstance(item, dict)]
+    return kept[:max_items] if max_items is not None else kept
 
 
 ZILLOW_BOX = 0.03  # degrees each way from the centre: a few kilometres

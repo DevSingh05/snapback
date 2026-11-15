@@ -34,11 +34,12 @@ FOUND = WebFacts(
     link=LinkCheck(status=CheckStatus.TIMED_OUT, ms=15000),
     elsewhere=ElsewhereCheck(
         status=CheckStatus.DONE,
-        postings=3,
-        by_source={"search": 1, "zillow": 2},
+        postings=1,
+        poster_differs=True,
+        nearby=2,
+        by_source={"zillow": 2},
         rent_low=1500,
         rent_high=1725,
-        poster_differs=True,
         ms=4200,
     ),
 )
@@ -70,7 +71,8 @@ def test_the_web_sub_agent_has_one_reading_tool_and_may_write_only_its_note():
     assert "lists the ad's plan or unit: yes" in text
     assert "shows the office phone on record: no" in text
     assert "The ad's link (Browser Use): timed_out" in text
-    assert "3 found (1 search, 2 zillow); asked rent 1500 to 1725" in text
+    assert "posted elsewhere (web search): 1 found; one shows a different phone: yes" in text
+    assert "Rentals this size nearby (Apify, not the same home): 2, asked rent 1500 to 1725" in text
 
 
 def test_the_code_note_says_still_running_until_the_checks_finish():
