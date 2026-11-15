@@ -148,7 +148,8 @@ const count = (parts: string[]) => parts.join(" ").split(/\s+/).filter(Boolean).
  * number, a rent or a link is never spoken. Pieces that would pass 15 s are left out: the
  * pointer first, then the reason; the verdict always stays. */
 export function spokenReply(replyText: string): string {
-  const lines = replyText.split("\n").map((l) => l.trim());
+  // a reason may end with its proof link (XO 03:32): speak the reason, never the link
+  const lines = replyText.split("\n").map((l) => l.trim().replace(/\s+https?:\/\/\S+$/, ""));
   const safe = (l: string) => l.length > 0 && !NO_DIGITS.test(l) && !LINK.test(l);
   const headline = lines[0] ?? "";
   const start = lines.findIndex((l) => REASONS.test(l));

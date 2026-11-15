@@ -7,6 +7,7 @@
  * step result that carries either is dropped and only its label is kept. No case is ever made.
  */
 
+import { checkAnchor, MAX_FLAG_LINKS } from "./anchors";
 import type { Lang } from "./profile";
 
 export type TimelineStep = { label: string; result: string; by?: string };
@@ -17,6 +18,7 @@ type CardLike = {
   state: string;
   headline?: string;
   rows: { lines: CardLine[] }[];
+  does_not?: string[] | null;
 };
 
 type Agent = "rules" | "record" | "phone" | "photo";
@@ -109,11 +111,21 @@ export function howCheckedText(
   const top = headline ?? card.headline ?? defaultHeadline(card.state, lang);
   const lines = [top, "", `${n.title} (${source}):`];
 
+  // XO 03:32: a red flag links to its line on the web card when that card lists it (English).
+  const onCard = new Set((card.does_not ?? []).map(checkAnchor).filter(Boolean));
+  let linked = 0;
   for (const row of card.rows) {
     for (const line of row.lines) {
       if (line.tone !== "red_flag") continue;
       const text = clean(`${line.label}: ${line.text}`);
-      if (text) lines.push(`- ${n.flag}: ${text}`);
+      if (!text) continue;
+      const anchor = lang === "en" ? checkAnchor(text) : null;
+      if (anchor && onCard.has(anchor) && linked < MAX_FLAG_LINKS) {
+        linked += 1;
+        lines.push(`- ${n.flag}: ${text} ${link}#${anchor}`);
+      } else {
+        lines.push(`- ${n.flag}: ${text}`);
+      }
     }
   }
 

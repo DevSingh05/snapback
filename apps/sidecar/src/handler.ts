@@ -14,6 +14,7 @@
 
 import { createHmac } from "node:crypto";
 
+import { CHECKS_SECTION, checkAnchor, MAX_FLAG_LINKS } from "./anchors";
 import { howCheckedText, type Timeline } from "./howchecked";
 import {
   PHONE_LIKE,
@@ -387,6 +388,22 @@ function topReasons(card: Card): string[] {
   return [...fromSummary, ...reasons(card)].slice(0, 2);
 }
 
+/** XO 03:32: each reason that is on the card's "What doesn't" list ends with a link to its
+ * proof, /case/<id>#<anchor> (at most MAX_FLAG_LINKS). English only: the web card is English. */
+function withFlagLinks(reasonLines: string[], card: Card, link: string, lang: Lang): string[] {
+  if (lang !== "en") return reasonLines.map((line) => `- ${line}`);
+  const listed = new Set(card.does_not ?? []);
+  const seen = new Set<string>();
+  return reasonLines.map((line) => {
+    // a line on the card's "What doesn't" list links to itself; a summary line links to the
+    // checks section that holds its proof (#checks, Checks.tsx)
+    const anchor = (listed.has(line) ? checkAnchor(line) : null) ?? CHECKS_SECTION;
+    if (seen.has(anchor) || seen.size >= MAX_FLAG_LINKS) return `- ${line}`;
+    seen.add(anchor);
+    return `- ${line} ${link}#${anchor}`;
+  });
+}
+
 /** The reply (U2): the locked headline, "Before you pay:" with the top two reasons, one next
  * step and the link. Every word of the verdict and the reasons comes from the card; the
  * sidecar writes no verdict. */
@@ -404,7 +421,7 @@ export function reportText(
     `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`,
   ];
   const top = topReasons(card);
-  if (top.length) lines.push("", w.before, ...top.map((line) => `- ${line}`));
+  if (top.length) lines.push("", w.before, ...withFlagLinks(top, card, link, lang));
   const step = nextStep(card, challenge, office, lang);
   if (step) lines.push("", `${w.next} ${step}`);
   if (askPhotos) lines.push("", w.photos);
