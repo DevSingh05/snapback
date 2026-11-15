@@ -73,6 +73,8 @@ export interface Card {
   footer: string[];
   verify_url?: string | null;
   lang: string;
+  // Set by the API when the state's own words would mislead (a HOLD with nothing against it).
+  headline?: string | null;
 }
 
 export type TraceKind =

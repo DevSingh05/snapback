@@ -1093,6 +1093,35 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     return _from_record(modules, lines)
 
 
+def _clean_hold_headline(
+    verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str
+) -> str | None:
+    """The headline for a HOLD that has nothing against it, or None.
+
+    "Nothing against it" is asked of `decide` itself, without changing it: the same evidence
+    with presence proven would be VERIFIED. So the one thing holding the case is that nobody
+    has been asked, or has yet answered, to prove they are inside. And no line on the card is a
+    red flag or a warning. The state stays HOLD.
+    """
+    if verdict.state is not VerdictState.HOLD:
+        return None
+    if evidence.presence not in (PresenceStatus.NOT_REQUESTED, PresenceStatus.WAITING):
+        return None
+    if_proven = evidence.model_copy(update={"presence": PresenceStatus.PROVEN})
+    if decide(if_proven, lang).state is not VerdictState.VERIFIED:
+        return None
+    tones = {line.tone for row in rows for line in row.lines}
+    if tones & {CardTone.RED_FLAG, CardTone.HOLD}:
+        return None
+    return strings.text("state.hold_clean", lang)
+
+
+def headline_text(card: Card) -> str:
+    """The words at the top of a card: its own headline when it has one, else its state's.
+    The PNG (card/render.py) reads it the same way."""
+    return card.headline or strings.text(f"state.{card.state.value}", card.lang)
+
+
 def build_card(
     modules: ModuleEvidence,
     *,
@@ -1108,7 +1137,8 @@ def build_card(
 
     Raises ValueError if `checked_at` or any reply time has no timezone.
     """
-    verdict = decide(to_evidence(modules, lang), lang)
+    evidence = to_evidence(modules, lang)
+    verdict = decide(evidence, lang)
     public_id = modules.case_id.removeprefix(FIXTURE_ID_PREFIX)
     checked = _aware(checked_at, "checked_at") if checked_at is not None else datetime.now(UTC)
     for spot in modules.challenge.spots if modules.challenge else []:
@@ -1132,6 +1162,7 @@ def build_card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
+        headline=_clean_hold_headline(verdict, evidence, rows, lang),
         checked_at=checked,
         expires_at=checked + CARD_TTL,
         rows=rows,
