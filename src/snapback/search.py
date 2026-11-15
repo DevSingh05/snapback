@@ -502,12 +502,15 @@ def alternatives_for(
 # --- the tour request draft -------------------------------------------------------------------
 
 
-def draft_tour_request(place: PlaceMatch, brief: RenterBrief | None = None) -> TourDraft:
+def draft_tour_request(
+    place: PlaceMatch, brief: RenterBrief | None = None, rooms_line: str | None = None
+) -> TourDraft:
     """A draft to the leasing office on record, for the renter to approve. Never sent.
 
     Addressed only to the office's company name: no phone digits, no poster, no person. It asks
     for a tour and for the application fee, because we hold no fees. Raises `NoOfficeOnRecord`
-    when the place has none."""
+    when the place has none. `rooms_line` is the code-written sentence naming the rooms the ad
+    left out (from the walk); it is added once, before the closing request."""
     office = (place.office_on_record or "").strip()
     if not office:
         raise NoOfficeOnRecord(place.property_id)
@@ -538,6 +541,7 @@ def draft_tour_request(place: PlaceMatch, brief: RenterBrief | None = None) -> T
             "",
             "Before I apply, could you tell me:",
             *asks,
+            *(["", rooms_line] if rooms_line else []),
             "",
             "Please reply with times that work for a tour. I have not paid anything, "
             "and I will not pay before I have seen the place.",

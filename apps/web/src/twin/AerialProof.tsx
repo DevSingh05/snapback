@@ -33,6 +33,21 @@ function srcFor(side: AerialSide): string | null {
   return fixtureTileSrc(tile.property_id);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2025-03-14" as "Mar 14, 2025", read as written (no timezone shift); null when unparseable. */
+export function formatCaptured(iso: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${Number(m[3])}, ${m[1]}` : null;
+}
+
+function capturedLine(side: AerialSide): string | null {
+  const when = formatCaptured(side.tile?.captured_on);
+  if (!when) return null;
+  return `Aerial photo captured ${when} ${side.tile?.source === "live" ? "(Vexcel)" : "(fixture tile)"}`;
+}
+
 function facts(record: PropertyRecord | null): string {
   if (!record) return "";
   return [
@@ -67,6 +82,7 @@ function Tile({
       ) : (
         <div className="aerial-missing">No aerial image for this building yet</div>
       )}
+      {capturedLine(side) ? <p className="aerial-date">{capturedLine(side)}</p> : null}
       {caption ? <figcaption className="aerial-caption">{caption}</figcaption> : null}
       {showFacts && facts(side.record) ? (
         <p className="aerial-facts">{facts(side.record)}</p>

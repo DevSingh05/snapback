@@ -95,8 +95,19 @@ _TIPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("office", "study", "den"), "Check the outlets and the phone and internet signal."),
 )
 _DEFAULT_TIP = "Look at the ceiling and walls for water stains, and try the light switches."
-_ENTRY_TIP = "Check the lock, and that the unit number on the door matches your lease."
-_START_TIP = "Check the lock, and that the unit number on the door matches your lease."
+DOOR_TIP = "Check the lock, and that the address (or unit number) on the door matches your lease."
+_ENTRY_TIP = DOOR_TIP
+_START_TIP = DOOR_TIP
+NO_SCAN_DATE = "Scan date not on record"
+AGE_NOTE = "Things can change after a scan: check finishes in person."
+SCAN_STALE_MONTHS = 12
+
+
+class TourSummary(BaseModel):
+    """S6: what the renter now knows, and what they still need to see in person. Code-written."""
+
+    know: list[str] = Field(default_factory=list)
+    see: list[str] = Field(default_factory=list)
 
 
 class TourFact(BaseModel):
@@ -200,6 +211,10 @@ class TourPlan(BaseModel):
     mode_line: str | None = None
     coverage: WalkCoverage | None = None
     director: TourDirector | None = None
+    # W4: the scan's date as Matterport gives it, or "Scan date not on record". Never invented.
+    scan_date_line: str | None = None
+    scan_age_note: str | None = None  # set when the scan is older than 12 months
+    summary: TourSummary | None = None  # W5: the two columns of the last screen
 
 
 class PhotoWalkFields(BaseModel):
@@ -541,6 +556,103 @@ def _numbered(sweeps: Sequence[TourSweep], order: dict[str, int], up: str = "y")
     return stops
 
 
+def scan_date_lines(scan_on: date | None, today: date | None = None) -> tuple[str, str | None]:
+    """The scan date line, and the change note when the scan is older than 12 months."""
+    if scan_on is None:
+        return NO_SCAN_DATE, None
+    now = today or date.today()
+    try:
+        cutoff = now.replace(year=now.year - SCAN_STALE_MONTHS // 12)
+    except ValueError:  # Feb 29
+        cutoff = now.replace(year=now.year - SCAN_STALE_MONTHS // 12, day=28)
+    line = f"Scanned {scan_on.strftime('%b')} {scan_on.year} (Matterport)"
+    return line, (AGE_NOTE if scan_on < cutoff else None)
+
+
+STILL_ALWAYS = (
+    "The actual unit you would rent, and its lease status.",
+    "Whether the person you are dealing with may lease it. The photos being of this home "
+    "does not tell you who may rent it.",
+    "Door widths, steps and the real condition of each room.",
+)
+MAX_SEE_EXTRAS = 5
+_ORDINALS = {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth"}
+
+
+def _the(title: str) -> str:
+    """'Bathroom 2' as 'the second bathroom'; 'Laundry' as 'the laundry'."""
+    base, _, num = title.rpartition(" ")
+    if base and num.isdigit() and int(num) in _ORDINALS:
+        return f"the {_ORDINALS[int(num)]} {base.lower()}"
+    return f"the {title.lower()}"
+
+
+def _joined(items: Sequence[str]) -> str:
+    if len(items) <= 1:
+        return "".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def rooms_to_see(plan: TourPlan) -> list[str]:
+    """Titles of the rooms no ad photo was placed in, in walking order. Empty while the view of
+    the ad is unknown, and when every photo was taken in another building (then the walk says
+    so, and no room of this home is 'missing')."""
+    cov = plan.coverage
+    if cov is not None and cov.placed == 0 and cov.elsewhere > 0:
+        return []
+    return [
+        s.title for s in plan.stops if s.kind in ("room", "stop") and s.ad_view == "none_placed"
+    ]
+
+
+def rooms_to_see_line(plan: TourPlan) -> str | None:
+    """The sentence the tour request gets: the rooms the ad left out. None when there are none."""
+    titles = rooms_to_see(plan)
+    if not titles:
+        return None
+    why = (
+        "which the photos we could place did not show"
+        if plan.coverage is not None and plan.coverage.unplaced > 0
+        else "which the listing did not show"
+    )
+    return f"I'd like to see {_joined([_the(t) for t in titles])}, {why}."
+
+
+def summarize(plan: TourPlan) -> TourSummary:
+    """The two columns of the last screen, from the plan alone. Every line is fixed text or a
+    fact code already holds; unknowns are left out, never guessed."""
+    cov = plan.coverage
+    know: list[str] = []
+    if cov is not None and cov.line:
+        know.append(cov.line)
+    if cov is not None and (cov.placed + cov.elsewhere + cov.unplaced) > 0:
+        n = cov.placed + cov.elsewhere + cov.unplaced
+        know.append(f"{cov.placed} of {n} ad photos were placed in this scan.")
+    if plan.has_scan and plan.scan_label:
+        know.append(f"The walk used {plan.scan_label}.")
+    know.append(f"What the record says is {plan.as_of}.")
+
+    see: list[str] = list(plan.director.lead_checks[:MAX_SEE_EXTRAS]) if plan.director else []
+    hidden = rooms_to_see(plan)
+    if hidden:
+        see.append(f"The ad did not show {_joined([_the(t) for t in hidden])}.")
+    seen_text = set(see)
+    claims = [
+        c.text
+        for st in plan.stops
+        for c in st.claims
+        if not (c.text in seen_text or seen_text.add(c.text))
+    ]
+    see.extend(claims[:MAX_SEE_EXTRAS])
+    see.extend(STILL_ALWAYS)
+    return TourSummary(know=know, see=see)
+
+
+def with_summary(plan: TourPlan) -> TourPlan:
+    """The plan with its summary columns filled from its current state."""
+    return plan.model_copy(update={"summary": summarize(plan)})
+
+
 def scan_label_for(kind: str) -> str:
     return SCAN_HOUSE if kind == "house" else SCAN_APARTMENT
 
@@ -558,6 +670,8 @@ def build_tour(
     aerial_source: DataSource | None = None,
     aerial_image: bool = False,
     plan_key: str | None = None,
+    scan_on: date | None = None,
+    today: date | None = None,
 ) -> TourPlan:
     """The whole tour: arrive, the door, the rooms, the outro. Pure: the same inputs give the same
     plan. `sweeps` carry the scan's own order and Matterport's room labels."""
@@ -584,6 +698,7 @@ def build_tour(
         note = ROOMS_NOTE
     else:
         note = NO_ROOMS_NOTE
+    scan_date_line, scan_age_note = scan_date_lines(scan_on, today) if has_scan else (None, None)
     prep = f"/prep/place/{property_id}" + (f"?plan_key={plan_key}" if plan_key else "")
     return TourPlan(
         up_axis=up,  # type: ignore[arg-type]
@@ -594,6 +709,8 @@ def build_tour(
         scan_label=scan_label_for(kind) if has_scan else None,
         rooms_labelled=labelled,
         rooms_note=note,
+        scan_date_line=scan_date_line,
+        scan_age_note=scan_age_note,
         aerial=TourAerial(
             source=aerial_source or source, captured_on=aerial_on, has_image=aerial_image
         ),
