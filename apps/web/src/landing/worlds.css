@@ -130,6 +130,8 @@
 }
 .wl-still .wl-pin {
   position: relative;
+  /* sticky's top would shift a relative box down over the first beat card (#356) */
+  top: 0;
 }
 .wl-canvas {
   position: absolute;
