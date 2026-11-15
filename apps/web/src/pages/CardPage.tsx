@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CaseNotFound, apiBase, fetchCard } from "../api";
 import {
@@ -136,6 +136,22 @@ export function CardPage({ caseId, variant }: { caseId: string; variant: "result
       });
     return () => ctrl.abort();
   }, [caseId, attempt, lang]);
+
+  // An iMessage red flag links to its proof, /case/<id>#check-<label> (or #checks). The card
+  // loads after mount, so the browser's own jump to the fragment happens before that line
+  // exists: once the card is ready, scroll to it, once per page load.
+  const jumped = useRef(false);
+  const ready = load.status === "ready";
+  useEffect(() => {
+    if (!ready || jumped.current) return;
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    jumped.current = true;
+    const target = document.getElementById(id);
+    if (!target) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    target.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+  }, [ready]);
 
   if (load.status === "ready")
     return variant === "result" ? (
