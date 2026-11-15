@@ -1217,20 +1217,15 @@
     bottom: 16px;
     width: auto;
     opacity: 0;
-    visibility: hidden;
+    pointer-events: none;
     transform: translate3d(0, 12px, 0);
     transition:
       opacity 0.3s var(--ease-out),
-      transform 0.3s var(--ease-out),
-      visibility 0s 0.3s;
+      transform 0.3s var(--ease-out);
   }
   .wl-live .wl-step.is-on .wl-say {
     opacity: 1;
-    visibility: visible;
     transform: none;
-    transition:
-      opacity 0.3s var(--ease-out),
-      transform 0.3s var(--ease-out);
   }
   .wl-rows li {
     grid-template-columns: minmax(0, 1fr) auto;
