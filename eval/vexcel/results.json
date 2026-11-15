@@ -1,50 +1,195 @@
 {
   "mode": "live",
-  "n": 28,
-  "right_cases": 12,
-  "wrong_building_cases": 16,
-  "hits": 17,
+  "matcher": "v2: SIFT + ratio test + RANSAC similarity, centre offset in metres",
+  "n": 54,
+  "right_cases": 24,
+  "wrong_building_cases": 30,
+  "hits": 52,
   "misses": [
-    "vx-r01",
-    "vx-r02",
-    "vx-r04",
-    "vx-r05",
-    "vx-r06",
-    "vx-r07",
-    "vx-r08",
-    "vx-r09",
-    "vx-r10",
-    "vx-r11",
-    "vx-r12"
+    "vx-n04",
+    "vx-r20"
   ],
   "next_door": {
-    "n": 8,
-    "hits": 8
+    "n": 18,
+    "hits": 17
   },
   "by_kind": {
     "right": {
-      "n": 12,
-      "hits": 1
+      "n": 24,
+      "hits": 23
     },
     "next_door": {
-      "n": 8,
-      "hits": 8
+      "n": 18,
+      "hits": 17
     },
     "wrong": {
-      "n": 8,
-      "hits": 8
+      "n": 12,
+      "hits": 12
     }
   },
+  "thresholds": {
+    "min_inliers": 40,
+    "max_offset_m": 18.0
+  },
+  "inlier_range": {
+    "right": [
+      293,
+      764
+    ],
+    "next_door": [
+      171,
+      609
+    ],
+    "wrong": [
+      0,
+      4
+    ]
+  },
+  "offset_m_range": {
+    "right": [
+      1.3,
+      20.0
+    ],
+    "next_door": [
+      16.4,
+      49.2
+    ],
+    "wrong": [
+      9.6,
+      130.0
+    ]
+  },
   "hash_diff_range": {
-    "right": [5, 31],
-    "next_door": [14, 42],
-    "wrong": [27, 38]
+    "right": [
+      4,
+      31
+    ],
+    "next_door": [
+      11,
+      42
+    ],
+    "wrong": [
+      26,
+      38
+    ]
   },
   "hash_threshold": 8,
+  "split": {
+    "tuned_on": [
+      "vx-n01",
+      "vx-n03",
+      "vx-n05",
+      "vx-n07",
+      "vx-n09",
+      "vx-n11",
+      "vx-n13",
+      "vx-n15",
+      "vx-n17",
+      "vx-r01",
+      "vx-r03",
+      "vx-r05",
+      "vx-r07",
+      "vx-r09",
+      "vx-r11",
+      "vx-r13",
+      "vx-r15",
+      "vx-r17",
+      "vx-r19",
+      "vx-r21",
+      "vx-r23",
+      "vx-w01",
+      "vx-w03",
+      "vx-w05",
+      "vx-w07",
+      "vx-w09",
+      "vx-w11"
+    ],
+    "held_out_ids": [
+      "vx-n02",
+      "vx-n04",
+      "vx-n06",
+      "vx-n08",
+      "vx-n10",
+      "vx-n12",
+      "vx-n14",
+      "vx-n16",
+      "vx-n18",
+      "vx-r02",
+      "vx-r04",
+      "vx-r06",
+      "vx-r08",
+      "vx-r10",
+      "vx-r12",
+      "vx-r14",
+      "vx-r16",
+      "vx-r18",
+      "vx-r20",
+      "vx-r22",
+      "vx-r24",
+      "vx-w02",
+      "vx-w04",
+      "vx-w06",
+      "vx-w08",
+      "vx-w10",
+      "vx-w12"
+    ],
+    "tuned": {
+      "min_inliers": 40,
+      "max_offset_m": 18.0
+    },
+    "tune": {
+      "right": {
+        "n": 12,
+        "hits": 12
+      },
+      "next_door": {
+        "n": 9,
+        "hits": 9
+      },
+      "wrong": {
+        "n": 6,
+        "hits": 6
+      }
+    },
+    "held_out": {
+      "right": {
+        "n": 12,
+        "hits": 11
+      },
+      "next_door": {
+        "n": 9,
+        "hits": 8
+      },
+      "wrong": {
+        "n": 6,
+        "hits": 6
+      }
+    },
+    "all_with_tuned": {
+      "right": {
+        "n": 24,
+        "hits": 23
+      },
+      "next_door": {
+        "n": 18,
+        "hits": 17
+      },
+      "wrong": {
+        "n": 12,
+        "hits": 12
+      }
+    }
+  },
   "bar": "18 of 20 (at least 20 cases, 90 percent), and 6+ next-door cases at 90 percent",
-  "bar_met": false,
+  "bar_met": true,
   "next_door_ok": true,
+  "gate": "held-out half: right >= 90%, next-door >= 90%, other wrong 100%, LIVE only",
+  "gate_met": false,
   "gate_open": false,
   "synthetic_cases": false,
-  "cases_from": "local kit set"
+  "per_pair": {
+    "cpu_ms": 378,
+    "wall_ms": 174
+  },
+  "cases_from": "cases_v2.json"
 }
