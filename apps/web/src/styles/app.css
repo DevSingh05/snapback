@@ -1,7 +1,20 @@
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* 17px root on a desk, 16px on a phone: every rem follows. */
+html {
+  font-size: 17px;
+}
+@media (max-width: 760px) {
+  html {
+    font-size: 16px;
+  }
 }
 
 body {
@@ -9,7 +22,7 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 1.0625rem;
+  font-size: 1rem;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
@@ -47,7 +60,7 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  background: linear-gradient(180deg, var(--sky), var(--paper) 28rem);
+  background: var(--paper);
 }
 
 .card-page {
@@ -76,29 +89,27 @@ h2 {
 }
 
 .chip {
+  /* LIVE or FIXTURE is drawn by ui/Tag. These rules keep the same look for the few places that
+     still write the chip by hand (a mono word with a 7px square before it, no tile). */
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  padding: 0;
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 0.78rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.08em;
-  padding: 5px 12px;
-  border-radius: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .chip-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 0;
-  background: currentColor;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--st-unchecked);
 }
-.chip-fixture {
-  color: var(--blue);
-  background: var(--blue-soft);
-}
-.chip-live {
-  color: var(--teal);
-  background: var(--teal-soft);
+.chip-live .chip-dot {
+  background: var(--st-ok);
 }
 
 .hero {
@@ -848,7 +859,7 @@ button {
   opacity: 0.09;
 }
 
-/* The house glyph. */
+/* The house glyph is the SNAPBACK mark (ui/Mark.tsx); these keep its old sizes. */
 .house {
   display: block;
   width: 96px;
@@ -856,49 +867,17 @@ button {
   flex: none;
   overflow: visible;
 }
-.house-lawn {
-  fill: var(--h-lawn);
-}
-.house-shade {
-  fill: var(--h-shade);
-}
-.house-path {
-  fill: var(--h-path);
-}
-.house-wall-left {
-  fill: var(--h-wall-shade);
-}
-.house-wall-right {
-  fill: var(--h-wall);
-}
-.house-roof {
-  fill: var(--h-roof);
-}
-.house-door {
-  fill: var(--h-door);
-}
-.house-window {
-  fill: var(--h-unlit);
-}
-.house-lit .house-window {
-  fill: var(--h-lit);
-}
-.house-roof-far {
-  fill: var(--h-roof-far);
-}
-.house-fascia,
-.house-verge {
-  fill: var(--h-roof-edge);
-}
 
 .wordmark {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  letter-spacing: 0.2em;
+  font-size: 0.875rem;
 }
-.wordmark-house {
-  width: 34px;
-  margin-block: -6px;
+.wordmark .ui-mark {
+  width: 22px;
+  height: 22px;
 }
 
 /* The verdict: one deep ink band for every state. The state is carried by a bright tile with

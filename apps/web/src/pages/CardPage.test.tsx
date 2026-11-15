@@ -8,10 +8,10 @@ import { CardPage, CardView } from "./CardPage";
 const card = cardHold as Card;
 
 describe("CardView with card_hold.json", () => {
-  it("shows PLACE, PERSON, PRICE in that order", () => {
+  it("names the kind of every check, failing ones first, then passing, then not checked", () => {
     render(<CardView card={card} variant="result" />);
     const labels = screen.getAllByTestId("row-label").map((el) => el.textContent);
-    expect(labels).toEqual(["PLACE", "PERSON", "PRICE"]);
+    expect(labels).toEqual(["PERSON", "PRICE", "PLACE", "PERSON", "PRICE"]);
   });
 
   it("shows the FIXTURE chip for fixture data and LIVE for live data", () => {
@@ -24,9 +24,11 @@ describe("CardView with card_hold.json", () => {
 
   it("uses the exact strings from the card, including NOT SHOWN", () => {
     render(<CardView card={card} variant="result" />);
-    expect(screen.getByText(/Being inside does not mean they may rent it/)).toBeInTheDocument();
-    expect(screen.getByText(/NOT SHOWN\./)).toBeInTheDocument();
-    expect(screen.getByText("Zelle before a viewing. Red flag.")).toBeInTheDocument();
+    // The same lines are in the two lists above; the ledger rows are the ones checked here.
+    const rows = screen.getAllByRole("row").map((r) => r.textContent ?? "");
+    expect(rows.some((t) => t.includes("Being inside does not mean they may rent it"))).toBe(true);
+    expect(rows.some((t) => t.includes("NOT SHOWN."))).toBe(true);
+    expect(rows.some((t) => t.includes("Zelle before a viewing. Red flag."))).toBe(true);
   });
 
   it("lists what was not checked and the footer rules", () => {
@@ -59,9 +61,11 @@ describe("CardView with card_hold.json", () => {
 });
 
 describe("Lab placement", () => {
-  it("is on the result page and hidden on the verify page", async () => {
+  it("is on neither the result page nor the verify page", async () => {
+    // Conductor ruling, Sat 18:2x: the Lab chart block leaves the case result entirely.
     const result = render(<CardPage caseId={card.case_id} variant="result" />);
-    expect(await result.findByTestId("lab-panel")).toBeInTheDocument();
+    await result.findByTestId("case-id");
+    expect(result.queryByTestId("lab-panel")).toBeNull();
     result.unmount();
     const verify = render(<CardPage caseId={card.case_id} variant="verify" />);
     await verify.findByTestId("case-id");

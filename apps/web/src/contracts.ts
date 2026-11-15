@@ -126,6 +126,38 @@ export interface TraceEvent {
   chosen_by: ChosenBy;
 }
 
+// One step of "What your agent did" (GET /cases/{id}/timeline), in the order it happened.
+// The label is plain words (en/es) with counts only: never a phone number, address or rent.
+// `by` is "agent" when the language model made the step happen, "code" otherwise; the result
+// is always code's. took_ms runs until the next step began (0 for the last and derived lines).
+export interface TimelineStep {
+  step: number;
+  label: string;
+  started_ms: number;
+  took_ms: number;
+  result: string;
+  source: DataSource;
+  by: "agent" | "code";
+}
+
+export interface TimelineTodo {
+  content: string;
+  done: boolean;
+}
+
+// GET /cases/{id}/timeline. Read token in a header; served with Cache-Control no-store.
+// `todos` (the agent's last todo list) and `plan` (sub-agents it handed work to, in order)
+// are empty unless the deep agent ran. `fell_back`: the agent stopped and code finished.
+export interface CaseTimeline {
+  case_id: string;
+  source: DataSource;
+  mode: "policy" | "deepagents";
+  fell_back: boolean;
+  steps: TimelineStep[];
+  todos: TimelineTodo[];
+  plan: string[];
+}
+
 // One working note the agent wrote (GET /cases/{id}/notes). Derived text only.
 export interface CaseNote {
   path: string;
@@ -274,6 +306,28 @@ export interface RealListing {
   phone_line?: string | null;
   cta_label?: string | null; // "See the real listing"
   cta_url?: string | null; // availability link, else https://<website_host>; only with figures
+}
+
+// Mirrors ReportSteps and ReportResponse in src/snapback/contracts.py (GET /cases/{id}/report;
+// read token in a header, never in the address). Listing facts only: no score, nothing about the
+// renter, no word about any person. `platforms` carries steps only when `reportable`.
+export interface ReportSteps {
+  platform: "facebook" | "zillow" | "craigslist";
+  name: string; // "Facebook Marketplace", "Zillow", "Craigslist"
+  steps: string[]; // what to click, in order
+}
+
+export interface ReportPack {
+  case_id: string;
+  source: DataSource; // show the LIVE or FIXTURE chip from this
+  lang: string;
+  checked_at: string;
+  state: VerdictState;
+  reportable: boolean; // true only on proof, or a record that shows the home for sale
+  proof_lines: string[]; // decide()'s own reasons, in order
+  twin_url?: string | null;
+  platforms?: ReportSteps[];
+  not_checked: string[];
 }
 
 // Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a
