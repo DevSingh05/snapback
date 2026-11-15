@@ -129,8 +129,9 @@ EN: dict[str, str] = {
     "allowed.call_office": "Not confirmed. Call the office on record yourself.",
     # Contact on record. The phone number itself and the record's web address are never shown.
     # A match is a supporting line only. It never counts as matching the record by itself.
+    # Issue #10: said as plainly as the "Not confirmed" line beside it. Never the digits.
     "contact.phone_match": (
-        "The phone matches the leasing office on record. Call it yourself to confirm."
+        "Matches. This is the leasing office's number on record. Call it yourself to confirm."
     ),
     # H1: the name matches the record and there was no phone to compare with the office's.
     "contact.phone_unchecked": (
@@ -662,7 +663,7 @@ ES: dict[str, str] = {
         "Sin confirmar. Llame usted mismo a la oficina que figura en el registro."
     ),
     "contact.phone_match": (
-        "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
+        "Coincide. Es el número de la oficina de alquiler que figura en el registro. "
         "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_unchecked": (
@@ -1135,8 +1136,10 @@ EN.update(
         "claimword.yard": "a yard",
         "claimword.pets": "pets are allowed",
         "claimword.beds": "{ad_value} bedrooms",
+        "claimword.beds_one": "1 bedroom",
         "claimword.beds_studio": "a studio",
         "claimword.baths": "{ad_value} bathrooms",
+        "claimword.baths_one": "1 bathroom",
         "claimword.sqft": "{ad_value} square feet",
         "claimword.new_management": "new management",
         "claimword.new_ownership": "new ownership",
@@ -1273,8 +1276,10 @@ ES.update(
         "claimword.yard": "patio o jardín",
         "claimword.pets": "se aceptan mascotas",
         "claimword.beds": "{ad_value} recámaras",
+        "claimword.beds_one": "1 recámara",
         "claimword.beds_studio": "un estudio",
         "claimword.baths": "{ad_value} baños",
+        "claimword.baths_one": "1 baño",
         "claimword.sqft": "{ad_value} pies cuadrados",
         "claimword.new_management": "nueva administración",
         "claimword.new_ownership": "nuevos dueños",
@@ -1682,6 +1687,16 @@ def has(key: str, lang: str = DEFAULT_LANG) -> bool:
 def text(key: str, lang: str = DEFAULT_LANG, **values: object) -> str:
     """The wording for `key`, with `{placeholders}` filled in. A missing key is a bug: KeyError."""
     return _table(lang)[key].format(**values)
+
+
+def claim_word(claim: str, ad_value: str | None, lang: str = DEFAULT_LANG) -> str:
+    """The ad's claim in the table's words: "a studio" for 0 beds, singular for 1 (#257)."""
+    key = claim
+    if claim == "beds" and ad_value == "0":
+        key = "beds_studio"
+    elif claim in ("beds", "baths") and ad_value == "1":
+        key = f"{claim}_one"
+    return text(f"claimword.{key}", lang, ad_value=ad_value or "", record_value="")
 
 
 def tone_word(tone: str, row: str, lang: str = DEFAULT_LANG) -> str:

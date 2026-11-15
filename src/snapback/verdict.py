@@ -298,9 +298,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
        red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
        leasing office's, a unit that does not fit the record and a licence number in the ad that is
        not active are not proof either.
-    2. No photo placed in the claimed property gives UNVERIFIED, with what the record
-       flagged listed among the reasons. One thing outranks it: a home listed for sale is
-       HOLD, with that reason first, whether or not any photo could be placed.
+    2. No photo placed in the claimed property (none sent, or none placed) gives UNVERIFIED,
+       with what the record flagged listed among the reasons. Any red flag outranks it (#10):
+       price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike link,
+       unit or a licence number in the ad that is not active gives HOLD, the verdict the same
+       flags give with photos, whether or not any photo could be placed. Something only "not
+       confirmed" (step 4) does not outrank it.
     3. Presence proven, authority matching the record, the ad's phone being the leasing
        office's on record, and no red flag of any kind gives VERIFIED. The phone is needed
        (red team H1, Sat 03:25): anyone can type the manager's public name, and a door code
@@ -381,16 +384,6 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         # through family, trusts and companies. It holds the case and is never a red flag.
         unconfirmed = [*unconfirmed, "reason.owner_not_poster"]
 
-    if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
-        unplaced = (
-            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
-        )
-        # For sale outranks "could not place" (conductor ruling, Sat 02:00). A home that is
-        # for sale usually has no scan to place photos in, and "we could not check" is the
-        # wrong thing to lead with. Still HOLD, never DONT_PAY: it is not proof.
-        state = VerdictState.HOLD if evidence.for_sale_flag else VerdictState.UNVERIFIED
-        return verdict(state, unplaced, *on_record, *unconfirmed)
-
     red_flags = []
     if evidence.price_flag:
         red_flags.append("reason.price_flag")
@@ -399,6 +392,18 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     elif evidence.rule_flag:
         red_flags.append("reason.rule_flag")
     red_flags.extend(on_record)
+
+    if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
+        unplaced = (
+            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
+        )
+        # A red flag outranks "could not place" (conductor ruling, Sat 02:00, for sale; issue
+        # #10, every red flag): no photos, or none placed, does not soften a lookalike link, a
+        # payment by app or a fee before a viewing. The verdict is the one the same flags give
+        # with photos, HOLD, never DONT_PAY: none of it is proof. "Not confirmed" alone is not
+        # a red flag and still reads UNVERIFIED here.
+        state = VerdictState.HOLD if red_flags else VerdictState.UNVERIFIED
+        return verdict(state, unplaced, *red_flags, *unconfirmed)
 
     if (
         evidence.presence is PresenceStatus.PROVEN
@@ -1066,12 +1071,7 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     for note in modules.ad_notes:
         if not strings.has(f"claims.{note.key}", lang):
             continue
-        claim_key = note.claim
-        if note.claim == "beds" and note.ad_value == "0":
-            claim_key = "beds_studio"
-        claim = strings.text(
-            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
-        )
+        claim = strings.claim_word(note.claim, note.ad_value, lang)
         label = "label.ad_claim"
         if note.pretext:
             label = "label.ad_pretext"

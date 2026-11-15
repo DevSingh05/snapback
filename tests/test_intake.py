@@ -176,6 +176,45 @@ def test_contact_claims_are_what_the_poster_says_about_themselves():
     assert contacts.emails == ["leasing@example.com"]
 
 
+@pytest.mark.parametrize("written", ["5550100142", "15550100142", "+15550100142"])
+def test_a_phone_written_as_bare_digits_is_still_a_phone(written):
+    # Issue #10 (Jeffrey's dry run): CoStar's record keeps the office phone as ten bare digits,
+    # and an ad that pastes it that way read as having no phone, so no Contact line at all.
+    assert extract_contacts(f"Call {written} to tour.").phones == [written]
+
+
+@pytest.mark.parametrize(
+    "text", ["Ref 555010014212", "Order 55501001420", "$5550100142", "ID 555010014"]
+)
+def test_a_long_or_short_digit_run_is_not_a_phone(text):
+    assert extract_contacts(text).phones == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "See https://houston.craigslist.org/apa/d/x/7801234567.html for photos.",
+        "houston.craigslist.org/apa/d/x/7801234567.html",
+        "Listing ID 4815162342",
+        "MLS# 8123456789",
+        "Account 1234567890",
+        "id=7135550142&a",
+        "ref #5550100142",
+        "x/5550100142",
+        "v.5550100142",
+    ],
+)
+def test_a_bare_digit_run_in_a_link_or_an_id_is_not_a_phone(text):
+    # Review of #257 (H1): a second "phone" makes check_phone say NO, and a real office ad
+    # loses its green Contact line.
+    assert extract_contacts(text).phones == []
+
+
+def test_an_office_ad_with_a_post_link_keeps_only_its_phone():
+    text = "Call 5550100142. Photos: https://houston.craigslist.org/apa/d/x/7801234567.html"
+    assert extract_contacts(text).phones == ["5550100142"]
+
+
 def test_no_contact_claims_in_plain_text():
     contacts = extract_contacts("Quiet street near the park, 2 bed / 2 bath.")
     assert (contacts.company, contacts.phones, contacts.emails) == (None, [], [])
