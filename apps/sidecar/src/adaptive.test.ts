@@ -27,7 +27,8 @@ const PLACES = {
       rent_max: 1490,
       price_text: "$1,400 to $1,490 a month",
       office_on_record: "Fixture Living LLC",
-      handoff_url: "https://oakcourt.example/availability",
+      budget_fit: "within",
+      availability_text: "as of CoStar's last research",
     },
     {
       property_id: "fx-2",
@@ -36,7 +37,8 @@ const PLACES = {
       rent_min: 1300,
       price_text: "$1,300 a month",
       office_on_record: "Sample Homes Co",
-      handoff_url: null,
+      budget_fit: "within",
+      availability_text: "as of CoStar's last research",
     },
   ],
 };
@@ -176,7 +178,7 @@ test("'show me safer homes' searches with the remembered budget and beds", async
   assert.equal(brief.beds_min, 2);
   const reply = c.texts[0] ?? "";
   assert.match(reply, /Fixture Living LLC/);
-  assert.match(reply, /oakcourt\.example\/availability/);
+  assert.match(reply, /http:\/\/web\.test\/map/); // /search carries no hand-off link: the map
   assert.doesNotMatch(reply, /1,?400|1,?490|1,?300/, "record rents never in a reply");
   assert.equal(posts(calls).length, 0, "no check");
 });
@@ -202,4 +204,58 @@ test("with no profile store, nothing is learned and the old behavior stands", as
   const c = client();
   await handleMessage(said("My budget is $1,500 and I need 2 beds"), c, plain);
   assert.equal(posts(calls).length, 1, "checked like any text");
+});
+
+// --- XO review of #264 ----------------------------------------------------------------------------
+
+test("[High] a short ad with no photos is checked, and nothing is learned from it", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(
+    said("Need a tenant for my 3 bedroom house near downtown. Text me at 555-0100"),
+    client(),
+    cfg,
+  );
+  assert.equal(posts(calls).length, 1);
+  assert.equal(cfg.profiles.get(KEY), null);
+});
+
+test("[High] 'my budget is' with a phone number is not a budget, and the ad is checked", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("my budget is 713-555-0100"), client(), cfg);
+  assert.equal(cfg.profiles.get(KEY)?.budget, undefined);
+});
+
+test("[Med] an English ad never flips a Spanish renter, nor sets their city or beds", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("Hola, mi presupuesto es $1,200 y necesito 2 recámaras"), client(), cfg);
+  const c = client();
+  await handleMessage(
+    said("Enjoy living in Houston! 3 bed / 2 bath, $1,500 a month, I need a deposit by Zelle"),
+    c,
+    cfg,
+  );
+  assert.equal(posts(calls).length, 1, "the ad was checked");
+  assert.deepEqual(cfg.profiles.get(KEY), { lang: "es", budget: 1200, beds: 2 });
+  assert.match(c.texts[0] ?? "", /^Espere por ahora/, "still answered in Spanish");
+});
+
+test("[Med] 'what do you remember?' with nothing kept never wipes the case", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("2 bed $900, Zelle first"), client(), cfg);
+  await handleMessage(said("what do you remember?"), client(), cfg);
+  const c = client();
+  await handleMessage(said("why?"), c, cfg);
+  assert.doesNotMatch(c.texts[0] ?? "", /Send me the ad first/);
+});
+
+test("[High] a phone-like number makes a short message an ad to check, not a profile", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("I need 2 beds 713-555-0100"), client(), cfg);
+  assert.equal(posts(calls).length, 1);
+  assert.equal(cfg.profiles.get(KEY), null);
 });

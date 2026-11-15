@@ -23,7 +23,11 @@ test("budget and beds are learned only from the renter's own words, never an ad'
     beds: 2,
   });
   assert.equal(learnFrom("I can pay up to 1800 a month").budget, 1800);
-  assert.equal(learnFrom("looking for a 3 bedroom").beds, 3);
+  assert.equal(learnFrom("I'm looking for a 3 bedroom").beds, 3);
+  // [High] only first-person forms: an ad's "Need a tenant for my 3 bedroom" is not the renter's
+  assert.equal(learnFrom("Need a tenant for my 3 bedroom house near downtown").beds, undefined);
+  // [High] a phone number is never a budget
+  assert.equal(learnFrom("my budget is 713-555-0100").budget, undefined);
   // an ad's own rent and beds are not the renter's budget
   const ad = learnFrom("2 bed / 2 bath apartment, $1,150 a month, Zelle the deposit");
   assert.equal(ad.budget, undefined);
@@ -43,6 +47,15 @@ test("a city is learned when the renter says where they are moving or looking", 
 });
 
 // --- the store -----------------------------------------------------------------------------------
+
+test("[Med] once a renter is Spanish, nothing flips them to English but asking", () => {
+  const store = new ProfileStore();
+  store.learn(KEY, "Hola, mi presupuesto es $1,200 y necesito 2 recámaras");
+  store.learn(KEY, "Hi, I need a place, is this real and is it for rent please");
+  assert.equal(store.get(KEY)?.lang, "es");
+  assert.match(profileCommand("English please", KEY, store)?.text ?? "", /English/);
+  assert.equal(store.get(KEY)?.lang, "en");
+});
 
 test("the store merges what it learns, keyed only by the keyed hash", () => {
   const store = new ProfileStore();
@@ -75,7 +88,8 @@ test("the file holds only the keyed hash and the learned fields, never words or 
   const dir = mkdtempSync(join(tmpdir(), "snapback-profile-"));
   const file = join(dir, "profiles.json");
   const store = new ProfileStore(file);
-  store.learn(KEY, "My budget is $1,500. Call me at 555-0142, I'm moving to Houston");
+  store.learn(KEY, "My budget is $1,500");
+  store.learn(KEY, "Call me at 555-0142, I'm moving to Houston");
   const saved = readFileSync(file, "utf8");
   assert.ok(saved.includes(KEY));
   assert.doesNotMatch(saved, /555|Call me/);
@@ -94,24 +108,30 @@ test("a missing or broken file starts empty, never crashes", () => {
 test("'what do you remember?' lists what is kept, in the renter's language", () => {
   const store = new ProfileStore();
   store.learn(KEY, "My budget is $1,500 and I need 2 beds, moving to Houston");
-  const said = profileCommand("What do you remember?", KEY, store);
+  const said = profileCommand("What do you remember?", KEY, store)?.text;
   assert.match(said ?? "", /budget: \$1,500/);
   assert.match(said ?? "", /beds: 2/);
   assert.match(said ?? "", /city: Houston/);
   assert.match(said ?? "", /forget me/);
   const es = new ProfileStore();
   es.learn(KEY, "Hola, mi presupuesto es $1,200 y necesito 2 recámaras");
-  assert.match(profileCommand("¿qué recuerdas?", KEY, es) ?? "", /presupuesto: \$1,200/);
+  assert.match(profileCommand("¿qué recuerdas?", KEY, es)?.text ?? "", /presupuesto: \$1,200/);
 });
 
 test("'what do you remember?' with nothing kept says so", () => {
-  assert.match(profileCommand("what do you remember", KEY, new ProfileStore()) ?? "", /nothing/i);
+  assert.match(
+    profileCommand("what do you remember", KEY, new ProfileStore())?.text ?? "",
+    /nothing/i,
+  );
 });
 
 test("'forget me' wipes it and says so; other text is not a command", () => {
   const store = new ProfileStore();
   store.learn(KEY, "My budget is $1,500");
-  assert.match(profileCommand("forget me", KEY, store) ?? "", /forgot/i);
+  assert.equal(profileCommand("forget me", KEY, store)?.kind, "forget");
+  assert.equal(store.get(KEY), null);
+  store.learn(KEY, "My budget is $1,500");
+  assert.match(profileCommand("forget me", KEY, store)?.text ?? "", /forgot/i);
   assert.equal(store.get(KEY), null);
   assert.equal(profileCommand("2 bed $900 Zelle first", KEY, store), null);
 });

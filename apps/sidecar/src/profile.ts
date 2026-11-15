@@ -38,6 +38,9 @@ const CITIES = [
   "Princeton",
 ];
 
+/** A phone-like run of digits: "713-555-0100", "555 0142", "(713) 555-0100". */
+export const PHONE_LIKE = /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]\d{4}|\b\d{3}[-.\s]\d{4}\b/;
+
 function money(raw: string): number | undefined {
   const n = Number(raw.replace(/[,$\s]/g, ""));
   return Number.isFinite(n) && n >= 200 && n <= 50_000 ? n : undefined;
@@ -54,11 +57,12 @@ export function learnFrom(text: string): Profile {
     /\b(?:my budget(?: is)?|budget of|i can (?:afford|pay)(?: up to)?|i can spend(?: up to)?|mi presupuesto(?: es)?|puedo pagar(?: hasta)?)\s*(?:about|around|is|of|hasta)?\s*(\$?\s?\d{1,2},?\d{3}|\$?\s?\d{3,5})/i.exec(
       said,
     );
-  const amount = budget?.[1] ? money(budget[1]) : undefined;
+  // a phone number is never a budget ("my budget is 713-555-0100")
+  const amount = budget?.[1] && !PHONE_LIKE.test(said) ? money(budget[1]) : undefined;
   if (amount !== undefined) out.budget = amount;
 
   const beds =
-    /\b(?:i need|i want|looking for|need|busco|necesito|quiero)\b[^.!?\n]{0,30}?\b(\d{1,2})\s*(?:-|\s)?(?:beds?|bedrooms?|br|bd|recámaras?|recamaras?|habitaciones?|cuartos?)\b/i.exec(
+    /\b(?:i need|i want|i'm looking for|im looking for|i am looking for|we need|we're looking for|we are looking for|busco|necesito|quiero|buscamos|necesitamos)\b[^.!?\n]{0,30}?\b(\d{1,2})\s*(?:-|\s)?(?:beds?|bedrooms?|br|bd|recámaras?|recamaras?|habitaciones?|cuartos?)\b/i.exec(
       said,
     );
   if (beds?.[1]) out.beds = Number(beds[1]);
@@ -110,15 +114,24 @@ export class ProfileStore {
     return Object.keys(profile).length ? profile : null;
   }
 
-  /** Merge what this message says about the renter. Returns the profile after. */
+  /** Merge what this message says about the renter. Returns the profile after. A renter who
+   * writes Spanish stays Spanish until they ask for English ("English please"). */
   learn(key: string, text: string): Profile {
     const learned = learnFrom(text);
     const before = this.get(key) ?? {};
+    if (before.lang === "es" && learned.lang === "en") delete learned.lang;
     if (Object.keys(learned).length === 0) return before;
     const after = { ...before, ...learned };
     this.all.set(key, { ...after, at: this.now() });
     this.save();
     return after;
+  }
+
+  /** The renter's explicit choice of language. */
+  setLang(key: string, lang: Lang): void {
+    const before = this.get(key) ?? {};
+    this.all.set(key, { ...before, lang, at: this.now() });
+    this.save();
   }
 
   forget(key: string): void {
@@ -141,6 +154,9 @@ export class ProfileStore {
 
 const REMEMBER =
   /^\s*(what do you (remember|know)( about me)?|what have you (saved|kept)|¿?qu[ée] (recuerdas|sabes)( de m[ií])?\??)\s*[?.!]*\s*$/i;
+const TO_ENGLISH = /^\s*(english( please)?|in english( please)?|reply in english)\s*[.!]*\s*$/i;
+const TO_SPANISH =
+  /^\s*(en espa[nñ]ol( por favor)?|espa[nñ]ol( por favor)?|in spanish)\s*[.!]*\s*$/i;
 const FORGET =
   /^\s*(forget me|forget everything|delete my (data|info)|olv[ií]dame|borra mis datos)\s*[.!]*\s*$/i;
 
@@ -157,16 +173,38 @@ function listed(profile: Profile, lang: Lang): string[] {
   return lines;
 }
 
-/** The reply to "what do you remember?" or "forget me", or null when it is neither. */
-export function profileCommand(text: string, key: string, store: ProfileStore): string | null {
+export type ProfileCommand = { kind: "forget" | "remember" | "lang"; text: string };
+
+/** The reply to "what do you remember?", "forget me" or a language choice, with which one it
+ * was, or null when the text is none of them. */
+export function profileCommand(
+  text: string,
+  key: string,
+  store: ProfileStore,
+): ProfileCommand | null {
   const spanish = /[¿¡]|olv[ií]dame|recuerdas|borra/i.test(text);
   if (FORGET.test(text)) {
     store.forget(key);
-    return spanish
-      ? "Listo, olvidé todo lo que sabía de usted."
-      : "Done. I forgot everything I knew about you.";
+    return {
+      kind: "forget",
+      text: spanish
+        ? "Listo, olvidé todo lo que sabía de usted."
+        : "Done. I forgot everything I knew about you.",
+    };
+  }
+  if (TO_ENGLISH.test(text)) {
+    store.setLang(key, "en");
+    return { kind: "lang", text: "OK, I'll reply in English." };
+  }
+  if (TO_SPANISH.test(text)) {
+    store.setLang(key, "es");
+    return { kind: "lang", text: "Listo, le respondo en español." };
   }
   if (!REMEMBER.test(text)) return null;
+  return { kind: "remember", text: rememberList(key, store, spanish) };
+}
+
+function rememberList(key: string, store: ProfileStore, spanish: boolean): string {
   const profile = store.get(key);
   const lang: Lang = profile?.lang ?? (spanish ? "es" : "en");
   const lines = profile ? listed(profile, lang) : [];

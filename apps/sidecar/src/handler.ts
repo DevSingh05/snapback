@@ -14,7 +14,14 @@
 
 import { createHmac } from "node:crypto";
 
-import { profileCommand, type Lang, type Profile, type ProfileStore } from "./profile";
+import {
+  PHONE_LIKE,
+  learnFrom,
+  profileCommand,
+  type Lang,
+  type Profile,
+  type ProfileStore,
+} from "./profile";
 
 /** One inbound message from a renter, whatever channel it arrived on. */
 export type InboundMessage = {
@@ -464,11 +471,12 @@ function whoToCall(
   return lines.join("\n");
 }
 
+/** The part of /search's PlaceMatch this reply reads. It carries no hand-off link (that is
+ * on /alternatives), and its rents are never read, so they can never reach a reply. */
 type PlaceMatch = {
   kind?: string;
   floor_plan?: string | null;
   office_on_record?: string | null;
-  handoff_url?: string | null;
 };
 
 /** "show me safer homes": researched places that fit the remembered budget and beds, from our
@@ -519,21 +527,25 @@ async function saferHomes(
   for (const place of places) {
     const what = place.floor_plan ?? place.kind ?? "";
     const who = place.office_on_record ? ` · ${place.office_on_record}` : "";
-    const where = place.handoff_url ? ` · ${place.handoff_url}` : "";
-    lines.push(`- ${what}${who}${where}`);
+    lines.push(`- ${what}${who}`);
   }
   lines.push(es ? "(según la última investigación de CoStar)" : "(as of CoStar's last research)");
+  const map = `${config.webUrl.replace(/\/$/, "")}/map`;
+  lines.push(es ? `Véalos en el mapa: ${map}` : `See them on the map: ${map}`);
   return lines.join("\n");
 }
 
 const AD_CUES =
-  /zelle|deposit|dep[oó]sito|venmo|cash ?app|wire|for rent|se renta|\bbath|ba[nñ]o|https?:|\$\s?\d{3,5}\s*(a|per|\/)\s*(month|mo)/i;
+  /zelle|deposit|dep[oó]sito|venmo|cash ?app|wire|for rent|se renta|tenant|inquilino|text me|call me|av[ai]lable|disponible|move[- ]in|\bbath|ba[nñ]o|\$\s?\d{3,5}\s*(a|per|\/)\s*(month|mo)/i;
+const A_LINK = /https?:|www\./i;
 
-/** A message that only tells us about the renter (budget, beds, city), not an ad to check. */
-function onlyAboutThem(text: string, before: Profile | null, after: Profile): boolean {
-  if (text.length > 160 || AD_CUES.test(text)) return false;
-  const learned = (["budget", "beds", "city"] as const).some((k) => after[k] !== before?.[k]);
-  return learned;
+/** A message that only tells us about the renter (budget, beds, city), not an ad to check: no ad
+ * wording, no phone-like digits, no link, and it states something about them. */
+function onlyAboutThem(text: string, learned: Profile): boolean {
+  if (text.length > 160 || AD_CUES.test(text) || PHONE_LIKE.test(text) || A_LINK.test(text)) {
+    return false;
+  }
+  return learned.budget !== undefined || learned.beds !== undefined || learned.city !== undefined;
 }
 
 function rememberedText(profile: Profile, lang: Lang): string {
@@ -637,17 +649,21 @@ export async function handleMessage(
   if (config.profiles) {
     const command = profileCommand(text, key, config.profiles);
     if (command !== null) {
-      if (config.profiles.get(key) === null) config.memory?.forget(key); // "forget me"
-      await client.reply(msg.threadId, command);
+      if (command.kind === "forget") config.memory?.forget(key); // only "forget me" wipes the case
+      await client.reply(msg.threadId, command.text);
       return true;
     }
-    const before = config.profiles.get(key);
-    profile = config.profiles.learn(key, text);
+    const learned = learnFrom(text);
     const noPhotos = (msg.images?.length ?? 0) === 0 && msg.imageUrls.length === 0;
-    if (noPhotos && onlyAboutThem(text, before, profile)) {
+    if (noPhotos && onlyAboutThem(text, learned)) {
+      profile = config.profiles.learn(key, text);
       await client.reply(msg.threadId, rememberedText(profile, profile.lang ?? "en"));
       return true;
     }
+    // Anything else (an ad, a follow-up) teaches nothing. Its language answers this one reply
+    // when the renter has not set one; a Spanish renter is never flipped to English.
+    profile = config.profiles.get(key);
+    if (!profile?.lang && learned.lang) profile = { ...(profile ?? {}), lang: learned.lang };
   }
   const lang: Lang = profile?.lang ?? "en";
   const intent = followUpIntent(msg);
