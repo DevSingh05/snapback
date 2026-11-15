@@ -54,7 +54,7 @@ export function learnFrom(text: string): Profile {
   else if ((said.match(EN_WORDS)?.length ?? 0) >= 2) out.lang = "en";
 
   const budget =
-    /\b(?:my budget(?: is)?|budget of|i can (?:afford|pay)(?: up to)?|i can spend(?: up to)?|mi presupuesto(?: es)?|puedo pagar(?: hasta)?)\s*(?:about|around|is|of|hasta)?\s*(\$?\s?\d{1,2},?\d{3}|\$?\s?\d{3,5})/i.exec(
+    /\b(?:(?:my )?budget(?: is)?|budget of|i can (?:afford|pay)(?: up to)?|i can spend(?: up to)?|mi presupuesto(?: es)?|puedo pagar(?: hasta)?)\s*(?:about|around|is|of|hasta)?\s*(\$?\s?\d{1,2},?\d{3}|\$?\s?\d{3,5})/i.exec(
       said,
     );
   // a phone number is never a budget ("my budget is 713-555-0100")
@@ -66,10 +66,26 @@ export function learnFrom(text: string): Profile {
       said,
     );
   if (beds?.[1]) out.beds = Number(beds[1]);
+  else {
+    // a bare "need 2 beds" opening a clause, with the count right after (never "need a tenant
+    // for my 3 bedroom", which is an ad's)
+    const bare =
+      /(?:^|[,;]\s*)need\s+(?:a\s+)?(\d{1,2})\s*(?:-|\s)?(?:beds?|bedrooms?|br|bd)\b/i.exec(said);
+    if (bare?.[1]) out.beds = Number(bare[1]);
+  }
+  // "I need a 2 bedroom under $1300": a cap is a budget only next to the renter's own need
+  if (out.beds !== undefined && out.budget === undefined && !PHONE_LIKE.test(said)) {
+    const cap =
+      /\b(?:under|up to|no more than|at most|max(?:imum)?)\s*(\$\s?\d{1,2},?\d{3}|\$\s?\d{3,5})/i.exec(
+        said,
+      );
+    const capped = cap?.[1] ? money(cap[1]) : undefined;
+    if (capped !== undefined) out.budget = capped;
+  }
 
   for (const city of CITIES) {
     const where = new RegExp(
-      String.raw`\b(?:i'?m moving to|i am moving to|we'?re moving to|i'?m relocating to|i am relocating to|i live in|we live in|i'?m looking in|i am looking in|i'?m looking for a place in|me mudo a|nos mudamos a|vivo en|busco en)\s+${city}\b`,
+      String.raw`(?:^\s*(?:moving to|relocating to|looking in)\s+${city}\b)|\b(?:i'?m moving to|i am moving to|we'?re moving to|i'?m relocating to|i am relocating to|i live in|we live in|i'?m looking in|i am looking in|i'?m looking for a place in|me mudo a|nos mudamos a|vivo en|busco en)\s+${city}\b`,
       "i",
     );
     if (where.test(said)) {
