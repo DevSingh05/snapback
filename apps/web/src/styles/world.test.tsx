@@ -39,16 +39,16 @@ describe("one world pass", () => {
     }
   });
 
-  it("draws the pinned photo beside the place check and labels it a stand-in", () => {
+  it("shows the photo pair in the band and labels a stand-in as one", () => {
+    // Design v4 ticket 3: the drawing beside the place check became the proof pair. In fixture
+    // mode both photos are stock, and each one says so on its stamp.
     const { container } = render(<CardView card={cardHold as Card} variant="result" />);
-    const place = container.querySelector(".group-place .cell-kind")!;
-    expect(place.querySelector("svg.kit-art-scan .ka-pin")).not.toBeNull();
-    expect(place).toHaveTextContent("Drawn stand-in");
-    expect(screen.getAllByTestId("row-label").map((el) => el.textContent)).toEqual([
-      "PLACE",
-      "PERSON",
-      "PRICE",
-    ]);
+    const shots = container.querySelectorAll(".case-band .case-shot");
+    expect(shots).toHaveLength(2);
+    for (const shot of shots) expect(shot).toHaveTextContent("SAMPLE PHOTO");
+    expect(new Set(screen.getAllByTestId("row-label").map((el) => el.textContent))).toEqual(
+      new Set(["PLACE", "PERSON", "PRICE"]),
+    );
   });
 
   it("draws every kit picture as decoration only", () => {

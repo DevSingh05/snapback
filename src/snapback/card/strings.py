@@ -129,8 +129,9 @@ EN: dict[str, str] = {
     "allowed.call_office": "Not confirmed. Call the office on record yourself.",
     # Contact on record. The phone number itself and the record's web address are never shown.
     # A match is a supporting line only. It never counts as matching the record by itself.
+    # Issue #10: said as plainly as the "Not confirmed" line beside it. Never the digits.
     "contact.phone_match": (
-        "The phone matches the leasing office on record. Call it yourself to confirm."
+        "Matches. This is the leasing office's number on record. Call it yourself to confirm."
     ),
     # H1: the name matches the record and there was no phone to compare with the office's.
     "contact.phone_unchecked": (
@@ -535,6 +536,16 @@ EN: dict[str, str] = {
         "Everything we checked matches the record. "
         "One step left before you pay: ask them to prove they're inside."
     ),
+    # A HOLD where nothing goes against the record but something is still not confirmed (#259).
+    "state.hold_nothing_against": (
+        "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+        "they're inside, and confirm with the office on record."
+    ),
+    # The same, when the record names no manager: there is no office on record to call.
+    "state.hold_nothing_against_no_office": (
+        "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+        "they're inside, and confirm with an office you look up yourself."
+    ),
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -662,7 +673,7 @@ ES: dict[str, str] = {
         "Sin confirmar. Llame usted mismo a la oficina que figura en el registro."
     ),
     "contact.phone_match": (
-        "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
+        "Coincide. Es el número de la oficina de alquiler que figura en el registro. "
         "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_unchecked": (
@@ -1103,6 +1114,14 @@ ES: dict[str, str] = {
         "Todo lo que revisamos coincide con el registro. "
         "Falta un paso antes de pagar: pídales que demuestren que están dentro."
     ),
+    "state.hold_nothing_against": (
+        "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+        "que están dentro y confirme con la oficina que figura en el registro."
+    ),
+    "state.hold_nothing_against_no_office": (
+        "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+        "que están dentro y confirme con una oficina que usted mismo busque."
+    ),
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
     "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",
@@ -1135,8 +1154,10 @@ EN.update(
         "claimword.yard": "a yard",
         "claimword.pets": "pets are allowed",
         "claimword.beds": "{ad_value} bedrooms",
+        "claimword.beds_one": "1 bedroom",
         "claimword.beds_studio": "a studio",
         "claimword.baths": "{ad_value} bathrooms",
+        "claimword.baths_one": "1 bathroom",
         "claimword.sqft": "{ad_value} square feet",
         "claimword.new_management": "new management",
         "claimword.new_ownership": "new ownership",
@@ -1273,8 +1294,10 @@ ES.update(
         "claimword.yard": "patio o jardín",
         "claimword.pets": "se aceptan mascotas",
         "claimword.beds": "{ad_value} recámaras",
+        "claimword.beds_one": "1 recámara",
         "claimword.beds_studio": "un estudio",
         "claimword.baths": "{ad_value} baños",
+        "claimword.baths_one": "1 baño",
         "claimword.sqft": "{ad_value} pies cuadrados",
         "claimword.new_management": "nueva administración",
         "claimword.new_ownership": "nuevos dueños",
@@ -1400,6 +1423,63 @@ ES.update(
     }
 )
 
+# The agent timeline (GET /cases/{id}/timeline) and the deep agent's time limit. Labels carry
+# counts only: never a phone number, an address or a rent.
+EN.update(
+    {
+        "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "timeline.read_ad": "Read the ad",
+        "timeline.which_checks": "Chose which checks to run",
+        "timeline.locate": "Placed {placed} of {total} photos in its 3D scan",
+        "timeline.locate_none": "Looked for the photos in a 3D scan",
+        "timeline.record": "Found the building on CoStar's record",
+        "timeline.record_missing": "Looked for the building on CoStar's record",
+        "timeline.rent": "Compared the rent with {n} floor plans",
+        "timeline.phone": "Checked the phone against the leasing office",
+        "timeline.for_sale": "Looked for a for-sale listing",
+        "timeline.license": "Looked up the license the ad names",
+        "timeline.owner": "Checked the county's owner of record",
+        "timeline.claims": "Compared the ad's claims with the record",
+        "timeline.ask_license": "Asked you for the license number",
+        "timeline.report": "Put the report together",
+        "timeline.skip.record": "Skipped CoStar's record",
+        "timeline.skip.for_sale": "Skipped the for-sale check",
+        "timeline.skip.license": "Skipped the license lookup",
+        "timeline.skip.owner": "Skipped the county's owner of record",
+        "timeline.skip.claims": "Skipped comparing the ad's claims",
+        "timeline.skip.ask_license": "Did not ask for a license number",
+        "timeline.skip.report": "Skipped the report",
+        "timeline.floor_plan": "Matched the photos to a floor plan",
+        "timeline.spot": "Drew a random spot for the photo challenge",
+        "timeline.approval": "Waited for your OK before sending anything",
+        "timeline.status": "Waited for an answer",
+        "timeline.retry": "Decided whether another photo was needed",
+        "timeline.retry_search": "Chose one more search for an unplaced photo",
+        "timeline.walk": "Planned the walk through the 3D scan",
+        "timeline.reply": "Checked the photo that came back",
+        "timeline.tool": "Ran a check",
+        "timeline.plan": "Wrote its plan ({done} of {count} done)",
+        "timeline.delegate": "Handed the {name} checks to a sub-agent",
+        "timeline.note": "Wrote a working note",
+        "timeline.unsure": "Flagged a close call",
+        "timeline.fallback": "The agent stopped, so code finished the checks",
+        "timeline.error": "Code used its own pick",
+        "timeline.verdict": "Code worked out the result",
+        "timeline.result.done": "Done.",
+        "timeline.result.read_ad": "Read what the ad says it is.",
+        "timeline.result.rent.within_range": "Inside the range on record.",
+        "timeline.result.rent.below_range": "Below the range on record.",
+        "timeline.result.rent.not_checked": "No rent on record to compare.",
+        "timeline.result.phone.yes": "It is the office's number.",
+        "timeline.result.phone.no": "It is not the office's number.",
+        "timeline.result.plan": "One todo per step; the agent keeps it up to date.",
+        "timeline.result.handed": "Still working.",
+        "timeline.result.returned": "Handed back its findings in a note.",
+        "timeline.result.note": "Derived text only; no result in it.",
+        "timeline.result.verdict": "Worked out by code from the evidence. No model picks it.",
+    }
+)
+
 EN.update(
     {
         "real.as_of": "as of CoStar's last research",
@@ -1472,6 +1552,60 @@ EN.update(
 
 ES.update(
     {
+        "trace.error.model_timeout": (
+            "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
+        ),
+        "timeline.read_ad": "Leyó el anuncio",
+        "timeline.which_checks": "Eligió qué comprobaciones hacer",
+        "timeline.locate": "Ubicó {placed} de {total} fotos en su escaneo 3D",
+        "timeline.locate_none": "Buscó las fotos en un escaneo 3D",
+        "timeline.record": "Encontró el edificio en el registro de CoStar",
+        "timeline.record_missing": "Buscó el edificio en el registro de CoStar",
+        "timeline.rent": "Comparó la renta con {n} planos",
+        "timeline.phone": "Comparó el teléfono con el de la oficina de arrendamiento",
+        "timeline.for_sale": "Buscó un anuncio de venta",
+        "timeline.license": "Buscó la licencia que nombra el anuncio",
+        "timeline.owner": "Revisó el propietario registrado en el condado",
+        "timeline.claims": "Comparó lo que dice el anuncio con el registro",
+        "timeline.ask_license": "Le pidió el número de licencia",
+        "timeline.report": "Preparó el informe",
+        "timeline.skip.record": "Omitió el registro de CoStar",
+        "timeline.skip.for_sale": "Omitió la búsqueda de venta",
+        "timeline.skip.license": "Omitió la búsqueda de licencia",
+        "timeline.skip.owner": "Omitió el propietario registrado en el condado",
+        "timeline.skip.claims": "Omitió comparar lo que dice el anuncio",
+        "timeline.skip.ask_license": "No pidió un número de licencia",
+        "timeline.skip.report": "Omitió el informe",
+        "timeline.floor_plan": "Emparejó las fotos con un plano",
+        "timeline.spot": "Sorteó un punto para el reto de la foto",
+        "timeline.approval": "Esperó su visto bueno antes de enviar nada",
+        "timeline.status": "Esperó una respuesta",
+        "timeline.retry": "Decidió si hacía falta otra foto",
+        "timeline.retry_search": "Eligió una búsqueda más para una foto sin ubicar",
+        "timeline.walk": "Planeó el recorrido por el escaneo 3D",
+        "timeline.reply": "Revisó la foto que llegó",
+        "timeline.tool": "Hizo una comprobación",
+        "timeline.plan": "Escribió su plan ({done} de {count} hechos)",
+        "timeline.delegate": "Pasó las comprobaciones de {name} a un subagente",
+        "timeline.note": "Escribió una nota de trabajo",
+        "timeline.unsure": "Marcó un caso dudoso",
+        "timeline.fallback": "El agente se detuvo, así que el código terminó las comprobaciones",
+        "timeline.error": "El código usó su propia opción",
+        "timeline.verdict": "El código calculó el resultado",
+        "timeline.result.done": "Hecho.",
+        "timeline.result.read_ad": "Leyó lo que el anuncio dice que es.",
+        "timeline.result.rent.within_range": "Dentro del rango registrado.",
+        "timeline.result.rent.below_range": "Por debajo del rango registrado.",
+        "timeline.result.rent.not_checked": "No hay renta registrada para comparar.",
+        "timeline.result.phone.yes": "Es el número de la oficina.",
+        "timeline.result.phone.no": "No es el número de la oficina.",
+        "timeline.result.plan": "Una tarea por paso; el agente la mantiene al día.",
+        "timeline.result.handed": "Todavía trabajando.",
+        "timeline.result.returned": "Devolvió lo que encontró en una nota.",
+        "timeline.result.note": "Solo texto derivado; sin resultado.",
+        "timeline.result.verdict": (
+            "Calculado por el código a partir de la evidencia. Ningún modelo lo elige."
+        ),
         "real.as_of": "según la última investigación de CoStar",
         "real.plan_studio": "estudio",
         "real.plan_beds": "de {beds} dormitorios",
@@ -1571,6 +1705,16 @@ def has(key: str, lang: str = DEFAULT_LANG) -> bool:
 def text(key: str, lang: str = DEFAULT_LANG, **values: object) -> str:
     """The wording for `key`, with `{placeholders}` filled in. A missing key is a bug: KeyError."""
     return _table(lang)[key].format(**values)
+
+
+def claim_word(claim: str, ad_value: str | None, lang: str = DEFAULT_LANG) -> str:
+    """The ad's claim in the table's words: "a studio" for 0 beds, singular for 1 (#257)."""
+    key = claim
+    if claim == "beds" and ad_value == "0":
+        key = "beds_studio"
+    elif claim in ("beds", "baths") and ad_value == "1":
+        key = f"{claim}_one"
+    return text(f"claimword.{key}", lang, ad_value=ad_value or "", record_value="")
 
 
 def tone_word(tone: str, row: str, lang: str = DEFAULT_LANG) -> str:

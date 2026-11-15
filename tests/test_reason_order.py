@@ -128,7 +128,7 @@ def test_when_nothing_could_be_placed_who_and_availability_still_come_first():
         }
     )
     verdict = decide(to_evidence(unplaced))
-    assert verdict.state is VerdictState.UNVERIFIED
+    assert verdict.state is VerdictState.HOLD  # red flags outrank "could not place" (#10)
     assert keys_of(verdict.reasons) == [
         "reason.lookalike_link",
         "reason.not_indexed",

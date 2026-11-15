@@ -18,7 +18,7 @@ interface Props {
 }
 
 export const REAL_LABEL = "Real view";
-export const DRAWING_LABEL = "3D drawing";
+export const DRAWING_LABEL = "Plan: you are here";
 
 // Two views of one stop, like a video call: one fills the stage and the other sits as a small
 // window in the corner. Tap the window, or use the 3D | Real switch, to swap them. Real fills

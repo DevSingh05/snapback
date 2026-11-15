@@ -298,9 +298,12 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
        red flag beside it. A home listed for sale, a lookalike link, a phone that is not the
        leasing office's, a unit that does not fit the record and a licence number in the ad that is
        not active are not proof either.
-    2. No photo placed in the claimed property gives UNVERIFIED, with what the record
-       flagged listed among the reasons. One thing outranks it: a home listed for sale is
-       HOLD, with that reason first, whether or not any photo could be placed.
+    2. No photo placed in the claimed property (none sent, or none placed) gives UNVERIFIED,
+       with what the record flagged listed among the reasons. Any red flag outranks it (#10):
+       price, payment, fee, data ask, pressure, link, overpayment, for sale, lookalike link,
+       unit or a licence number in the ad that is not active gives HOLD, the verdict the same
+       flags give with photos, whether or not any photo could be placed. Something only "not
+       confirmed" (step 4) does not outrank it.
     3. Presence proven, authority matching the record, the ad's phone being the leasing
        office's on record, and no red flag of any kind gives VERIFIED. The phone is needed
        (red team H1, Sat 03:25): anyone can type the manager's public name, and a door code
@@ -381,16 +384,6 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
         # through family, trusts and companies. It holds the case and is never a red flag.
         unconfirmed = [*unconfirmed, "reason.owner_not_poster"]
 
-    if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
-        unplaced = (
-            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
-        )
-        # For sale outranks "could not place" (conductor ruling, Sat 02:00). A home that is
-        # for sale usually has no scan to place photos in, and "we could not check" is the
-        # wrong thing to lead with. Still HOLD, never DONT_PAY: it is not proof.
-        state = VerdictState.HOLD if evidence.for_sale_flag else VerdictState.UNVERIFIED
-        return verdict(state, unplaced, *on_record, *unconfirmed)
-
     red_flags = []
     if evidence.price_flag:
         red_flags.append("reason.price_flag")
@@ -399,6 +392,18 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
     elif evidence.rule_flag:
         red_flags.append("reason.rule_flag")
     red_flags.extend(on_record)
+
+    if LocateStatus.LOCATED_IN_CLAIMED not in statuses:
+        unplaced = (
+            "reason.not_indexed" if statuses <= {LocateStatus.NOT_INDEXED} else "reason.not_located"
+        )
+        # A red flag outranks "could not place" (conductor ruling, Sat 02:00, for sale; issue
+        # #10, every red flag): no photos, or none placed, does not soften a lookalike link, a
+        # payment by app or a fee before a viewing. The verdict is the one the same flags give
+        # with photos, HOLD, never DONT_PAY: none of it is proof. "Not confirmed" alone is not
+        # a red flag and still reads UNVERIFIED here.
+        state = VerdictState.HOLD if red_flags else VerdictState.UNVERIFIED
+        return verdict(state, unplaced, *red_flags, *unconfirmed)
 
     if (
         evidence.presence is PresenceStatus.PROVEN
@@ -1066,12 +1071,7 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     for note in modules.ad_notes:
         if not strings.has(f"claims.{note.key}", lang):
             continue
-        claim_key = note.claim
-        if note.claim == "beds" and note.ad_value == "0":
-            claim_key = "beds_studio"
-        claim = strings.text(
-            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
-        )
+        claim = strings.claim_word(note.claim, note.ad_value, lang)
         label = "label.ad_claim"
         if note.pretext:
             label = "label.ad_pretext"
@@ -1099,26 +1099,65 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
 
 
 def _clean_hold_headline(
-    verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str
+    verdict: Verdict, evidence: Evidence, rows: list[CardRow], lang: str, modules: ModuleEvidence
 ) -> str | None:
-    """The headline for a HOLD that has nothing against it, or None.
+    """The headline for a HOLD that has nothing against it, or None. The state stays HOLD.
 
-    "Nothing against it" is asked of `decide` itself, without changing it: the same evidence
-    with presence proven would be VERIFIED. So the one thing holding the case is that nobody
-    has been asked, or has yet answered, to prove they are inside. And no line on the card is a
-    red flag or a warning. The state stays HOLD.
+    Two cases, strongest first. `decide` is asked a what-if and is not changed.
+
+    1. Everything matches: the same evidence with presence proven would be VERIFIED, and no
+       line is a red flag or a warning. Only the presence step is left.
+    2. Nothing goes against the record (#259): no line reads "Doesn't match" or "Warning",
+       though some read "Not confirmed". On a live record "Allowed to rent it" stays not
+       confirmed, so case 1 never fires there; the renter still has two things to do.
     """
     if verdict.state is not VerdictState.HOLD:
         return None
     if evidence.presence not in (PresenceStatus.NOT_REQUESTED, PresenceStatus.WAITING):
         return None
+    if any(_reads_as_against(row, line) for row in rows for line in row.lines):
+        return None
+    if _shows_a_contradiction(modules, evidence):
+        return None
     if_proven = evidence.model_copy(update={"presence": PresenceStatus.PROVEN})
-    if decide(if_proven, lang).state is not VerdictState.VERIFIED:
-        return None
-    tones = {line.tone for row in rows for line in row.lines}
-    if tones & {CardTone.RED_FLAG, CardTone.HOLD}:
-        return None
-    return strings.text("state.hold_clean", lang)
+    all_hold_free = not any(line.tone is CardTone.HOLD for row in rows for line in row.lines)
+    if all_hold_free and decide(if_proven, lang).state is VerdictState.VERIFIED:
+        return strings.text("state.hold_clean", lang)
+    if modules.authority is None or modules.authority.manager_on_record is None:
+        return strings.text("state.hold_nothing_against_no_office", lang)
+    return strings.text("state.hold_nothing_against", lang)
+
+
+def _shows_a_contradiction(modules: ModuleEvidence, evidence: Evidence) -> bool:
+    """Something on the card goes against the ad though it is no red flag (XO review of #263):
+    the office on record declined it, an ad claim the record contradicts, an owner who is not
+    the poster, a poster who is not the manager on record, or a phone that is not the office's.
+    A changed phone is a tamper we show catching, so it never lands on the reassuring line.
+    The aerial date and the ad's own excuses are information, not a contradiction."""
+    authority = modules.authority
+    return (
+        evidence.office_declined_domain is not None
+        or evidence.owner_flag
+        or any(
+            not note.matches and not note.pretext and note.key != "aerial_date"
+            for note in modules.ad_notes
+        )
+        or (
+            authority is not None
+            and (
+                authority.status is AuthorityStatus.MISMATCH
+                or authority.office_phone_match is PhoneMatch.NO
+            )
+        )
+    )
+
+
+def _reads_as_against(row: CardRow, line: CardLine) -> bool:
+    """The line would be shown as "Doesn't match" or "Warning": a red flag anywhere, or a
+    warning outside the PERSON row (there a hold reads "Not confirmed", e.g. no reply yet)."""
+    if line.tone is CardTone.RED_FLAG:
+        return True
+    return line.tone is CardTone.HOLD and row.kind is not CardRowKind.PERSON
 
 
 def headline_text(card: Card) -> str:
@@ -1169,7 +1208,7 @@ def build_card(
         case_id=public_id,
         source=modules.source,
         state=verdict.state,
-        headline=_clean_hold_headline(verdict, evidence, rows, lang),
+        headline=_clean_hold_headline(verdict, evidence, rows, lang, modules),
         checked_at=checked,
         expires_at=checked + CARD_TTL,
         rows=rows,

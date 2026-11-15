@@ -11,6 +11,8 @@ import type { Look } from "./mapStyle";
 import { CriteriaPanel, FinderPip, PlaceLedger } from "./panels";
 import { recordFinderEvent } from "../shell/finderStore";
 import type { FinderSignal } from "../contracts";
+import { saveMapTheme, savedMapTheme } from "./mapTheme";
+import type { MapTheme } from "./mapTheme";
 import { S } from "./strings";
 import { EMPTY_CRITERIA, criteriaCount } from "./types";
 import type { Criteria, PlaceSheetData, PlacesMap, RenterEvent } from "./types";
@@ -43,6 +45,7 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
   const narrow = useNarrow();
   const reducedMotion = usePrefersReducedMotion();
 
+  const [mapTheme, setMapTheme] = useState<MapTheme>(savedMapTheme);
   const [criteria, setCriteria] = useState<Criteria>(EMPTY_CRITERIA);
   const [load, setLoad] = useState<Feed>({ state: "loading" });
   const [tries, setTries] = useState(0);
@@ -151,13 +154,14 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
   );
 
   return (
-    <div className={`city${selected ? " city-picked" : ""}`} data-look={look}>
+    <div className={`city${selected ? " city-picked" : ""}`} data-look={look} data-theme={mapTheme}>
       <div className="stage">
         <MapView
           places={places}
           passed={passed}
           selectedPid={selected ? selectedPid : null}
           look={look}
+          theme={mapTheme}
           forceRaster={params.get("tiles") === "raster"}
           reducedMotion={reducedMotion}
           padding={padding}
@@ -200,6 +204,20 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
                 {S.eyebrow} · {S.city}
               </span>
               <SourceChip source={feed?.source ?? "fixture"} />
+              <button
+                type="button"
+                className="hud-theme mono"
+                aria-label={
+                  mapTheme === "dark" ? "Switch the map to Day" : "Switch the map to Night"
+                }
+                onClick={() => {
+                  const next: MapTheme = mapTheme === "dark" ? "light" : "dark";
+                  setMapTheme(next);
+                  saveMapTheme(next);
+                }}
+              >
+                {mapTheme === "dark" ? "Day" : "Night"}
+              </button>
             </div>
             {load.state === "ready" ? (
               <h1 className="hud-count" data-testid="count">
