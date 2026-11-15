@@ -187,8 +187,10 @@ class Settings(BaseSettings):
     # Off by default so a case with no keys makes no call; the demo laptop turns it on.
     snapback_web_direct_fetch: bool = False
     vexcel_api_key: SecretStr | None = None
-    # Off until scripts/measure_vexcel.py passes the 18-of-20 bar. When on, an aerial that says
-    # "wrong building" holds the case (never DONT_PAY, never clears).
+    # Off until a LIVE scripts/measure_vexcel.py run meets the gate on the held-out half (right
+    # and next-door 90 percent each, other wrong 100 percent). Nov 15, matcher v2, n=54: held-out
+    # next-door 8 of 9, so it stays off. When on, an aerial that says "wrong building" holds the
+    # case (never DONT_PAY, never clears).
     snapback_vexcel_in_verdict: bool = False
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None
