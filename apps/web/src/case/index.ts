@@ -35,6 +35,14 @@ export { ProofPair, stampPlace } from "./ProofPair";
 export { RealListing, realListingLink } from "./RealListing";
 export { SaferTiles, saferTiles } from "./SaferTiles";
 export { useProof } from "./useProof";
-export { useCopyAlert, useRealListing, useReportPack, useSaferPlaces } from "./useProofApi";
+export {
+  useCopyAlert,
+  useRealListing,
+  useReportPack,
+  useSaferPlaces,
+  useTimeline,
+} from "./useProofApi";
+export { AnswerPanel } from "./AnswerPanel";
+export { answerView, checkOfReason, reasonLines, tookText } from "./answer";
 export { VerdictBand, type BandAction } from "./VerdictBand";
 export { AGENCIES, AlertDraft, FilePanel, WhatNext, reportText } from "./WhatNext";
