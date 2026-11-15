@@ -650,6 +650,28 @@
   flex: 1;
 }
 
+.tour-door-scan p {
+  margin: 0 0 4px;
+}
+.tour-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.tour-summary h2 {
+  font-size: 1rem;
+  margin: 0 0 6px;
+}
+.tour-summary ul {
+  margin: 0;
+  padding-left: 18px;
+}
+@media (max-width: 480px) {
+  .tour-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Ticket 6: the page around the player ---------- */
 /* The path rail carries the page's LIVE or FIXTURE tags (one for the record, one for the 3D view). */
 .tour-path {
@@ -794,26 +816,5 @@
     bottom: auto;
     left: auto;
     right: 0;
-  }
-}
-.tour-door-scan p {
-  margin: 0 0 4px;
-}
-.tour-summary {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.tour-summary h2 {
-  font-size: 1rem;
-  margin: 0 0 6px;
-}
-.tour-summary ul {
-  margin: 0;
-  padding-left: 18px;
-}
-@media (max-width: 480px) {
-  .tour-summary {
-    grid-template-columns: 1fr;
   }
 }
