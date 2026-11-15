@@ -44,6 +44,7 @@ from snapback.agent import casework
 from snapback.agent.runner import Approver, PolicyChooser, run_case
 from snapback.agent.session import CANCEL, CaseSession, Step
 from snapback.agent.trace import clean_reason
+from snapback.agent.worklog import AgentWork
 from snapback.card import strings
 from snapback.contracts import TraceKind, Verdict
 
@@ -227,6 +228,53 @@ class _StopGuard(BaseCallbackHandler):
 
     def on_llm_start(self, *args: Any, **kwargs: Any) -> None:
         self._check()
+
+
+def work_of(case: CaseSession) -> AgentWork:
+    """The case's work log (worklog.py), made on first use."""
+    return case.__dict__.setdefault("_agent_work", AgentWork())
+
+
+class WorkWatch(BaseCallbackHandler):
+    """Notes every model call and tool call the agent and its sub-agents make, for the trace
+    cards. Callbacks in the run config reach the sub-agents too, and each call carries the name
+    of the agent that made it. It only reads, and stops noting once the agent is shut out."""
+
+    def __init__(self, case: CaseSession) -> None:
+        self._case = case
+        self._work = work_of(case)
+
+    def _live(self) -> bool:
+        return not _gate(self._case).stopped
+
+    @staticmethod
+    def _member(metadata: Any) -> str | None:
+        name = (metadata or {}).get("lc_agent_name")
+        return name if isinstance(name, str) and name else None
+
+    def on_chat_model_start(self, *args: Any, metadata: Any = None, **kwargs: Any) -> None:
+        if self._live():
+            self._work.model_call(self._member(metadata))
+
+    def on_tool_start(
+        self,
+        serialized: Any,
+        input_str: Any,
+        *,
+        run_id: Any = None,
+        metadata: Any = None,
+        inputs: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        if not self._live():
+            return
+        name = str((serialized or {}).get("name") or kwargs.get("name") or "")
+        if name:
+            self._work.tool_start(str(run_id), self._member(metadata), name, inputs)
+
+    def on_tool_end(self, output: Any, *, run_id: Any = None, **kwargs: Any) -> None:
+        if self._live():
+            self._work.tool_end(str(run_id), output)
 
 
 def _gate(case: CaseSession) -> _Gate:
@@ -479,6 +527,8 @@ def build_subagents(case: CaseSession, model: Any = None) -> list[dict[str, Any]
         )
     if case.walk_plan is not None and not advisory:
         specs.append(_walk_spec(case))
+    if case.web_facts is not None:
+        specs.append(_web_spec(case))
     # The built-in general-purpose sub-agent would inherit the choice tools. Replace it with one
     # that has none and no way to write anywhere.
     specs.append(
@@ -494,6 +544,44 @@ def build_subagents(case: CaseSession, model: Any = None) -> list[dict[str, Any]
         for spec in specs:
             spec["model"] = model
     return specs
+
+
+WEB_PROMPT = """\
+You are the web checker for one rental case inside SNAPBACK. Code has already run three web \
+checks side by side: the building's own site, the ad's own link opened in a real browser \
+(Browser Use), the ad's own words posted elsewhere (a web search), and rentals this size nearby \
+(Apify, not the same home). You have one reading tool, `read_web_facts`, and the file tools. Do \
+exactly this: call `read_web_facts` once; then call `write_file` with path `{path}` and a short \
+note: one fact per line, copied from what the tool returned, with its source. A check that says \
+not_checked, timed_out or failed stays that way: never guess what it would have found. Yes/no \
+values and counts only. No names of people, no phone digits, no result for the case: code works \
+that out and nothing you write changes it. Then reply with one sentence."""
+
+
+def _web_spec(case: CaseSession) -> dict[str, Any]:
+    @tool
+    def read_web_facts() -> str:
+        """What the three web checks found: statuses, yes/no values and counts."""
+        try:
+            facts = case.web_facts() if case.web_facts is not None else None
+        except Exception:
+            facts = None
+        return casework.web_text(facts)
+
+    path = casework.note_path(case.case_id, casework.WEB)
+    return {
+        "name": "web",
+        "description": (
+            "The web checks: the building's own site, where the ad's link really goes, the ad's "
+            "own words posted elsewhere, and rentals this size nearby (counts and rent range only)."
+        ),
+        "system_prompt": WEB_PROMPT.format(path=path),
+        "tools": [read_web_facts],
+        "permissions": [
+            FilesystemPermission(operations=["write"], paths=[path], mode="allow"),
+            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+        ],
+    }
 
 
 WALK_PROMPT = """\
@@ -841,7 +929,10 @@ def _stream_within(
     if remaining is not None and remaining <= 0:
         raise AgentTimeout
     failure: list[BaseException] = []
-    config = {**config, "callbacks": [*config.get("callbacks", []), _StopGuard(case)]}
+    config = {
+        **config,
+        "callbacks": [*config.get("callbacks", []), _StopGuard(case), WorkWatch(case)],
+    }
     gate = _gate(case)
 
     def leg() -> None:

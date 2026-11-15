@@ -1,0 +1,1121 @@
+/* The check team: the panel beside the 3D twin, the strip on the report and on Home, and the
+   team's cards. Day tokens only, sharp corners, no outline boxes: a member's state is a square
+   light and a left bar in the app's own row-state colours, always next to words.
+   Motion is transform and opacity only, set off by a recorded step, and off under
+   prefers-reduced-motion (the states still change). Heights that change with a step are
+   reserved up front, so nothing below moves as members light up. */
+
+.pr-panel {
+  /* A jump to the panel lands under the app's fixed bar, never behind it. */
+  scroll-margin-top: calc(var(--bar-h, 64px) + var(--sp-4));
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-5) var(--page-pad) var(--sp-6);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.pr-head {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pr-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+  color: var(--act);
+}
+.pr-head h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+/* Two lines are held for the status so a longer line never pushes the panel down. */
+.pr-status {
+  margin: 0;
+  min-height: calc(2 * 1.4em);
+  font-size: var(--fs-md);
+  line-height: 1.4;
+  font-weight: 700;
+}
+.pr-bar {
+  height: 4px;
+  background: var(--layer-2);
+  overflow: hidden;
+}
+.pr-bar span {
+  display: block;
+  height: 100%;
+  background: var(--act);
+  transform-origin: left center;
+  transition: transform 240ms linear;
+}
+.pr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 48px;
+}
+.pr-speed {
+  display: inline-flex;
+}
+.pr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: var(--ink);
+  color: var(--surface);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pr-btn-quiet {
+  min-width: 44px;
+  padding: 0 var(--sp-3);
+  background: var(--layer-2);
+  color: var(--ink);
+}
+.pr-btn:disabled {
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+.pr-btn-quiet[aria-pressed="true"] {
+  background: var(--act);
+  color: var(--on-act);
+}
+.pr-btn-link {
+  justify-self: start;
+  background: var(--act);
+  color: var(--on-act);
+}
+.pr-btn:focus-visible,
+.pr-tabs button:focus-visible,
+.pr-strip-item button:focus-visible,
+.pr-strip-item a:focus-visible,
+.pr-thread:focus-visible,
+.pr-desk:focus-visible,
+.pr-evidence summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.pr-note,
+.pr-quiet {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- tabs ---------- */
+.pr-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-5);
+  border-bottom: 1px solid var(--line);
+}
+.pr-tabs button {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pr-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--act);
+  color: var(--ink);
+}
+.pr-pane[hidden] {
+  display: none;
+}
+.pr-pane {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+/* ---------- the strip: one light per member ---------- */
+.pr-strip-wrap {
+  position: relative;
+}
+.pr-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-strip-item {
+  min-width: 0;
+}
+.pr-strip-item > button,
+.pr-strip-item > a,
+.pr-strip-in {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--sp-2);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-left: 4px solid var(--st-unchecked);
+  background: var(--layer-2);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.pr-strip-item > button {
+  cursor: pointer;
+}
+.pr-strip-light {
+  grid-row: 1 / span 2;
+  position: relative;
+  width: 12px;
+  height: 12px;
+  background: var(--st-unchecked);
+}
+.pr-strip-name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pr-strip-state {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pr-strip-item[data-state="idle"] .pr-strip-light,
+.pr-strip-item[data-state="unused"] .pr-strip-light,
+.pr-strip-item[data-state="skipped"] .pr-strip-light {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--st-unchecked);
+}
+.pr-strip-item[data-state="unused"] > *,
+.pr-strip-item[data-state="skipped"] > * {
+  background: transparent;
+  border-left-color: var(--line);
+  color: var(--muted);
+}
+.pr-strip-item[data-state="working"] > * {
+  border-left-color: var(--scan);
+  background: var(--amber-soft);
+}
+.pr-strip-item[data-state="working"] .pr-strip-light {
+  background: var(--scan);
+}
+.pr-strip-item[data-state="done"] > * {
+  border-left-color: var(--ink);
+  background: var(--layer-2);
+}
+.pr-strip-item[data-state="done"] .pr-strip-light {
+  background: var(--ink);
+}
+.pr-strip-item[data-state="done"][data-tone="ok"] > * {
+  border-left-color: var(--st-ok);
+  background: var(--teal-soft);
+}
+.pr-strip-item[data-state="done"][data-tone="ok"] .pr-strip-light {
+  background: var(--st-ok);
+}
+.pr-strip-item[data-state="done"][data-tone="hold"] > *,
+.pr-strip-item[data-state="done"][data-tone="not_shown"] > * {
+  border-left-color: var(--st-warn);
+  background: var(--amber-soft);
+}
+.pr-strip-item[data-state="done"][data-tone="hold"] .pr-strip-light,
+.pr-strip-item[data-state="done"][data-tone="not_shown"] .pr-strip-light {
+  background: var(--st-warn);
+}
+.pr-strip-item[data-state="done"][data-tone="red_flag"] > * {
+  border-left-color: var(--st-mismatch);
+  background: var(--coral-soft);
+}
+.pr-strip-item[data-state="done"][data-tone="red_flag"] .pr-strip-light {
+  background: var(--st-mismatch);
+}
+/* The pulse: a ring that grows out of a working member's light and fades. */
+.pr-strip-item[data-state="working"] .pr-strip-light::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--scan);
+  opacity: 0;
+}
+
+/* ---------- the thread ---------- */
+.pr-sub {
+  margin: 0;
+  color: var(--muted);
+}
+.pr-thread {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  height: 320px;
+  margin: 0;
+  padding: 0 var(--sp-2) 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.pr-line {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 4px solid var(--line);
+  background: var(--layer-2);
+  overflow-wrap: anywhere;
+}
+.pr-line[data-skipped="yes"] {
+  background: transparent;
+  color: var(--muted);
+}
+.pr-line[data-finding="yes"] {
+  margin-left: var(--sp-4);
+  border-left-color: var(--unchecked);
+  background: var(--unchecked-soft);
+}
+.pr-line[data-finding="yes"][data-tone="ok"] {
+  border-left-color: var(--teal);
+  background: var(--teal-soft);
+}
+.pr-line[data-finding="yes"][data-tone="hold"],
+.pr-line[data-finding="yes"][data-tone="not_shown"] {
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+.pr-line[data-finding="yes"][data-tone="red_flag"] {
+  border-left-color: var(--coral);
+  background: var(--coral-soft);
+  font-weight: 700;
+}
+.pr-who {
+  margin: 0;
+  color: var(--muted);
+}
+.pr-said {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.pr-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--sp-3);
+  margin: 0;
+  color: var(--muted);
+}
+
+/* ---------- the Decider ---------- */
+.pr-decider {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+}
+.pr-because {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.pr-because[data-shown="no"] {
+  visibility: hidden;
+}
+/* The slot is as tall as the stamp, so the stamp lands without moving what is under it. */
+.pr-stamp-slot {
+  display: grid;
+  align-items: center;
+  min-height: 60px;
+}
+.pr-stamp-slot > * {
+  grid-area: 1 / 1;
+}
+/* The stamp before it lands: it takes its room and shows nothing. */
+.pr-held {
+  visibility: hidden;
+}
+.pr-stamp {
+  margin: 0;
+  padding: var(--sp-4);
+  border-left: 8px solid var(--v-slate);
+  background: var(--v-band);
+  color: var(--on-v-band);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  transform-origin: left center;
+}
+.pr-decider[data-verdict="dont-pay"] .pr-stamp {
+  border-left-color: var(--v-dont-pay);
+}
+.pr-decider[data-verdict="hold"] .pr-stamp {
+  border-left-color: var(--v-hold);
+}
+.pr-decider[data-verdict="ok"] .pr-stamp {
+  border-left-color: var(--v-ok);
+}
+.pr-reasons {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.pr-reasons li {
+  display: grid;
+  gap: 0;
+}
+.pr-reasons .case-text-link {
+  justify-self: start;
+  min-height: 44px;
+  font-size: var(--fs-sm);
+}
+.pr-rule {
+  margin: 0;
+  max-width: 44ch;
+  font-weight: 700;
+}
+
+/* ---------- meet the team ---------- */
+.pr-meet {
+  display: grid;
+  gap: var(--sp-5);
+}
+.pr-team {
+  display: grid;
+  gap: var(--sp-3);
+}
+.pr-team-head h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-team-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.pr-desk {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 4px solid var(--st-unchecked);
+  background: var(--layer-2);
+  scroll-margin-top: 72px;
+}
+.pr-desk[data-state="unused"],
+.pr-desk[data-state="skipped"] {
+  background: transparent;
+  border-left-color: var(--line);
+}
+.pr-desk[data-state="working"] {
+  border-left-color: var(--scan);
+}
+.pr-desk[data-state="done"] {
+  border-left-color: var(--ink);
+}
+.pr-desk[data-state="done"][data-tone="ok"] {
+  border-left-color: var(--st-ok);
+}
+.pr-desk[data-state="done"][data-tone="hold"],
+.pr-desk[data-state="done"][data-tone="not_shown"] {
+  border-left-color: var(--st-warn);
+}
+.pr-desk[data-state="done"][data-tone="red_flag"] {
+  border-left-color: var(--st-mismatch);
+}
+.pr-desk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-3);
+}
+.pr-desk-head h4 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-model {
+  padding: 2px var(--sp-2);
+  background: var(--ink);
+  color: var(--surface);
+}
+.pr-job,
+.pr-never,
+.pr-avail {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.pr-never,
+.pr-avail {
+  color: var(--muted);
+}
+.pr-avail {
+  font-weight: 700;
+}
+.pr-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-tools li {
+  padding: 2px var(--sp-2);
+  background: var(--surface);
+  color: var(--ink);
+}
+.pr-out {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.pr-now {
+  margin: 0;
+  font-weight: 700;
+}
+.pr-findings {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.pr-evidence summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.pr-evidence ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- the report's strip ---------- */
+.pr-report {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-5);
+}
+.pr-report-line {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-report .case-text-link {
+  justify-self: start;
+  gap: var(--sp-2);
+}
+
+/* ---------- beside the twin ---------- */
+@media (min-width: 1180px) {
+  .twin-body.twin-with-team {
+    grid-template-columns: minmax(0, 1fr) 420px;
+    align-items: start;
+  }
+  .twin-with-team > .pr-panel {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    padding-inline: var(--sp-5);
+  }
+  .twin-with-team > :not(.pr-panel) {
+    grid-column: 1;
+  }
+  .pr-thread {
+    height: 360px;
+  }
+}
+
+/* ---------- motion, each tied to a step ---------- */
+@keyframes pr-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+@keyframes pr-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes pr-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.18) rotate(-2deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.98) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pr-panel[data-still="no"] .pr-strip-item[data-state="working"] .pr-strip-light::after {
+    animation: pr-pulse 1100ms var(--ease-out) infinite;
+  }
+  .pr-panel[data-still="no"][data-phase="running"] .pr-line {
+    animation: pr-in 260ms var(--ease-out) 1 backwards;
+  }
+  .pr-panel[data-still="no"] .pr-stamp {
+    animation: pr-stamp 420ms var(--ease-out) 1 backwards;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pr-bar span {
+    transition: none;
+  }
+}
+
+/* ---------- Home: the team while a check runs ---------- */
+.pr-home {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pr-home-line {
+  margin: 0;
+}
+.pr-home-link {
+  justify-self: start;
+  gap: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+}
+.pr-home-link:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- hover: an underline bar in the accent, never a colour swap that hides a state ---------- */
+@media (hover: hover) {
+  .pr-btn:hover:not(:disabled),
+  .pr-strip-item > button:hover,
+  .pr-strip-item > a:hover {
+    box-shadow: inset 0 -3px 0 var(--scan);
+  }
+  .pr-tabs button:hover {
+    color: var(--ink);
+  }
+  .pr-home-link:hover,
+  .pr-evidence summary:hover {
+    color: var(--act);
+  }
+}
+
+/* ---------- the graph: Planner, members, Decider, and the lines between them ---------- */
+.pr-graph {
+  position: relative;
+  width: 100%;
+}
+.pr-wires {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.pr-wire {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
+}
+.pr-wire-in,
+.pr-wire-out {
+  stroke: var(--ink);
+}
+[data-state="working"] > .pr-wire-in {
+  stroke: var(--scan);
+  stroke-width: 2.5;
+}
+.pr-nodes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-node {
+  --pr-plate: var(--surface);
+  --pr-frame: var(--st-unchecked);
+  --pr-glyph: var(--ink);
+  --pr-accent: var(--act);
+  --pr-word: var(--muted);
+  position: absolute;
+}
+.pr-node > button,
+.pr-node-in {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+.pr-node > button {
+  cursor: pointer;
+}
+.pr-node > button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+/* The words hold one height (a name may take two lines), so every member is the same size and
+   the lines meet it; spare room falls under the words, never between them. */
+.pr-node-text {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  height: 57px;
+  min-width: 0;
+  max-width: 100%;
+}
+.pr-node-name {
+  max-height: 30px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 15px;
+  overflow: hidden;
+}
+.pr-node-role {
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-node-state {
+  color: var(--pr-word);
+  line-height: 14px;
+  white-space: nowrap;
+}
+/* The Planner and the Decider: the mark on the centre line, the words beside it. */
+.pr-node-wide {
+  right: 0;
+}
+.pr-node-wide > button,
+.pr-node-wide > .pr-node-in {
+  grid-template-columns: 48px minmax(0, 1fr);
+  justify-items: start;
+  align-items: center;
+  gap: var(--sp-3);
+  width: auto;
+  text-align: left;
+}
+.pr-node-wide .pr-node-text {
+  justify-items: start;
+  height: auto;
+}
+.pr-node-wide .pr-node-name {
+  height: auto;
+  font-size: var(--fs-md);
+  line-height: 1.2;
+}
+.pr-avatar {
+  display: block;
+  overflow: visible;
+}
+.pr-avatar-plate {
+  fill: var(--pr-plate);
+  stroke: var(--pr-frame);
+  stroke-width: 3;
+}
+.pr-avatar-pulse {
+  fill: none;
+  stroke: var(--scan);
+  stroke-width: 3;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.g-ink {
+  fill: var(--pr-glyph);
+}
+.g-act {
+  fill: var(--pr-accent);
+}
+.g-cut {
+  fill: var(--pr-plate);
+}
+.pr-node[data-state="idle"],
+.pr-node[data-state="skipped"],
+.pr-node[data-state="unused"] {
+  --pr-glyph: var(--st-unchecked);
+  --pr-accent: var(--st-unchecked);
+  --pr-frame: var(--line);
+}
+.pr-node[data-state="skipped"] .pr-avatar-plate,
+.pr-node[data-state="unused"] .pr-avatar-plate {
+  stroke: var(--st-unchecked);
+  stroke-dasharray: 5 4;
+}
+.pr-node[data-state="skipped"] .pr-node-name,
+.pr-node[data-state="unused"] .pr-node-name,
+.pr-node[data-state="idle"] .pr-node-name {
+  color: var(--muted);
+}
+.pr-node[data-state="working"] {
+  --pr-plate: var(--amber-soft);
+  --pr-frame: var(--scan);
+  --pr-word: var(--amber);
+}
+.pr-node[data-state="done"] {
+  --pr-frame: var(--ink);
+  --pr-word: var(--ink);
+}
+.pr-node[data-state="done"][data-tone="ok"] {
+  --pr-plate: var(--teal-soft);
+  --pr-frame: var(--st-ok);
+  --pr-word: var(--teal);
+}
+.pr-node[data-state="done"][data-tone="hold"],
+.pr-node[data-state="done"][data-tone="not_shown"] {
+  --pr-plate: var(--amber-soft);
+  --pr-frame: var(--st-warn);
+  --pr-word: var(--amber);
+}
+.pr-node[data-state="done"][data-tone="red_flag"] {
+  --pr-plate: var(--coral-soft);
+  --pr-frame: var(--st-mismatch);
+  --pr-word: var(--coral);
+}
+/* The Decider, once the verdict is set: the matte of the stamp, so the eye ends there. */
+.pr-node-wide[data-agent="decider"][data-state="done"] {
+  --pr-plate: var(--v-band);
+  --pr-frame: var(--v-band);
+  --pr-glyph: var(--on-v-band);
+  --pr-accent: var(--scan);
+}
+/* A hand-off: a small square that runs along its line. */
+.pr-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: var(--scan);
+  box-shadow: 0 0 0 2px var(--surface);
+  offset-rotate: 0deg;
+  offset-distance: 0%;
+  opacity: 0;
+  pointer-events: none;
+}
+.pr-dot-out {
+  background: var(--ink);
+}
+@keyframes pr-run {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+@keyframes pr-ring {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.38);
+  }
+}
+@media (hover: hover) {
+  .pr-node > button:hover .pr-node-name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pr-graph[data-moving="yes"] .pr-dot {
+    animation: pr-run 760ms cubic-bezier(0.4, 0, 0.2, 1) 1 forwards;
+  }
+  .pr-graph[data-moving="yes"] .pr-node[data-state="working"] .pr-avatar-pulse {
+    animation: pr-ring 1100ms var(--ease-out) infinite;
+  }
+  .pr-graph[data-moving="yes"] .pr-wire-in,
+  .pr-graph[data-moving="yes"] .pr-wire-out {
+    animation: pr-in 320ms var(--ease-out) 1 backwards;
+  }
+}
+
+/* What ran a member, when a model did: a small ink chip on the corner of its mark (beside the
+   name for the Planner). Code-run members carry none. */
+.pr-node-mark {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+.pr-node-model {
+  padding: 1px 4px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.5625rem;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.pr-node-mark > .pr-node-model {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pr-node-wide .pr-node-name {
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px var(--sp-2);
+}
+.pr-node-wide .pr-node-model {
+  font-size: 0.625rem;
+}
+
+/* ---------- see how it worked: one card per member, down a line ---------- */
+.pr-trace {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.pr-trace-out {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 44px;
+  margin-left: auto;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+}
+.pr-trace-out:focus-visible,
+.pr-trace-card:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.pr-trace-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The mark sits on a line that runs down through every card, like the graph's. */
+.pr-trace-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-5);
+  scroll-margin-top: 72px;
+}
+.pr-trace-card::before {
+  content: "";
+  position: absolute;
+  top: 48px;
+  bottom: 0;
+  left: 23px;
+  width: 2px;
+  background: var(--line);
+}
+.pr-trace-card:last-child::before {
+  display: none;
+}
+.pr-trace-card:last-child {
+  padding-bottom: 0;
+}
+.pr-trace-mark {
+  position: relative;
+}
+.pr-trace-body {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding-left: var(--sp-3);
+  border-left: 4px solid var(--pr-frame);
+}
+.pr-trace-card[data-state="skipped"] .pr-trace-body,
+.pr-trace-card[data-state="idle"] .pr-trace-body {
+  border-left-color: var(--line);
+}
+.pr-trace-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-3);
+}
+.pr-trace-head h4 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-trace-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-3);
+  margin: 0;
+  color: var(--muted);
+}
+.pr-trace-code,
+.pr-trace-asked,
+.pr-trace-said,
+.pr-trace-found,
+.pr-trace-sent {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.pr-trace-code {
+  color: var(--muted);
+}
+.pr-trace-asked .ui-mono,
+.pr-trace-said .ui-mono,
+.pr-trace-sent .ui-mono,
+.pr-trace-plan > .ui-mono {
+  color: var(--muted);
+}
+.pr-trace-plan {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--layer-2);
+}
+.pr-trace-plan p {
+  margin: 0;
+}
+.pr-trace-plan ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+/* The tools, in order: a small square on a thin line for each, then what came back. */
+.pr-trace-steps {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-trace-steps li {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  padding-left: var(--sp-4);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.pr-trace-steps li::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  background: var(--pr-frame);
+}
+.pr-trace-steps li::after {
+  content: "";
+  position: absolute;
+  top: 15px;
+  bottom: calc(-1 * var(--sp-2) - 4px);
+  left: 3px;
+  width: 1px;
+  background: var(--line);
+}
+.pr-trace-steps li:last-child::after {
+  display: none;
+}
+.pr-trace-did {
+  font-weight: 700;
+}
+.pr-trace-got {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.pr-trace-end {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pr-trace-said {
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--layer-2);
+}
+.pr-trace-found {
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 4px solid var(--pr-frame);
+  background: var(--pr-plate);
+}
+/* A replay: what has not been reached yet keeps its room and shows nothing. */
+.pr-trace-card[data-shown="no"],
+.pr-trace-steps li[data-shown="no"],
+.pr-trace-end[data-shown="no"] {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pr-trace[data-playing="yes"] .pr-trace-card[data-shown="yes"],
+  .pr-trace[data-playing="yes"] .pr-trace-steps li[data-shown="yes"],
+  .pr-trace[data-playing="yes"] .pr-trace-end[data-shown="yes"] {
+    animation: pr-in 260ms var(--ease-out) 1 backwards;
+  }
+}

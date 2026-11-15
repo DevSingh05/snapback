@@ -29,7 +29,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.background import BackgroundAgents
+from snapback.agent.background import BUSY, BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
@@ -38,6 +38,9 @@ from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
+from snapback.agent.web.inputs import web_inputs_for
+from snapback.agent.web.run import start_web_checks
+from snapback.agent.worklog import AgentWork
 from snapback.api.casefiles import CaseFiles
 from snapback.card import strings
 from snapback.contracts import (
@@ -117,6 +120,7 @@ class RecordedCase:
     # What the renter rejected; a recorded case is read-only, so this stays empty.
     preferences = CasePreferences()
     agent_running = False  # no agent works a recorded case
+    work = None  # and no work log: its trace cards come from the trace alone
 
     def __init__(
         self,
@@ -272,6 +276,11 @@ class SessionCase:
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
 
+    @property
+    def work(self) -> AgentWork | None:
+        """The deep agent's work log for this case (worklog.AgentWork), or None if none ran."""
+        return self.session.__dict__.get("_agent_work")
+
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
         card = build_card(
             self.session.evidence,
@@ -398,6 +407,10 @@ def _setup_langsmith(settings: Settings) -> None:
         log.warning("LangSmith tracing could not be set up; carrying on without it")
 
 
+class NoModelKey(Exception):
+    """The deep agent was asked for and no model key is set."""
+
+
 def _background_job(
     case: "SessionCase", settings: Settings, model_factory: Callable[[], object] | None
 ) -> Callable[[], None]:
@@ -412,7 +425,7 @@ def _background_job(
 
         key = settings.anthropic_api_key
         if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("no model key")
+            raise NoModelKey
         return build_model(
             key.get_secret_value() if key else None,
             name,
@@ -431,12 +444,24 @@ def _background_job(
                 model(settings.snapback_agent_model, 2048),
                 subagent_model=model(settings.snapback_subagent_model, 1024),
             )
+        except NoModelKey:
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_nokey", session.lang)
+            )
+            return
         except Exception:
             session.trace.emit(
                 TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
             )
             return
-        run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+        try:
+            run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+        except Exception:
+            # run_advisory reports its own failures; this is what is left when even that broke.
+            log.exception("the background agent could not report its end for %s", case.case_id)
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
 
     return run
 
@@ -463,7 +488,7 @@ def _deepagents_runner(
 
         key = settings.anthropic_api_key if settings is not None else None
         if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("no model key")
+            raise NoModelKey
         return build_model(
             key.get_secret_value() if key else None,
             settings.snapback_agent_model if settings is not None else None,
@@ -720,6 +745,16 @@ class CaseStore:
                 Trace(full_id, source),
                 ask_enabled=self._settings.snapback_ask_renter,
             )
+            if live and self._settings.snapback_web_checks:
+                # W1: in the background; the sub-agent and the notes read it when it lands.
+                job = start_web_checks(
+                    web_inputs_for(listing, record, phone_salt(self._settings)),
+                    self._settings,
+                    salt=phone_salt(self._settings),
+                    trace=session.trace,
+                    source=source,
+                )
+                session.web_facts = job.facts
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
@@ -740,8 +775,26 @@ class CaseStore:
         if self._background is None:
             return
         case.agents = self._background
+        session = case.session
+
+        def gave_up(why: str) -> None:
+            # The run never started, or never ended: say so, so no screen waits on it.
+            key = "trace.error.model_busy" if why == BUSY else "trace.error.model_stuck"
+            if why != BUSY:
+                # Shut the late job out first (no lock wait), so it cannot add a second end.
+                from snapback.agent.graph import _gate
+
+                _gate(session).stopped = True
+            session.trace.emit(TraceKind.ERROR, strings.text(key, session.lang))
+            if why == BUSY:  # no agent ran, so code writes the notes it would have
+                refresh_policy_notes(session)
+
         self._background.submit(
-            case.case_id, _background_job(case, self._settings, self._agent_model)
+            case.case_id,
+            _background_job(case, self._settings, self._agent_model),
+            max_wait_s=self._settings.snapback_agent_queue_wait_s,
+            max_run_s=self._settings.agent_timeout_s + self._settings.snapback_agent_run_grace_s,
+            on_expire=gave_up,
         )
 
     def shutdown_agents(self) -> None:

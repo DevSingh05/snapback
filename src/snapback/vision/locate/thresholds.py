@@ -25,6 +25,9 @@ class Thresholds:
     spots_overlap_deg: float
     version: str
     flip_search: bool = True
+    # The strict bar's own inlier ratio (identify with no claimed home, and placing elsewhere).
+    # Defaults to min_inlier_ratio, so an older thresholds file reads as it did.
+    elsewhere_min_ratio: float = 0.25
 
 
 def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
@@ -35,6 +38,9 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
         raise ValueError("elsewhere_min_inliers must not be below min_inliers")
     if not 0.0 <= verify_cfg["claimed_min_spread"] <= verify_cfg["elsewhere_min_spread"]:
         raise ValueError("claimed_min_spread must be between 0 and elsewhere_min_spread")
+    strict_ratio = verify_cfg.get("elsewhere_min_ratio", verify_cfg["min_inlier_ratio"])
+    if not verify_cfg["min_inlier_ratio"] <= strict_ratio <= 1.0:
+        raise ValueError("elsewhere_min_ratio must be between min_inlier_ratio and 1.0")
     if verify_cfg["ambiguity_ratio"] <= 1.0:
         raise ValueError("ambiguity_ratio must be greater than 1.0")
     return Thresholds(
@@ -52,5 +58,6 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
         spots_top_n=data["spots"]["top_n"],
         spots_overlap_deg=data["spots"]["overlap_deg"],
         version="thresholds-" + hashlib.sha256(raw).hexdigest()[:12],
-        flip_search=bool(data["verify"].get("flip_search", False)),
+        flip_search=bool(data["verify"].get("flip_search", True)),
+        elsewhere_min_ratio=strict_ratio,
     )

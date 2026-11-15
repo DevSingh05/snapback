@@ -147,3 +147,58 @@ def test_a_mirrored_copy_is_placed_only_through_the_flip(twins):
     assert off.photos[0].status is LocateStatus.NOT_LOCATED
     on = locator(twins).locate("c", {"p": crop(sweeps, mirror=True)}, "fx-prop-1")
     assert on.photos[0].status is LocateStatus.LOCATED_IN_CLAIMED and on.photos[0].flipped is True
+
+
+def test_a_doubtful_claimed_match_is_never_flipped_into_another_building(twins, monkeypatch):
+    """Reviewer probe (#272 FIX 1): as sent, the photo has a tight but doubtful patch in the claimed
+    home (the spread bar) and nothing strict elsewhere; mirrored, the claimed home is weak and a
+    sister building matches strictly. A doubtful photo is never searched elsewhere (ruling 07:43,
+    #28), so the flip must not run and the photo must not be placed in the other building."""
+    import hashlib
+
+    import numpy as np
+
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    sweeps, _, _ = twins
+    photo = crop(sweeps, "fx-model-b", 1, 2)
+    sent_hash = hashlib.sha256(photo.convert("RGB").tobytes()).hexdigest()
+
+    def recorded(matcher, image, face, ransac_px):
+        model = face.info[FEATURE_KEY].split("/")[0]
+        if hashlib.sha256(image.tobytes()).hexdigest() == sent_hash:
+            n, spread = {"fx-model-a": (70, 0.018), "fx-model-b": (119, 0.218)}.get(model, (0, 0.0))
+        else:
+            n, spread = {"fx-model-b": (119, 0.218)}.get(model, (0, 0.0))
+        return Verification(max(n, 4), n, np.eye(3) if n else None, spread)
+
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", recorded)
+    result = locator(twins).locate("c", {"p": photo}, "fx-prop-1")
+    placed = result.photos[0]
+    assert placed.status is not LocateStatus.LOCATED_ELSEWHERE
+    assert placed.status is LocateStatus.NOT_LOCATED
+    assert placed.bar_failed == "spread" and not placed.flipped
+
+
+def test_a_flipped_match_below_the_strict_ratio_is_not_placed_elsewhere(twins, monkeypatch):
+    """#296 composition: the flip runs under the same strict bar, 60 percent consistent included.
+    Mirrored, building B clears the counts but only 43 percent of its matches agree."""
+    import hashlib
+
+    import numpy as np
+
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    sweeps, _, _ = twins
+    photo = crop(sweeps, "fx-model-b", 1, 2)
+    sent_hash = hashlib.sha256(photo.convert("RGB").tobytes()).hexdigest()
+
+    def recorded(matcher, image, face, ransac_px):
+        model = face.info[FEATURE_KEY].split("/")[0]
+        if hashlib.sha256(image.tobytes()).hexdigest() == sent_hash or model != "fx-model-b":
+            return Verification(4, 0, None, 0.0)
+        return Verification(140, 60, np.eye(3), 0.3)
+
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", recorded)
+    result = locator(twins).locate("c", {"p": photo}, "fx-prop-1")
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED

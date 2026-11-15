@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from snapback.agent.join import KitLookups
 from snapback.agent.timeline import build_timeline
 from snapback.api.main import create_app
+from snapback.card import strings
 from snapback.contracts import (
     ChoiceKind,
     DataSource,
@@ -235,9 +236,34 @@ def test_a_fallback_is_shown_as_its_own_step():
     ]
     tl = build_timeline("c1", DataSource.FIXTURE, events, evidence())
     assert tl.mode == "deepagents" and tl.fell_back is True
-    stop = next(s for s in tl.steps if s.label == "The agent stopped, so code finished the checks")
+    stop = next(
+        s
+        for s in tl.steps
+        if s.label == "The deep agent stopped: it ran out of time; code set the verdict"
+    )
     assert stop.by == "code"
     assert "ran out of time" in stop.result
+
+
+@pytest.mark.parametrize(
+    ("key", "why"),
+    [
+        ("trace.error.model_failed", "the model could not be used"),
+        ("trace.error.model_nokey", "no model key is set"),
+        ("trace.error.model_busy", "it waited too long behind other checks"),
+        ("trace.error.model_stuck", "it stopped answering"),
+    ],
+)
+def test_every_way_the_agent_stops_is_one_terminal_step_that_names_the_reason(key, why):
+    events = [
+        ev(0, 0, TraceKind.TODO, "plan", options=["[ ] Work"], chosen_by="model"),
+        ev(1, 3000, TraceKind.ERROR, strings.text(key)),
+        ev(2, 3001, TraceKind.VERDICT, "Hold.", pick="hold"),
+    ]
+    tl = build_timeline("c1", DataSource.FIXTURE, events, evidence())
+    labels = [s.label for s in tl.steps]
+    assert f"The deep agent stopped: {why}; code set the verdict" in labels
+    assert tl.fell_back is True and tl.running is False
 
 
 BARE = [

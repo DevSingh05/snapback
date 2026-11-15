@@ -1,0 +1,7 @@
+{
+  "id": "run-synthetic-1",
+  "status": "completed",
+  "result": "done",
+  "output": { "final_url": "https://pay-deposit-now.example/checkout", "asks_payment": true },
+  "totalCostUsd": 0.04
+}

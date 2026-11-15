@@ -202,11 +202,27 @@ class _Placement:
     check: Verification
 
 
+# Bars that mark a doubtful match: the flip must never override them.
+_NO_FLIP_BARS = frozenset({"ambiguity", "spread"})
+
+
 @dataclass(frozen=True)
 class _PlaceOutcome:
     placed: "_Placement | None"
     bar_failed: str | None  # "inliers", "ratio", "spread" or "ambiguity" when not placed
     rival_ratio: float | None  # best rival building's inliers over the claimed match's
+
+
+def passes_strict(c: Verification, t: Thresholds) -> bool:
+    """The strict bar: what naming a home from the photos alone, or placing a photo in another
+    building (a route to DON'T PAY), needs. More inliers and spread than the claimed bar, and its
+    own inlier ratio: a regenerated (AI-edited) photo can clear the counts with half its matches
+    inconsistent, and named the wrong building that way (#10)."""
+    return (
+        c.inliers >= t.elsewhere_min_inliers
+        and c.ratio >= max(t.min_inlier_ratio, t.elsewhere_min_ratio)
+        and c.spread >= t.elsewhere_min_spread
+    )
 
 
 def _failed_bar(top: Verification | None, t: Thresholds) -> str:
@@ -402,11 +418,7 @@ class Locator:
         ]
 
         def strict(c: Verification) -> bool:
-            return (
-                c.inliers >= t.elsewhere_min_inliers
-                and c.ratio >= t.min_inlier_ratio
-                and c.spread >= t.elsewhere_min_spread
-            )
+            return passes_strict(c, t)
 
         def claimed_ok(c: Verification) -> bool:
             return (
@@ -462,11 +474,7 @@ class Locator:
             entry = hit.entry
             face = self._face(entry.model_id, entry.sweep_id, entry.face)
             check = self._verify(photo, face, t)
-            if not (
-                check.inliers >= t.elsewhere_min_inliers
-                and check.ratio >= t.min_inlier_ratio
-                and check.spread >= t.elsewhere_min_spread
-            ):
+            if not passes_strict(check, t):
                 continue
             homes.add(self.catalog.property_of(entry.model_id))
             if best is None or check.inliers > best.check.inliers:
@@ -648,9 +656,11 @@ class Locator:
                 continue
             photo = image.convert("RGB")
             placed, bar, rival, ambiguous = attempt(photo)
-            if placed is None and flip_search and not ambiguous and bar != "ambiguity":
+            if placed is None and flip_search and not ambiguous and bar not in _NO_FLIP_BARS:
                 # V1 (#10): copied ads are often mirrored. Search the photo once more flipped left
-                # to right, under the very same bars and guards; only a placement counts.
+                # to right, under the very same bars and guards; only a placement counts. Never
+                # after a doubtful result (ambiguity or spread): a doubtful photo is not searched
+                # elsewhere (ruling 07:43, #28), and a flip would do exactly that.
                 mirrored = ImageOps.mirror(photo)
                 m_placed, m_bar, m_rival, m_ambiguous = attempt(mirrored)
                 ambiguous = ambiguous or m_ambiguous

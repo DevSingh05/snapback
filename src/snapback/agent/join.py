@@ -41,6 +41,7 @@ from snapback.contracts import (
     PhotoLocation,
     PriceResult,
     PropertyRecord,
+    RecordLine,
     RentalHouse,
     RuleHit,
     SpotCandidate,
@@ -254,6 +255,13 @@ class KitLookups:
         offices = getattr(match, "offices", None) or ()
         return lookup_owner(listing_text, offices, extract_contacts(listing_text).company)
 
+    def public_records(self, listing_text: str) -> list[RecordLine]:
+        """Texas public records (Comptroller, HUD manager, Houston address point): a LIVE run
+        with SNAPBACK_TX_RECORDS on only. Information lines; nothing here reaches `decide`."""
+        from snapback.adapters import tx_records
+
+        return tx_records.public_records(listing_text, self.source)
+
     def for_sale_at(self, listing_text: str, lat: float, lon: float) -> ForSaleMatch | None:
         """The same lookup, also matching any home within 40 m of this point."""
         try:
@@ -356,6 +364,17 @@ class JoinedModules:
         except Exception as error:  # a lookup that breaks leaves the line out, never the case
             log.warning("matched office not read (%s)", type(error).__name__)
             return None
+
+    def public_records(self, case_id: str) -> list[RecordLine]:
+        """Texas public records for the ad's company and street. Not looked up is empty."""
+        lookup = getattr(self._lookups, "public_records", None)
+        if lookup is None or not self._listing.text:
+            return []
+        try:
+            return list(lookup(self._listing.text) or [])
+        except Exception as error:  # a lookup that breaks leaves the lines out, never the case
+            log.warning("public records not read (%s)", type(error).__name__)
+            return []
 
     def ad_notes(self, case_id: str) -> list[AdNote]:
         """Ad vs record: the ad's claims against the home's record. No record, no notes."""
