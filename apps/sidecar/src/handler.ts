@@ -536,7 +536,7 @@ async function saferHomes(
 }
 
 const AD_CUES =
-  /zelle|deposit|dep[oó]sito|venmo|cash ?app|wire|for rent|se renta|tenant|inquilino|text me|call me|av[ai]lable|disponible|move[- ]in|\bbath|ba[nñ]o|\$\s?\d{3,5}\s*(a|per|\/)\s*(month|mo)/i;
+  /zelle|deposit|dep[oó]sito|venmo|cash ?app|wire|for rent|se renta|tenant|inquilino|text me|call me|avail(able)?\b|disponible|move[- ]in|\bbath|ba[nñ]o|\$\s?\d{3,5}\s*(a|per|\/)\s*(month|mo)/i;
 const A_LINK = /https?:|www\./i;
 const MONEY = /\$\s?\d/;
 const BEDS =

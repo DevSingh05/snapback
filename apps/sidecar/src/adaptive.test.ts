@@ -343,3 +343,13 @@ test("[Med] a city at the start counts only at the start: an ad's 'moving to' do
   await handleMessage(said("Great for anyone moving to Houston!"), client(), cfg);
   assert.equal(cfg.profiles.get(KEY), null);
 });
+
+// --- XO review of #264, r3 (optional): "available" is an ad's word -----------------------------
+
+test("[Low] 'Room available, need 2 bedroom apartment? DM me' is checked, not remembered", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("Room available, need 2 bedroom apartment? DM me"), client(), cfg);
+  assert.equal(posts(calls).length, 1);
+  assert.equal(cfg.profiles.get(KEY), null);
+});
