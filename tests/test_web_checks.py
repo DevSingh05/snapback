@@ -388,3 +388,94 @@ def test_past_the_hourly_cap_nothing_is_called_and_the_trace_says_so():
     assert [e.pick for e in trace.events] == ["web.cap"]
     now[0] = 3601.0  # an hour on, there is room again
     assert cap.take(2)
+
+
+# --- free stand-ins when there are no Bright Data zones ----------------------------------------
+
+
+def _answer(table):
+    calls: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        for match, response in table:
+            if match(request):
+                return response(request)
+        return httpx.Response(404)
+
+    return answer, calls
+
+
+def test_without_bright_data_the_site_is_fetched_directly_only_when_turned_on():
+    page = (REC / "site_page.html").read_text()
+    answer, calls = _answer(
+        [(lambda r: r.url.host == "oakcourt.example", lambda r: httpx.Response(200, text=page))]
+    )
+    given = inputs(ad_link=None, ad_phrase=None, center=None)
+    off = settings(brightdata_api_token=None)
+    assert (
+        run_web_checks(
+            given, off, salt=SALT, http=httpx.Client(transport=httpx.MockTransport(answer))
+        ).site.status
+        is CheckStatus.NOT_CHECKED
+    )
+    assert calls == []
+    on = settings(brightdata_api_token=None, snapback_web_direct_fetch=True)
+    site = run_web_checks(
+        given, on, salt=SALT, http=httpx.Client(transport=httpx.MockTransport(answer))
+    ).site
+    assert (
+        site.status is CheckStatus.DONE and site.lists_unit is True and site.phone_matches is True
+    )
+    assert [str(r.url) for r in calls] == ["https://oakcourt.example/"]
+
+
+def test_a_redirect_to_a_host_we_must_not_open_is_never_followed():
+    answer, calls = _answer(
+        [
+            (
+                lambda r: r.url.host == "oakcourt.example",
+                lambda r: httpx.Response(302, headers={"location": "https://m.facebook.com/oak"}),
+            )
+        ]
+    )
+    on = settings(brightdata_api_token=None, snapback_web_direct_fetch=True)
+    given = inputs(ad_link=None, ad_phrase=None, center=None)
+    site = run_web_checks(
+        given, on, salt=SALT, http=httpx.Client(transport=httpx.MockTransport(answer))
+    ).site
+    assert site.status is CheckStatus.FAILED
+    assert all("facebook" not in r.url.host for r in calls)
+
+
+def test_without_bright_data_the_search_runs_through_apify_and_reads_the_same():
+    page = {
+        "organicResults": [
+            {
+                "url": "https://classifieds-one.example/post/1",
+                "title": "2 bed",
+                "description": "text (832) 555-0177",
+            },
+            {"url": "https://www.oakcourt.example/plans", "title": "own site", "description": ""},
+        ]
+    }
+    answer, calls = _answer(
+        [
+            (
+                lambda r: "google-search-scraper" in r.url.path,
+                lambda r: httpx.Response(201, json=[page]),
+            ),
+            (lambda r: "zillow" in r.url.path, lambda r: httpx.Response(201, json=[])),
+        ]
+    )
+    conf = settings(brightdata_api_token=None, browser_use_api_key=None)
+    e = run_web_checks(
+        inputs(website_host="oakcourt.example"),
+        conf,
+        salt=SALT,
+        http=httpx.Client(transport=httpx.MockTransport(answer)),
+    ).elsewhere
+    assert e.status is CheckStatus.DONE and e.postings == 1 and e.poster_differs is True
+    search = next(r for r in calls if "google-search-scraper" in r.url.path)
+    assert json.loads(search.content)["queries"].startswith('"spacious two bedroom')
+    assert "maxItems" not in search.url.params  # a small cap is refused by pay-per-event actors

@@ -64,11 +64,15 @@ def _site(
     inputs: WebInputs, settings: Settings, http: httpx.Client, salt: str, limit: float
 ) -> SiteCheck:
     token = settings.brightdata_api_token
-    if token is None or not inputs.website_host or not may_open(f"https://{inputs.website_host}/"):
+    url = f"https://{inputs.website_host}/" if inputs.website_host else None
+    if url is None or not may_open(url):
         return SiteCheck(host=inputs.website_host)
-    raw = clients.unlock(
-        http, token, settings.brightdata_unlocker_zone, f"https://{inputs.website_host}/", limit
-    )
+    if token is not None:
+        raw = clients.unlock(http, token, settings.brightdata_unlocker_zone, url, limit)
+    elif settings.snapback_web_direct_fetch:
+        raw = clients.fetch_page(http, url, limit, may_open)
+    else:
+        return SiteCheck(host=inputs.website_host)
     return site_facts(raw, inputs, salt)
 
 
@@ -89,9 +93,12 @@ def _elsewhere(
     token, apify = settings.brightdata_api_token, settings.apify_token
     hits = None
     rentals: dict[str, list[dict[str, Any]]] = {}
-    if token is not None and inputs.ad_phrase:
+    if inputs.ad_phrase and (token is not None or apify is not None):
         query = f'"{inputs.ad_phrase}"' + (f" {inputs.city}" if inputs.city else "")
-        answer = clients.serp(http, token, settings.brightdata_serp_zone, query, limit)
+        if token is not None:
+            answer = clients.serp(http, token, settings.brightdata_serp_zone, query, limit)
+        else:  # no Bright Data zones: the same search through Apify's Google actor
+            answer = clients.apify_search(http, apify, query, limit)  # type: ignore[arg-type]
         hits = search_hits(answer, inputs.website_host)
     if apify is not None and inputs.center is not None:
         actors = {
@@ -174,9 +181,9 @@ def run_web_checks(
 
 
 STEP_WORDS = {
-    "site": "Read the building's own site through Bright Data",
+    "site": "Read the building's own site",
     "link": "Opened the ad's link in Browser Use",
-    "elsewhere": "Searched for the same home posted elsewhere (Bright Data search, Apify)",
+    "elsewhere": "Searched for the ad's words elsewhere and rentals this size nearby",
 }
 
 

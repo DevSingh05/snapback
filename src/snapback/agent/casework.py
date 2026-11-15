@@ -353,7 +353,7 @@ def web_text(facts: Any) -> str:
     site, link, other = facts.site, facts.link, facts.elsewhere
     lines = [f"Source: web checks ({facts.source.value})"]
     lines.append(
-        f"Building's own site (Bright Data): {site.status.value}"
+        f"Building's own site: {site.status.value}"
         + (
             f"; host {site.host}; lists the ad's plan or unit: {_yes_no(site.lists_unit)}; "
             f"shows the office phone on record: {_yes_no(site.phone_matches)}"
@@ -379,7 +379,7 @@ def web_text(facts: Any) -> str:
             if other.postings is not None
             else "not checked"
         )
-        lines.append(f"The ad's own words posted elsewhere (Bright Data search): {posted}")
+        lines.append(f"The ad's own words posted elsewhere (web search): {posted}")
         if other.nearby is not None:
             rents = (
                 f", asked rent {other.rent_low} to {other.rent_high}"
@@ -391,7 +391,7 @@ def web_text(facts: Any) -> str:
             )
     else:
         lines.append(
-            f"Posted elsewhere and rentals nearby (Bright Data search, Apify): {other.status.value}"
+            f"Posted elsewhere and rentals nearby (web search, Apify): {other.status.value}"
         )
     return "\n".join(lines)
 
