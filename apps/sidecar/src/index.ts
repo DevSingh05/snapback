@@ -19,6 +19,7 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { CaseMemory, type MessageClient } from "./handler";
+import { ProfileStore } from "./profile";
 import { connectPhoton, publicWebUrl, runPhoton, stageOptions } from "./photon";
 import { WatchBook, pushEvents, readEvents } from "./watch";
 
@@ -107,6 +108,11 @@ if (photon) {
         }
       : {}),
     memory: new CaseMemory(),
+    // Adaptive memory (D2): kept under the git-ignored data/ folder, purged by `make purge`
+    profiles: new ProfileStore(
+      process.env.SIDECAR_PROFILE_FILE ||
+        fileURLToPath(new URL("../../../data/sidecar/profiles.json", import.meta.url)),
+    ),
     acknowledge: stage.acknowledge,
     watches,
     apiUrl: API_URL,
