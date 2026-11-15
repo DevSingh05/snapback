@@ -1130,6 +1130,11 @@
   margin: 0;
   font-size: var(--fs-md);
 }
+.ob-fixture-note {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
 .ob-muted {
   margin: 0;
   font-size: var(--fs-sm);

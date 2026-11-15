@@ -261,7 +261,12 @@ export function TeamPanel({
       ? w.missing
       : run.status === "locked"
         ? w.locked
-        : statusLine(floor, w);
+        : statusLine(
+            floor,
+            // A replay in motion counts up from 0, which read as "1 of 5" beside the report's
+            // "5 of 5". While it runs the line names the run's own total, the report's count.
+            floor.phase === "running" ? { ...w, checks: () => w.ran(whole.checksTotal) } : w,
+          );
   const speeds: Speed[] = [1, 2];
   // A member's mark opens its trace card; a reason opens its card in Meet the team.
   const openTrace = (id: string) => {
