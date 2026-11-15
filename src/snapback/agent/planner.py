@@ -295,7 +295,10 @@ class Plan:
         if kind is PlanKind.OWNER:
             return {"owner": self._owner}
         if kind is PlanKind.CLAIMS:
-            return {"ad_notes": self._ad_notes, "public_records": self._public_records}
+            found: dict[str, object] = {"ad_notes": self._ad_notes}
+            if self._public_records:  # only when there is something: the step adds no empty key
+                found["public_records"] = self._public_records
+            return found
         if kind is PlanKind.ASK:
             raise ValueError("the question is asked by the session; the answer comes to answer()")
         return {}
