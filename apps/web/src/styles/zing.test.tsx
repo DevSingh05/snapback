@@ -60,7 +60,9 @@ describe("zing pass", () => {
       unverified: "slate",
     };
     for (const state of Object.keys(band) as VerdictState[]) {
-      const { unmount } = render(<CardView card={{ ...card, state }} variant="result" />);
+      const { unmount } = render(
+        <CardView card={{ ...card, state, headline: null }} variant="result" />,
+      );
       expect(screen.getByTestId("case-band")).toHaveAttribute("data-verdict", band[state]);
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(STATE_WORD[state]);
       unmount();

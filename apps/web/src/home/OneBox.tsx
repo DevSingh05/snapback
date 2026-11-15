@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useReducer, useRef, useState } from "rea
 
 import { apiBase, apiFetchRead, fetchCard } from "../api";
 import { answerAbout, isAgainst, type CaseAnswer } from "./caseAnswer";
-import { STATE_WORD, headlineOf, toneWord } from "../cardStrings";
+import { headlineOf, toneWord } from "../cardStrings";
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import sampleLivingRoom from "../assets/sample-living-room.webp";
 import sampleLounge from "../assets/sample-lounge.webp";
@@ -743,7 +743,7 @@ function SampleCase({ onOpen }: { onOpen: () => void }) {
         ))}
       </span>
       <span className="ob-sample-verdict" data-tone={TONE_OF[card.state]}>
-        {STATE_WORD[card.state]}
+        {headlineOf(card)}
       </span>
       <span className="ob-sample-rows">
         {lines.map(({ kind, line }) => {

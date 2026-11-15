@@ -133,7 +133,7 @@ describe("Home is one box", () => {
     render(<OneBox mode="fixture" createCase={made()} checkingMs={0} />);
     const sample = screen.getByTestId("ob-sample");
     expect(sample).toHaveTextContent("Sample report 7Q2M");
-    expect(sample).toHaveTextContent("Hold off for now");
+    expect(sample).toHaveTextContent("Hold off: it asks for money before you've seen the place");
     expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     // Proof, not features: the ad's photo beside the scan view, then the fixture card's own lines.
     const pair = within(sample).getByTestId("ob-pair");
@@ -179,7 +179,7 @@ describe("routing each message, shown honestly", () => {
     const verdict = await screen.findByTestId("ob-verdict");
     expect(screen.queryByRole("button", { name: /i approve it/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /skip this/i })).not.toBeInTheDocument();
-    expect(verdict).toHaveTextContent("Hold off for now");
+    expect(verdict).toHaveTextContent("Hold off: it asks for money before you've seen the place");
     expect(verdict).toHaveTextContent("Code set this verdict");
     expect(within(verdict).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     expect(within(verdict).getByRole("link", { name: "Open the full report" })).toHaveAttribute(
@@ -287,7 +287,9 @@ describe("routing each message, shown honestly", () => {
         expect.objectContaining({ link: "https://zillow.com/homedetails/123", text: null }),
       ),
     );
-    expect(await screen.findByTestId("ob-verdict")).toHaveTextContent("Hold off for now");
+    expect(await screen.findByTestId("ob-verdict")).toHaveTextContent(
+      "Hold off: it asks for money before you've seen the place",
+    );
   });
 
   it("a wish goes to the Finder; without the Finder service, code lists places and says so", async () => {
@@ -440,7 +442,7 @@ describe("follow-ups answer about the case on screen", () => {
     const user = await withCase();
     await say(user, "is it safe?");
     const a = reply();
-    expect(a).toHaveTextContent("Hold off for now");
+    expect(a).toHaveTextContent("Hold off: it asks for money before you've seen the place");
     for (const line of [...card.checks_out!, ...card.does_not!]) expect(a).toHaveTextContent(line);
     expect(a).toHaveTextContent("Not checkedID, lease, ownership");
   });

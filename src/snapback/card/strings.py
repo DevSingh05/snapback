@@ -258,6 +258,10 @@ EN: dict[str, str] = {
     "rule.fee.holding_deposit_before_viewing": (
         "A deposit or holding fee before a viewing. Red flag."
     ),
+    # Both of the two above fired: one line that names both, not two near-duplicates.
+    "rule.payment.zelle_and_deposit_before_viewing": (
+        "Zelle and a deposit or holding fee before a viewing. Red flag."
+    ),
     "rule.fee.application_fee_before_viewing": (
         "An application fee sent to a person before a viewing. Red flag."
     ),
@@ -546,6 +550,11 @@ EN: dict[str, str] = {
         "Nothing in this ad goes against the record. Before you pay: ask them to prove "
         "they're inside, and confirm with an office you look up yourself."
     ),
+    # A HOLD with a red-flag line says which kind, in the card's own words.
+    "state.hold_red_money": "Hold off: it asks for money before you've seen the place",
+    "state.hold_red_papers": "Hold off: it asks for personal papers before you've seen the place",
+    "state.hold_red_pressure": "Hold off: it pushes you to act before you've seen the place",
+    "state.hold_red": "Hold off: something in this ad is a red flag",
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -796,6 +805,9 @@ ES: dict[str, str] = {
     ),
     "rule.fee.holding_deposit_before_viewing": (
         "Un depósito o cargo de reserva antes de una visita. Señal de alerta."
+    ),
+    "rule.payment.zelle_and_deposit_before_viewing": (
+        "Zelle y un depósito o cargo de reserva antes de una visita. Señal de alerta."
     ),
     "rule.fee.application_fee_before_viewing": (
         "Un cargo de solicitud enviado a una persona antes de una visita. Señal de alerta."
@@ -1122,6 +1134,10 @@ ES: dict[str, str] = {
         "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
         "que están dentro y confirme con una oficina que usted mismo busque."
     ),
+    "state.hold_red_money": "Espere: pide dinero antes de que usted haya visto el lugar",
+    "state.hold_red_papers": "Espere: pide documentos personales antes de que haya visto el lugar",
+    "state.hold_red_pressure": "Espere: le presiona para actuar antes de ver el lugar",
+    "state.hold_red": "Espere: algo en este anuncio es una señal de alerta",
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
     "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",
