@@ -67,7 +67,7 @@ describe("code sets the words", () => {
   it.each(Object.keys(STATE_WORD) as VerdictState[])(
     "the %s headline is the cardStrings one, with its own bar colour",
     (state) => {
-      render(<CaseResult card={{ ...card, state }} />);
+      render(<CaseResult card={{ ...card, state, headline: null }} />);
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(STATE_WORD[state]);
       const tone = { dont_pay: "dont-pay", hold: "hold", verified: "ok", unverified: "slate" };
       expect(screen.getByTestId("case-band")).toHaveAttribute("data-verdict", tone[state]);
@@ -119,11 +119,22 @@ describe("one primary button", () => {
     render(<CaseResult card={card} />);
     expect(document.querySelectorAll(".case-primary")).toHaveLength(1);
     const primary = screen.getByTestId("case-primary");
-    expect(primary).toHaveTextContent("What to do next");
+    expect(primary).toHaveTextContent("Who do I call?");
     expect(primary).toHaveAttribute("href", "#next");
     expect(document.getElementById("next")).toBe(screen.getByTestId("case-todo"));
     expect(screen.getByTestId("case-band")).toContainElement(primary);
-    // The walk is the quiet link beside it, because a photo was placed.
+  });
+
+  it("on a hold the walk is not offered beside the money advice; one Who do I call link", () => {
+    render(<CaseResult card={card} />);
+    expect(screen.queryByRole("link", { name: "Walk it first" })).toBeNull();
+    const calls = screen.getAllByRole("link", { name: "Who do I call?" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toHaveAttribute("href", "#next");
+  });
+
+  it("an unverified result keeps the walk as the quiet link", () => {
+    render(<CaseResult card={{ ...card, state: "unverified", headline: null }} />);
     expect(
       within(screen.getByTestId("case-band")).getByRole("link", { name: "Walk it first" }),
     ).toHaveAttribute("href", "/case/7Q2M/twin");

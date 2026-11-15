@@ -151,6 +151,17 @@ const HEADLINES_ES: Record<string, string> = {
   dont_pay: "No pague. Algo aquí no coincide.",
   verified: "Las revisiones pasaron. Siga igual las dos reglas.",
 };
+// #280: the card's red-flag headlines (strings.py state.hold_red_*), in Spanish word for word.
+const RED_HEADLINES_ES: Record<string, string> = {
+  "Hold off: it asks for money before you've seen the place":
+    "Espere: pide dinero antes de que usted haya visto el lugar",
+  "Hold off: it asks for personal papers before you've seen the place":
+    "Espere: pide documentos personales antes de que haya visto el lugar",
+  "Hold off: it pushes you to act before you've seen the place":
+    "Espere: le presiona para actuar antes de ver el lugar",
+  "Hold off: something in this ad is a red flag":
+    "Espere: algo en este anuncio es una señal de alerta",
+};
 
 /** The reply's own few words, in each language. The verdict and reasons come from the card. */
 const WORDS = {
@@ -312,7 +323,8 @@ export function isAllowed(threadId: string, config: SidecarConfig): boolean {
 /** The card's own headline (#256: an honest ad reads differently) when set, else the locked
  * headline for its state. Both are code-owned; the sidecar never writes one. */
 export function headlineOf(card: Card, lang: Lang = "en"): string {
-  if (card.headline?.trim()) return card.headline.trim();
+  const own = card.headline?.trim();
+  if (own) return lang === "es" ? (RED_HEADLINES_ES[own] ?? own) : own;
   if (lang === "es") return HEADLINES_ES[card.state] ?? HEADLINES_ES.hold ?? HEADLINES.hold;
   return HEADLINES[card.state] ?? HEADLINES.hold;
 }
