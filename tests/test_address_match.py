@@ -132,3 +132,49 @@ def test_a_lookup_that_breaks_is_no_match_and_the_check_still_runs():
     assert record_for_address(_Broken(), ad) is None
     case = _store(_Broken()).create(_listing(ad))
     assert case.office_record is None
+
+
+# Review FIX on #323 (XO, 02:45): never join another state's or another city's building, and
+# never treat a North and a South building on one street number as the same address.
+
+LA_OAK = PropertyRecord(
+    property_id="fx-la-oak",
+    source=DataSource.LIVE,
+    market="Los Angeles",
+    street_address="1400 Example Oak Street, Los Angeles, CA 90012",
+)
+NORTH = _record("fx-north", "1200 N Example Main St, Houston, TX 77002")
+SOUTH = _record("fx-south", "1200 S Example Main St, Houston, TX 77002")
+PASADENA_OAK = _record("fx-pasadena-oak", "1400 Example Oak Street, Pasadena, TX")
+
+
+def test_a_texas_ad_never_joins_a_california_record_at_the_same_street():
+    index = build_index([LA_OAK])
+    ad = "1 bed at 1400 Example Oak St, Houston, TX. $900, text 713-555-0142"
+    assert match_address(ad, index) is None
+
+
+def test_the_city_must_agree_when_both_give_one():
+    index = build_index([PASADENA_OAK])
+    assert match_address("Room at 1400 Example Oak St, Houston, TX, $700.", index) is None
+    assert match_address("Room at 1400 Example Oak St, Pasadena, TX, $700.", index) is PASADENA_OAK
+
+
+def test_north_and_south_on_one_number_are_different_addresses():
+    index = build_index([NORTH, SOUTH])
+    assert match_address("2 bed, 1200 S Example Main St, Houston, TX 77002.", index) is SOUTH
+    assert match_address("2 bed, 1200 North Example Main Street, Houston TX.", index) is NORTH
+    assert match_address("2 bed, 1200 Example Main St, Houston, TX 77002.", index) is None
+
+
+def test_the_adapter_keeps_the_street_direction_before_and_after_the_name():
+    from snapback.adapters.costar_jsonl import parse_record
+
+    def address(**street):
+        raw = {"propertyId": "p", "primaryAddress": {"city": "Houston", "state": "TX", **street}}
+        return parse_record(raw, DataSource.FIXTURE).street_address
+
+    south = address(streetNumber=1200, streetDirection="S", streetName="Main", streetType="St")
+    assert south == "1200 S Main St, Houston, TX"
+    east = address(streetNumber=12, streetName="Elm", streetType="St", streetSuffix="E")
+    assert east == "12 Elm St E, Houston, TX"

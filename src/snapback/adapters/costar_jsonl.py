@@ -422,7 +422,9 @@ def _text(value: Any) -> str | None:
 def _street_address(address: Any) -> str | None:
     """ "100 Fixture Way, Houston, TX 77002" from the record's primary address, if it has one.
 
-    Used only to tell the office which building an ad is about (never on the card)."""
+    Used to tell the office which building an ad is about, and to match a typed address to
+    its record (never on the card). The direction stays in ("1200 S Main St", "12 Elm St E"),
+    so a North and a South building on one street number are never the same address."""
     if not isinstance(address, dict):
         return None
 
@@ -430,7 +432,15 @@ def _street_address(address: Any) -> str | None:
         return " ".join(str(address.get(key) or "").split())
 
     street = " ".join(
-        p for p in (part("streetNumber"), part("streetName"), part("streetType")) if p
+        p
+        for p in (
+            part("streetNumber"),
+            part("streetDirection"),
+            part("streetName"),
+            part("streetType"),
+            part("streetSuffix"),
+        )
+        if p
     )
     state = " ".join(p for p in (part("state"), part("postcode")) if p)
     text = ", ".join(p for p in (street, part("city"), state) if p)
