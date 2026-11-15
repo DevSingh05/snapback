@@ -1239,6 +1239,7 @@ export function Composer({
           ref={fileInput}
           id="photos"
           type="file"
+          aria-label="Add screenshots"
           className="sr-only"
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
           multiple

@@ -553,10 +553,28 @@ export function mountTwin(
 
   let visible = true,
     raf = 0,
-    lastN = -1;
+    lastN = -1,
+    fN = 0,
+    slow = 0,
+    lite = false,
+    lastT = 0;
   const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
-    if (!visible) return;
+    if (!visible) {
+      lastT = 0;
+      return;
+    }
+    // a slow device gets a lighter drawing, and a frame only while something moves
+    const dt = lastT ? now - lastT : 16;
+    lastT = now;
+    fN++;
+    if (!lite && fN > 8 && fN < 120 && dt > 40 && ++slow > 10) {
+      lite = true;
+      R.setPixelRatio(1);
+      sun.castShadow = false;
+      size();
+    }
+    if (lite && fN % 6 && tw.length === 0 && pts.size === 0) return;
     stepTw(now);
     if (!reduced && !pts.size && now - ob.idle > 4000) {
       const base = Math.round(ob.yawT / (Math.PI * 2)) * Math.PI * 2;

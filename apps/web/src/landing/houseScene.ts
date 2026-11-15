@@ -741,11 +741,33 @@ export function mountHouse(
   cv.addEventListener("pointercancel", up);
 
   let visible = true,
-    raf = 0;
+    raf = 0,
+    fN = 0,
+    slow = 0,
+    lite = false;
+  // A slow device (frames over 40 ms) gets a lighter drawing: one pixel per CSS pixel, no
+  // shadows, and a frame only when something moves (a few a second when nothing does).
+  const goLite = () => {
+    lite = true;
+    R.setPixelRatio(1);
+    pu.uPx.value = 1;
+    sun.castShadow = false;
+    size();
+  };
   const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
-    if (!visible) return;
+    if (!visible) {
+      ob.last = 0;
+      return;
+    }
+    const dt = ob.last ? now - ob.last : 16;
     ob.last = now;
+    fN++;
+    if (!lite && fN > 8 && fN < 120 && dt > 40 && ++slow > 10) goLite();
+    if (lite && fN % 6) {
+      const busy = Math.abs(st.pT - st.p) > 0.002 || pt.size > 0 || hot >= 0 || now - t0 < 2600;
+      if (!busy) return;
+    }
     if (!reduced && !pt.size && now - ob.idle > 4000) {
       const base = Math.round(ob.yawT / (Math.PI * 2)) * Math.PI * 2;
       ob.yawT += (base + 0.4 * Math.sin(now * 0.00022) - ob.yawT) * 0.012;
