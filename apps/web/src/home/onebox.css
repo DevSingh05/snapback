@@ -723,7 +723,9 @@
 .ob-thread {
   list-style: none;
   margin: 0;
-  padding: 0;
+  /* Room under the last row for the docked box (--ob-dock-h is measured in OneBox.tsx), so the
+     last buttons scroll fully above it. */
+  padding: 0 0 calc(var(--ob-dock-h, 0px) + var(--sp-3));
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
@@ -800,6 +802,48 @@
 }
 .ob-bot-error p {
   color: var(--coral);
+}
+.ob-answer {
+  max-width: 62ch;
+}
+.ob-answer-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.ob-answer p.ob-answer-lead {
+  font-weight: 700;
+}
+.ob-answer p.ob-answer-head {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.ob-answer ul {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.ob-answer li {
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+.ob-answer p.ob-answer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+.ob-answer-links a {
+  color: var(--ink);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.ob-proof-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
 }
 .ob-stamp {
   font-family: var(--font-mono);

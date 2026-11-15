@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { apiBase, apiFetchRead, fetchCard } from "../api";
+import { answerAbout, isAgainst, type CaseAnswer } from "./caseAnswer";
 import { STATE_WORD, headlineOf, toneWord } from "../cardStrings";
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import sampleLivingRoom from "../assets/sample-living-room.webp";
@@ -17,7 +18,6 @@ import type {
 } from "../contracts";
 import { HERO_PHOTOS, HeroStreet } from "../landing/HeroStreet";
 import { searchPlaces } from "../search/api";
-import { TracePanel } from "../trace";
 import {
   decide,
   FinderGone,
@@ -42,10 +42,8 @@ import {
   approveChallenge as defaultApprove,
   createCase as defaultCreateCase,
   fetchApiSource,
-  getCaseStatus as defaultStatus,
   type ApproveChallenge,
   type CreateCase,
-  type GetCaseStatus,
 } from "../upload/api";
 import { initialState, reduce } from "../upload/machine";
 import { MAX_FILES, addFiles, validateSubmission } from "../upload/validate";
@@ -56,11 +54,13 @@ import {
   rentFrom,
   route,
   ROUTE_LINE,
+  saferWords,
   SWITCH_LABEL,
   switchOf,
   VIEW_HREF,
   VIEW_NAME,
   withoutFacebookLinks,
+  type CaseTopic,
   type Intent,
   type View,
 } from "./intent";
@@ -136,6 +136,7 @@ export type Item =
   | { id: number; type: "places"; brief: RenterBrief; scansOnly: boolean; note: string }
   | { id: number; type: "picks"; picks: FinderPick[]; source: DataSource }
   | { id: number; type: "offer"; proposal: FinderProposal; source: DataSource }
+  | { id: number; type: "answer"; answer: CaseAnswer }
   | { id: number; type: "open"; view: View }
   | { id: number; type: "error"; text: string };
 
@@ -144,10 +145,7 @@ type ItemInput = Item extends infer T ? (T extends Item ? Omit<T, "id"> : never)
 interface Props {
   createCase?: CreateCase;
   approveChallenge?: ApproveChallenge;
-  getCaseStatus?: GetCaseStatus;
-  pollMs?: number;
   checkingMs?: number;
-  waitingMs?: number;
   mode?: DataSource;
 }
 
@@ -174,6 +172,13 @@ export function OneBox(props: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const dock = useRef<HTMLDivElement>(null);
+  // The card of each finished case and the ad's own words, kept so a follow-up is answered from
+  // them. A tick makes the thread scroll again when a card lands after its row was added.
+  const cardsRef = useRef<Record<string, Card>>({});
+  const adRef = useRef<Record<string, string>>({});
+  const [landed, setLanded] = useState(0);
 
   useEffect(() => {
     if (mode !== "live") return;
@@ -189,10 +194,26 @@ export function OneBox(props: Props) {
     setItems((prev) => [...prev, ...next.map((n) => ({ ...n, id: nextId.current++ }) as Item)]);
   }, []);
 
+  // The docked box covers the bottom of the page. The thread keeps that much room under its last
+  // row (--ob-dock-h, measured), so the last action row can always scroll fully above the box.
+  const docked = items.length > 0;
+  useEffect(() => {
+    const el = dock.current;
+    const host = root.current;
+    if (!el || !host) return;
+    const measure = () =>
+      host.style.setProperty("--ob-dock-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [docked]);
+
   useEffect(() => {
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     end.current?.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "end" });
-  }, [items.length, busy]);
+  }, [items.length, busy, landed]);
 
   // --- The Finder: one session for this tab, opened the first time it is needed.
   const finder = useCallback(async (): Promise<FinderAuth | null> => {
@@ -280,6 +301,35 @@ export function OneBox(props: Props) {
     [askFinder],
   );
 
+  /** A follow-up about the case on screen, answered from its card and never by the Finder. */
+  const answerCase = useCallback(
+    async (topic: CaseTopic) => {
+      const id = cases[cases.length - 1];
+      if (!id) {
+        add({ type: "bot", by: "policy", text: "Paste an ad first, and I'll answer about it." });
+        return;
+      }
+      let card = cardsRef.current[id];
+      if (!card) {
+        setBusy("Reading the result");
+        try {
+          card = await fetchCard(id);
+          cardsRef.current[id] = card;
+        } catch (err) {
+          add({
+            type: "error",
+            text: err instanceof Error ? err.message : "The result did not load.",
+          });
+          return;
+        } finally {
+          setBusy(null);
+        }
+      }
+      add({ type: "answer", answer: answerAbout(card, topic) });
+    },
+    [add, cases],
+  );
+
   /** Runs one submission with a known intent. */
   const run = useCallback(
     (intent: Intent, words: string, attached: File[]) => {
@@ -334,7 +384,7 @@ export function OneBox(props: Props) {
         return;
       }
       if (intent.kind === "ask") {
-        void askFinder(words, false);
+        void answerCase(intent.topic);
         return;
       }
       // find
@@ -351,7 +401,7 @@ export function OneBox(props: Props) {
       }
       findWith(words);
     },
-    [add, askFinder, findWith, knownRent],
+    [add, answerCase, findWith, knownRent],
   );
 
   const answerRent = useCallback(
@@ -470,7 +520,7 @@ export function OneBox(props: Props) {
   );
 
   return (
-    <div className="ob" data-empty={empty || undefined} data-testid="one-box">
+    <div className="ob" ref={root} data-empty={empty || undefined} data-testid="one-box">
       {!empty && (
         <div className="ob-top ui-on-matte">
           <HeroStreet strip />
@@ -570,8 +620,21 @@ export function OneBox(props: Props) {
                       ? answerUnsure(r)
                       : submit(r, [])
                 }
-                onCase={(id) => setCases((c) => (c.includes(id) ? c : [...c, id]))}
-                onFollow={(words) => submit(words, [])}
+                onCase={(id, ad) => {
+                  adRef.current[id] = ad;
+                  setCases((c) => (c.includes(id) ? c : [...c, id]));
+                }}
+                onCard={(card) => {
+                  cardsRef.current[card.case_id] = card;
+                  setLanded((n) => n + 1);
+                }}
+                onFollow={(words) => {
+                  const last = cases[cases.length - 1];
+                  submit(
+                    words === SAFER_LABEL ? saferWords(adRef.current[last ?? ""] ?? "") : words,
+                    [],
+                  );
+                }}
                 onDecided={async (p, yes) => {
                   if (!auth.current) return;
                   try {
@@ -604,7 +667,7 @@ export function OneBox(props: Props) {
             )}
           </ol>
           <div ref={end} />
-          <div className="ob-dock">
+          <div className="ob-dock" ref={dock}>
             {(error || fileErrors.length > 0) && <Problems error={error} fileErrors={fileErrors} />}
             {composer}
             <Learned kept={kept.map(keptLabel)} noticed={lines} />
@@ -780,10 +843,11 @@ export function SamplePhoto({
  * token. Never bundled: kit pictures stay on the server. Null until it loads, or when there is
  * none (fixture mode, no token, no placed photo).
  */
-function useScanPhoto(caseId: string): string | null {
+function useScanPhoto(caseId: string, lookup: boolean): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!apiBase()) return;
+    // An ad with no photos has no evidence file; asking for it would only log a 404.
+    if (!apiBase() || !lookup) return;
     const ctrl = new AbortController();
     let made: string | null = null;
     (async () => {
@@ -812,13 +876,13 @@ function useScanPhoto(caseId: string): string | null {
       ctrl.abort();
       if (made) URL.revokeObjectURL?.(made);
     };
-  }, [caseId]);
+  }, [caseId, lookup]);
   return url;
 }
 
 /** The "Walk it first" card under a verdict: the real scan view when the API has one. */
-function WalkCard({ caseId }: { caseId: string }) {
-  const scan = useScanPhoto(caseId);
+function WalkCard({ caseId, lookup }: { caseId: string; lookup: boolean }) {
+  const scan = useScanPhoto(caseId, lookup);
   const id = encodeURIComponent(caseId);
   return (
     <a className="ob-walk" href={`/case/${id}/twin`} data-testid="ob-walk">
@@ -1063,6 +1127,7 @@ export function ThreadItem({
   onSwitch,
   onReply,
   onCase,
+  onCard,
   onFollow,
   onDecided,
 }: {
@@ -1071,7 +1136,8 @@ export function ThreadItem({
   props: Props;
   onSwitch: (to: Intent) => void;
   onReply: (reply: string, kind: "rent" | "send" | "unsure") => void;
-  onCase: (id: string) => void;
+  onCase: (id: string, adText: string) => void;
+  onCard?: (card: Card) => void;
   onFollow: (words: string) => void;
   onDecided: (p: FinderProposal, yes: boolean) => Promise<void>;
 }) {
@@ -1144,10 +1210,13 @@ export function ThreadItem({
             mode={mode}
             props={props}
             onCase={onCase}
+            onCard={onCard}
             onFollow={onFollow}
           />
         </li>
       );
+    case "answer":
+      return <AnswerItem answer={it.answer} />;
     case "places":
       return (
         <li className="ob-card-row">
@@ -1181,7 +1250,45 @@ export function ThreadItem({
   }
 }
 
-// --- The ad check, inline. The same steps and approval gate as before, as one card.
+/** The label of the verdict's button for safer homes; Home turns it into the ad's own filter. */
+export const SAFER_LABEL = "Find safer homes";
+const WHO_LABEL = "Who do I call?";
+
+/** A reply about the case on screen: the card's own lines, with a short lead-in from code. */
+function AnswerItem({ answer }: { answer: CaseAnswer }) {
+  return (
+    <li className="ob-bot ob-answer" data-testid="ob-answer">
+      <p className="ob-answer-lead">{answer.lead}</p>
+      {answer.sections.map((sec, i) => (
+        <div key={i} className="ob-answer-sec">
+          {sec.heading && <p className="ob-answer-head">{sec.heading}</p>}
+          <ul>
+            {sec.lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <p className="ob-answer-links">
+        {answer.links.map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            {...(l.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          >
+            {l.label}
+            {l.external ? <span aria-hidden="true"> ↗</span> : null}
+          </a>
+        ))}
+      </p>
+      <span className="ob-stamp" data-by="policy">
+        Written by code from this result
+      </span>
+    </li>
+  );
+}
+
+// --- The ad check, inline. The verdict comes first; asking the poster for proof comes after it.
 
 const STEPS = [
   { key: "reading", label: "Reading the ad" },
@@ -1190,46 +1297,49 @@ const STEPS = [
   { key: "waiting", label: "Waiting for the poster" },
 ] as const;
 
+/** What the check shows while it runs. The poster step comes after the verdict, not before. */
+const CHECK_STEPS = STEPS.slice(0, 2);
+
 function CheckRun({
   input,
   mode,
   props,
   onCase,
+  onCard,
   onFollow,
 }: {
   input: { link: string | null; text: string | null; files: File[] };
   mode: DataSource;
   props: Props;
-  onCase: (id: string) => void;
+  onCase: (id: string, adText: string) => void;
+  onCard?: (card: Card) => void;
   onFollow: (words: string) => void;
 }) {
   const {
     createCase = defaultCreateCase,
     approveChallenge = defaultApprove,
-    getCaseStatus = defaultStatus,
-    pollMs = 700,
     checkingMs = 900,
-    waitingMs = 1800,
   } = props;
   const [state, dispatch] = useReducer(reduce, initialState);
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
   const started = useRef(false);
   const deciding = useRef(false);
+  // The drafted message, kept for after the verdict (the reducer drops it once the result is in).
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
     dispatch({ type: "submit" });
     createCase(input)
-      .then((made) =>
+      .then((made) => {
+        setChallenge(made.challenge_text);
         dispatch({
           type: "created",
           caseId: made.case_id,
           challengeText: made.challenge_text,
           source: made.source,
-        }),
-      )
+        });
+      })
       .catch((err: unknown) =>
         dispatch({
           type: "fail",
@@ -1244,65 +1354,48 @@ function CheckRun({
     return () => clearTimeout(t);
   }, [state.step, checkingMs, mode]);
 
+  // Verdict first: the check does not stop to ask. Nothing is ever sent for the renter, so the
+  // answer to the poster is recorded as "not now" and the result shows at once. The drafted
+  // message is offered under the verdict, to copy and send yourself.
+  const approvalCase = state.step === "approval" ? state.caseId : null;
   useEffect(() => {
-    if (state.step !== "waiting" || mode !== "fixture") return;
-    const t = setTimeout(() => dispatch({ type: "done" }), waitingMs);
-    return () => clearTimeout(t);
-  }, [state.step, waitingMs, mode]);
-
-  const waitingCase = state.step === "waiting" ? state.caseId : null;
-  useEffect(() => {
-    if (waitingCase === null || mode !== "live") return;
-    const ctrl = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      try {
-        const s = await getCaseStatus(waitingCase, ctrl.signal);
-        if (s.status === "done") {
-          dispatch({ type: "done" });
+    if (approvalCase === null || deciding.current) return;
+    deciding.current = true;
+    void (async () => {
+      if (mode === "live") {
+        try {
+          await approveChallenge(approvalCase, "cancel");
+        } catch (err) {
+          deciding.current = false;
+          dispatch({
+            type: "fail",
+            message: err instanceof Error ? err.message : "Something went wrong. Try again.",
+          });
           return;
         }
-      } catch {
-        if (ctrl.signal.aborted) return;
       }
-      timer = setTimeout(poll, pollMs);
-    };
-    void poll();
-    return () => {
-      ctrl.abort();
-      if (timer) clearTimeout(timer);
-    };
-  }, [waitingCase, mode, getCaseStatus, pollMs]);
+      deciding.current = false;
+      dispatch({ type: "skip" });
+    })();
+  }, [approvalCase, mode, approveChallenge]);
 
   const doneCase = state.step === "done" ? state.caseId : null;
+  const adText = input.text ?? "";
   useEffect(() => {
-    if (doneCase) onCase(doneCase);
-  }, [doneCase, onCase]);
-
-  async function choose(decision: "send" | "cancel") {
-    if (state.step !== "approval" || deciding.current) return;
-    deciding.current = true;
-    setBusy(true);
-    if (mode === "live") {
-      try {
-        await approveChallenge(state.caseId, decision);
-      } catch (err) {
-        deciding.current = false;
-        setBusy(false);
-        dispatch({
-          type: "fail",
-          message: err instanceof Error ? err.message : "Something went wrong. Try again.",
-        });
-        return;
-      }
-    }
-    deciding.current = false;
-    setBusy(false);
-    dispatch({ type: decision === "send" ? "approve" : "skip" });
-  }
+    if (doneCase) onCase(doneCase, adText);
+  }, [doneCase, adText, onCase]);
 
   if (state.step === "done")
-    return <VerdictCard caseId={state.caseId} source={state.source} onFollow={onFollow} />;
+    return (
+      <VerdictCard
+        caseId={state.caseId}
+        source={state.source}
+        onFollow={onFollow}
+        onCard={onCard}
+        challenge={challenge}
+        scanLookup={input.files.length > 0 || input.link !== null}
+      />
+    );
 
   if (state.step === "error")
     return (
@@ -1315,7 +1408,10 @@ function CheckRun({
       </article>
     );
 
-  const active = STEPS.findIndex((s) => s.key === state.step);
+  const active = Math.min(
+    1,
+    CHECK_STEPS.findIndex((s) => s.key === state.step),
+  );
   const source: DataSource = "source" in state ? state.source : mode;
   return (
     <article className="ob-card ob-check" data-testid="ob-check">
@@ -1323,44 +1419,22 @@ function CheckRun({
         <p className="ob-card-kicker">Checking the ad</p>
         <SourceChip source={source} />
       </header>
-      <CheckSteps active={active} />
-      {state.step === "approval" && (
-        <ChallengeDraft
-          text={state.challengeText}
-          busy={busy}
-          copied={copied}
-          onSend={() => void choose("send")}
-          onCopy={async () => {
-            try {
-              await navigator.clipboard.writeText(state.challengeText);
-              setCopied(true);
-            } catch {
-              setCopied(false);
-            }
-          }}
-          onSkip={() => void choose("cancel")}
-        />
-      )}
-      {state.step === "waiting" && (
-        <div className="ob-wait">
-          <p className="ob-card-text">
-            No reply yet means hold off, not a failure. The result updates when they answer.
-          </p>
-          {mode === "live" && <TracePanel caseId={state.caseId} mode="live" />}
-          <button type="button" className="ob-secondary" onClick={() => dispatch({ type: "done" })}>
-            See my result now
-          </button>
-        </div>
-      )}
+      <CheckSteps active={Math.max(active, 0)} steps={CHECK_STEPS} />
     </article>
   );
 }
 
 /** The check's four steps, the one at `active` lit. */
-export function CheckSteps({ active }: { active: number }) {
+export function CheckSteps({
+  active,
+  steps = STEPS,
+}: {
+  active: number;
+  steps?: readonly { key: string; label: string }[];
+}) {
   return (
     <ol className="ob-steps" aria-label="Progress">
-      {STEPS.map((s, i) => {
+      {steps.map((s, i) => {
         const status = i < active ? "done" : i === active ? "active" : "todo";
         return (
           <li
@@ -1453,16 +1527,32 @@ export function VerdictCard({
   caseId,
   source,
   onFollow,
+  onCard,
+  challenge = null,
+  scanLookup = true,
 }: {
   caseId: string;
   source: DataSource;
   onFollow?: (words: string) => void;
+  /** Told once when the card has loaded, so Home can answer follow-ups from it. */
+  onCard?: (card: Card) => void;
+  /** The message drafted for the poster, offered after the verdict. */
+  challenge?: string | null;
+  /** False when the ad had no photos, so the API has no scan view to ask for. */
+  scanLookup?: boolean;
 }) {
   const [card, setCard] = useState<Card | null | "error">(null);
+  const told = useRef(onCard);
+  useEffect(() => {
+    told.current = onCard;
+  });
   useEffect(() => {
     const ctrl = new AbortController();
     fetchCard(caseId, ctrl.signal)
-      .then(setCard)
+      .then((c) => {
+        setCard(c);
+        told.current?.(c);
+      })
       .catch(() => !ctrl.signal.aborted && setCard("error"));
     return () => ctrl.abort();
   }, [caseId]);
@@ -1482,7 +1572,15 @@ export function VerdictCard({
         </a>
       </article>
     );
-  return <VerdictView card={card} source={source} onFollow={onFollow} />;
+  return (
+    <VerdictView
+      card={card}
+      source={source}
+      onFollow={onFollow}
+      challenge={challenge}
+      scanLookup={scanLookup}
+    />
+  );
 }
 
 /** The verdict card itself, from a Card already in hand. `actions` replaces the two links (the
@@ -1492,13 +1590,19 @@ export function VerdictView({
   source,
   onFollow,
   actions,
+  challenge = null,
+  scanLookup = true,
 }: {
   card: Card;
   source: DataSource;
   onFollow?: (words: string) => void;
   actions?: React.ReactNode;
+  challenge?: string | null;
+  scanLookup?: boolean;
 }) {
   const [all, setAll] = useState(false);
+  // A red flag or a hold keeps only the paths that help: the report, who to call, safer homes.
+  const against = isAgainst(card);
   const id = encodeURIComponent(card.case_id);
   const allLines = card.rows.flatMap((row) =>
     row.lines.map((line, i) => ({ kind: row.kind, line, first: i === 0, key: `${row.kind}-${i}` })),
@@ -1554,29 +1658,88 @@ export function VerdictView({
         {actions ?? (
           <>
             <a className="ob-primary" href={`/case/${id}`}>
-              Open the full result
+              Open the full report
             </a>
-            <a className="ob-quiet" href={`/case/${id}/prep`}>
-              Get ready to visit
-            </a>
+            {!against && (
+              <a className="ob-quiet" href={`/case/${id}/prep`}>
+                Get ready to visit
+              </a>
+            )}
           </>
         )}
       </div>
-      {!actions && <WalkCard caseId={card.case_id} />}
+      {!actions && !against && <WalkCard caseId={card.case_id} lookup={scanLookup} />}
       {onFollow && (
         <ul className="ob-replies ob-follow" aria-label="Next">
-          {["Find me safer places like this", "Show me on the map", "Replay a real case"].map(
-            (w) => (
-              <li key={w}>
-                <button type="button" onClick={() => onFollow(w)}>
-                  {w}
-                </button>
-              </li>
-            ),
-          )}
+          {(against
+            ? [WHO_LABEL, SAFER_LABEL]
+            : [SAFER_LABEL, "Show me on the map", "Replay a real case"]
+          ).map((w) => (
+            <li key={w}>
+              <button type="button" onClick={() => onFollow(w)}>
+                {w}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
+      {challenge && !actions && <ProofAsk text={challenge} />}
     </article>
+  );
+}
+
+/** After the verdict: the message that asks the poster for a fresh photo, to copy and send
+ *  yourself. A second step, never a gate in front of the result. */
+function ProofAsk({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  return (
+    <section className="ob-proof-ask" aria-label="Ask the poster for proof">
+      <button
+        type="button"
+        className="ob-secondary"
+        aria-expanded={open}
+        data-testid="ob-proof-toggle"
+        onClick={() => setOpen(!open)}
+      >
+        Ask the poster for proof
+      </button>
+      {open && (
+        <div className="ob-approve">
+          <p className="ob-card-text">
+            A real landlord can send a fresh photo from inside the unit. Copy this and send it
+            yourself. Nothing is sent for you.
+          </p>
+          <label htmlFor="challenge" className="sr-only">
+            Message to send
+          </label>
+          <textarea
+            id="challenge"
+            className="ob-message"
+            rows={4}
+            readOnly
+            value={text}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <div className="ob-acts">
+            <button
+              type="button"
+              className="ob-secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(text);
+                  setCopied(true);
+                } catch {
+                  setCopied(false);
+                }
+              }}
+            >
+              {copied ? "Copied" : "Copy message"}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
