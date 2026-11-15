@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
@@ -91,6 +92,10 @@ class Settings(BaseSettings):
     # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
     langsmith_api_key: SecretStr | None = None
     langsmith_project: str = "snapback"
+    # The project's page in LangSmith, for the "LangSmith" link on the trace cards. A plain
+    # https address on smith.langchain.com with no query, fragment or sign-in in it: a key or
+    # a token never goes in an address, so anything else is dropped.
+    snapback_langsmith_url: str | None = None
     # Checks one renter (or one browser) may start per day, and a ceiling per network address
     # so that clearing cookies is not a way around it.
     snapback_daily_limit: int = 3
@@ -102,6 +107,19 @@ class Settings(BaseSettings):
     # A staged demo case from fixtures/demo (a, b or c), read from DEMO_CASE. With it set,
     # every new check runs on that case's stand-ins. Unset or empty for normal runs.
     demo_case: str | None = None
+
+    @field_validator("snapback_langsmith_url", mode="before")
+    @classmethod
+    def _a_plain_langsmith_address(cls, value: object) -> str | None:
+        url = str(value).strip() if value is not None else ""
+        try:
+            parts = urlsplit(url)
+            host = parts.hostname or ""
+        except ValueError:
+            return None
+        on_langsmith = host == "smith.langchain.com" or host.endswith(".smith.langchain.com")
+        plain = not (parts.query or parts.fragment or parts.username or parts.password)
+        return url if parts.scheme == "https" and on_langsmith and plain else None
 
     @field_validator("demo_case", mode="before")
     @classmethod

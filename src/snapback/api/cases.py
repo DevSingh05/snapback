@@ -38,6 +38,7 @@ from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
+from snapback.agent.worklog import AgentWork
 from snapback.api.casefiles import CaseFiles
 from snapback.card import strings
 from snapback.contracts import (
@@ -117,6 +118,7 @@ class RecordedCase:
     # What the renter rejected; a recorded case is read-only, so this stays empty.
     preferences = CasePreferences()
     agent_running = False  # no agent works a recorded case
+    work = None  # and no work log: its trace cards come from the trace alone
 
     def __init__(
         self,
@@ -262,6 +264,11 @@ class SessionCase:
 
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
+
+    @property
+    def work(self) -> AgentWork | None:
+        """The deep agent's work log for this case (worklog.AgentWork), or None if none ran."""
+        return self.session.__dict__.get("_agent_work")
 
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
         card = build_card(
