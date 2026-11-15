@@ -156,7 +156,23 @@ _CHOICE_KEYS = {
     ChoiceKind.WHICH_PHOTO: "timeline.retry_search",
     ChoiceKind.DWELL_ROOMS: "timeline.walk",
     ChoiceKind.LEAD_CHECKS: "timeline.walk",
+    ChoiceKind.FOLLOW_UP: "timeline.followup",
+    ChoiceKind.NEXT_STEP: "timeline.next_step",
 }
+
+
+def _followup_name(check: str) -> str:
+    from snapback.agent.followups import MENU
+
+    item = MENU.get(check)
+    return item.name if item is not None else check
+
+
+def _followup_source(evidence: ModuleEvidence, pick: str) -> str | None:
+    check = pick.removeprefix("followup:")
+    return next((f.source_name for f in evidence.followups if f.check == check), None)
+
+
 _TOOL_KEYS = {"license": "timeline.license", "reply": "timeline.reply"}
 
 
@@ -394,6 +410,16 @@ def build_timeline(
                     placed=counts[0],
                     total=counts[1],
                 )
+        elif event.kind is TraceKind.TOOL and (event.pick or "").startswith("followup:"):
+            b.add(
+                "timeline.followup_result",
+                at,
+                event.reason,
+                by,
+                model=by == "agent",
+                kind="followup",
+                source_name=_followup_source(evidence, event.pick or ""),
+            )
         elif event.kind is TraceKind.TOOL:
             b.add(
                 _TOOL_KEYS.get(event.pick or "", "timeline.tool"),
@@ -431,6 +457,34 @@ def build_timeline(
             )
             if key == "timeline.record":
                 b.record_lines(at)
+        elif event.kind is TraceKind.CHOICE and event.choice is ChoiceKind.FOLLOW_UP:
+            picked = next((f for f in evidence.followups if f.check == event.pick), None)
+            b.add(
+                "timeline.followup",
+                at,
+                picked.reason if picked is not None else event.reason,
+                by,
+                model=by == "agent",
+                kind="followup",
+                source_name=picked.source_name if picked is not None else None,
+                check=_followup_name(event.pick or ""),
+                gap=picked.gap if picked is not None else "",
+            )
+        elif event.kind is TraceKind.CHOICE and event.choice is ChoiceKind.NEXT_STEP:
+            from snapback.agent.followups import NEXT_STEPS
+
+            item = NEXT_STEPS.get(event.pick or "")
+            gap = event.options[0] if event.options else ""
+            b.add(
+                "timeline.next_step",
+                at,
+                event.reason,
+                by,
+                model=by == "agent",
+                kind="followup",
+                step=item.name if item is not None else (event.pick or ""),
+                gap=gap,
+            )
         elif event.kind is TraceKind.CHOICE:
             b.add(
                 _CHOICE_KEYS.get(event.choice, "timeline.tool"),

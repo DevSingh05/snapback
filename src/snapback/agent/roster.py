@@ -97,7 +97,7 @@ _CARDS: list[dict] = [
         "id": "planner",
         "team": "planner",
         "runner": "planner",
-        "kinds": [],
+        "kinds": ["followup"],  # its follow-up checks and drafted next step (agent/followups.py)
         "checks": [],
         "en": {
             "name": "Planner",
