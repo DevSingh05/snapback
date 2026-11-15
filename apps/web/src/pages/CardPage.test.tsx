@@ -42,11 +42,32 @@ describe("CardView with card_hold.json", () => {
     expect(screen.getByText(/SNAPBACK never texts first or asks for money/)).toBeInTheDocument();
   });
 
-  it("verify variant shows case id, expiry and a short summary", () => {
-    render(<CardView card={card} variant="verify" />);
+  it("verify variant shows case id, expiry and a short summary on a live card", () => {
+    render(<CardView card={{ ...card, source: "live" }} variant="verify" />);
     expect(screen.getByTestId("case-id")).toHaveTextContent("7Q2M");
     expect(screen.getByTestId("expiry")).toBeInTheDocument();
     expect(screen.getByTestId("summary")).toBeInTheDocument();
+  });
+
+  it("never shows an expiry countdown or 'Expired' on a FIXTURE card", () => {
+    const past = { ...card, expires_at: "2020-01-01T00:00:00Z" };
+    for (const variant of ["verify", "result"] as const) {
+      const { unmount } = render(<CardView card={past} variant={variant} />);
+      expect(screen.queryByTestId("expiry")).toBeNull();
+      expect(screen.queryByText(/expired/i)).toBeNull();
+      expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
+      unmount();
+    }
+  });
+
+  it("still says 'Expired' on a live card past its window", () => {
+    render(
+      <CardView
+        card={{ ...card, source: "live", expires_at: "2020-01-01T00:00:00Z" }}
+        variant="result"
+      />,
+    );
+    expect(screen.getByTestId("expiry")).toHaveTextContent("Expired");
   });
 
   it.each(["hold", "dont_pay", "unverified", "verified"] as const)(
