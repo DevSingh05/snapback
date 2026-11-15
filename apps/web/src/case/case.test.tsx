@@ -8,7 +8,6 @@ import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import { STATE_WORD } from "../cardStrings";
 import type { Card, VerdictState } from "../contracts";
 import { CardPage } from "../pages/CardPage";
-import record from "../../../../fixtures/demo/a/property_record.json";
 import {
   AnnotatedAd,
   CaseResult,

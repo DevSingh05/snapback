@@ -24,9 +24,11 @@ describe("CardView with card_hold.json", () => {
 
   it("uses the exact strings from the card, including NOT SHOWN", () => {
     render(<CardView card={card} variant="result" />);
-    expect(screen.getByText(/Being inside does not mean they may rent it/)).toBeInTheDocument();
-    expect(screen.getByText(/NOT SHOWN\./)).toBeInTheDocument();
-    expect(screen.getByText("Zelle before a viewing. Red flag.")).toBeInTheDocument();
+    // The same lines are in the two lists above; the ledger rows are the ones checked here.
+    const rows = screen.getAllByRole("row").map((r) => r.textContent ?? "");
+    expect(rows.some((t) => t.includes("Being inside does not mean they may rent it"))).toBe(true);
+    expect(rows.some((t) => t.includes("NOT SHOWN."))).toBe(true);
+    expect(rows.some((t) => t.includes("Zelle before a viewing. Red flag."))).toBe(true);
   });
 
   it("lists what was not checked and the footer rules", () => {

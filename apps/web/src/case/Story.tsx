@@ -18,9 +18,10 @@ import {
   ProofPair,
   RealListing,
   SaferTiles,
+  WhatNext,
   type ProofPin,
 } from ".";
-import { sampleListing, samplePlace } from "./samples";
+import { sampleAlert, sampleListing, samplePack, samplePlace } from "./samples";
 
 const card = cardHold as Card;
 
@@ -118,6 +119,13 @@ export function Story() {
         </div>
 
         <RealListing listing={sampleListing()} />
+
+        <WhatNext
+          alert={sampleAlert()}
+          pack={samplePack()}
+          officeHost={record.website_host}
+          pageUrl={card.verify_url ?? null}
+        />
 
         <SaferTiles
           places={[1, 2, 3].map((n) =>

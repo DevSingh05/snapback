@@ -24,10 +24,16 @@ describe("locked wording", () => {
 
   it("the Zelle line reads Warning and the waiting reply reads Not confirmed", () => {
     render(<CardView card={card} variant="result" />);
-    const zelle = screen.getByText("Zelle before a viewing. Red flag.").closest("tr");
+    // Each line is also in the two lists above; these are its rows in the ledger.
+    const inRow = (text: string | RegExp) =>
+      screen
+        .getAllByText(text)
+        .map((el) => el.closest("tr"))
+        .find((tr) => tr !== null)!;
+    const zelle = inRow("Zelle before a viewing. Red flag.");
     expect(zelle).toHaveTextContent("Warning");
     // The line keeps every character the API sent; only the capitals are set calmer by CSS.
-    const waiting = screen.getByText(/Being inside does not mean/).closest("tr");
+    const waiting = inRow(/Being inside does not mean/);
     expect(waiting).toHaveTextContent("NOT SHOWN. Being inside does not mean they may rent it.");
     expect(waiting).toHaveTextContent("Not confirmed");
   });

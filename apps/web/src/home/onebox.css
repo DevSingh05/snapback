@@ -103,6 +103,7 @@
 }
 /* The second half of the headline: the two questions the report answers, a size down. */
 .ob-title .ob-title-ask {
+  display: block;
   margin-top: var(--sp-4);
   max-width: 24em;
   font-size: clamp(1.25rem, 2.1vw, 1.75rem);

@@ -644,3 +644,18 @@
 .st-pick:nth-child(2) .st-pick-photo img {
   object-position: 60% 50%;
 }
+
+/* The hero starts at the top of the page, under the floating bar, so the bar's words sit on the
+   photograph's matte scrim and never on a strip of the page ground. */
+.app:has(.st-hero[data-bar="photo"]) > .shell {
+  padding-top: 0;
+}
+.st-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--bar-h, 64px) + var(--sp-6));
+  z-index: -1;
+  background: linear-gradient(180deg, var(--hero-scrim-bottom), transparent);
+  pointer-events: none;
+}
