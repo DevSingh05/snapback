@@ -37,6 +37,21 @@
   --blue: #0d6672;
   --blue-soft: #e4e1d9;
 
+  /* The check team's cast: one colour per member, worn by its character and its badge
+     (proofroom/crew.css). They name who a member is, never a result: a result is always a
+     row-state colour beside its word. */
+  --crew-planner: #e0a416;
+  --crew-rules: #3f5f9a;
+  --crew-record: #b26a35;
+  --crew-phone: #7a5bb0;
+  --crew-owner: #b0486f;
+  --crew-photo: #2893b5;
+  --crew-web: #6f8f2f;
+  --crew-finder: #cf6b45;
+  --crew-tour: #4f8f86;
+  --crew-decider: #2b3438;
+  --crew-other: #6b7780;
+
   --glass: rgb(251 250 247 / 0.72);
   --focus: var(--act);
   --shadow: 0 1px 2px rgb(10 12 13 / 0.08), 0 14px 34px rgb(10 12 13 / 0.14);

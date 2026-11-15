@@ -36,6 +36,9 @@ export interface RoomWords extends Words {
   seeTeam: string;
   runsOn: string;
   code: string;
+  view: string;
+  crewView: string;
+  diagramView: string;
 }
 
 export const WORDS: Record<Lang, RoomWords> = {
@@ -85,6 +88,9 @@ export const WORDS: Record<Lang, RoomWords> = {
     seeTeam: "See your check team work",
     runsOn: "Runs on",
     code: "code",
+    view: "View",
+    crewView: "Crew",
+    diagramView: "Diagram",
   },
   es: {
     room: "SALA DE PRUEBAS",
@@ -133,5 +139,8 @@ export const WORDS: Record<Lang, RoomWords> = {
     seeTeam: "Ver a tu equipo de revisión trabajar",
     runsOn: "Funciona con",
     code: "código",
+    view: "Vista",
+    crewView: "Equipo",
+    diagramView: "Diagrama",
   },
 };
