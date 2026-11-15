@@ -598,7 +598,7 @@ describe("the graph", () => {
     const node = (id: string) =>
       screen.getAllByTestId("team-node").find((n) => n.getAttribute("data-agent") === id)!;
     render(<TeamGraph desks={shownFor(deepTimeline())} label="t" moving={false} />);
-    expect(within(node("planner")).getByTestId("node-model")).toHaveTextContent("Claude Sonnet");
+    expect(within(node("planner")).getByTestId("node-model")).toHaveTextContent("Sonnet");
     expect(node("planner")).not.toHaveTextContent("By code");
     expect(within(node("photo")).getByTestId("node-model")).toHaveTextContent("Haiku");
     // Code ran the rules and sets the verdict: no model chip on either.
@@ -678,6 +678,17 @@ describe("the strip and its links", () => {
       `/case/${card.case_id}/twin`,
     );
     expect(screen.getByTestId("home-team-link")).toHaveTextContent("Watch them work");
+  });
+
+  it("Home: Watch them work is there from the moment the case has an id, before any timeline", () => {
+    // An API that never answers: no card, no timeline, no read token. The link must not wait.
+    vi.stubEnv("VITE_API_URL", "http://api.test");
+    vi.stubGlobal("fetch", () => new Promise(() => {}));
+    render(<HomeTeam caseId="K4MZ" />);
+    expect(screen.getByTestId("home-team-link")).toHaveAttribute("href", "/case/K4MZ/twin");
+    expect(screen.getByTestId("home-team-link").tagName).toBe("A");
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("AgentStrip names every member with its state in words", () => {

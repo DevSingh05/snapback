@@ -44,6 +44,7 @@ from snapback.agent import casework
 from snapback.agent.runner import Approver, PolicyChooser, run_case
 from snapback.agent.session import CANCEL, CaseSession, Step
 from snapback.agent.trace import clean_reason
+from snapback.agent.worklog import AgentWork
 from snapback.card import strings
 from snapback.contracts import TraceKind, Verdict
 
@@ -227,6 +228,53 @@ class _StopGuard(BaseCallbackHandler):
 
     def on_llm_start(self, *args: Any, **kwargs: Any) -> None:
         self._check()
+
+
+def work_of(case: CaseSession) -> AgentWork:
+    """The case's work log (worklog.py), made on first use."""
+    return case.__dict__.setdefault("_agent_work", AgentWork())
+
+
+class WorkWatch(BaseCallbackHandler):
+    """Notes every model call and tool call the agent and its sub-agents make, for the trace
+    cards. Callbacks in the run config reach the sub-agents too, and each call carries the name
+    of the agent that made it. It only reads, and stops noting once the agent is shut out."""
+
+    def __init__(self, case: CaseSession) -> None:
+        self._case = case
+        self._work = work_of(case)
+
+    def _live(self) -> bool:
+        return not _gate(self._case).stopped
+
+    @staticmethod
+    def _member(metadata: Any) -> str | None:
+        name = (metadata or {}).get("lc_agent_name")
+        return name if isinstance(name, str) and name else None
+
+    def on_chat_model_start(self, *args: Any, metadata: Any = None, **kwargs: Any) -> None:
+        if self._live():
+            self._work.model_call(self._member(metadata))
+
+    def on_tool_start(
+        self,
+        serialized: Any,
+        input_str: Any,
+        *,
+        run_id: Any = None,
+        metadata: Any = None,
+        inputs: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        if not self._live():
+            return
+        name = str((serialized or {}).get("name") or kwargs.get("name") or "")
+        if name:
+            self._work.tool_start(str(run_id), self._member(metadata), name, inputs)
+
+    def on_tool_end(self, output: Any, *, run_id: Any = None, **kwargs: Any) -> None:
+        if self._live():
+            self._work.tool_end(str(run_id), output)
 
 
 def _gate(case: CaseSession) -> _Gate:
@@ -881,7 +929,10 @@ def _stream_within(
     if remaining is not None and remaining <= 0:
         raise AgentTimeout
     failure: list[BaseException] = []
-    config = {**config, "callbacks": [*config.get("callbacks", []), _StopGuard(case)]}
+    config = {
+        **config,
+        "callbacks": [*config.get("callbacks", []), _StopGuard(case), WorkWatch(case)],
+    }
     gate = _gate(case)
 
     def leg() -> None:

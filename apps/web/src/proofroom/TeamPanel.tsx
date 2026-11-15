@@ -29,6 +29,8 @@ import {
   type Roster,
 } from "./model";
 import { TeamGraph } from "./TeamGraph";
+import { traceCards } from "./trace";
+import { TraceTab } from "./TraceTab";
 import { usePlayer, type Speed } from "./usePlayer";
 import { useRoster, useRun, type Run } from "./useRun";
 import { WORDS, type RoomWords } from "./words";
@@ -231,7 +233,7 @@ export function TeamPanel({
   });
   const team = teamView(floor, whole);
   const ending = floor.verdict ?? (whole.phase === "done" ? whole.verdict : null);
-  const [tab, setTab] = useState<"live" | "team">("live");
+  const [tab, setTab] = useState<"live" | "trace" | "team">("live");
   // The crew is the Live view; the diagram of the same run stays one press away.
   const [view, setView] = useState<"crew" | "diagram">("crew");
   const [focus, setFocus] = useState<string | null>(null);
@@ -252,6 +254,12 @@ export function TeamPanel({
         ? w.locked
         : statusLine(floor, w);
   const speeds: Speed[] = [1, 2];
+  // A member's mark opens its trace card; a reason opens its card in Meet the team.
+  const openTrace = (id: string) => {
+    setTab("trace");
+    setFocus(id);
+  };
+  const cards = traceCards(roster, teamView(whole, whole), run.timeline);
   const openDesk = (id: string) => {
     setTab("team");
     setFocus(id);
@@ -321,6 +329,17 @@ export function TeamPanel({
         <button
           type="button"
           role="tab"
+          id="pr-tab-trace"
+          aria-selected={tab === "trace"}
+          aria-controls="pr-pane-trace"
+          onClick={() => setTab("trace")}
+          data-testid="team-tab-trace"
+        >
+          {w.howTab}
+        </button>
+        <button
+          type="button"
+          role="tab"
           id="pr-tab-team"
           aria-selected={tab === "team"}
           aria-controls="pr-pane-team"
@@ -359,7 +378,7 @@ export function TeamPanel({
             lang={lang}
             moving={moving}
             verdictTone={run.card ? VERDICT_TONE[run.card.state] : "slate"}
-            onPick={openDesk}
+            onPick={openTrace}
           />
         ) : (
           <>
@@ -368,7 +387,7 @@ export function TeamPanel({
               lang={lang}
               label={w.team}
               moving={moving}
-              onPick={openDesk}
+              onPick={openTrace}
             />
             {team.notNeeded.length > 0 ? (
               <p className="pr-quiet" data-testid="team-not-needed">
@@ -493,6 +512,22 @@ export function TeamPanel({
             </a>
           </div>
         ) : null}
+      </div>
+      <div
+        id="pr-pane-trace"
+        role="tabpanel"
+        aria-labelledby="pr-tab-trace"
+        className="pr-pane"
+        hidden={tab !== "trace"}
+      >
+        <TraceTab
+          cards={cards}
+          lang={lang}
+          w={w}
+          focus={tab === "trace" ? focus : null}
+          traceUrl={run.timeline?.trace_url}
+          reduced={reduced}
+        />
       </div>
       <div
         id="pr-pane-team"
