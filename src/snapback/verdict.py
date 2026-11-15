@@ -1128,6 +1128,8 @@ def build_card(
     if claims:  # only when there is something to say; the three rows above are always there
         rows.append(CardRow(kind=CardRowKind.CLAIMS, lines=claims))
 
+    summary, checks_out, does_not = _summary(modules, verdict, rows, lang)
+
     return Card(
         case_id=public_id,
         source=modules.source,
@@ -1148,7 +1150,59 @@ def build_card(
         verify_url=verify_url,
         lang=lang,
         for_sale=_for_sale_finding(modules),
+        summary=summary,
+        checks_out=checks_out,
+        does_not=does_not,
     )
+
+
+SUMMARY_SENTENCES = 3
+_DOES_NOT_TONES = (CardTone.RED_FLAG, CardTone.HOLD, CardTone.NOT_SHOWN)
+
+
+def _price_gap(modules: ModuleEvidence, lang: str) -> str | None:
+    """How far under the building's own listing the asked rent is. The percent is ours; the
+    record's rents stay off the card."""
+    price = modules.price
+    if price is None or price.status is not PriceStatus.BELOW_RANGE:
+        return None
+    if not (price.record_min and price.listed_rent):
+        return None
+    percent = round(100 * (price.record_min - price.listed_rent) / price.record_min)
+    if percent <= 0:
+        return None
+    if price.compared_beds is None:
+        return strings.text("summary.price_gap_any", lang, percent=percent)
+    beds = price.compared_beds
+    plan = (
+        strings.text("rent.plan.studio", lang)
+        if beds == 0
+        else strings.text("rent.plan.beds", lang, beds=beds)
+    )
+    return strings.text("summary.price_gap", lang, percent=percent, plan=plan)
+
+
+def _summary(
+    modules: ModuleEvidence, verdict: Verdict, rows: list[CardRow], lang: str
+) -> tuple[list[str], list[str], list[str]]:
+    """Proof plan 3.2: the short why, what checks out, what does not. Code only, deterministic.
+
+    The sentences are decide()'s own reasons in its order (proof first), with the generic
+    "rent is far below" reason swapped for the measured gap, kept last, when there is one.
+    Nothing here chooses a state, and no sentence names a person."""
+    gap = _price_gap(modules, lang)
+    if gap:
+        # The measured gap is the strongest "not a good deal" fact, so it always makes the cut:
+        # decide()'s first two reasons, then the gap (it stands in for the generic price reason).
+        generic_price = strings.text("reason.price_flag", lang)
+        kept = [r for r in verdict.reasons if r != generic_price]
+        sentences = [*kept[: SUMMARY_SENTENCES - 1], gap]
+    else:
+        sentences = verdict.reasons[:SUMMARY_SENTENCES]
+    lines = [line for row in rows for line in row.lines]
+    checks_out = [f"{ln.label}: {ln.text}" for ln in lines if ln.tone is CardTone.OK]
+    does_not = [f"{ln.label}: {ln.text}" for ln in lines if ln.tone in _DOES_NOT_TONES]
+    return sentences, checks_out, does_not
 
 
 def _ownership_item(lang: str) -> str:

@@ -48,5 +48,18 @@
     "Only trust a SNAPBACK result you asked for yourself. SNAPBACK never texts first or asks for money."
   ],
   "verify_url": "http://localhost:5173/c/7Q2M",
-  "lang": "en"
+  "lang": "en",
+  "summary": [
+    "We could not confirm who is allowed to rent this unit.",
+    "A fresh photo proved someone was inside the unit, which is not authority.",
+    "The photos were located in this property."
+  ],
+  "checks_out": [
+    "Real: Taken in this building, in the 2 bed / 2 bath floor plan (3 of 3 photos).",
+    "Here now: Someone with access to a 2 bed / 2 bath unit here sent these just now (2 of 2 spots, code read, 21:44)."
+  ],
+  "does_not": [
+    "Allowed to rent it: NOT SHOWN. Being inside does not mean they may rent it.",
+    "Payment ask: Zelle before a viewing. Red flag."
+  ]
 }

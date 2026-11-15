@@ -40,6 +40,7 @@ export interface FloorPlanRent {
   per_bed: boolean;
   baths?: number | null;
   units_available?: number | null; // reported available at CoStar's last research
+  availability_url?: string | null; // LIVE local only; the route never sends it without the flag
 }
 
 export interface PriceResult {
@@ -73,6 +74,11 @@ export interface Card {
   footer: string[];
   verify_url?: string | null;
   lang: string;
+  // Proof plan 3.2, built by code (no model), in the card's language. Missing or empty on an
+  // older card. At most 3 sentences; checks_out and does_not are "label: text" strings.
+  summary?: string[];
+  checks_out?: string[]; // lines with tone ok
+  does_not?: string[]; // red flag, hold and not-shown lines
 }
 
 export type TraceKind =
@@ -230,6 +236,69 @@ export interface AerialProofResponse {
   distance_m: number | null;
 }
 
+// Mirrors RealListingPlan and RealListing in src/snapback/contracts.py
+// (GET /cases/{id}/real-listing; read token in a header, never in the address; no-store).
+// Record figures (rents, units, links, building name) are null unless figures_shown. Words are
+// built by code in the asked language (?lang=en|es). No phone digits and no street address.
+export interface RealListingPlan {
+  name?: string | null;
+  beds?: number | null; // 0 is a studio
+  baths?: number | null;
+  rent_min?: number | null; // whole dollars a month
+  rent_max?: number | null;
+  units_available?: number | null;
+  availability_host?: string | null; // host only
+}
+
+export interface RealListing {
+  case_id: string;
+  source: DataSource; // show the LIVE or FIXTURE chip from this
+  property_id: string;
+  which: "claimed" | "matched"; // matched: the building the photos were placed in
+  building_name?: string | null; // only with figures_shown
+  manager_company?: string | null;
+  website_host?: string | null;
+  plans: RealListingPlan[]; // narrowed to the ad's bedrooms; never a per-bed plan
+  photos_in_scan: number;
+  photos_total: number;
+  ad_rent?: number | null;
+  ad_asks_irreversible: boolean;
+  phone_is_office: "yes" | "no" | "not_checked";
+  figures_shown: boolean;
+  as_of: string; // "as of CoStar's last research"
+  headline: string; // the ad against the record, one paragraph
+  provenance?: string | null; // "N of M of the ad's photos are in CoStar's own scan..."
+  phone_line?: string | null;
+  cta_label?: string | null; // "See the real listing"
+  cta_url?: string | null; // availability link, else https://<website_host>; only with figures
+}
+
+// Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a
+// header, never in the address; no-store). A DRAFT for the leasing office on record: nothing is
+// ever sent, `sent` is always false. Show it only when `fires`. Words are in the asked language
+// (?lang=en|es). No phone digits, no street address, no person named, rent as a percent only.
+export interface CopyAlert {
+  case_id: string;
+  source: DataSource; // show the LIVE or FIXTURE chip from this
+  fires: boolean;
+  why_not?: "no_record" | "no_photos_in_scan" | "phone_not_checked" | "phone_is_office" | null;
+  which?: "claimed" | "matched" | null;
+  property_id?: string | null;
+  manager_company?: string | null; // who the note is for
+  website_host?: string | null;
+  photos_in_scan: number;
+  photos_total: number;
+  phone_is_office: "yes" | "no" | "not_checked"; // "no" when it fires on the claimed building
+  rent_percent_under?: number | null;
+  draft_only: true;
+  sent: false;
+  draft_subject?: string | null;
+  draft_body?: string | null; // plain text with blank lines between paragraphs
+  report_url?: string | null; // GET it with the read token header: the "Report this copy" pack
+  report_ready: boolean; // the pack hands out report steps only when true
+  as_of: string;
+}
+
 // Mirrors RenterBrief, PlaceMatch, SearchResponse, AlternativesResponse, TourDraftRequest and
 // TourDraft in src/snapback/contracts.py (POST /search, GET /cases/{id}/alternatives,
 // POST /cases/{id}/tour-draft). Every price and availability line ends "as of CoStar's last
@@ -274,6 +343,11 @@ export interface PlaceMatch {
   office_on_record?: string | null; // company name only
   checked?: boolean; // true only for a place that got the deep check; the rest are "researched"
   check_line?: string | null; // built by code: "Checked: listed for rent by ...; ..."
+  // GET /cases/{id}/alternatives only: where the renter goes to see this place's real listing.
+  // The plan's availability page, else https://<website host>, else null. A LIVE place has none
+  // unless the local demo's figures flag is on.
+  handoff_url?: string | null;
+  handoff_label?: string | null; // "Its listing on Apartments.com" or "The building's own site"
   source: DataSource;
 }
 
