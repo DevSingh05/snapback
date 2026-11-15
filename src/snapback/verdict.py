@@ -580,6 +580,10 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         if loose
         else []
     )
+    if loosely and not located and not elsewhere:
+        # Nothing placed: the loose match is the reason, so it leads the row (and the iMessage
+        # reply, which shows a row's first line) instead of the plain "could not be placed".
+        main, loosely = loosely[0], []
 
     matched = []
     if elsewhere and modules.matched_office:

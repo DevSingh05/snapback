@@ -85,3 +85,12 @@ def test_the_line_never_changes_the_verdict():
         PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="inliers")
     )
     assert decide(to_evidence(loose_case)) == decide(to_evidence(plain_case))
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_with_nothing_placed_the_loose_match_leads_the_row(lang):
+    """The iMessage reply shows a row's first line; the reason has to be that line."""
+    modules = modules_for(
+        PhotoLocation(photo_id="p1", status=LocateStatus.NOT_LOCATED, bar_failed="ratio")
+    )
+    assert place_lines(modules, lang)[0].label == LABEL[lang]
