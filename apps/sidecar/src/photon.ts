@@ -80,6 +80,8 @@ export type PhotonConfig = SidecarConfig & {
   makeImage?: (bytes: Uint8Array, mimeType: string) => unknown;
   /** CAF to m4a before speech to text. Defaults to ffmpeg. */
   convertVoice?: ConvertVoice;
+  /** How a rate-limited send waits before its retry (tests pass a fake). */
+  sleep?: (ms: number) => Promise<void>;
 };
 
 type Log = (line: string) => void;
@@ -174,7 +176,45 @@ async function collect(pending: Pending, content: PhotonContent, limits: Limits)
 }
 
 /** Run the loop until the message stream ends. Every send is a reply in the renter's thread. */
+// Photon's SDK throws a RateLimitError (gRPC RESOURCE_EXHAUSTED) with `retryAfterMs` when the
+// project is over its send rate. A reply waits as asked (within bounds) and is retried, so a busy
+// minute never drops a renter's answer. Any other send error is not retried.
+const RETRIES = 2;
+const RETRY_MIN_MS = 500;
+const RETRY_MAX_MS = 15_000;
+const RETRY_DEFAULT_MS = 2_000;
+
+function isRateLimit(err: unknown): boolean {
+  const e = err as { name?: unknown; message?: unknown } | null;
+  if (!e) return false;
+  return e.name === "RateLimitError" || /RESOURCE_EXHAUSTED|rate.?limit/i.test(String(e.message));
+}
+
+async function sendRetrying(
+  space: PhotonSpace,
+  content: unknown,
+  sleep: (ms: number) => Promise<void>,
+  log: Log,
+): Promise<unknown> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await space.send(content);
+    } catch (err) {
+      if (!isRateLimit(err) || attempt >= RETRIES) throw err;
+      const asked = (err as { retryAfterMs?: unknown }).retryAfterMs;
+      const wait = Math.min(
+        RETRY_MAX_MS,
+        Math.max(RETRY_MIN_MS, typeof asked === "number" ? asked : RETRY_DEFAULT_MS),
+      );
+      log(`[sidecar] Photon rate limit: waiting ${(wait / 1000).toFixed(1)} s, then retrying`);
+      await sleep(wait);
+    }
+  }
+}
+
 export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log = console.log) {
+  const sleep = config.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const send = (space: PhotonSpace, content: unknown) => sendRetrying(space, content, sleep, log);
   const pending = new Map<string, Pending>();
   const running: Promise<void>[] = [];
   const quietMs = config.quietMs ?? QUIET_MS;
@@ -190,12 +230,12 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
       if ("text" in heard) item.texts.push(heard.text);
       else if (item.texts.length === 0 && item.images.length === 0) {
         // nothing to check without the words: say why (off, too long, or not heard)
-        await item.space.send(heardFailure(heard.fail));
+        await send(item.space, heardFailure(heard.fail));
         return;
       }
     }
     if (item.texts.length === 0 && item.images.length === 0) {
-      for (const note of item.notes ?? []) await item.space.send(note);
+      for (const note of item.notes ?? []) await send(item.space, note);
       return;
     }
     const msg: InboundMessage = {
@@ -210,7 +250,7 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
     const client = {
       async reply(threadId: string, text: string) {
         if (threadId !== item.space.id) throw new Error("a reply may only go to its own thread");
-        await item.space.send(text);
+        await send(item.space, text);
         replied = text;
       },
       // the card picture, through the SDK's attachment builder, to the same space only
@@ -219,13 +259,13 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
             async image(threadId: string, bytes: Uint8Array, mimeType: string) {
               if (threadId !== item.space.id)
                 throw new Error("a reply may only go to its own thread");
-              await item.space.send(config.makeImage!(bytes, mimeType));
+              await send(item.space, config.makeImage!(bytes, mimeType));
             },
           }
         : {}),
     };
     const checking = config.acknowledge
-      ? async (text?: string) => void (await item.space.send(text ?? CHECKING))
+      ? async (text?: string) => void (await send(item.space, text ?? CHECKING))
       : undefined;
     await handleMessage(msg, client, config, checking);
     if (!spoken || !replied || !config.makeVoice) return;
@@ -234,7 +274,7 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
       const words = spokenReply(replied);
       if (!words) return; // nothing safe to say: the text reply stands alone
       const audio = await speak(words, config.apiUrl, get);
-      if (audio) await item.space.send(config.makeVoice(audio.bytes, audio.mimeType));
+      if (audio) await send(item.space, config.makeVoice(audio.bytes, audio.mimeType));
     } catch {
       log("[sidecar] a voice reply could not be sent; the text reply went out");
     }
@@ -266,7 +306,7 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
         // "watch <code>" and a stop word are answered at once, in the same thread, and never
         // checked; a swipe-reply "stop" counts too
         try {
-          await space.send(answer);
+          await send(space, answer);
         } catch {
           log("[sidecar] a reply could not be sent");
         }
