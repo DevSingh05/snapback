@@ -917,8 +917,10 @@
   transform: translateX(-50%);
 }
 .pr-node-wide .pr-node-name {
+  max-height: none;
+  overflow: visible;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2px var(--sp-2);
 }

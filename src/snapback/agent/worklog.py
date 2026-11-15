@@ -173,8 +173,11 @@ _READ_TOOLS = {
 def tool_label(tool: str, args: dict[str, Any], lang: str) -> str:
     """What a tool call did, in plain words. A tool this table does not know still gets words."""
     if tool == "task":
-        name = str(args.get("subagent_type") or "")
-        return strings.text("worklog.tool.task", lang, name=name)
+        from snapback.agent.roster import card_for  # the member's own name, not its id
+
+        kind = str(args.get("subagent_type") or "")
+        card = card_for(kind, lang)
+        return strings.text("worklog.tool.task", lang, name=card.name if card else kind)
     return strings.text(_READ_TOOLS.get(tool, "worklog.tool.other"), lang)
 
 
@@ -195,7 +198,17 @@ def _result(use: _Use, lang: str) -> str:
     # The label already names the source, so the "Source:" line is left out.
     lines = [ln.strip() for ln in use.output.splitlines() if ln.strip()]
     said = [ln for ln in lines if not ln.lower().startswith(("source:", "fuente:"))] or lines
-    return plain("; ".join(said[:2]), done)
+    return plain(_readable("; ".join(said[:2])), done)
+
+
+_CODE_WORDS = (("_", " "), (": None", ": none"), (": False", ": no"), (": True", ": yes"))
+
+
+def _readable(line: str) -> str:
+    """A facts line as words: statuses are written for code (`not_checked`, `False`)."""
+    for old, new in _CODE_WORDS:
+        line = line.replace(old, new)
+    return line
 
 
 def member_traces(

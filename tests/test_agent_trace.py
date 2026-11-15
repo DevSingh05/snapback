@@ -77,7 +77,8 @@ def test_each_member_has_a_card_with_what_it_was_asked_did_and_said(tmp_path, mo
     assert planner["model_calls"] == 5
     # A hand-off reads as a hand-off, naming the member.
     handed = [t["label"] for t in planner["tools"] if t["tool"] == "task"]
-    assert any("record" in label for label in handed)
+    assert "Handed work to: Record agent" in handed
+    assert "Handed work to: Phone and office agent" in handed
 
 
 class Loose(Crew):
@@ -155,7 +156,7 @@ def test_the_work_log_counts_and_orders_what_it_sees() -> None:
     work.tool_start("r1", None, "task", {"subagent_type": "record", "description": "Read it."})
     work.model_call("record")
     work.tool_start("r2", "record", "read_record_facts", {})
-    work.tool_end("r2", "Source: CoStar record (fixture)\nRent on record: 3 floor plans")
+    work.tool_end("r2", "Source: CoStar record (fixture)\nRent check: not_checked\nPer bed: False")
     work.model_call("record")
     work.tool_end("r1", "The record is in.")
     cards = member_traces(work, {"planner": "Claude Sonnet", "sub": "Claude Haiku", "code": "code"})
@@ -163,9 +164,8 @@ def test_the_work_log_counts_and_orders_what_it_sees() -> None:
     assert cards[1].asked == "Read it."
     assert cards[1].said == "The record is in."
     assert cards[1].model_calls == 2
-    assert (
-        cards[1].tools[0].result == "Rent on record: 3 floor plans"
-    )  # the source line is the label's
+    # The source line is the label's, and code's statuses read as words.
+    assert cards[1].tools[0].result == "Rent check: not checked; Per bed: no"
     assert cards[0].tools[0].tool == "task"
     # A tool nobody named still reads as plain words, never as a function name alone.
     assert worklog.tool_label("some_new_tool", {}, "en") != "some_new_tool"
