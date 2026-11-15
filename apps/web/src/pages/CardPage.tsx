@@ -5,11 +5,12 @@ import {
   CaseResult,
   VerdictBand,
   expiryText,
-  useCopyAlert,
+  useCopyAlertRead,
   useProof,
-  useRealListing,
-  useReportPack,
-  useSaferPlaces,
+  useProofRead,
+  useRealListingRead,
+  useReportPackRead,
+  useSaferPlacesRead,
   useTimeline,
 } from "../case";
 import "../case/case.css";
@@ -47,12 +48,12 @@ export function CardView({ card, variant }: { card: Card; variant: "result" | "v
 }
 
 function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) {
-  const proof = useProof(card);
-  const realListing = useRealListing(card.case_id, card.lang);
-  const copyAlert = useCopyAlert(card.case_id, card.lang);
-  const reportPack = useReportPack(card.case_id, card.lang);
+  const proof = useProofRead(card);
+  const realListing = useRealListingRead(card.case_id, card.lang);
+  const copyAlert = useCopyAlertRead(card.case_id, card.lang);
+  const reportPack = useReportPackRead(card.case_id, card.lang);
   const timeline = useTimeline(card.case_id, card.lang);
-  const saferPlaces = useSaferPlaces(
+  const saferPlaces = useSaferPlacesRead(
     card.case_id,
     card.state === "hold" || card.state === "dont_pay",
   );
@@ -60,12 +61,18 @@ function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) 
     <CaseResult
       card={card}
       variant="result"
-      proof={proof}
-      realListing={realListing}
-      copyAlert={copyAlert}
-      reportPack={reportPack}
+      proof={proof.value}
+      realListing={realListing.value}
+      copyAlert={copyAlert.value}
+      reportPack={reportPack.value}
       timeline={timeline}
-      saferPlaces={saferPlaces}
+      saferPlaces={saferPlaces.value ?? []}
+      checking={{
+        proof: proof.waiting,
+        real: realListing.waiting,
+        next: copyAlert.waiting || reportPack.waiting,
+        safer: saferPlaces.waiting,
+      }}
     >
       <OfficeConfirm caseId={card.case_id} onChanged={onChanged} />
       <ReplayLink caseId={card.case_id} />

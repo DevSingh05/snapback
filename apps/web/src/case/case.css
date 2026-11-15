@@ -1241,3 +1241,12 @@
   padding-left: 0;
   list-style: none;
 }
+
+/* A section whose read answered 202: one quiet line until its data lands. */
+.case-checking {
+  margin: 0;
+  padding: 0.75rem 0;
+  color: var(--ink);
+  opacity: 0.7;
+  font-size: 0.8125rem;
+}
