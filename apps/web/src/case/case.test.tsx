@@ -268,6 +268,28 @@ describe("the ledger", () => {
     const lines = screen.getAllByTestId("record-line").map((el) => el.textContent);
     expect(lines).toEqual(["3D SCAN · FIXTURE"]);
   });
+
+  it("names the source that answered a line, with LIVE or FIXTURE", () => {
+    const hud: Card = {
+      ...card,
+      rows: card.rows.map((row) =>
+        row.kind === "price"
+          ? {
+              ...row,
+              lines: row.lines.map((line) =>
+                line.key === "label.rent_vs_record"
+                  ? { ...line, source_name: "HUD", source: "live" as const }
+                  : line,
+              ),
+            }
+          : row,
+      ),
+    };
+    render(<Ledger card={hud} />);
+    const named = screen.getAllByTestId("line-source").map((el) => el.textContent);
+    expect(named).toContain("HUD · live");
+    expect(named).toContain("CoStar record · fixture");
+  });
 });
 
 describe("the price bar", () => {

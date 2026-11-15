@@ -723,7 +723,9 @@ class Lookups:
         return self._owner
 
 
-def card_from(tmp_path, lookups, text="3 bed house. I am the owner. $1,900.") -> dict:
+def card_from(
+    tmp_path, lookups, text="3 bed house in Houston, TX. I am the owner. $1,900."
+) -> dict:
     settings = Settings(_env_file=None, snapback_data_dir=tmp_path)
     client = TestClient(create_app(settings, lookups))
     made = client.post("/cases", data={"text": text}).json()
@@ -775,7 +777,8 @@ def test_an_unknown_company_s_name_is_nowhere_in_the_api_trace_or_report(tmp_pat
     settings = Settings(_env_file=None, snapback_data_dir=tmp_path)
     client = TestClient(create_app(settings, RealOwner()))
     made = client.post(
-        "/cases", data={"text": "3 bed house at 100 Fixture Lane. I am the owner. $1,900."}
+        "/cases",
+        data={"text": "3 bed house at 100 Fixture Lane, Houston, TX. I am the owner. $1,900."},
     ).json()
     auth = {"Authorization": f"Bearer {made['token']}"}
     if made["status"] == "waiting_for_approval":

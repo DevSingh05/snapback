@@ -12,6 +12,8 @@ export interface CardLine {
   source?: DataSource | null;
   // The label's table key ("label.payment_ask"): which check the line came from, in any language.
   key?: string | null;
+  // Which source answered the line: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+  source_name?: string | null;
 }
 
 export interface CardRow {
@@ -33,6 +35,7 @@ export interface ForSaleMatch {
   listed_on?: string | null; // ISO date
   changed_on?: string | null;
   offices?: string[]; // listing offices on record: brokerage companies, never a person
+  source_name?: string | null; // "Google Lens via SerpApi" when CoStar's record did not find it
 }
 
 export interface FloorPlanRent {
@@ -55,6 +58,32 @@ export interface PriceResult {
   n_floor_plans?: number | null;
   unit: UnitStatus;
   per_bed: boolean;
+  // "costar" (the building's record) or "hud_safmr" (HUD's typical rent for the ZIP). The HUD
+  // fields name the ZIP, bedroom count and rent that were compared.
+  baseline_source?: "costar" | "hud_safmr" | null;
+  baseline_rent?: number | null;
+  baseline_zip?: string | null;
+  baseline_beds?: number | null;
+}
+
+// Public data (Census Geocoder, RDAP). Mirrors PublicStatus, PlaceCheck and DomainCheck in
+// src/snapback/contracts.py.
+export type PublicStatus = "found" | "no_match" | "not_checked";
+
+export interface PlaceCheck {
+  status: PublicStatus;
+  zip?: string | null;
+  county_fips?: string | null;
+  county?: string | null;
+  source: DataSource;
+}
+
+export interface DomainCheck {
+  host: string;
+  status: PublicStatus;
+  registered_on?: string | null; // ISO date
+  age_days?: number | null;
+  source: DataSource;
 }
 
 export interface AuthorityResult {
@@ -154,6 +183,8 @@ export interface TimelineStep {
   // The check or sub-agent the step belongs to ("record", "owner", "locate", "place", ...), so a
   // reason can be tied to the step behind it. null when the step is not one check.
   kind?: string | null;
+  // Which source answered the step: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+  source_name?: string | null;
   // The plan left this check out; `result` says why.
   skipped?: boolean;
 }
@@ -373,6 +404,17 @@ export interface ReportPack {
   twin_url?: string | null;
   platforms?: ReportSteps[];
   not_checked: string[];
+  // Every source that answered a line of the card, by name, and the public-data lines (HUD,
+  // Census, RDAP) with their source and LIVE or FIXTURE. Lines about a person are not copied.
+  source_names?: string[];
+  sources?: ReportSource[];
+}
+
+export interface ReportSource {
+  source_name: string; // "HUD", "Census" or "RDAP"
+  label: string;
+  text: string;
+  data_source: DataSource;
 }
 
 // Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a

@@ -4,6 +4,7 @@ import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
 import { OneBox } from "./home/OneBox";
 import { CardPage } from "./pages/CardPage";
+import { ReviewsPage } from "./reviews/ReviewsPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
 import { ReplayPage } from "./replay/ReplayPage";
 import { AppShell, type Section } from "./shell/AppShell";
@@ -35,6 +36,7 @@ type Route =
   | { name: "investigate" }
   | { name: "replays" }
   | { name: "stories" }
+  | { name: "reviews" }
   | { name: "proof-room" }
   | { name: "home" };
 
@@ -52,6 +54,7 @@ export function matchRoute(path: string): Route {
   if (/^\/finder\/?$/.test(path)) return { name: "finder" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/stories\/?$/.test(path)) return { name: "stories" };
+  if (/^\/reviews\/?$/.test(path)) return { name: "reviews" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
@@ -95,20 +98,22 @@ export default function App() {
   useEffect(() => {
     if (toTwin) window.location.replace(proofRoomTarget(window.location.search));
   }, [toTwin]);
-  const section: Section | "stories" | null =
+  const section: Section | "stories" | "reviews" | null =
     route.name === "home"
       ? "home"
       : route.name === "stories"
         ? "stories"
-        : route.name === "map"
-          ? "map"
-          : route.name === "listings"
-            ? "listings"
-            : route.name === "finder"
-              ? "finder"
-              : route.name === "replays" || route.name === "replay"
-                ? "replays"
-                : null;
+        : route.name === "reviews"
+          ? "reviews"
+          : route.name === "map"
+            ? "map"
+            : route.name === "listings"
+              ? "listings"
+              : route.name === "finder"
+                ? "finder"
+                : route.name === "replays" || route.name === "replay"
+                  ? "replays"
+                  : null;
   // Inside a place, the bar says where you are.
   const here = window.location.pathname + window.location.search;
   const context =
@@ -142,6 +147,8 @@ export default function App() {
           <FinderPage />
         ) : route.name === "stories" ? (
           <StoriesPage />
+        ) : route.name === "reviews" ? (
+          <ReviewsPage />
         ) : route.name === "confirm" ? (
           <ConfirmPage />
         ) : route.name === "investigate" ? (

@@ -51,6 +51,24 @@ class Settings(BaseSettings):
     # The zone a card's times are shown in: the building's, not the server's. Houston is
     # America/Chicago.
     snapback_card_timezone: str = "America/Chicago"
+    # Public data for the homes CoStar does not cover (HUD, Census, HCAD, RDAP). All free, no key.
+    # The rent baseline is a file in the repo. The two lookups call out and so run on LIVE cases
+    # only; a fixture case uses recorded answers. On by default; a failure is "not checked".
+    snapback_hud_baseline: bool = True
+    # The ad's rent is BELOW_RANGE against HUD when it is under this share of HUD's typical rent
+    # for the ZIP and size. Measured on the eval bank (see the PR); a flag holds, never DONT_PAY.
+    snapback_hud_below_ratio: float = 0.60
+    snapback_census_geocoder: bool = True
+    snapback_rdap: bool = True
+    snapback_public_timeout_s: float = 2.0
+    # Google Lens via SerpApi (reverse image search of the ad's own public photo links), only
+    # when CoStar has no 3D scan to place the photos in. The key is SERPAPI_API_KEY from the
+    # environment; without it the check is "not checked". Free plan: 250 searches a month.
+    serpapi_api_key: SecretStr | None = None
+    snapback_lens: bool = True
+    snapback_lens_timeout_s: float = 4.0
+    # A domain registered fewer days ago than this is a new domain (link.new_domain, HOLD).
+    snapback_new_domain_days: int = 30
 
     @property
     def agent_timeout_s(self) -> float:
@@ -169,6 +187,9 @@ class Settings(BaseSettings):
     # Off by default so a case with no keys makes no call; the demo laptop turns it on.
     snapback_web_direct_fetch: bool = False
     vexcel_api_key: SecretStr | None = None
+    # Off until scripts/measure_vexcel.py passes the 18-of-20 bar. When on, an aerial that says
+    # "wrong building" holds the case (never DONT_PAY, never clears).
+    snapback_vexcel_in_verdict: bool = False
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None
     costar_kit_zip: str | None = None

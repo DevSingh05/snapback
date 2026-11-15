@@ -31,6 +31,7 @@ from snapback.contracts import (
     ReportPhotoPair,
     ReportPlatform,
     ReportResponse,
+    ReportSource,
     ReportStatusStrip,
     ReportSteps,
     VerdictState,
@@ -117,6 +118,29 @@ def _steps(platform: ReportPlatform, lang: str) -> ReportSteps:
     )
 
 
+_PUBLIC_SOURCES = ("HUD", "Census", "RDAP")
+
+
+def _source_names(card: Card) -> list[str]:
+    names = [ln.source_name for row in card.rows for ln in row.lines if ln.source_name]
+    return list(dict.fromkeys(names))
+
+
+def _public_sources(card: Card) -> list[ReportSource]:
+    """The lines a public source answered, each with its source's name and LIVE or FIXTURE."""
+    return [
+        ReportSource(
+            source_name=ln.source_name,
+            label=ln.label,
+            text=ln.text,
+            data_source=ln.source or card.source,
+        )
+        for row in card.rows
+        for ln in row.lines
+        if ln.source_name in _PUBLIC_SOURCES
+    ]
+
+
 def build_report(
     modules: ModuleEvidence, card: Card, *, case_id: str, lang: str, aerial: bool
 ) -> ReportResponse:
@@ -150,4 +174,6 @@ def build_report(
         aerial_url=f"/cases/{case_id}/aerial" if aerial else None,
         platforms=[_steps(platform, lang) for platform in ReportPlatform] if reportable else [],
         not_checked=list(card.not_checked),
+        source_names=_source_names(card),
+        sources=_public_sources(card),
     )

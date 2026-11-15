@@ -152,3 +152,118 @@
     margin-left: 0;
   }
 }
+
+/* ---------- the photo fade ---------- */
+/* The ad photo eases down by itself (TwinPage: AD_HOLD_MS, FADE_MS); the time is set inline. */
+.landing-photo {
+  transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+}
+/* Side by side: the ad photo keeps the left half, the scan shows on the right. */
+.landing[data-split="yes"] .landing-photo {
+  opacity: 1 !important;
+  clip-path: inset(0 50% 0 0);
+}
+/* The stage's own notes sit where the two labels go, so they step aside in this view. */
+.twin-stage:has(.landing[data-split="yes"]) .twin-placeholder,
+.landing[data-split="yes"] .landing-note {
+  visibility: hidden;
+}
+.landing-split {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  margin: 0;
+  pointer-events: none;
+}
+.landing-split::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1.5px);
+  width: 3px;
+  background: var(--surface);
+}
+.landing-split span {
+  justify-self: start;
+  margin: var(--sp-3);
+  padding: 4px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+.twin-fade {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--page-pad);
+  border-bottom: 1px solid var(--line);
+}
+.twin-fade-hint {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.4;
+}
+.twin-fade-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.twin-fade-btn {
+  flex: 1 1 150px;
+  min-height: 48px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: var(--layer-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  cursor: pointer;
+}
+.twin-fade-btn[aria-pressed="true"] {
+  background: var(--act);
+  color: var(--on-act);
+}
+.twin-fade-btn:focus-visible,
+.twin-fade-blend input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.twin-fade-blend {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  min-height: 44px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.twin-fade-blend input {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--act);
+}
+@media (max-width: 480px) {
+  .twin-fade-blend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (hover: hover) {
+  .twin-fade-btn:hover {
+    box-shadow: inset 0 -3px 0 var(--scan);
+  }
+}
+
+/* Beside the twin the team's panel spans every row of the page's left column. The spare height
+   goes to a last, empty row, so the fade controls stay right under the 3D view. */
+@media (min-width: 1180px) {
+  .twin-body.twin-with-team {
+    grid-template-rows: repeat(4, auto) 1fr;
+  }
+  .twin-body.twin-with-team > .pr-panel {
+    grid-row: 1 / span 5;
+  }
+}
