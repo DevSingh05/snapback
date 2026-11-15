@@ -42,21 +42,26 @@ class LinkCheck(BaseModel):
     status: CheckStatus = CheckStatus.NOT_CHECKED
     final_host: str | None = None  # where 'Apply / Pay deposit' really ends up
     same_as_record: bool | None = None  # that host is the building's own site
+    link_domain: LinkDomain | None = None  # matches / lookalike / other, against the record
     asks_payment_on_page: bool | None = None
     cost_usd: float | None = None
     ms: int | None = None
 
 
 class ElsewhereCheck(BaseModel):
-    """3. The same home posted elsewhere: a web search on the ad's own words, and Apify's
-    rental searches for the area and size. Counts only, never a name."""
+    """3. Two separate counts, never a name:
+    - the same ad's words posted elsewhere: an exact-phrase web search (Bright Data). Only these
+      hits can say another poster uses a different phone (`poster_differs`, from their snippets).
+    - rentals of this size nearby: Apify's area search. A market figure, never "the same home":
+      a different phone there is just another landlord, so it is never compared."""
 
     status: CheckStatus = CheckStatus.NOT_CHECKED
-    postings: int | None = None  # other postings found (search hits plus rental results)
-    by_source: dict[str, int] = Field(default_factory=dict)  # "search", "zillow", ...
-    rent_low: int | None = None
+    postings: int | None = None  # pages carrying the ad's own words (search hits), own site dropped
+    poster_differs: bool | None = None  # one of those pages shows a different phone
+    nearby: int | None = None  # rentals of the ad's size in the area (Apify)
+    by_source: dict[str, int] = Field(default_factory=dict)  # nearby rentals per source
+    rent_low: int | None = None  # asked rent among the nearby rentals
     rent_high: int | None = None
-    poster_differs: bool | None = None  # another posting carries a different phone
     ms: int | None = None
 
 
@@ -139,12 +144,15 @@ def link_facts(
     """Where the ad's link ended up, against the building's own site."""
     final_host = host_of(final_url) if final_url else None
     same: bool | None = None
+    domain: LinkDomain | None = None
     if final_host and website_host:
-        same = check_link([final_url or ""], website_host) is LinkDomain.MATCHES
+        domain = check_link([final_url or ""], website_host)
+        same = domain is LinkDomain.MATCHES
     return LinkCheck(
         status=CheckStatus.DONE if final_host else CheckStatus.FAILED,
         final_host=final_host,
         same_as_record=same,
+        link_domain=domain,
         asks_payment_on_page=asks_payment,
     )
 
@@ -210,32 +218,46 @@ def _postings(items: Sequence[Any]) -> list[Mapping[str, Any]]:
     return rows
 
 
-def search_hits(answer: Mapping[str, Any], website_host: str | None) -> list[str]:
-    """Links of web search results, minus the building's own site."""
+class SearchHit(BaseModel):
+    link: str
+    snippet: str = ""
+
+
+def search_hits(answer: Mapping[str, Any], website_host: str | None) -> list[SearchHit]:
+    """Web search results (link and snippet), minus the building's own site."""
     own = website_host.lower() if website_host else None
-    links: list[str] = []
+    hits: list[SearchHit] = []
     for row in answer.get("organic") or []:
-        link = row.get("link") or row.get("url") if isinstance(row, Mapping) else None
+        if not isinstance(row, Mapping):
+            continue
+        link = row.get("link") or row.get("url")
         if not isinstance(link, str):
             continue
         host = host_of(link)
         if host and own and (host == own or host.endswith("." + own)):
             continue
-        links.append(link)
-    return links
+        snippet = " ".join(str(row.get(k) or "") for k in ("title", "description", "snippet"))
+        hits.append(SearchHit(link=link, snippet=snippet))
+    return hits
 
 
 def elsewhere_facts(
-    hits: Sequence[str] | None,
+    hits: Sequence[SearchHit] | None,
     rentals: Mapping[str, Sequence[Mapping[str, Any]]],
     inputs: WebInputs,
     salt: str,
 ) -> ElsewhereCheck:
-    """Counts across the search hits and each rental source; rents only of the ad's size."""
-    by_source: dict[str, int] = {"search": len(hits)} if hits is not None else {}
+    """The exact-phrase hits (and whether one shows another phone) and, apart from them, the
+    count and rent range of nearby rentals of the ad's size."""
+    differs: bool | None = None
+    if hits is not None and inputs.ad_phone_hash:
+        found: set[str] = set()
+        for hit in hits:
+            found |= phone_hashes(html.escape(hit.snippet), salt)
+        differs = bool(found - {inputs.ad_phone_hash}) if found else None
+    by_source: dict[str, int] = {}
     rents: list[int] = []
-    phones: set[str] = set()
-    seen: set[str] = set(hits or [])
+    seen: set[str] = set()
     for name, items in rentals.items():
         kept = 0
         for item in _postings(items):
@@ -251,18 +273,13 @@ def elsewhere_facts(
             rent = money(_first(item, PRICE_KEYS))
             if rent is not None:
                 rents.append(rent)
-            phone = _first(item, PHONE_KEYS)
-            if isinstance(phone, str) and (h := phone_hash(phone, salt)):
-                phones.add(h)
         by_source[name] = kept
-    differs: bool | None = None
-    if inputs.ad_phone_hash and phones:
-        differs = bool(phones - {inputs.ad_phone_hash})
     return ElsewhereCheck(
         status=CheckStatus.DONE,
-        postings=sum(by_source.values()),
+        postings=len(hits) if hits is not None else None,
+        poster_differs=differs,
+        nearby=sum(by_source.values()) if rentals else None,
         by_source=by_source,
         rent_low=min(rents) if rents else None,
         rent_high=max(rents) if rents else None,
-        poster_differs=differs,
     )

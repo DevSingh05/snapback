@@ -365,27 +365,33 @@ def web_text(facts: Any) -> str:
         f"The ad's link (Browser Use): {link.status.value}"
         + (
             f"; ends at {link.final_host}; that is the building's own site: "
-            f"{_yes_no(link.same_as_record)}; asks for payment on the page: "
+            f"{_yes_no(link.same_as_record)}; against the record's website: "
+            f"{link.link_domain.value if link.link_domain else 'not checked'}"
+            f"; asks for payment on the page: "
             f"{_yes_no(link.asks_payment_on_page)}"
             if link.status.value == "done"
             else ""
         )
     )
     if other.status.value == "done":
-        rents = (
-            f"; asked rent {other.rent_low} to {other.rent_high}"
-            if other.rent_low is not None
-            else ""
+        posted = (
+            f"{other.postings} found; one shows a different phone: {_yes_no(other.poster_differs)}"
+            if other.postings is not None
+            else "not checked"
         )
-        sources = ", ".join(f"{n} {name}" for name, n in sorted(other.by_source.items()))
-        lines.append(
-            f"Same home posted elsewhere (Bright Data search, Apify): {other.postings} found "
-            f"({sources}){rents}; another posting has a different phone: "
-            f"{_yes_no(other.poster_differs)}"
-        )
+        lines.append(f"The ad's own words posted elsewhere (Bright Data search): {posted}")
+        if other.nearby is not None:
+            rents = (
+                f", asked rent {other.rent_low} to {other.rent_high}"
+                if other.rent_low is not None
+                else ""
+            )
+            lines.append(
+                f"Rentals this size nearby (Apify, not the same home): {other.nearby}{rents}"
+            )
     else:
         lines.append(
-            f"Same home posted elsewhere (Bright Data search, Apify): {other.status.value}"
+            f"Posted elsewhere and rentals nearby (Bright Data search, Apify): {other.status.value}"
         )
     return "\n".join(lines)
 

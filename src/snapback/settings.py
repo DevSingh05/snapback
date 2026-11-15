@@ -112,6 +112,8 @@ class Settings(BaseSettings):
     snapback_web_limit_s: float = 15.0
     # Browser Use spend cap per link check, in dollars (the account has little credit).
     browser_use_max_cost_usd: float = 0.10
+    # At most this many cases start web checks in any rolling hour (each case starts them once).
+    snapback_web_max_per_hour: int = 30
     vexcel_api_key: SecretStr | None = None
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None
