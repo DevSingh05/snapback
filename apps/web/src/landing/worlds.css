@@ -219,8 +219,15 @@
   font-weight: 700;
   white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.3s var(--ease-out);
+  transition:
+    opacity 0.3s var(--ease-out),
+    background-color 0.2s var(--ease-out),
+    color 0.2s var(--ease-out);
   will-change: transform;
+}
+.wl-lbl.is-hot {
+  background: var(--ink);
+  color: var(--paper);
 }
 .wl-lbl i {
   align-self: center;

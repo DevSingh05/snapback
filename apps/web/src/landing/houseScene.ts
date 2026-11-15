@@ -696,7 +696,31 @@ export function mountHouse(
     cv.setPointerCapture(e.pointerId);
     cv.classList.add("drag");
   };
+  // Hover (mouse only): the floor under the pointer lifts a little and its label lights, so
+  // the drawing answers the hand. One ray per frame at most.
+  const ray = new THREE.Raycaster(),
+    ndc = new THREE.Vector2(),
+    hov = [0, 0, 0];
+  let hot = -1,
+    hoverAt: [number, number] | null = null;
+  const pick = () => {
+    if (!hoverAt) return -1;
+    const r = cv.getBoundingClientRect();
+    ndc.set(((hoverAt[0] - r.left) / r.width) * 2 - 1, -((hoverAt[1] - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(floors, true).find((h) => h.object instanceof THREE.Mesh);
+    for (let o: THREE.Object3D | null = hit?.object ?? null; o; o = o.parent) {
+      const k = floors.indexOf(o as THREE.Group);
+      if (k >= 0) return k;
+    }
+    return -1;
+  };
+  const leave = () => {
+    hoverAt = null;
+  };
+  cv.addEventListener("pointerleave", leave);
   const move = (e: PointerEvent) => {
+    if (e.pointerType === "mouse" && !pt.size) hoverAt = [e.clientX, e.clientY];
     const q = pt.get(e.pointerId);
     if (!q) return;
     ob.yawT += (e.clientX - q[0]) * 0.008;
@@ -753,13 +777,25 @@ export function mountHouse(
     const want = rec > 0.2 ? 0 : p > 0.32 ? 2 : -1;
     Ls.forEach((l, k) => {
       fl[k] = (fl[k] ?? 0) + ((k === want ? 1 : 0) - (fl[k] ?? 0)) * (reduced ? 1 : 0.08);
-      l.intensity = 0.3 + 0.45 * (fl[k] ?? 0);
+      l.intensity = 0.3 + 0.45 * Math.max(fl[k] ?? 0, hov[k] ?? 0);
     });
     sg.rotation.y = Math.PI / 4 - yw;
     const a = 0.75 + 0.35 * seg(p, 0.32, 0.6) - 0.65 * rec;
     sun.position.set(Math.cos(a) * 20, 25, Math.sin(a) * 20);
     const o = st.open;
-    floors.forEach((g, k) => (g.position.y = 0.1 + k * FH + o * k * GAP));
+    if (hoverAt || hot >= 0) {
+      const k = !reduced && st.open > 0.6 && !pt.size ? pick() : -1;
+      if (k !== hot) {
+        const lbls = opts.floorLabels ?? [];
+        lbls[hot]?.classList.remove("is-hot");
+        lbls[k]?.classList.add("is-hot");
+        hot = k;
+      }
+    }
+    floors.forEach((g, k) => {
+      hov[k] = (hov[k] ?? 0) + ((k === hot ? 1 : 0) - (hov[k] ?? 0)) * 0.14;
+      g.position.y = 0.1 + k * FH + o * k * GAP + 0.28 * (hov[k] ?? 0);
+    });
     // the roof rises clear of the top floor while the photos land on its far walls
     roof.position.y =
       0.1 +
@@ -841,6 +877,7 @@ export function mountHouse(
       cv.removeEventListener("pointermove", move);
       cv.removeEventListener("pointerup", up);
       cv.removeEventListener("pointercancel", up);
+      cv.removeEventListener("pointerleave", leave);
       scene.traverse((n) => {
         if (!(n instanceof THREE.Mesh || n instanceof THREE.Points)) return;
         n.geometry.dispose();
