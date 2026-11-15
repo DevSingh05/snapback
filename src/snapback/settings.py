@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     snapback_agent_async_default_timeout_s: float = 60.0
     # A queued background run that has had no worker for this long is given up on (the trace says
     # so and code's result stands), and so is one still running this long past the time limit.
-    snapback_agent_queue_wait_s: float = Field(default=30.0, gt=0)
+    snapback_agent_queue_wait_s: float = Field(default=60.0, gt=0)
     snapback_agent_run_grace_s: float = Field(default=20.0, gt=0)
     snapback_agent_model: str = "claude-sonnet-5-5"
     # The sub-agents (one per check family) read a few facts and write a note: a small, fast model.

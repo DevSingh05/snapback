@@ -24,8 +24,8 @@ export type TimelineFeed = "connecting" | "streaming" | "polling" | "done" | "of
 export const POLL_MS = 1000;
 const MAX_POLL_FAILURES = 5;
 // Longest a run may be followed with no step landing before it is shown as stopped. The server's
-// own bounds (queue wait, time limit, grace) add up to well under this.
-export const STALL_MS = 120_000;
+// own bounds (queue wait, time limit, grace) (queue wait 60 s, then limit 60 s plus 20 s grace) add up to 140 s, under this.
+export const STALL_MS = 180_000;
 
 /** The GET the hook makes: null when this browser has no API or no read token for the case. */
 export type TimelineGet = (path: string, init: RequestInit) => Promise<Response> | null;

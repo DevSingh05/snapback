@@ -764,6 +764,11 @@ class CaseStore:
         def gave_up(why: str) -> None:
             # The run never started, or never ended: say so, so no screen waits on it.
             key = "trace.error.model_busy" if why == BUSY else "trace.error.model_stuck"
+            if why != BUSY:
+                # Shut the late job out first (no lock wait), so it cannot add a second end.
+                from snapback.agent.graph import _gate
+
+                _gate(session).stopped = True
             session.trace.emit(TraceKind.ERROR, strings.text(key, session.lang))
             if why == BUSY:  # no agent ran, so code writes the notes it would have
                 refresh_policy_notes(session)

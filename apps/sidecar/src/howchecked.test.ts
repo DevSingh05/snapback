@@ -31,7 +31,7 @@ const DONE = {
       result: "$1,150 is under $1,450 on record.",
       by: "agent",
     },
-    { label: "The agent stopped, so code finished the checks", result: "Done.", by: "code" },
+    { label: "The deep agent stopped: it waited too long behind other checks; code set the verdict", result: "Done.", by: "code" },
     {
       label: "Code worked out the result",
       result: "Worked out by code from the evidence. No model picks it.",
