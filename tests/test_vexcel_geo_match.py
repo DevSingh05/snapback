@@ -193,6 +193,9 @@ def test_extend_keeps_the_old_cases_and_adds_new_ones():
 def test_a_blank_tile_says_nothing_rather_than_wrong_building(tmp_path, world):
     a = _tile(tmp_path, world, 0, 0, "a")
     blank = tmp_path / "blank.png"
-    cv2.imwrite(str(blank), np.full((TILE_H, TILE_W), 128, np.uint8))
+    img = np.full((TILE_H, TILE_W), 128, np.uint8)
+    for x in (300, 400, 500):  # a cloud-grey tile with a few marks: some keypoints, too few
+        cv2.rectangle(img, (x, 280), (x + 20, 300), 30, -1)
+    cv2.imwrite(str(blank), img)
     assert vm.geo_match(a, str(blank)) is None
     assert vm.geo_match(str(blank), a) is None
