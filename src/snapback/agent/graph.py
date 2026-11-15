@@ -35,6 +35,7 @@ from typing import Any
 
 from deepagents import FilesystemPermission, create_deep_agent
 from langchain.agents.middleware import TodoListMiddleware
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
@@ -207,6 +208,27 @@ class _Gate:
         self.stopped = False
 
 
+class _StopGuard(BaseCallbackHandler):
+    """Refuses every model call that starts after the agent has been shut out. Callbacks in the
+    run config reach the sub-agents too, so an abandoned run stops spending model calls, not
+    only stops touching the case."""
+
+    raise_error = True
+
+    def __init__(self, case: CaseSession) -> None:
+        self._case = case
+
+    def _check(self) -> None:
+        if _gate(self._case).stopped:
+            raise AgentTimeout
+
+    def on_chat_model_start(self, *args: Any, **kwargs: Any) -> None:
+        self._check()
+
+    def on_llm_start(self, *args: Any, **kwargs: Any) -> None:
+        self._check()
+
+
 def _gate(case: CaseSession) -> _Gate:
     return case.__dict__.setdefault("_agent_gate", _Gate())
 
@@ -336,7 +358,8 @@ def build_subagents(case: CaseSession, model: Any = None) -> list[dict[str, Any]
 
     def reader(stem: str, tool_name: str, doc: str) -> Any:
         def run() -> str:
-            return casework.FACTS[stem](case.evidence)
+            with _turn(case) as live:
+                return casework.FACTS[stem](case.evidence) if live else STOPPED
 
         run.__name__ = tool_name
         run.__doc__ = doc
@@ -345,6 +368,9 @@ def build_subagents(case: CaseSession, model: Any = None) -> list[dict[str, Any]
     def search_tool() -> Any:
         def search_places() -> str:
             """Researched places near the checked ad's price and size, as text. No ids."""
+            with _turn(case) as live:
+                if not live:
+                    return STOPPED
             fn = case.search_places
             if fn is None:
                 return "No search is available for this case."
@@ -815,10 +841,17 @@ def _stream_within(
     if remaining is not None and remaining <= 0:
         raise AgentTimeout
     failure: list[BaseException] = []
+    config = {**config, "callbacks": [*config.get("callbacks", []), _StopGuard(case)]}
 
     def leg() -> None:
         try:
-            for chunk in agent.stream(payload, config, stream_mode="updates"):
+            stream = agent.stream(payload, config, stream_mode="updates")
+            for chunk in stream:
+                if _gate(case).stopped:
+                    close = getattr(stream, "close", None)
+                    if close is not None:
+                        close()
+                    return
                 watch.update(chunk)
             # The stream shows each file as it lands; the final state is the catch-all.
             watch.update({"state": {"files": agent.get_state(config).values.get("files")}})

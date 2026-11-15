@@ -214,8 +214,10 @@ class SessionCase:
         self.property_id: str | None = None  # our id for the building the listing claims
         self.files: CaseFiles | None = None  # evidence file, notes and pictures (E3 serves them)
         self._checked_at: datetime | None = None
-        self._lock = threading.Lock()
-        session.evidence_lock = self._lock  # evidence an agent adds waits for the policy's turn
+        self._lock = threading.RLock()
+        # Evidence an agent adds waits for the policy's turn. Re-entrant, so a caller already
+        # inside the case cannot deadlock on it.
+        session.evidence_lock = self._lock
         self.agents: BackgroundAgents | None = None  # set when the agent runs in the background
 
     @property
@@ -732,6 +734,11 @@ class CaseStore:
         self._background.submit(
             case.case_id, _background_job(case, self._settings, self._agent_model)
         )
+
+    def shutdown_agents(self) -> None:
+        """Stop taking background runs and drop the queued ones (the app is shutting down)."""
+        if self._background is not None:
+            self._background.shutdown()
 
     def wait_for_agents(self, timeout: float = 30.0) -> None:
         """Block until every background run has ended. For tests and scripts, never a request."""

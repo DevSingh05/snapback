@@ -61,6 +61,7 @@ class Crew(BaseChatModel):
     on_owner: Any = None
     broken: bool = False
     seen: Any = None  # list of models' calls, for assertions
+    started: Any = None  # a list; one entry per model call that begins
 
     def bind_tools(self, tools, **kwargs):
         return self
@@ -70,6 +71,8 @@ class Crew(BaseChatModel):
         return "crew"
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        if self.started is not None:
+            self.started.append(time.monotonic())
         if self.delay:
             time.sleep(self.delay)
         if self.broken:
@@ -303,6 +306,25 @@ def test_past_its_time_limit_the_background_agent_is_cut_off_and_the_timeline_sa
     assert session.verdict == before
 
 
+def test_after_the_time_limit_no_model_call_starts_and_the_pool_is_free(tmp_path, monkeypatch):
+    started: list = []
+    client = make_client(
+        tmp_path,
+        monkeypatch,
+        lambda: Crew(delay=0.4, started=started),
+        snapback_agent_timeout_s=0.6,
+        snapback_agent_max_concurrent=2,
+    )
+    for _ in range(3):
+        start(client)
+    client.app.state.store.wait_for_agents()
+    returned = time.monotonic()
+    after_wait = len(started)
+    time.sleep(2.5)  # abandoned runs get every chance to carry on
+    late = [t for t in started if t > returned]
+    assert len(started) == after_wait and late == []
+
+
 def test_a_model_that_breaks_leaves_the_case_and_the_answer_alone(tmp_path, monkeypatch):
     client = make_client(tmp_path, monkeypatch, lambda: Crew(broken=True))
     case = start(client)
@@ -378,6 +400,7 @@ def test_the_stream_sends_each_change_until_the_agent_is_done_and_needs_the_head
     with client.stream("GET", path, headers=headers) as r:
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/event-stream")
+        assert "private, no-store" in r.headers["cache-control"]
         text = "".join(r.iter_text())
     for block in text.split("\n\n"):
         if block.startswith("event: timeline"):
@@ -462,7 +485,7 @@ def test_langsmith_metadata_is_the_case_id_and_the_mode_only():
     case = CaseSession("fx-7Q2M", FixtureModules(), Trace("fx-7Q2M", DataSource.FIXTURE))
     assert run_advisory(case, Recorder(), deadline_s=5) is True
     assert Recorder.configs[0]["metadata"] == {"case_id": "fx-7Q2M", "mode": "deepagents_async"}
-    assert "listing" not in json.dumps(Recorder.configs[0])
+    assert "listing" not in json.dumps(Recorder.configs[0]["metadata"])
 
 
 def test_the_advisory_agent_has_no_tool_that_can_move_the_case():
