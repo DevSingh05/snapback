@@ -113,7 +113,7 @@ describe("the app shell", () => {
     const order = [...document.querySelectorAll<HTMLElement>(".app-bar :is(a, button)")].map(
       (el) => el.getAttribute("aria-label") ?? el.textContent,
     );
-    expect(order.slice(0, 1)).toEqual(["SNAPBACK home"]);
+    expect(order.slice(0, 1)).toEqual(["SNAPBACK intro"]);
     expect(order.slice(1, 6)).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
     expect(order.slice(6, 9)).toEqual(["Stories", "Reviews", "Customize"]);
   });
