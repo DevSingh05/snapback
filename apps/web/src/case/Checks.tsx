@@ -6,12 +6,13 @@ import "../ui/ui.css";
 import "./case.css";
 import type { DataSource } from "../contracts";
 import { State, Tag } from "../ui";
+import { checkAnchor } from "./checkAnchor";
 
-function Item({ line }: { line: string }) {
+function Item({ line, id }: { line: string; id?: string }) {
   const cut = line.indexOf(": ");
-  if (cut < 1) return <li>{line}</li>;
+  if (cut < 1) return <li id={id}>{line}</li>;
   return (
-    <li>
+    <li id={id}>
       <b>{line.slice(0, cut)}</b>
       <span>{line.slice(cut + 2)}</span>
     </li>
@@ -33,7 +34,12 @@ export function Checks({
   const bad = doesNot ?? [];
   if (good.length === 0 && bad.length === 0) return null;
   return (
-    <section className="case-checks" aria-labelledby={titleId} data-testid="case-checks">
+    <section
+      className="case-checks"
+      id="checks"
+      aria-labelledby={titleId}
+      data-testid="case-checks"
+    >
       <header className="case-sheet-head">
         <h2 id={titleId}>What checks out, and what doesn't</h2>
         <Tag source={source} testId="checks-source" />
@@ -45,9 +51,13 @@ export function Checks({
               <State kind="mismatch">What doesn't</State>
             </h3>
             <ul>
-              {bad.map((line) => (
-                <Item key={line} line={line} />
-              ))}
+              {bad.map((line, i) => {
+                // the iMessage reply links each red flag here (/case/<id>#check-<label>);
+                // one anchor per label, on its first line
+                const anchor = checkAnchor(line);
+                const first = anchor && bad.findIndex((l) => checkAnchor(l) === anchor) === i;
+                return <Item key={line} line={line} id={first ? anchor : undefined} />;
+              })}
             </ul>
           </div>
         ) : null}
