@@ -45,6 +45,9 @@ RETRY_ONLY = {
     ChoiceKind.WHICH_PHOTO,
     ChoiceKind.DWELL_ROOMS,
     ChoiceKind.LEAD_CHECKS,
+    # The background Planner's own choices (agent/followups.py), never made on the case path.
+    ChoiceKind.FOLLOW_UP,
+    ChoiceKind.NEXT_STEP,
 }
 
 

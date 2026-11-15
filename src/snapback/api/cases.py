@@ -265,6 +265,15 @@ class SessionCase:
             self.files = CaseFiles(evidence=evidence)
         else:
             self.files.evidence = evidence
+        # J1: the ad photo and the scan view it matched, per alias, in memory only.
+        reader = getattr(self.session.modules, "live_images", None)
+        located = self.session.evidence.locate
+        if reader is not None and located is not None:
+            alias = {p.photo_id: f"P{i}" for i, p in enumerate(located.photos, start=1)}
+            for photo_id, (ad, scan) in reader(self.session.case_id).items():
+                if photo_id in alias:
+                    self.files.images[(alias[photo_id], "photo")] = ad
+                    self.files.images[(alias[photo_id], "scan")] = scan
 
     @property
     def evidence(self) -> ModuleEvidence:
@@ -446,6 +455,7 @@ def _background_job(
             session.trace.emit(
                 TraceKind.ERROR, strings.text("trace.error.model_nokey", session.lang)
             )
+            _recorded_followups(session)
             return
         except Exception:
             session.trace.emit(
@@ -462,6 +472,17 @@ def _background_job(
             )
 
     return run
+
+
+def _recorded_followups(session: CaseSession) -> None:
+    """With no model, code makes the recorded follow-up picks (labelled FIXTURE). Information
+    lines only; a failure here is logged and changes nothing."""
+    try:
+        from snapback.agent.followups import run_recorded
+
+        run_recorded(session)
+    except Exception:
+        log.exception("recorded follow-ups failed for %s", session.case_id)
 
 
 def _deepagents_runner(
@@ -773,6 +794,23 @@ class CaseStore:
                     source=source,
                 )
                 session.web_facts = job.facts
+            if not asked_by_name:
+                # The Planner's follow-up menu for this case (agent/followups.py): existing
+                # lookups only, run if the deep agent picks them. Information lines, never a state.
+                from snapback.agent.followups import build_runners
+
+                try:
+                    session.followup_runners = build_runners(
+                        listing.text,
+                        source,
+                        self._settings,
+                        web_inputs=web_inputs_for(listing, record, phone_salt(self._settings)),
+                        web_ran=session.web_facts is not None,
+                        place_check=place_check,
+                        domain_check=domain_check,
+                    )
+                except Exception:
+                    log.warning("follow-up menu could not be built; the case has none")
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:

@@ -1,11 +1,11 @@
 # LIVE: locate over the buildings' own listing photos, and decoys.
 # k of n photos placed. decoy_false_placement: k of n decoys read as taken in the claimed building (target 0).
 # wrong_building and the decoy counts are over photos the locator ran on. photo_not_tested and decoy_not_tested: how many it never ran on.
-# thresholds: thresholds-f384b0a15cfc+disk+lightglue@disk-depth-9c2ee4de+lightglue-disk-b5b21d47
+# thresholds: thresholds-96520e46aa85+disk+lightglue@disk-depth-9c2ee4de+lightglue-disk-b5b21d47
 condition,metric,k,n,rate,ci_low,ci_high,frozen_at
-locate_real,right_building,43,48,0.8958,0.7783,0.9547,2026-11-14T16:38-05:00
-locate_real,wrong_building,0,48,0.0000,0.0000,0.0741,2026-11-14T16:38-05:00
-locate_real,photo_not_tested,0,48,0.0000,0.0000,0.0741,2026-11-14T16:38-05:00
-locate_real,decoy_false_placement,0,30,0.0000,0.0000,0.1135,2026-11-14T16:38-05:00
-locate_real,decoy_placed_elsewhere,5,30,0.1667,0.0734,0.3356,2026-11-14T16:38-05:00
-locate_real,decoy_not_tested,0,30,0.0000,0.0000,0.1135,2026-11-14T16:38-05:00
+locate_real,right_building,43,48,0.8958,0.7783,0.9547,2026-11-15T01:31-05:00
+locate_real,wrong_building,0,48,0.0000,0.0000,0.0741,2026-11-15T01:31-05:00
+locate_real,photo_not_tested,0,48,0.0000,0.0000,0.0741,2026-11-15T01:31-05:00
+locate_real,decoy_false_placement,0,30,0.0000,0.0000,0.1135,2026-11-15T01:31-05:00
+locate_real,decoy_placed_elsewhere,3,30,0.1000,0.0346,0.2562,2026-11-15T01:31-05:00
+locate_real,decoy_not_tested,0,30,0.0000,0.0000,0.1135,2026-11-15T01:31-05:00

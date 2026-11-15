@@ -36,6 +36,13 @@ import { useRoster, useRun, type Run } from "./useRun";
 import { WORDS, type RoomWords } from "./words";
 
 /** Where "See how they got this" goes: the report's "How we got this answer". */
+/** `?team=trace` opens the panel on "How they got this"; `?team=meet` on Meet the team. A page
+ *  that explains the app (Under the hood) links straight to the tab it is talking about. */
+export function teamTabFromSearch(search: string): "live" | "trace" | "team" {
+  const asked = new URLSearchParams(search).get("team");
+  return asked === "trace" ? "trace" : asked === "meet" ? "team" : "live";
+}
+
 export const answerHref = (caseId: string) =>
   `/case/${encodeURIComponent(caseId)}#case-answer-title`;
 
@@ -233,7 +240,9 @@ export function TeamPanel({
   });
   const team = teamView(floor, whole);
   const ending = floor.verdict ?? (whole.phase === "done" ? whole.verdict : null);
-  const [tab, setTab] = useState<"live" | "trace" | "team">("live");
+  const [tab, setTab] = useState<"live" | "trace" | "team">(() =>
+    teamTabFromSearch(window.location.search),
+  );
   // The crew is the Live view; the diagram of the same run stays one press away.
   const [view, setView] = useState<"crew" | "diagram">("crew");
   const [focus, setFocus] = useState<string | null>(null);
@@ -265,6 +274,40 @@ export function TeamPanel({
     setFocus(id);
   };
 
+  // The Decider's stamp. On Live it sits under the scene, so the scene starts high enough to
+  // fit one screen and the stamp lands below the desk it came from; on the other tabs it stays
+  // in the header. It is one element, in one place at a time.
+  const decider = (
+    <div
+      className="pr-decider"
+      data-stamped={floor.verdict ? "yes" : "no"}
+      data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
+      data-testid="team-decider"
+    >
+      <p className="pr-who ui-mono">
+        {floor.desks.find((d) => d.card.team === "decider")?.card.name}
+      </p>
+      {/* The slot is already as tall as the stamp will be, so the stamp lands in place. */}
+      <div className="pr-stamp-slot">
+        {floor.verdict ? (
+          <p className="pr-stamp" data-testid="team-verdict">
+            {floor.verdict.headline}
+          </p>
+        ) : (
+          <>
+            {ending ? (
+              <p className="pr-stamp pr-held" aria-hidden="true">
+                {ending.headline}
+              </p>
+            ) : null}
+            <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
+          </>
+        )}
+      </div>
+      <p className="pr-rule">{w.deciderRule}</p>
+    </div>
+  );
+
   return (
     <section
       className="pr-panel"
@@ -285,34 +328,7 @@ export function TeamPanel({
         <div className="pr-bar" aria-hidden="true">
           <span style={{ transform: `scaleX(${floor.progress})` }} />
         </div>
-        <div
-          className="pr-decider"
-          data-stamped={floor.verdict ? "yes" : "no"}
-          data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
-          data-testid="team-decider"
-        >
-          <p className="pr-who ui-mono">
-            {floor.desks.find((d) => d.card.team === "decider")?.card.name}
-          </p>
-          {/* The slot is already as tall as the stamp will be, so the stamp lands in place. */}
-          <div className="pr-stamp-slot">
-            {floor.verdict ? (
-              <p className="pr-stamp" data-testid="team-verdict">
-                {floor.verdict.headline}
-              </p>
-            ) : (
-              <>
-                {ending ? (
-                  <p className="pr-stamp pr-held" aria-hidden="true">
-                    {ending.headline}
-                  </p>
-                ) : null}
-                <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
-              </>
-            )}
-          </div>
-          <p className="pr-rule">{w.deciderRule}</p>
-        </div>
+        {tab === "live" ? null : decider}
       </header>
 
       <div className="pr-tabs" role="tablist" aria-label={w.team}>
@@ -357,19 +373,6 @@ export function TeamPanel({
         className="pr-pane"
         hidden={tab !== "live"}
       >
-        <div className="pr-view" role="group" aria-label={w.view}>
-          {(["crew", "diagram"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              className="pr-btn pr-btn-quiet"
-              aria-pressed={view === v}
-              onClick={() => setView(v)}
-            >
-              {v === "crew" ? w.crewView : w.diagramView}
-            </button>
-          ))}
-        </div>
         {view === "crew" ? (
           <CrewScene
             floor={floor}
@@ -396,6 +399,20 @@ export function TeamPanel({
             ) : null}
           </>
         )}
+        {tab === "live" ? decider : null}
+        <div className="pr-view" role="group" aria-label={w.view}>
+          {(["crew", "diagram"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className="pr-btn pr-btn-quiet"
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+            >
+              {v === "crew" ? w.crewView : w.diagramView}
+            </button>
+          ))}
+        </div>
         {run.timeline ? (
           <div className="pr-controls">
             <button

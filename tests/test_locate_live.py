@@ -898,3 +898,28 @@ def test_a_cache_entry_whose_poses_lack_the_viewer_angles_is_run_again(world, tm
     assert not again.from_cache
     rewritten = json.loads(path.read_text())["result"]["poses"]
     assert all(p["yaw_deg"] is not None and p["pitch_deg"] is not None for p in rewritten.values())
+
+
+def test_a_live_case_keeps_each_placed_photo_and_its_scan_view_for_the_evidence_image(
+    world, tmp_path
+):
+    """J1 (#10): a live SessionCase holds the ad photo and the matched scan view per alias, in
+    memory, and GET /evidence-image draws them."""
+    from snapback.api.cases import SessionCase
+    from snapback.vision.evidence_image import caption, render
+
+    live, modules = live_session(world, tmp_path)
+    case = SessionCase(
+        "LVJ1", live, modules._listing, lambda c: run_case(c, PolicyChooser(), lambda d: "send")
+    )
+    case.advance()
+    files = case.files
+    assert files is not None and files.evidence is not None
+    for entry in files.evidence.photos:
+        assert entry.status is LocateStatus.LOCATED_IN_CLAIMED
+        ad, scan = files.image(entry.alias, "photo"), files.image(entry.alias, "scan")
+        assert ad and scan  # both JPEG (CaseFiles.image serves JPEG only)
+        line = caption(
+            entry.alias, entry.status, entry.points.n_total, entry.flipped, DataSource.LIVE
+        )
+        assert render(ad, scan, entry.points, line).startswith(b"\x89PNG")
