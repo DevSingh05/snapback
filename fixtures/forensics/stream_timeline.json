@@ -5,6 +5,7 @@
   "n_gap": 10,
   "n_honest": 2684,
   "n_seeded": 10,
+  "n_single_group_gap": 10,
   "ring_ads": 355,
   "ring_ads_flagged": 329,
   "seeded": [
@@ -18,7 +19,9 @@
     "n_ads": 29,
     "name": "R01",
     "renters_est": 270,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 21,
+    "single_group_gap_days": 3
    },
    {
     "ad_days_before_flag": 7,
@@ -30,7 +33,9 @@
     "n_ads": 42,
     "name": "R02",
     "renters_est": 210,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 40,
+    "single_group_gap_days": 3
    },
    {
     "ad_days_before_flag": 3,
@@ -42,7 +47,9 @@
     "n_ads": 42,
     "name": "R03",
     "renters_est": 90,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 27,
+    "single_group_gap_days": 7
    },
    {
     "ad_days_before_flag": 31,
@@ -54,7 +61,9 @@
     "n_ads": 39,
     "name": "R04",
     "renters_est": 930,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 12,
+    "single_group_gap_days": 8
    },
    {
     "ad_days_before_flag": 4,
@@ -66,7 +75,9 @@
     "n_ads": 25,
     "name": "R05",
     "renters_est": 120,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 34,
+    "single_group_gap_days": 4
    },
    {
     "ad_days_before_flag": 8,
@@ -78,7 +89,9 @@
     "n_ads": 38,
     "name": "R06",
     "renters_est": 240,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 38,
+    "single_group_gap_days": 6
    },
    {
     "ad_days_before_flag": 4,
@@ -90,7 +103,9 @@
     "n_ads": 37,
     "name": "R07",
     "renters_est": 120,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 14,
+    "single_group_gap_days": 2
    },
    {
     "ad_days_before_flag": 8,
@@ -102,7 +117,9 @@
     "n_ads": 40,
     "name": "R08",
     "renters_est": 240,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 37,
+    "single_group_gap_days": 6
    },
    {
     "ad_days_before_flag": 10,
@@ -114,7 +131,9 @@
     "n_ads": 31,
     "name": "R09",
     "renters_est": 300,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 40,
+    "single_group_gap_days": 5
    },
    {
     "ad_days_before_flag": 10,
@@ -126,11 +145,14 @@
     "n_ads": 32,
     "name": "R10",
     "renters_est": 300,
-    "separated": false
+    "separated": false,
+    "single_group_flag_day": 28,
+    "single_group_gap_days": 4
    }
   ],
   "seeded_flagged": 10,
-  "seeded_separated": 0
+  "seeded_separated": 0,
+  "single_group_median_gap_days": 4.5
  },
  "days": 90,
  "flagged_ads_by_day": [

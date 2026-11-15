@@ -103,6 +103,8 @@ const small: StreamTimeline = {
     seeded_separated: 1,
     median_gap_days: 3,
     n_gap: 1,
+    single_group_median_gap_days: 3,
+    n_single_group_gap: 1,
     ring_ads: 5,
     ring_ads_flagged: 5,
     honest_flagged: 0,
@@ -113,6 +115,8 @@ const small: StreamTimeline = {
         n_ads: 5,
         flagged_ads: 5,
         separated: true,
+        single_group_flag_day: 5,
+        single_group_gap_days: 3,
         first_day: 2,
         flag_day: 5,
         gap_days: 3,
@@ -320,6 +324,15 @@ describe("the stream view", () => {
     expect(within(strip).getByText("1 of 1", { selector: ".sw-tile-hero b" })).toBeInTheDocument();
     expect(within(strip).getByText("3 days")).toBeInTheDocument();
     expect(within(strip).getByText(/n = 1 seeded rings/)).toBeInTheDocument();
+    expect(
+      within(strip).getByText(
+        /flagged = at least 4 of its ads inside reported groups \(any group\)/,
+      ),
+    ).toBeInTheDocument();
+    const lanes = screen.getByRole("region", { name: "Time to detect, per group" });
+    expect(lanes.querySelector(".sw-fine")).toHaveTextContent(
+      "Single-group rule for seeded rings: median 3 days, n = 1.",
+    );
     expect(within(strip).getByText(/0 of 20 honest ads flagged/)).toBeInTheDocument();
   });
 

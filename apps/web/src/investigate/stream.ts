@@ -53,6 +53,8 @@ export interface StreamGroup extends Detection {
 
 export interface SeededRing extends Detection {
   name: string;
+  single_group_flag_day: number | null;
+  single_group_gap_days: number | null;
   n_ads: number;
   flagged_ads: number;
   separated: boolean;
@@ -85,6 +87,8 @@ export interface StreamTimeline {
     seeded_separated: number;
     median_gap_days: number | null;
     n_gap: number;
+    single_group_median_gap_days: number | null;
+    n_single_group_gap: number;
     ring_ads: number;
     ring_ads_flagged: number;
     honest_flagged: number;

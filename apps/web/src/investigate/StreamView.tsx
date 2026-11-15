@@ -186,6 +186,7 @@ function Lanes({
   onSelect: (id: string) => void;
 }) {
   const frame = frameAt(data, pos);
+  const key = data.answer_key;
   const pct = (index: number) => `${(index / data.days) * 100}%`;
   return (
     <section className="sw-lanes" aria-label="Time to detect, per group">
@@ -238,8 +239,11 @@ function Lanes({
         })}
       </ol>
       <p className="sw-fine">
-        Flagged = the first day the ring finder, seeing only the ads posted so far, reports a group
-        with at least {data.min_ads} of these ads.
+        A group above is flagged on the first day the ring finder, seeing only the ads posted so
+        far, reports a group with at least {data.min_ads} of its ads. A seeded ring (the tiles) is
+        flagged when at least {data.min_ads} of its ads are inside reported groups, any group.
+        Single-group rule for seeded rings: median {days(key.single_group_median_gap_days)}, n ={" "}
+        {key.n_single_group_gap}.
       </p>
     </section>
   );
@@ -468,6 +472,7 @@ export function StreamView({
           </b>
           <span>seeded rings flagged</span>
           <small>
+            flagged = at least {data.min_ads} of its ads inside reported groups (any group) ·{" "}
             {frame.seededFlagged} of {key.n_seeded} by day {pos}
           </small>
         </div>

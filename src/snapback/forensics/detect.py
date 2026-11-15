@@ -178,22 +178,32 @@ def _against_truth(
     rows = []
     for name, members in seeded.items():
         flag = first_union_flag_day(members, daily)
+        # the stricter rule, for comparison: MIN_ADS of the ring's ads inside ONE reported group
+        single = first_flag_day(members, daily)
+        first = min(days_of[a] for a in members)
         rows.append(
             {
                 "name": name,
                 "n_ads": len(members),
                 "flagged_ads": len(members & set().union(*found)) if found else 0,
                 "separated": score["per_ring"][name]["recovered"],
+                "single_group_flag_day": single,
+                "single_group_gap_days": None if single is None else single - first,
                 **detection([days_of[a] for a in members], flag),
             }
         )
     gaps = [r["gap_days"] for r in rows if r["gap_days"] is not None]
+    single_gaps = [
+        r["single_group_gap_days"] for r in rows if r["single_group_gap_days"] is not None
+    ]
     return {
         "n_seeded": len(seeded),
         "seeded_flagged": len(gaps),
         "seeded_separated": score["rings_recovered"],
         "median_gap_days": median(gaps) if gaps else None,
         "n_gap": len(gaps),
+        "single_group_median_gap_days": median(single_gaps) if single_gaps else None,
+        "n_single_group_gap": len(single_gaps),
         "ring_ads": sum(len(m) for m in seeded.values()),
         "ring_ads_flagged": sum(r["flagged_ads"] for r in rows),
         "honest_flagged": score["honest_flagged"],

@@ -2,6 +2,7 @@
 the committed timeline checked against the ring finder it claims to come from."""
 
 import json
+import random
 from datetime import date
 
 import pytest
@@ -23,6 +24,7 @@ from snapback.forensics.detect import (
     signals,
     summarize_signals,
 )
+from snapback.forensics.graph import PHOTO_HAMMING, _near_pairs, hamming
 from snapback.forensics.pipeline import analyze
 from snapback.forensics.rings import MIN_ADS, W_PHONE, W_PHOTO, W_PHRASE
 from snapback.forensics.stream import DAYS, START, generate_stream
@@ -100,6 +102,77 @@ def test_signal_summary_counts_values_and_different_ads():
         "phone": {"values": 2, "ads": 5, "weight": W_PHONE},
         "wording": {"values": 2, "ads": 4, "weight": W_PHRASE},
     }
+
+
+# ---- the numpy photo matcher against the pair-by-pair one it replaced ------------------------
+
+
+def _slow_pairs(photos: list[str]) -> set[tuple[str, str]]:
+    """The loop `build_graph` ran before `_near_pairs`: every pair, one `hamming` call each."""
+    return {
+        (a, b)
+        for i, a in enumerate(photos)
+        for b in photos[i + 1 :]
+        if hamming(a, b) <= PHOTO_HAMMING
+    }
+
+
+def _photo(bits: int) -> str:
+    return f"ph-{bits:016x}"
+
+
+def _photos_with_neighbours(seed: int, n: int) -> list[str]:
+    """Random 64-bit ids, half of them a copy of an earlier one with 0 to 9 bits flipped, so
+    there are pairs on both sides of the threshold. Sorted and unique, as `build_graph` passes."""
+    rng = random.Random(seed)
+    values = [rng.getrandbits(64) for _ in range(n // 2)]
+    for _ in range(n - len(values)):
+        base = rng.choice(values)
+        for bit in rng.sample(range(64), rng.randint(0, 9)):
+            base ^= 1 << bit
+        values.append(base)
+    return sorted({_photo(v) for v in values})
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize("chunk", [1, 7, 64, 512])
+def test_near_pairs_gives_the_same_pairs_as_the_old_loop(seed, chunk):
+    photos = _photos_with_neighbours(seed, 180)
+    slow = _slow_pairs(photos)
+    assert slow, "the case must hold near pairs, or it proves nothing"
+    fast = _near_pairs(photos, chunk=chunk)
+    assert len(fast) == len(set(fast))  # no pair twice
+    assert set(fast) == slow
+
+
+@pytest.mark.parametrize("n", [63, 64, 65, 128, 129])
+def test_near_pairs_is_right_at_block_boundaries(n):
+    photos = _photos_with_neighbours(11, n)
+    assert set(_near_pairs(photos, chunk=64)) == _slow_pairs(photos)
+    assert set(_near_pairs(photos, chunk=len(photos))) == _slow_pairs(photos)
+
+
+def test_near_pairs_joins_at_six_bits_and_not_at_seven():
+    base = 0x0123456789ABCDEF
+    six = base ^ 0b111111
+    seven = base ^ (0b1111111 << 20)
+    assert PHOTO_HAMMING == 6
+    photos = sorted([_photo(base), _photo(six), _photo(seven)])
+    assert hamming(_photo(base), _photo(six)) == 6
+    assert hamming(_photo(base), _photo(seven)) == 7
+    assert set(_near_pairs(photos)) == {tuple(sorted([_photo(base), _photo(six)]))}
+    assert set(_near_pairs(photos)) == _slow_pairs(photos)
+
+
+def test_near_pairs_handles_the_top_bit_and_the_extremes():
+    photos = sorted([_photo(0), _photo(1 << 63), _photo((1 << 64) - 1), _photo((1 << 64) - 2)])
+    assert set(_near_pairs(photos)) == _slow_pairs(photos)
+    assert (_photo(0), _photo(1 << 63)) in set(_near_pairs(photos))
+
+
+def test_near_pairs_of_nothing_and_of_one_photo_is_empty():
+    assert _near_pairs([]) == []
+    assert _near_pairs([_photo(42)]) == []
 
 
 # ---- the committed timeline against the finder -------------------------------------------
@@ -192,6 +265,18 @@ def test_the_answer_key_score_matches_the_truth_file(timeline, stream, full):
     assert key["honest_flagged"] == len(flagged - real)
     assert key["seeded_flagged"] == sum(1 for r in key["seeded"] if r["flag_day"] is not None)
     assert key["n_gap"] == key["seeded_flagged"]
+    # one group holding 4 of a ring's ads implies 4 inside groups: the strict rule is never sooner
+    for row in key["seeded"]:
+        if row["single_group_flag_day"] is not None:
+            assert row["flag_day"] <= row["single_group_flag_day"]
+            assert row["single_group_gap_days"] == row["single_group_flag_day"] - row["first_day"]
+    strict = sorted(
+        r["single_group_gap_days"] for r in key["seeded"] if r["single_group_gap_days"] is not None
+    )
+    assert key["n_single_group_gap"] == len(strict)
+    mid = len(strict) // 2
+    middle = strict[mid] if len(strict) % 2 else (strict[mid - 1] + strict[mid]) / 2
+    assert key["single_group_median_gap_days"] == middle
 
 
 def test_the_api_serves_the_committed_timeline():
