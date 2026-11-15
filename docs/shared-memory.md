@@ -27,16 +27,14 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (14:50)
+## Who is doing what (Sat 22:09)
 
-Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41.
+Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Main 812da1d GREEN (CI run 43670005141, 22:05).
 
-| Person  | GitHub      | Lane                            | Now                                                                                                                                                                                                                                                |
-| ------- | ----------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dev     | DevSingh05  | A backend, deploy, ChatOverflow | Deploys main to Vercel on the conductor's ping (#38). Runs ChatOverflow: 14:47 on #41, 47 of 57 teammate notes posted, 10 held back by his screen.                                                                                                 |
-| Vidyut  | vs-githjk   | T front end (with Claude)       | Conductor reviews and merges. Open T PRs #214 #219 #221 (in review). Held for his preview sign-off: t/shell, t/consistency, t/match-viz, t/preview. a/forensics and a/todo-plan pushed, PRs wait on him. Builders running: walk player, M9 finder. |
-| Jeffrey | jeffrey-g05 | V vision and ML                 | #231 merged 14:46 (9f28843). Next: live evidence-file writer (about 20 min, ruling 14:46). Last heartbeat #10 14:31.                                                                                                                               |
-| Rishit  | RishitRai   | D data and iMessage             | #232 M10 watch at 4eab785: FIX list posted 14:43, merges after M4. Last push 14:26, last comment #41 14:41.                                                                                                                                        |
+- **Dev (DevSingh05, A):** #274 ff8af90 PASS (percent-host + punycode probes), #277 53c4fea PASS, #282 abee6fa PASS (test only). All 3 must merge main 812da1d, then merge in order 282 -> 274 -> 277. Bright Data key: Vidyut sends it privately (#8). Video C06/C08/C09. Owns demo-laptop .env and LangSmith. Vercel redeploy asked 21:55 (#8).
+- **Vidyut + conductor (vs-githjk, T):** video (VO FINAL, storyboard v3 approved except sc15), Devpost, business plan; #286 check team panel in fixes.
+- **Jeffrey (jeffrey-g05, V):** #272 still a8f8098 (no spread-bar fix pushed); #283 PASS, waits #272; rubric read on #41 OVERDUE (was due 22:00); live Photon test on his laptop (sidecar d/photon-v2 847ec84, API :8020); Vexcel feasibility **22:45**.
+- **Rishit (RishitRai, D):** #264 92004d0 node RED: 3 Spanish tests, because #280's red-flag headlines (strings.py:554-557 / :1137-1140) are not in HEADLINES_ES (FIX #11). Then 275 -> 276 -> 281 (deltas PASS). C19 clips by AirDrop **22:30**.
 
 ## Open questions
 
@@ -47,12 +45,10 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 
 ## Live facts
 
-- **main = 9f28843** (#231, 14:46): node and hygiene success, python in progress at 14:48 (`gh api .../check-runs`). Previous main 1e51388 (#222): node, python, hygiene success.
-- Merged since 11:12 (selection): #220 walk look + kit + landing (bc23728), #222 deepagents place agent (1e51388), #226 M3 event bus, #230 sibling-scan fix (ff29b3d), #231 live points (9f28843).
-- Open PRs at 14:48: #214@24e70a3, #219@a919049, #221@50b6896 (T, in review), #232@4eab785 (D, FIX).
-- **Which build is live on Vercel: NOT CHECKED** (no `plan/live.json`); master-guardian owns that answer.
-- Published (private, Vidyut's account): team page v14, Second Look v8, SNAPBACK Worlds v16 (original 3D house hero plus a 6-frame storyboard).
-- API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only, no `?token=`). `/c/:id` card stays public.
+- **main = aa09acb** (#280, 21:2x): **node CI FAILED**, python in progress (21:35). **Merge freeze until main is green**; a fix-forward builder owns it. Previous main 17e04be (#273).
+- Merged Sat evening: #250 #257 #263 #265-#271 #273 #278 #280.
+- **Which build is live on Vercel:** last reported by Dev 20:17 as bf5b574; **stale**, master-guardian owns `plan/live.json`. Dev told to hold redeploy until main is green.
+- API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only). Timeline, copy-alert, evidence-image all read the token from a header.
 
 ## Gates
 
@@ -66,6 +62,8 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 - No real addresses in code, fixtures, tests or docs.
 
 ## Gotchas
+
+- (Nov 14 22:08) XO subagent: `gh pr update-branch` on teammates' PRs and `gh pr merge` were denied by the permission classifier; the conductor runs them or asks the author to merge main.
 
 - Env names are Dev's: `MATTERPORT_API_KEY`, `MATTERPORT_API_TOKEN`, `VEXCEL_API_KEY`, `COSTAR_ZIP_PASSWORD` (`.env.example`). Kit goes in `data/` (git-ignored).
 - Null fields are omitted from CoStar records: always use `.get`.
@@ -99,3 +97,4 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 - Sat 11:03 `styles.test` bans raw hex colours in app CSS (#122 token rule): a CSS file written before #122 (replay.css in #198) passed its own PR CI and still turned main red on merge. Use tokens (`--on-act`, etc.) and merge main into old CSS branches before review.
 - Sat 11:04 The auto-mode classifier denies some builder actions (`gh pr create`, unattended merge loops, branch deletes): never retry a denied action; ask Vidyut, then the conductor does it.
 - Sat 10:31 Record-leak tests that grep logs for record numbers can match timestamps or tokens ('1600' in .160025Z); #210 tightens them.
+- 21:35 URL guards: `httpx.URL` keeps percent-encoding in the host (`face%62ook.com`), but a real browser decodes it to facebook.com. Allow only `^[a-z0-9.-]+$` hosts and refuse any userinfo (`x@host`). `rules/contact.host_of` keeps the part before `@` on purpose (lookalike rule); never reuse it as an open-guard.

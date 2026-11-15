@@ -479,6 +479,9 @@ class CardLine(BaseModel):
     # card can hold lines from a real record beside stand-ins for the twin and the challenge.
     # None means "the same as the card".
     source: DataSource | None = None
+    # The label's table key ("label.payment_ask"), so a page can tell which check a line came
+    # from in any language. None on an older card.
+    key: str | None = None
 
 
 class CardRow(BaseModel):
@@ -509,6 +512,9 @@ class Card(BaseModel):
     summary: list[str] = Field(default_factory=list)
     checks_out: list[str] = Field(default_factory=list)  # lines with tone OK
     does_not: list[str] = Field(default_factory=list)  # red flag, hold and not-shown lines
+    # Set only by GET /cases/{id}/card: whether the case has an evidence file to read. None means
+    # not said (an older server); the page then asks, as it always did.
+    has_evidence: bool | None = None
 
 
 class ChoiceKind(StrEnum):
@@ -731,7 +737,9 @@ class RealListing(BaseModel):
     provenance: str | None = None  # "N of M of the ad's photos are in CoStar's own scan..."
     phone_line: str | None = None
     cta_label: str | None = None  # "See the real listing"
-    cta_url: str | None = None  # the availability link, else https://<website_host>; with figures
+    cta_url: str | None = (
+        None  # the availability link, else https://<website_host>; shown with figures on or off
+    )
 
 
 class CopyAlert(BaseModel):
@@ -834,6 +842,15 @@ class CaseProgress(StrEnum):
     # A24 stretch: the agent asked the renter for the license number the ad did not give.
     WAITING_FOR_ANSWER = "waiting_for_answer"
     DONE = "done"
+
+
+class StillChecking(BaseModel):
+    """The body of a 202 from the report's reads (evidence, real-listing, copy-alert, report,
+    alternatives) while the check is still running: not ready, not failed. Ask again after
+    `retry_after_ms` (the Retry-After header says the same in seconds)."""
+
+    status: CaseProgress
+    retry_after_ms: int
 
 
 class CreateCaseRequest(BaseModel):

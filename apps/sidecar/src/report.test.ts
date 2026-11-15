@@ -12,9 +12,14 @@ import {
 } from "./handler";
 import { stageOptions } from "./photon";
 
-const card = JSON.parse(
-  readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
-);
+// These tests pin the locked headline for the state, so the fixture's own headline (#256, built
+// by code and covered by its own test) is dropped here.
+const card = {
+  ...JSON.parse(
+    readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
+  ),
+  headline: undefined,
+};
 const THREAD = "fx-thread-renter";
 const LINK = `http://web.test/case/${card.case_id}`;
 const TOKEN = "fx-secret-write-token";

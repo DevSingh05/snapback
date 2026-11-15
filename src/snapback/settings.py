@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from snapback.contracts import DataSource
@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     # America/Chicago.
     snapback_card_timezone: str = "America/Chicago"
 
+    @property
+    def agent_timeout_s(self) -> float:
+        """The deep agent's time limit for this mode: the explicit SNAPBACK_AGENT_TIMEOUT_S if one
+        was set, else 25 s on the request path and the longer budget for the background."""
+        if "snapback_agent_timeout_s" in self.model_fields_set:
+            return self.snapback_agent_timeout_s
+        if self.snapback_agent == "deepagents_async":
+            return self.snapback_agent_async_default_timeout_s
+        return self.snapback_agent_timeout_s
+
     @field_validator("snapback_card_timezone")
     @classmethod
     def _a_known_time_zone(cls, value: str) -> str:
@@ -63,11 +73,20 @@ class Settings(BaseSettings):
         return value
 
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
-    snapback_agent: Literal["policy", "deepagents"] = "policy"
+    # `deepagents_async`: the case runs on the policy and the answer returns at once; the deep
+    # agent then works the same case in the background and streams its steps into the timeline.
+    snapback_agent: Literal["policy", "deepagents", "deepagents_async"] = "policy"
     # The deep agent's time per run (seconds) before code finishes the case, and which Claude
     # model it uses (None: the graph's default). The key is ANTHROPIC_API_KEY, from the env.
     snapback_agent_timeout_s: float = 25.0
-    snapback_agent_model: str | None = None
+    # deepagents_async has no request waiting on it, so unless SNAPBACK_AGENT_TIMEOUT_S is set
+    # explicitly its default is this longer budget (measured: a full run takes about 25 s).
+    snapback_agent_async_default_timeout_s: float = 60.0
+    snapback_agent_model: str = "claude-sonnet-5-5"
+    # The sub-agents (one per check family) read a few facts and write a note: a small, fast model.
+    snapback_subagent_model: str = "claude-haiku-5-5"
+    # Most background agent runs at once (deepagents_async); the rest wait their turn.
+    snapback_agent_max_concurrent: int = Field(default=2, ge=1, le=16)
     # LangSmith tracing for the deepagents path. A human creates the key (AGENTS.md rule 8); with
     # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
     langsmith_api_key: SecretStr | None = None

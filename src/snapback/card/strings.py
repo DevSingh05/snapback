@@ -258,6 +258,10 @@ EN: dict[str, str] = {
     "rule.fee.holding_deposit_before_viewing": (
         "A deposit or holding fee before a viewing. Red flag."
     ),
+    # Both of the two above fired: one line that names both, not two near-duplicates.
+    "rule.payment.zelle_and_deposit_before_viewing": (
+        "Zelle and a deposit or holding fee before a viewing. Red flag."
+    ),
     "rule.fee.application_fee_before_viewing": (
         "An application fee sent to a person before a viewing. Red flag."
     ),
@@ -546,6 +550,11 @@ EN: dict[str, str] = {
         "Nothing in this ad goes against the record. Before you pay: ask them to prove "
         "they're inside, and confirm with an office you look up yourself."
     ),
+    # A HOLD with a red-flag line says which kind, in the card's own words.
+    "state.hold_red_money": "Hold off: it asks for money before you've seen the place",
+    "state.hold_red_papers": "Hold off: it asks for personal papers before you've seen the place",
+    "state.hold_red_pressure": "Hold off: it pushes you to act before you've seen the place",
+    "state.hold_red": "Hold off: something in this ad is a red flag",
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -796,6 +805,9 @@ ES: dict[str, str] = {
     ),
     "rule.fee.holding_deposit_before_viewing": (
         "Un depósito o cargo de reserva antes de una visita. Señal de alerta."
+    ),
+    "rule.payment.zelle_and_deposit_before_viewing": (
+        "Zelle y un depósito o cargo de reserva antes de una visita. Señal de alerta."
     ),
     "rule.fee.application_fee_before_viewing": (
         "Un cargo de solicitud enviado a una persona antes de una visita. Señal de alerta."
@@ -1122,6 +1134,10 @@ ES: dict[str, str] = {
         "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
         "que están dentro y confirme con una oficina que usted mismo busque."
     ),
+    "state.hold_red_money": "Espere: pide dinero antes de que usted haya visto el lugar",
+    "state.hold_red_papers": "Espere: pide documentos personales antes de que haya visto el lugar",
+    "state.hold_red_pressure": "Espere: le presiona para actuar antes de ver el lugar",
+    "state.hold_red": "Espere: algo en este anuncio es una señal de alerta",
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
     "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",
@@ -1428,6 +1444,9 @@ ES.update(
 EN.update(
     {
         "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "trace.updated": 'More checks changed the result from "{old}" to "{new}": {reason}',
+        "trace.updated.short": "More checks changed the result.",
+        "timeline.updated": "Updated after more checks",
         "timeline.read_ad": "Read the ad",
         "timeline.which_checks": "Chose which checks to run",
         "timeline.locate": "Placed {placed} of {total} photos in its 3D scan",
@@ -1450,9 +1469,9 @@ EN.update(
         "timeline.skip.ask_license": "Did not ask for a license number",
         "timeline.skip.report": "Skipped the report",
         "timeline.floor_plan": "Matched the photos to a floor plan",
-        "timeline.spot": "Drew a random spot for the photo challenge",
+        "timeline.spot": "Picked a spot for the poster to photograph",
         "timeline.approval": "Waited for your OK before sending anything",
-        "timeline.status": "Waited for an answer",
+        "timeline.status": "Waited for a reply",
         "timeline.retry": "Decided whether another photo was needed",
         "timeline.retry_search": "Chose one more search for an unplaced photo",
         "timeline.walk": "Planned the walk through the 3D scan",
@@ -1555,6 +1574,11 @@ ES.update(
         "trace.error.model_timeout": (
             "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
         ),
+        "trace.updated": (
+            'Más comprobaciones cambiaron el resultado de "{old}" a "{new}": {reason}'
+        ),
+        "trace.updated.short": "Más comprobaciones cambiaron el resultado.",
+        "timeline.updated": "Actualizado tras más comprobaciones",
         "timeline.read_ad": "Leyó el anuncio",
         "timeline.which_checks": "Eligió qué comprobaciones hacer",
         "timeline.locate": "Ubicó {placed} de {total} fotos en su escaneo 3D",
@@ -1577,7 +1601,7 @@ ES.update(
         "timeline.skip.ask_license": "No pidió un número de licencia",
         "timeline.skip.report": "Omitió el informe",
         "timeline.floor_plan": "Emparejó las fotos con un plano",
-        "timeline.spot": "Sorteó un punto para el reto de la foto",
+        "timeline.spot": "Eligió un punto para que quien publica lo fotografíe",
         "timeline.approval": "Esperó su visto bueno antes de enviar nada",
         "timeline.status": "Esperó una respuesta",
         "timeline.retry": "Decidió si hacía falta otra foto",
