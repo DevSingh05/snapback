@@ -394,3 +394,66 @@ def test_kit_lookups_owner_passes_the_kit_offices_and_the_poster_s_company(tmp_p
         assert (unknown.company, unknown.poster_matches) == (None, OwnerMatch.NO)
     finally:
         get_settings.cache_clear()
+
+
+# --- public data 3: every Harris County address, not only the kit's houses -----------------
+
+
+def _all_subset(tmp_path: Path) -> Path:
+    out = tmp_path / "data" / "hcad" / "owner_subset.jsonl"
+    build_subset(_hcad(tmp_path), None, out, salt="fx-salt")
+    return out
+
+
+def test_with_no_street_list_every_account_is_kept_and_found(tmp_path):
+    out = _all_subset(tmp_path)
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert len([r for r in rows if "key" in r]) == 4  # the kit house AND the three others
+    result = owner("2 bed at 999 Not In Kit Rd", out, salt="fx-salt")
+    assert result is not None and result.kind is OwnerKind.PERSON
+
+
+def test_the_all_harris_file_keeps_the_privacy_rules(tmp_path):
+    out = _all_subset(tmp_path)
+    text = out.read_text(encoding="utf-8").upper()
+    for private in ("FXPERSON", "FXNAME", "FXJANE", "FXOTHER", "SAMPLE", "FIXTURE", "EXAMPLE AVE"):
+        assert private not in text  # no private name and no address, only hashes
+    same = owner("999 Not In Kit Rd. My name is Fxjane Fxother.", out, salt="fx-salt")
+    assert same.poster_matches is OwnerMatch.YES
+    other = owner("999 Not In Kit Rd. My name is Fxbob Fxsmith.", out, salt="fx-salt")
+    assert other.poster_matches is OwnerMatch.NO
+
+
+def test_a_big_sorted_file_is_searched_without_reading_it_all(tmp_path):
+    folder = tmp_path / "big"
+    folder.mkdir()
+    n = 800
+    (folder / "owners.txt").write_text(
+        "acct\tln_num\tname\n" + "".join(f"a{i}\t1\tFXHOLDER{i} FXQ\n" for i in range(n)),
+        encoding="utf-8",
+    )
+    (folder / "real_acct.txt").write_text(
+        "acct\tsite_addr_1\tsite_addr_2\n"
+        + "".join(f"a{i}\t{1000 + i} FIXTURE LN\tKATY\n" for i in range(n)),
+        encoding="utf-8",
+    )
+    out = tmp_path / "data" / "hcad" / "owner_subset.jsonl"
+    build_subset(folder, None, out, salt="fx-salt")
+    head = json.loads(out.read_text(encoding="utf-8").splitlines()[0])
+    assert head["sorted"] is True
+    keys = [json.loads(line)["key"] for line in out.read_text().splitlines()[1:]]
+    assert keys == sorted(keys) and len(keys) == n
+    for i in (0, 1, 399, 400, 798, 799):
+        assert owner(f"house at {1000 + i} Fixture Ln", out, salt="fx-salt") is not None
+    assert owner("house at 5 Fixture Ln", out, salt="fx-salt") is None
+    assert owner("house at 9999 Fixture Ln", out, salt="fx-salt") is None
+
+
+def test_an_older_unsorted_file_is_still_read(tmp_path):
+    out = _subset(tmp_path)  # the kit build
+    lines = out.read_text(encoding="utf-8").splitlines()
+    head, rows = json.loads(lines[0]), lines[1:]
+    head.pop("sorted", None)
+    out.write_text("\n".join([json.dumps(head), *reversed(rows)]) + "\n", encoding="utf-8")
+    assert owner("2 bed at 100 Fixture Ln", out, salt="fx-salt") is not None
+    assert owner("200 Sample St, available", out, salt="fx-salt") is not None

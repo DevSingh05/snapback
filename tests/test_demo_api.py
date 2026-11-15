@@ -264,6 +264,7 @@ def test_case_c_over_the_api_is_held_because_the_house_is_for_sale(tmp_path):
         "listed_on": "2026-10-02",
         "changed_on": "2026-10-02",
         "offices": ["Fixture Realty Group"],
+        "source_name": None,  # CoStar's record found it; a reverse image search would say so
     }
     # A warning, never proof: this case can never read "Don't pay".
     assert "red_flag" not in [line["tone"] for row in card["rows"] for line in row["lines"]]

@@ -59,11 +59,18 @@
         "role": "CoStar record",
         "job": "Finds the building on CoStar's record: office, manager, website and rents.",
         "doing": "Looking up the building on CoStar's record",
-        "tools": ["CoStar record", "Floor-plan rents", "For-sale listings"],
+        "tools": [
+          "CoStar record",
+          "Floor-plan rents",
+          "For-sale listings",
+          "HUD rents",
+          "Census address",
+          "Domain age"
+        ],
         "model": "Claude Haiku",
         "never": ["Copies a raw record row into a note", "Guesses when the record is silent"],
         "availability": null,
-        "kinds": ["record", "rent", "for_sale"],
+        "kinds": ["record", "rent", "for_sale", "place_check", "link_domain"],
         "checks": ["record", "forsale"]
       },
       {
@@ -226,14 +233,21 @@
         "role": "Registro de CoStar",
         "job": "Busca el edificio en el registro de CoStar: oficina, gestor, web y rentas.",
         "doing": "Buscando el edificio en el registro de CoStar",
-        "tools": ["Registro de CoStar", "Rentas por plano", "Anuncios de venta"],
+        "tools": [
+          "Registro de CoStar",
+          "Rentas por plano",
+          "Anuncios de venta",
+          "Rentas de HUD",
+          "Dirección del Censo",
+          "Antigüedad del dominio"
+        ],
         "model": "Claude Haiku",
         "never": [
           "Copia una fila del registro en una nota",
           "Adivina cuando el registro no dice nada"
         ],
         "availability": null,
-        "kinds": ["record", "rent", "for_sale"],
+        "kinds": ["record", "rent", "for_sale", "place_check", "link_domain"],
         "checks": ["record", "forsale"]
       },
       {
