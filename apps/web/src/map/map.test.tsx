@@ -131,6 +131,21 @@ describe("the map page", () => {
     expect(attribution).toHaveTextContent("OpenStreetMap contributors");
   });
 
+  it("keeps its own Day and Night choice on the map wrapper, never on the root", async () => {
+    window.localStorage.clear();
+    const { container } = render(<MapPage MapView={NoMap} />);
+    const city = container.querySelector<HTMLElement>(".city")!;
+    expect(city).toHaveAttribute("data-theme", "dark");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Switch the map to Day" }));
+    expect(city).toHaveAttribute("data-theme", "light");
+    expect(window.localStorage.getItem("snapback-map-theme")).toBe("light");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Switch the map to Night" }));
+    expect(city).toHaveAttribute("data-theme", "dark");
+    window.localStorage.clear();
+  });
+
   it("lists every place as a button, so the map is not the only way in", async () => {
     render(<MapPage MapView={NoMap} />);
     const list = await screen.findByTestId("place-list");

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { apiBase, apiFetchRead, fetchCard } from "../api";
-import { headlineOf, toneWord } from "../cardStrings";
-import heroPhoto from "../assets/hero-dusk-balconies.webp";
-import sampleBuilding from "../assets/sample-building.webp";
+import { STATE_WORD, headlineOf, toneWord } from "../cardStrings";
+import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import sampleLivingRoom from "../assets/sample-living-room.webp";
 import sampleLounge from "../assets/sample-lounge.webp";
 import { SourceChip } from "../components/SourceChip";
@@ -16,6 +15,7 @@ import type {
   PlaceMatch,
   RenterBrief,
 } from "../contracts";
+import { HERO_PHOTOS, HeroStreet } from "../landing/HeroStreet";
 import { searchPlaces } from "../search/api";
 import { TracePanel } from "../trace";
 import {
@@ -36,6 +36,7 @@ import { MicButton, LevelMeter } from "../shell/FinderPage";
 import { markSignalsSent, loadFinderEvents, unsentSignals } from "../shell/finderStore";
 import { useVoiceInput, voiceStatus } from "../shell/voice";
 import { YourChecks } from "../shell/YourChecks";
+import { PhotoPin, State, type StateKind } from "../ui";
 import {
   MODE,
   approveChallenge as defaultApprove,
@@ -65,12 +66,24 @@ import {
 } from "./intent";
 import "./onebox.css";
 
-/** Tap one to start. Each goes through the same routing as typed words. */
-export const EXAMPLES = [
-  "Paste a Marketplace or Craigslist ad",
-  "Find me a 1 bed under $1,500 near downtown",
-  "Is this landlord real?",
-  "Walk me through a place",
+/** Tap one to start. Both are about checking an ad: that is the product. Each goes through the
+ * same routing as typed words. */
+export const EXAMPLES = ["Paste the ad you were sent", "Is this landlord real?"] as const;
+
+/** How it works, in three lines (focus plan section 1). The same words as the README. */
+export const HOW = [
+  {
+    title: "Send the ad",
+    text: "Text it to SNAPBACK on iMessage, or paste it in the one box: words, screenshots, or both.",
+  },
+  {
+    title: "We check it",
+    text: "Scam-pattern rules run on any ad; CoStar's record of the building adds rent, leasing office, manager and website; where CoStar has a 3D scan, we place the ad's photos in it.",
+  },
+  {
+    title: "You get a report",
+    text: "A verdict in plain words, the ad beside the real listing, what to do next, and safer homes on Apartments.com.",
+  },
 ] as const;
 
 /** The card's two rules, as the answer to any question about paying. Written by code. */
@@ -79,6 +92,18 @@ export const RULES_REPLY =
 
 export const FB_ASK =
   "Facebook keeps listings behind a login. Paste the listing text here and add its photos, and I'll check it.";
+
+/** The one measured line on Home (A8, n stated). Locked text: never add to it. */
+export const MEASURED =
+  "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it";
+
+/** What the button says: it follows the same routing as the message will. */
+export function sendLabel(text: string, files: number, caseOnScreen: boolean): string {
+  if (!text.trim() && files === 0) return "Check it";
+  const kind = route({ text, files, caseOnScreen }).kind;
+  if (kind === "find") return "Find places";
+  return kind === "check" || kind === "check-ask" || kind === "check-fb" ? "Check it" : "Ask";
+}
 
 const UNSURE_CHECK = "Check it as an ad";
 const UNSURE_FIND = "Find places like this";
@@ -92,7 +117,7 @@ const OPEN_LINE: Record<View, string> = {
   finder: "What the Finder has learned about you, and why it picked what it did.",
 };
 
-type Item =
+export type Item =
   | { id: number; type: "you"; text: string; files: string[] }
   | { id: number; type: "route"; intent: Intent; sub: { text: string; files: File[] } | null }
   | {
@@ -440,13 +465,15 @@ export function OneBox(props: Props) {
       fileInput={fileInput}
       box={box}
       big={empty}
+      label={sendLabel(text, files.length, cases.length > 0)}
     />
   );
 
   return (
     <div className="ob" data-empty={empty || undefined} data-testid="one-box">
       {!empty && (
-        <div className="ob-top">
+        <div className="ob-top ui-on-matte">
+          <HeroStreet strip />
           <SourceChip source={shownMode} />
           <div className="ob-top-acts">
             <button
@@ -468,46 +495,63 @@ export function OneBox(props: Props) {
 
       {empty ? (
         <section className="ob-start" aria-labelledby="ob-title">
-          <div className="ob-hero">
-            <img
-              className="ob-hero-img"
-              src={heroPhoto}
-              alt="An apartment building at dusk, its balconies lit against a pink sky"
-              data-testid="hero-photo"
-            />
+          <div className="ob-hero" data-bar="photo">
+            <HeroStreet />
             <div className="ob-hero-in">
-              <h1 id="ob-title" className="ob-title">
-                Found a place online? Ask before you pay.
-              </h1>
-              <p className="ob-lead">
-                Paste the ad or its link, add a screenshot, or just say what you&apos;re looking
-                for.
-              </p>
-              {composer}
-              {(error || fileErrors.length > 0) && (
-                <Problems error={error} fileErrors={fileErrors} />
-              )}
-              <ul className="ob-examples" aria-label="Try one">
-                {EXAMPLES.map((ex) => (
-                  <li key={ex}>
-                    <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
-                      {ex}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <p className="ob-credit">Photo: Tobias Wilden, Unsplash</p>
+              <div className="ob-hero-main">
+                <h1 id="ob-title" className="ob-title">
+                  <span>Send a rental ad before you pay.</span>{" "}
+                  <span className="ob-title-ask">
+                    Get a report: is this the real listing, and who do you call?
+                  </span>
+                </h1>
+                <ol className="ob-how" aria-label="How it works" data-testid="ob-how">
+                  {HOW.map((step, i) => (
+                    <li key={step.title}>
+                      <span className="ob-how-n ui-mono">{`0${i + 1}`}</span>
+                      <b>{step.title}</b>
+                      <span className="ob-how-text">{step.text}</span>
+                    </li>
+                  ))}
+                </ol>
+                {composer}
+                {(error || fileErrors.length > 0) && (
+                  <Problems error={error} fileErrors={fileErrors} />
+                )}
+                <ul className="ob-examples" aria-label="Try one">
+                  {EXAMPLES.map((ex) => (
+                    <li key={ex}>
+                      <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
+                        {ex}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="ob-measured ui-mono" data-testid="ob-measured">
+                  {MEASURED}
+                </p>
+              </div>
+              <SampleCase onOpen={() => submit(SAMPLE_AD, [])} />
             </div>
           </div>
-          <WhatYouCanDo onAsk={(w) => submit(w, [])} />
-          <p className="ob-fine ob-honest">
-            <SourceChip source={shownMode} />
-            <span>
-              SNAPBACK never messages anyone for you. Code sets every verdict; a model only explains
-              it.
-            </span>
-          </p>
-          <YourChecks />
+          <div className="ob-below">
+            <div className="ob-cols">
+              <YourChecks />
+              <SeeItHappen />
+            </div>
+            <footer className="ob-foot">
+              <p className="ob-honest">
+                <SourceChip source={shownMode} />
+                <span>
+                  SNAPBACK never messages anyone for you and never asks for money. Code sets every
+                  verdict; a model only explains it.
+                </span>
+              </p>
+              <p className="ob-credits">
+                Sample photos by {PHOTO_CREDITS} on Unsplash. They are not the homes we check.
+              </p>
+            </footer>
+          </div>
         </section>
       ) : (
         <>
@@ -576,68 +620,120 @@ export const SAMPLE_AD =
   "2 bed 2 bath near downtown, $1,350/month, utilities included. I'm working abroad so I can't " +
   "show it, but send the $600 deposit by Zelle today and I'll mail you the keys.";
 
-// What the box can do, each shown with a piece of the real product and one tap to try it.
-function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
+const SAMPLE_CARD = cardHold as Card;
+
+const PHOTO_CREDITS = [
+  HERO_PHOTOS.day.credit,
+  HERO_PHOTOS.dusk.credit,
+  "Minh Pham",
+  "Collov Home Design",
+  "Raphael (Ajani Kamali Akio)",
+  "Tobias Wilden",
+  "Marlene Céline Nordvik",
+].join(", ");
+
+// The sample case that hangs off the bottom edge of the hero. It shows proof, not a feature
+// list: the ad's photo beside the same view found in the building's 3D scan, then the line that
+// placed it and the line that most needs attention. Verdict and lines are the team's own fixture
+// card (the code's words); the pictures are one stock interior, stamped as a sample on both
+// sides. One tap runs the sample ad through the box.
+function SampleCase({ onOpen }: { onOpen: () => void }) {
+  const card = SAMPLE_CARD;
+  const all = card.rows.flatMap((row) => row.lines.map((line) => ({ kind: row.kind, line })));
+  const order = (t: string) => ({ red_flag: 0, hold: 1, not_shown: 1, ok: 2 })[t] ?? 3;
+  const placed = all.find((l) => l.kind === "place");
+  const flagged = [...all]
+    .filter((l) => l !== placed)
+    .sort((a, b) => order(a.line.tone) - order(b.line.tone))[0];
+  const lines = [placed, flagged].filter((l) => l !== undefined);
   return (
-    <section className="ob-can" aria-labelledby="ob-can-title">
-      <h2 id="ob-can-title" className="ob-can-title">
-        What you can do here
-      </h2>
-      <ul className="ob-can-list">
-        <li>
-          <button type="button" className="ob-can-item" onClick={() => onAsk(SAMPLE_AD)}>
-            <SamplePhoto src={sampleBuilding} alt="An apartment building, from below">
-              <span className="ob-over ob-over-verdict">
-                <span className="ob-over-kicker">
-                  Case 7Q2M <SourceChip source="fixture" />
-                </span>
-                <span className="ob-over-word">Hold off for now</span>
-              </span>
+    <button type="button" className="ob-sample ui-sheet" data-testid="ob-sample" onClick={onOpen}>
+      <span className="ob-sample-head ui-mono">
+        <span>Sample report {card.case_id}</span>
+        <SourceChip source="fixture" />
+      </span>
+      <span className="ob-pair" data-testid="ob-pair">
+        {(
+          [
+            ["The ad's photo", sampleLounge, "a living room with a pale green sofa"],
+            [
+              "Found in the building's 3D scan",
+              sampleLivingRoom,
+              "a living room with a grey sofa and plants, standing in for the scan view",
+            ],
+          ] as const
+        ).map(([label, src, what]) => (
+          <span key={label} className="ob-pair-side">
+            <SamplePhoto src={src} alt={`${label}: ${what}`}>
+              <PhotoPin n={1} x={38} y={56} />
+              <PhotoPin n={2} x={66} y={34} />
             </SamplePhoto>
-            <span className="ob-can-name">Check an ad</span>
-            <span className="ob-can-line">Try it on our sample ad</span>
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="ob-can-item"
-            onClick={() => onAsk("Find me a 1 bed under $1,500 near downtown")}
-          >
-            <SamplePhoto src={sampleLounge} alt="A bright living room with a pale green sofa">
-              <span className="ob-over">
-                <span className="ob-over-word">1 bed, under $1,500</span>
+            <span className="ob-pair-label ui-mono">{label}</span>
+          </span>
+        ))}
+      </span>
+      <span className="ob-sample-verdict" data-tone={TONE_OF[card.state]}>
+        {STATE_WORD[card.state]}
+      </span>
+      <span className="ob-sample-rows">
+        {lines.map(({ kind, line }) => {
+          const word = toneWord(line.tone, kind);
+          return (
+            <span key={`${kind}-${line.label}`} className="ob-sample-row">
+              <span className="ob-sample-what">
+                <span className="ob-sample-text">{line.text}</span>
               </span>
-            </SamplePhoto>
-            <span className="ob-can-name">Find a place</span>
-            <span className="ob-can-line">Say what you want; it asks the rest</span>
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="ob-can-item"
-            onClick={() => onAsk("Walk me through a place")}
-          >
-            <SamplePhoto src={sampleLivingRoom} alt="A living room with a grey sofa and plants">
-              <span className="ob-over">
-                <span className="ob-play" aria-hidden="true" />
-                <span className="ob-over-word">Walk it first</span>
+              <State kind={(WORD_TONE[word] ?? "unchecked") as StateKind}>{word}</State>
+            </span>
+          );
+        })}
+      </span>
+      <span className="ob-sample-go">
+        <span>Open the sample report</span>
+        <span aria-hidden="true">→</span>
+      </span>
+    </button>
+  );
+}
+
+const STORIES = [
+  {
+    photo: HERO_PHOTOS.dusk,
+    line: "Imagine Sascha, a week from moving, and a 2 bed priced well under the block.",
+  },
+  {
+    photo: HERO_PHOTOS.day,
+    line: "Imagine a master's student landing in Houston on Friday, renting from abroad.",
+  },
+] as const;
+
+// See it happen: the stories, as rows. Each is told as "imagine", never as a real person's case.
+function SeeItHappen() {
+  return (
+    <section className="ob-see" aria-labelledby="ob-see-title">
+      <header className="yc-head">
+        <h2 id="ob-see-title" className="yc-title">
+          See it happen
+        </h2>
+        <a className="yc-new" href="/stories">
+          All stories
+        </a>
+      </header>
+      <ul className="ob-see-list">
+        {STORIES.map((st) => (
+          <li key={st.line}>
+            <a className="ob-see-row" href="/stories">
+              <span className="ob-photo ob-see-thumb">
+                <img src={st.photo.src} alt="" loading="lazy" />
               </span>
-            </SamplePhoto>
-            <span className="ob-can-name">Walk it first</span>
-            <span className="ob-can-line">See it room by room before you visit</span>
-          </button>
-        </li>
+              <span className="ob-see-text">
+                <span className="ob-see-line">{st.line}</span>
+                <span className="ob-see-note">A story played out step by step. Sample photo.</span>
+              </span>
+            </a>
+          </li>
+        ))}
       </ul>
-      <nav className="ob-also" aria-label="Or open">
-        <span>Or open</span>
-        <a href="/map">Map</a>
-        <a href="/listings">Listings</a>
-        <a href="/finder">Finder</a>
-        <a href="/replay">Replays</a>
-        <a href="/investigate">Investigate</a>
-      </nav>
     </section>
   );
 }
@@ -779,7 +875,7 @@ function Glyph({ name }: { name: "attach" | "send" | "x" }) {
   );
 }
 
-function Composer({
+export function Composer({
   text,
   setText,
   files,
@@ -793,6 +889,7 @@ function Composer({
   fileInput,
   box,
   big,
+  label,
 }: {
   text: string;
   setText: (v: string) => void;
@@ -807,6 +904,7 @@ function Composer({
   fileInput: React.RefObject<HTMLInputElement | null>;
   box: React.RefObject<HTMLTextAreaElement | null>;
   big: boolean;
+  label: string;
 }) {
   const recording = voice.state === "recording";
   const writing = voice.state === "writing";
@@ -874,7 +972,7 @@ function Composer({
           value={text}
           placeholder={
             big
-              ? "Paste an ad or link, or type: a 1 bed under $1,500 near downtown"
+              ? "Paste the ad you were sent, or its link. Or ask: is this landlord real?"
               : "Ask a follow-up, paste another ad, or say what you want"
           }
           autoComplete="off"
@@ -948,8 +1046,7 @@ function Composer({
           className="ob-send"
           disabled={busy || recording || writing || (!text.trim() && files.length === 0)}
         >
-          <span>Send</span>
-          <Glyph name="send" />
+          <span>{label}</span>
         </button>
       </div>
     </form>
@@ -959,7 +1056,7 @@ function Composer({
 // ---------------------------------------------------------------------------------------------
 // The thread.
 
-function ThreadItem({
+export function ThreadItem({
   it,
   mode,
   props,
@@ -1226,76 +1323,23 @@ function CheckRun({
         <p className="ob-card-kicker">Checking the ad</p>
         <SourceChip source={source} />
       </header>
-      <ol className="ob-steps" aria-label="Progress">
-        {STEPS.map((s, i) => {
-          const status = i < active ? "done" : i === active ? "active" : "todo";
-          return (
-            <li
-              key={s.key}
-              data-status={status}
-              aria-current={status === "active" ? "step" : undefined}
-            >
-              {s.label}
-              <span className="sr-only">
-                {status === "done" ? " (done)" : status === "active" ? " (now)" : " (next)"}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <CheckSteps active={active} />
       {state.step === "approval" && (
-        <section className="ob-approve" aria-labelledby="ob-approve-title">
-          <h2 id="ob-approve-title" className="ob-card-title">
-            Ask the poster for proof
-          </h2>
-          <p className="ob-card-text">
-            A real landlord can send a fresh photo from inside the unit. Copy this and send it
-            yourself. Nothing is sent for you.
-          </p>
-          <label htmlFor="challenge" className="sr-only">
-            Message to send
-          </label>
-          <textarea
-            id="challenge"
-            className="ob-message"
-            rows={4}
-            readOnly
-            value={state.challengeText}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div className="ob-acts">
-            <button
-              type="button"
-              className="ob-primary"
-              disabled={busy}
-              onClick={() => void choose("send")}
-            >
-              I approve it and I will send it
-            </button>
-            <button
-              type="button"
-              className="ob-secondary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(state.challengeText);
-                  setCopied(true);
-                } catch {
-                  setCopied(false);
-                }
-              }}
-            >
-              {copied ? "Copied" : "Copy message"}
-            </button>
-            <button
-              type="button"
-              className="ob-quiet"
-              disabled={busy}
-              onClick={() => void choose("cancel")}
-            >
-              Skip this, show the result
-            </button>
-          </div>
-        </section>
+        <ChallengeDraft
+          text={state.challengeText}
+          busy={busy}
+          copied={copied}
+          onSend={() => void choose("send")}
+          onCopy={async () => {
+            try {
+              await navigator.clipboard.writeText(state.challengeText);
+              setCopied(true);
+            } catch {
+              setCopied(false);
+            }
+          }}
+          onSkip={() => void choose("cancel")}
+        />
       )}
       {state.step === "waiting" && (
         <div className="ob-wait">
@@ -1309,6 +1353,80 @@ function CheckRun({
         </div>
       )}
     </article>
+  );
+}
+
+/** The check's four steps, the one at `active` lit. */
+export function CheckSteps({ active }: { active: number }) {
+  return (
+    <ol className="ob-steps" aria-label="Progress">
+      {STEPS.map((s, i) => {
+        const status = i < active ? "done" : i === active ? "active" : "todo";
+        return (
+          <li
+            key={s.key}
+            data-status={status}
+            aria-current={status === "active" ? "step" : undefined}
+          >
+            {s.label}
+            <span className="sr-only">
+              {status === "done" ? " (done)" : status === "active" ? " (now)" : " (next)"}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The photo challenge, drafted for the renter to send themselves. Nothing is sent for them. */
+export function ChallengeDraft({
+  text,
+  busy,
+  copied,
+  onSend,
+  onCopy,
+  onSkip,
+}: {
+  text: string;
+  busy: boolean;
+  copied: boolean;
+  onSend: () => void;
+  onCopy: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <section className="ob-approve" aria-labelledby="ob-approve-title">
+      <h2 id="ob-approve-title" className="ob-card-title">
+        Ask the poster for proof
+      </h2>
+      <p className="ob-card-text">
+        A real landlord can send a fresh photo from inside the unit. Copy this and send it yourself.
+        Nothing is sent for you.
+      </p>
+      <label htmlFor="challenge" className="sr-only">
+        Message to send
+      </label>
+      <textarea
+        id="challenge"
+        className="ob-message"
+        rows={4}
+        readOnly
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <div className="ob-acts">
+        <button type="button" className="ob-primary" disabled={busy} onClick={onSend}>
+          I approve it and I will send it
+        </button>
+        <button type="button" className="ob-secondary" onClick={onCopy}>
+          {copied ? "Copied" : "Copy message"}
+        </button>
+        <button type="button" className="ob-quiet" disabled={busy} onClick={onSkip}>
+          Skip this, show the result
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1348,7 +1466,6 @@ export function VerdictCard({
       .catch(() => !ctrl.signal.aborted && setCard("error"));
     return () => ctrl.abort();
   }, [caseId]);
-  const [all, setAll] = useState(false);
   const id = encodeURIComponent(caseId);
   if (card === null)
     return (
@@ -1365,6 +1482,24 @@ export function VerdictCard({
         </a>
       </article>
     );
+  return <VerdictView card={card} source={source} onFollow={onFollow} />;
+}
+
+/** The verdict card itself, from a Card already in hand. `actions` replaces the two links (the
+ *  Stories page shows them as they look, without leaving the story). */
+export function VerdictView({
+  card,
+  source,
+  onFollow,
+  actions,
+}: {
+  card: Card;
+  source: DataSource;
+  onFollow?: (words: string) => void;
+  actions?: React.ReactNode;
+}) {
+  const [all, setAll] = useState(false);
+  const id = encodeURIComponent(card.case_id);
   const allLines = card.rows.flatMap((row) =>
     row.lines.map((line, i) => ({ kind: row.kind, line, first: i === 0, key: `${row.kind}-${i}` })),
   );
@@ -1416,14 +1551,18 @@ export function VerdictCard({
       )}
       <p className="ob-muted">Not checked: {card.not_checked.join(", ")}.</p>
       <div className="ob-acts">
-        <a className="ob-primary" href={`/case/${id}`}>
-          Open the full result
-        </a>
-        <a className="ob-quiet" href={`/case/${id}/prep`}>
-          Get ready to visit
-        </a>
+        {actions ?? (
+          <>
+            <a className="ob-primary" href={`/case/${id}`}>
+              Open the full result
+            </a>
+            <a className="ob-quiet" href={`/case/${id}/prep`}>
+              Get ready to visit
+            </a>
+          </>
+        )}
       </div>
-      <WalkCard caseId={caseId} />
+      {!actions && <WalkCard caseId={card.case_id} />}
       {onFollow && (
         <ul className="ob-replies ob-follow" aria-label="Next">
           {["Find me safer places like this", "Show me on the map", "Replay a real case"].map(
@@ -1565,7 +1704,16 @@ function PlacesCard({
   );
 }
 
-function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource }) {
+export function PicksCard({
+  picks,
+  source,
+  act,
+}: {
+  picks: FinderPick[];
+  source: DataSource;
+  /** Replaces each pick's one next step (the Stories page shows "Walk it first" on a sample). */
+  act?: (p: FinderPick) => React.ReactNode;
+}) {
   const sample = source === "fixture";
   return (
     <article className="ob-card ob-places" data-testid="ob-finder-picks">
@@ -1585,7 +1733,9 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
                 {sample ? " · Sample place by the team" : ""}
               </span>
             </div>
-            {sample ? (
+            {act ? (
+              act(p)
+            ) : sample ? (
               <a className="ob-pick-go" href="/listings" title="A sample place made by the team">
                 Browse similar
               </a>
@@ -1608,7 +1758,7 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
   );
 }
 
-function OfferCard({
+export function OfferCard({
   proposal,
   source,
   onDecided,

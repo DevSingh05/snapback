@@ -308,6 +308,28 @@ export interface RealListing {
   cta_url?: string | null; // availability link, else https://<website_host>; only with figures
 }
 
+// Mirrors ReportSteps and ReportResponse in src/snapback/contracts.py (GET /cases/{id}/report;
+// read token in a header, never in the address). Listing facts only: no score, nothing about the
+// renter, no word about any person. `platforms` carries steps only when `reportable`.
+export interface ReportSteps {
+  platform: "facebook" | "zillow" | "craigslist";
+  name: string; // "Facebook Marketplace", "Zillow", "Craigslist"
+  steps: string[]; // what to click, in order
+}
+
+export interface ReportPack {
+  case_id: string;
+  source: DataSource; // show the LIVE or FIXTURE chip from this
+  lang: string;
+  checked_at: string;
+  state: VerdictState;
+  reportable: boolean; // true only on proof, or a record that shows the home for sale
+  proof_lines: string[]; // decide()'s own reasons, in order
+  twin_url?: string | null;
+  platforms?: ReportSteps[];
+  not_checked: string[];
+}
+
 // Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a
 // header, never in the address; no-store). A DRAFT for the leasing office on record: nothing is
 // ever sent, `sent` is always false. Show it only when `fires`. Words are in the asked language

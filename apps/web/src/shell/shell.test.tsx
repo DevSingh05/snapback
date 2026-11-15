@@ -3,18 +3,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FIXTURE_TOUR } from "../tour/fixtureTour";
 import { seeingLine, waysOut } from "../walk/seeing";
-import { AppShell, PURPOSE, withTheme } from "./AppShell";
+import { AppShell, PURPOSE } from "./AppShell";
 import { FinderPage } from "./FinderPage";
 import { briefFromChips, chipFromWords, loadLearned } from "./finderRules";
 import { loadFinderEvents, recordFinderEvent } from "./finderStore";
-import { clean, DEFAULT_PREFS, loadPrefs } from "./prefs";
-import { defaultTheme, initialChoice, savedTheme, THEME_KEY } from "./theme";
+import { clean, DEFAULT_PREFS, loadPrefs, NAV_TABS, TABS } from "./prefs";
 import { YourChecks } from "./YourChecks";
 
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
-  delete document.documentElement.dataset.theme;
 });
 afterEach(() => {
   window.localStorage.clear();
@@ -27,11 +25,59 @@ const tabs = () =>
     .map((a) => a.textContent);
 
 describe("the app shell", () => {
-  it("shows the views as tabs, marks the current one, and has no sign-in", () => {
-    render(<AppShell section="listings">page</AppShell>);
-    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
-    expect(screen.getByRole("link", { name: "Listings" })).toHaveAttribute("aria-current", "page");
+  it("the front cut: the bar is Home and Stories, and nothing else has a front door", () => {
+    render(<AppShell section="home">page</AppShell>);
+    expect(tabs()).toEqual(["Home", "Stories"]);
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
+    for (const name of ["Listings", "Map", "Finder", "Replays", "Investigate"])
+      expect(screen.queryByRole("link", { name })).toBeNull();
     expect(document.body.textContent).not.toMatch(/sign in|log in|account/i);
+  });
+
+  it("the nav flag hides a page from the bar and keeps it in the list of pages", () => {
+    expect(NAV_TABS.map((t) => t.id)).toEqual(["home"]);
+    expect(TABS.filter((t) => !t.nav).map((t) => t.id)).toEqual([
+      "listings",
+      "map",
+      "finder",
+      "replays",
+    ]);
+    // Each hidden page still has its address.
+    expect(TABS.map((t) => t.href)).toEqual(["/home", "/listings", "/map", "/finder", "/replay"]);
+  });
+
+  it("a hidden page still renders in the shell, with no tab marked for it", () => {
+    render(<AppShell section="listings">page</AppShell>);
+    expect(tabs()).toEqual(["Home", "Stories"]);
+    expect(document.querySelector("[aria-current='page']")).toBeNull();
+    expect(screen.getByTestId("page-purpose")).toHaveTextContent(PURPOSE.listings!);
+  });
+
+  it("with only Home to choose there is no Customize; Stories is marked on its own page", () => {
+    render(<AppShell section="stories">page</AppShell>);
+    expect(screen.queryByRole("button", { name: "Customize" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("the report gets a tab while one is open", () => {
+    render(
+      <AppShell section={null} context={{ label: "Report", href: "/case/7Q2M" }}>
+        page
+      </AppShell>,
+    );
+    expect(tabs()).toEqual(["Home", "Stories", "Report"]);
+    expect(screen.getByRole("link", { name: "Report" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("given every view, shows them as tabs and marks the current one", () => {
+    render(
+      <AppShell section="listings" tabs={TABS}>
+        page
+      </AppShell>,
+    );
+    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories"]);
+    expect(screen.getByRole("link", { name: "Listings" })).toHaveAttribute("aria-current", "page");
   });
 
   it("adds a tab for where you are inside a place", () => {
@@ -44,84 +90,97 @@ describe("the app shell", () => {
     expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
-  it("opens the map in dark and every other page in light, until the person picks", () => {
-    expect(defaultTheme(true)).toBe("dark");
-    expect(defaultTheme(false)).toBe("light");
+  it("is light only: no Day or Dusk switch, and nothing sets a theme on the root", () => {
     const { unmount } = render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(screen.queryByRole("button", { name: /^(Day|Dusk|Light|Dark|Auto)$/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: /Day or Dusk/ })).toBeNull();
     unmount();
+    // A stored or carried "dark" from an older build changes nothing.
+    window.localStorage.setItem("snapback-theme", "dark");
+    window.history.replaceState(null, "", "/home?theme=dusk");
     render(<AppShell section="home">home</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
-  });
-
-  it("remembers a picked theme and uses it on every page, the map included", () => {
-    const { unmount } = render(<AppShell section="home">home</AppShell>);
-    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
-    expect(savedTheme()).toBe("dark");
-    fireEvent.click(screen.getByRole("button", { name: "Light" }));
-    unmount();
-    render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
-  });
-
-  it("shares one key with the website and takes the theme from the address", () => {
-    expect(THEME_KEY).toBe("snapback-theme");
-    expect(initialChoice("?theme=dark")).toBe("dark");
-    expect(window.localStorage.getItem("snapback-theme")).toBe("dark");
-    expect(initialChoice("?theme=purple")).toBe("dark"); // not a theme: the saved one stands
-    window.localStorage.clear();
-    expect(initialChoice("")).toBeNull();
-    // A link from the website carries its theme into the map too.
-    window.history.replaceState(null, "", "/map?theme=light");
-    render(<AppShell section="map">map</AppShell>);
-    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
     window.history.replaceState(null, "", "/");
   });
 
-  it("Auto follows the device: no theme is forced", () => {
-    render(<AppShell section="home">home</AppShell>);
-    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
-    expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(savedTheme()).toBe("system");
+  it("orders the bar mark, tabs, Stories, then Customize when there are views to choose", () => {
+    render(
+      <AppShell section="home" tabs={TABS}>
+        page
+      </AppShell>,
+    );
+    const order = [...document.querySelectorAll<HTMLElement>(".app-bar :is(a, button)")].map(
+      (el) => el.getAttribute("aria-label") ?? el.textContent,
+    );
+    expect(order.slice(0, 1)).toEqual(["SNAPBACK home"]);
+    expect(order.slice(1, 6)).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
+    expect(order.slice(6, 8)).toEqual(["Stories", "Customize"]);
   });
 
-  it("the phone Menu moves focus in, closes on Escape back to Menu, and on focus leaving", () => {
+  it("on a phone there is no theme button, and Customize is in the footer", () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => ({
+      matches: true,
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      render(
+        <AppShell section="home" tabs={TABS}>
+          page
+        </AppShell>,
+      );
+      expect(screen.queryByRole("button", { name: /Switch to (Day|Dusk)/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+      expect(
+        within(document.querySelector<HTMLElement>(".app-foot")!).getByRole("button", {
+          name: "Customize",
+        }),
+      ).toBeInTheDocument();
+      expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories"]);
+    } finally {
+      window.matchMedia = real;
+    }
+  });
+
+  it("Customize moves focus in, closes on Escape back to its button, and has no Menu", () => {
     render(
-      <>
-        <AppShell section="home">page</AppShell>
-        <button type="button">outside</button>
-      </>,
+      <AppShell section="home" tabs={TABS}>
+        page
+      </AppShell>,
     );
-    const menu = screen.getByRole("button", { name: "Menu" });
-    fireEvent.click(menu);
-    expect(menu).toHaveAttribute("aria-expanded", "true");
-    const panel = document.getElementById("app-menu")!;
-    expect(panel).toHaveAttribute("data-open");
+    expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+    const btn = screen.getByRole("button", { name: "Customize" });
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    const panel = screen.getByTestId("customize");
     expect(panel.contains(document.activeElement)).toBe(true);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
-    expect(panel).not.toHaveAttribute("data-open");
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
-    // Focus leaving the panel for somewhere else closes it.
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    const first = panel.querySelector("a")!;
-    fireEvent.focusOut(first, { relatedTarget: screen.getByRole("button", { name: "outside" }) });
-    expect(panel).not.toHaveAttribute("data-open");
+    expect(screen.queryByTestId("customize")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Customize" }));
   });
 
-  it("Customize hides a tab and picks the one that opens first, and remembers both", () => {
-    render(<AppShell section="home">home</AppShell>);
+  it("Customize hides a tab and remembers it; a page out of the bar can never open first", () => {
+    render(
+      <AppShell section="home" tabs={TABS}>
+        home
+      </AppShell>,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Customize" }));
     const panel = screen.getByTestId("customize");
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Replays" }));
-    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder"]);
+    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Stories"]);
     const firsts = within(panel).getAllByRole("radio", { name: "Opens first" });
     fireEvent.click(firsts[2]!); // Map
-    expect(loadPrefs()).toEqual({ hidden: ["replays"], first: "map" });
-    // Home can never be hidden, and a hidden tab cannot open first.
+    // The hidden tab is kept. Map is not in the bar, so the site still opens on Home.
+    expect(loadPrefs()).toEqual({ hidden: ["replays"], first: "home" });
     expect(within(panel).getByRole("checkbox", { name: "Home" })).toBeDisabled();
-    fireEvent.click(within(panel).getByRole("checkbox", { name: "Map" }));
+  });
+
+  it("an old saved choice to open on Map lands on Home", () => {
+    window.localStorage.setItem("snapback.space", JSON.stringify({ hidden: [], first: "map" }));
     expect(loadPrefs().first).toBe("home");
   });
 
@@ -136,13 +195,14 @@ describe("the app shell", () => {
   });
 });
 
-describe("Home: your checks", () => {
+describe("Home: your reports", () => {
   it("with no live server shows the team's sample case, labelled, with its verdict", async () => {
     render(<YourChecks />);
     await waitFor(() =>
       expect(screen.getByRole("link", { name: /Case 7Q2M/ })).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("your-checks")).toHaveTextContent("A sample case made by the team");
+    expect(screen.getByTestId("your-checks")).toHaveTextContent("A sample report made by the team");
+    expect(screen.getByRole("heading", { name: "Your reports" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Case 7Q2M/ })).toHaveAttribute("href", "/case/7Q2M");
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     expect(screen.getByRole("link", { name: "Check another ad" })).toHaveAttribute(
@@ -223,7 +283,7 @@ describe("Finder: a conversation, what it learned, and what fits", () => {
   });
 });
 
-describe("one purpose per page, and a theme that travels", () => {
+describe("one purpose per page", () => {
   it("says what the page is for in one line", () => {
     const { unmount } = render(<AppShell section="map">map</AppShell>);
     expect(screen.getByTestId("page-purpose")).toHaveTextContent("Find a home by where it is.");
@@ -235,13 +295,6 @@ describe("one purpose per page, and a theme that travels", () => {
     );
     expect(screen.getByTestId("page-purpose")).toHaveTextContent("See the home, room by room");
     expect(Object.keys(PURPOSE)).toHaveLength(7);
-  });
-
-  it("adds the theme to a link out, keeping its query and hash", () => {
-    expect(withTheme("https://site.example/", "dark")).toBe("https://site.example/?theme=dark");
-    expect(withTheme("https://site.example/a?x=1#top", "light")).toBe(
-      "https://site.example/a?x=1&theme=light#top",
-    );
   });
 });
 

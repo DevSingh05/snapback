@@ -44,6 +44,8 @@ from snapback.contracts import (
     CasePreferences,
     CaseProgress,
     DataSource,
+    ForSaleMatch,
+    ForSaleStatus,
     ModuleEvidence,
     PresenceStatus,
     PropertyRecord,
@@ -523,6 +525,28 @@ class CaseStore:
         market = record.market if record is not None else None
         return ZoneInfo(MARKET_ZONES.get(market or "", self._settings.snapback_card_timezone))
 
+    def _for_sale_by_position(
+        self, text: str, record: PropertyRecord | None, by_text: ForSaleMatch | None
+    ) -> ForSaleMatch | None:
+        """The for-sale answer for a named home, also looked up by the record's position (#10).
+
+        An ad with no street finds nothing by its text, while the home's own lat/lon does. The
+        same rule as the identify path (`JoinedModules._adopt_identified`): a position lookup
+        that finds nothing never undoes a listing the text lookup found."""
+        at = getattr(self._lookups, "for_sale_at", None)
+        if record is None or at is None or record.lat is None or record.lon is None:
+            return by_text
+        nearby = at(text, record.lat, record.lon)
+        if nearby is None:
+            return by_text
+        if (
+            by_text is not None
+            and by_text.status is not ForSaleStatus.NONE
+            and nearby.status is ForSaleStatus.NONE
+        ):
+            return by_text
+        return nearby
+
     def create(
         self,
         listing: Listing,
@@ -571,6 +595,7 @@ class CaseStore:
         for_sale = license = owner = None
         if not asked_by_name:
             for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+            for_sale = self._for_sale_by_position(listing.text, record, for_sale)
             # D10: only a live run calls the licence list, and a lookup that breaks is "not
             # looked up". It reads the poster's own claim in the text and keeps no name.
             license = license_of(self._lookups, listing.text)
