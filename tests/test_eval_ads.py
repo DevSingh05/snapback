@@ -28,11 +28,12 @@ def test_composition_is_deterministic():
     assert [(a.ad_id, a.text) for a in first] == [(a.ad_id, a.text) for a in second]
 
 
-def test_every_composed_type_is_present_and_all_49_messages_run(result):
+def test_every_composed_type_is_present_and_all_labelled_messages_run(result):
     kinds = {a.ad_type for a in result.ads}
     assert kinds >= TYPES
     cases = json.loads(ads.CASES_FILE.read_text())
-    assert len(cases) == 49
+    assert len(cases) >= 49
+    assert len([a for a in result.ads if a.ad_type.startswith("labelled_message")]) == len(cases)
     message_ids = {a.ad_id for a in result.ads if a.ad_type.startswith("labelled_message")}
     assert message_ids == {c["id"] for c in cases}
 
