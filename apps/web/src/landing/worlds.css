@@ -221,9 +221,12 @@
   transition: opacity 0.3s var(--ease-out);
   will-change: transform;
 }
-.wl-lbl .ui-mono {
-  font-size: 0.72rem;
-  color: var(--act);
+.wl-lbl i {
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--scan);
 }
 .wl-lbl-rec {
   background: var(--warn-soft);
@@ -645,10 +648,47 @@
   font-size: 0.8rem;
   letter-spacing: 0.06em;
 }
+.wl-stats {
+  margin: 8px 0 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px clamp(20px, 4vw, 56px);
+}
+.wl-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--on-matte) 22%, transparent);
+}
+.wl-stats dd {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(2.2rem, 4.6vw, 3.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  order: -1;
+}
+.wl-stats dt {
+  color: var(--on-matte-muted);
+  max-width: 24ch;
+}
 .wl-measured {
   margin: 0 0 10px;
-  font-size: 0.9rem;
-  color: var(--st-ok);
+  font-size: 0.95rem;
+  color: var(--on-matte-muted);
+  max-width: 80ch;
+}
+.wl-tag-live {
+  display: inline-block;
+  margin-right: 1px;
+  padding: 2px 9px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--on-act-matte);
+  background: var(--act-matte);
+  border-radius: var(--radius-pill);
 }
 
 /* the game: a fourth way in, across the top of the three */
@@ -757,6 +797,9 @@
 }
 
 @media (max-width: 900px) {
+  .wl-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .wl-twin {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -50,6 +50,14 @@ export const LANDING_USES = [
 export const LANDING_MEASURED =
   "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it";
 
+// The measured line again, as three figures. Same numbers, same n (78 real listing photos: 48
+// that belong to a home we hold, 30 decoys); the sentence under them is the source of truth.
+export const LANDING_STATS = [
+  { value: "43 of 48", label: "real listing photos placed in the right home" },
+  { value: "0", label: "placed in the wrong home" },
+  { value: "0 of 30", label: "decoy photos that fooled it" },
+] as const;
+
 // The scroll story over the pinned drawing: one short card per beat. The numbers in houseScene
 // (when the floors lift, when each photo lands, when the marker goes to the sign) follow these.
 export const LANDING_BEATS = [
@@ -195,7 +203,7 @@ function Hero({ reduced }: { reduced: boolean }) {
                 floorLbl.current[k] = n;
               }}
             >
-              <span className="ui-mono">{`0${3 - k}`}</span>
+              <i />
               {t}
             </div>
           ))}
@@ -552,8 +560,16 @@ function TakenHere({ reduced }: { reduced: boolean }) {
             </p>
           </div>
         </div>
-        <p className="wl-measured ui-mono" data-testid="wl-measured">
-          LIVE, re-measured Nov 15 · {LANDING_MEASURED}
+        <dl className="wl-stats" data-testid="wl-stats">
+          {LANDING_STATS.map((x) => (
+            <div key={x.label}>
+              <dt>{x.label}</dt>
+              <dd>{x.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="wl-measured" data-testid="wl-measured">
+          <b className="wl-tag-live ui-mono">LIVE</b>, re-measured Nov 15 · {LANDING_MEASURED}
         </p>
         <p className="wl-fine">
           The floor and the three pictures are stand-ins for the sample (SYNTHETIC), and say so. In

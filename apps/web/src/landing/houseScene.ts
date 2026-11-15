@@ -760,7 +760,12 @@ export function mountHouse(
     sun.position.set(Math.cos(a) * 20, 25, Math.sin(a) * 20);
     const o = st.open;
     floors.forEach((g, k) => (g.position.y = 0.1 + k * FH + o * k * GAP));
-    roof.position.y = 0.1 + 3 * FH + o * (2 * GAP + 1.7);
+    // the roof rises clear of the top floor while the photos land on its far walls
+    roof.position.y =
+      0.1 +
+      3 * FH +
+      o * (2 * GAP + 1.7) +
+      3.4 * ease(seg(p, 0.28, 0.4)) * (1 - ease(seg(p, 0.6, 0.74)));
     const topY = 3 * FH + o * 2 * GAP,
       ph = reduced ? 0.55 : (now * 0.00016) % 1,
       sy = (ph < 0.5 ? ph * 2 : 2 - ph * 2) * topY;
