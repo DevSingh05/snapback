@@ -16,6 +16,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
     GET  /eval/ads.csv                    measured ad batch: ad type by verdict, n, misses
     GET  /healthz                         liveness and the data source
+    GET  /agents                          the roster: every agent's card (?lang=en|es)
     POST /voice/tts, POST /voice/stt      the Finder's voice (ElevenLabs; see api/voice.py)
     POST /verdict                         decide() on evidence the caller already has
 
@@ -50,6 +51,7 @@ from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
 from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
+from snapback.agent.roster import Roster, roster
 from snapback.agent.timeline import CaseTimeline, build_timeline
 from snapback.api.card_cache import CardPictures
 from snapback.api.casefiles import ALIAS, CaseFiles
@@ -360,6 +362,12 @@ def create_app(
         if found is None:
             raise HTTPException(status_code=404, detail="No replay with that name.")
         return found
+
+    @app.get("/agents")
+    def agents(lang: Language = "en") -> Roster:
+        """SNAPBACK's team of agents: each one's job, tools, model and what it never does.
+        Public and the same for everyone; it holds no case data and runs nothing."""
+        return roster(lang)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
