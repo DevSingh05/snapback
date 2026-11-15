@@ -27,17 +27,17 @@
     "n_honest": 2684,
     "n_ring_ads": 355,
     "n_rings": 10,
-    "ring_ads_flagged": 329,
+    "ring_ads_flagged": 354,
     "rings_found": 10,
     "rings_told_apart": 0
    },
-   "pipeline_hop": {
+   "pipeline_wording_seeds": {
     "groups_reported": 6,
     "honest_flagged": 0,
     "n_honest": 2684,
     "n_ring_ads": 355,
     "n_rings": 10,
-    "ring_ads_flagged": 354,
+    "ring_ads_flagged": 329,
     "rings_found": 10,
     "rings_told_apart": 0
    },
@@ -55,16 +55,6 @@
     "rings_told_apart": 0
    },
    "pipeline": {
-    "groups_reported": 10,
-    "honest_flagged": 0,
-    "n_honest": 2684,
-    "n_ring_ads": 355,
-    "n_rings": 10,
-    "ring_ads_flagged": 70,
-    "rings_found": 7,
-    "rings_told_apart": 0
-   },
-   "pipeline_hop": {
     "groups_reported": 13,
     "honest_flagged": 0,
     "n_honest": 2684,
@@ -73,6 +63,16 @@
     "ring_ads_flagged": 171,
     "rings_found": 9,
     "rings_told_apart": 1
+   },
+   "pipeline_wording_seeds": {
+    "groups_reported": 10,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 70,
+    "rings_found": 7,
+    "rings_told_apart": 0
    },
    "same_ask_pairs_in_ring": 0.0
   },
@@ -88,16 +88,6 @@
     "rings_told_apart": 0
    },
    "pipeline": {
-    "groups_reported": 2,
-    "honest_flagged": 0,
-    "n_honest": 2684,
-    "n_ring_ads": 355,
-    "n_rings": 10,
-    "ring_ads_flagged": 8,
-    "rings_found": 1,
-    "rings_told_apart": 0
-   },
-   "pipeline_hop": {
     "groups_reported": 10,
     "honest_flagged": 0,
     "n_honest": 2684,
@@ -105,6 +95,16 @@
     "n_rings": 10,
     "ring_ads_flagged": 57,
     "rings_found": 7,
+    "rings_told_apart": 0
+   },
+   "pipeline_wording_seeds": {
+    "groups_reported": 2,
+    "honest_flagged": 0,
+    "n_honest": 2684,
+    "n_ring_ads": 355,
+    "n_rings": 10,
+    "ring_ads_flagged": 8,
+    "rings_found": 1,
     "rings_told_apart": 0
    },
    "same_ask_pairs_in_ring": 0.0
@@ -130,7 +130,7 @@
     "rings_found": 0,
     "rings_told_apart": 0
    },
-   "pipeline_hop": {
+   "pipeline_wording_seeds": {
     "groups_reported": 0,
     "honest_flagged": 0,
     "n_honest": 2684,

@@ -23,7 +23,7 @@ class Analysis:
         return next((r for r in self.rings if ad_id in r.ad_ids), None)
 
 
-def analyze(corpus: Corpus, *, hop: bool = False) -> Analysis:
+def analyze(corpus: Corpus, *, hop: bool = True) -> Analysis:
     facts = extract_all(corpus.ads)
     graph = build_graph(corpus.ads, facts)
     return Analysis(corpus=corpus, facts=facts, graph=graph, rings=find_rings(graph, hop=hop))

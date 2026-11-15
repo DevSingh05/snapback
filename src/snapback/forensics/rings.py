@@ -143,9 +143,9 @@ def _one_hop(graph: LinkGraph, seeds: set[int], copiers: dict[int, int]) -> set[
     return seeds | hopped
 
 
-def find_rings(graph: LinkGraph, *, hop: bool = False) -> list[Ring]:
-    """`hop=True` widens the seeds by one phone or photo-copy link (see `_one_hop`); the default
-    keeps the wording-only seeds the demo has always used."""
+def find_rings(graph: LinkGraph, *, hop: bool = True) -> list[Ring]:
+    """`hop=True` (the default) widens the seeds by one phone or photo-copy link (see `_one_hop`);
+    `hop=False` keeps the wording-only seeds."""
     seeds = _pressure(graph)
     copiers = _copiers(graph)
     if hop:

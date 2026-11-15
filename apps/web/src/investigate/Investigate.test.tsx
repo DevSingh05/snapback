@@ -316,12 +316,12 @@ describe("robustness line", () => {
     variants: {
       original: {
         pipeline: { rings_found: 10, honest_flagged: 0 },
-        pipeline_hop: { rings_found: 10, honest_flagged: 0 },
+        pipeline_wording_seeds: { rings_found: 10, honest_flagged: 0 },
         keyword_baseline: { rings_found: 1, honest_flagged: 0 },
       },
       paraphrased: {
-        pipeline: { rings_found: 7, honest_flagged: 0 },
-        pipeline_hop: { rings_found: 9, honest_flagged: 0 },
+        pipeline: { rings_found: 9, honest_flagged: 0 },
+        pipeline_wording_seeds: { rings_found: 7, honest_flagged: 0 },
         keyword_baseline: { rings_found: 0, honest_flagged: 0 },
       },
     },
@@ -331,7 +331,7 @@ describe("robustness line", () => {
     render(<RobustnessLine results={made} />);
     expect(
       screen.getByText(
-        "Holds up when ads are reworded: 7 of 10 rings (synthetic, n=10 rings, 3,039 ads)",
+        "Holds up when ads are reworded: 9 of 10 rings (synthetic, n=10 rings, 3,039 ads)",
       ),
     ).toBeTruthy();
     expect(screen.getByText(/Keyword search on the reworded ads: 0 of 10/)).toBeTruthy();

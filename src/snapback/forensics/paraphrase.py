@@ -240,16 +240,17 @@ def rings_found(found: list[set[int]], truth: dict[str, set[int]]) -> int:
 
 
 def score_variant(corpus: Corpus, truth: dict[str, set[int]]) -> dict[str, Any]:
-    """`pipeline` is the finder as shipped; `pipeline_hop` adds the phone and photo-copy fallback
-    (`rings.find_rings(hop=True)`); `keyword_baseline` is the payment-words search."""
+    """`pipeline` is the finder as shipped, with the phone and photo-copy fallback;
+    `pipeline_wording_seeds` is the same finder seeded by wording only (`hop=False`);
+    `keyword_baseline` is the payment-words search."""
     n = len(corpus.ads)
     pipeline = [set(r.ad_ids) for r in analyze(corpus).rings]
-    hopped = [set(r.ad_ids) for r in analyze(corpus, hop=True).rings]
+    wording = [set(r.ad_ids) for r in analyze(corpus, hop=False).rings]
     keyword = keyword_groups(corpus)
     out: dict[str, Any] = {}
     for name, groups in (
         ("pipeline", pipeline),
-        ("pipeline_hop", hopped),
+        ("pipeline_wording_seeds", wording),
         ("keyword_baseline", keyword),
     ):
         s = _score(groups, truth, n)
@@ -388,12 +389,12 @@ if __name__ == "__main__":
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(made, indent=1, sort_keys=True) + "\n")
     for name, v in made["variants"].items():
-        p, h, k = v["pipeline"], v["pipeline_hop"], v["keyword_baseline"]
+        p, h, k = v["pipeline"], v["pipeline_wording_seeds"], v["keyword_baseline"]
         print(
             f"SYNTHETIC {name}: pipeline {p['rings_found']}/{p['n_rings']} rings, "
-            f"with phone/photo fallback {h['rings_found']}/{h['n_rings']}, "
+            f"wording-only seeds {h['rings_found']}/{h['n_rings']}, "
             f"keyword {k['rings_found']}/{k['n_rings']}, "
             f"honest flagged {p['honest_flagged']}/{p['n_honest']} "
-            f"({h['honest_flagged']} with fallback)"
+            f"({h['honest_flagged']} wording-only seeds)"
         )
     print(f"wrote {args.out}")

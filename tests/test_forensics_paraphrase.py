@@ -103,12 +103,11 @@ def test_live_rewriter_needs_a_key_and_never_leaks(monkeypatch):
     assert capped("b", random.Random(1)) != "ok"
 
 
-def test_fallback_hop_is_off_by_default_and_changes_nothing_on_the_seed():
+def test_fallback_is_on_by_default_and_costs_nothing_on_the_seed():
     corpus = load_corpus()
-    base, hop = evaluate(analyze(corpus)), evaluate(analyze(corpus, hop=True))
-    assert base["pipeline"]["ring_recall"] == 1.0
-    assert hop["pipeline"]["ring_recall"] == 1.0
-    assert hop["pipeline"]["honest_flagged"] == 0
+    shipped, wording = evaluate(analyze(corpus)), evaluate(analyze(corpus, hop=False))
+    assert shipped["pipeline"]["ring_recall"] == 1.0 == wording["pipeline"]["ring_recall"]
+    assert shipped["pipeline"]["honest_flagged"] == 0
 
 
 def test_results_file_is_labelled_and_reproducible():
@@ -120,17 +119,17 @@ def test_results_file_is_labelled_and_reproducible():
     n = made["n_rings"]
     assert n == 10 and made["n_honest"] == 2684
     assert v["original"]["pipeline"]["rings_found"] == 10
-    # the honest result: rewording costs the shipped finder rings; the fallback wins most back
-    assert v["paraphrased"]["pipeline"]["rings_found"] < 10
+    # rewording costs a ring even with the fallback, and costs the wording-only seeds more
+    assert v["paraphrased"]["pipeline"]["rings_found"] == 9
     assert (
-        v["paraphrased"]["pipeline_hop"]["rings_found"]
-        > v["paraphrased"]["pipeline"]["rings_found"]
+        v["paraphrased"]["pipeline_wording_seeds"]["rings_found"]
+        < v["paraphrased"]["pipeline"]["rings_found"]
     )
     assert (
         v["paraphrased"]["keyword_baseline"]["rings_found"]
         < v["paraphrased"]["pipeline"]["rings_found"]
     )
     for variant in v.values():
-        for who in ("pipeline", "pipeline_hop", "keyword_baseline"):
+        for who in ("pipeline", "pipeline_wording_seeds", "keyword_baseline"):
             assert variant[who]["honest_flagged"] == 0
             assert variant[who]["n_rings"] == n

@@ -509,7 +509,7 @@ export type ParaphraseResults = {
   n_honest: number;
   variants: Record<
     string,
-    Record<"pipeline" | "pipeline_hop" | "keyword_baseline", { rings_found: number; honest_flagged: number }>
+    Record<"pipeline" | "pipeline_wording_seeds" | "keyword_baseline", { rings_found: number; honest_flagged: number }>
   >;
 };
 
@@ -522,7 +522,7 @@ export function robustnessText(r: ParaphraseResults) {
     detail:
       `Original wording: ${r.variants.original.pipeline.rings_found} of ${n}. ` +
       `Keyword search on the reworded ads: ${para.keyword_baseline.rings_found} of ${n}. ` +
-      `With the phone and photo-copy fallback: ${para.pipeline_hop.rings_found} of ${n}. ` +
+      `Seeded by wording only: ${para.pipeline_wording_seeds.rings_found} of ${n}. ` +
       `Honest ads flagged: ${para.pipeline.honest_flagged} of ${r.n_honest}.`,
   };
 }
