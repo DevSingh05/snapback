@@ -1,0 +1,609 @@
+/* The check team: the panel beside the 3D twin, the strip on the report and on Home, and the
+   team's cards. Day tokens only, sharp corners, no outline boxes: a member's state is a square
+   light and a left bar in the app's own row-state colours, always next to words.
+   Motion is transform and opacity only, set off by a recorded step, and off under
+   prefers-reduced-motion (the states still change). Heights that change with a step are
+   reserved up front, so nothing below moves as members light up. */
+
+.pr-panel {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-5) var(--page-pad) var(--sp-6);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.pr-head {
+  display: grid;
+  gap: var(--sp-2);
+}
+.pr-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+  color: var(--act);
+}
+.pr-head h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+/* Two lines are held for the status so a longer line never pushes the panel down. */
+.pr-status {
+  margin: 0;
+  min-height: calc(2 * 1.4em);
+  font-size: var(--fs-md);
+  line-height: 1.4;
+  font-weight: 700;
+}
+.pr-bar {
+  height: 4px;
+  background: var(--layer-2);
+  overflow: hidden;
+}
+.pr-bar span {
+  display: block;
+  height: 100%;
+  background: var(--act);
+  transform-origin: left center;
+  transition: transform 240ms linear;
+}
+.pr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 48px;
+}
+.pr-speed {
+  display: inline-flex;
+}
+.pr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: var(--ink);
+  color: var(--surface);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pr-btn-quiet {
+  min-width: 44px;
+  padding: 0 var(--sp-3);
+  background: var(--layer-2);
+  color: var(--ink);
+}
+.pr-btn-quiet[aria-pressed="true"] {
+  background: var(--act);
+  color: var(--on-act);
+}
+.pr-btn-link {
+  justify-self: start;
+  background: var(--act);
+  color: var(--on-act);
+}
+.pr-btn:focus-visible,
+.pr-tabs button:focus-visible,
+.pr-strip-item button:focus-visible,
+.pr-strip-item a:focus-visible,
+.pr-thread:focus-visible,
+.pr-desk:focus-visible,
+.pr-evidence summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.pr-note,
+.pr-quiet {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- tabs ---------- */
+.pr-tabs {
+  display: flex;
+  gap: var(--sp-5);
+  border-bottom: 1px solid var(--line);
+}
+.pr-tabs button {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pr-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--act);
+  color: var(--ink);
+}
+.pr-pane {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+/* ---------- the strip: one light per member ---------- */
+.pr-strip-wrap {
+  position: relative;
+}
+.pr-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-strip-item {
+  min-width: 0;
+}
+.pr-strip-item > button,
+.pr-strip-item > a,
+.pr-strip-in {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--sp-2);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-left: 4px solid var(--st-unchecked);
+  background: var(--layer-2);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.pr-strip-item > button {
+  cursor: pointer;
+}
+.pr-strip-light {
+  grid-row: 1 / span 2;
+  position: relative;
+  width: 12px;
+  height: 12px;
+  background: var(--st-unchecked);
+}
+.pr-strip-name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pr-strip-state {
+  color: var(--muted);
+}
+.pr-strip-item[data-state="idle"] .pr-strip-light,
+.pr-strip-item[data-state="unused"] .pr-strip-light,
+.pr-strip-item[data-state="skipped"] .pr-strip-light {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--st-unchecked);
+}
+.pr-strip-item[data-state="unused"] > *,
+.pr-strip-item[data-state="skipped"] > * {
+  background: transparent;
+  border-left-color: var(--line);
+  color: var(--muted);
+}
+.pr-strip-item[data-state="working"] > * {
+  border-left-color: var(--scan);
+  background: var(--amber-soft);
+}
+.pr-strip-item[data-state="working"] .pr-strip-light {
+  background: var(--scan);
+}
+.pr-strip-item[data-state="done"] > * {
+  border-left-color: var(--ink);
+  background: var(--layer-2);
+}
+.pr-strip-item[data-state="done"] .pr-strip-light {
+  background: var(--ink);
+}
+.pr-strip-item[data-state="done"][data-tone="ok"] > * {
+  border-left-color: var(--st-ok);
+  background: var(--teal-soft);
+}
+.pr-strip-item[data-state="done"][data-tone="ok"] .pr-strip-light {
+  background: var(--st-ok);
+}
+.pr-strip-item[data-state="done"][data-tone="hold"] > *,
+.pr-strip-item[data-state="done"][data-tone="not_shown"] > * {
+  border-left-color: var(--st-warn);
+  background: var(--amber-soft);
+}
+.pr-strip-item[data-state="done"][data-tone="hold"] .pr-strip-light,
+.pr-strip-item[data-state="done"][data-tone="not_shown"] .pr-strip-light {
+  background: var(--st-warn);
+}
+.pr-strip-item[data-state="done"][data-tone="red_flag"] > * {
+  border-left-color: var(--st-mismatch);
+  background: var(--coral-soft);
+}
+.pr-strip-item[data-state="done"][data-tone="red_flag"] .pr-strip-light {
+  background: var(--st-mismatch);
+}
+/* The pulse: a ring that grows out of a working member's light and fades. */
+.pr-strip-item[data-state="working"] .pr-strip-light::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--scan);
+  opacity: 0;
+}
+
+/* A hand-off: a small square that travels between two lights. */
+.pr-packet {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--act);
+  opacity: 0;
+  pointer-events: none;
+}
+.pr-packet-out {
+  background: var(--ink);
+}
+
+/* ---------- the thread ---------- */
+.pr-sub {
+  margin: 0;
+  color: var(--muted);
+}
+.pr-thread {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  height: 320px;
+  margin: 0;
+  padding: 0 var(--sp-2) 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.pr-line {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 4px solid var(--line);
+  background: var(--layer-2);
+  overflow-wrap: anywhere;
+}
+.pr-line[data-skipped="yes"] {
+  background: transparent;
+  color: var(--muted);
+}
+.pr-line[data-finding="yes"] {
+  margin-left: var(--sp-4);
+  border-left-color: var(--unchecked);
+  background: var(--unchecked-soft);
+}
+.pr-line[data-finding="yes"][data-tone="ok"] {
+  border-left-color: var(--teal);
+  background: var(--teal-soft);
+}
+.pr-line[data-finding="yes"][data-tone="hold"],
+.pr-line[data-finding="yes"][data-tone="not_shown"] {
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+.pr-line[data-finding="yes"][data-tone="red_flag"] {
+  border-left-color: var(--coral);
+  background: var(--coral-soft);
+  font-weight: 700;
+}
+.pr-who {
+  margin: 0;
+  color: var(--muted);
+}
+.pr-said {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.pr-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--sp-3);
+  margin: 0;
+  color: var(--muted);
+}
+
+/* ---------- the Decider ---------- */
+.pr-decider {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+/* The slot is as tall as the stamp, so the stamp lands without moving what is under it. */
+.pr-stamp-slot {
+  display: grid;
+  align-items: center;
+  min-height: 84px;
+}
+.pr-stamp {
+  margin: 0;
+  padding: var(--sp-4);
+  border-left: 8px solid var(--v-slate);
+  background: var(--v-band);
+  color: var(--on-v-band);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  transform-origin: left center;
+}
+.pr-decider[data-verdict="dont-pay"] .pr-stamp {
+  border-left-color: var(--v-dont-pay);
+}
+.pr-decider[data-verdict="hold"] .pr-stamp {
+  border-left-color: var(--v-hold);
+}
+.pr-decider[data-verdict="ok"] .pr-stamp {
+  border-left-color: var(--v-ok);
+}
+.pr-reasons {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.pr-reasons li {
+  display: grid;
+  gap: 0;
+}
+.pr-reasons .case-text-link {
+  justify-self: start;
+  min-height: 44px;
+  font-size: var(--fs-sm);
+}
+.pr-rule {
+  margin: 0;
+  max-width: 44ch;
+  font-weight: 700;
+}
+
+/* ---------- meet the team ---------- */
+.pr-meet {
+  display: grid;
+  gap: var(--sp-5);
+}
+.pr-team {
+  display: grid;
+  gap: var(--sp-3);
+}
+.pr-team-head h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-team-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.pr-desk {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 4px solid var(--st-unchecked);
+  background: var(--layer-2);
+  scroll-margin-top: 72px;
+}
+.pr-desk[data-state="unused"],
+.pr-desk[data-state="skipped"] {
+  background: transparent;
+  border-left-color: var(--line);
+}
+.pr-desk[data-state="working"] {
+  border-left-color: var(--scan);
+}
+.pr-desk[data-state="done"] {
+  border-left-color: var(--ink);
+}
+.pr-desk[data-state="done"][data-tone="ok"] {
+  border-left-color: var(--st-ok);
+}
+.pr-desk[data-state="done"][data-tone="hold"],
+.pr-desk[data-state="done"][data-tone="not_shown"] {
+  border-left-color: var(--st-warn);
+}
+.pr-desk[data-state="done"][data-tone="red_flag"] {
+  border-left-color: var(--st-mismatch);
+}
+.pr-desk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-3);
+}
+.pr-desk-head h4 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-model {
+  padding: 2px var(--sp-2);
+  background: var(--ink);
+  color: var(--surface);
+}
+.pr-job,
+.pr-never,
+.pr-avail {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.pr-never,
+.pr-avail {
+  color: var(--muted);
+}
+.pr-avail {
+  font-weight: 700;
+}
+.pr-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-tools li {
+  padding: 2px var(--sp-2);
+  background: var(--surface);
+  color: var(--ink);
+}
+.pr-out {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.pr-now {
+  margin: 0;
+  font-weight: 700;
+}
+.pr-findings {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.pr-evidence summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.pr-evidence ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- the report's strip ---------- */
+.pr-report {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-5);
+}
+.pr-report-line {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.pr-report .case-text-link {
+  justify-self: start;
+}
+
+/* ---------- beside the twin ---------- */
+@media (min-width: 1180px) {
+  .twin-body.twin-with-team {
+    grid-template-columns: minmax(0, 1fr) 420px;
+    align-items: start;
+  }
+  .twin-with-team > .pr-panel {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    padding-inline: var(--sp-5);
+  }
+  .twin-with-team > :not(.pr-panel) {
+    grid-column: 1;
+  }
+  .pr-thread {
+    height: 360px;
+  }
+}
+
+/* ---------- motion, each tied to a step ---------- */
+@keyframes pr-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+@keyframes pr-travel {
+  0% {
+    opacity: 0;
+    transform: translate(var(--x0), var(--y0));
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x1), var(--y1));
+  }
+}
+@keyframes pr-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes pr-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.18) rotate(-2deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.98) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pr-panel[data-still="no"] .pr-strip-item[data-state="working"] .pr-strip-light::after {
+    animation: pr-pulse 1100ms var(--ease-out) infinite;
+  }
+  .pr-panel[data-still="no"] .pr-packet {
+    animation: pr-travel 620ms var(--ease-out) 1 forwards;
+  }
+  .pr-panel[data-still="no"][data-phase="running"] .pr-line {
+    animation: pr-in 260ms var(--ease-out) 1 backwards;
+  }
+  .pr-panel[data-still="no"] .pr-stamp {
+    animation: pr-stamp 420ms var(--ease-out) 1 backwards;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pr-bar span {
+    transition: none;
+  }
+}

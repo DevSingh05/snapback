@@ -1,0 +1,490 @@
+// "Your check team", open beside the 3D twin (below it on a phone). One status line that moves
+// with every step, the team as a row of lights, the thread of what each member says as it
+// works, then the Decider's stamp with the card's own verdict. "Meet the team" holds each
+// member's card: its job, tools and sources, what runs it, what it never does, and on a case
+// what it found with the evidence behind it.
+//
+// Everything on screen is tied to a recorded step. A finished run replays from its timeline;
+// a run that is still live shows steps as the API reports them. With reduced motion there is no
+// replay clock and no movement, only the states. Nothing here works out a result.
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+
+import "../ui/ui.css";
+import "../case/case.css";
+import "./proofroom.css";
+import { dataMode } from "../api";
+import { tookText } from "../case/answer";
+import { VERDICT_TONE } from "../case/model";
+import { usePrefersReducedMotion } from "../twin/useReducedMotion";
+import { Tag } from "../ui/Tag";
+import { AgentStrip } from "./AgentStrip";
+import { floorAt, statusLine, type Desk, type Floor, type Lang, type Roster } from "./model";
+import { usePlayer, type Speed } from "./usePlayer";
+import { useRoster, useRun, type Run } from "./useRun";
+import { WORDS, type RoomWords } from "./words";
+
+/** Where "See how they got this" goes: the report's "How we got this answer". */
+export const answerHref = (caseId: string) =>
+  `/case/${encodeURIComponent(caseId)}#case-answer-title`;
+
+interface Packet {
+  id: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  out: boolean;
+}
+
+function DeskCard({
+  desk,
+  lang,
+  w,
+  rest,
+  focused,
+}: {
+  desk: Desk;
+  lang: Lang;
+  w: RoomWords;
+  rest: boolean;
+  focused: boolean;
+}) {
+  const { card } = desk;
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!focused) return;
+    ref.current?.focus();
+    ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [focused]);
+  return (
+    <article
+      ref={ref}
+      id={`desk-${card.id}`}
+      className="pr-desk"
+      data-state={rest ? "rest" : desk.state}
+      data-tone={desk.tone}
+      data-testid="desk"
+      data-agent={card.id}
+      tabIndex={-1}
+    >
+      <header className="pr-desk-head">
+        <h4>{card.name}</h4>
+        <span className="pr-model ui-mono" title={w.runsOn}>
+          {card.model === "code" ? w.code : card.model}
+        </span>
+      </header>
+      <p className="pr-job">{card.job}</p>
+      <ul className="pr-tools" aria-label="Tools and sources">
+        {card.tools.map((tool) => (
+          <li key={tool} className="ui-mono">
+            {tool}
+          </li>
+        ))}
+      </ul>
+      {card.availability ? <p className="pr-avail">{card.availability}</p> : null}
+      <p className="pr-never">
+        <span className="ui-mono">{w.never}</span> {card.never.join(" · ")}
+      </p>
+      {rest ? null : (
+        <div className="pr-out" data-testid="desk-out">
+          {desk.state === "working" ? (
+            <p className="pr-now">{card.doing}…</p>
+          ) : desk.state === "done" ? (
+            <>
+              {desk.findings.length > 0 ? (
+                <ul className="pr-findings">
+                  {desk.findings.map((f) => (
+                    <li key={`${f.label}-${f.text}`} data-testid="desk-finding">
+                      {f.label ? <b>{f.label}: </b> : null}
+                      {f.text}
+                    </li>
+                  ))}
+                </ul>
+              ) : desk.why ? (
+                <p className="pr-quiet">
+                  {w.notChecked}: {desk.why}
+                </p>
+              ) : (
+                <ul className="pr-findings pr-did">
+                  {desk.evidence.map((line, i) => (
+                    <li key={`${line}-${i}`}>{line}</li>
+                  ))}
+                </ul>
+              )}
+              {desk.evidence.length > 0 && (desk.findings.length > 0 || desk.why) ? (
+                <details className="pr-evidence" data-testid="desk-evidence">
+                  <summary>{w.evidence}</summary>
+                  <ul>
+                    {desk.evidence.map((line, i) => (
+                      <li key={`${line}-${i}`}>{line}</li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+              <p className="pr-foot ui-mono">
+                {desk.source ? <Tag source={desk.source} /> : null}
+                {desk.tookMs !== null ? <span>{tookText(desk.tookMs, lang)}</span> : null}
+              </p>
+            </>
+          ) : desk.state === "skipped" ? (
+            <p className="pr-quiet">
+              {w.notChecked}
+              {desk.why ? `: ${desk.why}` : ""}
+            </p>
+          ) : (
+            <p className="pr-quiet">{desk.state === "unused" ? w.state.unused : w.waiting}</p>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function MeetTheTeam({
+  roster,
+  floor,
+  lang,
+  w,
+  focus,
+}: {
+  roster: Roster;
+  floor: Floor;
+  lang: Lang;
+  w: RoomWords;
+  focus: string | null;
+}) {
+  return (
+    <div className="pr-meet" data-testid="meet-the-team">
+      {roster.teams.map((team) => (
+        <section key={team.id} className="pr-team" data-team={team.id}>
+          <header className="pr-team-head">
+            <h3>{team.name}</h3>
+            <p>{team.about}</p>
+          </header>
+          {floor.desks
+            .filter((d) => d.card.team === team.id)
+            .map((desk) => (
+              <DeskCard
+                key={desk.card.id}
+                desk={desk}
+                lang={lang}
+                w={w}
+                rest={floor.phase === "rest"}
+                focused={focus === desk.card.id}
+              />
+            ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+export interface TeamPanelProps {
+  caseId: string;
+  // Tests and stories: a run instead of the reads, no replay on arrival, or no motion.
+  run?: Run;
+  roster?: Roster;
+  autoplay?: boolean;
+  reduced?: boolean;
+}
+
+export function TeamPanel({
+  caseId,
+  run: given,
+  roster: givenRoster,
+  autoplay = true,
+  reduced: forced,
+}: TeamPanelProps) {
+  const prefers = usePrefersReducedMotion();
+  const reduced = forced ?? prefers;
+  const read = useRun(given ? null : caseId);
+  const run = given ?? read;
+  const lang: Lang = run.card?.lang === "es" ? "es" : "en";
+  const fetched = useRoster(lang);
+  const roster = givenRoster ?? fetched;
+  const w = WORDS[lang];
+  const player = usePlayer(run.timeline, { auto: autoplay, still: reduced });
+  const floor = floorAt({
+    roster,
+    card: run.card,
+    timeline: run.timeline,
+    listing: run.listing,
+    at: player.at,
+    snapback: w.snapback,
+  });
+  const [tab, setTab] = useState<"live" | "team">("live");
+  const [focus, setFocus] = useState<string | null>(null);
+  const moving = !reduced && floor.phase === "running";
+
+  // The thread keeps its newest line in view, inside its own box: the page never jumps.
+  const thread = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const el = thread.current;
+    if (el && moving) el.scrollTop = el.scrollHeight;
+  }, [floor.log.length, moving]);
+
+  // Hand-offs: when work reaches a member, a mark travels to it from the Planner's light; when
+  // it is done, one travels on to the Decider's. Each is set off by a real step, once.
+  const strip = useRef<HTMLDivElement>(null);
+  const seen = useRef<Record<string, string>>({});
+  const nextId = useRef(0);
+  const [packets, setPackets] = useState<Packet[]>([]);
+  const states = floor.desks.map((d) => `${d.card.id}:${d.state}`).join(",");
+  useLayoutEffect(() => {
+    const box = strip.current;
+    const before = seen.current;
+    const now: Record<string, string> = {};
+    const fresh: Packet[] = [];
+    const centre = (id: string) => {
+      const el = box?.querySelector<HTMLElement>(`[data-agent="${id}"] .pr-strip-light`);
+      if (!el || !box) return null;
+      const a = el.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      return { x: a.left - b.left + a.width / 2, y: a.top - b.top + a.height / 2 };
+    };
+    const planner = floor.desks.find((d) => d.card.team === "planner")?.card.id;
+    const decider = floor.desks.find((d) => d.card.team === "decider")?.card.id;
+    for (const desk of floor.desks) {
+      const id = desk.card.id;
+      now[id] = desk.state;
+      if (!moving || before[id] === desk.state || id === planner || id === decider) continue;
+      const out = desk.state === "done";
+      if (!out && desk.state !== "working") continue;
+      const from = centre(out ? id : (planner ?? id));
+      const to = centre(out ? (decider ?? id) : id);
+      if (from && to)
+        fresh.push({ id: nextId.current++, x0: from.x, y0: from.y, x1: to.x, y1: to.y, out });
+    }
+    seen.current = now;
+    if (fresh.length > 0) setPackets((old) => [...old.slice(-8), ...fresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [states, moving]);
+  useEffect(() => {
+    if (!moving) setPackets([]);
+  }, [moving]);
+
+  const source = floor.source ?? run.card?.source ?? dataMode();
+  const status =
+    run.status === "missing"
+      ? w.missing
+      : run.status === "locked"
+        ? w.locked
+        : statusLine(floor, w);
+  const speeds: Speed[] = [1, 2];
+  const openDesk = (id: string) => {
+    setTab("team");
+    setFocus(id);
+  };
+
+  return (
+    <section
+      className="pr-panel"
+      aria-labelledby="pr-title"
+      data-testid="team-panel"
+      data-phase={floor.phase}
+      data-still={reduced ? "yes" : "no"}
+    >
+      <header className="pr-head">
+        <p className="pr-eyebrow ui-mono">
+          <span>{w.room}</span>
+          <Tag source={source} testId="team-source" />
+        </p>
+        <h2 id="pr-title">{w.team}</h2>
+        <p className="pr-status" role="status" aria-live="polite" data-testid="team-status">
+          {status}
+        </p>
+        <div className="pr-bar" aria-hidden="true">
+          <span style={{ transform: `scaleX(${floor.progress})` }} />
+        </div>
+        {run.timeline ? (
+          <div className="pr-controls">
+            <button
+              type="button"
+              className="pr-btn"
+              onClick={player.replay}
+              data-testid="team-replay"
+            >
+              {w.replay}
+            </button>
+            <span className="pr-speed" role="group" aria-label={w.speed}>
+              {speeds.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="pr-btn pr-btn-quiet"
+                  aria-pressed={player.speed === s}
+                  onClick={() => player.setSpeed(s)}
+                >
+                  {s}x
+                </button>
+              ))}
+            </span>
+            {player.playing ? (
+              <button
+                type="button"
+                className="pr-btn pr-btn-quiet"
+                onClick={player.skip}
+                data-testid="team-skip"
+              >
+                {w.skip}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {player.playing ? <p className="pr-note">{w.held}</p> : null}
+      </header>
+
+      <div className="pr-tabs" role="tablist" aria-label={w.team}>
+        <button
+          type="button"
+          role="tab"
+          id="pr-tab-live"
+          aria-selected={tab === "live"}
+          aria-controls="pr-pane-live"
+          onClick={() => setTab("live")}
+        >
+          {w.liveTab}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="pr-tab-team"
+          aria-selected={tab === "team"}
+          aria-controls="pr-pane-team"
+          onClick={() => setTab("team")}
+          data-testid="team-tab-meet"
+        >
+          {w.meet}
+        </button>
+      </div>
+
+      <div
+        id="pr-pane-live"
+        role="tabpanel"
+        aria-labelledby="pr-tab-live"
+        className="pr-pane"
+        hidden={tab !== "live"}
+      >
+        <div className="pr-strip-wrap" ref={strip}>
+          <AgentStrip desks={floor.desks} lang={lang} label={w.team} onPick={openDesk} />
+          {packets.map((p) => (
+            <span
+              key={p.id}
+              className={p.out ? "pr-packet pr-packet-out" : "pr-packet"}
+              aria-hidden="true"
+              style={
+                {
+                  "--x0": `${p.x0}px`,
+                  "--y0": `${p.y0}px`,
+                  "--x1": `${p.x1}px`,
+                  "--y1": `${p.y1}px`,
+                } as CSSProperties
+              }
+              onAnimationEnd={() => setPackets((old) => old.filter((q) => q.id !== p.id))}
+            />
+          ))}
+        </div>
+
+        <h3 className="pr-sub ui-mono">{w.thread}</h3>
+        <ol
+          className="pr-thread"
+          ref={thread}
+          data-testid="team-thread"
+          tabIndex={0}
+          aria-label={w.thread}
+        >
+          {floor.log.length === 0 ? <li className="pr-quiet">{w.threadEmpty}</li> : null}
+          {floor.log.map((line, i) => (
+            <li
+              key={`${line.step}-${i}`}
+              className="pr-line"
+              data-finding={line.finding ? "yes" : "no"}
+              data-tone={line.tone ?? "none"}
+              data-skipped={line.skipped ? "yes" : "no"}
+              data-testid="team-line"
+            >
+              <span className="pr-who ui-mono">{line.who}</span>
+              <span className="pr-said">{line.text}</span>
+              {line.finding ? null : (
+                <span className="pr-foot ui-mono">
+                  <Tag source={line.source} />
+                  {line.deskId && !line.skipped ? <span>{tookText(line.tookMs, lang)}</span> : null}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+        {floor.fellBack ? <p className="pr-note">{w.fellBack}</p> : null}
+
+        <div
+          className="pr-decider"
+          data-stamped={floor.verdict ? "yes" : "no"}
+          data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
+          data-testid="team-decider"
+        >
+          <p className="pr-who ui-mono">
+            {floor.desks.find((d) => d.card.team === "decider")?.card.name}
+          </p>
+          <div className="pr-stamp-slot">
+            {floor.verdict ? (
+              <p className="pr-stamp" data-testid="team-verdict">
+                {floor.verdict.headline}
+              </p>
+            ) : (
+              <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
+            )}
+          </div>
+          {floor.verdict && floor.verdict.reasons.length > 0 ? (
+            <>
+              <p className="pr-who ui-mono">{w.because}</p>
+              <ul className="pr-reasons">
+                {floor.verdict.reasons.map((reason) => {
+                  const desk = floor.desks.find((d) => d.card.id === reason.deskId);
+                  return (
+                    <li key={reason.text} data-testid="team-reason">
+                      <span>{reason.text}</span>
+                      {desk ? (
+                        <a
+                          className="case-text-link"
+                          href={`#desk-${desk.card.id}`}
+                          data-testid="team-reason-link"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            openDesk(desk.card.id);
+                          }}
+                        >
+                          {w.see} {desk.card.name}
+                        </a>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : null}
+          <p className="pr-rule">{w.deciderRule}</p>
+          {floor.verdict ? (
+            <a className="pr-btn pr-btn-link" href={answerHref(caseId)} data-testid="team-how">
+              {w.how} <span aria-hidden="true">→</span>
+            </a>
+          ) : null}
+        </div>
+      </div>
+      <div
+        id="pr-pane-team"
+        role="tabpanel"
+        aria-labelledby="pr-tab-team"
+        className="pr-pane"
+        hidden={tab !== "team"}
+      >
+        <MeetTheTeam
+          roster={roster}
+          floor={floor}
+          lang={lang}
+          w={w}
+          focus={tab === "team" ? focus : null}
+        />
+      </div>
+    </section>
+  );
+}

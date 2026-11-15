@@ -1,0 +1,151 @@
+// The Proof Room's own words. Agent names, jobs and tools come from the roster (GET /agents);
+// findings and the verdict come from the card. Spanish is kept short on purpose.
+import type { DeskState, Lang, Words } from "./model";
+
+export interface RoomWords extends Words {
+  room: string;
+  title: string;
+  lede: string;
+  restLink: string;
+  sample: string;
+  replay: string;
+  skip: string;
+  speed: string;
+  playing: string;
+  held: string;
+  state: Record<DeskState, string>;
+  waiting: string;
+  never: string;
+  evidence: string;
+  notChecked: string;
+  thread: string;
+  threadEmpty: string;
+  snapback: string;
+  deciderRule: string;
+  because: string;
+  see: string;
+  report: string;
+  locked: string;
+  missing: string;
+  fellBack: string;
+  plan: string;
+  codePlan: string;
+  liveTab: string;
+  meet: string;
+  deciderWaits: string;
+  team: string;
+  onIt: string;
+  watch: string;
+  summary: (checked: number, flags: number) => string;
+  how: string;
+  seeTeam: string;
+  runsOn: string;
+  code: string;
+}
+
+export const WORDS: Record<Lang, RoomWords> = {
+  en: {
+    room: "PROOF ROOM",
+    title: "Your check team, gathering the proof",
+    lede: "A small team checks the ad for you before you pay. Each one has one job, and you can see what it used and what it found.",
+    rest: "Run a check to watch them work",
+    restLink: "Run a check",
+    sample: "Watch a sample run",
+    checks: (done, total) => `${done} of ${total} checks done`,
+    setBy: (headline) => `code set the result: ${headline}`,
+    starting: "reading the ad",
+    replay: "Replay this run",
+    skip: "Skip to the result",
+    speed: "Speed",
+    playing: "Replaying the recorded run",
+    held: "Steps quicker than a second are held so you can read them. Times shown are the recorded ones.",
+    state: {
+      idle: "Waiting",
+      working: "Working",
+      done: "Done",
+      skipped: "Not checked",
+      unused: "Not used on this case",
+    },
+    waiting: "Waiting for its turn",
+    never: "Never",
+    evidence: "Evidence",
+    notChecked: "Not checked",
+    thread: "What the team is saying",
+    threadEmpty: "Nothing yet. The team speaks up as each check starts.",
+    snapback: "SNAPBACK",
+    deciderRule: "Code sets the verdict. No model can talk a renter into paying.",
+    because: "Because",
+    see: "See",
+    report: "Open the full report",
+    locked:
+      "This run opens only in the browser that started the check. Open it from your report there.",
+    missing: "We could not find that case.",
+    fellBack: "The agent stopped, so code finished the checks.",
+    plan: "Its to-do list",
+    codePlan: "Code ran the standard plan on this case.",
+    liveTab: "Live",
+    meet: "Meet the team",
+    deciderWaits: "Waiting for the team's evidence",
+    team: "Your check team",
+    onIt: "Your check team is on it",
+    watch: "Watch them work",
+    summary: (checked, flags) =>
+      `${checked} checked, ${flags === 0 ? "no red flags" : flags === 1 ? "1 found a red flag" : `${flags} found red flags`}`,
+    how: "See how they got this",
+    seeTeam: "See your check team work",
+    runsOn: "Runs on",
+    code: "code",
+  },
+  es: {
+    room: "SALA DE PRUEBAS",
+    title: "Tu equipo de revisión, reuniendo las pruebas",
+    lede: "Un equipo pequeño revisa el anuncio antes de que pagues. Cada uno tiene una tarea, y puedes ver qué usó y qué halló.",
+    rest: "Haz una revisión para verlos trabajar",
+    restLink: "Hacer una revisión",
+    sample: "Ver una revisión de muestra",
+    checks: (done, total) => `${done} de ${total} comprobaciones hechas`,
+    setBy: (headline) => `el código fijó el resultado: ${headline}`,
+    starting: "leyendo el anuncio",
+    replay: "Repetir esta revisión",
+    skip: "Ir al resultado",
+    speed: "Velocidad",
+    playing: "Repitiendo la revisión grabada",
+    held: "Los pasos de menos de un segundo se sostienen para poder leerlos. Los tiempos son los grabados.",
+    state: {
+      idle: "En espera",
+      working: "Trabajando",
+      done: "Hecho",
+      skipped: "No comprobado",
+      unused: "No se usó en este caso",
+    },
+    waiting: "Esperando su turno",
+    never: "Nunca",
+    evidence: "Pruebas",
+    notChecked: "No comprobado",
+    thread: "Lo que dice el equipo",
+    threadEmpty: "Nada aún. El equipo habla cuando empieza cada comprobación.",
+    snapback: "SNAPBACK",
+    deciderRule: "El código fija el resultado. Ningún modelo puede convencer a nadie de pagar.",
+    because: "Porque",
+    see: "Ver",
+    report: "Abrir el informe completo",
+    locked:
+      "Esta revisión solo se abre en el navegador que la empezó. Ábrela desde tu informe allí.",
+    missing: "No encontramos ese caso.",
+    fellBack: "El agente se detuvo, así que el código terminó las comprobaciones.",
+    plan: "Su lista de tareas",
+    codePlan: "El código siguió el plan estándar en este caso.",
+    liveTab: "En vivo",
+    meet: "Conoce al equipo",
+    deciderWaits: "Esperando las pruebas del equipo",
+    team: "Tu equipo de revisión",
+    onIt: "Tu equipo de revisión está en ello",
+    watch: "Verlos trabajar",
+    summary: (checked, flags) =>
+      `${checked} comprobados, ${flags === 0 ? "sin señales de alerta" : `${flags} con señales de alerta`}`,
+    how: "Ver cómo llegaron a esto",
+    seeTeam: "Ver a tu equipo de revisión trabajar",
+    runsOn: "Funciona con",
+    code: "código",
+  },
+};

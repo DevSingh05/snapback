@@ -18,6 +18,7 @@ import type {
 } from "../contracts";
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
+import { ReportTeam } from "../proofroom/ReportTeam";
 import { AnswerPanel } from "./AnswerPanel";
 import { Checks } from "./Checks";
 import { Ledger } from "./Ledger";
@@ -146,6 +147,7 @@ export function CaseResult({
       >
         {proof ? <ProofPair {...proof} handoff={own && !inline} /> : null}
       </VerdictBand>
+      {own ? <ReportTeam card={card} timeline={timeline} realListing={realListing} /> : null}
 
       {beside ? (
         <div
