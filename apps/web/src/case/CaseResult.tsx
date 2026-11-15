@@ -11,8 +11,10 @@ import { headlineOf, historySteps, shortDate } from "../cardStrings";
 import type { Card, CardLine, CardRowKind, CopyAlert, ReportPack } from "../contracts";
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
+import type { Lang } from "../lang";
 import { Checks } from "./Checks";
 import { Ledger } from "./Ledger";
+import { LangSwitch } from "./LangSwitch";
 import {
   VERDICT_TONE,
   checkedStamp,
@@ -58,6 +60,9 @@ export interface CaseResultProps {
   saferHref?: string;
   // Anything the page adds under the next steps (the safer places, the office check).
   children?: ReactNode;
+  // The report's language switch (EN | ES), when the caller can refetch in the other one.
+  lang?: Lang;
+  onLang?: (lang: Lang) => void;
 }
 
 export function CaseResult({
@@ -76,6 +81,8 @@ export function CaseResult({
   reportPack = null,
   saferHref: saferTo,
   children,
+  lang,
+  onLang,
 }: CaseResultProps) {
   const id = encodeURIComponent(card.case_id);
   const key = inline ? `-${card.case_id}` : "";
@@ -106,6 +113,7 @@ export function CaseResult({
           CASE <span data-testid="case-id">{card.case_id}</span>
         </span>
         <Tag source={card.source} testId="source-chip" />
+        {lang && onLang ? <LangSwitch lang={lang} onChange={onLang} /> : null}
       </p>
 
       <VerdictBand

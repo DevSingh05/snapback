@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { CaseNotFound, fetchCard } from "../api";
+import { CaseNotFound, apiBase, fetchCard } from "../api";
 import {
   CaseResult,
   VerdictBand,
@@ -12,6 +12,7 @@ import {
   useSaferPlaces,
 } from "../case";
 import "../case/case.css";
+import { asLang, loadLang, saveLang, type Lang } from "../lang";
 import { OfficeConfirm } from "../office/OfficeConfirm";
 import { replayForCase } from "../replay";
 import { Loading, Problem } from "../ui";
@@ -36,16 +37,36 @@ function ReplayLink({ caseId }: { caseId: string }) {
 
 // The card as a case result (design v4 ticket 3). The pieces live in ../case; this file only
 // loads the card and hangs the page's own extras under the next steps.
-export function CardView({ card, variant }: { card: Card; variant: "result" | "verify" }) {
+export function CardView({
+  card,
+  variant,
+  lang,
+  onLang,
+}: {
+  card: Card;
+  variant: "result" | "verify";
+  lang?: Lang;
+  onLang?: (lang: Lang) => void;
+}) {
   const proof = useProof(card);
   return (
-    <CaseResult card={card} variant={variant} proof={proof}>
+    <CaseResult card={card} variant={variant} proof={proof} lang={lang} onLang={onLang}>
       <ReplayLink caseId={card.case_id} />
     </CaseResult>
   );
 }
 
-function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) {
+function ResultPage({
+  card,
+  onChanged,
+  lang,
+  onLang,
+}: {
+  card: Card;
+  onChanged: () => void;
+  lang?: Lang;
+  onLang: (lang: Lang) => void;
+}) {
   const proof = useProof(card);
   const realListing = useRealListing(card.case_id, card.lang);
   const copyAlert = useCopyAlert(card.case_id, card.lang);
@@ -63,6 +84,8 @@ function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) 
       copyAlert={copyAlert}
       reportPack={reportPack}
       saferPlaces={saferPlaces}
+      lang={lang}
+      onLang={onLang}
     >
       <OfficeConfirm caseId={card.case_id} onChanged={onChanged} />
       <ReplayLink caseId={card.case_id} />
@@ -79,24 +102,41 @@ type Load =
 export function CardPage({ caseId, variant }: { caseId: string; variant: "result" | "verify" }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+  // ?lang=es opens in Spanish; else the viewer's last choice (see ../lang).
+  const [lang, setLang] = useState<Lang>(() => loadLang());
+  // With no API there is only the English fixture, so no switch.
+  const live = Boolean(apiBase());
+  const choose = (next: Lang) => {
+    saveLang(next);
+    setLang(asLang(next) ?? "en");
+  };
 
   useEffect(() => {
     const ctrl = new AbortController();
-    setLoad({ status: "loading" });
-    fetchCard(caseId, ctrl.signal)
+    // A new language keeps the report on screen until the other one lands; a new case, or a
+    // retry, starts from the loading band.
+    setLoad((was) =>
+      was.status === "ready" && was.card.case_id === caseId ? was : { status: "loading" },
+    );
+    fetchCard(caseId, ctrl.signal, lang)
       .then((card) => setLoad({ status: "ready", card }))
       .catch((err: unknown) => {
         if (ctrl.signal.aborted) return;
         setLoad({ status: err instanceof CaseNotFound ? "missing" : "error" });
       });
     return () => ctrl.abort();
-  }, [caseId, attempt]);
+  }, [caseId, attempt, lang]);
 
   if (load.status === "ready")
     return variant === "result" ? (
-      <ResultPage card={load.card} onChanged={() => setAttempt((n) => n + 1)} />
+      <ResultPage
+        card={load.card}
+        onChanged={() => setAttempt((n) => n + 1)}
+        lang={live ? lang : undefined}
+        onLang={choose}
+      />
     ) : (
-      <CardView card={load.card} variant={variant} />
+      <CardView card={load.card} variant={variant} lang={live ? lang : undefined} onLang={choose} />
     );
   if (load.status === "loading")
     return (
