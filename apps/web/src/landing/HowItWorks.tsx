@@ -42,7 +42,7 @@ export const STEPS: readonly Step[] = [
     key: "find",
     note: "If the check fails",
     title: "Find safer places",
-    text: "Leave that ad. Look at verified listings on Apartments.com, or ask for researched homes you can walk first.",
+    text: "Leave that ad. Search listings on Apartments.com, or ask for researched homes you can walk first.",
     src: heroBalconies,
     alt: "An apartment building with glass balconies under a pink sky",
   },

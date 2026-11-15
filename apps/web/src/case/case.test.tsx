@@ -25,12 +25,12 @@ import {
   realListingLink,
   saferTiles,
   stampPlace,
-  type ProofCard,
-  type RealListingData,
-  type SaferPlace,
 } from ".";
+import { sampleListing, samplePlace } from "./samples";
 
 const card = cardHold as Card;
+// The same card as an older API sent it: no summary and no two lists.
+const bare: Card = { ...card, summary: [], checks_out: [], does_not: [] };
 const HERE = __dirname;
 const sources = readdirSync(HERE)
   .filter((name) => /\.(ts|tsx|css|html)$/.test(name) && !name.includes(".test."))
@@ -76,7 +76,7 @@ describe("code sets the words", () => {
   );
 
   it("the one why sentence is the worst failing API line, as given, and the rest are counted", () => {
-    render(<CaseResult card={card} />);
+    render(<CaseResult card={bare} />);
     expect(flaggedLines(card).map((l) => l.text)).toEqual([
       "Zelle before a viewing. Red flag.",
       "NOT SHOWN. Being inside does not mean they may rent it.",
@@ -116,68 +116,74 @@ describe("a failed check", () => {
 });
 
 describe("one primary button", () => {
-  it("the result has exactly one, in the band", () => {
+  it("a result that did not pass has exactly one, in the band, pointing at what to do next", () => {
     render(<CaseResult card={card} />);
     expect(document.querySelectorAll(".case-primary")).toHaveLength(1);
     const primary = screen.getByTestId("case-primary");
-    expect(primary).toHaveTextContent("Walk it first");
-    expect(primary).toHaveAttribute("href", "/case/7Q2M/twin");
+    expect(primary).toHaveTextContent("What to do next");
+    expect(primary).toHaveAttribute("href", "#next");
+    expect(document.getElementById("next")).toBe(screen.getByTestId("case-todo"));
     expect(screen.getByTestId("case-band")).toContainElement(primary);
+    // The walk is the quiet link beside it, because a photo was placed.
+    expect(
+      within(screen.getByTestId("case-band")).getByRole("link", { name: "Walk it first" }),
+    ).toHaveAttribute("href", "/case/7Q2M/twin");
   });
 
-  it("with no photo placed the one primary is the safer places, not a walk", () => {
-    const unplaced: Card = {
-      ...card,
-      state: "unverified",
-      rows: card.rows.filter((r) => r.kind !== "place"),
-    };
-    render(<CaseResult card={unplaced} />);
+  it("a result that passed opens the walk; with no photo placed, the places instead", () => {
+    const passed = render(<CaseResult card={{ ...card, state: "verified" }} />);
+    expect(screen.getByTestId("case-primary")).toHaveAttribute("href", "/case/7Q2M/twin");
+    passed.unmount();
+    render(
+      <CaseResult
+        card={{ ...card, state: "verified", rows: card.rows.filter((r) => r.kind !== "place") }}
+      />,
+    );
     expect(document.querySelectorAll(".case-primary")).toHaveLength(1);
     expect(screen.getByTestId("case-primary")).toHaveTextContent("Find me safer places");
   });
 
-  it("the verify page has none, and one LIVE or FIXTURE tag", () => {
-    render(<CaseResult card={card} variant="verify" />);
+  it("the verify page has none, and one LIVE or FIXTURE tag in its head", () => {
+    render(<CaseResult card={bare} variant="verify" />);
     expect(document.querySelectorAll(".case-primary")).toHaveLength(0);
     expect(screen.getAllByTestId("source-chip")).toHaveLength(1);
+    expect(screen.queryByTestId("case-todo")).toBeNull();
+    expect(screen.queryByTestId("case-safer")).toBeNull();
   });
 });
 
-describe("what to do now", () => {
+describe("the Apartments.com hand-off", () => {
   it("a case that did not pass hands off to the Apartments.com search, labelled as a search", () => {
     render(<CaseResult card={card} />);
     const link = screen.getByTestId("case-handoff");
-    expect(link).toHaveTextContent("Search verified listings on Apartments.com");
+    expect(link).toHaveTextContent("Search listings on Apartments.com");
+    expect(link).not.toHaveTextContent(/verified/i);
     expect(link).toHaveAttribute("href", "https://www.apartments.com/houston-tx/");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByTestId("case-safer")).toContainElement(link);
   });
 
   it("a case that passed has no hand-off", () => {
     render(<CaseResult card={{ ...card, state: "verified" }} />);
     expect(screen.queryByTestId("case-handoff")).toBeNull();
+    expect(screen.queryByTestId("case-safer")).toBeNull();
   });
 });
 
-describe("beside the ledger", () => {
-  it("the real listing, else the pasted ad, sits in the side column; else the ledger is alone", () => {
+describe("the ad beside the real listing, and the ledger", () => {
+  it("the real listing and the pasted ad share one block; with neither it is not there", () => {
     const alone = render(<CaseResult card={card} />);
-    expect(document.querySelector(".case-side")).toBeNull();
-    expect(document.querySelector(".case-body-with-side")).toBeNull();
+    expect(screen.queryByTestId("case-beside")).toBeNull();
     alone.unmount();
     const ad = render(<CaseResult card={card} adText="2 bed near downtown." />);
-    expect(document.querySelector(".case-side")).toHaveAttribute("data-side", "ad");
-    expect(document.querySelector(".case-side")).toContainElement(screen.getByTestId("case-ad"));
+    expect(screen.getByTestId("case-beside")).toHaveAttribute("data-side", "ad");
+    expect(screen.getByTestId("case-beside")).toContainElement(screen.getByTestId("case-ad"));
     ad.unmount();
-    render(
-      <CaseResult
-        card={card}
-        adText="2 bed near downtown."
-        realListing={{ case_id: "7Q2M", source: "fixture", building_name: "Fixture Court" }}
-      />,
-    );
-    const side = document.querySelector(".case-body-with-side > .case-side")!;
-    expect(side).toHaveAttribute("data-side", "real");
-    expect(side.firstElementChild).toBe(screen.getByTestId("case-real"));
+    render(<CaseResult card={card} adText="2 bed near downtown." realListing={sampleListing()} />);
+    const beside = screen.getByTestId("case-beside");
+    expect(beside).toHaveAttribute("data-side", "real");
+    expect(beside.firstElementChild).toBe(screen.getByTestId("case-real"));
+    expect(beside).toContainElement(screen.getByTestId("case-ad"));
   });
 
   it("keeps every character of a NOT SHOWN line and leaves the state to the state word", () => {
@@ -377,7 +383,7 @@ describe("why this is not a good deal", () => {
   const summary = ["Sentence one from the card.", "Sentence two from the card."];
 
   it("prints the card's own summary sentences under the heading, in place of the fallback", () => {
-    render(<CaseResult card={{ ...card, summary } as ProofCard} />);
+    render(<CaseResult card={{ ...card, summary }} />);
     const block = screen.getByTestId("case-reasons");
     expect(block).toHaveTextContent("WHY THIS IS NOT A GOOD DEAL");
     expect(
@@ -389,40 +395,23 @@ describe("why this is not a good deal", () => {
   });
 
   it("a card that passed keeps its summary but not that heading", () => {
-    render(<CaseResult card={{ ...card, state: "verified", summary } as ProofCard} />);
+    render(<CaseResult card={{ ...card, state: "verified", summary }} />);
     const block = screen.getByTestId("case-reasons");
     expect(block).toHaveTextContent(summary[0]!);
     expect(block).not.toHaveTextContent("NOT A GOOD DEAL");
   });
 
   it("with no summary on the card the block is not there", () => {
-    render(<CaseResult card={card} />);
+    render(<CaseResult card={bare} />);
     expect(screen.queryByTestId("case-reasons")).toBeNull();
   });
 });
 
 describe("the real listing", () => {
-  // The shape of GET /cases/{id}/real-listing, filled from the synthetic record of demo case a.
-  const listing: RealListingData = {
-    case_id: "7Q2M",
-    source: "fixture",
-    which: "claimed",
-    building_name: "Fixture Court",
-    manager_company: record.manager_company,
-    website_host: record.website_host,
-    plans: record.floor_plan_rents
-      .filter((p) => p.beds === 2)
-      .map((p) => ({ ...p, units_available: 3 })),
-    photos_in_scan: 3,
-    photos_total: 3,
-    ad_rent: 900,
-    ad_asks_irreversible: true,
-    phone_is_office: "no",
-    figures_shown: true,
-    as_of: "2026-10-30",
-  };
+  // The shape of GET /cases/{id}/real-listing as contracts.ts has it.
+  const listing = sampleListing();
 
-  it("puts the ad beside the record, with the provenance line, the date and the chip", () => {
+  it("puts the ad beside the record and prints the API's own lines as given", () => {
     render(<RealListing listing={listing} />);
     const panel = screen.getByTestId("case-real");
     expect(within(panel).getByRole("heading", { name: "The ad" })).toBeInTheDocument();
@@ -431,53 +420,73 @@ describe("the real listing", () => {
         name: "Its Apartments.com listing on CoStar's record",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("real-provenance")).toHaveTextContent(
-      "3 of 3 of the ad's photos are in CoStar's own scan of this building. The ad's number is not the office's on record.",
-    );
+    expect(screen.getByTestId("real-headline").textContent).toBe(listing.headline);
+    expect(screen.getByTestId("real-provenance").textContent).toBe(listing.provenance);
+    expect(panel).toHaveTextContent(listing.phone_line!);
     expect(panel).toHaveTextContent("$900 a month");
-    expect(panel).toHaveTextContent("$1,600 to $1,900 a month · 3 units reported available");
+    expect(panel).toHaveTextContent("$1,600 to $1,900 a month");
     expect(panel).toHaveTextContent("Fixture Living LLC");
     expect(screen.getByTestId("real-source")).toHaveTextContent("FIXTURE");
-    expect(within(panel).getByTestId("record-line")).toHaveTextContent(
-      "COSTAR RECORD · AS OF 2026-10-30 · FIXTURE",
-    );
   });
 
-  it("has one button, to the availability link when there is one, else the building's site", () => {
-    const { unmount } = render(<RealListing listing={listing} />);
+  it("prints the as-of phrase once, as the API gave it, with LIVE or FIXTURE", () => {
+    render(<RealListing listing={listing} />);
+    const line = screen.getByTestId("real-record");
+    expect(line.textContent).toBe("COSTAR RECORD · as of CoStar's last research · FIXTURE");
+    expect(line.textContent).not.toMatch(/as of as of/i);
+  });
+
+  it("a line the API left out is not written here instead", () => {
+    render(
+      <RealListing
+        listing={sampleListing({ provenance: null, phone_line: null, phone_is_office: "no" })}
+      />,
+    );
+    expect(screen.queryByTestId("real-provenance")).toBeNull();
+    expect(screen.getByTestId("case-real")).not.toHaveTextContent(/number/i);
+  });
+
+  it("has one button, to the API's own link with the API's own label, and none without it", () => {
+    const { unmount } = render(
+      <RealListing listing={sampleListing({ cta_label: "See its listing" })} />,
+    );
     const link = screen.getByTestId("real-link");
-    expect(link).toHaveTextContent("See the real listing");
-    expect(link).toHaveAttribute("href", "https://fixtureliving.example");
+    expect(link).toHaveTextContent("See its listing");
+    expect(link).toHaveAttribute("href", "https://www.apartments.com/fixture-court/");
     expect(screen.getByTestId("case-real").querySelectorAll("a, button")).toHaveLength(1);
     unmount();
-    const withUrl = {
-      ...listing,
-      plans: [
-        { ...listing.plans![0]!, availability_url: "https://www.apartments.com/fixture-court/" },
-      ],
-    };
-    expect(realListingLink(withUrl)).toBe("https://www.apartments.com/fixture-court/");
+    // No link from the API: no button, and never one built from the host name.
+    expect(realListingLink(sampleListing({ cta_url: null }))).toBeNull();
+    render(<RealListing listing={sampleListing({ cta_url: null })} />);
+    expect(screen.queryByTestId("real-link")).toBeNull();
+    expect(screen.getByTestId("case-real").querySelectorAll("a")).toHaveLength(0);
   });
 
   it("never links to anything that is not a plain https address", () => {
-    expect(realListingLink({ ...listing, website_host: "javascript:alert(1)" })).toBeNull();
-    expect(realListingLink({ ...listing, website_host: "evil.example/path?x" })).toBeNull();
+    expect(realListingLink(sampleListing({ cta_url: "javascript:alert(1)" }))).toBeNull();
+    expect(realListingLink(sampleListing({ cta_url: "http://www.apartments.com/x" }))).toBeNull();
     expect(outLink("http://www.apartments.com/x")).toBeNull();
     expect(outLink("javascript:alert(1)")).toBeNull();
     expect(hostLink(" FixtureLiving.example ")).toBe("https://fixtureliving.example");
-    render(<RealListing listing={{ ...listing, website_host: null }} />);
-    expect(screen.queryByTestId("real-link")).toBeNull();
+    expect(hostLink("evil.example/path?x")).toBeNull();
   });
 
   it("leaves the rents out when the API says figures are not shown, and says so", () => {
-    render(<RealListing listing={{ ...listing, figures_shown: false }} />);
+    render(
+      <RealListing
+        listing={sampleListing({
+          figures_shown: false,
+          plans: [{ name: "2 bed / 2 bath", rent_min: 1600, rent_max: 1900, units_available: 3 }],
+        })}
+      />,
+    );
     const panel = screen.getByTestId("case-real");
-    expect(panel).not.toHaveTextContent("$1,600");
+    expect(within(panel).queryByText(/\$1,600 to/, { selector: "dd" })).toBeNull();
     expect(panel).toHaveTextContent("3 units reported available");
     expect(panel).toHaveTextContent("Rents are not shown on this run.");
   });
 
-  it("renders in the result only when the listing is there", () => {
+  it("renders in the report only when the listing is there", () => {
     const { unmount } = render(<CaseResult card={card} />);
     expect(screen.queryByTestId("case-real")).toBeNull();
     unmount();
@@ -489,14 +498,7 @@ describe("the real listing", () => {
 });
 
 describe("safer places to go to", () => {
-  const place = (n: number, url: string | null): SaferPlace => ({
-    property_id: `fx-${n}`,
-    floor_plan: "1 bed / 1 bath",
-    price_text: "$1,450 to $1,600 a month as of CoStar's last research",
-    source: "fixture",
-    handoff_url: url,
-    handoff_label: "Its listing on Apartments.com",
-  });
+  const place = (n: number, url: string | null) => samplePlace(n, { handoff_url: url });
   const places = [
     place(1, "https://www.apartments.com/fx-1/"),
     place(2, null),
@@ -520,10 +522,12 @@ describe("safer places to go to", () => {
     expect(tiles[0]).toHaveAttribute("target", "_blank");
     expect(tiles[0]).toHaveTextContent("SAFER: LISTED ON APARTMENTS.COM");
     expect(tiles[0]).toHaveTextContent("Its listing on Apartments.com");
-    // The step and the rail point at the tiles on this page.
-    expect(document.getElementById("safer")).toBe(screen.getByTestId("case-tiles"));
-    for (const link of screen.getAllByRole("link", { name: "Find me safer places like this" }))
-      expect(link).toHaveAttribute("href", "#safer");
+    // The tiles sit in the report's own section, under its heading.
+    const section = document.getElementById("safer")!;
+    expect(section).toContainElement(screen.getByTestId("case-tiles"));
+    expect(
+      within(section).getByRole("heading", { name: "Safer homes on Apartments.com" }),
+    ).toBeInTheDocument();
   });
 
   it("uses a hand-off only when it is a plain https link; otherwise the walk or the prep", () => {
@@ -547,11 +551,12 @@ describe("safer places to go to", () => {
     expect(shown[1]).not.toHaveTextContent("LISTED ON APARTMENTS.COM");
   });
 
-  it("only at the end of a result that did not pass; else the step goes to the Finder", () => {
+  it("only on a result that did not pass; one that passed keeps the step to the Finder", () => {
     const { unmount } = render(
       <CaseResult card={{ ...card, state: "verified" }} saferPlaces={places} />,
     );
     expect(screen.queryByTestId("case-tiles")).toBeNull();
+    expect(screen.queryByTestId("case-safer")).toBeNull();
     for (const link of screen.getAllByRole("link", { name: "Find me safer places like this" }))
       expect(link).toHaveAttribute("href", "/finder");
     unmount();

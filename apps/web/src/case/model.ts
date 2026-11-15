@@ -120,62 +120,43 @@ export interface AdMark {
 
 export const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
-// ---- the proof API (plan/proof-plan.md 3.1 to 3.3). These fields are optional and additive:
-// each block renders only when its field is present, so the page works before the API lands.
-// The shapes move to contracts.ts when the XO adds them there. ----
+// ---- the proof API. The shapes are the API's own, mirrored in contracts.ts; nothing here
+// restates them. Each block of the report renders only when its read came back. ----
+export type {
+  CopyAlert,
+  RealListing,
+  RealListingPlan,
+  ReportPack,
+  PlaceMatch as SaferPlace,
+} from "../contracts";
 
-/** Card.summary, Card.checks_out and Card.does_not: sentences written by code, never here. */
-export type ProofCard = Card & {
-  summary?: string[] | null;
-  checks_out?: string[] | null;
-  does_not?: string[] | null;
+// The standing list on every card names what no check covers, one word each. These are the plain
+// sentences for the words the API sends today; a word not listed here is shown as it came.
+const COULD_NOT: Record<string, string> = {
+  id: "We did not check anyone's ID.",
+  lease: "We did not read or check a lease.",
+  ownership: "We did not check who owns the home.",
 };
 
-export interface RealListingPlan {
-  name?: string | null;
-  beds?: number | null;
-  baths?: number | null;
-  rent_min?: number | null;
-  rent_max?: number | null;
-  units_available?: number | null;
-  availability_host?: string | null;
-  availability_url?: string | null;
+/** "What this check could not do": the card's standing list in plain words, then every line
+ *  the API marked not checked, as the API wrote it. Empty when the card has neither. */
+export function couldNotDo(card: Card): string[] {
+  const standing = card.not_checked.map(
+    (item) => COULD_NOT[item.trim().toLowerCase()] ?? `Not checked: ${item}.`,
+  );
+  const lines = card.rows.flatMap((row) =>
+    row.lines.filter((l) => l.tone === "not_checked").map((l) => `${l.label}: ${l.text}`),
+  );
+  return [...standing, ...lines];
 }
 
-/** GET /cases/{id}/real-listing. No phone digits and no street address are ever in it. */
-export interface RealListing {
-  case_id: string;
-  source: DataSource;
-  property_id?: string | null;
-  // "matched": the building the photos sit in; "claimed": the one the ad names.
-  which?: "claimed" | "matched";
-  building_name?: string | null;
-  manager_company?: string | null;
-  website_host?: string | null;
-  plans?: RealListingPlan[];
-  photos_in_scan?: number | null;
-  photos_total?: number | null;
-  ad_rent?: number | null;
-  ad_asks_irreversible?: boolean;
-  phone_is_office?: "yes" | "no" | "not_checked";
-  // False on a LIVE run without the figures flag: rents are then left out.
-  figures_shown?: boolean;
-  as_of?: string | null;
-}
+// A run of digits shaped like a phone number. The API never sends one in a draft; this keeps
+// it true on the page even if a draft ever carried one.
+const PHONE_DIGITS = /\(?\+?(?:\d[\s().-]*){9,}\d/g;
 
-/** A PlaceMatch from /alternatives, with the hand-off to its own listing when the API has one. */
-export interface SaferPlace {
-  property_id: string;
-  floor_plan?: string | null;
-  price_text?: string | null;
-  availability_text?: string | null;
-  scan_text?: string | null;
-  office_on_record?: string | null;
-  plan_key?: string | null;
-  has_3d_scan?: boolean;
-  source: DataSource;
-  handoff_url?: string | null;
-  handoff_label?: string | null;
+/** The text with any phone-shaped run of digits taken out. */
+export function withoutPhoneDigits(text: string): string {
+  return text.replace(PHONE_DIGITS, "[number not shown]");
 }
 
 const HOST = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;

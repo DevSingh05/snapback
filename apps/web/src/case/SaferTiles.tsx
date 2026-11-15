@@ -42,20 +42,11 @@ function kicker(tile: SaferTile): string {
   return onApartments(tile.href) ? "SAFER: LISTED ON APARTMENTS.COM" : "SAFER: ON COSTAR'S RECORD";
 }
 
-export function SaferTiles({
-  places,
-  id,
-  titleId = "case-safer-title",
-}: {
-  places: SaferPlace[];
-  id?: string;
-  titleId?: string;
-}) {
+export function SaferTiles({ places }: { places: SaferPlace[] }) {
   const tiles = saferTiles(places);
   if (tiles.length === 0) return null;
   return (
-    <section className="case-tiles" id={id} aria-labelledby={titleId} data-testid="case-tiles">
-      <h2 id={titleId}>A safer next step</h2>
+    <div className="case-tiles" data-testid="case-tiles">
       <p className="case-tiles-lead">
         Researched places like this one. See the rooms or the listing before you contact anyone.
       </p>
@@ -98,6 +89,6 @@ export function SaferTiles({
           );
         })}
       </ul>
-    </section>
+    </div>
   );
 }

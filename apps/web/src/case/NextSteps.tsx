@@ -16,7 +16,7 @@ export interface NextStep {
 // The hand-off when a case does not pass: CoStar's own rental site. The API gives no listing
 // address for it, so this is the site's Houston search page, and the label says it is a search.
 export const APARTMENTS_SEARCH = {
-  label: "Search verified listings on Apartments.com",
+  label: "Search listings on Apartments.com",
   href: "https://www.apartments.com/houston-tx/",
   external: true,
 } as const;

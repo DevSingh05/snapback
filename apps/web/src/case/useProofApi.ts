@@ -1,37 +1,57 @@
-// The two proof reads for the case page: the real listing and the researched places to go to
-// instead. On a live run both use the case's read token (in a header, never in an address);
-// in fixture mode the places are the team's synthetic ones and there is no real listing. With
-// no token, or a route that is not there yet, they give nothing and the page stands.
+// The report's reads beyond the card: the real listing, the draft note for the leasing office,
+// the report pack and the researched places to go to instead. Each is one GET with the case's
+// read token in a header (never in an address) and comes back in the API's own shape from
+// contracts.ts. With no API, no token, a 404 or any other failure a read gives null, and its
+// section of the report is simply not there; the rest of the page does not depend on it.
 import { useEffect, useState } from "react";
 
 import { apiBase, apiFetchRead } from "../api";
+import type { CopyAlert, RealListing, ReportPack } from "../contracts";
 import { fetchAlternatives } from "../search/api";
-import type { RealListing, SaferPlace } from "./model";
+import type { SaferPlace } from "./model";
 
-export function useRealListing(caseId: string): RealListing | null {
-  const [listing, setListing] = useState<RealListing | null>(null);
+const langOf = (lang: string | undefined) => (lang === "es" ? "es" : "en");
+
+/** One read of `/cases/{id}/<what>`; null until it lands, and null for good when it does not. */
+function useCaseRead<T>(caseId: string, what: string, lang?: string): T | null {
+  const [body, setBody] = useState<T | null>(null);
   useEffect(() => {
+    setBody(null);
     if (!apiBase()) return;
     const ctrl = new AbortController();
     (async () => {
       try {
         const res = await apiFetchRead(
-          `/cases/${encodeURIComponent(caseId)}/real-listing`,
+          `/cases/${encodeURIComponent(caseId)}/${what}?lang=${langOf(lang)}`,
           caseId,
-          {
-            signal: ctrl.signal,
-          },
+          { signal: ctrl.signal },
         );
         if (!res?.ok) return;
-        const body = (await res.json()) as RealListing;
-        if (!ctrl.signal.aborted) setListing(body);
+        const read = (await res.json()) as T;
+        if (!ctrl.signal.aborted) setBody(read);
       } catch {
-        // No panel: the rest of the result does not depend on it.
+        // No section: the rest of the report stands without it.
       }
     })();
     return () => ctrl.abort();
-  }, [caseId]);
-  return listing;
+  }, [caseId, what, lang]);
+  return body;
+}
+
+/** GET /cases/{id}/real-listing. A 404 means CoStar has no record of the building: null. */
+export function useRealListing(caseId: string, lang?: string): RealListing | null {
+  return useCaseRead<RealListing>(caseId, "real-listing", lang);
+}
+
+/** GET /cases/{id}/copy-alert: the draft, only when the API says it fires. It is never sent. */
+export function useCopyAlert(caseId: string, lang?: string): CopyAlert | null {
+  const alert = useCaseRead<CopyAlert>(caseId, "copy-alert", lang);
+  return alert?.fires ? alert : null;
+}
+
+/** GET /cases/{id}/report: the pack a renter can file. */
+export function useReportPack(caseId: string, lang?: string): ReportPack | null {
+  return useCaseRead<ReportPack>(caseId, "report", lang);
 }
 
 export function useSaferPlaces(caseId: string, wanted: boolean): SaferPlace[] {
@@ -41,7 +61,7 @@ export function useSaferPlaces(caseId: string, wanted: boolean): SaferPlace[] {
     const ctrl = new AbortController();
     fetchAlternatives(caseId, ctrl.signal)
       .then((found) => {
-        if (!ctrl.signal.aborted) setPlaces(found.matches as SaferPlace[]);
+        if (!ctrl.signal.aborted) setPlaces(found.matches);
       })
       .catch(() => {});
     return () => ctrl.abort();

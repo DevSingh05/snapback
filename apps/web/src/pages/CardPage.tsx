@@ -5,8 +5,10 @@ import {
   CaseResult,
   VerdictBand,
   expiryText,
+  useCopyAlert,
   useProof,
   useRealListing,
+  useReportPack,
   useSaferPlaces,
 } from "../case";
 import "../case/case.css";
@@ -45,7 +47,9 @@ export function CardView({ card, variant }: { card: Card; variant: "result" | "v
 
 function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) {
   const proof = useProof(card);
-  const realListing = useRealListing(card.case_id);
+  const realListing = useRealListing(card.case_id, card.lang);
+  const copyAlert = useCopyAlert(card.case_id, card.lang);
+  const reportPack = useReportPack(card.case_id, card.lang);
   const saferPlaces = useSaferPlaces(
     card.case_id,
     card.state === "hold" || card.state === "dont_pay",
@@ -56,6 +60,8 @@ function ResultPage({ card, onChanged }: { card: Card; onChanged: () => void }) 
       variant="result"
       proof={proof}
       realListing={realListing}
+      copyAlert={copyAlert}
+      reportPack={reportPack}
       saferPlaces={saferPlaces}
     >
       <OfficeConfirm caseId={card.case_id} onChanged={onChanged} />

@@ -16,9 +16,10 @@
 }
 .case-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 14px;
+  gap: 4px 14px;
   min-height: 52px;
   margin: 0;
   border-bottom: 1px solid var(--line);
@@ -868,4 +869,264 @@
   .case-row {
     animation: case-row 420ms var(--ease-out) calc(720ms + var(--i, 0) * 80ms) 1 backwards;
   }
+}
+
+/* ---------- the report (B5): its name, and the sections in reading order ---------- */
+.case-head-name {
+  margin-right: auto;
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+/* The ad beside the real listing. With both, the real listing takes the wide side. */
+.case-beside {
+  display: grid;
+  gap: var(--sp-6) 72px;
+  align-items: start;
+  padding-top: var(--sp-8);
+}
+.case-beside .case-real {
+  padding-top: 0;
+}
+@media (min-width: 1100px) {
+  .case-beside-two {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+  }
+}
+.case-real-prov {
+  max-width: 70ch;
+  margin: var(--sp-3) 0 0;
+  color: var(--muted);
+}
+
+/* What checks out and what doesn't: two columns on one rule, the failing side first. */
+.case-checks {
+  padding-top: var(--sp-8);
+}
+.case-checks-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+.case-checks-col {
+  min-width: 0;
+  padding: var(--sp-5) var(--sp-6) var(--sp-5) 0;
+}
+.case-checks-col + .case-checks-col {
+  padding-right: 0;
+  padding-left: var(--sp-6);
+  border-left: 1px solid var(--line);
+}
+.case-checks-col h3 {
+  margin: 0 0 var(--sp-4);
+  font-size: 1.1875rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.case-checks-col ul {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.case-checks-col li {
+  display: grid;
+  gap: 2px;
+  max-width: 58ch;
+  padding-left: 14px;
+  line-height: 1.45;
+}
+.case-checks-col[data-side="does-not"] li {
+  box-shadow: inset 3px 0 0 var(--st-mismatch);
+}
+.case-checks-col[data-side="checks-out"] li {
+  box-shadow: inset 3px 0 0 var(--st-ok);
+}
+.case-checks-col li b {
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .case-checks-col,
+  .case-checks-col + .case-checks-col {
+    padding: var(--sp-5) 0;
+    border-left: 0;
+  }
+  .case-checks-col + .case-checks-col {
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* What to do next: numbered steps down the page; the draft and the report sit inside theirs. */
+.case-todo,
+.case-safer {
+  padding-top: var(--sp-8);
+  scroll-margin-top: 72px;
+}
+.case-todo > h2,
+.case-safer > h2 {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink);
+}
+.case-todo-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: todo;
+}
+.case-todo-steps > li {
+  position: relative;
+  counter-increment: todo;
+  min-width: 0;
+  padding: var(--sp-5) 0 var(--sp-5) 64px;
+  border-bottom: 1px solid var(--line);
+}
+.case-todo-steps > li::before {
+  content: "0" counter(todo);
+  position: absolute;
+  top: calc(var(--sp-5) + 4px);
+  left: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--act);
+}
+.case-todo-steps h3 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.case-todo-steps > li > p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--muted);
+}
+.case-alert,
+.case-file-pack {
+  max-width: 760px;
+  margin-top: var(--sp-4);
+  padding: var(--sp-5);
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 var(--hi),
+    0 0 0 1px var(--line);
+}
+.case-alert-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin: 0 0 var(--sp-4);
+  color: var(--muted);
+}
+.case-alert-subject {
+  margin: 0 0 var(--sp-3);
+  font-weight: 800;
+}
+.case-alert-body p {
+  max-width: 66ch;
+  margin: 0 0 var(--sp-3);
+  line-height: 1.5;
+}
+.case-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: var(--sp-4) 0 0;
+}
+.case-copy .ui-btn-quiet {
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.case-copy-said,
+.case-alert-note {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.case-alert-note {
+  margin: var(--sp-3) 0 0;
+}
+.case-alert-note a,
+.case-file a {
+  color: var(--ink);
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+.case-file-pack ul,
+.case-file-agencies ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+.case-file-lead {
+  max-width: 62ch;
+  margin: var(--sp-4) 0 var(--sp-2);
+  color: var(--muted);
+}
+.case-file details {
+  max-width: 760px;
+  border-bottom: 1px solid var(--line);
+}
+.case-file summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 700;
+}
+.case-file details ol {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 var(--sp-4);
+  padding-left: 22px;
+}
+@media (max-width: 640px) {
+  .case-todo-steps > li {
+    padding-left: 0;
+    padding-top: calc(var(--sp-5) + 22px);
+  }
+  .case-todo-steps > li::before {
+    top: var(--sp-5);
+  }
+  .case-alert,
+  .case-file-pack {
+    padding: var(--sp-4);
+  }
+  .case-copy .ui-btn-quiet {
+    flex: 1 1 100%;
+  }
+}
+
+/* Safer homes: the tiles sit under the section's own heading. */
+.case-safer .case-tiles {
+  padding-top: 0;
+}
+.case-safer-more {
+  margin: var(--sp-5) 0 0;
+}
+
+/* The foot of the report: what the check could not do, then every check on the table. */
+.case-foot {
+  display: flex;
+  flex-direction: column;
+}
+.case-could-not {
+  padding-top: var(--sp-8);
+}
+.case-could-not ul {
+  display: grid;
+  gap: 8px;
+  max-width: 70ch;
+  margin: var(--sp-5) 0 0;
+  padding-left: 18px;
+  font-size: 1.0625rem;
+}
+.case-how {
+  margin: var(--sp-4) 0 0;
 }

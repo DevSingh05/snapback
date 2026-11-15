@@ -1,6 +1,7 @@
 // The case result pieces (design v4 ticket 3). The case page and the Home thread build from
 // the same ones.
 export { AnnotatedAd, markRuns } from "./AnnotatedAd";
+export { Checks } from "./Checks";
 export { CaseResult, type CaseResultProps } from "./CaseResult";
 export { Ledger, groupLines, type LedgerGroup } from "./Ledger";
 export {
@@ -16,12 +17,15 @@ export {
   outLink,
   type AdMark,
   type PriceFigures,
-  type ProofCard,
   type ProofData,
   type ProofPin,
   type ProofShot,
+  couldNotDo,
+  withoutPhoneDigits,
+  type CopyAlert,
   type RealListing as RealListingData,
   type RealListingPlan,
+  type ReportPack,
   type SaferPlace,
   type VerdictTone,
 } from "./model";
@@ -31,5 +35,6 @@ export { ProofPair, stampPlace } from "./ProofPair";
 export { RealListing, realListingLink } from "./RealListing";
 export { SaferTiles, saferTiles } from "./SaferTiles";
 export { useProof } from "./useProof";
-export { useRealListing, useSaferPlaces } from "./useProofApi";
+export { useCopyAlert, useRealListing, useReportPack, useSaferPlaces } from "./useProofApi";
 export { VerdictBand, type BandAction } from "./VerdictBand";
+export { AGENCIES, AlertDraft, FilePanel, WhatNext, reportText } from "./WhatNext";

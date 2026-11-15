@@ -1,23 +1,13 @@
 // The real listing: the ad on the left, and on the right what CoStar's record holds for the
-// building, side by side so a renter can see the gap. Every value is a field of
-// GET /cases/{id}/real-listing; a field the API left out is a row left out. Rents show only
-// when the API says figures may be shown. No phone digits and no street address ever appear.
+// building, side by side so a renter can see the gap. Every value and every sentence is a field
+// of GET /cases/{id}/real-listing (contracts.ts RealListing): the lead paragraph, the photo
+// line and the phone line are written by the API's code, never here. A field the API left out
+// is a row left out. Rents show only when the API says figures may be shown. No phone digits
+// and no street address ever appear.
 import "../ui/ui.css";
 import "./case.css";
-import { RecordLine, Tag } from "../ui";
-import {
-  dollars,
-  hostLink,
-  outLink,
-  type RealListing as Listing,
-  type RealListingPlan,
-} from "./model";
-
-const PHONE: Record<NonNullable<Listing["phone_is_office"]>, string> = {
-  yes: "The office's number on record",
-  no: "Not the office's number on record",
-  not_checked: "Not checked",
-};
+import { Tag } from "../ui";
+import { dollars, outLink, type RealListing as Listing, type RealListingPlan } from "./model";
 
 function rentOf(plan: RealListingPlan): string | null {
   const { rent_min: lo, rent_max: hi } = plan;
@@ -26,13 +16,10 @@ function rentOf(plan: RealListingPlan): string | null {
   return `${dollars((lo ?? hi)!)} a month`;
 }
 
-/** Where "See the real listing" goes: the availability link, else the building's own site. */
+/** Where "See the real listing" goes: the API's own link and nothing else. The page never
+ *  builds an address from a host name; with no link from the API there is no button. */
 export function realListingLink(listing: Listing): string | null {
-  for (const plan of listing.plans ?? []) {
-    const link = outLink(plan.availability_url) ?? hostLink(plan.availability_host);
-    if (link) return link;
-  }
-  return hostLink(listing.website_host);
+  return outLink(listing.cta_url);
 }
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -52,7 +39,6 @@ export function RealListing({
   listing: Listing;
   titleId?: string;
 }) {
-  const { photos_in_scan: placed, photos_total: total } = listing;
   const figures = listing.figures_shown === true;
   const plans = listing.plans ?? [];
   const link = realListingLink(listing);
@@ -63,12 +49,14 @@ export function RealListing({
         <h2 id={titleId}>The ad, next to the real listing</h2>
         <Tag source={listing.source} testId="real-source" />
       </header>
-      {placed != null && total ? (
-        <p className="case-real-lead" data-testid="real-provenance">
-          {placed} of {total} of the ad's photos are in CoStar's own scan of this building.
-          {listing.phone_is_office === "no"
-            ? " The ad's number is not the office's on record."
-            : ""}
+      {listing.headline ? (
+        <p className="case-real-lead" data-testid="real-headline">
+          {listing.headline}
+        </p>
+      ) : null}
+      {listing.provenance ? (
+        <p className="case-real-prov" data-testid="real-provenance">
+          {listing.provenance}
         </p>
       ) : null}
       <div className="case-real-cols">
@@ -87,10 +75,7 @@ export function RealListing({
                   : null
               }
             />
-            <Row
-              label="Phone"
-              value={listing.phone_is_office ? PHONE[listing.phone_is_office] : null}
-            />
+            <Row label="Phone" value={listing.phone_line} />
           </dl>
         </div>
         <div className="case-real-col" data-side="record">
@@ -114,7 +99,9 @@ export function RealListing({
           {!figures && plans.length > 0 ? (
             <p className="case-real-note">Rents are not shown on this run.</p>
           ) : null}
-          <RecordLine source="costar" date={listing.as_of} live={listing.source} />
+          <span className="ui-record" data-testid="real-record">
+            COSTAR RECORD · {listing.as_of} · {listing.source === "live" ? "LIVE" : "FIXTURE"}
+          </span>
           {link ? (
             <a
               className="ui-btn-quiet case-real-link"
@@ -123,7 +110,7 @@ export function RealListing({
               rel="noopener noreferrer"
               data-testid="real-link"
             >
-              See the real listing <span aria-hidden="true">↗</span>
+              {listing.cta_label ?? "See the real listing"} <span aria-hidden="true">↗</span>
             </a>
           ) : null}
         </div>

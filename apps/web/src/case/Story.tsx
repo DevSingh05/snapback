@@ -20,6 +20,7 @@ import {
   SaferTiles,
   type ProofPin,
 } from ".";
+import { sampleListing, samplePlace } from "./samples";
 
 const card = cardHold as Card;
 
@@ -116,36 +117,17 @@ export function Story() {
           </div>
         </div>
 
-        <RealListing
-          listing={{
-            case_id: card.case_id,
-            source: "fixture",
-            which: "claimed",
-            building_name: "Fixture Court",
-            manager_company: record.manager_company,
-            website_host: record.website_host,
-            plans: plan ? [plan] : [],
-            photos_in_scan: EVIDENCE_FIXTURE_A.photos.filter(
-              (p) => p.status === "located_in_claimed",
-            ).length,
-            photos_total: EVIDENCE_FIXTURE_A.photos.length,
-            ad_rent: Number.isFinite(listed) ? listed : null,
-            ad_asks_irreversible: false,
-            phone_is_office: "no",
-            figures_shown: true,
-            as_of: null,
-          }}
-        />
+        <RealListing listing={sampleListing()} />
 
         <SaferTiles
-          places={[1, 2, 3].map((n) => ({
-            property_id: `fx-story-${n}`,
-            floor_plan: plan?.name,
-            price_text: "Sample tile. The words here come from the API.",
-            source: "fixture" as const,
-            handoff_url: `https://${record.website_host}/`,
-            handoff_label: "The building's own site",
-          }))}
+          places={[1, 2, 3].map((n) =>
+            samplePlace(n, {
+              floor_plan: plan?.name,
+              price_text: "Sample tile. The words here come from the API.",
+              handoff_url: `https://${record.website_host}/`,
+              handoff_label: "The building's own site",
+            }),
+          )}
         />
 
         <CaseResult
