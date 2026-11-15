@@ -1,8 +1,10 @@
 """Runtime settings, read from the environment and an optional .env file."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
@@ -82,6 +84,10 @@ class Settings(BaseSettings):
     # deepagents_async has no request waiting on it, so unless SNAPBACK_AGENT_TIMEOUT_S is set
     # explicitly its default is this longer budget (measured: a full run takes about 25 s).
     snapback_agent_async_default_timeout_s: float = 60.0
+    # A queued background run that has had no worker for this long is given up on (the trace says
+    # so and code's result stands), and so is one still running this long past the time limit.
+    snapback_agent_queue_wait_s: float = Field(default=60.0, gt=0)
+    snapback_agent_run_grace_s: float = Field(default=20.0, gt=0)
     snapback_agent_model: str = "claude-sonnet-5-5"
     # The sub-agents (one per check family) read a few facts and write a note: a small, fast model.
     snapback_subagent_model: str = "claude-haiku-5-5"
@@ -91,6 +97,10 @@ class Settings(BaseSettings):
     # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
     langsmith_api_key: SecretStr | None = None
     langsmith_project: str = "snapback"
+    # The project's page in LangSmith, for the "LangSmith" link on the trace cards. A plain
+    # https address on smith.langchain.com with no query, fragment or sign-in in it: a key or
+    # a token never goes in an address, so anything else is dropped.
+    snapback_langsmith_url: str | None = None
     # Checks one renter (or one browser) may start per day, and a ceiling per network address
     # so that clearing cookies is not a way around it.
     snapback_daily_limit: int = 3
@@ -102,6 +112,22 @@ class Settings(BaseSettings):
     # A staged demo case from fixtures/demo (a, b or c), read from DEMO_CASE. With it set,
     # every new check runs on that case's stand-ins. Unset or empty for normal runs.
     demo_case: str | None = None
+
+    @field_validator("snapback_langsmith_url", mode="before")
+    @classmethod
+    def _a_plain_langsmith_address(cls, value: object) -> str | None:
+        url = str(value).strip() if value is not None else ""
+        try:
+            parts = urlsplit(url)
+            host = parts.hostname or ""
+        except ValueError:
+            return None
+        on_langsmith = host == "smith.langchain.com" or host.endswith(".smith.langchain.com")
+        plain = not (parts.query or parts.fragment or parts.username or parts.password)
+        # A key pasted into the path is still a key in an address.
+        if re.search(r"(lsv2_|sk-)", parts.path, re.IGNORECASE):
+            return None
+        return url if parts.scheme == "https" and on_langsmith and plain else None
 
     @field_validator("demo_case", mode="before")
     @classmethod

@@ -1,7 +1,9 @@
 // Home, while a check runs and right after: "Your check team is on it", one light per member.
 // Before the case exists nothing is known, so every member waits; no light is ever guessed.
 // Once it does, the lights are the case's recorded steps (read again each second while the
-// agent is still running), and "Watch them work" opens the live check screen for that case.
+// agent is still running), and "Watch them work" opens the live check screen for that case. The
+// link needs only the case's id, never a timeline: it is there the moment the case exists, even
+// while the first read is still on its way or cannot be had (the check screen asks for itself).
 import "./proofroom.css";
 import { AgentStrip } from "./AgentStrip";
 import { bundledRoster, floorAt, statusLine, type Lang } from "./model";
@@ -37,7 +39,7 @@ export function HomeTeam({ caseId, lang = "en" }: { caseId: string | null; lang?
         )}
       </p>
       <AgentStrip desks={team} lang={lang} label={w.team} />
-      {caseId && run.timeline ? (
+      {caseId ? (
         <a className="pr-home-link" href={teamHref(caseId)} data-testid="home-team-link">
           {w.watch} <span aria-hidden="true">→</span>
         </a>

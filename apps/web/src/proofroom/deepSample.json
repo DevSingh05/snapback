@@ -1,0 +1,526 @@
+{
+  "card": {
+    "case_id": "UWS3",
+    "source": "fixture",
+    "state": "hold",
+    "checked_at": "2026-11-14T21:46:26.107377-06:00",
+    "expires_at": "2026-11-15T21:46:26.107377-06:00",
+    "rows": [
+      {
+        "kind": "place",
+        "lines": [
+          {
+            "label": "Real",
+            "text": "Taken in this building, in the 2 bed / 2 bath floor plan (3 of 3 photos).",
+            "tone": "ok",
+            "source": null,
+            "key": "label.real"
+          }
+        ]
+      },
+      {
+        "kind": "person",
+        "lines": [
+          {
+            "label": "Here now",
+            "text": "Not checked (no one has been asked to prove they are inside yet).",
+            "tone": "not_checked",
+            "source": null,
+            "key": "label.here_now"
+          },
+          {
+            "label": "Allowed to rent it",
+            "text": "NOT SHOWN. Being inside does not mean they may rent it.",
+            "tone": "not_shown",
+            "source": null,
+            "key": "label.allowed"
+          }
+        ]
+      },
+      {
+        "kind": "price",
+        "lines": [
+          {
+            "label": "Payment ask",
+            "text": "Zelle and a deposit or holding fee before a viewing. Red flag.",
+            "tone": "red_flag",
+            "source": null,
+            "key": "label.payment_ask"
+          },
+          {
+            "label": "Pressure",
+            "text": "They say they cannot show the unit in person. Red flag.",
+            "tone": "red_flag",
+            "source": null,
+            "key": "label.pressure"
+          },
+          {
+            "label": "Rent vs record",
+            "text": "Not checked (our data has no rent for this building).",
+            "tone": "not_checked",
+            "source": null,
+            "key": "label.rent_vs_record"
+          }
+        ]
+      }
+    ],
+    "not_checked": ["ID", "lease", "ownership"],
+    "footer": [
+      "Two rules: never pay before a signed lease and a viewing; never pay by Zelle, wire or gift card.",
+      "Only trust a SNAPBACK result you asked for yourself. SNAPBACK never texts first or asks for money."
+    ],
+    "verify_url": "http://localhost:5173/c/UWS3",
+    "lang": "en",
+    "headline": "Hold off: it asks for money before you've seen the place",
+    "for_sale": null,
+    "summary": [
+      "Money or personal papers were asked for before any viewing.",
+      "We could not confirm who is allowed to rent this unit.",
+      "Nobody has proved they are inside the unit yet."
+    ],
+    "checks_out": [
+      "Real: Taken in this building, in the 2 bed / 2 bath floor plan (3 of 3 photos)."
+    ],
+    "does_not": [
+      "Allowed to rent it: NOT SHOWN. Being inside does not mean they may rent it.",
+      "Payment ask: Zelle and a deposit or holding fee before a viewing. Red flag.",
+      "Pressure: They say they cannot show the unit in person. Red flag."
+    ],
+    "has_evidence": false
+  },
+  "timeline": {
+    "case_id": "UWS3",
+    "source": "fixture",
+    "mode": "deepagents",
+    "fell_back": false,
+    "running": false,
+    "steps": [
+      {
+        "step": 0,
+        "label": "Read the ad",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Read what the ad says it is.",
+        "source": "fixture",
+        "by": "code",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 1,
+        "label": "Chose which checks to run",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "The building is in our data area and has a 3D twin.",
+        "source": "fixture",
+        "by": "code",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 2,
+        "label": "Placed 3 of 3 photos in its 3D scan",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Placing 3 listing photos in the twin.",
+        "source": "fixture",
+        "by": "code",
+        "kind": "locate",
+        "skipped": false
+      },
+      {
+        "step": 3,
+        "label": "Skipped the for-sale check",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Skipped listing brokerage: the home is not listed for sale right now.",
+        "source": "fixture",
+        "by": "code",
+        "kind": "for_sale",
+        "skipped": true
+      },
+      {
+        "step": 4,
+        "label": "Skipped the license lookup",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Skipped TREC license: the ad names no license to look up.",
+        "source": "fixture",
+        "by": "code",
+        "kind": "license",
+        "skipped": true
+      },
+      {
+        "step": 5,
+        "label": "Skipped the county's owner of record",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Skipped owner of record: no owner on record to read.",
+        "source": "fixture",
+        "by": "code",
+        "kind": "owner",
+        "skipped": true
+      },
+      {
+        "step": 6,
+        "label": "Found the building on CoStar's record",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Only one option was open.",
+        "source": "fixture",
+        "by": "code",
+        "kind": "record",
+        "skipped": false
+      },
+      {
+        "step": 7,
+        "label": "Put the report together",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Only one option was open.",
+        "source": "fixture",
+        "by": "code",
+        "kind": "report",
+        "skipped": false
+      },
+      {
+        "step": 8,
+        "label": "Matched the photos to a floor plan",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Plan A: 457 inliers vs 9.",
+        "source": "fixture",
+        "by": "code",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 9,
+        "label": "Picked a spot for the poster to photograph",
+        "started_ms": 0,
+        "took_ms": 0,
+        "result": "Random draw from the top 5; fx-spot-sink skipped because it overlaps a listing photo.",
+        "source": "fixture",
+        "by": "code",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 10,
+        "label": "Waited for a reply",
+        "started_ms": 0,
+        "took_ms": 473,
+        "result": "Waiting for the renter to approve the message. Nothing is sent until then.",
+        "source": "fixture",
+        "by": "code",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 11,
+        "label": "Wrote its plan (0 of 3 done)",
+        "started_ms": 473,
+        "took_ms": 355,
+        "result": "One todo per step; the agent keeps it up to date.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 12,
+        "label": "Handed the record checks to a sub-agent",
+        "started_ms": 828,
+        "took_ms": 1097,
+        "result": "Handed back its findings in a note.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": "record",
+        "skipped": false
+      },
+      {
+        "step": 13,
+        "label": "Handed the office-and-licence checks to a sub-agent",
+        "started_ms": 828,
+        "took_ms": 1096,
+        "result": "Handed back its findings in a note.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": "office-and-licence",
+        "skipped": false
+      },
+      {
+        "step": 14,
+        "label": "Handed the owner checks to a sub-agent",
+        "started_ms": 828,
+        "took_ms": 1137,
+        "result": "Handed back its findings in a note.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": "owner",
+        "skipped": false
+      },
+      {
+        "step": 15,
+        "label": "Handed the place checks to a sub-agent",
+        "started_ms": 828,
+        "took_ms": 1132,
+        "result": "Handed back its findings in a note.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": "place",
+        "skipped": false
+      },
+      {
+        "step": 16,
+        "label": "Handed the search checks to a sub-agent",
+        "started_ms": 828,
+        "took_ms": 1142,
+        "result": "Handed back its findings in a note.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": "search",
+        "skipped": false
+      },
+      {
+        "step": 17,
+        "label": "Wrote a working note",
+        "started_ms": 1925,
+        "took_ms": 0,
+        "result": "Derived text only; no result in it.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 18,
+        "label": "Wrote a working note",
+        "started_ms": 1925,
+        "took_ms": 0,
+        "result": "Derived text only; no result in it.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 19,
+        "label": "Wrote a working note",
+        "started_ms": 1960,
+        "took_ms": 0,
+        "result": "Derived text only; no result in it.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 20,
+        "label": "Wrote a working note",
+        "started_ms": 1965,
+        "took_ms": 0,
+        "result": "Derived text only; no result in it.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 21,
+        "label": "Wrote a working note",
+        "started_ms": 1970,
+        "took_ms": 0,
+        "result": "Derived text only; no result in it.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      },
+      {
+        "step": 22,
+        "label": "Wrote its plan (3 of 3 done)",
+        "started_ms": 2325,
+        "took_ms": 0,
+        "result": "One todo per step; the agent keeps it up to date.",
+        "source": "fixture",
+        "by": "agent",
+        "kind": null,
+        "skipped": false
+      }
+    ],
+    "todos": [
+      {
+        "content": "Hand each check to its member",
+        "done": true
+      },
+      {
+        "content": "Read the notes they hand back",
+        "done": true
+      },
+      {
+        "content": "Write the plain explanation and the tour questions",
+        "done": true
+      }
+    ],
+    "plan": ["record", "office-and-licence", "owner", "place", "search"],
+    "members": [
+      {
+        "kind": "planner",
+        "model": "Claude Sonnet",
+        "asked": null,
+        "tools": [
+          {
+            "tool": "write_todos",
+            "label": "Updated its to-do list",
+            "result": "0 of 3 steps done."
+          },
+          {
+            "tool": "task",
+            "label": "Handed work to: Phone and office agent",
+            "result": "The ad's contact could not be matched to the leasing office on record."
+          },
+          {
+            "tool": "task",
+            "label": "Handed work to: Owner and licence agent",
+            "result": "The county has no owner data for this address, so ownership is not confirmed."
+          },
+          {
+            "tool": "task",
+            "label": "Handed work to: Record agent",
+            "result": "The record has this building. No rent on record matches the ad's floor plan."
+          },
+          {
+            "tool": "task",
+            "label": "Handed work to: Photo agent",
+            "result": "All three photos were placed inside the building the ad names."
+          },
+          {
+            "tool": "task",
+            "label": "Handed work to: Finder",
+            "result": "Two places on the record fit the budget; both are in my note."
+          },
+          {
+            "tool": "write_todos",
+            "label": "Updated its to-do list",
+            "result": "3 of 3 steps done."
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          }
+        ],
+        "said": null,
+        "took_ms": 2573,
+        "model_calls": 5
+      },
+      {
+        "kind": "office-and-licence",
+        "model": "Claude Haiku",
+        "asked": "Compare the ad's contact with the leasing office on record. Yes or no only.",
+        "tools": [
+          {
+            "tool": "read_office_facts",
+            "label": "Read how the ad's contact compares with the leasing office",
+            "result": "Poster vs office on record: unknown; office: none on record; brokerage-only comparison: no; Phone vs office phone: not…"
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          }
+        ],
+        "said": "The ad's contact could not be matched to the leasing office on record.",
+        "took_ms": 718,
+        "model_calls": 3
+      },
+      {
+        "kind": "record",
+        "model": "Claude Haiku",
+        "asked": "Look up this building on CoStar's record and note what the ad gets right and wrong.",
+        "tools": [
+          {
+            "tool": "read_record_facts",
+            "label": "Read the facts on CoStar's record of the building",
+            "result": "Rent check: not checked; ad says … ; record no band; Floor plans on record: none; per-bed pricing: no"
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          }
+        ],
+        "said": "The record has this building. No rent on record matches the ad's floor plan.",
+        "took_ms": 714,
+        "model_calls": 3
+      },
+      {
+        "kind": "place",
+        "model": "Claude Haiku",
+        "asked": "Say where the ad's photos were placed in the building's 3D scan.",
+        "tools": [
+          {
+            "tool": "read_place_facts",
+            "label": "Read where the photos were placed in the 3D scan",
+            "result": "Photos: 3; 3 located in claimed; Rooms the placed photos fall in: none"
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          }
+        ],
+        "said": "All three photos were placed inside the building the ad names.",
+        "took_ms": 746,
+        "model_calls": 3
+      },
+      {
+        "kind": "owner",
+        "model": "Claude Haiku",
+        "asked": "Check the county's owner of record against who the ad says is renting it.",
+        "tools": [
+          {
+            "tool": "read_owner_facts",
+            "label": "Read the county's owner of record",
+            "result": "Owner of record: no owner data for this address"
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          }
+        ],
+        "said": "The county has no owner data for this address, so ownership is not confirmed.",
+        "took_ms": 746,
+        "model_calls": 3
+      },
+      {
+        "kind": "search",
+        "model": "Claude Haiku",
+        "asked": "Find other homes on CoStar's record that fit this renter's budget.",
+        "tools": [
+          {
+            "tool": "search_places",
+            "label": "Searched CoStar's record for places that fit",
+            "result": "Decision tradeoff: picked … more a month shows 2 more places. Raise the budget? (chosen by policy): Ask the question th…"
+          },
+          {
+            "tool": "write_file",
+            "label": "Wrote its working note",
+            "result": "Saved. Derived text only; no result in it."
+          }
+        ],
+        "said": "Two places on the record fit the budget; both are in my note.",
+        "took_ms": 747,
+        "model_calls": 3
+      }
+    ],
+    "trace_url": null
+  }
+}

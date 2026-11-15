@@ -45,8 +45,8 @@ const NAMES: Record<Lang, Record<Agent | "result" | "flag" | "title" | "full", s
 };
 
 const VERDICT = /worked out the result|calcul[oó] el resultado/i;
-// "The agent stopped, so code finished the checks" (timeline.fallback): its own line
-const FALLBACK = /the agent stopped|el agente se detuvo/i;
+// "The deep agent stopped: <reason>; code set the verdict" (timeline.fallback): its own line
+const FALLBACK = /agent(?:e)? (?:profundo )?(?:stopped|se detuvo)/i;
 // The only step results shown: the known timeline.result.* strings (src/snapback/card/strings.py).
 // Anything else is trace text ("Plan A: 457 inliers vs 9", "Only one option was open"), so only
 // the step's label is kept.
