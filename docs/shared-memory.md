@@ -27,7 +27,7 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (Sun 04:25)
+## Who is doing what (Sun 04:36)
 
 Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Freeze 04:30 (design stack w/worlds-scroll iterates to 06:15; hard stop 07:30). Standing merge OK: review PASS + green CI. Merge with `--subject "<title> (#N)" --body ""` only.
 
@@ -46,6 +46,7 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 ## Live facts
 
 - **main = 3f65762** (04:24): #343 3f65762, #344 839e86b. Freeze deploy @3f65762 asked 04:24 (#8). Earlier, main = 5e134e7 (04:08): #342 c889e31, #340 5e134e7 on a7f6d99 (shared memory) on 44fdef3. Freeze deploy @5e134e7 asked 04:09 (#8). Merged 03:55-03:58: #341 055954d, #335 44fdef3. Before: #339 641726c, #337 b22b83e, #336 3311405, #331 c739b1f, #326 11373e4. Main CI: 4c1feaa green; 055954d and 44fdef3 in progress at 03:59.
+- **04:35 live check (XO):** snapback-navy.vercel.app serves `index-DTQecwLo.js` (was `index-Dy-fdfeS.js` at 04:33); bundle contains #343 "A next step, drafted for you" and #344 "in a median of 2.5 days" = freeze code 3f65762 frontend is live. Vercel deployment id NOT posted yet (re-asked #8 04:36); plan/live.json not written. Main CI 5e5f776 3/3 green; 3f65762 python still running at 04:35.
 - **Which build is live on Vercel:** Dev reported 03:52 4c1feaa (dpl_4XfqJ1pwUiqatWCqxgbAVo3rFTTA READY, production); master-guardian owns `plan/live.json`, not refreshed by XO. Redeploy @44fdef3 asked 03:59 on #8.
 - SNAPBACK_VEXCEL_IN_VERDICT stays OFF (v2 held-out 8/9 next-door misses 90%; footprints gate FAILED 03:34, #327 held).
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only). Timeline, copy-alert, evidence-image all read the token from a header.
