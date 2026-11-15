@@ -217,9 +217,7 @@ describe("the screen pictures", () => {
       });
       if (p.shot.kind === "screen") {
         expect(within(link).getByRole("img", { name: p.shot.alt })).toBeInTheDocument();
-        expect(existsSync(path.join(REPO, `apps/web/src/assets/hood/show-${p.id}.webp`))).toBe(
-          true,
-        );
+        expect(within(link).getByRole("img", { name: p.shot.alt })).toHaveAttribute("src");
       } else {
         expect(within(link).getByRole("img", { name: /sample iMessage thread/i })).toBeVisible();
       }

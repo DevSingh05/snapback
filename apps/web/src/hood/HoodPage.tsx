@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
-import amazonShot from "../assets/hood/show-amazon.webp";
-import arlequinShot from "../assets/hood/show-arlequin.webp";
-import costarShot from "../assets/hood/show-costar.webp";
-import langchainShot from "../assets/hood/show-langchain.webp";
+import amazonShot from "../assets/hood/show-onebox.webp";
+import arlequinShot from "../assets/hood/show-rings.webp";
+import costarShot from "../assets/hood/show-scan.webp";
+import langchainShot from "../assets/hood/show-crew.webp";
 import "../ui/ui.css";
 import {
   LABEL_HINT,

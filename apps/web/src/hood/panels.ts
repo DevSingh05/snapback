@@ -85,7 +85,7 @@ export interface Panel {
   /** A short line under the links, for what cannot be shown in a browser. */
   aside?: string;
   /** The small picture of the Show me screen: a crop of the app's own screen in fixture mode
-   *  (assets/hood/show-<id>.webp), or the drawn sample thread. */
+   *  (assets/hood/show-*.webp, named for the screen), or the drawn sample thread. */
   shot: { kind: "screen"; alt: string } | { kind: "thread" };
 }
 
