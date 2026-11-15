@@ -277,3 +277,44 @@ def test_recorded_case_has_photos_off_every_stop_so_no_room_says_none_placed():
     body = _walk_client().get("/cases/fx-7Q2M/walk").json()
     assert body["plan"]["coverage"]["placed"] == 3
     assert all(s["ad_view"] != "none_placed" for s in body["plan"]["stops"])
+
+
+class _NoHomeNamed:
+    """A case whose ad named no home (as a pasted ad with no address is): the recorded case's
+    evidence, with the building known only through what the photos did or did not identify."""
+
+    def __init__(self, inner, identified: bool) -> None:
+        self._inner = inner
+        self.property_id = None
+        locate = inner.evidence.locate.model_copy(update={"identified_by_scan": identified})
+        self.evidence = inner.evidence.model_copy(update={"locate": locate})
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def _no_home_named(monkeypatch, client, identified: bool, case_id="fx-7Q2M"):
+    store = client.app.state.store
+    case = _NoHomeNamed(store.get(case_id), identified)
+    real = store.get
+    monkeypatch.setattr(store, "get", lambda cid: case if cid == case_id else real(cid))
+
+
+def test_a_case_whose_home_the_photos_identified_still_has_a_walk(monkeypatch):
+    client = _walk_client()
+    named = client.get("/cases/fx-7Q2M/walk").json()
+    _no_home_named(monkeypatch, client, identified=True)
+    res = client.get("/cases/fx-7Q2M/walk")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["model_id"] == named["model_id"]
+    assert [s["kind"] for s in body["plan"]["stops"]] == [s["kind"] for s in named["plan"]["stops"]]
+    assert body["plan"]["coverage"]["placed"] == named["plan"]["coverage"]["placed"]
+
+
+def test_a_case_with_no_home_named_or_identified_has_no_walk(monkeypatch):
+    client = _walk_client()
+    _no_home_named(monkeypatch, client, identified=False)
+    res = client.get("/cases/fx-7Q2M/walk")
+    assert res.status_code == 404
+    assert res.json()["detail"] == "This case has no building on record."

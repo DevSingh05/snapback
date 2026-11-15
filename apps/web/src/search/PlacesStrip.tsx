@@ -144,33 +144,55 @@ function PlaceRow({
         </p>
       )}
       {draft.status === "ready" && (
-        <section className="pf-draft">
-          <p className="pf-draft-to">
-            To: <strong>{draft.draft.addressee}</strong>
-          </p>
-          <label htmlFor={`draft-${place.property_id}-${place.plan_key ?? ""}`} className="sr-only">
-            Tour request draft
-          </label>
-          <textarea
-            id={`draft-${place.property_id}-${place.plan_key ?? ""}`}
-            className="pf-draft-text"
-            rows={6}
-            readOnly
-            value={draft.draft.text}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div className="pf-draft-actions">
-            <button type="button" className="pf-action" onClick={() => void copy(draft.draft.text)}>
-              Copy
-            </button>
-            <span role="status" className="pf-note">
-              {copied ? "Copied." : ""}
-            </span>
-          </div>
-          <p className="pf-note">We never send it for you. You copy it and send it yourself.</p>
-        </section>
+        <TourDraftView
+          draft={draft.draft}
+          id={`draft-${place.property_id}-${place.plan_key ?? ""}`}
+          copied={copied}
+          onCopy={() => void copy(draft.draft.text)}
+        />
       )}
     </li>
+  );
+}
+
+/** A drafted tour request to the leasing office on record. Never sent for the renter. */
+export function TourDraftView({
+  draft,
+  id,
+  copied,
+  onCopy,
+}: {
+  draft: TourDraft;
+  id: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <section className="pf-draft">
+      <p className="pf-draft-to">
+        To: <strong>{draft.addressee}</strong>
+      </p>
+      <label htmlFor={id} className="sr-only">
+        Tour request draft
+      </label>
+      <textarea
+        id={id}
+        className="pf-draft-text"
+        rows={6}
+        readOnly
+        value={draft.text}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <div className="pf-draft-actions">
+        <button type="button" className="pf-action" onClick={onCopy}>
+          Copy
+        </button>
+        <span role="status" className="pf-note">
+          {copied ? "Copied." : ""}
+        </span>
+      </div>
+      <p className="pf-note">We never send it for you. You copy it and send it yourself.</p>
+    </section>
   );
 }
 

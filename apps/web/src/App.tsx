@@ -10,6 +10,7 @@ import { AppShell, type Section } from "./shell/AppShell";
 import { FinderPage } from "./shell/FinderPage";
 import { ListingsPage } from "./shell/ListingsPage";
 import { loadPrefs, tabOf } from "./shell/prefs";
+import { StoriesPage } from "./stories/StoriesPage";
 import { TourPage } from "./tour/TourPage";
 import { TourPrepPage } from "./tourprep/TourPrepPage";
 import { TracePage } from "./trace/TracePage";
@@ -33,6 +34,7 @@ type Route =
   | { name: "confirm" }
   | { name: "investigate" }
   | { name: "replays" }
+  | { name: "stories" }
   | { name: "home" };
 
 export function matchRoute(path: string): Route {
@@ -40,6 +42,7 @@ export function matchRoute(path: string): Route {
   if (/^\/listings\/?$/.test(path)) return { name: "listings" };
   if (/^\/finder\/?$/.test(path)) return { name: "finder" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
+  if (/^\/stories\/?$/.test(path)) return { name: "stories" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
@@ -72,24 +75,27 @@ export default function App() {
   }, []);
 
   const route = matchRoute(path);
-  // The site's root opens on the view the renter chose to see first. /home is always Home.
+  // The site's root opens on Home. Only a tab in the bar can open first (prefs.clean), so an
+  // old saved choice never lands anyone on a page the front cut took out of the bar.
   useEffect(() => {
     const first = loadPrefs().first;
     if (window.location.pathname === "/" && first !== "home")
       window.location.replace(tabOf(first).href);
   }, []);
-  const section: Section | null =
+  const section: Section | "stories" | null =
     route.name === "home"
       ? "home"
-      : route.name === "map"
-        ? "map"
-        : route.name === "listings"
-          ? "listings"
-          : route.name === "finder"
-            ? "finder"
-            : route.name === "replays" || route.name === "replay"
-              ? "replays"
-              : null;
+      : route.name === "stories"
+        ? "stories"
+        : route.name === "map"
+          ? "map"
+          : route.name === "listings"
+            ? "listings"
+            : route.name === "finder"
+              ? "finder"
+              : route.name === "replays" || route.name === "replay"
+                ? "replays"
+                : null;
   // Inside a place, the bar says where you are.
   const here = window.location.pathname + window.location.search;
   const context =
@@ -97,7 +103,9 @@ export default function App() {
       ? { label: "Walk", href: here }
       : route.name === "prep-case" || route.name === "prep-place"
         ? { label: "Tour prep", href: here }
-        : null;
+        : route.name === "result" || route.name === "verify"
+          ? { label: "Report", href: here }
+          : null;
   if (route.name === "map") {
     return (
       <AppShell section="map">
@@ -118,6 +126,8 @@ export default function App() {
           <ListingsPage />
         ) : route.name === "finder" ? (
           <FinderPage />
+        ) : route.name === "stories" ? (
+          <StoriesPage />
         ) : route.name === "confirm" ? (
           <ConfirmPage />
         ) : route.name === "investigate" ? (

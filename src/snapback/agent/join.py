@@ -22,7 +22,7 @@ from snapback.agent.intake import Listing
 from snapback.agent.intake.claims import extract_claims
 from snapback.agent.locate_live import LiveLocate, LiveOutcome
 from snapback.agent.modules import ChallengeOutcome, FixtureModules
-from snapback.agent.rules import check_price
+from snapback.agent.rules import apply_rules, check_price
 from snapback.agent.rules.ad_vs_record import compare_ad_to_record
 from snapback.agent.rules.contact import check_authority
 from snapback.agent.rules.owner import check_owner
@@ -322,6 +322,12 @@ class JoinedModules:
         return self._listing.scope
 
     def rules(self, case_id: str) -> list[RuleHit]:
+        # Intake read the text before the record was known. With the record's own website, a
+        # credit-check link that goes to the building's own site is read again as the landlord's.
+        self._identify(case_id)
+        host = self._record.website_host if self._record is not None else None
+        if host:
+            return apply_rules(self._listing.text, own_host=host)
         return list(self._listing.rule_hits)
 
     def price(self, case_id: str) -> PriceResult | None:

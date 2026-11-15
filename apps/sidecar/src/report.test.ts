@@ -12,9 +12,14 @@ import {
 } from "./handler";
 import { stageOptions } from "./photon";
 
-const card = JSON.parse(
-  readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
-);
+// These tests pin the locked headline for the state, so the fixture's own headline (#256, built
+// by code and covered by its own test) is dropped here.
+const card = {
+  ...JSON.parse(
+    readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
+  ),
+  headline: undefined,
+};
 const THREAD = "fx-thread-renter";
 const LINK = `http://web.test/case/${card.case_id}`;
 const TOKEN = "fx-secret-write-token";
@@ -175,7 +180,9 @@ test("checks passed: the reasons are what checked out", () => {
 });
 
 test("a card from before #250 (no summary fields) still gets a report from its own lines", () => {
-  const text = reportText(card, LINK);
+  // The shared fixture card now carries #250's fields; take them off to stand for an older card.
+  const before250 = { ...card, summary: undefined, checks_out: undefined, does_not: undefined };
+  const text = reportText(before250, LINK);
   assert.match(text, /Payment ask: Zelle before a viewing/); // red flag first
   assert.match(text, /Full report:/);
 });

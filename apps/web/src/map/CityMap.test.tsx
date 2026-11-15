@@ -71,6 +71,7 @@ const base = {
   places,
   passed: new Set<string>(),
   look: "glass" as const,
+  theme: "dark" as const,
   padding: { top: 0, right: 0, bottom: 0, left: 0 },
   onPick: () => {},
   onMiss: () => {},

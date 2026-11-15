@@ -52,39 +52,39 @@ function animations(css: string): Array<{ value: string; inside: string[] }> {
 
 describe("zing pass", () => {
   it("gives each verdict its own band and keeps the locked headline", () => {
+    // Design v4 ticket 3: the band is matte and the verdict colour is the bar beside the headline.
     const band: Record<VerdictState, string> = {
-      dont_pay: "hero-coral",
-      hold: "hero-amber",
-      verified: "hero-teal",
-      unverified: "hero-blue",
+      dont_pay: "dont-pay",
+      hold: "hold",
+      verified: "ok",
+      unverified: "slate",
     };
     for (const state of Object.keys(band) as VerdictState[]) {
-      const { container, unmount } = render(
-        <CardView card={{ ...card, state }} variant="result" />,
+      const { unmount } = render(
+        <CardView card={{ ...card, state, headline: null }} variant="result" />,
       );
-      expect(container.querySelector(".hero")).toHaveClass(band[state]);
+      expect(screen.getByTestId("case-band")).toHaveAttribute("data-verdict", band[state]);
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(STATE_WORD[state]);
       unmount();
     }
   });
 
-  it("colours each chip by the word it shows, so one word always looks one way", () => {
+  it("colours each state square by the word it shows, so one word always looks one way", () => {
     const { container } = render(<CardView card={card} variant="result" />);
     const kinds = new Map<string, Set<string>>();
-    for (const chip of container.querySelectorAll<HTMLElement>(".tone")) {
-      const word = chip.textContent!.slice(1);
-      const kind = [...chip.classList].find((c) => c.startsWith("tone-is-"))!;
-      kinds.set(word, (kinds.get(word) ?? new Set()).add(kind));
+    for (const chip of container.querySelectorAll<HTMLElement>(".case-row .ui-state")) {
+      const word = chip.textContent!;
+      kinds.set(word, (kinds.get(word) ?? new Set()).add(chip.dataset.state!));
     }
     expect(kinds.size).toBeGreaterThan(1);
     for (const [word, set] of kinds) expect([...set], word).toHaveLength(1);
     expect(new Set([...kinds.values()].map((v) => [...v][0])).size).toBe(kinds.size);
-    expect([...kinds.get("Warning")!]).toEqual(["tone-is-warn"]);
+    expect([...kinds.get("Warning")!]).toEqual(["warn"]);
   });
 
   it("numbers the evidence lines in order so they land one after another", () => {
     const { container } = render(<CardView card={card} variant="result" />);
-    const order = Array.from(container.querySelectorAll<HTMLElement>(".evidence tbody tr")).map(
+    const order = Array.from(container.querySelectorAll<HTMLElement>(".case-ledger tbody tr")).map(
       (tr) => tr.style.getPropertyValue("--i"),
     );
     expect(order.length).toBeGreaterThan(1);

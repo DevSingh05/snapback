@@ -9,6 +9,8 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     GET  /cases/{case_id}/notes           the agent's working notes (read-only)
+    GET  /cases/{case_id}/timeline        what the agent did, step by step (?lang=en|es)
+    GET  /cases/{case_id}/timeline/stream the same, live (SSE), until the background agent is done
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
@@ -32,6 +34,7 @@ import json
 import re
 import secrets
 from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -49,6 +52,7 @@ from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
 from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
+from snapback.agent.timeline import CaseTimeline, build_timeline
 from snapback.api.card_cache import CardPictures
 from snapback.api.casefiles import ALIAS, CaseFiles
 from snapback.api.cases import (
@@ -75,12 +79,14 @@ from snapback.contracts import (
     AlternativesResponse,
     Card,
     CasePreferences,
+    CopyAlert,
     CreateCaseResponse,
     DataSource,
     Evidence,
     EvidenceFile,
     LocateStatus,
     PreferencesUpdate,
+    RealListing,
     RenterBrief,
     ReplyResponse,
     ReportResponse,
@@ -89,6 +95,7 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.copy_alert import copy_alert
 from snapback.events import EventBus
 from snapback.events.bus import seq_of
 from snapback.office.context import listing_context
@@ -116,6 +123,7 @@ from snapback.places_map import (
     source_of,
 )
 from snapback.preferences import merge as merge_preferences
+from snapback.real_listing import real_listing
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
@@ -230,6 +238,37 @@ async def _event_stream(events: EventBus, after: int, follow: bool) -> AsyncIter
                 quiet = 0.0
 
 
+TIMELINE_POLL_SECONDS = 0.25
+TIMELINE_STREAM_MAX_SECONDS = 180.0
+
+
+async def _timeline_stream(case: RecordedCase | SessionCase, lang: str) -> AsyncIterator[str]:
+    """The case's timeline now, then again each time it changes, until the background agent has
+    finished (or the cap). `event: timeline`, `data` is a CaseTimeline. A case with no agent at
+    work gets its one snapshot and the stream ends."""
+    last = ""
+    quiet = 0.0
+    waited = 0.0
+    while True:
+        running = case.agent_running  # read first: a step written after this is caught next lap
+        evidence = case.evidence
+        snapshot = build_timeline(
+            case.case_id, evidence.source, case.events(), evidence, lang, running=running
+        ).model_dump_json()
+        if snapshot != last:
+            last = snapshot
+            quiet = 0.0
+            yield f"event: timeline\ndata: {snapshot}\n\n"
+        if not running or waited >= TIMELINE_STREAM_MAX_SECONDS:
+            return
+        await asyncio.sleep(TIMELINE_POLL_SECONDS)
+        waited += TIMELINE_POLL_SECONDS
+        quiet += TIMELINE_POLL_SECONDS
+        if quiet >= KEEP_ALIVE_SECONDS:
+            yield ": keep-alive\n\n"
+            quiet = 0.0
+
+
 async def _trace_stream(
     case: RecordedCase | SessionCase, after: int, pace: float
 ) -> AsyncIterator[str]:
@@ -262,6 +301,7 @@ def create_app(
     office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
     finder_model: object | None = None,
+    case_model: Callable[[], object] | None = None,
     voice_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
@@ -270,7 +310,9 @@ def create_app(
     settings = settings or get_settings()
     # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
     lookups = lookups or KitLookups(settings.snapback_data_source)
-    store = CaseStore(settings, lookups)
+    # `case_model` makes the chat model for the deep agent on cases (tests pass a scripted one);
+    # it is used only when SNAPBACK_AGENT=deepagents.
+    store = CaseStore(settings, lookups, agent_model=case_model)
     if registry is _DEFAULT:
         registry = SafetyRegistry(settings.snapback_data_dir)
     # One allowance per renter or per browser, and a ceiling per network address so that
@@ -284,7 +326,12 @@ def create_app(
     search_limit = PerMinuteLimit(SEARCH_PER_MINUTE)
     chooser = search_chooser or search_chooser_for(settings.snapback_agent)
 
-    app = FastAPI(title="SNAPBACK API", version="0.0.1")
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        store.shutdown_agents()  # queued background agent runs are dropped, none start late
+
+    app = FastAPI(title="SNAPBACK API", version="0.0.1", lifespan=lifespan)
     app.state.store = store
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
@@ -660,6 +707,93 @@ def create_app(
             update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
         )
 
+    def proof_inputs(case: RecordedCase | SessionCase):
+        """The claimed and the matched building's records and the ad's beds and unit, for the
+        real-listing panel and the copy alert. 503 when the kit is missing."""
+        try:
+            # A session case's property id comes from the form only; when the photos identified the
+            # building (the ad named none), locate holds it, as RecordedCase reads it.
+            locate = case.evidence.locate
+            claimed_id = case.property_id or (locate.claimed_property_id if locate else None)
+            claimed = lookups.record(claimed_id) if claimed_id else None
+            matched_id = matched_id_of(case)
+            matched = lookups.record(matched_id) if matched_id else None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        listing = getattr(case, "listing", None)
+        beds = getattr(listing, "beds", None)
+        if beds is None and case.evidence.price is not None:
+            beds = case.evidence.price.compared_beds
+        return claimed, matched, beds, getattr(listing, "unit", None)
+
+    @app.get("/cases/{case_id}/real-listing")
+    def get_real_listing(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> RealListing:
+        """The ad's building as CoStar's record has it, beside what the ad says. The building
+        the photos were placed in wins when it is not the claimed one. Record figures show for a
+        LIVE case only when SNAPBACK_SHOW_RECORD_FIGURES is on. Needs the case's read token in a
+        header; a token in the address is refused. Never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers["Cache-Control"] = "no-store"
+        modules = case.evidence
+        claimed, matched, beds, unit = proof_inputs(case)
+        panel = real_listing(
+            modules,
+            claimed,
+            matched,
+            settings,
+            ad_beds=beds,
+            ad_unit=unit,
+            lang=lang,
+        )
+        if panel is None:
+            raise HTTPException(status_code=404, detail=strings.text("real.no_record", lang))
+        return panel.model_copy(update={"case_id": case_id})
+
+    @app.get("/cases/{case_id}/copy-alert")
+    def get_copy_alert(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CopyAlert:
+        """A DRAFT note for the leasing office on record when the ad's photos sit in its
+        building's scan and the ad's number is not the office's. Nothing is ever sent. Same
+        token rule as the real-listing route: header only, never in the address. Never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers["Cache-Control"] = "no-store"
+        claimed, matched, beds, unit = proof_inputs(case)
+        pack = build_report(
+            case.evidence,
+            case.card(settings.snapback_public_base_url, lang),
+            case_id=case_id,
+            lang=lang,
+            aerial=case.property_id is not None,
+        )
+        return copy_alert(
+            case.evidence,
+            claimed,
+            matched,
+            settings,
+            case_id=case_id,
+            ad_beds=beds,
+            ad_unit=unit,
+            report_ready=pack.reportable,
+            lang=lang,
+        )
+
     @app.get("/cases/{case_id}/aerial/{side}.jpg")
     def get_aerial_image(
         case_id: str,
@@ -995,6 +1129,50 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         return case.notes()
 
+    @app.get("/cases/{case_id}/timeline", response_model=CaseTimeline)
+    def get_timeline(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseTimeline:
+        """What the agent did, in order: each step's plain label, when it started, how long it
+        took, a short result, LIVE or FIXTURE, and whether the agent or code did it; plus the
+        agent's todo list and sub-agents when the deep agent ran. Built from the trace; no
+        phone, address or rent in any label. Read token in a header only; never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers.update(NO_STORE)
+        evidence = case.evidence
+        return build_timeline(
+            case.case_id, evidence.source, case.events(), evidence, lang, running=case.agent_running
+        )
+
+    @app.get("/cases/{case_id}/timeline/stream")
+    def get_timeline_stream(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        """The timeline as server-sent events while the deep agent works the case in the
+        background: `event: timeline`, `data` is a CaseTimeline, sent whenever a step lands, and
+        the stream ends once the agent has finished (its last event has `running: false`).
+        Read token in `Authorization: Bearer` or `X-Case-Token`, never in the address (401).
+        A browser reads it with `fetch`, not EventSource, which cannot send a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        return StreamingResponse(
+            _timeline_stream(case, lang),
+            media_type="text/event-stream",
+            headers={**NO_STORE, "X-Accel-Buffering": "no"},
+        )
+
     @app.post("/search")
     def post_search(
         brief: RenterBrief,
@@ -1186,7 +1364,13 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         try:
             return agentic_alternatives(
-                case, lookups, chooser, n, case.preferences, settings.snapback_data_source
+                case,
+                lookups,
+                chooser,
+                n,
+                case.preferences,
+                settings.snapback_data_source,
+                settings.snapback_show_record_figures,
             )
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
@@ -1317,14 +1501,24 @@ def create_app(
             plan = tour_for(other, None, any_plan=True, model_id=model)
             plan, fields = map_elsewhere(plan, locate, other, office_of(other))
             return with_summary(choose_walk(plan)), locate, fields, model
-        if case.property_id is None:
+        if walk_home(case) is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
         return claimed_walk(case, locate)
+
+    def walk_home(case) -> str | None:
+        """The home a case's walk is of: the one the ad named, else the one its photos
+        identified (a pasted ad with no address, placed by the scan alone). None when neither."""
+        if case.property_id is not None:
+            return case.property_id
+        locate = case.evidence.locate
+        if locate is not None and locate.identified_by_scan:
+            return locate.claimed_property_id
+        return None
 
     def claimed_walk(case, locate) -> tuple:
         """The case's own building walk (the claimed home), with its placed photos and summary."""
         model = scan_model_of(locate)
-        plan = tour_for(case.property_id, None, any_plan=True, model_id=model)
+        plan = tour_for(walk_home(case), None, any_plan=True, model_id=model)
         if locate is None:
             return with_summary(plan), None, {}, model
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
@@ -1454,7 +1648,7 @@ def create_app(
     def rooms_line_for(case, property_id: str) -> str | None:
         """The rooms the ad left out, only for the case's own building and only when the walk
         knows them. Any trouble building the walk just leaves the line out."""
-        if case.property_id is None or case.property_id != property_id:
+        if walk_home(case) != property_id:
             return None
         try:
             return rooms_to_see_line(claimed_walk(case, case.evidence.locate)[0])

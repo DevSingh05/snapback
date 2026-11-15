@@ -148,3 +148,16 @@ def test_notes_need_the_read_token_in_a_header_and_are_written_by_code_in_policy
     assert all(n["path"].startswith(f"/case/{body['case_id']}/") for n in body["notes"])
     # derived text only: no image data, nothing that looks like a phone number
     assert not any("base64" in n["text"] or PHONE.search(n["text"]) for n in body["notes"])
+
+
+def test_alternatives_carry_a_hand_off_link_in_a_fixture_case_and_never_a_phone(client):
+    case = new_case(client)
+    got = client.get(
+        f"/cases/{case['case_id']}/alternatives?n=10",
+        headers={"Authorization": f"Bearer {case['read_token']}"},
+    ).json()
+    assert any(m["handoff_url"] for m in got["matches"])  # the fixture kit has a site on record
+    for m in got["matches"]:
+        assert m["handoff_url"] is None or m["handoff_url"].startswith("https://")
+        assert m["handoff_url"] is None or m["handoff_label"]
+        assert not PHONE.search(str(m["handoff_url"]))

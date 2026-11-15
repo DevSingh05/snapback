@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 
 describe("replay index", () => {
-  it("lists every file in demo/replays, with title, pattern, source, date and link", () => {
+  it("lists every file in demo/replays, with title, pattern, source and date, and no source link", () => {
     expect(FILES.length).toBeGreaterThan(0);
     const demo = bundledReplays().filter((r) => FILES.includes(`${r.slug}.json`));
     expect(demo.map((r) => `${r.slug}.json`).sort()).toEqual([...FILES].sort());
@@ -60,10 +60,10 @@ describe("replay index", () => {
       const row = within(rows.find((li) => li.dataset.slug === r.slug) as HTMLElement);
       expect(row.getByRole("link", { name: r.title })).toHaveAttribute("href", `/replay/${r.slug}`);
       if (r.source) {
-        expect(row.getByRole("link", { name: r.source.name })).toHaveAttribute(
-          "href",
-          r.source.url,
-        );
+        // The source is named in plain text and never linked (it can print a renter's name).
+        expect(row.getByText(new RegExp(r.source.name))).toBeInTheDocument();
+        expect(row.queryByRole("link", { name: r.source.name })).toBeNull();
+        expect(row.getAllByRole("link")).toHaveLength(1);
       }
     }
   });
@@ -126,16 +126,16 @@ describe("replay page", () => {
     );
   });
 
-  it("ends every sourced replay with the replay sentence, the source and the link", () => {
+  it("ends every sourced replay with the replay sentence and the source, as plain text", () => {
     render(<ReplayView replay={sourced} lang="en" />);
     const foot = screen.getByTestId("replay-footer");
     expect(foot).toHaveTextContent(
       "Replay of a reported case (ABC13 Houston, Feb 15, 2025). The listing and house are re-created; no real names.",
     );
-    expect(within(foot).getByRole("link", { name: "Source" })).toHaveAttribute(
-      "href",
-      "https://example.org/x",
-    );
+    // The source is cited as plain text: no link out of the replay page.
+    expect(within(foot).queryByRole("link")).toBeNull();
+    expect(screen.getByTestId("source-name")).toHaveTextContent("ABC13 Houston");
+    expect(document.querySelector('a[href="https://example.org/x"]')).toBeNull();
   });
 
   it("writes that footer in Spanish", () => {

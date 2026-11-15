@@ -13,6 +13,7 @@ creating a case in live mode says so instead of pretending.
 
 import json
 import logging
+import os
 import secrets
 import threading
 from collections.abc import Callable
@@ -28,6 +29,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
+from snapback.agent.background import BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
@@ -43,6 +45,8 @@ from snapback.contracts import (
     CasePreferences,
     CaseProgress,
     DataSource,
+    ForSaleMatch,
+    ForSaleStatus,
     ModuleEvidence,
     PresenceStatus,
     PropertyRecord,
@@ -112,6 +116,7 @@ class RecordedCase:
     read_token = None
     # What the renter rejected; a recorded case is read-only, so this stays empty.
     preferences = CasePreferences()
+    agent_running = False  # no agent works a recorded case
 
     def __init__(
         self,
@@ -209,7 +214,16 @@ class SessionCase:
         self.property_id: str | None = None  # our id for the building the listing claims
         self.files: CaseFiles | None = None  # evidence file, notes and pictures (E3 serves them)
         self._checked_at: datetime | None = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        # Evidence an agent adds waits for the policy's turn. Re-entrant, so a caller already
+        # inside the case cannot deadlock on it.
+        session.evidence_lock = self._lock
+        self.agents: BackgroundAgents | None = None  # set when the agent runs in the background
+
+    @property
+    def agent_running(self) -> bool:
+        """The deep agent is still working this case in the background (queued or running)."""
+        return self.agents is not None and self.agents.running(self.case_id)
 
     @property
     def listing(self) -> Listing:
@@ -372,31 +386,113 @@ def _policy_runner(session: CaseSession) -> object:
         refresh_policy_notes(session)  # the same notes, written by code
 
 
-def _deepagents_runner(settings: Settings | None = None) -> Callable[[CaseSession], object]:
-    """A runner that drives each case with its own deep agent, falling back to the policy."""
-    agents: dict[str, object] = {}
-    if settings is not None:
-        try:
-            from snapback.agent.graph import enable_langsmith
+def _setup_langsmith(settings: Settings) -> None:
+    """Trace with LangSmith when a key is set (settings or the environment). Only the project name
+    is set here; each run's metadata is the case id and the mode, nothing from the ad."""
+    try:
+        from snapback.agent.graph import enable_langsmith
 
-            key = settings.langsmith_api_key
-            enable_langsmith(key.get_secret_value() if key else None, settings.langsmith_project)
+        key = settings.langsmith_api_key
+        enable_langsmith(key.get_secret_value() if key else None, settings.langsmith_project)
+    except Exception:
+        log.warning("LangSmith tracing could not be set up; carrying on without it")
+
+
+def _background_job(
+    case: "SessionCase", settings: Settings, model_factory: Callable[[], object] | None
+) -> Callable[[], None]:
+    """What one background run does: build the advisory agent (main model for the plan, the small
+    one for the sub-agents) and run it within the time limit. Any failure is a trace line, never
+    an exception, and never touches the result."""
+
+    def model(name: str, max_tokens: int) -> object:
+        if model_factory is not None:
+            return model_factory()
+        from snapback.agent.graph import build_model
+
+        key = settings.anthropic_api_key
+        if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError("no model key")
+        return build_model(
+            key.get_secret_value() if key else None,
+            name,
+            settings.agent_timeout_s,
+            max_tokens,
+            "low",
+        )
+
+    def run() -> None:
+        session = case.session
+        try:
+            from snapback.agent.graph import build_advisory_agent, run_advisory
+
+            agent = build_advisory_agent(
+                session,
+                model(settings.snapback_agent_model, 2048),
+                subagent_model=model(settings.snapback_subagent_model, 1024),
+            )
         except Exception:
-            log.warning("LangSmith tracing could not be set up; carrying on without it")
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
+            return
+        run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+
+    return run
+
+
+def _deepagents_runner(
+    settings: Settings | None = None, model_factory: Callable[[], object] | None = None
+) -> Callable[[CaseSession], object]:
+    """A runner that drives each case with its own deep agent, falling back to the policy.
+
+    The agent plans (its todo list), orders the checks and hands each family to a sub-agent;
+    `decide()` still sets the result. It gets `snapback_agent_timeout_s` per run. On any error
+    or on the time limit the trace says so, code finishes the case, and that case stays on the
+    policy from then on. `model_factory` makes the chat model (tests); by default Claude, with
+    the key from settings (read from the environment), never printed."""
+    agents: dict[str, object] = {}
+    timeout_s = settings.agent_timeout_s if settings is not None else None
+    if settings is not None:
+        _setup_langsmith(settings)
+
+    def make_model() -> object:
+        if model_factory is not None:
+            return model_factory()
+        from snapback.agent.graph import build_model
+
+        key = settings.anthropic_api_key if settings is not None else None
+        if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError("no model key")
+        return build_model(
+            key.get_secret_value() if key else None,
+            settings.snapback_agent_model if settings is not None else None,
+            timeout_s,
+        )
+
+    def policy(session: CaseSession) -> object:
+        try:
+            return run_case(session, PolicyChooser())
+        finally:
+            refresh_policy_notes(session)
 
     def run(session: CaseSession) -> object:
+        if session.__dict__.get("agent_fell_back"):
+            return policy(session)  # the agent stopped once on this case; code carries on
         try:
             from snapback.agent.graph import build_agent, run_case_with_agent
 
-            agent = agents.setdefault(session.case_id, build_agent(session))
-            return run_case_with_agent(session, agent)
+            agent = agents.get(session.case_id)
+            if agent is None:
+                agent = agents[session.case_id] = build_agent(session, make_model())
         except Exception:
             # The extra is not installed, there is no key, or the graph could not be built.
-            session.trace.emit(TraceKind.ERROR, strings.text("trace.error.model_failed"))
-            try:
-                return run_case(session, PolicyChooser())
-            finally:
-                refresh_policy_notes(session)
+            session.__dict__["agent_fell_back"] = True
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
+            return policy(session)
+        return run_case_with_agent(session, agent, deadline_s=timeout_s)
 
     return run
 
@@ -407,6 +503,7 @@ class CaseStore:
         settings: Settings,
         lookups: Lookups | None = None,
         live_locate: LiveLocate | None = None,
+        agent_model: Callable[[], object] | None = None,
     ) -> None:
         self._settings = settings
         # Lane D's adapters: the record and the for-sale lookup (A10). The kit is read once.
@@ -421,10 +518,17 @@ class CaseStore:
         self._lock = threading.Lock()
         self._memory: PhotoMemory | None = None
         self._runner = (
-            _deepagents_runner(settings)
+            _deepagents_runner(settings, agent_model)
             if settings.snapback_agent == "deepagents"
             else _policy_runner
         )
+        # deepagents_async: the answer comes from the policy at once; the agent follows on its
+        # own thread (see `_start_agent`), at most N at a time.
+        self._agent_model = agent_model
+        self._background: BackgroundAgents | None = None
+        if settings.snapback_agent == "deepagents_async":
+            _setup_langsmith(settings)
+            self._background = BackgroundAgents(settings.snapback_agent_max_concurrent)
         if settings.snapback_data_source is DataSource.FIXTURE:
             self._add_recorded_fixture()
         elif settings.demo_case:
@@ -497,6 +601,28 @@ class CaseStore:
         market = record.market if record is not None else None
         return ZoneInfo(MARKET_ZONES.get(market or "", self._settings.snapback_card_timezone))
 
+    def _for_sale_by_position(
+        self, text: str, record: PropertyRecord | None, by_text: ForSaleMatch | None
+    ) -> ForSaleMatch | None:
+        """The for-sale answer for a named home, also looked up by the record's position (#10).
+
+        An ad with no street finds nothing by its text, while the home's own lat/lon does. The
+        same rule as the identify path (`JoinedModules._adopt_identified`): a position lookup
+        that finds nothing never undoes a listing the text lookup found."""
+        at = getattr(self._lookups, "for_sale_at", None)
+        if record is None or at is None or record.lat is None or record.lon is None:
+            return by_text
+        nearby = at(text, record.lat, record.lon)
+        if nearby is None:
+            return by_text
+        if (
+            by_text is not None
+            and by_text.status is not ForSaleStatus.NONE
+            and nearby.status is ForSaleStatus.NONE
+        ):
+            return by_text
+        return nearby
+
     def create(
         self,
         listing: Listing,
@@ -545,6 +671,7 @@ class CaseStore:
         for_sale = license = owner = None
         if not asked_by_name:
             for_sale = self._lookups.for_sale(listing.text) if listing.text else None
+            for_sale = self._for_sale_by_position(listing.text, record, for_sale)
             # D10: only a live run calls the licence list, and a lookup that breaks is "not
             # looked up". It reads the poster's own claim in the text and keeps no name.
             license = license_of(self._lookups, listing.text)
@@ -604,4 +731,28 @@ class CaseStore:
             case.property_id = property_id  # the building the listing claims, if it named one
             self._cases[short_id] = case
         case.advance()
+        self._start_agent(case)
         return case
+
+    def _start_agent(self, case: SessionCase) -> None:
+        """Queue the deep agent on this case, once (SNAPBACK_AGENT=deepagents_async). The request
+        has its answer already and does not wait for this."""
+        if self._background is None:
+            return
+        case.agents = self._background
+        self._background.submit(
+            case.case_id, _background_job(case, self._settings, self._agent_model)
+        )
+
+    def shutdown_agents(self) -> None:
+        """Stop taking background runs and drop the queued ones (the app is shutting down)."""
+        if self._background is not None:
+            self._background.shutdown()
+
+    def wait_for_agents(self, timeout: float = 30.0) -> None:
+        """Block until every background run has ended. For tests and scripts, never a request."""
+        if self._background is None:
+            return
+        for case in list(self._cases.values()):
+            if isinstance(case, SessionCase):
+                self._background.wait(case.case_id, timeout)

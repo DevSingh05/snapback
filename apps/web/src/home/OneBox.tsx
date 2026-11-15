@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useReducer, useRef, useState } from "react";
 
 import { apiBase, apiFetchRead, fetchCard } from "../api";
+import { answerAbout, isAgainst, type CaseAnswer } from "./caseAnswer";
 import { headlineOf, toneWord } from "../cardStrings";
-import heroPhoto from "../assets/hero-dusk-balconies.webp";
-import sampleBuilding from "../assets/sample-building.webp";
+import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import sampleLivingRoom from "../assets/sample-living-room.webp";
 import sampleLounge from "../assets/sample-lounge.webp";
 import { SourceChip } from "../components/SourceChip";
@@ -16,8 +16,8 @@ import type {
   PlaceMatch,
   RenterBrief,
 } from "../contracts";
+import { HERO_PHOTOS, HeroStreet } from "../landing/HeroStreet";
 import { searchPlaces } from "../search/api";
-import { TracePanel } from "../trace";
 import {
   decide,
   FinderGone,
@@ -36,15 +36,14 @@ import { MicButton, LevelMeter } from "../shell/FinderPage";
 import { markSignalsSent, loadFinderEvents, unsentSignals } from "../shell/finderStore";
 import { useVoiceInput, voiceStatus } from "../shell/voice";
 import { YourChecks } from "../shell/YourChecks";
+import { PhotoPin, State, type StateKind } from "../ui";
 import {
   MODE,
   approveChallenge as defaultApprove,
   createCase as defaultCreateCase,
   fetchApiSource,
-  getCaseStatus as defaultStatus,
   type ApproveChallenge,
   type CreateCase,
-  type GetCaseStatus,
 } from "../upload/api";
 import { initialState, reduce } from "../upload/machine";
 import { MAX_FILES, addFiles, validateSubmission } from "../upload/validate";
@@ -55,22 +54,36 @@ import {
   rentFrom,
   route,
   ROUTE_LINE,
+  saferWords,
   SWITCH_LABEL,
   switchOf,
   VIEW_HREF,
   VIEW_NAME,
   withoutFacebookLinks,
+  type CaseTopic,
   type Intent,
   type View,
 } from "./intent";
 import "./onebox.css";
 
-/** Tap one to start. Each goes through the same routing as typed words. */
-export const EXAMPLES = [
-  "Paste a Marketplace or Craigslist ad",
-  "Find me a 1 bed under $1,500 near downtown",
-  "Is this landlord real?",
-  "Walk me through a place",
+/** Tap one to start. Both are about checking an ad: that is the product. Each goes through the
+ * same routing as typed words. */
+export const EXAMPLES = ["Paste the ad you were sent", "Is this landlord real?"] as const;
+
+/** How it works, in three lines (focus plan section 1). The same words as the README. */
+export const HOW = [
+  {
+    title: "Send the ad",
+    text: "Text it to SNAPBACK on iMessage, or paste it in the one box: words, screenshots, or both.",
+  },
+  {
+    title: "We check it",
+    text: "Scam-pattern rules run on any ad; CoStar's record of the building adds rent, leasing office, manager and website; where CoStar has a 3D scan, we place the ad's photos in it.",
+  },
+  {
+    title: "You get a report",
+    text: "A verdict in plain words, the ad beside the real listing, what to do next, and safer homes on Apartments.com.",
+  },
 ] as const;
 
 /** The card's two rules, as the answer to any question about paying. Written by code. */
@@ -79,6 +92,18 @@ export const RULES_REPLY =
 
 export const FB_ASK =
   "Facebook keeps listings behind a login. Paste the listing text here and add its photos, and I'll check it.";
+
+/** The one measured line on Home (A8, n stated). Locked text: never add to it. */
+export const MEASURED =
+  "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it";
+
+/** What the button says: it follows the same routing as the message will. */
+export function sendLabel(text: string, files: number, caseOnScreen: boolean): string {
+  if (!text.trim() && files === 0) return "Check it";
+  const kind = route({ text, files, caseOnScreen }).kind;
+  if (kind === "find") return "Find places";
+  return kind === "check" || kind === "check-ask" || kind === "check-fb" ? "Check it" : "Ask";
+}
 
 const UNSURE_CHECK = "Check it as an ad";
 const UNSURE_FIND = "Find places like this";
@@ -92,7 +117,7 @@ const OPEN_LINE: Record<View, string> = {
   finder: "What the Finder has learned about you, and why it picked what it did.",
 };
 
-type Item =
+export type Item =
   | { id: number; type: "you"; text: string; files: string[] }
   | { id: number; type: "route"; intent: Intent; sub: { text: string; files: File[] } | null }
   | {
@@ -111,6 +136,7 @@ type Item =
   | { id: number; type: "places"; brief: RenterBrief; scansOnly: boolean; note: string }
   | { id: number; type: "picks"; picks: FinderPick[]; source: DataSource }
   | { id: number; type: "offer"; proposal: FinderProposal; source: DataSource }
+  | { id: number; type: "answer"; answer: CaseAnswer }
   | { id: number; type: "open"; view: View }
   | { id: number; type: "error"; text: string };
 
@@ -119,10 +145,7 @@ type ItemInput = Item extends infer T ? (T extends Item ? Omit<T, "id"> : never)
 interface Props {
   createCase?: CreateCase;
   approveChallenge?: ApproveChallenge;
-  getCaseStatus?: GetCaseStatus;
-  pollMs?: number;
   checkingMs?: number;
-  waitingMs?: number;
   mode?: DataSource;
 }
 
@@ -149,6 +172,13 @@ export function OneBox(props: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const dock = useRef<HTMLDivElement>(null);
+  // The card of each finished case and the ad's own words, kept so a follow-up is answered from
+  // them. A tick makes the thread scroll again when a card lands after its row was added.
+  const cardsRef = useRef<Record<string, Card>>({});
+  const adRef = useRef<Record<string, string>>({});
+  const [landed, setLanded] = useState(0);
 
   useEffect(() => {
     if (mode !== "live") return;
@@ -164,10 +194,33 @@ export function OneBox(props: Props) {
     setItems((prev) => [...prev, ...next.map((n) => ({ ...n, id: nextId.current++ }) as Item)]);
   }, []);
 
+  // The docked box covers the bottom of the page. The thread keeps that much room under its last
+  // row (--ob-dock-h, measured), so the last action row can always scroll fully above the box.
+  const docked = items.length > 0;
+  useEffect(() => {
+    const el = dock.current;
+    const host = root.current;
+    if (!el || !host) return;
+    // The box is pinned a little above the bottom edge on a phone (the tab bar sits under it),
+    // so what it covers is its height plus that offset.
+    const measure = () => {
+      const lift = Number.parseFloat(getComputedStyle(el).bottom) || 0;
+      host.style.setProperty(
+        "--ob-dock-h",
+        `${Math.ceil(el.getBoundingClientRect().height + lift)}px`,
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [docked]);
+
   useEffect(() => {
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     end.current?.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "end" });
-  }, [items.length, busy]);
+  }, [items.length, busy, landed]);
 
   // --- The Finder: one session for this tab, opened the first time it is needed.
   const finder = useCallback(async (): Promise<FinderAuth | null> => {
@@ -255,6 +308,35 @@ export function OneBox(props: Props) {
     [askFinder],
   );
 
+  /** A follow-up about the case on screen, answered from its card and never by the Finder. */
+  const answerCase = useCallback(
+    async (topic: CaseTopic) => {
+      const id = cases[cases.length - 1];
+      if (!id) {
+        add({ type: "bot", by: "policy", text: "Paste an ad first, and I'll answer about it." });
+        return;
+      }
+      let card = cardsRef.current[id];
+      if (!card) {
+        setBusy("Reading the result");
+        try {
+          card = await fetchCard(id);
+          cardsRef.current[id] = card;
+        } catch (err) {
+          add({
+            type: "error",
+            text: err instanceof Error ? err.message : "The result did not load.",
+          });
+          return;
+        } finally {
+          setBusy(null);
+        }
+      }
+      add({ type: "answer", answer: answerAbout(card, topic) });
+    },
+    [add, cases],
+  );
+
   /** Runs one submission with a known intent. */
   const run = useCallback(
     (intent: Intent, words: string, attached: File[]) => {
@@ -309,7 +391,7 @@ export function OneBox(props: Props) {
         return;
       }
       if (intent.kind === "ask") {
-        void askFinder(words, false);
+        void answerCase(intent.topic);
         return;
       }
       // find
@@ -326,7 +408,7 @@ export function OneBox(props: Props) {
       }
       findWith(words);
     },
-    [add, askFinder, findWith, knownRent],
+    [add, answerCase, findWith, knownRent],
   );
 
   const answerRent = useCallback(
@@ -440,13 +522,15 @@ export function OneBox(props: Props) {
       fileInput={fileInput}
       box={box}
       big={empty}
+      label={sendLabel(text, files.length, cases.length > 0)}
     />
   );
 
   return (
-    <div className="ob" data-empty={empty || undefined} data-testid="one-box">
+    <div className="ob" ref={root} data-empty={empty || undefined} data-testid="one-box">
       {!empty && (
-        <div className="ob-top">
+        <div className="ob-top ui-on-matte">
+          <HeroStreet strip />
           <SourceChip source={shownMode} />
           <div className="ob-top-acts">
             <button
@@ -468,46 +552,63 @@ export function OneBox(props: Props) {
 
       {empty ? (
         <section className="ob-start" aria-labelledby="ob-title">
-          <div className="ob-hero">
-            <img
-              className="ob-hero-img"
-              src={heroPhoto}
-              alt="An apartment building at dusk, its balconies lit against a pink sky"
-              data-testid="hero-photo"
-            />
+          <div className="ob-hero" data-bar="photo">
+            <HeroStreet />
             <div className="ob-hero-in">
-              <h1 id="ob-title" className="ob-title">
-                Found a place online? Ask before you pay.
-              </h1>
-              <p className="ob-lead">
-                Paste the ad or its link, add a screenshot, or just say what you&apos;re looking
-                for.
-              </p>
-              {composer}
-              {(error || fileErrors.length > 0) && (
-                <Problems error={error} fileErrors={fileErrors} />
-              )}
-              <ul className="ob-examples" aria-label="Try one">
-                {EXAMPLES.map((ex) => (
-                  <li key={ex}>
-                    <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
-                      {ex}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <p className="ob-credit">Photo: Tobias Wilden, Unsplash</p>
+              <div className="ob-hero-main">
+                <h1 id="ob-title" className="ob-title">
+                  <span>Send a rental ad before you pay.</span>{" "}
+                  <span className="ob-title-ask">
+                    Get a report: is this the real listing, and who do you call?
+                  </span>
+                </h1>
+                <ol className="ob-how" aria-label="How it works" data-testid="ob-how">
+                  {HOW.map((step, i) => (
+                    <li key={step.title}>
+                      <span className="ob-how-n ui-mono">{`0${i + 1}`}</span>
+                      <b>{step.title}</b>
+                      <span className="ob-how-text">{step.text}</span>
+                    </li>
+                  ))}
+                </ol>
+                {composer}
+                {(error || fileErrors.length > 0) && (
+                  <Problems error={error} fileErrors={fileErrors} />
+                )}
+                <ul className="ob-examples" aria-label="Try one">
+                  {EXAMPLES.map((ex) => (
+                    <li key={ex}>
+                      <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
+                        {ex}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="ob-measured ui-mono" data-testid="ob-measured">
+                  {MEASURED}
+                </p>
+              </div>
+              <SampleCase onOpen={() => submit(SAMPLE_AD, [])} />
             </div>
           </div>
-          <WhatYouCanDo onAsk={(w) => submit(w, [])} />
-          <p className="ob-fine ob-honest">
-            <SourceChip source={shownMode} />
-            <span>
-              SNAPBACK never messages anyone for you. Code sets every verdict; a model only explains
-              it.
-            </span>
-          </p>
-          <YourChecks />
+          <div className="ob-below">
+            <div className="ob-cols">
+              <YourChecks />
+              <SeeItHappen />
+            </div>
+            <footer className="ob-foot">
+              <p className="ob-honest">
+                <SourceChip source={shownMode} />
+                <span>
+                  SNAPBACK never messages anyone for you and never asks for money. Code sets every
+                  verdict; a model only explains it.
+                </span>
+              </p>
+              <p className="ob-credits">
+                Sample photos by {PHOTO_CREDITS} on Unsplash. They are not the homes we check.
+              </p>
+            </footer>
+          </div>
         </section>
       ) : (
         <>
@@ -526,8 +627,21 @@ export function OneBox(props: Props) {
                       ? answerUnsure(r)
                       : submit(r, [])
                 }
-                onCase={(id) => setCases((c) => (c.includes(id) ? c : [...c, id]))}
-                onFollow={(words) => submit(words, [])}
+                onCase={(id, ad) => {
+                  adRef.current[id] = ad;
+                  setCases((c) => (c.includes(id) ? c : [...c, id]));
+                }}
+                onCard={(card) => {
+                  cardsRef.current[card.case_id] = card;
+                  setLanded((n) => n + 1);
+                }}
+                onFollow={(words) => {
+                  const last = cases[cases.length - 1];
+                  submit(
+                    words === SAFER_LABEL ? saferWords(adRef.current[last ?? ""] ?? "") : words,
+                    [],
+                  );
+                }}
                 onDecided={async (p, yes) => {
                   if (!auth.current) return;
                   try {
@@ -560,7 +674,7 @@ export function OneBox(props: Props) {
             )}
           </ol>
           <div ref={end} />
-          <div className="ob-dock">
+          <div className="ob-dock" ref={dock}>
             {(error || fileErrors.length > 0) && <Problems error={error} fileErrors={fileErrors} />}
             {composer}
             <Learned kept={kept.map(keptLabel)} noticed={lines} />
@@ -576,68 +690,120 @@ export const SAMPLE_AD =
   "2 bed 2 bath near downtown, $1,350/month, utilities included. I'm working abroad so I can't " +
   "show it, but send the $600 deposit by Zelle today and I'll mail you the keys.";
 
-// What the box can do, each shown with a piece of the real product and one tap to try it.
-function WhatYouCanDo({ onAsk }: { onAsk: (words: string) => void }) {
+const SAMPLE_CARD = cardHold as Card;
+
+const PHOTO_CREDITS = [
+  HERO_PHOTOS.day.credit,
+  HERO_PHOTOS.dusk.credit,
+  "Minh Pham",
+  "Collov Home Design",
+  "Raphael (Ajani Kamali Akio)",
+  "Tobias Wilden",
+  "Marlene Céline Nordvik",
+].join(", ");
+
+// The sample case that hangs off the bottom edge of the hero. It shows proof, not a feature
+// list: the ad's photo beside the same view found in the building's 3D scan, then the line that
+// placed it and the line that most needs attention. Verdict and lines are the team's own fixture
+// card (the code's words); the pictures are one stock interior, stamped as a sample on both
+// sides. One tap runs the sample ad through the box.
+function SampleCase({ onOpen }: { onOpen: () => void }) {
+  const card = SAMPLE_CARD;
+  const all = card.rows.flatMap((row) => row.lines.map((line) => ({ kind: row.kind, line })));
+  const order = (t: string) => ({ red_flag: 0, hold: 1, not_shown: 1, ok: 2 })[t] ?? 3;
+  const placed = all.find((l) => l.kind === "place");
+  const flagged = [...all]
+    .filter((l) => l !== placed)
+    .sort((a, b) => order(a.line.tone) - order(b.line.tone))[0];
+  const lines = [placed, flagged].filter((l) => l !== undefined);
   return (
-    <section className="ob-can" aria-labelledby="ob-can-title">
-      <h2 id="ob-can-title" className="ob-can-title">
-        What you can do here
-      </h2>
-      <ul className="ob-can-list">
-        <li>
-          <button type="button" className="ob-can-item" onClick={() => onAsk(SAMPLE_AD)}>
-            <SamplePhoto src={sampleBuilding} alt="An apartment building, from below">
-              <span className="ob-over ob-over-verdict">
-                <span className="ob-over-kicker">
-                  Case 7Q2M <SourceChip source="fixture" />
-                </span>
-                <span className="ob-over-word">Hold off for now</span>
-              </span>
+    <button type="button" className="ob-sample ui-sheet" data-testid="ob-sample" onClick={onOpen}>
+      <span className="ob-sample-head ui-mono">
+        <span>Sample report {card.case_id}</span>
+        <SourceChip source="fixture" />
+      </span>
+      <span className="ob-pair" data-testid="ob-pair">
+        {(
+          [
+            ["The ad's photo", sampleLounge, "a living room with a pale green sofa"],
+            [
+              "Found in the building's 3D scan",
+              sampleLivingRoom,
+              "a living room with a grey sofa and plants, standing in for the scan view",
+            ],
+          ] as const
+        ).map(([label, src, what]) => (
+          <span key={label} className="ob-pair-side">
+            <SamplePhoto src={src} alt={`${label}: ${what}`}>
+              <PhotoPin n={1} x={38} y={56} />
+              <PhotoPin n={2} x={66} y={34} />
             </SamplePhoto>
-            <span className="ob-can-name">Check an ad</span>
-            <span className="ob-can-line">Try it on our sample ad</span>
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="ob-can-item"
-            onClick={() => onAsk("Find me a 1 bed under $1,500 near downtown")}
-          >
-            <SamplePhoto src={sampleLounge} alt="A bright living room with a pale green sofa">
-              <span className="ob-over">
-                <span className="ob-over-word">1 bed, under $1,500</span>
+            <span className="ob-pair-label ui-mono">{label}</span>
+          </span>
+        ))}
+      </span>
+      <span className="ob-sample-verdict" data-tone={TONE_OF[card.state]}>
+        {headlineOf(card)}
+      </span>
+      <span className="ob-sample-rows">
+        {lines.map(({ kind, line }) => {
+          const word = toneWord(line.tone, kind);
+          return (
+            <span key={`${kind}-${line.label}`} className="ob-sample-row">
+              <span className="ob-sample-what">
+                <span className="ob-sample-text">{line.text}</span>
               </span>
-            </SamplePhoto>
-            <span className="ob-can-name">Find a place</span>
-            <span className="ob-can-line">Say what you want; it asks the rest</span>
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="ob-can-item"
-            onClick={() => onAsk("Walk me through a place")}
-          >
-            <SamplePhoto src={sampleLivingRoom} alt="A living room with a grey sofa and plants">
-              <span className="ob-over">
-                <span className="ob-play" aria-hidden="true" />
-                <span className="ob-over-word">Walk it first</span>
+              <State kind={(WORD_TONE[word] ?? "unchecked") as StateKind}>{word}</State>
+            </span>
+          );
+        })}
+      </span>
+      <span className="ob-sample-go">
+        <span>Open the sample report</span>
+        <span aria-hidden="true">→</span>
+      </span>
+    </button>
+  );
+}
+
+const STORIES = [
+  {
+    photo: HERO_PHOTOS.dusk,
+    line: "Imagine Sascha, a week from moving, and a 2 bed priced well under the block.",
+  },
+  {
+    photo: HERO_PHOTOS.day,
+    line: "Imagine a master's student landing in Houston on Friday, renting from abroad.",
+  },
+] as const;
+
+// See it happen: the stories, as rows. Each is told as "imagine", never as a real person's case.
+function SeeItHappen() {
+  return (
+    <section className="ob-see" aria-labelledby="ob-see-title">
+      <header className="yc-head">
+        <h2 id="ob-see-title" className="yc-title">
+          See it happen
+        </h2>
+        <a className="yc-new" href="/stories">
+          All stories
+        </a>
+      </header>
+      <ul className="ob-see-list">
+        {STORIES.map((st) => (
+          <li key={st.line}>
+            <a className="ob-see-row" href="/stories">
+              <span className="ob-photo ob-see-thumb">
+                <img src={st.photo.src} alt="" loading="lazy" />
               </span>
-            </SamplePhoto>
-            <span className="ob-can-name">Walk it first</span>
-            <span className="ob-can-line">See it room by room before you visit</span>
-          </button>
-        </li>
+              <span className="ob-see-text">
+                <span className="ob-see-line">{st.line}</span>
+                <span className="ob-see-note">A story played out step by step. Sample photo.</span>
+              </span>
+            </a>
+          </li>
+        ))}
       </ul>
-      <nav className="ob-also" aria-label="Or open">
-        <span>Or open</span>
-        <a href="/map">Map</a>
-        <a href="/listings">Listings</a>
-        <a href="/finder">Finder</a>
-        <a href="/replay">Replays</a>
-        <a href="/investigate">Investigate</a>
-      </nav>
     </section>
   );
 }
@@ -684,10 +850,11 @@ export function SamplePhoto({
  * token. Never bundled: kit pictures stay on the server. Null until it loads, or when there is
  * none (fixture mode, no token, no placed photo).
  */
-function useScanPhoto(caseId: string): string | null {
+function useScanPhoto(caseId: string, lookup: boolean): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!apiBase()) return;
+    // An ad with no photos has no evidence file; asking for it would only log a 404.
+    if (!apiBase() || !lookup) return;
     const ctrl = new AbortController();
     let made: string | null = null;
     (async () => {
@@ -716,13 +883,13 @@ function useScanPhoto(caseId: string): string | null {
       ctrl.abort();
       if (made) URL.revokeObjectURL?.(made);
     };
-  }, [caseId]);
+  }, [caseId, lookup]);
   return url;
 }
 
 /** The "Walk it first" card under a verdict: the real scan view when the API has one. */
-function WalkCard({ caseId }: { caseId: string }) {
-  const scan = useScanPhoto(caseId);
+function WalkCard({ caseId, lookup }: { caseId: string; lookup: boolean }) {
+  const scan = useScanPhoto(caseId, lookup);
   const id = encodeURIComponent(caseId);
   return (
     <a className="ob-walk" href={`/case/${id}/twin`} data-testid="ob-walk">
@@ -779,7 +946,7 @@ function Glyph({ name }: { name: "attach" | "send" | "x" }) {
   );
 }
 
-function Composer({
+export function Composer({
   text,
   setText,
   files,
@@ -793,6 +960,7 @@ function Composer({
   fileInput,
   box,
   big,
+  label,
 }: {
   text: string;
   setText: (v: string) => void;
@@ -807,6 +975,7 @@ function Composer({
   fileInput: React.RefObject<HTMLInputElement | null>;
   box: React.RefObject<HTMLTextAreaElement | null>;
   big: boolean;
+  label: string;
 }) {
   const recording = voice.state === "recording";
   const writing = voice.state === "writing";
@@ -874,7 +1043,7 @@ function Composer({
           value={text}
           placeholder={
             big
-              ? "Paste an ad or link, or type: a 1 bed under $1,500 near downtown"
+              ? "Paste the ad you were sent, or its link. Or ask: is this landlord real?"
               : "Ask a follow-up, paste another ad, or say what you want"
           }
           autoComplete="off"
@@ -948,8 +1117,7 @@ function Composer({
           className="ob-send"
           disabled={busy || recording || writing || (!text.trim() && files.length === 0)}
         >
-          <span>Send</span>
-          <Glyph name="send" />
+          <span>{label}</span>
         </button>
       </div>
     </form>
@@ -959,13 +1127,14 @@ function Composer({
 // ---------------------------------------------------------------------------------------------
 // The thread.
 
-function ThreadItem({
+export function ThreadItem({
   it,
   mode,
   props,
   onSwitch,
   onReply,
   onCase,
+  onCard,
   onFollow,
   onDecided,
 }: {
@@ -974,7 +1143,8 @@ function ThreadItem({
   props: Props;
   onSwitch: (to: Intent) => void;
   onReply: (reply: string, kind: "rent" | "send" | "unsure") => void;
-  onCase: (id: string) => void;
+  onCase: (id: string, adText: string) => void;
+  onCard?: (card: Card) => void;
   onFollow: (words: string) => void;
   onDecided: (p: FinderProposal, yes: boolean) => Promise<void>;
 }) {
@@ -1047,10 +1217,13 @@ function ThreadItem({
             mode={mode}
             props={props}
             onCase={onCase}
+            onCard={onCard}
             onFollow={onFollow}
           />
         </li>
       );
+    case "answer":
+      return <AnswerItem answer={it.answer} />;
     case "places":
       return (
         <li className="ob-card-row">
@@ -1084,7 +1257,45 @@ function ThreadItem({
   }
 }
 
-// --- The ad check, inline. The same steps and approval gate as before, as one card.
+/** The label of the verdict's button for safer homes; Home turns it into the ad's own filter. */
+export const SAFER_LABEL = "Find safer homes";
+const WHO_LABEL = "Who do I call?";
+
+/** A reply about the case on screen: the card's own lines, with a short lead-in from code. */
+function AnswerItem({ answer }: { answer: CaseAnswer }) {
+  return (
+    <li className="ob-bot ob-answer" data-testid="ob-answer">
+      <p className="ob-answer-lead">{answer.lead}</p>
+      {answer.sections.map((sec, i) => (
+        <div key={i} className="ob-answer-sec">
+          {sec.heading && <p className="ob-answer-head">{sec.heading}</p>}
+          <ul>
+            {sec.lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <p className="ob-answer-links">
+        {answer.links.map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            {...(l.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          >
+            {l.label}
+            {l.external ? <span aria-hidden="true"> ↗</span> : null}
+          </a>
+        ))}
+      </p>
+      <span className="ob-stamp" data-by="policy">
+        Written by code from this result
+      </span>
+    </li>
+  );
+}
+
+// --- The ad check, inline. The verdict comes first; asking the poster for proof comes after it.
 
 const STEPS = [
   { key: "reading", label: "Reading the ad" },
@@ -1093,46 +1304,49 @@ const STEPS = [
   { key: "waiting", label: "Waiting for the poster" },
 ] as const;
 
+/** What the check shows while it runs. The poster step comes after the verdict, not before. */
+const CHECK_STEPS = STEPS.slice(0, 2);
+
 function CheckRun({
   input,
   mode,
   props,
   onCase,
+  onCard,
   onFollow,
 }: {
   input: { link: string | null; text: string | null; files: File[] };
   mode: DataSource;
   props: Props;
-  onCase: (id: string) => void;
+  onCase: (id: string, adText: string) => void;
+  onCard?: (card: Card) => void;
   onFollow: (words: string) => void;
 }) {
   const {
     createCase = defaultCreateCase,
     approveChallenge = defaultApprove,
-    getCaseStatus = defaultStatus,
-    pollMs = 700,
     checkingMs = 900,
-    waitingMs = 1800,
   } = props;
   const [state, dispatch] = useReducer(reduce, initialState);
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
   const started = useRef(false);
   const deciding = useRef(false);
+  // The drafted message, kept for after the verdict (the reducer drops it once the result is in).
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
     dispatch({ type: "submit" });
     createCase(input)
-      .then((made) =>
+      .then((made) => {
+        setChallenge(made.challenge_text);
         dispatch({
           type: "created",
           caseId: made.case_id,
           challengeText: made.challenge_text,
           source: made.source,
-        }),
-      )
+        });
+      })
       .catch((err: unknown) =>
         dispatch({
           type: "fail",
@@ -1147,65 +1361,48 @@ function CheckRun({
     return () => clearTimeout(t);
   }, [state.step, checkingMs, mode]);
 
+  // Verdict first: the check does not stop to ask. Nothing is ever sent for the renter, so the
+  // answer to the poster is recorded as "not now" and the result shows at once. The drafted
+  // message is offered under the verdict, to copy and send yourself.
+  const approvalCase = state.step === "approval" ? state.caseId : null;
   useEffect(() => {
-    if (state.step !== "waiting" || mode !== "fixture") return;
-    const t = setTimeout(() => dispatch({ type: "done" }), waitingMs);
-    return () => clearTimeout(t);
-  }, [state.step, waitingMs, mode]);
-
-  const waitingCase = state.step === "waiting" ? state.caseId : null;
-  useEffect(() => {
-    if (waitingCase === null || mode !== "live") return;
-    const ctrl = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      try {
-        const s = await getCaseStatus(waitingCase, ctrl.signal);
-        if (s.status === "done") {
-          dispatch({ type: "done" });
+    if (approvalCase === null || deciding.current) return;
+    deciding.current = true;
+    void (async () => {
+      if (mode === "live") {
+        try {
+          await approveChallenge(approvalCase, "cancel");
+        } catch (err) {
+          deciding.current = false;
+          dispatch({
+            type: "fail",
+            message: err instanceof Error ? err.message : "Something went wrong. Try again.",
+          });
           return;
         }
-      } catch {
-        if (ctrl.signal.aborted) return;
       }
-      timer = setTimeout(poll, pollMs);
-    };
-    void poll();
-    return () => {
-      ctrl.abort();
-      if (timer) clearTimeout(timer);
-    };
-  }, [waitingCase, mode, getCaseStatus, pollMs]);
+      deciding.current = false;
+      dispatch({ type: "skip" });
+    })();
+  }, [approvalCase, mode, approveChallenge]);
 
   const doneCase = state.step === "done" ? state.caseId : null;
+  const adText = input.text ?? "";
   useEffect(() => {
-    if (doneCase) onCase(doneCase);
-  }, [doneCase, onCase]);
-
-  async function choose(decision: "send" | "cancel") {
-    if (state.step !== "approval" || deciding.current) return;
-    deciding.current = true;
-    setBusy(true);
-    if (mode === "live") {
-      try {
-        await approveChallenge(state.caseId, decision);
-      } catch (err) {
-        deciding.current = false;
-        setBusy(false);
-        dispatch({
-          type: "fail",
-          message: err instanceof Error ? err.message : "Something went wrong. Try again.",
-        });
-        return;
-      }
-    }
-    deciding.current = false;
-    setBusy(false);
-    dispatch({ type: decision === "send" ? "approve" : "skip" });
-  }
+    if (doneCase) onCase(doneCase, adText);
+  }, [doneCase, adText, onCase]);
 
   if (state.step === "done")
-    return <VerdictCard caseId={state.caseId} source={state.source} onFollow={onFollow} />;
+    return (
+      <VerdictCard
+        caseId={state.caseId}
+        source={state.source}
+        onFollow={onFollow}
+        onCard={onCard}
+        challenge={challenge}
+        scanLookup={input.files.length > 0 || input.link !== null}
+      />
+    );
 
   if (state.step === "error")
     return (
@@ -1218,7 +1415,9 @@ function CheckRun({
       </article>
     );
 
-  const active = STEPS.findIndex((s) => s.key === state.step);
+  // The approval step passes at once; it shows as the check still running.
+  const found = CHECK_STEPS.findIndex((s) => s.key === state.step);
+  const active = found === -1 ? 1 : found;
   const source: DataSource = "source" in state ? state.source : mode;
   return (
     <article className="ob-card ob-check" data-testid="ob-check">
@@ -1226,89 +1425,88 @@ function CheckRun({
         <p className="ob-card-kicker">Checking the ad</p>
         <SourceChip source={source} />
       </header>
-      <ol className="ob-steps" aria-label="Progress">
-        {STEPS.map((s, i) => {
-          const status = i < active ? "done" : i === active ? "active" : "todo";
-          return (
-            <li
-              key={s.key}
-              data-status={status}
-              aria-current={status === "active" ? "step" : undefined}
-            >
-              {s.label}
-              <span className="sr-only">
-                {status === "done" ? " (done)" : status === "active" ? " (now)" : " (next)"}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      {state.step === "approval" && (
-        <section className="ob-approve" aria-labelledby="ob-approve-title">
-          <h2 id="ob-approve-title" className="ob-card-title">
-            Ask the poster for proof
-          </h2>
-          <p className="ob-card-text">
-            A real landlord can send a fresh photo from inside the unit. Copy this and send it
-            yourself. Nothing is sent for you.
-          </p>
-          <label htmlFor="challenge" className="sr-only">
-            Message to send
-          </label>
-          <textarea
-            id="challenge"
-            className="ob-message"
-            rows={4}
-            readOnly
-            value={state.challengeText}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div className="ob-acts">
-            <button
-              type="button"
-              className="ob-primary"
-              disabled={busy}
-              onClick={() => void choose("send")}
-            >
-              I approve it and I will send it
-            </button>
-            <button
-              type="button"
-              className="ob-secondary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(state.challengeText);
-                  setCopied(true);
-                } catch {
-                  setCopied(false);
-                }
-              }}
-            >
-              {copied ? "Copied" : "Copy message"}
-            </button>
-            <button
-              type="button"
-              className="ob-quiet"
-              disabled={busy}
-              onClick={() => void choose("cancel")}
-            >
-              Skip this, show the result
-            </button>
-          </div>
-        </section>
-      )}
-      {state.step === "waiting" && (
-        <div className="ob-wait">
-          <p className="ob-card-text">
-            No reply yet means hold off, not a failure. The result updates when they answer.
-          </p>
-          {mode === "live" && <TracePanel caseId={state.caseId} mode="live" />}
-          <button type="button" className="ob-secondary" onClick={() => dispatch({ type: "done" })}>
-            See my result now
-          </button>
-        </div>
-      )}
+      <CheckSteps active={active} steps={CHECK_STEPS} />
     </article>
+  );
+}
+
+/** The check's four steps, the one at `active` lit. */
+export function CheckSteps({
+  active,
+  steps = STEPS,
+}: {
+  active: number;
+  steps?: readonly { key: string; label: string }[];
+}) {
+  return (
+    <ol className="ob-steps" aria-label="Progress">
+      {steps.map((s, i) => {
+        const status = i < active ? "done" : i === active ? "active" : "todo";
+        return (
+          <li
+            key={s.key}
+            data-status={status}
+            aria-current={status === "active" ? "step" : undefined}
+          >
+            {s.label}
+            <span className="sr-only">
+              {status === "done" ? " (done)" : status === "active" ? " (now)" : " (next)"}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The photo challenge, drafted for the renter to send themselves. Nothing is sent for them. */
+export function ChallengeDraft({
+  text,
+  busy,
+  copied,
+  onSend,
+  onCopy,
+  onSkip,
+}: {
+  text: string;
+  busy: boolean;
+  copied: boolean;
+  onSend: () => void;
+  onCopy: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <section className="ob-approve" aria-labelledby="ob-approve-title">
+      <h2 id="ob-approve-title" className="ob-card-title">
+        Ask the poster for proof
+      </h2>
+      <p className="ob-card-text">
+        A real landlord can send a fresh photo from inside the unit. Copy this and send it yourself.
+        Nothing is sent for you.
+      </p>
+      <label htmlFor="challenge" className="sr-only">
+        Message to send
+      </label>
+      <textarea
+        id="challenge"
+        className="ob-message"
+        rows={4}
+        readOnly
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <div className="ob-acts">
+        <button type="button" className="ob-primary" disabled={busy} onClick={onSend}>
+          I approve it and I will send it
+        </button>
+        <button type="button" className="ob-secondary" onClick={onCopy}>
+          {copied ? "Copied" : "Copy message"}
+        </button>
+        <button type="button" className="ob-quiet" disabled={busy} onClick={onSkip}>
+          Skip this, show the result
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1335,20 +1533,35 @@ export function VerdictCard({
   caseId,
   source,
   onFollow,
+  onCard,
+  challenge = null,
+  scanLookup = true,
 }: {
   caseId: string;
   source: DataSource;
   onFollow?: (words: string) => void;
+  /** Told once when the card has loaded, so Home can answer follow-ups from it. */
+  onCard?: (card: Card) => void;
+  /** The message drafted for the poster, offered after the verdict. */
+  challenge?: string | null;
+  /** False when the ad had no photos, so the API has no scan view to ask for. */
+  scanLookup?: boolean;
 }) {
   const [card, setCard] = useState<Card | null | "error">(null);
+  const told = useRef(onCard);
+  useEffect(() => {
+    told.current = onCard;
+  });
   useEffect(() => {
     const ctrl = new AbortController();
     fetchCard(caseId, ctrl.signal)
-      .then(setCard)
+      .then((c) => {
+        setCard(c);
+        told.current?.(c);
+      })
       .catch(() => !ctrl.signal.aborted && setCard("error"));
     return () => ctrl.abort();
   }, [caseId]);
-  const [all, setAll] = useState(false);
   const id = encodeURIComponent(caseId);
   if (card === null)
     return (
@@ -1365,6 +1578,38 @@ export function VerdictCard({
         </a>
       </article>
     );
+  return (
+    <VerdictView
+      card={card}
+      source={source}
+      onFollow={onFollow}
+      challenge={challenge}
+      scanLookup={scanLookup}
+    />
+  );
+}
+
+/** The verdict card itself, from a Card already in hand. `actions` replaces the two links (the
+ *  Stories page shows them as they look, without leaving the story). */
+export function VerdictView({
+  card,
+  source,
+  onFollow,
+  actions,
+  challenge = null,
+  scanLookup = true,
+}: {
+  card: Card;
+  source: DataSource;
+  onFollow?: (words: string) => void;
+  actions?: React.ReactNode;
+  challenge?: string | null;
+  scanLookup?: boolean;
+}) {
+  const [all, setAll] = useState(false);
+  // A red flag or a hold keeps only the paths that help: the report, who to call, safer homes.
+  const against = isAgainst(card);
+  const id = encodeURIComponent(card.case_id);
   const allLines = card.rows.flatMap((row) =>
     row.lines.map((line, i) => ({ kind: row.kind, line, first: i === 0, key: `${row.kind}-${i}` })),
   );
@@ -1416,28 +1661,100 @@ export function VerdictCard({
       )}
       <p className="ob-muted">Not checked: {card.not_checked.join(", ")}.</p>
       <div className="ob-acts">
-        <a className="ob-primary" href={`/case/${id}`}>
-          Open the full result
-        </a>
-        <a className="ob-quiet" href={`/case/${id}/prep`}>
-          Get ready to visit
-        </a>
+        {actions ?? (
+          <>
+            <a className="ob-primary" href={`/case/${id}`}>
+              Open the full report
+            </a>
+            {!against && (
+              <a className="ob-quiet" href={`/case/${id}/prep`}>
+                Get ready to visit
+              </a>
+            )}
+          </>
+        )}
       </div>
-      <WalkCard caseId={caseId} />
+      {!actions && !against && <WalkCard caseId={card.case_id} lookup={scanLookup} />}
       {onFollow && (
         <ul className="ob-replies ob-follow" aria-label="Next">
-          {["Find me safer places like this", "Show me on the map", "Replay a real case"].map(
-            (w) => (
-              <li key={w}>
-                <button type="button" onClick={() => onFollow(w)}>
-                  {w}
-                </button>
-              </li>
-            ),
-          )}
+          {(against
+            ? [WHO_LABEL, SAFER_LABEL]
+            : [SAFER_LABEL, "Show me on the map", "Replay a real case"]
+          ).map((w) => (
+            <li key={w}>
+              <button type="button" onClick={() => onFollow(w)}>
+                {w}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
+      {challenge && !actions && <ProofAsk text={challenge} />}
     </article>
+  );
+}
+
+/** After the verdict: the message that asks the poster for a fresh photo, to copy and send
+ *  yourself. A second step, never a gate in front of the result. */
+function ProofAsk({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const fieldId = useId();
+  const draft = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) draft.current?.scrollIntoView?.({ block: "nearest" });
+  }, [open]);
+  return (
+    <section className="ob-proof-ask" aria-label="Ask the poster for proof">
+      <button
+        type="button"
+        className="ob-secondary"
+        aria-expanded={open}
+        data-testid="ob-proof-toggle"
+        onClick={() => setOpen(!open)}
+      >
+        Ask the poster for proof
+      </button>
+      {open && (
+        <div
+          className="ob-approve"
+          ref={draft}
+          style={{ scrollMarginBottom: "calc(var(--ob-dock-h, 0px) + 12px)" }}
+        >
+          <p className="ob-card-text">
+            A real landlord can send a fresh photo from inside the unit. Copy this and send it
+            yourself. Nothing is sent for you.
+          </p>
+          <label htmlFor={fieldId} className="sr-only">
+            Message to send
+          </label>
+          <textarea
+            id={fieldId}
+            className="ob-message"
+            rows={4}
+            readOnly
+            value={text}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <div className="ob-acts">
+            <button
+              type="button"
+              className="ob-secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(text);
+                  setCopied(true);
+                } catch {
+                  setCopied(false);
+                }
+              }}
+            >
+              {copied ? "Copied" : "Copy message"}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1565,7 +1882,16 @@ function PlacesCard({
   );
 }
 
-function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource }) {
+export function PicksCard({
+  picks,
+  source,
+  act,
+}: {
+  picks: FinderPick[];
+  source: DataSource;
+  /** Replaces each pick's one next step (the Stories page shows "Walk it first" on a sample). */
+  act?: (p: FinderPick) => React.ReactNode;
+}) {
   const sample = source === "fixture";
   return (
     <article className="ob-card ob-places" data-testid="ob-finder-picks">
@@ -1585,7 +1911,9 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
                 {sample ? " · Sample place by the team" : ""}
               </span>
             </div>
-            {sample ? (
+            {act ? (
+              act(p)
+            ) : sample ? (
               <a className="ob-pick-go" href="/listings" title="A sample place made by the team">
                 Browse similar
               </a>
@@ -1608,7 +1936,7 @@ function PicksCard({ picks, source }: { picks: FinderPick[]; source: DataSource 
   );
 }
 
-function OfferCard({
+export function OfferCard({
   proposal,
   source,
   onDecided,

@@ -1,6 +1,10 @@
-/* The app frame: one bar on every page. Mark, tabs, light or dark. Sharp corners, tokens only. */
+/* The app frame: one bar on every page. Mark, tabs, Stories, Customize. Sharp corners, tokens
+   only. At 390 the five tabs are words fixed at the bottom (56px plus the safe area).
+   --tabbar-h is that height (0 on wide screens): any fixed or sticky bottom bar elsewhere must
+   sit at `bottom: var(--tabbar-h)` so the tab bar never covers it. */
 .app {
   --bar-h: 64px;
+  --tabbar-h: 0px;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -16,7 +20,7 @@
   gap: var(--sp-4);
   padding-inline: var(--page-pad);
   background: var(--bar-bg);
-  border-bottom: 1px solid var(--line);
+  box-shadow: inset 0 -1px 0 var(--line);
 }
 .app-mark {
   display: flex;
@@ -34,7 +38,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 48px;
   padding-inline: var(--sp-4);
   color: var(--muted);
   font-weight: 700;
@@ -45,14 +49,15 @@
 .app-tab[aria-current="page"] {
   color: var(--ink);
 }
+/* The current tab: a 3px ink line, not the accent. */
 .app-tab[aria-current="page"]::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
+  left: var(--sp-4);
+  right: var(--sp-4);
+  bottom: 0;
   height: 3px;
-  background: var(--act);
+  background: var(--ink);
 }
 .app-tab-context {
   margin-left: var(--sp-2);
@@ -69,31 +74,73 @@
   background: var(--muted);
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
-.app-theme {
+
+/* Right side: Stories (a text link), then Customize. */
+.app-tools {
   align-self: center;
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--layer-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
 }
-.app-theme-opt {
-  min-height: 40px;
-  padding: var(--sp-1) var(--sp-3);
+.app-tool,
+.app-custom-open,
+.app-site {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: auto;
+  min-height: 48px;
+  padding: 0 var(--sp-3);
   background: transparent;
   color: var(--muted);
+  font-weight: 700;
   font-size: var(--fs-sm);
+  text-decoration: none;
+  cursor: pointer;
 }
-.app-theme-opt[aria-pressed="true"] {
-  background: var(--act);
-  color: var(--on-act);
+.app-stories {
+  color: var(--ink);
+  margin-right: var(--sp-2);
 }
 @media (hover: hover) {
-  .app-tab:hover {
+  .app-tab:hover,
+  .app-tool:hover,
+  .app-custom-open:hover,
+  .app-site:hover {
     color: var(--ink);
   }
-  .app-theme-opt:hover:not([aria-pressed="true"]) {
-    color: var(--ink);
-  }
+}
+
+/* Over a photograph (Home, Stories): the bar floats, transparent, in bone, over a soft scrim. */
+.app[data-bar="photo"],
+.app:has([data-bar="photo"]) {
+  --mark-act: var(--act-matte);
+}
+:is(.app[data-bar="photo"], .app:has([data-bar="photo"])) > .app-bar {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  background: linear-gradient(180deg, var(--hero-scrim-top), transparent);
+  box-shadow: none;
+  color: var(--on-hero);
+}
+:is(.app[data-bar="photo"], .app:has([data-bar="photo"])) > .app-bar :is(.app-mark, .app-stories) {
+  color: var(--on-hero);
+}
+:is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+  > .app-bar
+  :is(.app-tab, .app-tool, .app-custom-open, .app-site) {
+  color: var(--on-hero-muted);
+}
+:is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+  > .app-bar
+  :is(.app-tab[data-in="true"], .app-tab[aria-current="page"], .app-stories) {
+  color: var(--on-hero);
+}
+:is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+  > .app-bar
+  :is(.app-tab[aria-current="page"])::after {
+  background: var(--on-hero);
 }
 
 /* Pages sit under the bar. The map fills what is left of the screen. */
@@ -110,58 +157,101 @@
   height: calc(100dvh - var(--bar-h));
 }
 
+/* ---------- Phones: tabs fixed at the bottom, Customize in the footer ---------- */
 @media (max-width: 760px) {
   .app {
-    --bar-h: 132px;
+    --bar-h: 56px;
+    --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--tabbar-h);
   }
   .app-bar {
-    flex-wrap: wrap;
-    gap: 0 var(--sp-3);
+    align-items: center;
+    gap: 0;
     padding-inline: var(--sp-4);
   }
   .app-mark {
     min-height: 48px;
     margin-right: auto;
   }
-  .app-theme {
-    order: 2;
-  }
   .app-tabs {
-    order: 3;
-    flex: 1 0 100%;
-    margin: 0 calc(-1 * var(--sp-4));
-    padding-inline: var(--sp-2);
-    overflow-x: auto;
-    border-top: 1px solid var(--line);
+    position: fixed;
+    z-index: 55;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--tabbar-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    gap: 0;
+    margin: 0;
+    background: var(--bar-bg);
+    box-shadow: inset 0 1px 0 var(--line);
   }
   .app-tab {
-    min-height: 46px;
-    padding-inline: var(--sp-3);
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 2px;
+    font-size: var(--fs-sm);
     white-space: nowrap;
+  }
+  /* The bottom bar is a light bar even over a photograph (Home), so its tabs take the ink
+     tokens, not the cream the floating top bar uses: the cream was 1.02:1 on the bar. */
+  :is(.app[data-bar="photo"], .app:has([data-bar="photo"])) > .app-bar .app-tabs .app-tab {
+    color: var(--muted);
+  }
+  :is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+    > .app-bar
+    .app-tabs
+    :is(.app-tab[data-in="true"], .app-tab[aria-current="page"]) {
+    color: var(--ink);
+  }
+  :is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+    > .app-bar
+    .app-tabs
+    .app-tab[aria-current="page"]::after {
+    background: var(--ink);
+  }
+  /* The current tab: a 3px ink line on top. */
+  .app-tab[aria-current="page"]::after {
+    left: var(--sp-2);
+    right: var(--sp-2);
+    top: 0;
+    bottom: auto;
+  }
+  .app-tab-context {
+    margin-left: 0;
+    padding-left: 2px;
+  }
+  .app-tab-context::before {
+    display: none;
+  }
+  .app-tools {
+    gap: 0;
+  }
+  .app-stories {
+    margin-right: 0;
   }
   .app > .shell {
     padding-top: var(--sp-4);
   }
   .app .city {
     height: auto;
-    min-height: calc(100dvh - var(--bar-h));
+    min-height: calc(100dvh - var(--bar-h) - var(--tabbar-h));
+  }
+  /* A docked bar elsewhere (the one box) clears the tab bar. */
+  .app .ob-dock {
+    bottom: var(--tabbar-h);
+    padding-bottom: var(--sp-3);
   }
 }
-
-/* ---------- Bar tools: light or dark, and Customize ---------- */
-.app-tools {
-  align-self: center;
+.app-foot {
   display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-3) var(--page-pad);
+  background: var(--layer-0);
 }
-.app-custom-open {
-  min-height: 44px;
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--layer-2);
-  color: var(--ink);
-  font-size: var(--fs-sm);
-}
+
 .app-custom {
   position: absolute;
   z-index: 60;
@@ -369,12 +459,6 @@
   min-width: 0;
 }
 @media (max-width: 760px) {
-  .app-custom-open {
-    padding-inline: var(--sp-2);
-  }
-  .app-tools {
-    order: 2;
-  }
   .view-split,
   .view-split:has(.view-side) {
     grid-template-columns: minmax(0, 1fr);
@@ -406,102 +490,17 @@
   color: var(--muted);
   background: var(--layer-2);
 }
-.app-bar {
-  min-height: 56px;
-}
-.app-site {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding-inline: var(--sp-2);
-  color: var(--act);
-  font-size: var(--fs-sm);
-  font-weight: 700;
-}
 
-/* The mark in the bar: the name, set flat. No drawing in the frame. */
-.app-wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-md);
-  letter-spacing: 0.16em;
-}
-.app-wordmark::before {
-  content: "";
-  width: 12px;
-  height: 12px;
-  background: var(--act);
-}
-
-/* The tabs and tools sit in the bar on wide screens. On phones the bar is one row (the mark
-   and Menu) and they open as a panel under it. */
-.app-menu {
-  display: contents;
-}
-.app-menu-btn {
-  display: none;
-}
 @media (max-width: 760px) {
-  .app {
-    --bar-h: 56px;
-  }
-  .app-bar {
-    flex-wrap: nowrap;
-    align-items: center;
-  }
-  .app-mark {
-    margin-right: auto;
-  }
-  .app-menu-btn {
-    display: inline-flex;
-    align-items: center;
-    align-self: center;
-    min-height: 44px;
-    padding: var(--sp-2) var(--sp-4);
-    background: var(--layer-2);
-    color: var(--ink);
-    font-size: var(--fs-sm);
-  }
-  .app-menu {
-    display: none;
-  }
-  .app-menu[data-open] {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
+  .app-custom {
+    position: fixed;
     z-index: 60;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4) var(--sp-4);
-    background: var(--bar-bg);
-    box-shadow: var(--shadow-lift);
-  }
-  .app-menu[data-open] .app-tabs {
-    order: 0;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    border-top: 0;
-    overflow: visible;
-  }
-  .app-menu[data-open] .app-tab {
-    min-height: 48px;
-    padding-inline: 0;
-    font-size: var(--fs-lg);
-  }
-  .app-menu[data-open] .app-tab[aria-current="page"]::after {
-    left: -16px;
-    right: auto;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    height: auto;
-  }
-  .app-menu[data-open] .app-tools {
-    align-self: flex-start;
-    flex-wrap: wrap;
+    left: var(--sp-4);
+    right: var(--sp-4);
+    top: auto;
+    bottom: calc(var(--tabbar-h) + var(--sp-2));
+    width: auto;
+    max-height: calc(100dvh - var(--bar-h) - var(--tabbar-h) - var(--sp-5));
+    overflow-y: auto;
   }
 }

@@ -299,7 +299,9 @@ def test_with_the_flag_text_the_presenter_pastes_is_what_gets_read(tmp_path):
     )
     card = client.get(f"/cases/{case['case_id']}/card").json()
     said = json.dumps(card)
-    assert "Zelle before a viewing. Red flag." in said  # the pasted text was read
+    assert (
+        "Zelle and a deposit or holding fee before a viewing. Red flag." in said
+    )  # the pasted text was read
     assert card["state"] == "dont_pay"  # and the staged photo evidence still decides
 
 

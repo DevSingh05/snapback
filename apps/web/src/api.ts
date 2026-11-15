@@ -1,5 +1,6 @@
 import cardHold from "../../../fixtures/contracts/card_hold.json";
 import type { Card, DataSource } from "./contracts";
+import type { Lang } from "./lang";
 
 const fixtureCard = cardHold as Card;
 
@@ -30,7 +31,7 @@ export function saveCaseToken(caseId: string, token: string): void {
 
 // The read-only secret (POST /cases `read_token`). It opens the SSE trace, sent in an
 // Authorization header by fetch. It is never put in a URL, and the write token above never is.
-const READ_TOKEN_PREFIX = "snapback.case-read-token.";
+export const READ_TOKEN_PREFIX = "snapback.case-read-token.";
 
 export function saveCaseReadToken(caseId: string, token: string): void {
   try {
@@ -85,12 +86,17 @@ export function apiFetchRead(
   return apiFetch(path, { ...init, headers });
 }
 
-export async function fetchCard(caseId: string, signal?: AbortSignal): Promise<Card> {
+export async function fetchCard(caseId: string, signal?: AbortSignal, lang?: Lang): Promise<Card> {
   if (!apiBase()) {
     if (caseId.toUpperCase() === fixtureCard.case_id) return fixtureCard;
     throw new CaseNotFound(caseId);
   }
-  const res = await apiFetch(`/cases/${encodeURIComponent(caseId)}/card`, { signal });
+  const res = await apiFetch(
+    `/cases/${encodeURIComponent(caseId)}/card${lang ? `?lang=${lang}` : ""}`,
+    {
+      signal,
+    },
+  );
   if (res.status === 404) throw new CaseNotFound(caseId);
   if (!res.ok) throw new Error(`The server answered ${res.status}.`);
   return (await res.json()) as Card;

@@ -171,7 +171,8 @@ def _counted(
         return []
     low, high = slack(*span)
     if low <= claim.value <= high:
-        return [_note(f"{key}_match", kind, matches=True)]
+        # The confirming line says the number too ("The ad says 3 bedrooms"), so it is kept.
+        return [_note(f"{key}_match", kind, matches=True, ad_value=_number(claim.value))]
     return [
         _note(
             f"{key}_differ",

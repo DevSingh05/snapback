@@ -134,8 +134,9 @@ EN: dict[str, str] = {
     "allowed.call_office": "Not confirmed. Call the office on record yourself.",
     # Contact on record. The phone number itself and the record's web address are never shown.
     # A match is a supporting line only. It never counts as matching the record by itself.
+    # Issue #10: said as plainly as the "Not confirmed" line beside it. Never the digits.
     "contact.phone_match": (
-        "The phone matches the leasing office on record. Call it yourself to confirm."
+        "Matches. This is the leasing office's number on record. Call it yourself to confirm."
     ),
     # H1: the name matches the record and there was no phone to compare with the office's.
     "contact.phone_unchecked": (
@@ -165,6 +166,9 @@ EN: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
+    ),
+    "contact.lookalike_sender": (
+        "An email address in the listing imitates this building's website. Red flag."
     ),
     "contact.office_confirmed": (
         "Confirmed by the office: someone at {domain}, the website CoStar has on record for "
@@ -259,6 +263,10 @@ EN: dict[str, str] = {
     "rule.fee.holding_deposit_before_viewing": (
         "A deposit or holding fee before a viewing. Red flag."
     ),
+    # Both of the two above fired: one line that names both, not two near-duplicates.
+    "rule.payment.zelle_and_deposit_before_viewing": (
+        "Zelle and a deposit or holding fee before a viewing. Red flag."
+    ),
     "rule.fee.application_fee_before_viewing": (
         "An application fee sent to a person before a viewing. Red flag."
     ),
@@ -267,6 +275,19 @@ EN: dict[str, str] = {
     "rule.data.id_before_viewing": "A photo of your ID before a viewing. Red flag.",
     "rule.pressure.cannot_show": "They say they cannot show the unit in person. Red flag.",
     "rule.link.payment_link": "A payment link sent by the poster. Red flag.",
+    "rule.impersonation.platform_holds_money": (
+        "Says a site such as Apartments.com or Airbnb will hold your money. CoStar's "
+        "own page on fraud lists a claim of affiliation with it as a red flag. Red flag."
+    ),
+    "rule.impersonation.escrow_agent": (
+        "A rental deposit goes to the owner's office, not to an escrow agent. Red flag."
+    ),
+    "rule.data.credit_score_screenshot": "A screenshot of your credit score. Red flag.",
+    "rule.data.paystub_before_viewing": ("Pay stubs sent to a person before a viewing. Red flag."),
+    "rule.data.sevis_before_viewing": ("Your I-20 or SEVIS papers before a viewing. Red flag."),
+    "rule.link.affiliate_credit_check": (
+        "A link to run your own credit check, which can enrol you in a paid plan. Red flag."
+    ),
     "rule_category.payment_method": (
         "A payment that cannot be taken back, asked for before a viewing. Red flag."
     ),
@@ -461,7 +482,7 @@ EN: dict[str, str] = {
     "reason.forged_copy_unknown": "The reply is a copy of one of the listing photos.",
     "reason.photo_elsewhere": "At least one listing photo was taken in a different property.",
     "reason.price_flag": "The rent is far below comparable units.",
-    "reason.payment_flag": "Payment was requested before any viewing.",
+    "reason.payment_flag": "Money or personal papers were asked for before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
     "reason.for_sale": (
         "This home is listed for sale. Confirm with the listing brokerage that it is also "
@@ -524,6 +545,21 @@ EN: dict[str, str] = {
         "Everything we checked matches the record. "
         "One step left before you pay: ask them to prove they're inside."
     ),
+    # A HOLD where nothing goes against the record but something is still not confirmed (#259).
+    "state.hold_nothing_against": (
+        "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+        "they're inside, and confirm with the office on record."
+    ),
+    # The same, when the record names no manager: there is no office on record to call.
+    "state.hold_nothing_against_no_office": (
+        "Nothing in this ad goes against the record. Before you pay: ask them to prove "
+        "they're inside, and confirm with an office you look up yourself."
+    ),
+    # A HOLD with a red-flag line says which kind, in the card's own words.
+    "state.hold_red_money": "Hold off: it asks for money before you've seen the place",
+    "state.hold_red_papers": "Hold off: it asks for personal papers before you've seen the place",
+    "state.hold_red_pressure": "Hold off: it pushes you to act before you've seen the place",
+    "state.hold_red": "Hold off: something in this ad is a red flag",
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -657,7 +693,7 @@ ES: dict[str, str] = {
         "Sin confirmar. Llame usted mismo a la oficina que figura en el registro."
     ),
     "contact.phone_match": (
-        "El teléfono coincide con el de la oficina de alquiler que figura en el registro. "
+        "Coincide. Es el número de la oficina de alquiler que figura en el registro. "
         "Llame usted mismo para confirmarlo."
     ),
     "contact.phone_unchecked": (
@@ -684,6 +720,9 @@ ES: dict[str, str] = {
     ),
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
+    ),
+    "contact.lookalike_sender": (
+        "Una dirección de correo del anuncio imita el sitio web de este edificio. Señal de alerta."
     ),
     "contact.office_confirmed": (
         "Confirmado por la oficina: alguien en {domain}, el sitio web que CoStar tiene "
@@ -778,6 +817,9 @@ ES: dict[str, str] = {
     "rule.fee.holding_deposit_before_viewing": (
         "Un depósito o cargo de reserva antes de una visita. Señal de alerta."
     ),
+    "rule.payment.zelle_and_deposit_before_viewing": (
+        "Zelle y un depósito o cargo de reserva antes de una visita. Señal de alerta."
+    ),
     "rule.fee.application_fee_before_viewing": (
         "Un cargo de solicitud enviado a una persona antes de una visita. Señal de alerta."
     ),
@@ -793,6 +835,28 @@ ES: dict[str, str] = {
     ),
     "rule.link.payment_link": (
         "Un enlace de pago enviado por quien publicó el anuncio. Señal de alerta."
+    ),
+    "rule.impersonation.platform_holds_money": (
+        "Dice que un sitio como Apartments.com o Airbnb guardará su dinero. La página de "
+        "CoStar sobre fraude lista una supuesta afiliación con ellos como señal de "
+        "alerta. Señal de alerta."
+    ),
+    "rule.impersonation.escrow_agent": (
+        "Un depósito de renta va a la oficina del dueño, no a un agente de depósito en "
+        "garantía. Señal de alerta."
+    ),
+    "rule.data.credit_score_screenshot": (
+        "Una captura de pantalla de su puntaje de crédito. Señal de alerta."
+    ),
+    "rule.data.paystub_before_viewing": (
+        "Talones de pago enviados a una persona antes de una visita. Señal de alerta."
+    ),
+    "rule.data.sevis_before_viewing": (
+        "Sus documentos I-20 o SEVIS antes de una visita. Señal de alerta."
+    ),
+    "rule.link.affiliate_credit_check": (
+        "Un enlace para revisar su propio crédito, que puede inscribirle en un plan de pago. "
+        "Señal de alerta."
     ),
     "rule_category.payment_method": (
         "Un pago que no se puede recuperar, pedido antes de una visita. Señal de alerta."
@@ -1005,7 +1069,7 @@ ES: dict[str, str] = {
     "reason.forged_copy_unknown": "La respuesta es una copia de una de las fotos del anuncio.",
     "reason.photo_elsewhere": "Al menos una foto del anuncio se tomó en otra propiedad.",
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
-    "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
+    "reason.payment_flag": ("Se pidió dinero o documentos personales antes de cualquier visita."),
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
     "reason.for_sale": (
         "Esta vivienda está en venta. Confirme con la agencia que la anuncia que también se "
@@ -1073,6 +1137,18 @@ ES: dict[str, str] = {
         "Todo lo que revisamos coincide con el registro. "
         "Falta un paso antes de pagar: pídales que demuestren que están dentro."
     ),
+    "state.hold_nothing_against": (
+        "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+        "que están dentro y confirme con la oficina que figura en el registro."
+    ),
+    "state.hold_nothing_against_no_office": (
+        "Nada en este anuncio contradice el registro. Antes de pagar: pídales que demuestren "
+        "que están dentro y confirme con una oficina que usted mismo busque."
+    ),
+    "state.hold_red_money": "Espere: pide dinero antes de que usted haya visto el lugar",
+    "state.hold_red_papers": "Espere: pide documentos personales antes de que haya visto el lugar",
+    "state.hold_red_pressure": "Espere: le presiona para actuar antes de ver el lugar",
+    "state.hold_red": "Espere: algo en este anuncio es una señal de alerta",
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
     "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",
@@ -1105,8 +1181,10 @@ EN.update(
         "claimword.yard": "a yard",
         "claimword.pets": "pets are allowed",
         "claimword.beds": "{ad_value} bedrooms",
+        "claimword.beds_one": "1 bedroom",
         "claimword.beds_studio": "a studio",
         "claimword.baths": "{ad_value} bathrooms",
+        "claimword.baths_one": "1 bathroom",
         "claimword.sqft": "{ad_value} square feet",
         "claimword.new_management": "new management",
         "claimword.new_ownership": "new ownership",
@@ -1243,8 +1321,10 @@ ES.update(
         "claimword.yard": "patio o jardín",
         "claimword.pets": "se aceptan mascotas",
         "claimword.beds": "{ad_value} recámaras",
+        "claimword.beds_one": "1 recámara",
         "claimword.beds_studio": "un estudio",
         "claimword.baths": "{ad_value} baños",
+        "claimword.baths_one": "1 baño",
         "claimword.sqft": "{ad_value} pies cuadrados",
         "claimword.new_management": "nueva administración",
         "claimword.new_ownership": "nuevos dueños",
@@ -1370,6 +1450,282 @@ ES.update(
     }
 )
 
+# The agent timeline (GET /cases/{id}/timeline) and the deep agent's time limit. Labels carry
+# counts only: never a phone number, an address or a rent.
+EN.update(
+    {
+        "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "trace.updated": 'More checks changed the result from "{old}" to "{new}": {reason}',
+        "trace.updated.short": "More checks changed the result.",
+        "timeline.updated": "Updated after more checks",
+        "timeline.read_ad": "Read the ad",
+        "timeline.which_checks": "Chose which checks to run",
+        "timeline.locate": "Placed {placed} of {total} photos in its 3D scan",
+        "timeline.locate_none": "Looked for the photos in a 3D scan",
+        "timeline.record": "Found the building on CoStar's record",
+        "timeline.record_missing": "Looked for the building on CoStar's record",
+        "timeline.rent": "Compared the rent with {n} floor plans",
+        "timeline.phone": "Checked the phone against the leasing office",
+        "timeline.for_sale": "Looked for a for-sale listing",
+        "timeline.license": "Looked up the license the ad names",
+        "timeline.owner": "Checked the county's owner of record",
+        "timeline.claims": "Compared the ad's claims with the record",
+        "timeline.ask_license": "Asked you for the license number",
+        "timeline.report": "Put the report together",
+        "timeline.skip.record": "Skipped CoStar's record",
+        "timeline.skip.for_sale": "Skipped the for-sale check",
+        "timeline.skip.license": "Skipped the license lookup",
+        "timeline.skip.owner": "Skipped the county's owner of record",
+        "timeline.skip.claims": "Skipped comparing the ad's claims",
+        "timeline.skip.ask_license": "Did not ask for a license number",
+        "timeline.skip.report": "Skipped the report",
+        "timeline.floor_plan": "Matched the photos to a floor plan",
+        "timeline.spot": "Drew a random spot for the photo challenge",
+        "timeline.approval": "Waited for your OK before sending anything",
+        "timeline.status": "Waited for an answer",
+        "timeline.retry": "Decided whether another photo was needed",
+        "timeline.retry_search": "Chose one more search for an unplaced photo",
+        "timeline.walk": "Planned the walk through the 3D scan",
+        "timeline.reply": "Checked the photo that came back",
+        "timeline.tool": "Ran a check",
+        "timeline.plan": "Wrote its plan ({done} of {count} done)",
+        "timeline.delegate": "Handed the {name} checks to a sub-agent",
+        "timeline.note": "Wrote a working note",
+        "timeline.unsure": "Flagged a close call",
+        "timeline.fallback": "The agent stopped, so code finished the checks",
+        "timeline.error": "Code used its own pick",
+        "timeline.verdict": "Code worked out the result",
+        "timeline.result.done": "Done.",
+        "timeline.result.read_ad": "Read what the ad says it is.",
+        "timeline.result.rent.within_range": "Inside the range on record.",
+        "timeline.result.rent.below_range": "Below the range on record.",
+        "timeline.result.rent.not_checked": "No rent on record to compare.",
+        "timeline.result.phone.yes": "It is the office's number.",
+        "timeline.result.phone.no": "It is not the office's number.",
+        "timeline.result.plan": "One todo per step; the agent keeps it up to date.",
+        "timeline.result.handed": "Still working.",
+        "timeline.result.returned": "Handed back its findings in a note.",
+        "timeline.result.note": "Derived text only; no result in it.",
+        "timeline.result.verdict": "Worked out by code from the evidence. No model picks it.",
+    }
+)
+
+EN.update(
+    {
+        "real.as_of": "as of CoStar's last research",
+        "real.plan_studio": "studio",
+        "real.plan_beds": "{beds}-bed",
+        "real.plan_unnamed": "matching floor plan",
+        "real.ad_rent": "The ad asks {ad_rent} a month.",
+        "real.ad_no_rent": "The ad's rent could not be read.",
+        "real.ad_irreversible": (
+            "It asks for a payment that cannot be taken back, before a viewing."
+        ),
+        "real.range": "{low} to {high}",
+        "real.record_one": (
+            "Its Apartments.com listing on CoStar's record says {band} a month for a {plan}."
+        ),
+        "real.record_many": (
+            "Its Apartments.com listing on CoStar's record says {band} a month across "
+            "{n} matching floor plans."
+        ),
+        "real.record_hidden": (
+            "CoStar's record has this building's Apartments.com listing; its rent figures "
+            "are not shown here."
+        ),
+        "real.record_no_rent": "CoStar's record has no rent for a matching floor plan.",
+        "real.record_no_plan": (
+            "CoStar's record has this building, with no whole-unit floor plan that matches the ad."
+        ),
+        "real.managed_by": "Managed by {company}.",
+        "real.website": "Its own website: {host}.",
+        "real.provenance_scan": (
+            "{n} of {m} of the ad's photos are in CoStar's own scan of this building."
+        ),
+        "real.provenance_elsewhere": (
+            "{n} of {m} of the ad's photos are in CoStar's scan of a different building "
+            "than the one the ad names."
+        ),
+        "real.provenance_none": (
+            "None of the ad's {m} photos could be placed in CoStar's scan of this building."
+        ),
+        "real.phone_office": "The ad's number is the office's on record.",
+        "real.phone_not_office": "The ad's number is not the office's on record.",
+        "real.cta": "See the real listing",
+        "real.no_record": "CoStar has no record of the building this ad names.",
+        "copy.subject": "An ad using photos of your building was checked",
+        "copy.to_company": "To the leasing office at {company},",
+        "copy.to_office": "To the leasing office,",
+        "copy.photos_claimed": (
+            "SNAPBACK checked an ad today. {n} of its {m} photos sit in CoStar's own 3D scan "
+            "of your building."
+        ),
+        "copy.photos_matched": (
+            "SNAPBACK checked an ad today. {n} of its {m} photos sit in CoStar's own 3D scan "
+            "of your building, though the ad names a different one."
+        ),
+        "copy.phone_not_office": "The number in the ad is not the office's number on record.",
+        "copy.rent_under": "Its asked rent is {percent}% under your listed plan.",
+        "copy.ask": (
+            "This may be a copy of your listing, or an agent you work with. Please confirm "
+            "whether you posted it."
+        ),
+        "copy.report_line": "If you did not, the {report} for this check shows where to report it.",
+        "copy.report_name": "evidence pack",
+        "copy.draft_only": "This is a draft. Nothing has been sent.",
+        "handoff.listing": "Its listing on Apartments.com",
+        "handoff.site": "The building's own site",
+        "summary.price_gap": "The rent is {percent}% under this building's {plan} listing.",
+        "summary.price_gap_any": "The rent is {percent}% under this building's listings.",
+    }
+)
+
+ES.update(
+    {
+        "trace.error.model_timeout": (
+            "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
+        ),
+        "trace.updated": (
+            'Más comprobaciones cambiaron el resultado de "{old}" a "{new}": {reason}'
+        ),
+        "trace.updated.short": "Más comprobaciones cambiaron el resultado.",
+        "timeline.updated": "Actualizado tras más comprobaciones",
+        "timeline.read_ad": "Leyó el anuncio",
+        "timeline.which_checks": "Eligió qué comprobaciones hacer",
+        "timeline.locate": "Ubicó {placed} de {total} fotos en su escaneo 3D",
+        "timeline.locate_none": "Buscó las fotos en un escaneo 3D",
+        "timeline.record": "Encontró el edificio en el registro de CoStar",
+        "timeline.record_missing": "Buscó el edificio en el registro de CoStar",
+        "timeline.rent": "Comparó la renta con {n} planos",
+        "timeline.phone": "Comparó el teléfono con el de la oficina de arrendamiento",
+        "timeline.for_sale": "Buscó un anuncio de venta",
+        "timeline.license": "Buscó la licencia que nombra el anuncio",
+        "timeline.owner": "Revisó el propietario registrado en el condado",
+        "timeline.claims": "Comparó lo que dice el anuncio con el registro",
+        "timeline.ask_license": "Le pidió el número de licencia",
+        "timeline.report": "Preparó el informe",
+        "timeline.skip.record": "Omitió el registro de CoStar",
+        "timeline.skip.for_sale": "Omitió la búsqueda de venta",
+        "timeline.skip.license": "Omitió la búsqueda de licencia",
+        "timeline.skip.owner": "Omitió el propietario registrado en el condado",
+        "timeline.skip.claims": "Omitió comparar lo que dice el anuncio",
+        "timeline.skip.ask_license": "No pidió un número de licencia",
+        "timeline.skip.report": "Omitió el informe",
+        "timeline.floor_plan": "Emparejó las fotos con un plano",
+        "timeline.spot": "Sorteó un punto para el reto de la foto",
+        "timeline.approval": "Esperó su visto bueno antes de enviar nada",
+        "timeline.status": "Esperó una respuesta",
+        "timeline.retry": "Decidió si hacía falta otra foto",
+        "timeline.retry_search": "Eligió una búsqueda más para una foto sin ubicar",
+        "timeline.walk": "Planeó el recorrido por el escaneo 3D",
+        "timeline.reply": "Revisó la foto que llegó",
+        "timeline.tool": "Hizo una comprobación",
+        "timeline.plan": "Escribió su plan ({done} de {count} hechos)",
+        "timeline.delegate": "Pasó las comprobaciones de {name} a un subagente",
+        "timeline.note": "Escribió una nota de trabajo",
+        "timeline.unsure": "Marcó un caso dudoso",
+        "timeline.fallback": "El agente se detuvo, así que el código terminó las comprobaciones",
+        "timeline.error": "El código usó su propia opción",
+        "timeline.verdict": "El código calculó el resultado",
+        "timeline.result.done": "Hecho.",
+        "timeline.result.read_ad": "Leyó lo que el anuncio dice que es.",
+        "timeline.result.rent.within_range": "Dentro del rango registrado.",
+        "timeline.result.rent.below_range": "Por debajo del rango registrado.",
+        "timeline.result.rent.not_checked": "No hay renta registrada para comparar.",
+        "timeline.result.phone.yes": "Es el número de la oficina.",
+        "timeline.result.phone.no": "No es el número de la oficina.",
+        "timeline.result.plan": "Una tarea por paso; el agente la mantiene al día.",
+        "timeline.result.handed": "Todavía trabajando.",
+        "timeline.result.returned": "Devolvió lo que encontró en una nota.",
+        "timeline.result.note": "Solo texto derivado; sin resultado.",
+        "timeline.result.verdict": (
+            "Calculado por el código a partir de la evidencia. Ningún modelo lo elige."
+        ),
+        "real.as_of": "según la última investigación de CoStar",
+        "real.plan_studio": "estudio",
+        "real.plan_beds": "de {beds} dormitorios",
+        "real.plan_unnamed": "plano que coincide",
+        "real.ad_rent": "El anuncio pide {ad_rent} al mes.",
+        "real.ad_no_rent": "No se pudo leer el alquiler del anuncio.",
+        "real.ad_irreversible": (
+            "Pide un pago que no se puede recuperar, antes de cualquier visita."
+        ),
+        "real.range": "{low} a {high}",
+        "real.record_one": (
+            "Su anuncio en Apartments.com, en el registro de CoStar, dice {band} al mes "
+            "por un plano {plan}."
+        ),
+        "real.record_many": (
+            "Su anuncio en Apartments.com, en el registro de CoStar, dice {band} al mes "
+            "en {n} planos que coinciden."
+        ),
+        "real.record_hidden": (
+            "El registro de CoStar tiene el anuncio de este edificio en Apartments.com; "
+            "aquí no se muestran sus cifras de alquiler."
+        ),
+        "real.record_no_rent": (
+            "El registro de CoStar no tiene alquiler para un plano que coincida."
+        ),
+        "real.record_no_plan": (
+            "El registro de CoStar tiene este edificio, sin un plano de unidad completa que "
+            "coincida con el anuncio."
+        ),
+        "real.managed_by": "Administrado por {company}.",
+        "real.website": "Su sitio web: {host}.",
+        "real.provenance_scan": (
+            "{n} de {m} fotos del anuncio están en el escaneo propio de CoStar de este edificio."
+        ),
+        "real.provenance_elsewhere": (
+            "{n} de {m} fotos del anuncio están en el escaneo de CoStar de un edificio "
+            "distinto al que nombra el anuncio."
+        ),
+        "real.provenance_none": (
+            "Ninguna de las {m} fotos del anuncio se pudo ubicar en el escaneo de CoStar "
+            "de este edificio."
+        ),
+        "real.phone_office": "El número del anuncio es el de la oficina en el registro.",
+        "real.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
+        "real.cta": "Ver el anuncio real",
+        "real.no_record": "CoStar no tiene registro del edificio que nombra este anuncio.",
+        "copy.subject": "Se revisó un anuncio que usa fotos de su edificio",
+        "copy.to_company": "A la oficina de arrendamiento de {company}:",
+        "copy.to_office": "A la oficina de arrendamiento:",
+        "copy.photos_claimed": (
+            "SNAPBACK revisó hoy un anuncio. {n} de sus {m} fotos están en el escaneo 3D "
+            "propio de CoStar de su edificio."
+        ),
+        "copy.photos_matched": (
+            "SNAPBACK revisó hoy un anuncio. {n} de sus {m} fotos están en el escaneo 3D "
+            "propio de CoStar de su edificio, aunque el anuncio nombra otro."
+        ),
+        "copy.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
+        "copy.rent_under": "La renta que pide está {percent}% por debajo de su plano publicado.",
+        "copy.ask": (
+            "Puede ser una copia de su anuncio, o de un agente con quien trabajan. Confirme "
+            "si lo publicaron."
+        ),
+        "copy.report_line": "Si no fue así, el {report} de esta revisión muestra dónde reportarlo.",
+        "copy.report_name": "paquete de evidencia",
+        "copy.draft_only": "Este es un borrador. No se ha enviado nada.",
+        "handoff.listing": "Su anuncio en Apartments.com",
+        "handoff.site": "El sitio del propio edificio",
+        "summary.price_gap": (
+            "La renta está {percent}% por debajo de lo que el edificio anuncia para {plan}."
+        ),
+        "summary.price_gap_any": (
+            "La renta está {percent}% por debajo de los anuncios de este edificio."
+        ),
+    }
+)
+
+# CoStar's own published line (apartmenthomeliving.com/info/avoid-scams-and-fraud, "What we ask
+# you to do", read Nov 14 2026), quoted exactly where a surface explains the impersonation rule.
+# Kept out of the string tables: the quote has to say "Scammers", a word the card never uses.
+COSTAR_AFFILIATION_QUOTE = (
+    "Claim of affiliation with us. Scammers may impersonate Apartments.com or Apartment Finder "
+    "to make it seem like we participate in the lease transaction or transfer of funds."
+)
+
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
 
 
@@ -1384,6 +1740,16 @@ def has(key: str, lang: str = DEFAULT_LANG) -> bool:
 def text(key: str, lang: str = DEFAULT_LANG, **values: object) -> str:
     """The wording for `key`, with `{placeholders}` filled in. A missing key is a bug: KeyError."""
     return _table(lang)[key].format(**values)
+
+
+def claim_word(claim: str, ad_value: str | None, lang: str = DEFAULT_LANG) -> str:
+    """The ad's claim in the table's words: "a studio" for 0 beds, singular for 1 (#257)."""
+    key = claim
+    if claim == "beds" and ad_value == "0":
+        key = "beds_studio"
+    elif claim in ("beds", "baths") and ad_value == "1":
+        key = f"{claim}_one"
+    return text(f"claimword.{key}", lang, ad_value=ad_value or "", record_value="")
 
 
 def tone_word(tone: str, row: str, lang: str = DEFAULT_LANG) -> str:
