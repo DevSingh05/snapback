@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
-// The agent trace, folded into a strip under the twin. Collapsed until the viewer opens it.
+// The raw agent trace, folded into a strip under the twin for anyone who wants every event.
+// The check team panel beside the twin tells the same run in plain words.
 export function TraceStrip({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
@@ -12,7 +13,7 @@ export function TraceStrip({ children }: { children: ReactNode }) {
         aria-controls="trace-strip-body"
         onClick={() => setOpen((o) => !o)}
       >
-        Agent trace
+        Agent trace, raw
         <span className="mono" aria-hidden="true">
           {open ? "Hide" : "Show"}
         </span>
