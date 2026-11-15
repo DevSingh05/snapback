@@ -1,0 +1,131 @@
+{
+  "case_id": "7Q2M",
+  "source": "fixture",
+  "mode": "policy",
+  "fell_back": false,
+  "steps": [
+    {
+      "step": 0,
+      "label": "Read the ad",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Read what the ad says it is.",
+      "source": "fixture",
+      "by": "code",
+      "kind": null,
+      "skipped": false
+    },
+    {
+      "step": 1,
+      "label": "Chose which checks to run",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "The building is in our data area and has a 3D twin.",
+      "source": "fixture",
+      "by": "code",
+      "kind": null,
+      "skipped": false
+    },
+    {
+      "step": 2,
+      "label": "Placed 3 of 3 photos in its 3D scan",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Placing 3 listing photos in the twin.",
+      "source": "fixture",
+      "by": "code",
+      "kind": "locate",
+      "skipped": false
+    },
+    {
+      "step": 3,
+      "label": "Skipped the for-sale check",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Skipped listing brokerage: the home is not listed for sale right now.",
+      "source": "fixture",
+      "by": "code",
+      "kind": "for_sale",
+      "skipped": true
+    },
+    {
+      "step": 4,
+      "label": "Skipped the license lookup",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Skipped TREC license: the ad names no license to look up.",
+      "source": "fixture",
+      "by": "code",
+      "kind": "license",
+      "skipped": true
+    },
+    {
+      "step": 5,
+      "label": "Skipped the county's owner of record",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Skipped owner of record: no owner on record to read.",
+      "source": "fixture",
+      "by": "code",
+      "kind": "owner",
+      "skipped": true
+    },
+    {
+      "step": 6,
+      "label": "Found the building on CoStar's record",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Only one option was open.",
+      "source": "fixture",
+      "by": "code",
+      "kind": "record",
+      "skipped": false
+    },
+    {
+      "step": 7,
+      "label": "Put the report together",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Only one option was open.",
+      "source": "fixture",
+      "by": "code",
+      "kind": "report",
+      "skipped": false
+    },
+    {
+      "step": 8,
+      "label": "Matched the photos to a floor plan",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Plan A: 457 inliers vs 9.",
+      "source": "fixture",
+      "by": "code",
+      "kind": null,
+      "skipped": false
+    },
+    {
+      "step": 9,
+      "label": "Drew a random spot for the photo challenge",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Random draw from the top 5; fx-spot-sink skipped because it overlaps a listing photo.",
+      "source": "fixture",
+      "by": "code",
+      "kind": null,
+      "skipped": false
+    },
+    {
+      "step": 10,
+      "label": "Waited for an answer",
+      "started_ms": 0,
+      "took_ms": 0,
+      "result": "Waiting for the renter to approve the message. Nothing is sent until then.",
+      "source": "fixture",
+      "by": "code",
+      "kind": null,
+      "skipped": false
+    }
+  ],
+  "todos": [],
+  "plan": []
+}
