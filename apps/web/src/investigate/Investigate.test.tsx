@@ -340,6 +340,8 @@ describe("robustness line", () => {
 
   it("reads the committed eval file", () => {
     const t = robustnessText(real as unknown as Parameters<typeof robustnessText>[0]);
-    expect(t.headline).toMatch(/^Holds up when ads are reworded: \d+ of 10 rings \(synthetic, n=10 rings/);
+    expect(t?.headline).toMatch(
+      /^Holds up when ads are reworded: \d+ of 10 rings \(synthetic, n=10 rings/,
+    );
   });
 });
