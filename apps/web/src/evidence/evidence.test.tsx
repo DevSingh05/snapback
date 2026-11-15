@@ -64,7 +64,11 @@ describe("ConfidenceChip: three states only", () => {
       "the points cover 0.03 of the photo, the bar is 0.05",
     );
     expect(failedLine({ ...p, bar_failed: "ambiguity" }, bars)).toMatch(/another building/);
-    for (const failed of ["inliers", "ratio", "spread", "ambiguity"] as const)
+    // A loose match is described, never diagnosed: no edited/AI claim (#297 follow-up).
+    const loose = failedLine({ ...p, bar_failed: "loose" }, bars);
+    expect(loose).toBe("a loose match: only 0.18 of its points agreed, too few to place it");
+    expect(loose).not.toMatch(/edit|AI|generat/i);
+    for (const failed of ["inliers", "ratio", "spread", "ambiguity", "loose"] as const)
       expect(failedLine({ ...p, bar_failed: failed }, bars)).not.toMatch(/fake|scam|fraud/i);
   });
 

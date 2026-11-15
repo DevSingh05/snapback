@@ -47,6 +47,10 @@ export function failedLine(p: EvidencePhoto, bars: Record<string, number>): stri
   if (failed === "spread" && p.spread != null && b.spread != null)
     return `the points cover ${num(p.spread)} of the photo, the bar is ${num(b.spread)}`;
   if (failed === "ambiguity") return "another building matched far more strongly";
+  if (failed === "loose")
+    return p.inlier_ratio != null
+      ? `a loose match: only ${num(p.inlier_ratio)} of its points agreed, too few to place it`
+      : "a loose match: too few of its points agreed to place it";
   return "one bar was not met";
 }
 

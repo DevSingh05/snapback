@@ -84,8 +84,8 @@ EN: dict[str, str] = {
     "label.loose": "Loose match",
     "place.loose": (
         "{loose} of {total} photos match a building's 3D scan only loosely: many of their details "
-        "do not line up. They may be edited or AI-made. Ask for a live video walkthrough before "
-        "you pay."
+        "do not line up, so we could not place them. Ask for a live video walkthrough before you "
+        "pay."
     ),
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
     "place.not_indexed_yet": "Not checked (this building's scan is not indexed yet).",
@@ -712,8 +712,8 @@ ES: dict[str, str] = {
     "label.loose": "Coincidencia débil",
     "place.loose": (
         "{loose} de {total} fotos coinciden solo débilmente con el escaneo 3D de un edificio: "
-        "muchos detalles no encajan. Pueden estar editadas o hechas con IA. Pida un recorrido en "
-        "video en vivo antes de pagar."
+        "muchos detalles no encajan, así que no pudimos ubicarlas. Pida un recorrido en video en "
+        "vivo antes de pagar."
     ),
     "place.not_indexed": "No comprobado (no tenemos un escaneo 3D de este edificio).",
     "place.not_indexed_yet": (
