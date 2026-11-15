@@ -161,6 +161,12 @@ def found(fips):
         ("House at 100 Fixture Ln, TX 75201", None, False),
         (HOUSTON, found("48113"), False),  # the county wins over the ad's wording
         ("Brenthouston Rd, Dallas, TX", None, False),
+        ("500 Houston St, Fort Worth TX", None, False),  # a street named Houston, not the city
+        ("500 Houston St, Fort Worth, TX 76102", None, False),
+        ("14 Example Ln, Houston 77096", None, True),
+        ("14 Example Ln, Pasadena, Texas", None, True),
+        ("14 Example Ln, La Porte, TX 77571", None, True),
+        ("a house near Houston, no address", None, False),  # no state or ZIP: not the city slot
     ],
 )
 def test_who_may_be_asked_the_harris_owner_roll(text, place, allowed):
