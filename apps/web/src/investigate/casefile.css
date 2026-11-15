@@ -272,8 +272,8 @@
 }
 
 .cf-print {
-  background: #fff;
-  color: #111;
+  background: var(--print-paper);
+  color: var(--print-ink);
   padding: 36px 40px;
   box-shadow: var(--shadow);
   font-family: Georgia, "Times New Roman", serif;
@@ -287,7 +287,7 @@
 .cf-print h2 {
   font-size: 1.05rem;
   margin: 22px 0 8px;
-  border-bottom: 2px solid #111;
+  border-bottom: 2px solid var(--print-ink);
   padding-bottom: 3px;
 }
 
@@ -295,18 +295,24 @@
   font-family: system-ui, sans-serif;
   font-weight: 800;
   letter-spacing: 0.04em;
-  border: 2px solid #111;
+  border-top: 2px solid var(--print-ink);
+  border-right: 2px solid var(--print-ink);
+  border-bottom: 2px solid var(--print-ink);
+  border-left: 2px solid var(--print-ink);
   padding: 6px 10px;
 }
 
 .cf-print .cf-table th,
 .cf-print .cf-table td {
-  border: 1px solid #888;
+  border-top: 1px solid var(--print-rule);
+  border-right: 1px solid var(--print-rule);
+  border-bottom: 1px solid var(--print-rule);
+  border-left: 1px solid var(--print-rule);
   font-size: 0.8rem;
 }
 
 .cf-print .cf-table th {
-  background: #eee;
+  background: var(--print-fill);
 }
 
 .cf-dl {

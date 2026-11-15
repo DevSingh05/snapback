@@ -152,3 +152,76 @@ def test_api_case_file_and_study(client, analysis):
     s = client.get("/forensics/case-study")
     assert s.status_code == 200
     assert s.json()["ring"]["id"] in {r.id for r in analysis.rings}
+
+
+def _untied_note(cf) -> str:
+    return next((n for n in cf["not_known"] if n.startswith("Why ad")), "")
+
+
+def test_untied_counts_ties_in_both_directions(analysis, monkeypatch):
+    """An ad that only a LATER ad reuses is tied, so it is not listed as untied."""
+    from snapback.forensics import casefile as mod
+
+    order = list(analysis.ring("D").ad_ids)
+    early, late = order[1], order[2]
+    real = mod.pair_ties
+
+    def fake(graph, older, newer):
+        # one photo tie, between `early` (older) and `late` (newer), nothing else
+        if (older, newer) == (early, late):
+            return [
+                {
+                    "kind": "photo",
+                    "weight": 3,
+                    "evidence": {"photo_sets": 1, "closest_bits": 0, "strong": True},
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(mod, "pair_ties", fake)
+    note = _untied_note(build_case_file(analysis, "D"))
+    listed = note.split(".")[0]
+    ids = {
+        int(x)
+        for x in listed.replace("Why ads", "")
+        .replace("Why ad", "")
+        .replace("belongs", "")
+        .replace("belong", "")
+        .replace(",", " ")
+        .split()
+    }
+    assert early not in ids and late not in ids
+    assert order[0] in ids
+    assert "community step" not in note
+    monkeypatch.setattr(mod, "pair_ties", real)
+
+
+def test_untied_single_ad_uses_singular(analysis, monkeypatch):
+    from snapback.forensics import casefile as mod
+
+    order = list(analysis.ring("D").ad_ids)
+    lone = order[0]
+
+    def fake(graph, older, newer):
+        if lone in (older, newer):
+            return []
+        return [{"kind": "phone", "weight": 5, "evidence": {"phone": "x"}}]
+
+    monkeypatch.setattr(mod, "pair_ties", fake)
+    note = _untied_note(build_case_file(analysis, "D"))
+    assert note.startswith(f"Why ad {lone} belongs.")
+    assert " It carries no number" in note
+
+
+def test_recrop_wording_only_when_bits_differ():
+    from snapback.forensics.casefile import _tie_sentence
+
+    def tie(bits):
+        return {
+            "kind": "photo",
+            "from_ad": 7,
+            "evidence": {"photo_sets": 2, "closest_bits": bits, "strong": True},
+        }
+
+    assert "re-cropped" not in _tie_sentence(tie(0))
+    assert "re-cropped" in _tie_sentence(tie(3))

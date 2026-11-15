@@ -244,12 +244,16 @@ def build_case_file(analysis: Analysis, ring_id: str) -> dict[str, Any] | None:
     first_date = graph.ads[first_ad].posted_at
 
     links: list[dict[str, Any]] = []
-    untied: list[int] = []
     for i, ad_id in enumerate(order[1:], start=1):
         ties = first_ties(graph, ad_id, order[:i])
         links += ties
-        if not any(t["weight"] > 0 for t in ties):
-            untied.append(ad_id)
+    # A tie counts in both directions: an earlier ad that a later ad reuses is tied too.
+    tied: set[int] = set()
+    for i, older in enumerate(order):
+        for newer in order[i + 1 :]:
+            if any(t["weight"] > 0 for t in pair_ties(graph, older, newer)):
+                tied.update((older, newer))
+    untied = [a for a in order if a not in tied]
 
     signals = []
     for kind, weight in WEIGHTS.items():
@@ -290,9 +294,14 @@ def build_case_file(analysis: Analysis, ring_id: str) -> dict[str, Any] | None:
     if flagged_on is None:
         not_known.append("The flag day. The detector never reported this ring on its own days.")
     if untied:
+        if len(untied) == 1:
+            subject, verb = f"ad {untied[0]}", "carries"
+        else:
+            subject, verb = f"ads {', '.join(map(str, untied))}", "carry"
         not_known.append(
-            f"Why ads {', '.join(map(str, untied))} belong. They carry no number, photo or "
-            f"wording tie to an earlier ad in the ring; they joined through the community step."
+            f"Why {subject} belong{'s' if len(untied) == 1 else ''}. "
+            f"{'It' if len(untied) == 1 else 'They'} {verb} no number, photo, wording or site "
+            f"tie to any other ad in the ring."
         )
     weak = [lk for lk in links if lk["kind"] == "photo" and not lk["evidence"]["strong"]]
     if weak:
@@ -354,8 +363,9 @@ def _tie_sentence(tie: dict[str, Any]) -> str:
         return f"It uses the same number as ad {other} ({ev['phone']})."
     if tie["kind"] == "photo":
         strength = "" if ev["strong"] else " (one picture only: could be stock)"
+        recrop = ", re-cropped" if ev["closest_bits"] > 0 else ""
         return (
-            f"It reuses {ev['photo_sets']} photo set(s) from ad {other}, re-cropped: the closest "
+            f"It reuses {ev['photo_sets']} photo set(s) from ad {other}{recrop}: the closest "
             f"pair differs by {ev['closest_bits']} of 64 bits{strength}."
         )
     if tie["kind"] == "wording":
