@@ -1,0 +1,97 @@
+/* The soft system, carried to every inside screen. Home and the thread got it first (onebox.css);
+   this sheet gives the same two shapes to the report card, the map, the Finder, the listings,
+   Stories, replays and Under the hood: one radius for surfaces, a pill for anything you press or
+   read as a chip. Shape only: no colour, size or layout changes here. The :root prefix lets it
+   win over each screen's own single-class rule whatever order the chunks load in. */
+
+/* surfaces: cards, panels, photographs, fields */
+:root .ui-photo,
+:root .hud,
+:root .pane,
+:root .lcard,
+:root .lcard-inset,
+:root .fd-honest,
+:root .fd-example,
+:root .fd-composer,
+:root .fd-side,
+:root .fd-block,
+:root .fd-input,
+:root .fd-own,
+:root .pf-strip,
+:root .pf-row,
+:root .pf-scan,
+:root .pf-budget,
+:root .pf-budget input,
+:root .pf-budget select,
+:root .pane input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+:root .st-pick,
+:root .st-frame,
+:root .st-ad,
+:root .replay-page,
+:root .uh-num,
+:root .uh-show,
+:root .uh-thread,
+:root .uh-bubble,
+:root .uh-nums,
+:root .uh-foot {
+  border-radius: var(--radius);
+}
+/* a card that holds a photograph or a coloured band clips it to the same corner */
+:root .ui-photo,
+:root .lcard,
+:root .st-pick,
+:root .st-frame,
+:root .uh-show,
+:root .replay-page {
+  overflow: hidden;
+}
+
+/* things you press, and chips */
+:root .case-primary,
+:root .ui-btn,
+:root .ui-btn-quiet,
+:root .hud-theme,
+:root .seg,
+:root .seg-opt,
+:root .tog,
+:root .own-add,
+:root .fd-off-chip,
+:root .fd-stamp,
+:root .fd-mic,
+:root .fd-send,
+:root .fd-quiet,
+:root .pf-action,
+:root .st-ad-count,
+:root .st-ctl,
+:root .uh-mark,
+:root .uh-stamp {
+  border-radius: var(--radius-pill);
+}
+
+/* one press response everywhere: a small lift on hover, a settle on press */
+@media (prefers-reduced-motion: no-preference) {
+  :root .case-primary,
+  :root .pf-action,
+  :root .fd-send,
+  :root .fd-example,
+  :root .st-ctl,
+  :root .lcard {
+    transition:
+      transform 0.2s var(--ease-out),
+      box-shadow 0.2s var(--ease-out);
+  }
+  :root .case-primary:hover,
+  :root .pf-action:hover,
+  :root .fd-send:hover:not(:disabled),
+  :root .fd-example:hover,
+  :root .st-ctl:hover {
+    transform: translateY(-2px);
+  }
+  :root .case-primary:active,
+  :root .pf-action:active,
+  :root .fd-send:active,
+  :root .fd-example:active,
+  :root .st-ctl:active {
+    transform: translateY(0) scale(0.98);
+  }
+}

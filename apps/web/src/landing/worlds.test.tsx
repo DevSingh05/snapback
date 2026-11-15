@@ -84,6 +84,15 @@ describe("SNAPBACK Worlds front door", () => {
     expect(within(reviews).getByTestId("realtor-quote")).toHaveTextContent("The Agency, Los Gatos");
   });
 
+  it("offers the 30-second game as a fourth way in, above the three", () => {
+    render(<WorldsLanding />);
+    const spot = screen.getByTestId("wl-col-spot");
+    expect(spot).toHaveAttribute("href", "/spot");
+    expect(spot).toHaveTextContent("Spot the scam in 30 seconds");
+    const stories = screen.getByTestId("wl-col-stories");
+    expect(spot.compareDocumentPosition(stories) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("keeps copy honest: no AWS claim, no Apartments.com detection claim, no em dashes", () => {
     const { container } = render(<WorldsLanding />);
     const text = container.textContent ?? "";

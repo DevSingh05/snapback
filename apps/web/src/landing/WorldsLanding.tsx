@@ -573,6 +573,16 @@ function SeeForYourself() {
         <h2 id="wl-see-h" className="wl-h2">
           Check all three before you trust us.
         </h2>
+        <a className="wl-spot" href="/spot" data-testid="wl-col-spot">
+          <span className="wl-spot-k ui-mono">30 seconds</span>
+          <span className="wl-spot-t">Spot the scam in 30 seconds</span>
+          <span className="wl-spot-p">
+            A quick game first: can you spot the scam ad before the clock runs out?
+          </span>
+          <span className="wl-spot-go" aria-hidden="true">
+            Play
+          </span>
+        </a>
         <div className="wl-three">
           <div className="wl-col" data-testid="wl-col-stories">
             <h3 className="wl-h3">Stories</h3>

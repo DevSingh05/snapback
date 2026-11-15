@@ -651,6 +651,75 @@
   color: var(--st-ok);
 }
 
+/* the game: a fourth way in, across the top of the three */
+.wl a.wl-spot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "k t go" "k p go";
+  gap: 4px 22px;
+  align-items: center;
+  margin-bottom: 40px;
+  padding: 20px 24px;
+  text-decoration: none;
+  color: var(--on-matte);
+  background: var(--matte);
+  border-radius: var(--radius);
+  box-shadow: var(--wl-lift);
+  transition:
+    transform 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+.wl a.wl-spot:hover {
+  transform: translateY(-2px);
+}
+.wl a.wl-spot:active {
+  transform: translateY(0) scale(0.995);
+}
+.wl-spot-k {
+  grid-area: k;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--on-scan);
+  background: var(--scan);
+  border-radius: var(--radius-pill);
+}
+.wl-spot-t {
+  grid-area: t;
+  font-weight: 800;
+  font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+  line-height: 1.1;
+}
+.wl-spot-p {
+  grid-area: p;
+  color: var(--on-matte-muted);
+}
+.wl-spot-go {
+  grid-area: go;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 26px;
+  font-weight: 700;
+  color: var(--on-act-matte);
+  background: var(--act-matte);
+  border-radius: var(--radius-pill);
+}
+@media (max-width: 700px) {
+  .wl a.wl-spot {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "k" "t" "p" "go";
+    justify-items: start;
+    gap: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wl a.wl-spot {
+    transition: none;
+  }
+}
+
 /* three ways */
 .wl-three {
   display: grid;
