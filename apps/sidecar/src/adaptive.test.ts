@@ -297,3 +297,49 @@ for (const [why, text] of [
     assert.equal(cfg.profiles.get(KEY), null, text);
   });
 }
+
+// --- XO review of #264, round 3: common renter phrasings are learned again ---------------------
+
+for (const [text, want] of [
+  ["moving to Houston next month", { city: "Houston" }],
+  ["Moving to Houston, budget $1200, need 2 beds", { city: "Houston", budget: 1200, beds: 2 }],
+  [
+    "I'm moving to Houston, I need a 2 bedroom under $1300",
+    { city: "Houston", budget: 1300, beds: 2 },
+  ],
+] as const) {
+  test(`[Med] a renter's own words are remembered, not checked: ${text}`, async () => {
+    const calls: Call[] = [];
+    const cfg = config(calls);
+    await handleMessage(said(text), client(), cfg);
+    assert.equal(posts(calls).length, 0, text);
+    const got = cfg.profiles.get(KEY);
+    for (const [field, value] of Object.entries(want)) {
+      assert.equal(got?.[field as keyof typeof got], value, `${field} in: ${text}`);
+    }
+  });
+}
+
+test("[Med] a roommate ad that names a price and a city is checked, never remembered", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  const text = "I need a roommate for my 2 bedroom in Houston, $700 each";
+  await handleMessage(said(text), client(), cfg);
+  assert.equal(posts(calls).length, 1);
+  assert.equal(cfg.profiles.get(KEY), null);
+});
+
+test("[Med] 'under $N' is only a budget next to the renter's own need, never in an ad", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("Nice 2 bed under $1300 near downtown"), client(), cfg);
+  assert.equal(posts(calls).length, 1);
+  assert.equal(cfg.profiles.get(KEY), null);
+});
+
+test("[Med] a city at the start counts only at the start: an ad's 'moving to' does not", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(said("Great for anyone moving to Houston!"), client(), cfg);
+  assert.equal(cfg.profiles.get(KEY), null);
+});

@@ -32,6 +32,10 @@ test("budget and beds are learned only from the renter's own words, never an ad'
   const ad = learnFrom("2 bed / 2 bath apartment, $1,150 a month, Zelle the deposit");
   assert.equal(ad.budget, undefined);
   assert.equal(ad.beds, undefined);
+  // #264 round 3: "under $N" is a budget only next to the renter's own need
+  assert.equal(learnFrom("I need a 2 bedroom under $1300").budget, 1300);
+  assert.equal(learnFrom("Nice 2 bed under $1300 near downtown").budget, undefined);
+  assert.equal(learnFrom("Need a tenant for my 3 bedroom, under $1300").budget, undefined);
   assert.equal(learnFrom("Mi presupuesto es $1,200 y necesito 2 recámaras").budget, 1200);
   assert.equal(learnFrom("Mi presupuesto es $1,200 y necesito 2 recámaras").beds, 2);
 });
