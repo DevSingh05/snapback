@@ -52,5 +52,5 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
         spots_top_n=data["spots"]["top_n"],
         spots_overlap_deg=data["spots"]["overlap_deg"],
         version="thresholds-" + hashlib.sha256(raw).hexdigest()[:12],
-        flip_search=bool(data["verify"].get("flip_search", False)),
+        flip_search=bool(data["verify"].get("flip_search", True)),
     )

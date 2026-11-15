@@ -202,6 +202,10 @@ class _Placement:
     check: Verification
 
 
+# Bars that mark a doubtful match: the flip must never override them.
+_NO_FLIP_BARS = frozenset({"ambiguity", "spread"})
+
+
 @dataclass(frozen=True)
 class _PlaceOutcome:
     placed: "_Placement | None"
@@ -648,9 +652,11 @@ class Locator:
                 continue
             photo = image.convert("RGB")
             placed, bar, rival, ambiguous = attempt(photo)
-            if placed is None and flip_search and not ambiguous and bar != "ambiguity":
+            if placed is None and flip_search and not ambiguous and bar not in _NO_FLIP_BARS:
                 # V1 (#10): copied ads are often mirrored. Search the photo once more flipped left
-                # to right, under the very same bars and guards; only a placement counts.
+                # to right, under the very same bars and guards; only a placement counts. Never
+                # after a doubtful result (ambiguity or spread): a doubtful photo is not searched
+                # elsewhere (ruling 07:43, #28), and a flip would do exactly that.
                 mirrored = ImageOps.mirror(photo)
                 m_placed, m_bar, m_rival, m_ambiguous = attempt(mirrored)
                 ambiguous = ambiguous or m_ambiguous

@@ -773,7 +773,7 @@ def test_a_rival_under_the_elsewhere_inlier_floor_never_blocks_even_at_3x(twins,
 
 def test_each_claimed_face_is_verified_at_most_once(twins, locator, monkeypatch):
     """A claimed match failing only the spread floor must not cost a second pass (#186 review).
-    Per image: an unplaced photo is searched once more flipped (#10, V1), a different image."""
+    A doubtful (spread) result is final: the flip never runs after it (#10, V1, ruling 07:43)."""
     import hashlib
 
     from snapback.vision.locate.verify import FEATURE_KEY
@@ -797,4 +797,4 @@ def test_each_claimed_face_is_verified_at_most_once(twins, locator, monkeypatch)
     assert result.photos[0].status is LocateStatus.NOT_LOCATED
     claimed = {k: n for k, n in calls.items() if k[1].startswith("fx-model-a/")}
     assert claimed and max(claimed.values()) == 1
-    assert len(images) == 2  # as sent, then flipped once
+    assert len(images) == 1  # as sent only: a spread result is never flipped
