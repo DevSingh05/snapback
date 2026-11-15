@@ -65,29 +65,97 @@ export type SidecarConfig = {
   memory?: CaseMemory;
 };
 
-const CASE_TTL_MS = 24 * 60 * 60 * 1000; // a card expires in 24 h; so does the follow-up
+const CASE_TTL_MS = 2 * 60 * 60 * 1000; // a follow-up answers from a case up to 2 h old
 
-/** Each thread's last case (public id and the challenge to send), in memory only. */
+type Remembered = { caseId: string; challenge?: string | null; readToken?: string | null };
+
+/** Each thread's last case, keyed by the thread's keyed hash (never the thread id), in memory
+ * only. Expired entries are dropped when read. */
 export class CaseMemory {
-  private last = new Map<string, { caseId: string; challenge?: string | null; at: number }>();
+  private last = new Map<string, Remembered & { at: number }>();
+  private running = new Set<string>();
 
   constructor(private now: () => number = Date.now) {}
 
-  remember(threadId: string, caseId: string, challenge?: string | null): void {
-    this.last.set(threadId, { caseId, challenge, at: this.now() });
+  remember(
+    key: string,
+    caseId: string,
+    challenge?: string | null,
+    readToken?: string | null,
+  ): void {
+    this.last.set(key, { caseId, challenge, readToken, at: this.now() });
   }
 
   /** This thread's own case, if it is still fresh. Never another thread's. */
-  recall(threadId: string): { caseId: string; challenge?: string | null } | null {
-    const found = this.last.get(threadId);
-    if (!found || this.now() - found.at > CASE_TTL_MS) return null;
+  recall(key: string): Remembered | null {
+    const found = this.last.get(key);
+    if (!found) return null;
+    if (this.now() - found.at > CASE_TTL_MS) {
+      this.last.delete(key);
+      return null;
+    }
     return found;
+  }
+
+  /** A check is running for this thread: a follow-up must not answer from the older case. */
+  begin(key: string): void {
+    this.running.add(key);
+  }
+  end(key: string): void {
+    this.running.delete(key);
+  }
+  checking(key: string): boolean {
+    return this.running.has(key);
   }
 }
 
-const WHY = /^\s*(why|why not|how come|what did you find|what's wrong|whats wrong)\s*[?.!]*\s*$/i;
-const WHAT_NOW =
-  /^\s*(what (should|do|can) i do|what now|now what|what next|next steps?|what do i do now)\s*[?.!]*\s*$/i;
+export const SEND_THE_AD_FIRST = "Send me the ad first and I'll check it.";
+export const STILL_CHECKING = "Still checking, one moment.";
+
+type Intent = "why" | "now" | "call" | "safe";
+const TAIL = String.raw`(\s+(now|then))?\s*[?.!]*\s*$`;
+const INTENTS: [Intent, RegExp][] = [
+  [
+    "why",
+    new RegExp(
+      String.raw`^\s*(why( not)?|how come|what did you find|what's wrong|whats wrong)` + TAIL,
+      "i",
+    ),
+  ],
+  [
+    "now",
+    new RegExp(
+      String.raw`^\s*(what (should|do|can) i do|what now|now what|what next|next steps?|what do i do)` +
+        TAIL,
+      "i",
+    ),
+  ],
+  [
+    "call",
+    new RegExp(
+      String.raw`^\s*(who (do|should|can) i (call|contact|talk to)|who('s| is) the (manager|landlord|office))` +
+        TAIL,
+      "i",
+    ),
+  ],
+  [
+    "safe",
+    new RegExp(
+      String.raw`^\s*(is (it|this|that) (safe|real|legit|a scam|ok|okay)|can i (pay|trust (it|this)))` +
+        TAIL,
+      "i",
+    ),
+  ],
+];
+
+/** The follow-up a short message asks, or null if it is an ad. Curly quotes count; any "why ..."
+ * under 40 characters with no link is a "why". */
+export function intentOf(raw: string): Intent | null {
+  const text = raw.replace(/[\u2018\u2019]/g, "'").trim();
+  for (const [intent, pattern] of INTENTS) if (pattern.test(text)) return intent;
+  if (/^why\b/i.test(text) && text.length < 40 && !/https?:|www\./i.test(text)) return "why";
+  return null;
+}
 
 const MAX_PHOTOS = 10;
 
@@ -246,19 +314,47 @@ async function fetchCard(config: SidecarConfig, caseId: string): Promise<Card | 
   return res.ok ? ((await res.json()) as Card) : null;
 }
 
-/** A "why?" or "what should I do?" about this thread's last case, or null if it is neither
- * (or there is no fresh case): then the text is checked like any other. */
-async function followUp(msg: InboundMessage, config: SidecarConfig): Promise<string | null> {
-  const text = msg.text ?? "";
+/** The follow-up a message asks, or null when it is an ad (or carries photos). */
+function followUpIntent(msg: InboundMessage): Intent | null {
   if ((msg.images?.length ?? 0) > 0 || msg.imageUrls.length > 0) return null;
-  const why = WHY.test(text);
-  if (!why && !WHAT_NOW.test(text)) return null;
-  const last = config.memory?.recall(msg.threadId);
-  if (!last) return null;
+  return intentOf(msg.text ?? "");
+}
+
+/** The answer to a follow-up. It never makes a case: no fresh case gives "send me the ad
+ * first", a check still running gives "still checking", and a card that cannot be read gives
+ * COULD_NOT_CHECK. */
+async function answerFollowUp(
+  intent: Intent,
+  msg: InboundMessage,
+  config: SidecarConfig,
+): Promise<string> {
+  const key = renterId(msg.threadId, config.renterSalt);
+  if (config.memory?.checking(key)) return STILL_CHECKING;
+  const last = config.memory?.recall(key);
+  if (!last) return SEND_THE_AD_FIRST;
   const card = await fetchCard(config, last.caseId);
-  if (!card) return null;
+  if (!card) return COULD_NOT_CHECK;
   const link = caseLink(config, last.caseId);
-  return why ? whyText(card, link) : whatNowText(card, link, last.challenge);
+  if (intent === "why") return whyText(card, link);
+  if (intent === "now") return whatNowText(card, link, last.challenge);
+  if (intent === "safe") return reportText(card, link, last.challenge);
+  const office = last.readToken ? await officeOnRecord(config, last.caseId, last.readToken) : null;
+  return whoToCall(card, link, office);
+}
+
+/** "who do I call?": the office on record and its own site (#250); never a phone number. */
+function whoToCall(card: Card, link: string, office: OfficeOnRecord | null): string {
+  const lines = [HEADLINES[card.state] ?? HEADLINES.hold, ""];
+  if (office?.manager_company && office.website_host) {
+    lines.push(
+      `Call ${office.manager_company} through ${office.website_host}, not the number in the ad.`,
+    );
+  } else {
+    lines.push("CoStar's record has no office on file for this building, so I can't name one.");
+    lines.push(...card.footer.filter((line) => line.startsWith("Two rules")));
+  }
+  lines.push("", `Full report: ${link}`);
+  return lines.join("\n");
 }
 
 /** Who is on record and where (#250), with the read token in a header. Only the company and
@@ -302,7 +398,7 @@ async function check(msg: InboundMessage, config: SidecarConfig): Promise<Checke
     read_token: readToken,
     challenge_text: challenge,
   } = (await created.json()) as CreateCaseResponse;
-  config.memory?.remember(msg.threadId, caseId, challenge);
+  config.memory?.remember(renterId(msg.threadId, config.renterSalt), caseId, challenge, readToken);
   const link = caseLink(config, caseId);
   const card = await fetchCard(config, caseId);
   if (!card) return { text: `${HEADLINES.hold}\nSNAPBACK check ${caseId} started.\n${link}` };
@@ -338,25 +434,36 @@ export async function handleMessage(
   onChecking?: () => Promise<void>,
 ): Promise<boolean> {
   if (!isAllowed(msg.threadId, config)) return false;
-  try {
-    const answer = await followUp(msg, config);
-    if (answer !== null) {
-      await client.reply(msg.threadId, answer);
-      return true;
+  const intent = followUpIntent(msg);
+  if (intent !== null) {
+    // Ruling (#255 review): a follow-up never creates a case, whatever happens here.
+    let answer: string;
+    try {
+      answer = await answerFollowUp(intent, msg, config);
+    } catch {
+      answer = COULD_NOT_CHECK;
     }
-  } catch {
-    // a follow-up that cannot be answered is checked like any other text
+    await client.reply(msg.threadId, answer);
+    return true;
   }
   if (onlyAMarketplaceLink(msg)) {
     await client.reply(msg.threadId, ONLY_A_LINK); // nothing to check, so no check is used
     return true;
   }
+  const key = renterId(msg.threadId, config.renterSalt);
   let checked: Checked;
+  config.memory?.begin(key);
   try {
-    await onChecking?.();
+    try {
+      await onChecking?.();
+    } catch {
+      // a failed "checking" reply never skips the check
+    }
     checked = await check(msg, config);
   } catch {
     checked = { text: COULD_NOT_CHECK };
+  } finally {
+    config.memory?.end(key);
   }
   await client.reply(msg.threadId, checked.text);
   if (checked.caseId) await sendCardPicture(client, msg, config, checked.caseId);

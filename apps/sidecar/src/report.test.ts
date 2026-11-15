@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { CaseMemory, handleMessage, reportText, type InboundMessage } from "./handler";
+import {
+  COULD_NOT_CHECK,
+  CaseMemory,
+  handleMessage,
+  renterId,
+  reportText,
+  type InboundMessage,
+} from "./handler";
+import { stageOptions } from "./photon";
 
 const card = JSON.parse(
   readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
@@ -232,11 +240,12 @@ test("'what should I do?' gives the next steps from the same case", async () => 
   assert.equal(calls.filter((x) => x.method === "POST").length, 1);
 });
 
-test("'why?' with no earlier check in this thread is read as text and checked", async () => {
+test("[H] 'why?' with no case in this thread never makes one: 'send me the ad first'", async () => {
   const calls: Call[] = [];
   const c = client();
   await handleMessage(ad("why?"), c, config(calls));
-  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 0);
+  assert.equal(c.texts[0], "Send me the ad first and I'll check it.");
 });
 
 test("a follow-up only reads this thread's own case", async () => {
@@ -245,21 +254,20 @@ test("a follow-up only reads this thread's own case", async () => {
   await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
   const other = client();
   await handleMessage({ ...ad("why?"), threadId: "fx-thread-other" }, other, cfg);
-  assert.equal(
-    calls.filter((x) => x.method === "POST").length,
-    2,
-    "the other thread's 'why?' is a new check",
-  );
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1, "no case for the other thread");
+  assert.equal(other.texts[0], "Send me the ad first and I'll check it.");
 });
 
-test("a follow-up after the case expires is a new check", async () => {
+test("[L] a follow-up more than 2 hours after the check never makes a case", async () => {
   let now = Date.parse("2026-11-14T12:00:00Z");
   const calls: Call[] = [];
   const cfg = { ...config(calls), memory: new CaseMemory(() => now) };
   await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
-  now += 25 * 60 * 60 * 1000;
-  await handleMessage(ad("why?"), client(), cfg);
-  assert.equal(calls.filter((x) => x.method === "POST").length, 2);
+  now += 2 * 60 * 60 * 1000 + 1;
+  const late = client();
+  await handleMessage(ad("why?"), late, cfg);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+  assert.equal(late.texts[0], "Send me the ad first and I'll check it.");
 });
 
 test("through Photon, the card picture goes to the same thread right after the text", async () => {
@@ -376,4 +384,136 @@ test("U1: a follow-up gets no 'checking' reply", async () => {
   })();
   await runPhoton({ messages: messages as AsyncIterable<[typeof renter, never]> }, cfg);
   assert.ok(!sent.some((x) => typeof x === "string" && x.startsWith("Got it.")));
+});
+
+// --- XO review of #255 (Sat 18:59) -----------------------------------------------------------------
+
+test("[H] if the card cannot be read, a follow-up says it couldn't check and makes no case", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  const broken = {
+    ...cfg,
+    fetch: (async () => new Response("down", { status: 500 })) as typeof fetch,
+  };
+  const c = client();
+  await handleMessage(ad("why?"), c, broken);
+  assert.equal(c.texts[0], COULD_NOT_CHECK);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+});
+
+test("[H] if the follow-up reply throws, it never falls through to a check", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  const throwing = {
+    ...cfg,
+    fetch: (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch,
+  };
+  const c = client();
+  await handleMessage(ad("why?"), c, throwing);
+  assert.equal(c.texts[0], COULD_NOT_CHECK);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+});
+
+for (const said of [
+  "Why?",
+  "why’s that",
+  "why is it on hold",
+  "what should I do now?",
+  "what do I do then",
+  "What now",
+]) {
+  test(`[M] '${said}' is a follow-up`, async () => {
+    const calls: Call[] = [];
+    const cfg = config(calls);
+    await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+    await handleMessage(ad(said), client(), cfg);
+    assert.equal(calls.filter((x) => x.method === "POST").length, 1, said);
+  });
+}
+
+test("[M] a long 'why' sentence or one with a link is an ad, not a follow-up", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  await handleMessage(
+    ad("why would the landlord ask for Zelle before I even see the 2 bed place"),
+    client(),
+    cfg,
+  );
+  await handleMessage(ad("why https://example.com/listing"), client(), cfg);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 3);
+});
+
+test("[M] 'who do I call?' names the office on record and its site, never digits", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  const c = client();
+  await handleMessage(ad("Who do I call?"), c, cfg);
+  assert.match(c.texts[0] ?? "", /Fixture Living LLC/);
+  assert.match(c.texts[0] ?? "", /oakcourt\.example/);
+  assert.doesNotMatch(c.texts[0] ?? "", /\d{3}[-.\s]?\d{4}/);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+});
+
+test("[M] 'is it safe?' gives the headline and the top reasons from the card", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  const c = client();
+  await handleMessage(ad("is it safe?"), c, cfg);
+  assert.match(c.texts[0] ?? "", /^Hold off for now/);
+  assert.match(c.texts[0] ?? "", /Zelle before a viewing/);
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+});
+
+test("[M] 'why?' sent while a check is running says 'still checking', not the old ad", async () => {
+  const calls: Call[] = [];
+  let release = () => {};
+  const gate = new Promise<void>((done) => (release = done));
+  const slow = api(calls);
+  const cfg = {
+    ...config(calls),
+    fetch: (async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).endsWith("/cases") && init?.method === "POST") await gate;
+      return slow(input, init);
+    }) as typeof fetch,
+  };
+  const running = handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  const c = client();
+  await handleMessage(ad("why?"), c, cfg);
+  assert.equal(c.texts[0], "Still checking, one moment.");
+  release();
+  await running;
+});
+
+test("[L] a failed 'checking' reply never skips the check", async () => {
+  const calls: Call[] = [];
+  const c = client();
+  await handleMessage(ad("2 bed $900, Zelle first"), c, config(calls), async () => {
+    throw new Error("send failed");
+  });
+  assert.equal(calls.filter((x) => x.method === "POST").length, 1);
+  assert.match(c.texts[0] ?? "", /^Hold off for now/);
+});
+
+test("[L] memory is keyed by the keyed hash, never the thread id", async () => {
+  const calls: Call[] = [];
+  const cfg = config(calls);
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), cfg);
+  assert.equal(cfg.memory.recall(THREAD), null);
+  assert.ok(cfg.memory.recall(renterId(THREAD, "fx-salt")));
+});
+
+test("[M] stage switches: card picture and checking reply are on only when set to 1", () => {
+  assert.deepEqual(stageOptions({}), { sendCardImage: false, acknowledge: false });
+  assert.deepEqual(stageOptions({ SNAPBACK_SEND_CARD_IMAGE: "1", SNAPBACK_SEND_CHECKING: "1" }), {
+    sendCardImage: true,
+    acknowledge: true,
+  });
+  assert.deepEqual(stageOptions({ SNAPBACK_SEND_CARD_IMAGE: "0" }).sendCardImage, false);
 });

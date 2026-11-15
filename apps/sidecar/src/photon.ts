@@ -84,6 +84,18 @@ export type PhotonConfig = SidecarConfig & {
 
 type Log = (line: string) => void;
 
+/** Stage switches, so either can be turned off on stage: the card picture
+ * (SNAPBACK_SEND_CARD_IMAGE=1) and the "checking" reply (SNAPBACK_SEND_CHECKING=1). Off unless 1. */
+export function stageOptions(env: Record<string, string | undefined>): {
+  sendCardImage: boolean;
+  acknowledge: boolean;
+} {
+  return {
+    sendCardImage: env.SNAPBACK_SEND_CARD_IMAGE === "1",
+    acknowledge: env.SNAPBACK_SEND_CHECKING === "1",
+  };
+}
+
 const QUIET_MS = 4000;
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
