@@ -60,6 +60,7 @@ export interface AuthorityResult {
   poster_said?: string | null;
   office_phone_match: PhoneMatch;
   link_domain: LinkDomain;
+  lookalike_sender_only?: boolean; // the lookalike came from a sender address alone
 }
 
 export interface Card {

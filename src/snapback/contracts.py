@@ -306,6 +306,8 @@ class AuthorityResult(BaseModel):
     # A15: the comparison was with the listing brokerages alone. The home has no property
     # record, so there is no manager, office phone or website on record to compare with.
     brokerage_only: bool = False
+    # The lookalike came from a sender address alone; no link in the listing imitates the site.
+    lookalike_sender_only: bool = False
 
 
 class ForSaleStatus(StrEnum):
