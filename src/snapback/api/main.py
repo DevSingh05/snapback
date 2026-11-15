@@ -9,6 +9,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/card.png        the same card as a picture, for iMessage (?lang=en|es)
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     GET  /cases/{case_id}/notes           the agent's working notes (read-only)
+    GET  /cases/{case_id}/timeline        what the agent did, step by step (?lang=en|es)
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
@@ -49,6 +50,7 @@ from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
 from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
+from snapback.agent.timeline import CaseTimeline, build_timeline
 from snapback.api.card_cache import CardPictures
 from snapback.api.casefiles import ALIAS, CaseFiles
 from snapback.api.cases import (
@@ -266,6 +268,7 @@ def create_app(
     office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
     finder_model: object | None = None,
+    case_model: Callable[[], object] | None = None,
     voice_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
@@ -274,7 +277,9 @@ def create_app(
     settings = settings or get_settings()
     # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
     lookups = lookups or KitLookups(settings.snapback_data_source)
-    store = CaseStore(settings, lookups)
+    # `case_model` makes the chat model for the deep agent on cases (tests pass a scripted one);
+    # it is used only when SNAPBACK_AGENT=deepagents.
+    store = CaseStore(settings, lookups, agent_model=case_model)
     if registry is _DEFAULT:
         registry = SafetyRegistry(settings.snapback_data_dir)
     # One allowance per renter or per browser, and a ceiling per network address so that
@@ -1052,6 +1057,26 @@ def create_app(
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
         return case.notes()
+
+    @app.get("/cases/{case_id}/timeline", response_model=CaseTimeline)
+    def get_timeline(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CaseTimeline:
+        """What the agent did, in order: each step's plain label, when it started, how long it
+        took, a short result, LIVE or FIXTURE, and whether the agent or code did it; plus the
+        agent's todo list and sub-agents when the deep agent ran. Built from the trace; no
+        phone, address or rent in any label. Read token in a header only; never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers.update(NO_STORE)
+        evidence = case.evidence
+        return build_timeline(case.case_id, evidence.source, case.events(), evidence, lang)
 
     @app.post("/search")
     def post_search(

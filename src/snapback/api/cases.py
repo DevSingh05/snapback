@@ -13,6 +13,7 @@ creating a case in live mode says so instead of pretending.
 
 import json
 import logging
+import os
 import secrets
 import threading
 from collections.abc import Callable
@@ -365,9 +366,18 @@ def _policy_runner(session: CaseSession) -> object:
         refresh_policy_notes(session)  # the same notes, written by code
 
 
-def _deepagents_runner(settings: Settings | None = None) -> Callable[[CaseSession], object]:
-    """A runner that drives each case with its own deep agent, falling back to the policy."""
+def _deepagents_runner(
+    settings: Settings | None = None, model_factory: Callable[[], object] | None = None
+) -> Callable[[CaseSession], object]:
+    """A runner that drives each case with its own deep agent, falling back to the policy.
+
+    The agent plans (its todo list), orders the checks and hands each family to a sub-agent;
+    `decide()` still sets the result. It gets `snapback_agent_timeout_s` per run. On any error
+    or on the time limit the trace says so, code finishes the case, and that case stays on the
+    policy from then on. `model_factory` makes the chat model (tests); by default Claude, with
+    the key from settings (read from the environment), never printed."""
     agents: dict[str, object] = {}
+    timeout_s = settings.snapback_agent_timeout_s if settings is not None else None
     if settings is not None:
         try:
             from snapback.agent.graph import enable_langsmith
@@ -377,19 +387,43 @@ def _deepagents_runner(settings: Settings | None = None) -> Callable[[CaseSessio
         except Exception:
             log.warning("LangSmith tracing could not be set up; carrying on without it")
 
+    def make_model() -> object:
+        if model_factory is not None:
+            return model_factory()
+        from snapback.agent.graph import build_model
+
+        key = settings.anthropic_api_key if settings is not None else None
+        if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError("no model key")
+        return build_model(
+            key.get_secret_value() if key else None,
+            settings.snapback_agent_model if settings is not None else None,
+            timeout_s,
+        )
+
+    def policy(session: CaseSession) -> object:
+        try:
+            return run_case(session, PolicyChooser())
+        finally:
+            refresh_policy_notes(session)
+
     def run(session: CaseSession) -> object:
+        if session.__dict__.get("agent_fell_back"):
+            return policy(session)  # the agent stopped once on this case; code carries on
         try:
             from snapback.agent.graph import build_agent, run_case_with_agent
 
-            agent = agents.setdefault(session.case_id, build_agent(session))
-            return run_case_with_agent(session, agent)
+            agent = agents.get(session.case_id)
+            if agent is None:
+                agent = agents[session.case_id] = build_agent(session, make_model())
         except Exception:
             # The extra is not installed, there is no key, or the graph could not be built.
-            session.trace.emit(TraceKind.ERROR, strings.text("trace.error.model_failed"))
-            try:
-                return run_case(session, PolicyChooser())
-            finally:
-                refresh_policy_notes(session)
+            session.__dict__["agent_fell_back"] = True
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
+            return policy(session)
+        return run_case_with_agent(session, agent, deadline_s=timeout_s)
 
     return run
 
@@ -400,6 +434,7 @@ class CaseStore:
         settings: Settings,
         lookups: Lookups | None = None,
         live_locate: LiveLocate | None = None,
+        agent_model: Callable[[], object] | None = None,
     ) -> None:
         self._settings = settings
         # Lane D's adapters: the record and the for-sale lookup (A10). The kit is read once.
@@ -414,7 +449,7 @@ class CaseStore:
         self._lock = threading.Lock()
         self._memory: PhotoMemory | None = None
         self._runner = (
-            _deepagents_runner(settings)
+            _deepagents_runner(settings, agent_model)
             if settings.snapback_agent == "deepagents"
             else _policy_runner
         )
