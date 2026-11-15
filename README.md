@@ -4,7 +4,7 @@
 
 ### Trust the home, not the ad.
 
-**Real photos, fake landlord. SNAPBACK checks a rental ad against the real home's 3D scan and property record before you pay.**
+**Real photos, fake landlord. Send SNAPBACK the ad: it checks the real home's 3D scan and property record, and tells you who to call before you pay.**
 
 [Live site](https://snapback-navy.vercel.app) · [Demo video](https://youtu.be/XN3aK8T2BJo) ·
 [Devpost](DEVPOST_URL) · [Spot the scam](https://snapback-navy.vercel.app/spot)
