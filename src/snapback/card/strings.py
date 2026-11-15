@@ -37,6 +37,24 @@ EN: dict[str, str] = {
     "label.office": "Office confirmation",
     "label.link": "Link",
     "label.license": "License",
+    "label.src_comptroller": "Texas Comptroller",
+    "label.src_hud": "HUD record",
+    "label.src_houston": "City of Houston",
+    "records.comptroller_active": (
+        "Texas Comptroller: {company} is an active Texas company since {year}."
+    ),
+    "records.comptroller_inactive": (
+        "Texas Comptroller: {company} is on the list but not as an active company."
+    ),
+    "records.comptroller_none": (
+        "Texas Comptroller: {company} is not found in the Comptroller list "
+        "(sole proprietors aren't listed)."
+    ),
+    "records.hud_manager": "HUD's record lists the manager as {company}.",
+    "records.hud_phone_differs": "The ad's phone isn't the manager's number on HUD's record.",
+    "records.address_point": (
+        "City of Houston: this street address is on the city's address points (ZIP {zip_code})."
+    ),
     "label.owner": "Owner of record",
     "label.owner_rule": "Owner's rule",
     "label.unit": "Unit on record",
@@ -591,6 +609,27 @@ ES: dict[str, str] = {
     "label.office": "Confirmación de la oficina",
     "label.link": "Enlace",
     "label.license": "Licencia",
+    "label.src_comptroller": "Contralor de Texas",
+    "label.src_hud": "Registro de HUD",
+    "label.src_houston": "Ciudad de Houston",
+    "records.comptroller_active": (
+        "Contralor de Texas: {company} es una empresa activa de Texas desde {year}."
+    ),
+    "records.comptroller_inactive": (
+        "Contralor de Texas: {company} está en la lista, pero no como empresa activa."
+    ),
+    "records.comptroller_none": (
+        "Contralor de Texas: {company} no aparece en la lista del Contralor "
+        "(los propietarios individuales no figuran)."
+    ),
+    "records.hud_manager": "El registro de HUD indica que el administrador es {company}.",
+    "records.hud_phone_differs": (
+        "El teléfono del anuncio no es el número del administrador en el registro de HUD."
+    ),
+    "records.address_point": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad "
+        "(código postal {zip_code})."
+    ),
     "label.owner": "Propietario registrado",
     "label.owner_rule": "Regla del propietario",
     "label.unit": "Unidad en el registro",
