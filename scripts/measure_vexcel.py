@@ -5,7 +5,8 @@
     uv run python scripts/measure_vexcel.py --mode live
     uv run python scripts/measure_vexcel.py --mode fixture
 
-Cases: data/vexcel_eval/cases.json if present; else built from the local CoStar kit
+Cases: data/vexcel_eval/cases_v2.json (n=54, built by vexcel_set.extend_cases) or cases.json
+(n=28) if present; else built from the local CoStar kit
 (residential listings, Houston) and saved there (git-ignored); else the committed synthetic set
 eval/vexcel/cases.fixture.json. Prints n, hits, misses and pass/fail against the 18-of-20 bar,
 and writes eval/vexcel/results.json (counts and case ids only). Only a LIVE pass lets
@@ -59,8 +60,11 @@ def kit_rows(data_dir: Path) -> list[dict]:
 
 def load_cases(cases: Path | None, data_dir: Path) -> tuple[dict, str]:
     local = data_dir / "vexcel_eval" / "cases.json"
+    extended = data_dir / "vexcel_eval" / "cases_v2.json"  # the n=54 set (superset of cases.json)
     if cases:
         return json.loads(cases.read_text(encoding="utf-8")), cases.name  # no local path
+    if extended.is_file():
+        return json.loads(extended.read_text(encoding="utf-8")), "local kit set, extended"
     if local.is_file():
         return json.loads(local.read_text(encoding="utf-8")), "local kit set"
     rows = kit_rows(data_dir)
