@@ -4,7 +4,7 @@
 
 ### Trust the home, not the ad.
 
-**SNAPBACK checks a rental ad against the real home before you pay.**
+**Real photos, fake landlord. SNAPBACK checks a rental ad against the real home's 3D scan and property record before you pay.**
 
 [Live site](https://snapback-navy.vercel.app) · [Demo video](https://youtu.be/XN3aK8T2BJo) ·
 [Devpost](DEVPOST_URL) · [Spot the scam](https://snapback-navy.vercel.app/spot)
@@ -17,6 +17,16 @@
 
 ![The SNAPBACK landing page: a 3D house cut open under the line "Trust the home, not the ad."](docs/readme/landing.webp)
 
+## At a glance
+
+| Track                                            | What we built                                                                                                                                   | Where to see it (URL path)                  | Result (number, n, label)                                                                                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| CoStar: "Inside and Out: AI for the Built World" | The ad's photos placed inside the building's Matterport 3D scan, checked against CoStar's property record                                       | `/case/7Q2M/twin` (sample case)             | 43 of 48 real listing photos in the right home, 0 in a wrong one (n = 48 photos, LIVE); 0 of 30 decoys passed (n = 30, LIVE)                  |
+| Amazon: Best Practical AI Innovation             | One verdict, the top two reasons and one next step, in the place the ad arrived                                                                 | `/home`                                     | Tampered copies of a real listing caught 6 of 6 for each change (n = 6 photos per change, LIVE)                                               |
+| LangChain: Best use of deepagents                | A Planner with a check team of sub-agents, each with one read-only tool; up to 2 follow-up checks tied to open gaps; a next step behind Approve | `/case/7Q2M/twin` (check team)              | Planner done in a median 22.9 s in the background; the report never waits (n = 5 timed runs, FIXTURE)                                         |
+| Arlequin AI Track 1: AI-Driven Forensics         | A ring finder that links ads by reworded text, photos, phones and wordings, with a case file per group                                          | `/investigate`                              | 10 of 10 seeded rings flagged, median 2.5 days after a ring's first ad; 0 of 2,684 honest ads flagged (n = 3,039 ads over 90 days, SYNTHETIC) |
+| Photon: Build a Messaging Agent using Photon 2.0 | The same check in iMessage on Photon 2.0: send the ad, get the verdict in the thread                                                            | iMessage (allowlisted threads; no web path) | 10 of 11 right, replies in 0.38 to 4.44 s (n = 10 test ads through a test client, FIXTURE)                                                    |
+
 Send SNAPBACK the ad you found, by iMessage or in the one box on the web: a link, its text or
 screenshots. It checks the place, the person and the price against the home's own record, gives you
 a short report with one verdict, and hands you back to the real listing and the office on record.
@@ -26,7 +36,7 @@ Code sets every verdict. SNAPBACK never pays, books or sends anything for you.
   <a href="https://youtu.be/XN3aK8T2BJo"><img src="docs/readme/video.png" alt="Watch the 2-minute SNAPBACK demo on YouTube" width="760" /></a>
 </p>
 
-[The problem](#the-problem) · [How it works](#how-it-works) · [What's inside](#whats-inside) ·
+[At a glance](#at-a-glance) · [The problem](#the-problem) · [How it works](#how-it-works) · [What's inside](#whats-inside) ·
 [Results](#results) · [Architecture](#architecture) · [Quick start](#quick-start) ·
 [Honest limits](#honest-limits) · [Team](#team)
 
@@ -92,7 +102,7 @@ the payment but never says "Don't pay" alone. SNAPBACK never calls a named perso
 | ![The report: a Hold off verdict, three reasons and "Who do I call?"](docs/readme/report.webp) | <img src="docs/readme/phone-report.webp" alt="The same report at phone width" width="260" /> |
 
 **4. Then the hand-off.** The report shows the ad beside the real listing, with a "See the real
-listing" link to it on Apartments.com, and the office on record to call. A Hold or unverified card
+listing" link to it on Apartments.com, and the office on record to call. A Hold or unverified report
 names the one fact that would settle it, for example "the office confirms this number". When a
 listing is being copied, SNAPBACK drafts a note to that office. Every draft says "Draft, not sent.
 You send it."
@@ -145,9 +155,9 @@ data or real listing photos. **FIXTURE** means team-made data through the real p
 
 | What                                                                                                   | Result                                                                                                                                                                                       | n                     | Label     |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | --------- |
-| Tamper test on scan renders                                                                            | Each change caught 2 of 2                                                                                                                                                                    | 2 renders, per change | LIVE      |
+| Tamper test on 3D scan renders                                                                         | Each change caught 2 of 2                                                                                                                                                                    | 2 renders, per change | LIVE      |
 | Batch run: composed ads and labelled messages through the real pipeline (`eval/ads_results.csv`, #262) | 117 of 123 handled as expected, including 43 of 43 clean messages left alone                                                                                                                 | 123                   | FIXTURE   |
-| Deep agent report latency (#273, real model runs)                                                      | Report returns in 0.03 to 0.09 s without waiting; agent done in a median 22.9 s, no fallbacks                                                                                                | 6 cases, 5 timed runs | FIXTURE   |
+| Planner and report latency (#273, real model runs)                                                     | Report returns in 0.03 to 0.09 s without waiting; agent done in a median 22.9 s, no fallbacks                                                                                                | 6 cases, 5 timed runs | FIXTURE   |
 | Ring finder on reworded ads, phone and photo-link fallback on (#312)                                   | Only 171 of 355 ring ads (48%) caught once reworded                                                                                                                                          | 355 ring ads          | SYNTHETIC |
 | Ring finder on a 301-ad corpus with 4 seeded rings                                                     | 4 of 4 rings, 0 of 244 honest ads flagged; a keyword search found 0 of 4                                                                                                                     | 301 ads               | SYNTHETIC |
 | Vexcel aerial matcher v2, SIFT with RANSAC (`eval/vexcel/results.json`)                                | 52 of 54 placed right (right building 23 of 24, next-door 17 of 18, other wrong 12 of 12). Held-out half, with thresholds tuned on the other half: right building 11 of 12, next-door 8 of 9 | 54 cases              | LIVE      |
@@ -157,14 +167,14 @@ data or real listing photos. **FIXTURE** means team-made data through the real p
 
 ## Sponsor tracks
 
-| Track                                            | What SNAPBACK brings to it                                                                                                                                                                                                               |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Business and Enterprise                          | Turns records a business already keeps (property record, office phone, website, rents, 3D scan) into a check that protects the renter before money moves, and drafts a note to the office when a listing is being copied                 |
-| CoStar: Inside and Out, AI for the Built World   | Two layers decide the verdict: CoStar's record of the building and the Matterport scan the ad's photos are placed in. Vexcel aerials appear on the place sheet as evidence only. Every report ends at the real listing on Apartments.com |
-| Amazon: Best Practical AI Innovation             | A renter about to send a deposit asks one question where the scam arrives, in iMessage, and gets one verdict, the top two reasons and one next step                                                                                      |
-| LangChain: Best use of deepagents                | A Planner with `write_todos` and a check team of sub-agents, each with one read-only tool, bounded to 2 follow-up checks tied to open gaps, traced in LangSmith                                                                          |
-| Arlequin AI Track 1: AI-Driven Forensics         | The ring finder: reworded-text, photo, phone and wording links, Louvain communities, a 90-day stream and a case file per group                                                                                                           |
-| Photon: Build a Messaging Agent using Photon 2.0 | A Node sidecar on Photon 2.0 (the Spectrum SDK): text, screenshots, photos or a voice memo in, a short report and a picture of the card back in the same thread                                                                          |
+| Track                                            | What SNAPBACK brings to it                                                                                                                                                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Business and Enterprise                          | Turns records a business already keeps (property record, office phone, website, rents, 3D scan) into a check that protects the renter before money moves, and drafts a note to the office when a listing is being copied                    |
+| CoStar: "Inside and Out: AI for the Built World" | Two layers decide the verdict: CoStar's record of the building and the Matterport 3D scan the ad's photos are placed in. Vexcel aerials appear on the place sheet as evidence only. Every report ends at the real listing on Apartments.com |
+| Amazon: Best Practical AI Innovation             | A renter about to send a deposit asks one question where the scam arrives, in iMessage, and gets one verdict, the top two reasons and one next step                                                                                         |
+| LangChain: Best use of deepagents                | A Planner with `write_todos` and a check team of sub-agents, each with one read-only tool, bounded to 2 follow-up checks tied to open gaps, traced in LangSmith                                                                             |
+| Arlequin AI Track 1: AI-Driven Forensics         | The ring finder: reworded-text, photo, phone and wording links, Louvain communities, a 90-day stream and a case file per group                                                                                                              |
+| Photon: Build a Messaging Agent using Photon 2.0 | A Node sidecar on Photon 2.0 (the Spectrum SDK): text, screenshots, photos or a voice memo in, a short report and a picture of the card back in the same thread                                                                             |
 
 ## Architecture
 
@@ -189,7 +199,7 @@ flowchart TD
 2. **The checks run in code.** Each one reads its source and returns evidence with its origin.
 3. **Code sets the verdict.** `verdict.decide()` in `src/snapback/verdict.py` turns that evidence
    into one verdict. It is the only place a verdict is chosen. No model sees or sets it.
-4. **Photo placement.** DINOv2 retrieval over views rendered from the Matterport scans, then DISK
+4. **Photo placement.** DINOv2 retrieval over views rendered from the Matterport 3D scans, then DISK
    and LightGlue matching (kornia) with RANSAC and a spatial spread check.
 5. **The Planner works the open gaps** in the background with a hard time limit. Each check team
    member has one read-only tool and writes its findings as notes in the agent file system. The
@@ -246,7 +256,7 @@ and `src/snapback/settings.py` has the rest.
 | For                         | Variables                                                                                                                                       |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mode                        | `SNAPBACK_DATA_SOURCE`, `DEMO_CASE`, `SNAPBACK_SHOW_RECORD_FIGURES`                                                                             |
-| Deep agent and tracing      | `SNAPBACK_AGENT`, `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`                                                                 |
+| Planner and tracing         | `SNAPBACK_AGENT`, `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`                                                                 |
 | CoStar kit and its partners | `COSTAR_KIT_URL`, `COSTAR_KIT_ZIP`, `COSTAR_ZIP_PASSWORD`, `MATTERPORT_API_KEY`, `MATTERPORT_API_TOKEN`, `VEXCEL_API_KEY`                       |
 | Web checks                  | `SNAPBACK_WEB_CHECKS`, `BRIGHTDATA_API_TOKEN`, `APIFY_TOKEN`, `BROWSER_USE_API_KEY`, `SERPAPI_API_KEY`                                          |
 | iMessage and voice          | `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET`, `SIDECAR_ALLOWED_THREADS`, `SIDECAR_RENTER_SALT`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` |
@@ -271,7 +281,7 @@ Where no script exists we say so.
 | Decoy photos (0 of 30)                                 | `make eval-locate-real` (same run writes the decoy row)                                                                                          | Same as above                                                                                                                                      |
 | Tamper test (6 of 6, 2 of 2)                           | No script. Run by hand: edit a real listing's phone, add a "Zelle before the tour" line, or swap in a lookalike link, then paste it into the app | **Kit** and a running `make api`; counts are in `docs/devpost.md`                                                                                  |
 | Batch of composed ads (117 of 123)                     | `make eval-ads`                                                                                                                                  | **Open** (FIXTURE). With the kit it writes `data/eval/ads_results.live.csv` instead                                                                |
-| Deep agent in the background (22.9 s)                  | No script. Timed by hand on `make api` with `uv sync --extra agent`, reading the case timeline                                                   | Model key in `.env`; **Kit** for the LIVE cases                                                                                                    |
+| Planner in the background (22.9 s)                     | No script. Timed by hand on `make api` with `uv sync --extra agent`, reading the case timeline                                                   | Model key in `.env`; **Kit** for the LIVE cases                                                                                                    |
 | Ring finder over 90 days (10 of 10, 0 of 2,684)        | `uv run python -m snapback.forensics.detect`                                                                                                     | **Open** (SYNTHETIC); rewrites `fixtures/forensics/stream_timeline.json`                                                                           |
 | Ring finder on reworded ads (9 of 10, keyword 0 of 10) | `PYTHONPATH=src uv run python -m snapback.forensics.paraphrase`                                                                                  | **Open** (SYNTHETIC); rewrites `eval/forensics/paraphrase_results.json`                                                                            |
 | Ring finder on 301 ads (4 of 4, keyword 0 of 4)        | `uv run pytest tests/test_forensics.py`                                                                                                          | **Open** (SYNTHETIC); the test asserts 4 of 4 rings and that the keyword baseline finds under half; the exact 0 of 4 is in the `evaluate()` output |
@@ -314,9 +324,9 @@ The full account is in [DATA_USE.md](DATA_USE.md).
 
 | Where it goes                                | What is sent                                                                                                                                           |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stays on our machine                         | CoStar kit records, Matterport scans and Vexcel imagery. Photo matching and OCR run locally                                                            |
+| Stays on our machine                         | CoStar kit records, Matterport 3D scans and Vexcel imagery. Photo matching and OCR run locally                                                         |
 | The language model (Anthropic Claude)        | The renter's own text and yes/no facts the code derived. Never kit rows, record figures, photos or addresses                                           |
-| LangSmith                                    | The deep agent's trace: the same text and derived facts the model saw                                                                                  |
+| LangSmith                                    | The Planner's trace: the same text and derived facts the model saw                                                                                     |
 | Web checks (Bright Data, Apify, Browser Use) | Small derived values: the record's website host, the ad link's host, a short phrase of the ad with no contact details, the rounded area, the bed count |
 | Reverse image search (SerpApi)               | At most 2 public photo links found in the ad text. Never an uploaded file                                                                              |
 | ElevenLabs                                   | The voice memo, and the spoken reply's text (which never holds a phone number, a rent or a link)                                                       |
