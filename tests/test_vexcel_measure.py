@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from snapback.adapters import vexcel
-from snapback.contracts import AerialStatus, AerialTile, DataSource, PropertyRecord
+from snapback.contracts import AerialStatus, DataSource, PropertyRecord
 from snapback.eval import vexcel_set as vs
 
 REPO = Path(__file__).resolve().parent.parent
@@ -35,35 +35,8 @@ def test_no_coordinates_says_nothing():
     )
 
 
-def _png(path, seed):
-    from PIL import Image
-
-    img = Image.new("L", (64, 64))
-    img.putdata([(x * seed + y * (seed + 3)) % 256 for y in range(64) for x in range(64)])
-    img.save(path, "PNG")
-    return str(path)
-
-
-def test_live_compares_the_two_tiles(tmp_path):
-    same = _png(tmp_path / "s.png", 7)
-    other = _png(tmp_path / "o.png", 29)
-    paths = {"a": same, "b": same, "c": other}
-
-    def tile(record, direction="north", **_):
-        return AerialTile(
-            property_id=record.property_id,
-            source=DataSource.LIVE,
-            direction=direction,
-            path=paths[record.property_id],
-        )
-
-    a, b, c = rec("a", 29.76, -95.37), rec("b", 29.7601, -95.3701), rec("c", 29.762, -95.37)
-    assert vs.aerial_match(a, b, source=DataSource.LIVE, tile_fn=tile).status is (
-        AerialStatus.RIGHT_BUILDING
-    )
-    assert vs.aerial_match(c, a, source=DataSource.LIVE, tile_fn=tile).status is (
-        AerialStatus.WRONG_BUILDING
-    )
+# The LIVE matcher itself (v2, geometric) is tested on synthetic scenes in
+# tests/test_vexcel_geo_match.py.
 
 
 def test_live_with_a_missing_tile_is_not_checked():
