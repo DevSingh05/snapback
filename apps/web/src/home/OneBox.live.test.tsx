@@ -201,15 +201,18 @@ describe("chips on every sample", () => {
       ).toBe(true),
     );
     const sample = screen.getByTestId("ob-sample");
-    expect(sample).toHaveTextContent("Sample case 7Q2M");
+    expect(sample).toHaveTextContent("Sample report 7Q2M");
     expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
   });
 
-  it("the Find tile sends the budget its picture shows", async () => {
+  // The Find tile left Home with the front cut; the same words typed in the box still carry
+  // their budget, so nothing asks for it again.
+  it("a typed search sends the budget it names", async () => {
     server();
     const user = userEvent.setup();
     render(<OneBox mode="live" />);
-    await user.click(screen.getByRole("button", { name: /find safer places/i }));
+    await user.type(screen.getByRole("textbox"), "Find me a 1 bed under $1,500 near downtown");
+    await user.click(screen.getByRole("button", { name: "Find places" }));
     expect(screen.getByTestId("ob-you")).toHaveTextContent(
       "Find me a 1 bed under $1,500 near downtown",
     );

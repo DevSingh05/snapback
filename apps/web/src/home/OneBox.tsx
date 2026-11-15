@@ -16,7 +16,6 @@ import type {
   RenterBrief,
 } from "../contracts";
 import { HERO_PHOTOS, HeroStreet } from "../landing/HeroStreet";
-import { HowItWorks } from "../landing/HowItWorks";
 import { searchPlaces } from "../search/api";
 import { TracePanel } from "../trace";
 import {
@@ -67,13 +66,24 @@ import {
 } from "./intent";
 import "./onebox.css";
 
-/** Tap one to start. Each goes through the same routing as typed words. Checking an ad leads:
- * that is the product. Looking for a place is the last and quietest one. */
-export const EXAMPLES = [
-  "Paste the ad you were sent",
-  "Is this landlord real?",
-  "Walk me through a place",
-  "Find me a 1 bed under $1,500 near downtown",
+/** Tap one to start. Both are about checking an ad: that is the product. Each goes through the
+ * same routing as typed words. */
+export const EXAMPLES = ["Paste the ad you were sent", "Is this landlord real?"] as const;
+
+/** How it works, in three lines (focus plan section 1). The same words as the README. */
+export const HOW = [
+  {
+    title: "Send the ad",
+    text: "Text it to SNAPBACK on iMessage, or paste it in the one box: words, screenshots, or both.",
+  },
+  {
+    title: "We check it",
+    text: "Scam-pattern rules run on any ad; CoStar's record of the building adds rent, leasing office, manager and website; where CoStar has a 3D scan, we place the ad's photos in it.",
+  },
+  {
+    title: "You get a report",
+    text: "A verdict in plain words, the ad beside the real listing, what to do next, and safer homes on Apartments.com.",
+  },
 ] as const;
 
 /** The card's two rules, as the answer to any question about paying. Written by code. */
@@ -490,19 +500,27 @@ export function OneBox(props: Props) {
             <div className="ob-hero-in">
               <div className="ob-hero-main">
                 <h1 id="ob-title" className="ob-title">
-                  <span>Found a place online?</span> <span>Ask before you pay.</span>
+                  <span>Send a rental ad before you pay.</span>{" "}
+                  <span className="ob-title-ask">
+                    Get a report: is this the real listing, and who do you call?
+                  </span>
                 </h1>
-                <p className="ob-lead">
-                  Paste the ad you were sent, its link or a screenshot. We check its photos, its
-                  price and who is asking against the record of the real home.
-                </p>
+                <ol className="ob-how" aria-label="How it works" data-testid="ob-how">
+                  {HOW.map((step, i) => (
+                    <li key={step.title}>
+                      <span className="ob-how-n ui-mono">{`0${i + 1}`}</span>
+                      <b>{step.title}</b>
+                      <span className="ob-how-text">{step.text}</span>
+                    </li>
+                  ))}
+                </ol>
                 {composer}
                 {(error || fileErrors.length > 0) && (
                   <Problems error={error} fileErrors={fileErrors} />
                 )}
                 <ul className="ob-examples" aria-label="Try one">
-                  {EXAMPLES.map((ex, i) => (
-                    <li key={ex} data-quiet={i === EXAMPLES.length - 1 || undefined}>
+                  {EXAMPLES.map((ex) => (
+                    <li key={ex}>
                       <button type="button" className="ob-example" onClick={() => submit(ex, [])}>
                         {ex}
                       </button>
@@ -517,13 +535,6 @@ export function OneBox(props: Props) {
             </div>
           </div>
           <div className="ob-below">
-            <HowItWorks
-              actions={{
-                check: () => submit(SAMPLE_AD, []),
-                walk: () => submit("Walk me through a place", []),
-                find: () => submit("Find me a 1 bed under $1,500 near downtown", []),
-              }}
-            />
             <div className="ob-cols">
               <YourChecks />
               <SeeItHappen />
@@ -638,13 +649,22 @@ function SampleCase({ onOpen }: { onOpen: () => void }) {
   return (
     <button type="button" className="ob-sample ui-sheet" data-testid="ob-sample" onClick={onOpen}>
       <span className="ob-sample-head ui-mono">
-        <span>Sample case {card.case_id}</span>
+        <span>Sample report {card.case_id}</span>
         <SourceChip source="fixture" />
       </span>
       <span className="ob-pair" data-testid="ob-pair">
-        {(["The ad's photo", "Found in the building's 3D scan"] as const).map((label) => (
+        {(
+          [
+            ["The ad's photo", sampleLounge, "a living room with a pale green sofa"],
+            [
+              "Found in the building's 3D scan",
+              sampleLivingRoom,
+              "a living room with a grey sofa and plants, standing in for the scan view",
+            ],
+          ] as const
+        ).map(([label, src, what]) => (
           <span key={label} className="ob-pair-side">
-            <SamplePhoto src={sampleLounge} alt={`${label}: a living room with a pale green sofa`}>
+            <SamplePhoto src={src} alt={`${label}: ${what}`}>
               <PhotoPin n={1} x={38} y={56} />
               <PhotoPin n={2} x={66} y={34} />
             </SamplePhoto>
@@ -669,7 +689,7 @@ function SampleCase({ onOpen }: { onOpen: () => void }) {
         })}
       </span>
       <span className="ob-sample-go">
-        <span>See how we worked this out</span>
+        <span>Open the sample report</span>
         <span aria-hidden="true">→</span>
       </span>
     </button>

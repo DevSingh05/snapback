@@ -57,7 +57,7 @@ export function YourChecks() {
     <section className="yc" aria-labelledby="yc-title" data-testid="your-checks">
       <header className="yc-head">
         <h2 id="yc-title" className="yc-title">
-          Your checks
+          Your reports
         </h2>
         <a className="yc-new" href="#listing">
           Check another ad
@@ -65,8 +65,8 @@ export function YourChecks() {
       </header>
       <p className="yc-sub">
         {sample
-          ? "A sample case made by the team. Your own checks appear here."
-          : "The ads you checked in this browser, this visit."}
+          ? "A sample report made by the team. Your own reports appear here."
+          : "A report for each ad you checked in this browser, this visit."}
       </p>
       {rows === null ? (
         <Loading label="Loading your checks" rows={2} className="yc-wait" />

@@ -101,12 +101,65 @@
 .ob-title span {
   display: block;
 }
-.ob-lead {
-  margin: var(--sp-5) 0 var(--sp-6);
-  font-size: 1.12rem;
-  line-height: 1.6;
+/* The second half of the headline: the two questions the report answers, a size down. */
+.ob-title .ob-title-ask {
+  margin-top: var(--sp-4);
+  max-width: 24em;
+  font-size: clamp(1.25rem, 2.1vw, 1.75rem);
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--on-hero-muted);
-  max-width: 44em;
+}
+/* How it works: three lines on one rule, numbered, above the box. */
+.ob-how {
+  list-style: none;
+  margin: var(--sp-6) 0 var(--sp-5);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-5);
+  border-top: 1px solid var(--hero-line);
+}
+.ob-how li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--sp-3);
+  min-width: 0;
+}
+.ob-how-n {
+  color: var(--act-matte);
+  font-size: 0.75rem;
+}
+.ob-how b {
+  color: var(--on-hero);
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.ob-how-text {
+  color: var(--on-hero-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+@media (max-width: 720px) {
+  .ob-how {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .ob-how li {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 2px var(--sp-2);
+    padding-block: var(--sp-3);
+  }
+  .ob-how li + li {
+    border-top: 1px solid var(--hero-line);
+  }
+  .ob-how-text {
+    grid-column: 2;
+  }
 }
 
 /* The starters read as things to say: an arrow and the words, light on the photo. */

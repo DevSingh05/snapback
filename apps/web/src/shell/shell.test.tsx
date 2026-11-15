@@ -195,13 +195,14 @@ describe("the app shell", () => {
   });
 });
 
-describe("Home: your checks", () => {
+describe("Home: your reports", () => {
   it("with no live server shows the team's sample case, labelled, with its verdict", async () => {
     render(<YourChecks />);
     await waitFor(() =>
       expect(screen.getByRole("link", { name: /Case 7Q2M/ })).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("your-checks")).toHaveTextContent("A sample case made by the team");
+    expect(screen.getByTestId("your-checks")).toHaveTextContent("A sample report made by the team");
+    expect(screen.getByRole("heading", { name: "Your reports" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Case 7Q2M/ })).toHaveAttribute("href", "/case/7Q2M");
     expect(screen.getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     expect(screen.getByRole("link", { name: "Check another ad" })).toHaveAttribute(

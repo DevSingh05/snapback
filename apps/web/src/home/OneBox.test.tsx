@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CreateCase } from "../upload/api";
-import { EXAMPLES, FB_ASK, MEASURED, OneBox, sendLabel } from "./OneBox";
+import { EXAMPLES, FB_ASK, HOW, MEASURED, OneBox, sendLabel } from "./OneBox";
 
 // The box's button names what it will do: it follows the routing of what is typed.
 const SEND = /^(check it|find places|ask)$/i;
@@ -32,9 +32,8 @@ beforeEach(() => {
 });
 
 describe("Home is one box", () => {
-  it("opens on one input, four starters and no form", async () => {
+  it("opens on one input, two starters and no form", async () => {
     render(<OneBox mode="fixture" />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/ask before you pay/i);
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/max rent/i)).not.toBeInTheDocument();
@@ -44,34 +43,58 @@ describe("Home is one box", () => {
     expect(screen.getAllByTestId("source-chip")[0]).toHaveTextContent("FIXTURE");
   });
 
+  it("says the use case in the headline: send an ad before you pay, get a report", () => {
+    render(<OneBox mode="fixture" />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toHaveTextContent("Send a rental ad before you pay.");
+    expect(h1).toHaveTextContent("Get a report: is this the real listing, and who do you call?");
+  });
+
+  it("says how it works in three lines, in order, above the box", () => {
+    render(<OneBox mode="fixture" />);
+    const how = screen.getByTestId("ob-how");
+    expect(
+      within(how)
+        .getAllByRole("listitem")
+        .map((li) => li.querySelector("b")!.textContent),
+    ).toEqual(["Send the ad", "We check it", "You get a report"]);
+    for (const step of HOW) expect(how).toHaveTextContent(step.text);
+    expect(how.compareDocumentPosition(box()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("the front cut: no walk or find prompt, no four-step strip, and no door to a hidden page", () => {
+    render(<OneBox mode="fixture" />);
+    expect(EXAMPLES).toEqual(["Paste the ad you were sent", "Is this landlord real?"]);
+    const text = document.body.textContent ?? "";
+    expect(text).not.toMatch(/Walk me through a place|Find me a 1 bed/);
+    expect(screen.queryByTestId("how-it-works")).toBeNull();
+    const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+    for (const hidden of ["/listings", "/map", "/finder", "/replay", "/investigate"])
+      expect(hrefs, hidden).not.toContain(hidden);
+    expect(hrefs).toContain("/stories");
+  });
+
   it("the hero photo has alt text, and every sample photo is stamped as one", () => {
     render(<OneBox mode="fixture" />);
     const hero = screen.getByTestId("hero-photo");
     expect(hero).toHaveAttribute("alt", expect.stringMatching(/apartment building/i));
-    // The sample case's proof pair and the four path steps: six stock photos, every one stamped.
-    const samples = [
-      ...screen.getAllByTestId("sample-photo"),
-      ...within(screen.getByTestId("how-it-works")).getAllByText("SAMPLE PHOTO"),
-    ].map((el) => (el.dataset.testid === "sample-photo" ? el : el.parentElement!));
-    expect(samples).toHaveLength(6);
+    // The sample report's proof pair: two stock photos, both stamped, and not the same picture.
+    const samples = screen.getAllByTestId("sample-photo");
+    expect(samples).toHaveLength(2);
     for (const s of samples) {
       expect(s).toHaveTextContent(/sample photo/i);
       expect(within(s).getByRole("img")).toHaveAttribute("alt", expect.stringMatching(/\w/));
     }
+    const [ad, scan] = samples.map((s) => within(s).getByRole("img").getAttribute("src"));
+    expect(ad).not.toBe(scan);
   });
 
-  it("leads with checking an ad; looking for a place is the last, quiet starter", () => {
+  it("leads with checking an ad, and the box asks for the ad", () => {
     render(<OneBox mode="fixture" />);
     const starters = within(screen.getByRole("list", { name: "Try one" })).getAllByRole("listitem");
+    expect(starters).toHaveLength(2);
     expect(starters[0]).toHaveTextContent("Paste the ad you were sent");
     expect(starters[1]).toHaveTextContent("Is this landlord real?");
-    expect(starters.map((li) => li.hasAttribute("data-quiet"))).toEqual([
-      false,
-      false,
-      false,
-      true,
-    ]);
-    expect(starters[3]).toHaveTextContent("Find me a 1 bed");
     expect(box()).toHaveAttribute(
       "placeholder",
       expect.stringMatching(/^Paste the ad you were sent/),
@@ -106,7 +129,7 @@ describe("Home is one box", () => {
     const user = userEvent.setup();
     render(<OneBox mode="fixture" createCase={made()} checkingMs={0} waitingMs={0} />);
     const sample = screen.getByTestId("ob-sample");
-    expect(sample).toHaveTextContent("Sample case 7Q2M");
+    expect(sample).toHaveTextContent("Sample report 7Q2M");
     expect(sample).toHaveTextContent("Hold off for now");
     expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     // Proof, not features: the ad's photo beside the scan view, then the fixture card's own lines.
@@ -120,7 +143,7 @@ describe("Home is one box", () => {
     // The photograph collapses to a strip and the thread takes the page.
     expect(screen.getByTestId("hero-street")).toHaveClass("hs-strip");
     expect(screen.getByTestId("ob-you")).toHaveTextContent("send the $600 deposit by Zelle");
-    expect(screen.queryByTestId("how-it-works")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ob-how")).not.toBeInTheDocument();
   });
 
   it("an empty send says what to do and starts nothing", async () => {
