@@ -42,7 +42,8 @@
 :root .inv-error,
 :root .case-band,
 :root .ob-photo,
-:root .of-panel {
+:root .of-panel,
+:root .twin-stage {
   border-radius: var(--radius);
 }
 /* a card that holds a photograph or a coloured band clips it to the same corner */
@@ -53,7 +54,8 @@
 :root .replay-page,
 :root .sw-strip,
 :root .sw-board,
-:root .ob-photo {
+:root .ob-photo,
+:root .twin-stage {
   overflow: hidden;
 }
 
@@ -77,6 +79,7 @@
 :root .uh-mark,
 :root .uh-stamp,
 :root .uh-jump a,
+:root .twin-fade-btn,
 :root .inv-chip,
 :root .sw-play,
 :root .ui-pin {
@@ -146,4 +149,51 @@
 :root .fd-side .pf-actions {
   grid-column: 1 / -1;
   padding: var(--w-2) var(--w-4) var(--w-4);
+}
+
+/* ---------- phone fixes from the team's phone walk (issue 334) ---------- */
+@media (max-width: 700px) {
+  /* iOS zooms the page when a field under 16px takes focus */
+  :root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  :root textarea,
+  :root select {
+    font-size: 16px;
+  }
+  /* the labels that carry LIVE / FIXTURE / SAMPLE must be readable: a 12px floor */
+  :root .ui-stamp,
+  :root .attribution,
+  :root .legend,
+  :root .uh-stamp,
+  :root .fd-stamp {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+  }
+  /* the Twin's stage leaves room for its own controls on the first screen */
+  :root .twin-stage {
+    height: min(46vh, 400px);
+  }
+  /* the report's "tell someone" links and the map's credits are finger sized */
+  :root .case-file-where a,
+  :root .case-file-agencies a,
+  :root .attribution a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
+/* Pages are separate documents, so the browser cross-fades between them, and the brand mark
+   holds still from the front door to the app. Browsers without this just navigate. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+  :root .wl-mark,
+  :root .app-mark {
+    view-transition-name: brand;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.22s;
+  }
 }

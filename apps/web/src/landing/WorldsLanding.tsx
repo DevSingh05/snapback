@@ -102,22 +102,30 @@ function Hero({ reduced }: { reduced: boolean }) {
     if (!cv || !el) return;
     let dead = false;
     let io: IntersectionObserver | undefined;
-    void import("./houseScene").then(({ mountHouse }) => {
-      if (dead) return;
-      const s = mountHouse(cv, el, reduced, {
-        photos: [sampleLivingRoom, sampleKitchen, sampleLounge],
-        floorLabels: floorLbl.current,
-        signLabel: signLbl.current,
-      });
-      if (!s) {
-        setDrawn(false);
-        return;
-      }
-      scene.current = s;
-      io = new IntersectionObserver((es) => es.forEach((e) => s.setVisible(e.isIntersecting)));
-      io.observe(el);
-      window.dispatchEvent(new Event("scroll"));
-    });
+    // the words paint first; the drawing's code is fetched once the page is idle
+    const idle: (fn: () => void) => void =
+      typeof window.requestIdleCallback === "function"
+        ? (fn) => window.requestIdleCallback(fn, { timeout: 1200 })
+        : (fn) => window.setTimeout(fn, 1);
+    idle(
+      () =>
+        void import("./houseScene").then(({ mountHouse }) => {
+          if (dead) return;
+          const s = mountHouse(cv, el, reduced, {
+            photos: [sampleLivingRoom, sampleKitchen, sampleLounge],
+            floorLabels: floorLbl.current,
+            signLabel: signLbl.current,
+          });
+          if (!s) {
+            setDrawn(false);
+            return;
+          }
+          scene.current = s;
+          io = new IntersectionObserver((es) => es.forEach((e) => s.setVisible(e.isIntersecting)));
+          io.observe(el);
+          window.dispatchEvent(new Event("scroll"));
+        }),
+    );
     return () => {
       dead = true;
       io?.disconnect();
@@ -513,6 +521,41 @@ function TakenHere({ reduced }: { reduced: boolean }) {
   const playRef = useRef(play);
   playRef.current = play;
 
+  // The measured figures count up once to their exact values when the row comes into view.
+  // The real text is what the page starts and ends with (and what a screen reader hears).
+  const stats = useRef<HTMLDListElement>(null);
+  useEffect(() => {
+    const el = stats.current;
+    if (!el || reduced || typeof IntersectionObserver === "undefined") return;
+    let raf = 0;
+    const spans = [...el.querySelectorAll<HTMLElement>("[data-count]")];
+    const io = new IntersectionObserver(
+      (es) => {
+        if (!es.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        const t0 = performance.now();
+        const tick = (now: number) => {
+          const p = Math.min(1, (now - t0) / 900),
+            e = 1 - Math.pow(1 - p, 3);
+          spans.forEach((n) => {
+            const to = n.dataset.count ?? "";
+            // only the first number runs ("43 of 48" counts 0 to 43); a zero stays a zero
+            n.textContent = to.replace(/^\d+/, (d) => String(Math.round(Number(d) * e)));
+          });
+          if (p < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+      spans.forEach((n) => (n.textContent = n.dataset.count ?? ""));
+    };
+  }, [reduced]);
+
   useEffect(() => {
     const cv = canvas.current;
     const el = box.current;
@@ -632,11 +675,15 @@ function TakenHere({ reduced }: { reduced: boolean }) {
             </p>
           </div>
         </div>
-        <dl className="wl-stats" data-testid="wl-stats">
+        <dl className="wl-stats" data-testid="wl-stats" ref={stats}>
           {LANDING_STATS.map((x) => (
             <div key={x.label}>
               <dt>{x.label}</dt>
-              <dd>{x.value}</dd>
+              <dd aria-label={x.value}>
+                <span aria-hidden="true" data-count={x.value}>
+                  {x.value}
+                </span>
+              </dd>
             </div>
           ))}
         </dl>
