@@ -180,7 +180,7 @@ const SETTLE_BY_ROW: Partial<Record<CardRowKind, string>> = {
   price: "a rent on record for this home to compare with",
 };
 
-/** For a card that is unsure (Hold off, or could not place the photos): the ONE fact that would
+/** For a card that is unsure (a Hold or an unverified photo result): the ONE fact that would
  *  settle it, as a phrase to follow "Would settle it:". It comes from the card's own Not
  *  confirmed and Not checked lines. Null for a clear result, a red-flag result, or a card with no such
  *  line. */
