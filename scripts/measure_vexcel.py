@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -59,7 +60,7 @@ def kit_rows(data_dir: Path) -> list[dict]:
 def load_cases(cases: Path | None, data_dir: Path) -> tuple[dict, str]:
     local = data_dir / "vexcel_eval" / "cases.json"
     if cases:
-        return json.loads(cases.read_text(encoding="utf-8")), str(cases)
+        return json.loads(cases.read_text(encoding="utf-8")), cases.name  # no local path
     if local.is_file():
         return json.loads(local.read_text(encoding="utf-8")), "local kit set"
     rows = kit_rows(data_dir)
@@ -76,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mode", choices=["auto", "fixture", "live"], default="auto")
     ap.add_argument("--cases", type=Path, default=None)
     ap.add_argument("--data-dir", type=Path, default=REPO / "data")
+    ap.add_argument("--out", type=Path, default=None, help="results file (default results.json)")
     args = ap.parse_args(argv)
 
     have_key = key_configured()
@@ -86,25 +88,40 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     doc, where = load_cases(args.cases, args.data_dir)
     source = DataSource.LIVE if live else DataSource.FIXTURE
+    cpu0, wall0 = time.process_time(), time.perf_counter()
     result = vexcel_set.run_cases(doc, source=source)
+    per_pair = {
+        "cpu_ms": round((time.process_time() - cpu0) * 1000 / max(result["n"], 1)),
+        "wall_ms": round((time.perf_counter() - wall0) * 1000 / max(result["n"], 1)),
+    }
+    result["per_pair"] = per_pair
     result["cases_from"] = where
-    vexcel_set.write_results(result, RESULTS)
+    vexcel_set.write_results(result, args.out or RESULTS)
 
     print(f"mode: {result['mode'].upper()}  cases: {where}")
     print(f"n={result['n']}  wrong-building cases={result['wrong_building_cases']}")
     print(f"hits={result['hits']}  misses={result['misses']}")
     print(f"right={result['right_cases']}  next-door={result['next_door']}")
-    print(
-        f"hash-diff ranges (bits of 64, same-building if <= {result['hash_threshold']}): "
-        f"{result['hash_diff_range']}"
-    )
+    print(f"by kind: {result['by_kind']}")
+    print(f"thresholds in use: {result['thresholds']}")
+    print(f"inlier ranges: {result['inlier_range']}")
+    print(f"offset ranges (m): {result['offset_m_range']}")
+    print(f"v1 hash-diff ranges, for comparison: {result['hash_diff_range']}")
+    print(f"per pair (tiles cached, includes the v1 hash): {per_pair}")
+    if result["split"]:
+        sp = result["split"]
+        print(f"split: tuned on half -> {sp['tuned']}")
+        print(f"  tune half: {sp['tune']}")
+        print(f"  HELD-OUT:  {sp['held_out']}")
+        print(f"  all n with tuned thresholds: {sp['all_with_tuned']}")
     passed = result["bar_met"] and result["next_door_ok"]
     print(f"bar {result['bar']}: {'PASS' if passed else 'FAIL'}")
+    print(f"gate ({result['gate']}): {'MET' if result['gate_met'] else 'NOT MET'}")
     if result["mode"] == "fixture":
         print("FIXTURE measures the geometry only; it does not open the verdict gate.")
     elif result["gate_open"]:
         print("LIVE pass: SNAPBACK_VEXCEL_IN_VERDICT may be turned on.")
-    print(f"wrote {RESULTS.relative_to(REPO)}")
+    print(f"wrote {args.out or RESULTS.relative_to(REPO)}")
     return 0 if passed else 1
 
 

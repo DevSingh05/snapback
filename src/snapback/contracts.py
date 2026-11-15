@@ -82,6 +82,10 @@ class AerialResult(BaseModel):
     status: AerialStatus = AerialStatus.NOT_CHECKED
     distance_m: float | None = None
     hash_diff: int | None = None  # LIVE only: differing bits of 64 between the two tiles
+    # LIVE only, matcher v2: geometrically consistent feature matches, and how far (metres on the
+    # ground) the claimed tile's centre lands from the ad tile's centre.
+    inliers: int | None = None
+    offset_m: float | None = None
 
 
 class Evidence(BaseModel):
