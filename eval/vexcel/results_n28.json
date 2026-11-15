@@ -5,9 +5,7 @@
   "right_cases": 12,
   "wrong_building_cases": 16,
   "hits": 27,
-  "misses": [
-    "vx-n04"
-  ],
+  "misses": ["vx-n04"],
   "next_door": {
     "n": 8,
     "hits": 7
@@ -31,46 +29,19 @@
     "max_offset_m": 18.0
   },
   "inlier_range": {
-    "right": [
-      431,
-      764
-    ],
-    "next_door": [
-      203,
-      609
-    ],
-    "wrong": [
-      2,
-      4
-    ]
+    "right": [431, 764],
+    "next_door": [203, 609],
+    "wrong": [2, 4]
   },
   "offset_m_range": {
-    "right": [
-      1.9,
-      14.9
-    ],
-    "next_door": [
-      16.4,
-      45.1
-    ],
-    "wrong": [
-      17.9,
-      130.0
-    ]
+    "right": [1.9, 14.9],
+    "next_door": [16.4, 45.1],
+    "wrong": [17.9, 130.0]
   },
   "hash_diff_range": {
-    "right": [
-      5,
-      31
-    ],
-    "next_door": [
-      14,
-      42
-    ],
-    "wrong": [
-      27,
-      38
-    ]
+    "right": [5, 31],
+    "next_door": [14, 42],
+    "wrong": [27, 38]
   },
   "hash_threshold": 8,
   "split": {
