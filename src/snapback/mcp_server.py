@@ -272,6 +272,39 @@ class Snapback:
     def result_url(self, case_id: str) -> str:
         return f"{self.web_url}/case/{quote(case_id, safe='')}"
 
+    def optional(self, path: str, cid: str) -> Any:
+        """A read that may be missing (older API, no record, no token held here): the answer, or
+        None. Never an error, so one absent extra cannot sink a tool."""
+        token = self.vault.read_tokens.get(cid) or self.vault.case_tokens.get(cid)
+        if token is None:
+            return None
+        try:
+            return self.call("GET", f"/cases/{quote(cid, safe='')}/{path}", token=token)
+        except SnapbackError:
+            return None
+
+    def proof_of(self, cid: str, card: dict[str, Any]) -> dict[str, Any]:
+        """The card's own summary, checks_out and does_not, and the real-listing hand-off link,
+        all as the API words them. Absent fields stay empty; nothing is made up here."""
+        real = self.optional("real-listing", cid) or {}
+        link = real.get("cta_url")
+        return {
+            "headline": card.get("headline"),
+            "summary": card.get("summary", []),
+            "checks_out": card.get("checks_out", []),
+            "does_not": card.get("does_not", []),
+            "real_listing": (
+                {
+                    "headline": real.get("headline"),
+                    "provenance": real.get("provenance"),
+                    "link_label": real.get("cta_label"),
+                    "link": link,
+                }
+                if link
+                else None
+            ),
+        }
+
     # --- tools --------------------------------------------------------------------------------
 
     def check_listing(
@@ -312,7 +345,13 @@ class Snapback:
                 budget = f"Budget saved for this case: up to {max_rent} a month."
         state = made.get("state")
         status = made.get("status", "running")
+        try:
+            card = self.call("GET", f"/cases/{quote(case_id, safe='')}/card")
+        except SnapbackError:
+            card = None  # the card is not ready yet; snapback_get_verdict will have it
+        proof = self.proof_of(case_id, card) if card else {}
         return {
+            **proof,
             "case_id": case_id,
             "source": label(made.get("source")),
             "status": status,
@@ -349,6 +388,7 @@ class Snapback:
         state = card.get("state", "")
         status = progress.get("status", "done")
         return {
+            **self.proof_of(cid, card),
             "case_id": card.get("case_id", case_id),
             "source": card_source,
             "verdict": card.get("headline") or strings.text(f"state.{state}"),
@@ -479,6 +519,57 @@ class Snapback:
             "note": "Nothing was sent. The renter reads it and sends it themselves, if they want.",
         }
 
+    def why(self, case_id: str) -> dict[str, Any]:
+        cid = case_id.strip()
+        if not cid:
+            raise SnapbackError("Give the case id that snapback_check_listing returned.")
+        card = self.call("GET", f"/cases/{quote(cid, safe='')}/card")
+        timeline = self.optional("timeline", cid)  # None on an API without it (404)
+        if isinstance(timeline, dict):
+            timeline = timeline.get("steps") or timeline.get("events")
+        steps = None
+        if isinstance(timeline, list):
+            steps = [
+                item
+                if isinstance(item, str)
+                else next(
+                    (str(item[k]) for k in ("text", "summary", "label", "title") if item.get(k)),
+                    "",
+                )
+                for item in timeline
+                if isinstance(item, str | dict)
+            ]
+        return {
+            "case_id": card.get("case_id", cid),
+            "source": label(card.get("source")),
+            "verdict": card.get("headline") or strings.text(f"state.{card.get('state', '')}"),
+            "verdict_set_by": "code (snapback.verdict.decide), never a language model",
+            "reasons": card.get("summary", []),
+            "does_not_check_out": card.get("does_not", []),
+            "checks_out": card.get("checks_out", []),
+            "steps": steps,
+            "steps_note": None if steps is not None else "This API has no step list for a case.",
+        }
+
+    def what_to_do(self, case_id: str) -> dict[str, Any]:
+        cid = case_id.strip()
+        if not cid:
+            raise SnapbackError("Give the case id that snapback_check_listing returned.")
+        card = self.call("GET", f"/cases/{quote(cid, safe='')}/card")
+        office = self.optional("office", cid)
+        state = card.get("state", "")
+        return {
+            "case_id": card.get("case_id", cid),
+            "source": label(card.get("source")),
+            "verdict": card.get("headline") or strings.text(f"state.{state}"),
+            "next_steps": card.get("footer", []),
+            "next_action": NEXT_BY_STATE.get(state, ""),
+            "not_checked": card.get("not_checked", []),
+            "office_on_record": (office or {}).get("guidance"),
+            "office_domain": (office or {}).get("domain"),
+            "real_listing_link": (self.proof_of(cid, card)["real_listing"] or {}).get("link"),
+        }
+
     def walk_summary(self, case_id: str) -> dict[str, Any]:
         cid = case_id.strip()
         token = self.vault.read_tokens.get(cid) or self.vault.case_tokens.get(cid)
@@ -585,7 +676,7 @@ class PlainArgumentErrors:
 
 
 def build_server(app: Snapback) -> MCPServer:
-    """The MCP server with SNAPBACK's six tools bound to `app`."""
+    """The MCP server with SNAPBACK's eight tools bound to `app`."""
     mcp = MCPServer(
         name="snapback",
         title="SNAPBACK",
@@ -611,7 +702,11 @@ def build_server(app: Snapback) -> MCPServer:
 
         Returns the case_id, LIVE or FIXTURE, the status, the verdict once known and a link to
         the result page. The case's tokens stay inside this MCP server and are never shown.
-        Next: call snapback_get_verdict with the case_id, then snapback_walk_summary.
+        Also returns, when the card is ready, its summary, what checks out, what does not, and the
+        link to the real listing on the building's own site. Quote the verdict as given and never
+        call a person a scammer.
+        Next: snapback_get_verdict, snapback_why, snapback_what_to_do or snapback_walk_summary
+        with the case_id.
         """
         return plainly(app.check_listing, ad_text, list(photo_urls), max_rent)
 
@@ -625,6 +720,22 @@ def build_server(app: Snapback) -> MCPServer:
         poster a scammer. If status is not "done", the card is what is known so far.
         """
         return plainly(app.get_verdict, case_id)
+
+    @mcp.tool(name="snapback_why")
+    def why(case_id: str) -> dict[str, Any]:
+        """Why SNAPBACK reached its verdict for a case: the reasons in the API's own words, the
+        lines that check out, the lines that do not, and the steps the check took when the API
+        lists them. Quote the verdict as given, do not soften or strengthen it, and never call a
+        person a scammer: SNAPBACK says what does not match, not who someone is."""
+        return plainly(app.why, case_id)
+
+    @mcp.tool(name="snapback_what_to_do")
+    def what_to_do(case_id: str) -> dict[str, Any]:
+        """What the renter should do next for a case: the next steps as the API words them, what
+        SNAPBACK did not check, the leasing office on record (to call on a number the renter
+        finds themselves) and the link to the real listing when there is one. Quote the verdict
+        as given and never call a person a scammer."""
+        return plainly(app.what_to_do, case_id)
 
     @mcp.tool(name="snapback_find_places")
     def find_places(brief: str) -> dict[str, Any]:
