@@ -294,7 +294,8 @@ export interface AerialProofResponse {
 
 // Mirrors RealListingPlan and RealListing in src/snapback/contracts.py
 // (GET /cases/{id}/real-listing; read token in a header, never in the address; no-store).
-// Record figures (rents, units, links, building name) are null unless figures_shown. Words are
+// Record figures (rents, units, building name) are null unless figures_shown. The hand-off link
+// (cta_url) is not a figure: it is sent with figures_shown on or off. Words are
 // built by code in the asked language (?lang=en|es). No phone digits and no street address.
 export interface RealListingPlan {
   name?: string | null;
@@ -326,7 +327,7 @@ export interface RealListing {
   provenance?: string | null; // "N of M of the ad's photos are in CoStar's own scan..."
   phone_line?: string | null;
   cta_label?: string | null; // "See the real listing"
-  cta_url?: string | null; // availability link, else https://<website_host>; only with figures
+  cta_url?: string | null; // availability link, else https://<website_host>; shown with figures on or off
 }
 
 // Mirrors ReportSteps and ReportResponse in src/snapback/contracts.py (GET /cases/{id}/report;
