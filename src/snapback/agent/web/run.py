@@ -15,7 +15,6 @@ from typing import Any
 
 import httpx
 
-from snapback.agent.rules.contact import host_of
 from snapback.agent.web import clients
 from snapback.agent.web.facts import (
     CheckStatus,
@@ -34,16 +33,22 @@ from snapback.settings import Settings
 
 MAX_RENTALS = 25  # items asked of each Apify search
 # Never opened or fetched, whatever the ad links to (sponsor and platform terms, #8).
-NEVER_OPEN = ("facebook.com", "fb.com", "fb.me", "apartments.com")
+NEVER_OPEN = ("facebook.com", "fb.com", "fb.me", "m.me", "apartments.com")
 _PLAIN_LINK = re.compile(r"https?://[^\s\"'<>`]+", re.I)
 
 
 def may_open(link: str | None) -> bool:
     """A link we may hand to a browser or fetch: http(s) only, no whitespace or quotes (it goes
     into an agent's task text), and never a host we must not open."""
-    if not link or not _PLAIN_LINK.fullmatch(link):
+    if not link or not _PLAIN_LINK.fullmatch(link) or "\\" in link:
         return False
-    host = (host_of(link) or "").lower().rstrip(".")
+    try:
+        url = httpx.URL(link)
+    except (httpx.InvalidURL, ValueError):
+        return False
+    if url.userinfo:  # "https://x@facebook.com/..." really goes to facebook.com
+        return False
+    host = url.host.lower().rstrip(".")
     if not host:
         return False
     return not any(host == bad or host.endswith("." + bad) for bad in NEVER_OPEN)
@@ -183,7 +188,7 @@ def run_web_checks(
 STEP_WORDS = {
     "site": "Read the building's own site",
     "link": "Opened the ad's link in Browser Use",
-    "elsewhere": "Searched for the ad's words elsewhere and rentals this size nearby",
+    "elsewhere": "Searched for the ad's own words posted elsewhere, and rentals this size nearby",
 }
 
 

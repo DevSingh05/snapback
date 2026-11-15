@@ -454,9 +454,9 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
 
 WEB_PROMPT = """\
 You are the web checker for one rental case inside SNAPBACK. Code has already run three web \
-checks side by side: the building's own site (Bright Data), the ad's own link opened in a real \
-browser (Browser Use), and the same home posted elsewhere (a web search on the ad's words and \
-Apify rental searches). You have one reading tool, `read_web_facts`, and the file tools. Do \
+checks side by side: the building's own site, the ad's own link opened in a real browser \
+(Browser Use), the ad's own words posted elsewhere (a web search), and rentals this size nearby \
+(Apify, not the same home). You have one reading tool, `read_web_facts`, and the file tools. Do \
 exactly this: call `read_web_facts` once; then call `write_file` with path `{path}` and a short \
 note: one fact per line, copied from what the tool returned, with its source. A check that says \
 not_checked, timed_out or failed stays that way: never guess what it would have found. Yes/no \
@@ -478,8 +478,8 @@ def _web_spec(case: CaseSession) -> dict[str, Any]:
     return {
         "name": "web",
         "description": (
-            "The web checks: the building's own site, where the ad's link really goes, and the "
-            "same home posted elsewhere (counts and rent range only)."
+            "The web checks: the building's own site, where the ad's link really goes, the ad's "
+            "own words posted elsewhere, and rentals this size nearby (counts and rent range only)."
         ),
         "system_prompt": WEB_PROMPT.format(path=path),
         "tools": [read_web_facts],

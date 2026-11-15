@@ -186,8 +186,9 @@ def zillow_rentals_url(center: tuple[float, float], beds: int | None) -> str:
 LINK_TASK = (
     "Open {link}. If the page has a button or link to apply, rent, reserve or pay a deposit, "
     "click it once and wait for the next page. Do not type anything into any form and do not "
-    "pay. Report the final page address, and whether that page asks for a payment, deposit or "
-    "card details before a viewing."
+    "pay. If any page you reach is on facebook.com, fb.com or apartments.com, stop at once and "
+    "report that address without doing anything on it. Report the final page address, and "
+    "whether that page asks for a payment, deposit or card details before a viewing."
 )
 LINK_SCHEMA = {
     "type": "object",
