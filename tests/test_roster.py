@@ -93,7 +93,8 @@ def test_only_the_decider_sets_the_verdict_and_it_is_code() -> None:
     assert "verdict" in decider.job
     assert next(c for c in cards if c.id == "rules").model == "code"
     for card in cards:
-        assert card.job and card.doing and card.tools and card.never, card.id
+        assert card.job and card.role and card.doing and card.tools and card.never, card.id
+        assert len(card.role) <= 24, card.role  # it sits under a small avatar
 
 
 def models(by: dict) -> dict[str, str]:
