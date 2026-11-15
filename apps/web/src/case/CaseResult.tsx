@@ -142,7 +142,10 @@ export function CaseResult({
         meta={
           <>
             <span>THE RESULT · {checkedStamp(card.checked_at)}</span>
-            <span data-testid="expiry">{expiryText(card.expires_at)}</span>
+            {/* A sample report is a fixture: it is always there, so it never reads "Expired". */}
+            <span data-testid="expiry">
+              {card.source === "fixture" ? "Sample: does not expire" : expiryText(card.expires_at)}
+            </span>
           </>
         }
         why={flaggedLines(card)}
