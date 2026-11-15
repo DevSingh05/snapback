@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { matchRoute } from "../App";
@@ -66,17 +66,9 @@ describe("SNAPBACK Worlds front door", () => {
     expect(text).not.toMatch(/[–—]/);
   });
 
-  it("switches Day and Dusk on its own page and remembers the choice", () => {
-    window.localStorage.clear();
-    const { unmount } = render(<WorldsLanding />);
-    const page = screen.getByTestId("worlds-landing");
-    expect(page).toHaveAttribute("data-theme", "light");
-    fireEvent.click(screen.getByRole("button", { name: "Dusk" }));
-    expect(page).toHaveAttribute("data-theme", "dark");
-    expect(window.localStorage.getItem("sb-theme")).toBe("dark");
-    unmount();
+  it("is Day only: no theme switch and no theme attribute", () => {
     render(<WorldsLanding />);
-    expect(screen.getByTestId("worlds-landing")).toHaveAttribute("data-theme", "dark");
-    window.localStorage.clear();
+    expect(screen.queryByRole("button", { name: /^(Day|Dusk)$/ })).toBeNull();
+    expect(screen.getByTestId("worlds-landing")).not.toHaveAttribute("data-theme");
   });
 });

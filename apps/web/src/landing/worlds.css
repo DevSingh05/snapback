@@ -1,5 +1,4 @@
-/* SNAPBACK Worlds, the front door at "/". Every colour is a token (tokens.css); the Dusk look is
-   the .wl[data-theme="dark"] block there. Sharp corners, nothing boxed. */
+/* SNAPBACK Worlds, the front door at "/". Every colour is a token (tokens.css); Day only. Sharp corners, nothing boxed. */
 
 .wl {
   background: var(--paper);
@@ -63,25 +62,6 @@
 }
 .wl-nav a:hover {
   background: var(--line);
-}
-.wl-theme {
-  display: flex;
-  background: var(--layer-2);
-}
-.wl-theme button {
-  min-height: 44px;
-  padding: 0 14px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--ink);
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-.wl-theme button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--paper);
 }
 .wl a:focus-visible,
 .wl button:focus-visible {

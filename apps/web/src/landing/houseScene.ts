@@ -1,66 +1,44 @@
-// @ts-nocheck
 // The Worlds hero: an open dollhouse on its own lot, in a block of houses, drawn with three.js
 // (orthographic, no photographs). Ported from the SNAPBACK Worlds page (v17), keeping the house
 // that lifts apart floor by floor; the scripted check demo, photo fly-ins and DOM labels are left
-// out. Pure drawing: it holds no claim about any real home. Colours come from the two palettes
-// below (the Worlds Daylight / Dusk values), chosen by the page theme.
+// out. Pure drawing: it holds no claim about any real home. Colours are the Worlds Daylight
+// values below (Day only, like the rest of the app).
 import * as THREE from "three";
 
-export type Theme = "light" | "dark";
-
-const PAL: Record<Theme, Record<string, string>> = {
-  light: {
-    sky: "#CFE0EA",
-    ground: "#CEDBE3",
-    block: "#F5F7F8",
-    stone: "#D8CFC0",
-    wall: "#FBFAF7",
-    floor: "#CDAE86",
-    glass: "#B4D3E6",
-    dark: "#3A4A54",
-    slab: "#EFEBE3",
-    sofa: "#6E8597",
-    rug: "#E6D9C6",
-    road: "#C3D1DA",
-    far: "#8FA6B6",
-    cloud: "#FFFFFF",
-    lawn: "#C5D6BA",
-    leaf: "#86A886",
-    roof: "#5F7483",
-    act: "#0D6672",
-    scan: "#DFA20A",
-    mu: "#43555F",
-  },
-  dark: {
-    sky: "#0E0F12",
-    ground: "#202329",
-    block: "#3A3E46",
-    stone: "#A1988A",
-    wall: "#D6D0C4",
-    floor: "#B08D62",
-    glass: "#6C9AB3",
-    dark: "#15181C",
-    slab: "#8E887C",
-    sofa: "#6F8598",
-    rug: "#A6987F",
-    road: "#17191D",
-    far: "#4A4F59",
-    cloud: "#5A606B",
-    lawn: "#2F3B33",
-    leaf: "#4B6652",
-    roof: "#4A5360",
-    act: "#EEF3F5",
-    scan: "#F2C14E",
-    mu: "#BDB7AB",
-  },
+const PAL: Record<string, string> = {
+  sky: "#CFE0EA",
+  ground: "#CEDBE3",
+  block: "#F5F7F8",
+  stone: "#D8CFC0",
+  wall: "#FBFAF7",
+  floor: "#CDAE86",
+  glass: "#B4D3E6",
+  dark: "#3A4A54",
+  slab: "#EFEBE3",
+  sofa: "#6E8597",
+  rug: "#E6D9C6",
+  road: "#C3D1DA",
+  far: "#8FA6B6",
+  cloud: "#FFFFFF",
+  lawn: "#C5D6BA",
+  leaf: "#86A886",
+  roof: "#5F7483",
+  act: "#0D6672",
+  scan: "#DFA20A",
+  mu: "#43555F",
 };
 
+type Bind = [object, string, string];
 const PIT = 0.528;
 const CD = 150;
+const ctx2d = (c: HTMLCanvasElement): CanvasRenderingContext2D => {
+  const x = c.getContext("2d");
+  if (!x) throw new Error("no 2d canvas");
+  return x;
+};
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 export interface HouseScene {
-  setTheme(t: Theme): void;
   setVisible(v: boolean): void;
   dispose(): void;
 }
@@ -68,18 +46,17 @@ export interface HouseScene {
 export function mountHouse(
   cv: HTMLCanvasElement,
   el: HTMLElement,
-  theme: Theme,
   reduced: boolean,
 ): HouseScene | null {
-  let R;
+  let R: THREE.WebGLRenderer;
   try {
     R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
   } catch {
     return null;
   }
-  let th: Theme = theme;
-  const binds: [any, string, string][] = [];
-  const recolor = () => binds.forEach((b) => b[0][b[1]].set(PAL[th][b[2]]));
+  const binds: Bind[] = [];
+  const recolor = () =>
+    binds.forEach((b) => (b[0] as Record<string, THREE.Color>)[b[1]]?.set(PAL[b[2]] ?? "#ffffff"));
   R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   R.shadowMap.enabled = true;
   R.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -87,8 +64,9 @@ export function mountHouse(
     cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 440),
     rootG = new THREE.Group();
   scene.add(rootG);
-  scene.fog = new THREE.Fog(0xffffff, 150, 206);
-  binds.push([scene.fog, "color", "sky"]);
+  const fog = new THREE.Fog(0xffffff, 150, 206);
+  scene.fog = fog;
+  binds.push([fog, "color", "sky"]);
   const hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.62);
   binds.push([hemi, "groundColor", "ground"]);
   scene.add(hemi);
@@ -106,21 +84,31 @@ export function mountHouse(
   sc.far = 90;
   scene.add(sun);
   scene.add(sun.target);
-  const M = (t, o?) => {
+  const M = (t: string, o?: THREE.MeshStandardMaterialParameters) => {
     const m = new THREE.MeshStandardMaterial(
       Object.assign({ roughness: 0.94, metalness: 0 }, o || {}),
     );
     binds.push([m, "color", t]);
     return m;
   };
-  const B = (t, o?) => {
+  const B = (t: string, o?: THREE.MeshBasicMaterialParameters) => {
     const m = new THREE.MeshBasicMaterial(
       Object.assign({ transparent: true, depthWrite: false }, o || {}),
     );
     binds.push([m, "color", t]);
     return m;
   };
-  function box(p, w, h, d, x, y, z, mat, sh?) {
+  function box(
+    p: THREE.Object3D,
+    w: number,
+    h: number,
+    d: number,
+    x: number,
+    y: number,
+    z: number,
+    mat: THREE.Material,
+    sh?: boolean,
+  ) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x + w / 2, y + h / 2, z + d / 2);
     m.castShadow = sh !== false;
@@ -146,7 +134,7 @@ export function mountHouse(
       "uniform float uScan,uOn,uBase,uPx;varying float vA;void main(){vec4 w=modelMatrix*vec4(position,1.);float g=exp(-abs(w.y-uScan)*1.4);vA=uBase+uOn*g;gl_Position=projectionMatrix*viewMatrix*w;gl_PointSize=uPx*(1.7+2.6*g*uOn);}",
     fragmentShader: "uniform vec3 uCol;varying float vA;void main(){gl_FragColor=vec4(uCol,vA);}",
   });
-  const points = (parent, list) => {
+  const points = (parent: THREE.Object3D, list: number[][]) => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(list.flat()), 3));
     const P = new THREE.Points(g, pm);
@@ -154,8 +142,8 @@ export function mountHouse(
     parent.add(P);
     return P;
   };
-  const lattice = (W, D, H, s, o) => {
-    const p = [];
+  const lattice = (W: number, D: number, H: number, s: number, o: number) => {
+    const p: [number, number, number][] = [];
     for (let x = s / 2; x < W; x += s) for (let z = s / 2; z < D; z += s) p.push([x, o + 0.04, z]);
     for (let y = s / 2; y < H; y += s) {
       for (let z = s / 2; z < D; z += s) p.push([o, y, z]);
@@ -176,12 +164,7 @@ export function mountHouse(
     mRoof = M("roof");
   const mWin = new THREE.MeshStandardMaterial({ roughness: 0.25, emissiveIntensity: 0.25 });
   binds.push([mWin, "color", "glass"], [mWin, "emissive", "glass"]);
-  const WS = [
-    [-1, 0],
-    [0, -1],
-    [1, 0],
-    [0, 1],
-  ].map((n) => {
+  const side = (n: [number, number]) => {
     const gl = new THREE.MeshStandardMaterial({
       roughness: 0.25,
       emissiveIntensity: 0.25,
@@ -191,23 +174,25 @@ export function mountHouse(
     return {
       n,
       o: n[0] + n[1] < 0 ? 1 : 0,
-      ms: [],
+      ms: [] as THREE.Object3D[],
       st: M("stone", { transparent: true }),
       wl: M("wall", { transparent: true }),
       gl,
       dr: M("act", { transparent: true }),
     };
-  });
+  };
+  const WS = [side([-1, 0]), side([0, -1]), side([1, 0]), side([0, 1])] as const;
   const pg = new THREE.GridHelper(43, 10);
   pg.position.set(-2.3, 0.015, -2.2);
-  pg.material.transparent = true;
-  pg.material.opacity = 0.2;
-  pg.material.vertexColors = false;
-  binds.push([pg.material, "color", "mu"]);
+  const pgm = pg.material as THREE.LineBasicMaterial;
+  pgm.transparent = true;
+  pgm.opacity = 0.2;
+  pgm.vertexColors = false;
+  binds.push([pgm, "color", "mu"]);
   rootG.add(pg);
   const fc = document.createElement("canvas");
   fc.width = fc.height = 64;
-  const fx = fc.getContext("2d");
+  const fx = ctx2d(fc);
   fx.fillStyle = "#fff";
   fx.fillRect(0, 0, 64, 64);
   fx.fillStyle = "#b9c6d0";
@@ -222,8 +207,8 @@ export function mountHouse(
   gnd.position.z = 89.5;
   gnd.receiveShadow = true;
   g0.add(gnd);
-  scene.fog.near = 151;
-  scene.fog.far = 173;
+  fog.near = 151;
+  fog.far = 173;
   for (let i = -3; i <= 3; i++)
     box(rootG, 1.1, 0.02, 34, i * 4.3 - 2.85, 0, -16, mRoad, false).receiveShadow = true;
   for (let j = -3; j <= 3; j++)
@@ -269,7 +254,7 @@ export function mountHouse(
   const sk = document.createElement("canvas");
   sk.width = 1024;
   sk.height = 256;
-  const sx = sk.getContext("2d");
+  const sx = ctx2d(sk);
   sx.fillStyle = "#fff";
   let rs = 11;
   const rr = () => {
@@ -299,12 +284,14 @@ export function mountHouse(
   const cc = document.createElement("canvas");
   cc.width = 512;
   cc.height = 128;
-  const cx2 = cc.getContext("2d");
-  [
-    [90, 52, 150, 20],
-    [300, 86, 180, 16],
-    [440, 34, 110, 13],
-  ].forEach((q) => {
+  const cx2 = ctx2d(cc);
+  (
+    [
+      [90, 52, 150, 20],
+      [300, 86, 180, 16],
+      [440, 34, 110, 13],
+    ] as [number, number, number, number][]
+  ).forEach((q) => {
     const g2 = cx2.createRadialGradient(0, 0, 0, 0, 0, 1);
     g2.addColorStop(0, "rgba(255,255,255,.95)");
     g2.addColorStop(1, "rgba(255,255,255,0)");
@@ -333,8 +320,8 @@ export function mountHouse(
     GAP = 1.9,
     W = 7,
     D = 4.6,
-    floors = [],
-    Ls = [];
+    floors: THREE.Group[] = [],
+    Ls: THREE.PointLight[] = [];
   const Bd = new THREE.Group();
   Bd.position.set(-W / 2, 0, -D / 2);
   rootG.add(Bd);
@@ -346,12 +333,14 @@ export function mountHouse(
   box(Bd, 1.8, 0.03, 6.6, W + 0.5, 0.1, 0.7, mRoad, false).receiveShadow = true;
   box(Bd, 1.3, 0.42, 2.7, W + 0.75, 0.26, 3.0, mSofa);
   box(Bd, 1.2, 0.4, 1.4, W + 0.8, 0.68, 3.5, mWin);
-  [
-    [W + 0.7, 3.3],
-    [W + 1.9, 3.3],
-    [W + 0.7, 5.0],
-    [W + 1.9, 5.0],
-  ].forEach((q) => box(Bd, 0.2, 0.4, 0.5, q[0], 0.1, q[1], mDark));
+  (
+    [
+      [W + 0.7, 3.3],
+      [W + 1.9, 3.3],
+      [W + 0.7, 5.0],
+      [W + 1.9, 5.0],
+    ] as [number, number][]
+  ).forEach((q) => box(Bd, 0.2, 0.4, 0.5, q[0], 0.1, q[1], mDark));
   box(Bd, 0.4, 0.5, 4.6, -2.4, 0.1, 2.6, mLeaf);
   box(Bd, 0.6, 0.45, 0.5, 1.6, 0.1, D + 0.25, mLeaf);
   box(Bd, 0.6, 0.45, 0.5, 5.0, 0.1, D + 0.25, mLeaf);
@@ -360,10 +349,12 @@ export function mountHouse(
   box(Bd, 1.7, 1.0, 1.7, -1.82, 1.3, D + 0.78, mLeaf);
   box(Bd, 1.25, 0.8, 1.25, -1.6, 2.3, D + 1.0, mLeaf);
   box(Bd, 0.7, 0.6, 0.7, -1.32, 3.1, D + 1.28, mLeaf);
-  [
-    [-2.0, 3.0],
-    [4.3, W + 0.4],
-  ].forEach((r) => {
+  (
+    [
+      [-2.0, 3.0],
+      [4.3, W + 0.4],
+    ] as [number, number][]
+  ).forEach((r) => {
     box(Bd, r[1] - r[0], 0.07, 0.06, r[0], 0.5, 7.15, mWall);
     box(Bd, r[1] - r[0], 0.07, 0.06, r[0], 0.3, 7.15, mWall);
     for (let x = r[0]; x <= r[1] + 0.01; x += (r[1] - r[0]) / 8)
@@ -379,7 +370,7 @@ export function mountHouse(
   sgc.width = 400;
   sgc.height = 280;
   {
-    const x = sgc.getContext("2d");
+    const x = ctx2d(sgc);
     x.fillStyle = "#ffffff";
     x.fillRect(0, 0, 400, 280);
     x.fillStyle = "#0D6672";
@@ -407,7 +398,7 @@ export function mountHouse(
     box(g, W + 0.2, 0.22, D + 0.2, -0.1, 0, -0.1, mSlab);
     box(g, W - 0.2, 0.03, D - 0.2, 0.1, 0.22, 0.1, mFloor, false).receiveShadow = true;
     const H = FH - 0.22,
-      wm = (n, arr) => arr.forEach((m) => WS[n].ms.push(m));
+      wm = (n: 0 | 1 | 2 | 3, arr: THREE.Object3D[]) => arr.forEach((m) => WS[n].ms.push(m));
     wm(0, [
       box(g, 0.18, H, D + 0.1, -0.1, 0.22, -0.1, WS[0].st),
       box(g, 0.04, H - 0.08, D - 0.1, 0.08, 0.22, 0.08, WS[0].wl, false),
@@ -433,11 +424,13 @@ export function mountHouse(
     for (let q = 0; q < 5; q++)
       box(g, 1.0, (q + 1) * 0.44, 0.36, 0.14, 0.22, 0.14 + q * 0.36, mStone);
     if (k === 0) wm(3, [box(g, 1.05, 1.9, 0.34, 3.1, 0.22, D - 0.21, WS[3].dr, false)]);
-    [
-      [W - 0.06, D - 0.06],
-      [W - 0.06, -0.02],
-      [-0.02, D - 0.06],
-    ].forEach((c) => box(g, 0.13, FH - 0.22, 0.13, c[0] - 0.06, 0.22, c[1] - 0.06, mDark));
+    (
+      [
+        [W - 0.06, D - 0.06],
+        [W - 0.06, -0.02],
+        [-0.02, D - 0.06],
+      ] as [number, number][]
+    ).forEach((c) => box(g, 0.13, FH - 0.22, 0.13, c[0] - 0.06, 0.22, c[1] - 0.06, mDark));
     const L = new THREE.PointLight(0xffdfb6, 0.3, 8.5, 1.6);
     L.position.set(W * 0.55, FH - 0.5, D * 0.55);
     g.add(L);
@@ -451,7 +444,8 @@ export function mountHouse(
       ]),
     );
   }
-  const f2 = floors[2];
+  const [f0, f1, f2] = floors;
+  if (!f0 || !f1 || !f2) return null;
   box(f2, 0.1, 1.1, 2.3, 4.0, 0.25, 0.12, mWall);
   box(f2, 2.3, 0.02, 1.5, 4.4, 0.25, 2.6, mRug, false).receiveShadow = true;
   box(f2, 2.0, 0.42, 0.8, 4.55, 0.25, 3.55, mSofa);
@@ -460,25 +454,27 @@ export function mountHouse(
   box(f2, 1.5, 0.4, 2.0, 1.9, 0.25, 2.2, mWall);
   box(f2, 1.5, 0.14, 1.2, 1.9, 0.65, 3.0, mSofa);
   box(f2, 1.5, 0.7, 0.12, 1.9, 0.25, 2.08, mStone);
-  const f1 = floors[1];
   box(f1, 0.6, 0.9, 2.1, 0.12, 0.25, 2.3, mStone);
   box(f1, 0.64, 0.05, 2.14, 0.1, 1.15, 2.28, mWall);
   box(f1, 1.6, 0.07, 0.9, 4.3, 0.95, 1.0, mStone);
-  [
-    [4.4, 1.1],
-    [5.7, 1.1],
-    [4.4, 1.75],
-    [5.7, 1.75],
-  ].forEach((q) => box(f1, 0.07, 0.7, 0.07, q[0], 0.25, q[1], mDark));
-  [
-    [4.6, 0.55],
-    [5.3, 2.0],
-  ].forEach((q) => box(f1, 0.42, 0.45, 0.42, q[0], 0.25, q[1], mSofa));
+  (
+    [
+      [4.4, 1.1],
+      [5.7, 1.1],
+      [4.4, 1.75],
+      [5.7, 1.75],
+    ] as [number, number][]
+  ).forEach((q) => box(f1, 0.07, 0.7, 0.07, q[0], 0.25, q[1], mDark));
+  (
+    [
+      [4.6, 0.55],
+      [5.3, 2.0],
+    ] as [number, number][]
+  ).forEach((q) => box(f1, 0.42, 0.45, 0.42, q[0], 0.25, q[1], mSofa));
   box(f1, 2.4, 0.02, 1.6, 3.9, 0.25, 2.6, mRug, false).receiveShadow = true;
   const mPer = M("act");
   box(f1, 0.5, 1.15, 0.4, 2.5, 0.25, 2.6, mPer);
   box(f1, 0.34, 0.34, 0.34, 2.58, 1.43, 2.63, mWall);
-  const f0 = floors[0];
   box(f0, 3.4, 0.9, 0.62, 3.3, 0.25, 0.14, mWall);
   box(f0, 3.5, 0.06, 0.7, 3.25, 1.15, 0.12, mDark);
   box(f0, 3.4, 0.55, 0.34, 3.3, 1.62, 0.14, mStone);
@@ -542,7 +538,7 @@ export function mountHouse(
   const ob = { yaw: 0, yawT: 0, pit: PIT, pitT: PIT, idle: 0, last: 0 };
   const st = { open: 0, on: 0 };
   const t0 = performance.now();
-  const setCam = (o) => {
+  const setCam = (o: { cx: number; cy: number; ppu: number; y: number; pit: number }) => {
     const c = cam;
     c.left = -o.cx / o.ppu;
     c.right = (dim.cw - o.cx) / o.ppu;
@@ -585,13 +581,13 @@ export function mountHouse(
   size();
 
   // drag turns the block all the way round; a slow turn on its own after 4 s of rest
-  const pt = new Map();
-  const down = (e) => {
+  const pt = new Map<number, [number, number]>();
+  const down = (e: PointerEvent) => {
     pt.set(e.pointerId, [e.clientX, e.clientY]);
     cv.setPointerCapture(e.pointerId);
     cv.classList.add("drag");
   };
-  const move = (e) => {
+  const move = (e: PointerEvent) => {
     const q = pt.get(e.pointerId);
     if (!q) return;
     ob.yawT += (e.clientX - q[0]) * 0.008;
@@ -599,7 +595,7 @@ export function mountHouse(
     pt.set(e.pointerId, [e.clientX, e.clientY]);
     ob.idle = performance.now();
   };
-  const up = (e) => {
+  const up = (e: PointerEvent) => {
     pt.delete(e.pointerId);
     if (!pt.size) cv.classList.remove("drag");
     ob.idle = performance.now();
@@ -610,9 +606,8 @@ export function mountHouse(
   cv.addEventListener("pointercancel", up);
 
   let visible = true,
-    raf = 0,
-    dead = false;
-  const frame = (now) => {
+    raf = 0;
+  const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
     if (!visible) return;
     ob.last = now;
@@ -662,15 +657,10 @@ export function mountHouse(
   raf = requestAnimationFrame(frame);
 
   return {
-    setTheme(t) {
-      th = t;
-      recolor();
-    },
-    setVisible(v) {
+    setVisible(v: boolean) {
       visible = v;
     },
     dispose() {
-      dead = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       cv.removeEventListener("pointerdown", down);
@@ -678,13 +668,13 @@ export function mountHouse(
       cv.removeEventListener("pointerup", up);
       cv.removeEventListener("pointercancel", up);
       scene.traverse((n) => {
-        if (n.geometry) n.geometry.dispose();
-        const m = n.material;
-        if (m)
-          (Array.isArray(m) ? m : [m]).forEach((x) => {
-            if (x.map) x.map.dispose();
-            x.dispose();
-          });
+        if (!(n instanceof THREE.Mesh || n instanceof THREE.Points)) return;
+        n.geometry.dispose();
+        const m: THREE.Material | THREE.Material[] = n.material;
+        (Array.isArray(m) ? m : [m]).forEach((x) => {
+          if ("map" in x && x.map instanceof THREE.Texture) x.map.dispose();
+          x.dispose();
+        });
       });
       R.dispose();
     },

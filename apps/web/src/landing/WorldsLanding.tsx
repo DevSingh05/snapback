@@ -6,25 +6,13 @@ import sampleLounge from "../assets/sample-lounge.webp";
 import { Photo, PhotoPin, State } from "../ui";
 import { Lockup } from "../ui/Mark";
 import { RealtorQuote } from "./RealtorQuote";
-import type { HouseScene, Theme } from "./houseScene";
+import type { HouseScene } from "./houseScene";
 import "./worlds.css";
 
 // SNAPBACK Worlds: the front door ("the outside") at "/". A drawn 3D house lifts apart on the
 // page, then the check, how it works, where it helps, how a photo is placed, and three ways to
 // see for yourself. The app ("the inside") is one click away at /home. Everything stamped as a
 // sample is a sample; the one measured line is the app's own (Home carries the same words).
-
-const THEME_KEY = "sb-theme";
-
-function readTheme(): Theme {
-  try {
-    const t = window.localStorage.getItem(THEME_KEY);
-    if (t === "dark" || t === "light") return t;
-  } catch {
-    // Storage blocked: the page still works in Day.
-  }
-  return "light";
-}
 
 export const LANDING_HOW = [
   {
@@ -60,12 +48,10 @@ export const LANDING_USES = [
 export const LANDING_MEASURED =
   "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it";
 
-function Hero({ theme, reduced }: { theme: Theme; reduced: boolean }) {
+function Hero({ reduced }: { reduced: boolean }) {
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const scene = useRef<HouseScene | null>(null);
-  const themeNow = useRef(theme);
-  themeNow.current = theme;
   const [drawn, setDrawn] = useState(true);
 
   useEffect(() => {
@@ -76,7 +62,7 @@ function Hero({ theme, reduced }: { theme: Theme; reduced: boolean }) {
     let io: IntersectionObserver | undefined;
     void import("./houseScene").then(({ mountHouse }) => {
       if (dead) return;
-      const s = mountHouse(cv, el, themeNow.current, reduced);
+      const s = mountHouse(cv, el, reduced);
       if (!s) {
         setDrawn(false);
         return;
@@ -92,8 +78,6 @@ function Hero({ theme, reduced }: { theme: Theme; reduced: boolean }) {
       scene.current = null;
     };
   }, [reduced]);
-
-  useEffect(() => scene.current?.setTheme(theme), [theme]);
 
   return (
     <section className="wl-hero" ref={stage} aria-label="SNAPBACK">
@@ -342,20 +326,11 @@ function SeeForYourself() {
 }
 
 export default function WorldsLanding() {
-  const [theme, setTheme] = useState<Theme>(readTheme);
   const [reduced] = useState(
     () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
   );
-  const pick = (t: Theme) => {
-    setTheme(t);
-    try {
-      window.localStorage.setItem(THEME_KEY, t);
-    } catch {
-      // Storage blocked: the choice still holds for this visit.
-    }
-  };
   return (
-    <div className="wl" data-theme={theme} data-testid="worlds-landing">
+    <div className="wl" data-testid="worlds-landing">
       <header className="wl-bar">
         <div className="wl-bar-in">
           <a className="wl-mark" href="/" aria-label="SNAPBACK">
@@ -368,21 +343,13 @@ export default function WorldsLanding() {
             <a href="/stories">Stories</a>
             <a href="/reviews">Reviews</a>
           </nav>
-          <div className="wl-theme" role="group" aria-label="Theme">
-            <button type="button" aria-pressed={theme === "light"} onClick={() => pick("light")}>
-              Day
-            </button>
-            <button type="button" aria-pressed={theme === "dark"} onClick={() => pick("dark")}>
-              Dusk
-            </button>
-          </div>
           <a className="wl-btn wl-btn-main wl-open" href="/home">
             Open SNAPBACK
           </a>
         </div>
       </header>
       <main>
-        <Hero theme={theme} reduced={reduced} />
+        <Hero reduced={reduced} />
         <Verdict />
         <How />
         <Uses />
