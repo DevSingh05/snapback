@@ -15,14 +15,41 @@ for (const phrase of [
   "is it real",
   "Is it real?",
   "Is this a real listing.", // how speech-to-text often ends a voice note
+  // XO 02:22: the wider set
+  "is the listing real",
+  "Is the listing real?",
+  "Is this legit?",
+  "is this a legit place",
+  "is it a real apartment",
+  "is this the real home",
+  "Is that a real house?",
+  "is this ok",
+  "is this a scam",
+  "is it a scam?",
 ]) {
   test(`'${phrase}' is the 'is this real' follow-up`, () => {
     assert.equal(intentOf(phrase), "safe");
   });
 }
 
+for (const phrase of [
+  "es un anuncio real",
+  "¿Es un lugar real?",
+  "es una casa real",
+  "es un departamento real",
+]) {
+  test(`Spanish '${phrase}' is the 'is this real' follow-up`, () => {
+    assert.equal(intentOf(phrase), "safe");
+  });
+}
+
 test("a longer ad that starts the same way is still an ad, not a follow-up", () => {
   assert.equal(intentOf("Is this a real listing? 2 bed $900, Zelle the deposit first"), null);
+  assert.equal(
+    intentOf("Is the listing real and available? Spacious 2 bed, $950, text me to tour"),
+    null,
+  );
+  assert.equal(intentOf("Es un departamento real, 2 recámaras, $900, depósito por Zelle"), null);
 });
 
 const card = JSON.parse(
