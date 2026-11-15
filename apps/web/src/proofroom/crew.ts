@@ -39,8 +39,10 @@ export const personaOf = (id: string): Persona => PERSONAS[id] ?? "helper";
 
 // The stage, in SVG user units. The plot is a square lawn seen in the drawing kit's isometric
 // view; scene point (0, 0) is its far corner.
-export const VIEW = { w: 420, h: 456 };
-export const ORIGIN = { ox: 210, oy: 138 };
+// The stage is wider than the plot: speech sits in the sky over the two back corners, and the
+// neighbours' street shows behind.
+export const VIEW = { w: 540, h: 446 };
+export const ORIGIN = { ox: 270, oy: 162 };
 export const PLOT = 220;
 const INSET = 20;
 // The home in the ad, in the middle of the plot.
@@ -204,7 +206,8 @@ export function reported(floor: Floor): { id: string; flag: boolean }[] {
 
 // ---------- speech ----------
 
-export const SAY_MAX = 70;
+// Three lines of a bubble at its reading size.
+export const SAY_MAX = 60;
 
 /** A line short enough for a speech bubble, cut at a word. */
 export function shortSay(text: string, max = SAY_MAX): string {
@@ -225,6 +228,23 @@ export interface CrewBubble {
 }
 
 export const BUBBLES_MAX = 2;
+
+export type BubbleSlot = "left" | "right";
+
+/** Where each bubble sits: one of two fixed slots in the sky, over the back corners of the
+ *  plot, so speech is large and never covers a member. A bubble takes the slot on its
+ *  speaker's side when it is free (the newest speaker chooses first); the Planner, in the
+ *  middle, takes the right. */
+export function bubbleSlots(bubbles: CrewBubble[], cast: CrewActor[]): BubbleSlot[] {
+  const taken = new Set<BubbleSlot>();
+  return bubbles.map((b) => {
+    const side = cast.find((a) => a.id === b.deskId)?.side;
+    const want: BubbleSlot = side === "left" ? "left" : "right";
+    const slot = taken.has(want) ? (want === "left" ? "right" : "left") : want;
+    taken.add(slot);
+    return slot;
+  });
+}
 
 /** Who is speaking now, newest first. A member at work says what it is doing; a member that
  *  is done says its finding. Once the run is over a red flag speaks first. The Decider never

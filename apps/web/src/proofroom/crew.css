@@ -150,15 +150,18 @@
 
 /* ---------- the stage ---------- */
 .cs {
+  position: relative;
+  width: 100%;
   min-width: 0;
+  max-width: 600px;
+  margin-inline: auto;
+  container: crew / inline-size;
 }
 .cs-stage {
   position: relative;
   width: 100%;
-  max-width: 560px;
-  margin-inline: auto;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--sky) 0%, var(--paper) 58%);
+  background: var(--sky);
 }
 .cs-stage {
   container-type: inline-size;
@@ -171,24 +174,122 @@
   overflow: visible;
 }
 
-/* The kit's tones this scene adds: the member's colour and note paper. */
+/* ---------- the setting: sky, street, lawn, light ---------- */
+/* One low warm sun, behind and to the left: it warms what faces it and leaves the +x faces in
+   cool shade. Every colour is still a token, mixed. The dark of a shadow is the roof edge's,
+   which stays dark in both themes. */
+.cs-sky-high {
+  stop-color: color-mix(in srgb, var(--h-unlit) 52%, var(--sky));
+}
+.cs-sky-low {
+  stop-color: color-mix(in srgb, var(--h-lit) 34%, var(--sky));
+}
+.cs-sun-stop {
+  stop-color: var(--h-lit);
+}
+.cs-haze-stop {
+  stop-color: color-mix(in srgb, var(--h-lit) 20%, var(--sky));
+}
+.cs-shade-stop {
+  stop-color: var(--h-roof-edge);
+}
+.cs-ridge {
+  fill: color-mix(in srgb, var(--h-leaf) 42%, var(--sky));
+}
+.cs-verge {
+  fill: color-mix(in srgb, var(--h-lawn) 66%, var(--paper));
+}
+.cs .cs-lot {
+  fill: color-mix(in srgb, var(--h-lawn) 84%, var(--h-leaf));
+}
+/* Distance: the neighbours are paler than the plot, and the haze takes the far ones. */
+.cs-backdrop {
+  opacity: 0.7;
+}
+.cs .dk-asphalt {
+  fill: color-mix(in srgb, var(--h-roof) 38%, var(--h-path));
+}
+.cs .dk-lawn,
+.cs .cs-lawn-a {
+  fill: color-mix(in srgb, var(--h-lawn) 74%, var(--h-leaf));
+}
+.cs .cs-lawn-b {
+  fill: color-mix(in srgb, var(--h-lawn) 88%, var(--h-lit));
+}
+.cs .cs-lawn-sun {
+  fill: color-mix(in srgb, var(--h-lit) 24%, transparent);
+}
+.cs .cs-tuft {
+  stroke: color-mix(in srgb, var(--h-leaf) 76%, var(--h-roof-edge));
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  fill: none;
+}
+.cs .cs-soil {
+  fill: color-mix(in srgb, var(--h-wood) 56%, var(--h-roof-edge));
+}
+.cs .cs-bloom {
+  fill: var(--h-wall);
+}
+.cs .cs-bloom-warm {
+  fill: var(--h-lit);
+}
+.cs .dk-top.dk-green {
+  fill: color-mix(in srgb, var(--h-leaf) 76%, var(--h-lit));
+}
+.cs .dk-right.dk-green {
+  fill: color-mix(in srgb, var(--h-leaf) 72%, var(--h-roof-edge));
+}
+/* The home: its lit wall is warm, its shaded wall cool, and the sun is in its windows. */
+.cs-home .dk-left.dk-white {
+  fill: color-mix(in srgb, var(--h-wall) 78%, var(--h-lit));
+}
+.cs-home .dk-right.dk-white {
+  fill: color-mix(in srgb, var(--h-wall-shade) 78%, var(--h-roof));
+}
+.cs-home .dk-top.dk-slate {
+  fill: color-mix(in srgb, var(--h-roof) 78%, var(--h-lit));
+}
+.cs-home .dk-right.dk-slate {
+  fill: color-mix(in srgb, var(--h-roof) 66%, var(--h-roof-edge));
+}
+.cs-home .dk-glass {
+  fill: color-mix(in srgb, var(--h-unlit) 56%, var(--h-lit));
+}
+/* Soft shadows: the home's on the lawn, and one under every member. */
+.cs .cs-cast {
+  fill: color-mix(in srgb, var(--h-roof-edge) 36%, transparent);
+}
+.cs-soft {
+  filter: blur(1.6px);
+}
+.cs-actor[data-state="skipped"] .cs-shadow {
+  display: none;
+}
+
+/* The kit's tones this scene adds: the member's colour and note paper. On a figure the colour
+   is worn as cloth: the member's own colour with some of the timber's warmth in it, so it sits
+   in the same light as the home and does not read as plastic. */
+.cs-actor {
+  --cloth: color-mix(in srgb, var(--crew) 80%, var(--h-wood));
+}
 .cs .dk-crew {
-  --c: var(--crew);
+  --c: var(--cloth);
 }
 .cs .dk-paper {
   --c: var(--surface);
 }
 .cs .dk-top.dk-crew {
-  fill: color-mix(in srgb, var(--crew) 82%, var(--surface));
+  fill: color-mix(in srgb, var(--cloth) 80%, var(--h-lit));
 }
 .cs .dk-left.dk-crew {
-  fill: var(--crew);
+  fill: var(--cloth);
 }
 .cs .dk-right.dk-crew {
-  fill: color-mix(in srgb, var(--crew) 76%, var(--ink));
+  fill: color-mix(in srgb, var(--cloth) 72%, var(--h-roof-edge));
 }
 .cs-limb {
-  stroke: color-mix(in srgb, var(--crew) 78%, var(--ink));
+  stroke: color-mix(in srgb, var(--cloth) 78%, var(--ink));
   stroke-width: 3.6;
   stroke-linecap: round;
   fill: none;
@@ -200,7 +301,7 @@
   fill: none;
 }
 .cs-band {
-  fill: color-mix(in srgb, var(--surface) 86%, var(--crew));
+  fill: color-mix(in srgb, var(--surface) 86%, var(--cloth));
 }
 .cs-board {
   fill: color-mix(in srgb, var(--h-wood) 84%, var(--ink));
@@ -238,7 +339,7 @@
   stroke-width: 1;
 }
 .cs-visor {
-  fill: color-mix(in srgb, var(--crew) 72%, var(--ink));
+  fill: color-mix(in srgb, var(--cloth) 72%, var(--ink));
 }
 .cs-drawer {
   fill: color-mix(in srgb, var(--h-roof) 22%, var(--h-wall));
@@ -246,15 +347,25 @@
 .cs-pull,
 .cs-cup,
 .cs-hair {
-  fill: color-mix(in srgb, var(--ink) 84%, var(--crew));
+  fill: color-mix(in srgb, var(--ink) 84%, var(--cloth));
 }
 .cs-headband {
-  stroke: color-mix(in srgb, var(--ink) 84%, var(--crew));
+  stroke: color-mix(in srgb, var(--ink) 84%, var(--cloth));
   stroke-width: 2.2;
   stroke-linecap: round;
   fill: none;
 }
 .cs-wave {
+  fill: var(--cloth);
+}
+/* The mark over the member who is speaking. */
+.cs-speaking path {
+  fill: var(--surface);
+  stroke: var(--crew);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+.cs-speaking circle {
   fill: var(--crew);
 }
 .cs-bobble {
@@ -401,10 +512,11 @@
   display: grid;
   justify-items: center;
   gap: 2px;
-  padding: 2px 5px 3px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 3px 7px 4px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
   border: 0;
-  border-bottom: 2px solid var(--crew);
+  border-bottom: 3px solid var(--crew);
+  box-shadow: 0 1px 3px var(--h-shade);
   color: var(--ink);
   font: inherit;
   line-height: 1.1;
@@ -420,24 +532,28 @@
 .cs-tag-name {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.6875rem;
+  gap: 5px;
+  font-size: 0.875rem;
   font-weight: 700;
   white-space: nowrap;
 }
 .cs-tag-line {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.5938rem;
+  gap: 5px;
+  font-size: 0.75rem;
   white-space: nowrap;
+}
+/* Waiting at the edge for a turn: the name is enough until it steps in. */
+.cs-tag[data-place="wing"] .cs-tag-line {
+  display: none;
 }
 .cs-tag-model {
   font-family: var(--font-mono);
   color: var(--muted);
 }
 .cs-tag-state {
-  padding: 1px 4px;
+  padding: 1px 5px;
   background: var(--unchecked-soft);
   color: var(--unchecked);
   font-weight: 700;
@@ -470,60 +586,91 @@
 }
 
 /* ---------- speech ---------- */
+/* Two slots over the sky, left and right. The words are 15px or more at every desktop width,
+   ink on the surface colour, so they read from across a room and in a recording. */
 .cs-bubble {
   position: absolute;
+  top: 8px;
   z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 39.5%;
   margin: 0;
-  padding: 6px 8px 7px 6px;
+  padding: 7px 10px 9px;
   background: var(--surface);
-  border-left: 4px solid var(--crew);
+  border-left: 5px solid var(--crew);
   box-shadow: var(--shadow);
   color: var(--ink);
-  font-size: 0.6875rem;
-  line-height: 1.24;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+}
+.cs-bubble[data-slot="left"] {
+  left: 8px;
+}
+.cs-bubble[data-slot="right"] {
+  right: 8px;
 }
 .cs-bubble::after {
   content: "";
   position: absolute;
-  bottom: -5px;
-  left: var(--tail, 14px);
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
   background: var(--surface);
   transform: rotate(45deg);
 }
-.cs-bubble[data-side="lead"]::after {
-  bottom: auto;
-  top: 18px;
-  left: -5px;
-  margin-left: 0;
-  background: var(--crew);
+.cs-bubble[data-slot="left"]::after {
+  right: 26px;
 }
-.cs-bubble-text {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
+.cs-bubble[data-slot="right"]::after {
+  left: 22px;
 }
 .cs-bubble-who {
-  font-size: 0.625rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: var(--muted);
+  line-height: 1.15;
+}
+/* What the member found, in a word: a tab on the bubble's top edge, so it costs no line. */
+.cs-bubble-state {
+  position: absolute;
+  top: -7px;
+  right: 8px;
+  padding: 1px 7px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+/* Never more than three lines, so a bubble stays in the sky. */
+.cs-bubble-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .cs-bubble[data-tone="red_flag"] {
   border-left-color: var(--coral);
 }
-.cs-bubble[data-tone="red_flag"] .cs-bubble-who {
-  color: var(--coral);
+.cs-bubble[data-tone="red_flag"] .cs-bubble-state {
+  background: var(--coral);
+  color: var(--surface);
 }
-.cs-bubble[data-tone="ok"] .cs-bubble-who {
+.cs-bubble[data-tone="ok"] .cs-bubble-state {
+  background: var(--teal-soft);
   color: var(--teal);
 }
-.cs-bubble[data-tone="hold"] .cs-bubble-who,
-.cs-bubble[data-tone="not_shown"] .cs-bubble-who {
+.cs-bubble[data-tone="hold"] .cs-bubble-state,
+.cs-bubble[data-tone="not_shown"] .cs-bubble-state {
+  background: var(--amber-soft);
   color: var(--amber);
 }
 
@@ -531,15 +678,15 @@
 .cs-verdict {
   position: absolute;
   z-index: 3;
-  max-width: 34%;
+  max-width: 36%;
   margin: 0;
-  padding: 6px 9px;
+  padding: 7px 11px;
   border-left: 6px solid var(--v-slate);
   background: var(--v-band);
   color: var(--on-v-band);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 800;
-  line-height: 1.16;
+  line-height: 1.18;
   transform: rotate(-3deg);
   transform-origin: left center;
 }
@@ -558,11 +705,13 @@
   position: absolute;
   left: 6px;
   bottom: 4px;
-  max-width: 34%;
+  max-width: 30%;
   margin: 0;
-  color: var(--muted);
-  font-size: 0.625rem;
-  line-height: 1.2;
+  padding: 3px 6px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--ink);
+  font-size: 0.75rem;
+  line-height: 1.25;
 }
 .cs-bench-why {
   display: block;
@@ -591,51 +740,67 @@
   align-self: center;
 }
 
-/* A phone: the stage is narrower than its words were sized for, so they step down. */
-@container (max-width: 380px) {
+/* A phone: the stage is narrower than its words were sized for. The tags step down and keep
+   only the name and the state; speech moves under the stage, full width, in room that is held
+   for it so the page does not jump. */
+@container (max-width: 440px) {
   .cs-tag-name {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     gap: 3px;
   }
   .cs-tag-name .crew-badge {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
   .cs-tag-line {
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
+  }
+  .cs-tag-model {
+    display: none;
   }
   .cs-tag > button,
   .cs-tag-in {
-    padding: 1px 3px 2px;
-  }
-  .cs-bubble {
-    padding: 4px 6px 5px 5px;
-    font-size: 0.625rem;
-    line-height: 1.2;
-  }
-  .cs-bubble .crew-badge {
-    width: 20px;
-    height: 20px;
-  }
-  .cs-bubble[data-side="ring"] {
-    translate: 0 6px;
+    padding: 1px 4px 2px;
+    border-bottom-width: 2px;
   }
   .cs-verdict {
-    max-width: 38%;
+    max-width: 40%;
     padding: 5px 7px;
-    font-size: 0.6875rem;
+    font-size: 0.8125rem;
     translate: -10px 0;
   }
+  /* The sky is free on a phone (speech is under the stage), so the bench's line goes there. */
   .cs-bench {
-    max-width: 25%;
-    font-size: 0.5625rem;
+    top: 4px;
+    bottom: auto;
+    max-width: 30%;
+    padding: 2px 4px;
+    font-size: 0.625rem;
+    line-height: 1.15;
+  }
+}
+@container crew (max-width: 440px) {
+  .cs-bubbles {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    min-height: 168px;
+    padding-top: 8px;
+  }
+  .cs-bubble[data-slot] {
+    position: relative;
+    inset: auto;
+    width: auto;
+  }
+  .cs-bubble::after {
+    content: none;
   }
 }
 
 /* Beside the twin the crew gets a wider column than the diagram needed. */
 @media (min-width: 1280px) {
   .twin-body.twin-with-team:has(> .pr-panel) {
-    grid-template-columns: minmax(0, 1fr) 500px;
+    grid-template-columns: minmax(0, 1fr) clamp(500px, 42vw, 600px);
   }
 }
 
@@ -801,6 +966,15 @@
   }
   .cs[data-moving="yes"] .cs-bubble {
     animation: cs-say 240ms var(--ease-out) 1 backwards;
+  }
+  .cs[data-moving="yes"] .cs-speaking circle {
+    animation: cs-blink 1100ms ease-in-out infinite;
+  }
+  .cs[data-moving="yes"] .cs-speaking circle:nth-of-type(2) {
+    animation-delay: 180ms;
+  }
+  .cs[data-moving="yes"] .cs-speaking circle:nth-of-type(3) {
+    animation-delay: 360ms;
   }
   .cs-verdict[data-stamped="yes"] {
     animation: cs-slam 460ms var(--ease-out) 1 backwards;
