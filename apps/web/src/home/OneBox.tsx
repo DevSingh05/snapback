@@ -17,7 +17,6 @@ import type {
   PlaceMatch,
   RenterBrief,
 } from "../contracts";
-import { HERO_PHOTOS, HeroStreet } from "../landing/HeroStreet";
 import { searchPlaces } from "../search/api";
 import {
   decide,
@@ -39,6 +38,8 @@ import { useVoiceInput, voiceStatus } from "../shell/voice";
 import { YourChecks } from "../shell/YourChecks";
 import { HomeTeam } from "../proofroom/HomeTeam";
 import { PhotoPin, State, type StateKind } from "../ui";
+import { Tag } from "../ui/Tag";
+import { Elevation } from "./Elevation";
 import {
   MODE,
   approveChallenge as defaultApprove,
@@ -531,8 +532,7 @@ export function OneBox(props: Props) {
   return (
     <div className="ob" ref={root} data-empty={empty || undefined} data-testid="one-box">
       {!empty && (
-        <div className="ob-top ui-on-matte">
-          <HeroStreet strip />
+        <div className="ob-top">
           <SourceChip source={shownMode} />
           <div className="ob-top-acts">
             <button
@@ -554,16 +554,18 @@ export function OneBox(props: Props) {
 
       {empty ? (
         <section className="ob-start" aria-labelledby="ob-title">
-          <div className="ob-hero" data-bar="photo">
-            <HeroStreet />
+          <div className="ob-hero">
+            <div className="ob-field" aria-hidden="true" />
             <div className="ob-hero-in">
-              <div className="ob-hero-main">
-                <h1 id="ob-title" className="ob-title">
-                  <span>Send a rental ad before you pay.</span>{" "}
-                  <span className="ob-title-ask">
-                    Get a report: is this the real listing, and who do you call?
-                  </span>
-                </h1>
+              <h1 id="ob-title" className="ob-title">
+                <span>Send a rental ad before you pay.</span>{" "}
+                <span className="ob-title-ask">
+                  Get a report: is this the real listing, and who do you call?
+                </span>
+              </h1>
+              <aside className="ob-side" aria-label="How it works">
+                <Elevation />
+                <p className="ob-side-note ui-mono">A drawing, not a photo. No real address.</p>
                 <ol className="ob-how" aria-label="How it works" data-testid="ob-how">
                   {HOW.map((step, i) => (
                     <li key={step.title}>
@@ -573,6 +575,8 @@ export function OneBox(props: Props) {
                     </li>
                   ))}
                 </ol>
+              </aside>
+              <div className="ob-ask">
                 {composer}
                 {(error || fileErrors.length > 0) && (
                   <Problems error={error} fileErrors={fileErrors} />
@@ -586,19 +590,24 @@ export function OneBox(props: Props) {
                     </li>
                   ))}
                 </ul>
-                <p className="ob-measured ui-mono" data-testid="ob-measured">
-                  {MEASURED}
-                </p>
+                <div className="ob-measured-row">
+                  <p className="ob-measured ui-mono" data-testid="ob-measured">
+                    {MEASURED}
+                  </p>
+                  <Tag source="live" />
+                </div>
               </div>
-              <SampleCase onOpen={() => submit(SAMPLE_AD, [])} />
             </div>
           </div>
           <div className="ob-below">
             <div className="ob-cols">
-              <YourChecks />
-              <SeeItHappen />
+              <WaysIn />
+              <SampleCase onOpen={() => submit(SAMPLE_AD, [])} />
             </div>
-            <RealtorQuote />
+            <div className="ob-cols ob-cols-even">
+              <YourChecks />
+              <RealtorQuote />
+            </div>
             <footer className="ob-foot">
               <p className="ob-honest">
                 <SourceChip source={shownMode} />
@@ -696,8 +705,6 @@ export const SAMPLE_AD =
 const SAMPLE_CARD = cardHold as Card;
 
 const PHOTO_CREDITS = [
-  HERO_PHOTOS.day.credit,
-  HERO_PHOTOS.dusk.credit,
   "Minh Pham",
   "Collov Home Design",
   "Raphael (Ajani Kamali Akio)",
@@ -769,45 +776,72 @@ function SampleCase({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-const STORIES = [
+/** Where the app opens up from the box. Two lead rows (the map, the Finder), then the rest. */
+export const WAYS = [
   {
-    photo: HERO_PHOTOS.dusk,
-    line: "Imagine Sascha, a week from moving, and a 2 bed priced well under the block.",
+    href: "/map",
+    title: "The map",
+    text: "Every researched place, by where it is. Tap one to see what the record says.",
+    lead: true,
   },
   {
-    photo: HERO_PHOTOS.day,
-    line: "Imagine a master's student landing in Houston on Friday, renting from abroad.",
+    href: "/finder",
+    title: "The Finder",
+    text: "Say what you need. It ranks places, shows why, and keeps only what you say yes to.",
+    lead: true,
+  },
+  {
+    href: "/listings",
+    title: "Listings and tour prep",
+    text: "Browse the researched places and get ready to visit one.",
+    lead: false,
+  },
+  {
+    href: "/stories",
+    title: "All stories",
+    text: "Imagined renters, played out step by step.",
+    lead: false,
+  },
+  {
+    href: "/reviews",
+    title: "Reviews and reports",
+    text: "What people who tried SNAPBACK said, counted.",
+    lead: false,
   },
 ] as const;
 
-// See it happen: the stories, as rows. Each is told as "imagine", never as a real person's case.
-function SeeItHappen() {
+// The ways in, as an index of rows on hairlines: no tiles. Checking an ad stays the one filled
+// action on the page; these are ink links. Your recent checks sit in their own block below.
+function WaysIn() {
   return (
-    <section className="ob-see" aria-labelledby="ob-see-title">
+    <nav className="ob-ways" aria-labelledby="ob-ways-title" data-testid="ob-ways">
       <header className="yc-head">
-        <h2 id="ob-see-title" className="yc-title">
-          See it happen
+        <h2 id="ob-ways-title" className="yc-title">
+          Or start somewhere else
         </h2>
-        <a className="yc-new" href="/stories">
-          All stories
-        </a>
       </header>
-      <ul className="ob-see-list">
-        {STORIES.map((st) => (
-          <li key={st.line}>
-            <a className="ob-see-row" href="/stories">
-              <span className="ob-photo ob-see-thumb">
-                <img src={st.photo.src} alt="" loading="lazy" />
+      <ul className="ob-ways-list">
+        {WAYS.map((w, i) => (
+          <li key={w.href} data-lead={w.lead || undefined}>
+            {/* Stories keeps the short name other pages and tests know it by. */}
+            <a
+              className="ob-way"
+              href={w.href}
+              aria-label={w.href === "/stories" ? w.title : undefined}
+            >
+              <span className="ob-way-n ui-mono">{`0${i + 1}`}</span>
+              <span className="ob-way-main">
+                <span className="ob-way-title">{w.title}</span>
+                <span className="ob-way-text">{w.text}</span>
               </span>
-              <span className="ob-see-text">
-                <span className="ob-see-line">{st.line}</span>
-                <span className="ob-see-note">A story played out step by step. Sample photo.</span>
+              <span className="ob-way-go" aria-hidden="true">
+                →
               </span>
             </a>
           </li>
         ))}
       </ul>
-    </section>
+    </nav>
   );
 }
 

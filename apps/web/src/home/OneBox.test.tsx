@@ -6,7 +6,7 @@ import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import type { Card } from "../contracts";
 import type { CreateCase } from "../upload/api";
 import { isAgainst } from "./caseAnswer";
-import { EXAMPLES, FB_ASK, HOW, MEASURED, OneBox, VerdictView, sendLabel } from "./OneBox";
+import { EXAMPLES, FB_ASK, HOW, MEASURED, OneBox, VerdictView, WAYS, sendLabel } from "./OneBox";
 
 // The box's button names what it will do: it follows the routing of what is typed.
 const SEND = /^(check it|find places|ask)$/i;
@@ -65,22 +65,31 @@ describe("Home is one box", () => {
     expect(how.compareDocumentPosition(box()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("the front cut: no walk or find prompt, no four-step strip, and no door to a hidden page", () => {
+  it("no walk or find prompt and no four-step strip; the app opens up from the box", () => {
     render(<OneBox mode="fixture" />);
     expect(EXAMPLES).toEqual(["Paste the ad you were sent", "Is this landlord real?"]);
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/Walk me through a place|Find me a 1 bed/);
     expect(screen.queryByTestId("how-it-works")).toBeNull();
     const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-    for (const hidden of ["/listings", "/map", "/finder", "/replay", "/investigate"])
-      expect(hrefs, hidden).not.toContain(hidden);
-    expect(hrefs).toContain("/stories");
+    for (const hidden of ["/replay", "/investigate"]) expect(hrefs, hidden).not.toContain(hidden);
+    // Inside the app, the box is where everything else starts: the map and the Finder lead.
+    const ways = within(screen.getByTestId("ob-ways")).getAllByRole("link");
+    expect(ways.map((a) => a.getAttribute("href"))).toEqual([
+      "/map",
+      "/finder",
+      "/listings",
+      "/stories",
+      "/reviews",
+    ]);
+    expect(ways.map((a) => a.getAttribute("href"))).toEqual(WAYS.map((w) => w.href));
   });
 
-  it("the hero photo has alt text, and every sample photo is stamped as one", () => {
+  it("carries no street photograph, only a drawing; every sample photo is stamped as one", () => {
     render(<OneBox mode="fixture" />);
-    const hero = screen.getByTestId("hero-photo");
-    expect(hero).toHaveAttribute("alt", expect.stringMatching(/apartment building/i));
+    expect(screen.queryByTestId("hero-photo")).toBeNull();
+    expect(screen.queryByTestId("hero-street")).toBeNull();
+    expect(screen.getByTestId("ob-elevation")).toHaveAttribute("aria-hidden", "true");
     // The sample report's proof pair: two stock photos, both stamped, and not the same picture.
     const samples = screen.getAllByTestId("sample-photo");
     expect(samples).toHaveLength(2);
@@ -143,8 +152,8 @@ describe("Home is one box", () => {
     expect(sample).toHaveTextContent("Taken in this building");
     expect(sample).toHaveTextContent("Zelle before a viewing. Red flag.Warning");
     await user.click(sample);
-    // The photograph collapses to a strip and the thread takes the page.
-    expect(screen.getByTestId("hero-street")).toHaveClass("hs-strip");
+    // The thread takes the page, with no photograph above it.
+    expect(screen.queryByTestId("hero-street")).toBeNull();
     expect(screen.getByTestId("ob-you")).toHaveTextContent("send the $600 deposit by Zelle");
     expect(screen.queryByTestId("ob-how")).not.toBeInTheDocument();
   });
