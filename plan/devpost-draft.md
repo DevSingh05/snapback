@@ -11,22 +11,26 @@
 > - No named person is called a scammer.
 > - Nothing is said about whether any listing site detects scams.
 >
-> **Open PRs are not claimed:** #272 (mirrored photos), #283 (evidence image), #296 (edited
-> photos) and #302 (public data). Each moves into the text only once it merges.
+> **Open PRs are not claimed:** #272 (mirrored photos), #283 (evidence image) and #302 (public
+> data). Each moves into the text only once it merges. #296 (the strict 60% bar) is merged as
+> `63f3122`.
+>
+> **Vexcel** is listed only as data we were given. No verdict line uses it until the labelled set
+> merges.
 >
 > `plan/money-case.md` is not on any branch I can read, so its numbers aren't in this draft. Point
 > me at it and I'll fold them in.
 
-**Tagline:** Trust the home, not the ad.
+**Tagline:** Rental tour prep, with scam safety built in. Trust the home, not the ad.
 
 ## Inspiration
 
-In February 2025, a renter near Houston found a house on Craigslist. The poster said he was the
-landlord and gave her a door code. She paid $2,200 for rent and a deposit and moved in. Two days
-later the real owner, a rental company, told her the poster did not own the house (ABC13 Houston,
-Feb 15 2025).
+In February 2025, a renter near Houston found a house on Craigslist. The poster said they were the
+landlord and gave the renter a door code. The renter paid $2,200 for rent and a deposit and moved
+in. Two days later the real owner, a rental company, told them the poster did not own the house
+(ABC13 Houston, Feb 15 2025).
 
-She did nothing careless. The photos were of a real house, and she even got inside.
+They did nothing careless. The photos were of a real house, and they even got inside.
 
 This is common:
 
@@ -37,16 +41,25 @@ This is common:
   2026). That covers all real estate scams, not only rentals.
 
 These scams work because real photos pass. The person and the offer are what's fake, and the
-home's own record can show that. So we built a renter's agent that checks the ad against the
-record before any money moves.
+home's own record can show that. So we built what a renter needs to prepare for a tour, and put
+a check against the home's record inside it, before any money moves.
 
 ## What it does
 
-**Text SNAPBACK a rental ad before you pay, and get a report: is this the real listing, and who
-do I call?**
+**SNAPBACK is rental tour prep with scam safety built in.** Find a place, see it on the map, walk
+it in 3D before you go, and check the ad before any money moves.
 
-You send the ad on iMessage, or paste it in the one box on the web: a link, its text or
-screenshots. A team of checks runs. Each reads one source and writes one sourced line on the card:
+**Tour prep:**
+
+- **Listings finder:** researched places from CoStar's Houston listings that fit your budget.
+- **Map:** the places on a 3D city map.
+- **3D walk:** "Walk it first" tours from the building's Matterport scan.
+- **Tour request:** drafted to the leasing office on record. You send it yourself.
+
+**Scam safety, built in.** Text SNAPBACK an ad before you pay and get a report: is this the real
+listing, and who do I call? You send the ad on iMessage, or paste it in the one box on the web: a
+link, its text or screenshots. A team of checks runs. Each reads one source and writes one sourced
+line on the card:
 
 - **Photos taken in this home:** the ad's photos are matched against the building's Matterport 3D
   scan. "Taken in this building (3 of 3 photos)", or "Taken in a different building. Red flag."
@@ -91,6 +104,13 @@ Code sets the verdict. "Don't pay" needs proof, and SNAPBACK never calls a named
 
 SNAPBACK never pays, books or sends anything for you.
 
+**What a realtor said:**
+
+> "if he can add in additional safety features for preventing further scams and financial scams, I
+> think this would be a very good app to have in the marketplace."
+>
+> Ashwin Veeravalli, Realtor, The Agency, Los Gatos CA
+
 ## How we built it
 
 - **Backend:** Python 3.12 and FastAPI. Intake, the rules, the case runner and the API are in
@@ -104,8 +124,8 @@ SNAPBACK never pays, books or sends anything for you.
 - **Photo placement:** DINOv2 retrieval over views rendered from the Matterport scans, then DISK
   and LightGlue matching (kornia), RANSAC verification and a spatial-spread check.
 - **Data:**
-  - The CoStar kit (property records, Homes.com listings), Matterport scans and Vexcel aerial
-    imagery.
+  - The CoStar kit (property records, Homes.com listings) and Matterport scans. We were also given
+    Vexcel aerial imagery, which is shown as a picture and not yet used in a verdict.
   - Harris County owner records, TREC licence data, the Texas Comptroller, HUD and City of
     Houston.
   - The kit stays in a git-ignored folder. Only derived yes/no facts reach a model, never kit
@@ -178,7 +198,7 @@ SNAPBACK never pays, books or sends anything for you.
 ## What's next
 
 - **Edited and AI-made photos.** One AI-edited photo was caught as inconsistent with the real scan
-  (n=1). A stricter bar is in review, and it needs measuring before we claim more.
+  (n=1). A stricter bar now runs, but at n=1 it needs measuring before we claim more.
 - **University partnerships for international students,** who rent from abroad, sight unseen and
   to a deadline. Pre-arrival housing guides could carry "check any listing before you send a
   deposit".
@@ -191,5 +211,5 @@ SNAPBACK never pays, books or sends anything for you.
 
 Python, FastAPI, pydantic, uv, PyTorch, DINOv2, kornia (DISK, LightGlue), FAISS, OpenCV, RapidOCR,
 ONNX Runtime, LangChain deepagents, TypeScript, React, Vite, MapLibre, Node.js, Photon 2.0
-(Spectrum SDK, iMessage), ElevenLabs, Matterport, Vexcel, CoStar and Homes.com data, GitHub
-Actions.
+(Spectrum SDK, iMessage), ElevenLabs, Matterport, CoStar and Homes.com data, Vexcel aerial
+imagery (provided), GitHub Actions.
