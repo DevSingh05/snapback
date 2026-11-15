@@ -2,13 +2,60 @@
 
 > Draft for the HackPrinceton Fall 2026 Devpost page. Every number carries its n and whether it
 > is LIVE (the CoStar kit) or FIXTURE (synthetic, team-made). Sources: the README, the PRs on
-> `main` and the team board. Not yet on `main`, so not claimed here: MCP (#241), the one box
-> (#243) and the Stories page.
+> `main` and the team board. Features not yet on `main` are listed under "In progress" only.
+> Quotes are word for word from the sources named beside them.
 
 ## Tagline
 
-**Trust the home, not the ad.** Paste a rental ad you found online. SNAPBACK checks it against
-the home's own record before you pay anyone.
+**Trust the home, not the ad.**
+
+"I text SNAPBACK a rental ad before I pay and get a report: is this the real listing, and who do I
+call?"
+
+How it works:
+
+1. Send the ad (iMessage, or paste it in the box).
+2. We check it against CoStar's record of the building (and its 3D scan where one exists).
+3. You get a report: the verdict in plain words, the ad beside the real listing, what to do next,
+   and safer homes on Apartments.com.
+
+One prong: the scam check before you pay. Everything else lives inside the report.
+
+CoStar protects the listings on its own sites; SNAPBACK protects the renter from the ad that
+copies one, wherever it shows up, and sends them back to the real listing on Apartments.com.
+
+## Scam prevention first
+
+Many rental scams happen on the copy: a real home's photos, reposted somewhere else, with a
+stranger's phone number and a request for money.
+
+- **The renter is the one holding the copy.** CoStar's own scam page warns renters that "Scammers
+  may impersonate Apartments.com or Apartment Finder to make it seem like we participate in the
+  lease transaction or transfer of funds", and that "we do not participate in any rental
+  transactions and cannot refund your money if you are scammed" (apartmenthomeliving.com, "Avoid
+  scams and fraud", © 2026 CoStar Group). A listing site can't see ads posted elsewhere; the
+  renter is the one holding the copy.
+- **It is common.** The FTC (Dec 22 2025) counted nearly 65,000 rental-scam reports since 2020,
+  about $65 million lost, with a median loss of $1,000. About half of reports in the 12 months to
+  June 2025 began with a fake Facebook ad.
+- **It is costly.** The FBI's Boston office (Aug 11 2026) reported that 12,368 people lost
+  $275,110,419 to real estate scams in 2025 (all real estate scams, not only rentals).
+
+SNAPBACK meets the renter where the copy is: they paste it, upload it or text it, and the home's
+own record answers before any money moves. CoStar could ship this beside its listings.
+
+## Who it serves
+
+1. **The renter about to pay.** Our two stories: Sascha, and a student moving from India to
+   Houston who must sign before she lands.
+2. **The leasing office whose listing is copied.** We draft a "your listing is being copied" note
+   for the office on record. It is never sent automatically.
+3. **CoStar and Apartments.com.** Check before you pay, and the renter is handed back to the real
+   listing.
+4. **The public.** A report the renter can file. Free for renters.
+
+The live moment of our pitch is the iMessage round trip: text the ad, get the report in the same
+thread.
 
 ## Inspiration
 
@@ -17,10 +64,7 @@ landlord and gave her a door code. She paid $2,200 for rent and a deposit and mo
 later the real owner, a rental company, told her the poster did not own the house (ABC13 Houston,
 Feb 15 2025).
 
-She did nothing careless. The photos were of a real house, and she even got inside. The FTC
-counted nearly 65,000 rental-scam reports from January 2020 to June 2025, and about half of the
-reports in the 12 months ending June 2025 began with a fake ad on Facebook
-([FTC Data Spotlight, Dec 2025](https://www.ftc.gov/news-events/data-visualizations/data-spotlight/2025/12/rental-scams-hit-home-65-million-reported-losses)).
+She did nothing careless. The photos were of a real house, and she even got inside.
 
 These scams work because real photos pass. The person and the offer are what's fake, and the
 home's own record can show that. So we built a renter's agent that checks the ad against the
@@ -71,6 +115,10 @@ or sends anything for you.
   a prompt-injection guard.
 - **Front end:** Vite, React and TypeScript, with a MapLibre 3D city map, an isometric 3D house
   and a walkthrough tour. Every screen says LIVE or FIXTURE.
+- **The one box:** the home page is a single box. Type, talk, paste or drop an ad; code routes it
+  and answers inline (#243).
+- **MCP server:** SNAPBACK as tools for any agent, over local stdio: six tools, and the tour
+  request stays a draft (#241).
 - **iMessage:** a Node sidecar on Photon's Spectrum SDK. A renter texts the ad and gets the card
   back as text plus a link. Only allowlisted threads are answered, and thread ids are kept as
   keyed hashes.
@@ -87,10 +135,26 @@ or sends anything for you.
 - **Locate gate, LIVE scans, renders (not photos):** of n = 20 claimed-building views and
   10 other-building views, from unseen directions, 20 of 20 were placed in the right building with
   0 false placements (held-out seed, #28).
-- **Photo accuracy on real listing photos, LIVE (A8, #72; CoStar OK'd sharing totals):** of
-  n = 78 photos (48 from the indexed homes, 30 decoys), 43 of 48 were placed in the right home,
-  0 were placed in a wrong one, and 5 could not be placed; 0 of 30 decoys fooled it. Right room
-  was not measured.
+- **Photo placement, LIVE (A8, #72; CoStar OK'd sharing totals):** "Measured on 78 real listing
+  photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it." The
+  right room is not measured, and we don't claim it.
+- **Live tamper test, LIVE (a real listing and tampered copies of it; nothing posted
+  anywhere).** Counts are Dev's run on real photos, then Jeffrey's on scan renders:
+  - Phone number changed: caught 6 of 6 and 2 of 2.
+  - "Send the deposit by Zelle before the tour": caught 6 of 6 and 2 of 2.
+  - Lookalike website link: caught 6 of 6 and 2 of 2.
+  - Rent cut 40%: flagged 2 of 2. Rent cut 30%: not flagged, by design. We flag only rents far
+    below the building's lowest rent, so honest discounts pass.
+  - Cropped photos still match (14 of 18; 4 of 4). Mirrored photos mostly stop matching (4 of 18
+    placed) and were never placed in a wrong home.
+- **Batch run, FIXTURE (composed ads, n per type):** cloned phone 9 of 9 held; another
+  building's photos 6 of 6 "Don't pay"; price cut 9 of 9 held; a for-sale home listed as a
+  rental 3 of 3 held; clean ads 6 of 6 cleared; clean messages 17 of 17 cleared; messages with
+  money asks 26 of 32 caught. Overall 76 of 82.
+- **CoStar record coverage, LIVE kit (counts):** 3,339 records; 2,139 have the building's
+  website; 1,747 have floor-plan rents; 708 have an availability page. The locate index on the
+  demo machine holds 21 scans.
+- **Speed, LIVE:** text-only checks take about 1 s; checks with photos take about 19 to 26 s.
 - **Forensics, SYNTHETIC/FIXTURE corpus:** on n = 301 ads with 4 seeded rings (57 ring ads), it
   recovered 4 of 4 rings, found 57 of 57 ring ads and flagged 0 of 244 honest ads. A keyword
   baseline recovered 0 of 4 rings. On 10 held-out seeds (about 300 ads each) it averaged ring
@@ -99,6 +163,16 @@ or sends anything for you.
 - **Replays of reported cases, FIXTURE:** two staged replays (the move-in paid to a poster who
   didn't own the house, and a Zelle deposit for a house never for rent) both stop at Hold off,
   before the payment.
+
+## Limitations
+
+- **Not every home has a 3D scan.** The rules, phone and link checks run on any ad. Rent, office,
+  manager and website need CoStar's record, and photo placement needs a scan. Where we lack one,
+  the report says "not checked", never a guess.
+- **This weekend: the Houston area,** from CoStar's event kit.
+- **Mirrored photos can defeat the photo match.** The other checks still run.
+- **An honest ad reads "Hold off" until the poster proves they're inside** (one tap). We never call
+  a home safe without proof.
 
 ## Challenges we ran into
 
@@ -131,14 +205,23 @@ or sends anything for you.
   manages it, and whether it is for sale.
 - Saying "not checked" honestly builds more trust than a confident guess.
 
+## In progress
+
+Built, not yet on `main`, so not claimed above:
+
+- **The real listing:** a panel that shows the home's real listing, a hand-off link back to it on
+  Apartments.com, and an alert when an ad looks copied from it (#250).
+- **New rules,** and a **batch run** over many ads at once.
+- The **Stories** page.
+- **Voice in iMessage:** merged in the sidecar (#245); the live round trip from a phone is next.
+
 ## What's next
 
 - **University partnerships for international students.** They rent from abroad, sight unseen,
   and often to a deadline. Pre-arrival housing guides could carry "check any listing before you
   send a deposit".
-- **Platforms:** run the check when a listing is posted on Facebook Marketplace, Zillow or
-  Craigslist. Today it works on any listing a renter can paste or forward.
-- **Voice:** send a voice memo in iMessage and get the answer back as text plus a voice reply.
+- **Platforms:** CoStar could ship this beside its listings, and other platforms could run the
+  check when an ad is posted. Today it works on any listing a renter can paste or forward.
 - **More cities, more languages** (English and Spanish today), and measured accuracy on real ad
   photos at scale.
 
@@ -162,7 +245,9 @@ Actions.
   addresses or prices, as CoStar allowed for the event.
 - **Photon (+ Best Voice Agent):** the iMessage sidecar is live on Photon's Spectrum SDK: text an
   ad and get the card back. Watch alerts text a linked Finder search at most 3 times a day, and
-  "stop" ends them. Voice memos in and spoken replies out are in progress.
+  "stop" ends them. Voice memos in and spoken replies out are built (#245): a memo is written down
+  by our speech-to-text and checked like a typed ad, and the answer comes back as text plus a voice
+  memo. The live round trip from a phone is next.
 - **Arlequin:** the investigator view finds rental-scam rings across many ads, with evidence for
   every link, on a SYNTHETIC/FIXTURE corpus (numbers above).
 - **GoDaddy domain:** TBD.

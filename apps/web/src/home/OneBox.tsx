@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { apiBase, apiFetchRead, fetchCard } from "../api";
-import { STATE_WORD, toneWord } from "../cardStrings";
+import { STATE_WORD, headlineOf, toneWord } from "../cardStrings";
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import sampleLivingRoom from "../assets/sample-living-room.webp";
 import sampleLounge from "../assets/sample-lounge.webp";
@@ -1503,7 +1503,7 @@ export function VerdictView({
         </p>
         <SourceChip source={card.source ?? source} />
       </header>
-      <h2 className="ob-verdict-word">{STATE_WORD[card.state]}</h2>
+      <h2 className="ob-verdict-word">{headlineOf(card)}</h2>
       <p className="ob-muted">Code set this verdict from the checks below.</p>
       <dl className="ob-lines">
         {shownLines.map(({ kind, line, first, key }) => {

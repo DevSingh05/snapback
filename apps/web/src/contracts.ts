@@ -79,6 +79,8 @@ export interface Card {
   summary?: string[];
   checks_out?: string[]; // lines with tone ok
   does_not?: string[]; // red flag, hold and not-shown lines
+  // Set by the API when the state's own words would mislead (a HOLD with nothing against it).
+  headline?: string | null;
 }
 
 export type TraceKind =

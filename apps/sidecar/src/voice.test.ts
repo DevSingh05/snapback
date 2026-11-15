@@ -133,7 +133,7 @@ test("a spoken ad gets the card as text plus a voice memo from /voice/tts", asyn
   const renter = space(RENTER);
   await runPhoton(app([[renter, memo()]]), config(calls));
   assert.equal(renter.sent[0]?.kind, "text");
-  assert.match(renter.sent[0]?.text ?? "", /Full result:/);
+  assert.match(renter.sent[0]?.text ?? "", /Full report:/);
   assert.equal(renter.sent[1]?.kind, "voice");
   const tts = calls.find((c) => c.url.endsWith("/voice/tts"));
   const said = JSON.parse(String(tts?.body)) as { text: string };
