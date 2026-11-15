@@ -14,6 +14,15 @@
 
 import { createHmac } from "node:crypto";
 
+import {
+  PHONE_LIKE,
+  learnFrom,
+  profileCommand,
+  type Lang,
+  type Profile,
+  type ProfileStore,
+} from "./profile";
+
 /** One inbound message from a renter, whatever channel it arrived on. */
 export type InboundMessage = {
   threadId: string;
@@ -64,6 +73,8 @@ export type SidecarConfig = {
   fetch?: typeof fetch;
   /** Each thread's last case, for "why?" and "what should I do?". Without it, no follow-ups. */
   memory?: CaseMemory;
+  /** Adaptive memory (D2): what each renter told us about themselves. Without it, nothing. */
+  profiles?: ProfileStore;
 };
 
 const CASE_TTL_MS = 2 * 60 * 60 * 1000; // a follow-up answers from a case up to 2 h old
@@ -98,6 +109,11 @@ export class CaseMemory {
     return found;
   }
 
+  /** "forget me": the thread's remembered case goes too. */
+  forget(key: string): void {
+    this.last.delete(key);
+  }
+
   /** A check is running for this thread: a follow-up must not answer from the older case. */
   begin(key: string): void {
     this.running.add(key);
@@ -111,9 +127,70 @@ export class CaseMemory {
 }
 
 export const SEND_THE_AD_FIRST = "Send me the ad first and I'll check it.";
+
+/** Locked Spanish headlines: the `state.*` strings in card/strings.py (es), word for word. */
+const HEADLINES_ES: Record<string, string> = {
+  hold: "Espere por ahora",
+  unverified: "No se pudieron ubicar estas fotos",
+  dont_pay: "No pague. Algo aquí no coincide.",
+  verified: "Las revisiones pasaron. Siga igual las dos reglas.",
+};
+// #280: the card's red-flag headlines (strings.py state.hold_red_*), in Spanish word for word.
+const RED_HEADLINES_ES: Record<string, string> = {
+  "Hold off: it asks for money before you've seen the place":
+    "Espere: pide dinero antes de que usted haya visto el lugar",
+  "Hold off: it asks for personal papers before you've seen the place":
+    "Espere: pide documentos personales antes de que haya visto el lugar",
+  "Hold off: it pushes you to act before you've seen the place":
+    "Espere: le presiona para actuar antes de ver el lugar",
+  "Hold off: something in this ad is a red flag":
+    "Espere: algo en este anuncio es una señal de alerta",
+};
+
+/** The reply's own few words, in each language. The verdict and reasons come from the card. */
+const WORDS = {
+  en: {
+    before: "Before you pay:",
+    why: "Why:",
+    next: "Next:",
+    full: "Full report:",
+    notChecked: "Not checked:",
+    ask: 'Ask me "why?" or "what should I do?"',
+    photos: "Send the ad's photos too and I can check where they were taken.",
+    call: (who: string, host: string) => `Call ${who} through ${host}, not the number in the ad.`,
+    send: (msg: string) => `send the poster this message: ${msg}`,
+    sendTitle: "Send the poster this message:",
+    rules: "Two rules",
+    checking:
+      "Got it. Checking this against CoStar's record before you pay anyone. About a minute.",
+    adFirst: "Send me the ad first and I'll check it.",
+    stillChecking: "Still checking, one moment.",
+    noOffice: "CoStar's record has no office on file for this building, so I can't name one.",
+  },
+  es: {
+    before: "Antes de pagar:",
+    why: "Por qué:",
+    next: "Siguiente:",
+    full: "Informe completo:",
+    notChecked: "Sin revisar:",
+    ask: 'Pregúnteme "¿por qué?" o "¿qué hago?"',
+    photos: "Mándeme también las fotos del anuncio y reviso dónde se tomaron.",
+    call: (who: string, host: string) =>
+      `Llame a ${who} a través de ${host}, no al número del anuncio.`,
+    send: (msg: string) => `mándele este mensaje a quien publica: ${msg}`,
+    sendTitle: "Mándele este mensaje a quien publica:",
+    rules: "Dos reglas",
+    checking:
+      "Recibido. Lo reviso con el registro de CoStar antes de que pague a nadie. Cerca de un minuto.",
+    adFirst: "Mándeme primero el anuncio y lo reviso.",
+    stillChecking: "Sigo revisando, un momento.",
+    noOffice:
+      "El registro de CoStar no tiene una oficina para este edificio, así que no puedo nombrar una.",
+  },
+} as const;
 export const STILL_CHECKING = "Still checking, one moment.";
 
-type Intent = "why" | "now" | "call" | "safe";
+type Intent = "why" | "now" | "call" | "safe" | "places";
 const TAIL = String.raw`(\s+(now|then))?\s*[?.!]*\s*$`;
 const INTENTS: [Intent, RegExp][] = [
   [
@@ -149,10 +226,24 @@ const INTENTS: [Intent, RegExp][] = [
   ],
 ];
 
+const SPANISH_INTENTS: [Intent, RegExp][] = [
+  ["why", /^\s*por\s*qu[eé]\s*[?.!]*\s*$/i],
+  ["now", /^\s*(qu[eé] (hago|debo hacer|puedo hacer)( ahora)?)\s*[?.!]*\s*$/i],
+  ["call", /^\s*(a qui[eé]n (llamo|le llamo|contacto))\s*[?.!]*\s*$/i],
+  ["safe", /^\s*(es (seguro|real|una estafa|confiable))\s*[?.!]*\s*$/i],
+];
+const PLACES =
+  /^\s*(show me( some| other| real| safer)? (places|homes|apartments|listings)|(other|safer|real) (places|homes|apartments)|find me (a place|places|a home|homes)|mu[eé]strame (lugares|opciones|casas|departamentos)|otras opciones|busca(me)? (un lugar|lugares|departamentos))\s*[?.!]*\s*$/i;
+
 /** The follow-up a short message asks, or null if it is an ad. Curly quotes count; any "why ..."
  * under 40 characters with no link is a "why". */
 export function intentOf(raw: string): Intent | null {
-  const text = raw.replace(/[\u2018\u2019]/g, "'").trim();
+  const text = raw
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[¿¡]/g, "")
+    .trim();
+  if (PLACES.test(text)) return "places";
+  for (const [intent, pattern] of SPANISH_INTENTS) if (pattern.test(text)) return intent;
   for (const [intent, pattern] of INTENTS) if (pattern.test(text)) return intent;
   if (/^why\b/i.test(text) && text.length < 40 && !/https?:|www\./i.test(text)) return "why";
   return null;
@@ -189,8 +280,11 @@ export function isAllowed(threadId: string, config: SidecarConfig): boolean {
 
 /** The card's own headline (#256: an honest ad reads differently) when set, else the locked
  * headline for its state. Both are code-owned; the sidecar never writes one. */
-export function headlineOf(card: Card): string {
-  return card.headline?.trim() || (HEADLINES[card.state] ?? HEADLINES.hold);
+export function headlineOf(card: Card, lang: Lang = "en"): string {
+  const own = card.headline?.trim();
+  if (own) return lang === "es" ? (RED_HEADLINES_ES[own] ?? own) : own;
+  if (lang === "es") return HEADLINES_ES[card.state] ?? HEADLINES_ES.hold ?? HEADLINES.hold;
+  return HEADLINES[card.state] ?? HEADLINES.hold;
 }
 
 export function cardText(card: Card, link: string, challenge?: string | null): string {
@@ -227,12 +321,18 @@ function reasons(card: Card): string[] {
 
 /** One next step: call the office on record through its own site (#250), else send the
  * challenge, else the card's own two rules. */
-function nextStep(card: Card, challenge?: string | null, office?: OfficeOnRecord | null): string {
+function nextStep(
+  card: Card,
+  challenge?: string | null,
+  office?: OfficeOnRecord | null,
+  lang: Lang = "en",
+): string {
+  const w = WORDS[lang];
   if (office?.manager_company && office.website_host) {
-    return `Call ${office.manager_company} through ${office.website_host}, not the number in the ad.`;
+    return w.call(office.manager_company, office.website_host);
   }
-  if (challenge) return `send the poster this message: ${challenge}`;
-  return card.footer.find((line) => line.startsWith("Two rules")) ?? card.footer[0] ?? "";
+  if (challenge) return w.send(challenge);
+  return card.footer.find((line) => line.startsWith(w.rules)) ?? card.footer[0] ?? "";
 }
 
 /** The top two reasons: Card.summary first, then the first lines that do not check out. */
@@ -250,14 +350,19 @@ export function reportText(
   challenge?: string | null,
   office?: OfficeOnRecord | null,
   askPhotos = false,
+  lang: Lang = "en",
 ): string {
-  const lines = [headlineOf(card), `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`];
+  const w = WORDS[lang];
+  const lines = [
+    headlineOf(card, lang),
+    `SNAPBACK check ${card.case_id} (${card.source.toUpperCase()})`,
+  ];
   const top = topReasons(card);
-  if (top.length) lines.push("", "Before you pay:", ...top.map((line) => `- ${line}`));
-  const step = nextStep(card, challenge, office);
-  if (step) lines.push("", `Next: ${step}`);
-  if (askPhotos) lines.push("", ASK_PHOTOS);
-  lines.push("", `Full report: ${link}`, 'Ask me "why?" or "what should I do?"');
+  if (top.length) lines.push("", w.before, ...top.map((line) => `- ${line}`));
+  const step = nextStep(card, challenge, office, lang);
+  if (step) lines.push("", `${w.next} ${step}`);
+  if (askPhotos) lines.push("", w.photos);
+  lines.push("", `${w.full} ${link}`, w.ask);
   return lines.join("\n");
 }
 
@@ -277,19 +382,26 @@ export function onlyAMarketplaceLink(msg: InboundMessage): boolean {
 }
 
 /** "why?": every reason on this case's card, what was not checked, and the link. */
-function whyText(card: Card, link: string): string {
-  const lines = [headlineOf(card), "", "Why:"];
+function whyText(card: Card, link: string, lang: Lang = "en"): string {
+  const w = WORDS[lang];
+  const lines = [headlineOf(card, lang), "", w.why];
   lines.push(...reasons(card).map((line) => `- ${line}`));
-  if (card.not_checked.length) lines.push("", `Not checked: ${card.not_checked.join(", ")}`);
-  lines.push("", `Full report: ${link}`);
+  if (card.not_checked.length) lines.push("", `${w.notChecked} ${card.not_checked.join(", ")}`);
+  lines.push("", `${w.full} ${link}`);
   return lines.join("\n");
 }
 
 /** "what should I do?": the challenge to send (if any), then the card's own footer rules. */
-function whatNowText(card: Card, link: string, challenge?: string | null): string {
-  const lines = [headlineOf(card), ""];
-  if (challenge) lines.push("Send the poster this message:", challenge, "");
-  lines.push(...card.footer, "", `Full report: ${link}`);
+function whatNowText(
+  card: Card,
+  link: string,
+  challenge?: string | null,
+  lang: Lang = "en",
+): string {
+  const w = WORDS[lang];
+  const lines = [headlineOf(card, lang), ""];
+  if (challenge) lines.push(w.sendTitle, challenge, "");
+  lines.push(...card.footer, "", `${w.full} ${link}`);
   return lines.join("\n");
 }
 
@@ -308,10 +420,15 @@ function caseLink(config: SidecarConfig, caseId: string): string {
   return `${config.webUrl.replace(/\/$/, "")}/case/${encodeURIComponent(caseId)}`;
 }
 
-async function fetchCard(config: SidecarConfig, caseId: string): Promise<Card | null> {
+async function fetchCard(
+  config: SidecarConfig,
+  caseId: string,
+  lang: Lang = "en",
+): Promise<Card | null> {
   const get = config.fetch ?? fetch;
   const api = config.apiUrl.replace(/\/$/, "");
-  const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/card`);
+  const query = lang === "es" ? "?lang=es" : "";
+  const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/card${query}`);
   return res.ok ? ((await res.json()) as Card) : null;
 }
 
@@ -328,34 +445,139 @@ async function answerFollowUp(
   intent: Intent,
   msg: InboundMessage,
   config: SidecarConfig,
+  profile: Profile | null = null,
 ): Promise<string> {
+  const lang: Lang = profile?.lang ?? "en";
+  const w = WORDS[lang];
+  if (intent === "places") return saferHomes(config, profile, lang);
   const key = renterId(msg.threadId, config.renterSalt);
-  if (config.memory?.checking(key)) return STILL_CHECKING;
+  if (config.memory?.checking(key)) return lang === "es" ? w.stillChecking : STILL_CHECKING;
   const last = config.memory?.recall(key);
-  if (!last) return SEND_THE_AD_FIRST;
-  const card = await fetchCard(config, last.caseId);
+  if (!last) return lang === "es" ? w.adFirst : SEND_THE_AD_FIRST;
+  const card = await fetchCard(config, last.caseId, lang);
   if (!card) return COULD_NOT_CHECK;
   const link = caseLink(config, last.caseId);
-  if (intent === "why") return whyText(card, link);
-  if (intent === "now") return whatNowText(card, link, last.challenge);
-  if (intent === "safe") return reportText(card, link, last.challenge);
+  if (intent === "why") return whyText(card, link, lang);
+  if (intent === "now") return whatNowText(card, link, last.challenge, lang);
+  if (intent === "safe") return reportText(card, link, last.challenge, null, false, lang);
   const office = last.readToken ? await officeOnRecord(config, last.caseId, last.readToken) : null;
-  return whoToCall(card, link, office);
+  return whoToCall(card, link, office, lang);
 }
 
 /** "who do I call?": the office on record and its own site (#250); never a phone number. */
-function whoToCall(card: Card, link: string, office: OfficeOnRecord | null): string {
-  const lines = [headlineOf(card), ""];
+function whoToCall(
+  card: Card,
+  link: string,
+  office: OfficeOnRecord | null,
+  lang: Lang = "en",
+): string {
+  const w = WORDS[lang];
+  const lines = [headlineOf(card, lang), ""];
   if (office?.manager_company && office.website_host) {
-    lines.push(
-      `Call ${office.manager_company} through ${office.website_host}, not the number in the ad.`,
-    );
+    lines.push(w.call(office.manager_company, office.website_host));
   } else {
-    lines.push("CoStar's record has no office on file for this building, so I can't name one.");
-    lines.push(...card.footer.filter((line) => line.startsWith("Two rules")));
+    lines.push(w.noOffice);
+    lines.push(...card.footer.filter((line) => line.startsWith(w.rules)));
   }
-  lines.push("", `Full report: ${link}`);
+  lines.push("", `${w.full} ${link}`);
   return lines.join("\n");
+}
+
+/** The part of /search's PlaceMatch this reply reads. It carries no hand-off link (that is
+ * on /alternatives), and its rents are never read, so they can never reach a reply. */
+type PlaceMatch = {
+  kind?: string;
+  floor_plan?: string | null;
+  office_on_record?: string | null;
+};
+
+/** "show me safer homes": researched places that fit the remembered budget and beds, from our
+ * own search (POST /search). Asks only for what it does not know yet. Never prints a rent. */
+async function saferHomes(
+  config: SidecarConfig,
+  profile: Profile | null,
+  lang: Lang,
+): Promise<string> {
+  const es = lang === "es";
+  const missing: string[] = [];
+  if (profile?.budget === undefined) {
+    missing.push(es ? "¿Cuál es su presupuesto al mes?" : "What's your monthly budget?");
+  }
+  if (profile?.beds === undefined) {
+    missing.push(es ? "¿Cuántas recámaras necesita?" : "How many bedrooms do you need?");
+  }
+  if (missing.length) {
+    return [
+      es ? "Para buscarle lugares más seguros:" : "To find you safer homes:",
+      ...missing,
+    ].join("\n");
+  }
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  const res = await get(`${api}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      max_rent_month: profile?.budget,
+      beds_min: profile?.beds,
+      max_results: 3,
+    }),
+  });
+  if (!res.ok) return COULD_NOT_CHECK;
+  const found = (await res.json()) as { matches?: PlaceMatch[] };
+  const places = (found.matches ?? []).slice(0, 3);
+  const budget = `$${(profile?.budget ?? 0).toLocaleString("en-US")}`;
+  const fit = es
+    ? `${profile?.beds} recámaras, hasta ${budget}`
+    : `${profile?.beds} beds, up to ${budget}`;
+  if (places.length === 0) {
+    return es
+      ? `Ahora no hay lugares investigados que encajen (${fit}).`
+      : `No researched places fit ${fit} right now.`;
+  }
+  const lines = [es ? `Lugares más seguros para ${fit}:` : `Safer homes for ${fit}:`];
+  for (const place of places) {
+    const what = place.floor_plan ?? place.kind ?? "";
+    const who = place.office_on_record ? ` · ${place.office_on_record}` : "";
+    lines.push(`- ${what}${who}`);
+  }
+  lines.push(es ? "(según la última investigación de CoStar)" : "(as of CoStar's last research)");
+  const map = `${config.webUrl.replace(/\/$/, "")}/map`;
+  lines.push(es ? `Véalos en el mapa: ${map}` : `See them on the map: ${map}`);
+  return lines.join("\n");
+}
+
+const AD_CUES =
+  /zelle|deposit|dep[oó]sito|venmo|cash ?app|wire|for rent|se renta|tenant|inquilino|text me|call me|avail(able)?\b|disponible|move[- ]in|\bbath|ba[nñ]o|\$\s?\d{3,5}\s*(a|per|\/)\s*(month|mo)/i;
+const A_LINK = /https?:|www\./i;
+const MONEY = /\$\s?\d/;
+const BEDS =
+  /\b\d{1,2}\s*(?:-|\s)?(?:beds?|bedrooms?|br|bd|rec[aá]maras?|habitaciones?|cuartos?)\b/i;
+
+/** A message that only tells us about the renter (budget, beds, city), not an ad to check: no ad
+ * wording, no phone-like digits, no link, and it states something about them. */
+function onlyAboutThem(text: string, learned: Profile): boolean {
+  if (text.length > 160 || AD_CUES.test(text) || PHONE_LIKE.test(text) || A_LINK.test(text)) {
+    return false;
+  }
+  // A price or "2 bed" is an ad's unless the renter said it about themselves ("my budget is",
+  // "I need 2 beds"); a city alone never makes a message theirs.
+  if (MONEY.test(text) && learned.budget === undefined) return false;
+  if (BEDS.test(text) && learned.beds === undefined) return false;
+  return learned.budget !== undefined || learned.beds !== undefined || learned.city !== undefined;
+}
+
+function rememberedText(profile: Profile, lang: Lang): string {
+  const es = lang === "es";
+  const parts: string[] = [];
+  if (profile.budget !== undefined) {
+    parts.push(`${es ? "presupuesto" : "budget"} $${profile.budget.toLocaleString("en-US")}`);
+  }
+  if (profile.beds !== undefined) parts.push(`${profile.beds} ${es ? "recámaras" : "beds"}`);
+  if (profile.city) parts.push(profile.city);
+  return es
+    ? `Anotado: ${parts.join(", ")}. Lo recuerdo 30 días. Escriba "muéstrame lugares" para ver lugares más seguros que encajen, o "olvídame" para borrarlo.`
+    : `Got it: ${parts.join(", ")}. I'll remember that for 30 days. Text "show me places" for safer homes that fit, or "forget me" to delete it.`;
 }
 
 /** Who is on record and where (#250), with the read token in a header. Only the company and
@@ -379,7 +601,11 @@ async function officeOnRecord(
   }
 }
 
-async function check(msg: InboundMessage, config: SidecarConfig): Promise<Checked> {
+async function check(
+  msg: InboundMessage,
+  config: SidecarConfig,
+  lang: Lang = "en",
+): Promise<Checked> {
   const get = config.fetch ?? fetch;
   const api = config.apiUrl.replace(/\/$/, "");
 
@@ -401,10 +627,10 @@ async function check(msg: InboundMessage, config: SidecarConfig): Promise<Checke
   } = (await created.json()) as CreateCaseResponse;
   config.memory?.remember(renterId(msg.threadId, config.renterSalt), caseId, challenge, readToken);
   const link = caseLink(config, caseId);
-  const card = await fetchCard(config, caseId);
+  const card = await fetchCard(config, caseId, lang);
   if (!card) return { text: `${HEADLINES.hold}\nSNAPBACK check ${caseId} started.\n${link}` };
   const office = readToken ? await officeOnRecord(config, caseId, readToken) : null;
-  return { text: reportText(card, link, challenge, office, images.length === 0), caseId };
+  return { text: reportText(card, link, challenge, office, images.length === 0, lang), caseId };
 }
 
 /** The card as a picture, sent after the text. A failure here never undoes the text. */
@@ -432,15 +658,39 @@ export async function handleMessage(
   msg: InboundMessage,
   client: MessageClient,
   config: SidecarConfig,
-  onChecking?: () => Promise<void>,
+  onChecking?: (text?: string) => Promise<void>,
 ): Promise<boolean> {
   if (!isAllowed(msg.threadId, config)) return false;
+  const key = renterId(msg.threadId, config.renterSalt);
+  const text = msg.text ?? "";
+  // Adaptive memory (D2): commands first, then learn from what the renter says.
+  let profile: Profile | null = null;
+  if (config.profiles) {
+    const command = profileCommand(text, key, config.profiles);
+    if (command !== null) {
+      if (command.kind === "forget") config.memory?.forget(key); // only "forget me" wipes the case
+      await client.reply(msg.threadId, command.text);
+      return true;
+    }
+    const learned = learnFrom(text);
+    const noPhotos = (msg.images?.length ?? 0) === 0 && msg.imageUrls.length === 0;
+    if (noPhotos && onlyAboutThem(text, learned)) {
+      profile = config.profiles.learn(key, text);
+      await client.reply(msg.threadId, rememberedText(profile, profile.lang ?? "en"));
+      return true;
+    }
+    // Anything else (an ad, a follow-up) teaches nothing. Its language answers this one reply
+    // when the renter has not set one; a Spanish renter is never flipped to English.
+    profile = config.profiles.get(key);
+    if (!profile?.lang && learned.lang) profile = { ...(profile ?? {}), lang: learned.lang };
+  }
+  const lang: Lang = profile?.lang ?? "en";
   const intent = followUpIntent(msg);
   if (intent !== null) {
     // Ruling (#255 review): a follow-up never creates a case, whatever happens here.
     let answer: string;
     try {
-      answer = await answerFollowUp(intent, msg, config);
+      answer = await answerFollowUp(intent, msg, config, profile);
     } catch {
       answer = COULD_NOT_CHECK;
     }
@@ -451,16 +701,15 @@ export async function handleMessage(
     await client.reply(msg.threadId, ONLY_A_LINK); // nothing to check, so no check is used
     return true;
   }
-  const key = renterId(msg.threadId, config.renterSalt);
   let checked: Checked;
   config.memory?.begin(key);
   try {
     try {
-      await onChecking?.();
+      await onChecking?.(WORDS[lang].checking);
     } catch {
       // a failed "checking" reply never skips the check
     }
-    checked = await check(msg, config);
+    checked = await check(msg, config, lang);
   } catch {
     checked = { text: COULD_NOT_CHECK };
   } finally {
