@@ -117,4 +117,4 @@ def test_a_name_with_a_connector_word_matches_and_its_lookalike_host_is_flagged(
 
 
 def test_connectors_alone_never_make_a_name():
-    assert build_name_index([_rec("fx-x", "At the Oaks"), _rec("fx-y", "Oak of Elm")]) == {}
+    assert build_name_index([_rec("fx-x", "At the Oaks"), _rec("fx-y", "Elm of")]) == {}
