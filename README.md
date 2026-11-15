@@ -185,6 +185,27 @@ photos. FIXTURE means team-made data through the real pipeline. SYNTHETIC means 
 - **The ring finder is tested on data built alongside it,** so its numbers show the method works
   on rings shaped like these. They are not an accuracy claim for real listings.
 
+## Reproduce every number
+
+One command per row of the Measured table, run from the repo root after `make setup`. **Kit** means
+it needs CoStar's sponsor kit, which is not in this repo (see `DATA_USE.md`), or a key you hold.
+Rows marked **Open** run on what is committed. Where no script exists we say so.
+
+| Row                                                    | Command                                                                                                                                          | Needs                                                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real photos placed in the right home (43 of 48)        | `make eval-locate-real`                                                                                                                          | **Kit** (listing photos and Matterport index), `--extra vision` and `make prefetch-weights`                                                        |
+| Decoy photos (0 of 30)                                 | `make eval-locate-real` (same run writes the decoy row)                                                                                          | Same as above                                                                                                                                      |
+| Tamper test (6 of 6, 2 of 2)                           | No script. Run by hand: edit a real listing's phone, add a "Zelle before the tour" line, or swap in a lookalike link, then paste it into the app | **Kit** and a running `make api`; counts are in `docs/devpost.md`                                                                                  |
+| Batch of composed ads (117 of 123)                     | `make eval-ads`                                                                                                                                  | **Open** (FIXTURE). With the kit it writes `data/eval/ads_results.live.csv` instead                                                                |
+| Deep agent in the background (22.9 s)                  | No script. Timed by hand on `make api` with `uv sync --extra agent`, reading the case timeline                                                   | Model key in `.env`; **Kit** for the LIVE cases                                                                                                    |
+| Ring finder over 90 days (10 of 10, 0 of 2,684)        | `uv run python -m snapback.forensics.detect`                                                                                                     | **Open** (SYNTHETIC); rewrites `fixtures/forensics/stream_timeline.json`                                                                           |
+| Ring finder on 301 ads (4 of 4, keyword 0 of 4)        | `uv run pytest tests/test_forensics.py`                                                                                                          | **Open** (SYNTHETIC); the test asserts 4 of 4 rings and that the keyword baseline finds under half; the exact 0 of 4 is in the `evaluate()` output |
+| Ring finder on reworded ads (9 of 10, keyword 0 of 10) | `PYTHONPATH=src uv run python -m snapback.forensics.paraphrase`                                                                                  | **Open** (SYNTHETIC); rewrites `eval/forensics/paraphrase_results.json`                                                                            |
+| Vexcel aerial matcher (52 of 54)                       | `uv run python scripts/measure_vexcel.py --mode live`                                                                                            | **Kit** and a Vexcel key for LIVE; without them `--mode fixture` runs the committed synthetic set, which is not this row                           |
+
+`make eval` also rewrites `eval/results.csv` and runs the regression gate against
+`eval/baseline.csv`. Counts only are written to the eval files; no listing text, phone or photo.
+
 ## Quickstart
 
 Needs [uv](https://docs.astral.sh/uv/), Python 3.12, Node 22 and npm.
