@@ -1,0 +1,197 @@
+/* The soft system, carried to every inside screen. Home and the thread got it first (onebox.css);
+   this sheet gives the same two shapes to the report card, the map, the Finder, the listings,
+   Stories, replays and Under the hood: one radius for surfaces, a pill for anything you press or
+   read as a chip. Shape only: no colour, size or layout changes here. The :root prefix lets it
+   win over each screen's own single-class rule whatever order the chunks load in. */
+
+/* surfaces: cards, panels, photographs, fields */
+:root .ui-photo,
+:root .hud,
+:root .pane,
+:root .lcard,
+:root .lcard-inset,
+:root .legend,
+:root .attribution,
+:root .fd-honest,
+:root .fd-example,
+:root .fd-composer,
+:root .fd-side,
+:root .fd-block,
+:root .fd-input,
+:root .fd-own,
+:root .pf-strip,
+:root .pf-row,
+:root .pf-scan,
+:root .pf-budget,
+:root .pf-budget input,
+:root .pf-budget select,
+:root .pane input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+:root .st-frame,
+:root .st-ad,
+:root .replay-page,
+:root .uh-show,
+:root .uh-thread,
+:root .uh-bubble,
+:root .uh-nums,
+:root .uh-foot,
+:root .uh-jump,
+:root .sw-strip,
+:root .sw-board,
+:root .sw-lanes,
+:root .inv-robust,
+:root .inv-error,
+:root .ob-photo,
+:root .of-panel,
+:root .twin-stage {
+  border-radius: var(--radius);
+}
+/* a card that holds a photograph or a coloured band clips it to the same corner */
+:root .ui-photo,
+:root .lcard,
+:root .st-frame,
+:root .uh-show,
+:root .replay-page,
+:root .sw-strip,
+:root .sw-board,
+:root .ob-photo,
+:root .twin-stage {
+  overflow: hidden;
+}
+
+/* things you press, and chips */
+:root .case-primary,
+:root .ui-btn,
+:root .ui-btn-quiet,
+:root .hud-theme,
+:root .seg,
+:root .seg-opt,
+:root .tog,
+:root .own-add,
+:root .fd-off-chip,
+:root .fd-stamp,
+:root .fd-mic,
+:root .fd-send,
+:root .fd-quiet,
+:root .pf-action,
+:root .st-ad-count,
+:root .st-ctl,
+:root .uh-mark,
+:root .uh-stamp,
+:root .uh-jump a,
+:root .twin-fade-btn,
+:root .inv-chip,
+:root .sw-play,
+:root .ui-pin {
+  border-radius: var(--radius-pill);
+}
+
+/* one press response everywhere: a small lift on hover, a settle on press */
+@media (prefers-reduced-motion: no-preference) {
+  :root .case-primary,
+  :root .pf-action,
+  :root .fd-send,
+  :root .fd-example,
+  :root .st-ctl,
+  :root .lcard {
+    transition:
+      transform 0.2s var(--ease-out),
+      box-shadow 0.2s var(--ease-out);
+  }
+  :root .case-primary:hover,
+  :root .pf-action:hover,
+  :root .fd-send:hover:not(:disabled),
+  :root .fd-example:hover,
+  :root .st-ctl:hover {
+    transform: translateY(-2px);
+  }
+  :root .case-primary:active,
+  :root .pf-action:active,
+  :root .fd-send:active,
+  :root .fd-example:active,
+  :root .st-ctl:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+/* the page frame itself (the Finder and the listings sit in one) */
+:root .view {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* A place row inside the Finder's narrow side column stacks, as it already does on a phone:
+   the drawing across the top, the words under it at full width. */
+:root .fd-side .pf-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+:root .fd-side .pf-art {
+  grid-row: 1;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 104px;
+  padding: var(--w-2) var(--w-4);
+  background: linear-gradient(90deg, var(--w-sky-a), var(--w-sky-b));
+}
+:root .fd-side .pf-art .kit-art,
+:root .fd-side .pf-art .kit-art-house {
+  width: auto;
+  height: 118px;
+  margin: 0 0 -22px;
+}
+:root .fd-side .pf-body {
+  padding: var(--w-4) var(--w-4) var(--w-2);
+}
+:root .fd-side .pf-price {
+  font-size: var(--w-h3);
+}
+:root .fd-side .pf-actions {
+  grid-column: 1 / -1;
+  padding: var(--w-2) var(--w-4) var(--w-4);
+}
+
+/* ---------- phone fixes from the team's phone walk (issue 334) ---------- */
+@media (max-width: 700px) {
+  /* iOS zooms the page when a field under 16px takes focus */
+  :root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  :root textarea,
+  :root select {
+    font-size: 16px;
+  }
+  /* the labels that carry LIVE / FIXTURE / SAMPLE must be readable: a 12px floor */
+  :root .ui-stamp,
+  :root .attribution,
+  :root .legend,
+  :root .uh-stamp,
+  :root .fd-stamp {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+  }
+  /* the Twin's stage leaves room for its own controls on the first screen */
+  :root .twin-stage {
+    height: min(46vh, 400px);
+  }
+  /* the report's "tell someone" links and the map's credits are finger sized: the padding
+     widens the touch area without moving the line they sit in */
+  :root .case-file-where a,
+  :root .case-file-agencies a,
+  :root .attribution a {
+    padding-block: 12px;
+  }
+}
+
+/* Pages are separate documents, so the browser cross-fades between them, and the brand mark
+   holds still from the front door to the app. Browsers without this just navigate. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+  :root .wl-mark,
+  :root .app-mark {
+    view-transition-name: brand;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.22s;
+  }
+}

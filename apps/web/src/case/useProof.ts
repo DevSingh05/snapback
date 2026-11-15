@@ -1,7 +1,7 @@
 // The proof pair for a case, read at run time. With the API: the case's evidence file (written by
 // code), the ad's own photo and the scan frame it matched, all fetched with the read token in a
 // header and shown through blob URLs, so no kit picture is ever bundled. Without the API
-// (fixture mode): a licensed stock interior on both sides, stamped SAMPLE PHOTO, with no pins.
+// (fixture mode): two licensed stock interiors, one a side, stamped SAMPLE PHOTO, with no pins.
 import { useEffect, useState } from "react";
 
 import { apiBase, apiFetchRead, apiFetchReadWhenReady } from "../api";
@@ -10,7 +10,7 @@ import { pickSpots, pointsSentence } from "../evidence/match";
 import { placeLine } from "../evidence/read";
 import type { EvidenceFile, EvidencePhoto } from "../evidence/types";
 import { useAdPhoto } from "../tour/useAdPhoto";
-import { photoFor } from "../ui";
+import { photoFor, STOCK } from "../ui";
 import type { ProofData, ProofPin } from "./model";
 
 // Three pins read at a glance on a photo this size; the match view shows the rest.
@@ -35,14 +35,16 @@ function pinsOf(photo: EvidencePhoto): ProofPin[] {
 
 function samplePair(card: Card): ProofData {
   const sample = photoFor({ source: "fixture", stock: "interior", seed: card.case_id });
+  // The scan side is a second stock room, so the pair never reads as one picture shown twice.
+  const other = STOCK.interior.find((x) => x.src !== sample.src);
   const shot = { src: sample.src, alt: sample.alt, stamp: sample.stamp };
   return {
     ad: shot,
-    scan: shot,
+    scan: other ? { src: other.src, alt: other.alt, stamp: sample.stamp } : shot,
     pins: [],
     kicker: null,
     caption:
-      "Sample photos. On a live check the ad's photo sits here, beside the scan frame it matched.",
+      "Sample photos, two stand-ins. On a live check the ad's photo sits here, beside the scan frame it matched.",
   };
 }
 

@@ -1,8 +1,8 @@
 // The Worlds hero: an open dollhouse on its own lot, in a block of houses, drawn with three.js
-// (orthographic, no photographs). Ported from the SNAPBACK Worlds page (v17), keeping the house
-// that lifts apart floor by floor; the scripted check demo, photo fly-ins and DOM labels are left
-// out. Pure drawing: it holds no claim about any real home. Colours are the Worlds Daylight
-// values below (Day only, like the rest of the app).
+// (orthographic). Ported from the SNAPBACK Worlds page (v17). The page's scroll drives it: the
+// house lifts apart floor by floor, the ad's sample photos fly to the walls they were taken at,
+// then a gold marker goes to the yard sign (the home's record). Pure drawing: it holds no claim
+// about any real home. Colours are the Worlds Daylight values below (Day only, like the app).
 import * as THREE from "three";
 
 const PAL: Record<string, string> = {
@@ -38,15 +38,33 @@ const ctx2d = (c: HTMLCanvasElement): CanvasRenderingContext2D => {
 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
+const seg = (v: number, a: number, b: number) => clamp((v - a) / (b - a), 0, 1);
+const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+const back = (t: number) => {
+  const u = clamp(t, 0, 1) - 1;
+  return 1 + 2.4 * u * u * u + 1.4 * u * u;
+};
+
 export interface HouseScene {
   setVisible(v: boolean): void;
+  /** 0 at the top of the scroll stage, 1 at its end. */
+  setProgress(p: number): void;
   dispose(): void;
+}
+
+export interface HouseOpts {
+  /** Three sample photos from "the ad"; they fly to the top floor's walls. */
+  photos?: string[];
+  /** DOM labels pinned to the drawing: one per floor (ground first) and one for the yard sign. */
+  floorLabels?: (HTMLElement | null)[];
+  signLabel?: HTMLElement | null;
 }
 
 export function mountHouse(
   cv: HTMLCanvasElement,
   el: HTMLElement,
   reduced: boolean,
+  opts: HouseOpts = {},
 ): HouseScene | null {
   let R: THREE.WebGLRenderer;
   try {
@@ -57,7 +75,9 @@ export function mountHouse(
   const binds: Bind[] = [];
   const recolor = () =>
     binds.forEach((b) => (b[0] as Record<string, THREE.Color>)[b[1]]?.set(PAL[b[2]] ?? "#ffffff"));
-  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // phones get a lighter canvas: fewer pixels and a smaller shadow map
+  const small = window.innerWidth < 900;
+  R.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
   R.shadowMap.enabled = true;
   R.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene(),
@@ -72,7 +92,7 @@ export function mountHouse(
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffffff, 0.45);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
   sun.shadow.bias = -0.0008;
   sun.shadow.radius = 3;
   const sc = sun.shadow.camera;
@@ -532,12 +552,93 @@ export function mountHouse(
   box(sheet, 0.07, 0.05, D + 1.2, -0.6, 0, -0.6, mSh, false);
   box(sheet, 0.07, 0.05, D + 1.2, W + 0.53, 0, -0.6, mSh, false);
   box(sheet, W + 1.2, 0.01, D + 1.2, -0.6, 0, -0.6, mSh2, false);
+
+  // the ad's photos: each flies in and locks onto the wall it was taken at
+  const TL = new THREE.TextureLoader();
+  // they come from the side the ad's card sits on (screen left, towards the viewer)
+  const off = new THREE.Vector3(-0.4, 4, 12.4),
+    cWhite = new THREE.Color(0xffffff),
+    cGold = new THREE.Color(PAL.scan);
+  type Flying = {
+    g: THREE.Group;
+    slot: THREE.Vector3;
+    bm: THREE.MeshBasicMaterial;
+    im: THREE.MeshBasicMaterial;
+  };
+  const photos: Flying[] = [];
+  const photo = (src: string, x: number, y: number, z: number, ry: number) => {
+    const g = new THREE.Group();
+    const bm = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      side: THREE.DoubleSide,
+    });
+    const tex = TL.load(src, (t) => {
+      const img = t.image as { width: number; height: number };
+      const ia = img.width / img.height,
+        sa = 1.88 / 1.28;
+      if (ia > sa) {
+        t.repeat.x = sa / ia;
+        t.offset.x = (1 - t.repeat.x) / 2;
+      } else {
+        t.repeat.y = ia / sa;
+        t.offset.y = (1 - t.repeat.y) / 2;
+      }
+    });
+    const im = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+    g.add(new THREE.Mesh(new THREE.PlaneGeometry(2.0, 1.4), bm));
+    const ip = new THREE.Mesh(new THREE.PlaneGeometry(1.88, 1.28), im);
+    ip.position.z = 0.02;
+    g.add(ip);
+    g.rotation.y = ry;
+    g.visible = false;
+    f2.add(g);
+    photos.push({ g, slot: new THREE.Vector3(x, y, z), bm, im });
+  };
+  const SLOTS: [number, number, number, number][] = [
+    [0.2, 1.5, 3.15, Math.PI / 2],
+    [2.65, 1.5, 0.2, 0],
+    [5.45, 1.5, 0.2, 0],
+  ];
+  (opts.photos ?? []).slice(0, 3).forEach((src, i) => {
+    const q = SLOTS[i];
+    if (q) photo(src, q[0], q[1], q[2], q[3]);
+  });
+  // our marker: the gold matched point from the mark, floating over whatever is being checked
+  const mk = new THREE.Group();
+  rootG.add(mk);
+  const mkM = B("scan", { opacity: 1, depthTest: false });
+  const mkA = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.62, 0.08), mkM);
+  mkA.renderOrder = 8;
+  mk.add(mkA);
+  const mkB = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.08), mkM);
+  mkB.position.y = -0.62;
+  mkB.renderOrder = 8;
+  mk.add(mkB);
+  mk.visible = false;
+  const mkP = new THREE.Vector3(0, 12, 0),
+    mkT = new THREE.Vector3(),
+    v3 = new THREE.Vector3();
   recolor();
 
   let dim = { cw: 1, ch: 1 };
   const ob = { yaw: 0, yawT: 0, pit: PIT, pitT: PIT, idle: 0, last: 0 };
-  const st = { open: 0, on: 0 };
+  const st = { open: 0, on: 0, p: reduced ? 1 : 0, pT: reduced ? 1 : 0 };
   const t0 = performance.now();
+  const fl = [0, 0, 0];
+  const lbl = new Map<HTMLElement, { x: number; y: number; o: string }>();
+  const put = (n: HTMLElement, v: THREE.Vector3, dx: number, dy: number, show: boolean) => {
+    v.project(cam);
+    const x = clamp(((v.x + 1) / 2) * dim.cw + dx, 8, dim.cw - (dim.cw > 900 ? 200 : 132)),
+      y = clamp(((1 - v.y) / 2) * dim.ch + dy, 8, dim.ch - 44);
+    let c = lbl.get(n);
+    if (!c) lbl.set(n, (c = { x, y, o: "" }));
+    c.x += (x - c.x) * (reduced ? 1 : 0.2);
+    c.y += (y - c.y) * (reduced ? 1 : 0.2);
+    n.style.transform = `translate3d(${c.x.toFixed(1)}px,${c.y.toFixed(1)}px,0)`;
+    const o = show ? "1" : "0";
+    if (o !== c.o) n.style.opacity = c.o = o;
+  };
   const setCam = (o: { cx: number; cy: number; ppu: number; y: number; pit: number }) => {
     const c = cam;
     c.left = -o.cx / o.ppu;
@@ -554,12 +655,22 @@ export function mountHouse(
     const cw = dim.cw,
       ch = dim.ch,
       wide = cw > 900,
-      ppu = Math.min(43, cw / 15.4, ch / 19.5);
-    setCam({ ppu, cx: cw * (wide ? 0.66 : 0.5), cy: ch * (wide ? 0.58 : 0.62), y: 6, pit: ob.pit });
+      // the camera leans in to the top floor while the photos land, then down to the yard sign
+      ca = ease(seg(st.p, 0.28, 0.4)),
+      cb = ease(seg(st.p, 0.6, 0.74)),
+      cy0 = 6 + 2.2 * ca - 2.8 * cb,
+      ppu = Math.min(58, cw / 15.4, ch / (wide ? 19.5 : 30)) * (1 + 0.16 * ca - 0.1 * cb);
+    setCam({
+      ppu,
+      cx: cw * (wide ? (cw < 1200 ? 0.72 : 0.66) : 0.5),
+      cy: ch * (wide ? 0.56 : 0.27),
+      y: cy0,
+      pit: ob.pit,
+    });
     const c = cam,
       wU = c.right - c.left,
       mx = (c.left + c.right) / 2,
-      hz = 21 * Math.sin(ob.pit) - 6 * Math.cos(ob.pit),
+      hz = 21 * Math.sin(ob.pit) - cy0 * Math.cos(ob.pit),
       hU = (wide ? 120 : 84) / ppu,
       cU = (wide ? 56 : 40) / ppu;
     sky.scale.set(wU, hU, 1);
@@ -587,7 +698,31 @@ export function mountHouse(
     cv.setPointerCapture(e.pointerId);
     cv.classList.add("drag");
   };
+  // Hover (mouse only): the floor under the pointer lifts a little and its label lights, so
+  // the drawing answers the hand. One ray per frame at most.
+  const ray = new THREE.Raycaster(),
+    ndc = new THREE.Vector2(),
+    hov = [0, 0, 0];
+  let hot = -1,
+    hoverAt: [number, number] | null = null;
+  const pick = () => {
+    if (!hoverAt) return -1;
+    const r = cv.getBoundingClientRect();
+    ndc.set(((hoverAt[0] - r.left) / r.width) * 2 - 1, -((hoverAt[1] - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const hit = ray.intersectObjects(floors, true).find((h) => h.object instanceof THREE.Mesh);
+    for (let o: THREE.Object3D | null = hit?.object ?? null; o; o = o.parent) {
+      const k = floors.indexOf(o as THREE.Group);
+      if (k >= 0) return k;
+    }
+    return -1;
+  };
+  const leave = () => {
+    hoverAt = null;
+  };
+  cv.addEventListener("pointerleave", leave);
   const move = (e: PointerEvent) => {
+    if (e.pointerType === "mouse" && !pt.size) hoverAt = [e.clientX, e.clientY];
     const q = pt.get(e.pointerId);
     if (!q) return;
     ob.yawT += (e.clientX - q[0]) * 0.008;
@@ -606,20 +741,46 @@ export function mountHouse(
   cv.addEventListener("pointercancel", up);
 
   let visible = true,
-    raf = 0;
+    raf = 0,
+    fN = 0,
+    slow = 0,
+    lite = false;
+  // A slow device (frames over 40 ms) gets a lighter drawing: one pixel per CSS pixel, no
+  // shadows, and a frame only when something moves (a few a second when nothing does).
+  const goLite = () => {
+    lite = true;
+    R.setPixelRatio(1);
+    pu.uPx.value = 1;
+    sun.castShadow = false;
+    size();
+  };
   const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
-    if (!visible) return;
+    if (!visible) {
+      ob.last = 0;
+      return;
+    }
+    const dt = ob.last ? now - ob.last : 16;
     ob.last = now;
+    fN++;
+    if (!lite && fN > 8 && fN < 120 && dt > 40 && ++slow > 10) goLite();
+    if (lite && fN % 6) {
+      const busy = Math.abs(st.pT - st.p) > 0.002 || pt.size > 0 || hot >= 0 || now - t0 < 2600;
+      if (!busy) return;
+    }
     if (!reduced && !pt.size && now - ob.idle > 4000) {
       const base = Math.round(ob.yawT / (Math.PI * 2)) * Math.PI * 2;
       ob.yawT += (base + 0.4 * Math.sin(now * 0.00022) - ob.yawT) * 0.012;
       ob.pitT += (PIT - ob.pitT) * 0.012;
     }
-    // the house lifts apart once, after a short beat, and stays open
-    const target = reduced ? 1 : clamp((now - t0 - 500) / 1900, 0, 1);
-    st.open = 1 - Math.pow(1 - target, 3);
+    // Scroll is the clock. The page sets pT; the drawing eases after it, so a wheel tick or a
+    // flick never jumps. On load the floors part a little on their own, to say "this opens".
+    st.p += (st.pT - st.p) * (reduced ? 1 : 0.11);
+    const p = st.p,
+      hint = reduced ? 0 : 0.1 * ease(clamp((now - t0 - 500) / 1500, 0, 1));
+    st.open = Math.max(hint, ease(seg(p, 0.04, 0.28)));
     st.on = Math.min(1, st.open * 1.2);
+    const rec = seg(p, 0.64, 0.8);
     const kk = reduced ? 1 : 0.1;
     ob.yaw += (ob.yawT - ob.yaw) * kk;
     ob.pit += (ob.pitT - ob.pit) * kk;
@@ -635,14 +796,36 @@ export function mountHouse(
       const vv = w.o > 0.02;
       w.ms.forEach((m) => (m.visible = vv));
     });
-    const lit = reduced ? 1 : Math.floor(now / 2600) % 3;
-    Ls.forEach((l, k) => (l.intensity = 0.3 + 0.45 * (st.open > 0.9 && k === lit ? 1 : 0)));
+    // the floor being checked warms up: the top floor while the photos land, the ground floor
+    // while the record is read
+    const want = rec > 0.2 ? 0 : p > 0.32 ? 2 : -1;
+    Ls.forEach((l, k) => {
+      fl[k] = (fl[k] ?? 0) + ((k === want ? 1 : 0) - (fl[k] ?? 0)) * (reduced ? 1 : 0.08);
+      l.intensity = 0.3 + 0.45 * Math.max(fl[k] ?? 0, hov[k] ?? 0);
+    });
     sg.rotation.y = Math.PI / 4 - yw;
-    const a = 0.75;
+    const a = 0.75 + 0.35 * seg(p, 0.32, 0.6) - 0.65 * rec;
     sun.position.set(Math.cos(a) * 20, 25, Math.sin(a) * 20);
     const o = st.open;
-    floors.forEach((g, k) => (g.position.y = 0.1 + k * FH + o * k * GAP));
-    roof.position.y = 0.1 + 3 * FH + o * (2 * GAP + 1.7);
+    if (hoverAt || hot >= 0) {
+      const k = !reduced && st.open > 0.6 && !pt.size ? pick() : -1;
+      if (k !== hot) {
+        const lbls = opts.floorLabels ?? [];
+        lbls[hot]?.classList.remove("is-hot");
+        lbls[k]?.classList.add("is-hot");
+        hot = k;
+      }
+    }
+    floors.forEach((g, k) => {
+      hov[k] = (hov[k] ?? 0) + ((k === hot ? 1 : 0) - (hov[k] ?? 0)) * 0.14;
+      g.position.y = 0.1 + k * FH + o * k * GAP + 0.28 * (hov[k] ?? 0);
+    });
+    // the roof rises clear of the top floor while the photos land on its far walls
+    roof.position.y =
+      0.1 +
+      3 * FH +
+      o * (2 * GAP + 1.7) +
+      3.4 * ease(seg(p, 0.28, 0.4)) * (1 - ease(seg(p, 0.6, 0.74)));
     const topY = 3 * FH + o * 2 * GAP,
       ph = reduced ? 0.55 : (now * 0.00016) % 1,
       sy = (ph < 0.5 ? ph * 2 : 2 - ph * 2) * topY;
@@ -652,13 +835,64 @@ export function mountHouse(
     pu.uOn.value = st.on;
     mSh.opacity = 0.7 * st.on;
     mSh2.opacity = 0.12 * st.on;
+    let landed = 0;
+    photos.forEach((f, i) => {
+      const q = seg(p, 0.32 + i * 0.07, 0.44 + i * 0.07);
+      f.g.visible = q > 0.001;
+      f.g.position.copy(f.slot).addScaledVector(off, 1 - back(q));
+      f.g.scale.setScalar(1 + 1.5 * (1 - ease(q)));
+      f.bm.opacity = f.im.opacity = Math.min(1, q * 3);
+      // a gold flash on the frame as it locks on
+      f.bm.color.copy(cWhite).lerp(cGold, Math.sin(seg(q, 0.8, 1) * Math.PI));
+      if (q > 0.98) landed = i + 1;
+    });
+    // the marker: over the home, then over each photo as it lands, then at the yard sign
+    rootG.updateMatrixWorld(true);
+    const s0 = photos[Math.min(landed, photos.length - 1)]?.slot;
+    if (rec > 0.02) f0.localToWorld(mkT.set(1.9, 3.5, D + 1.6));
+    else if (p > 0.32 && s0) f2.localToWorld(mkT.set(s0.x + 0.4, 3.0, s0.z + 0.4));
+    else f2.localToWorld(mkT.set(W / 2, FH + 1.0, D / 2));
+    rootG.worldToLocal(mkT);
+    mkP.lerp(mkT, reduced ? 1 : 0.12);
+    mk.position.copy(mkP);
+    if (!reduced) mk.position.y += Math.sin(now * 0.003) * 0.12;
+    mk.rotation.y = Math.PI / 4 - yw;
+    const mkv = seg(p, 0.1, 0.2);
+    mk.visible = mkv > 0.02;
+    mk.scale.setScalar(Math.max(0.01, mkv) * (1 + (reduced ? 0 : 0.12 * Math.sin(now * 0.006))));
     R.render(scene, cam);
+    (opts.floorLabels ?? []).forEach((n, k) => {
+      const g = floors[k];
+      if (!n || !g) return;
+      let bx = -1e9,
+        by = 0;
+      (
+        [
+          [W + 0.3, -0.3],
+          [W + 0.3, D + 0.3],
+          [-0.3, D + 0.3],
+          [-0.3, -0.3],
+        ] as [number, number][]
+      ).forEach((c) => {
+        g.localToWorld(v3.set(c[0], 1.25, c[1])).project(cam);
+        if (v3.x > bx) {
+          bx = v3.x;
+          by = v3.y;
+        }
+      });
+      put(n, v3.set(bx, by, 0).unproject(cam), 10, 14, st.open > 0.55);
+    });
+    if (opts.signLabel)
+      put(opts.signLabel, f0.localToWorld(v3.set(1.9, 4.4, D + 1.6)), 18, -18, rec > 0.6);
   };
   raf = requestAnimationFrame(frame);
 
   return {
     setVisible(v: boolean) {
       visible = v;
+    },
+    setProgress(q: number) {
+      if (!reduced) st.pT = clamp(q, 0, 1);
     },
     dispose() {
       cancelAnimationFrame(raf);
@@ -667,6 +901,7 @@ export function mountHouse(
       cv.removeEventListener("pointermove", move);
       cv.removeEventListener("pointerup", up);
       cv.removeEventListener("pointercancel", up);
+      cv.removeEventListener("pointerleave", leave);
       scene.traverse((n) => {
         if (!(n instanceof THREE.Mesh || n instanceof THREE.Points)) return;
         n.geometry.dispose();

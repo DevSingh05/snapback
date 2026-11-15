@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { matchRoute } from "../App";
-import WorldsLanding, { LANDING_MEASURED } from "./WorldsLanding";
+import WorldsLanding, { LANDING_BEATS, LANDING_MEASURED } from "./WorldsLanding";
 
 describe("SNAPBACK Worlds front door", () => {
   it("is the page at / and the app moved to /home", () => {
@@ -14,12 +14,12 @@ describe("SNAPBACK Worlds front door", () => {
   it("has one clear way into the app and a Stories link in the bar", () => {
     render(<WorldsLanding />);
     const bar = document.querySelector<HTMLElement>(".wl-bar")!;
-    expect(within(bar).getByRole("link", { name: "Open SNAPBACK" })).toHaveAttribute(
-      "href",
-      "/home",
-    );
+    expect(within(bar).getByRole("link", { name: "Check an ad" })).toHaveAttribute("href", "/home");
     expect(within(bar).getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
-    expect(screen.getByRole("link", { name: "Check an ad" })).toHaveAttribute("href", "/home");
+    // one verb for the way in, wherever it appears
+    for (const link of screen.getAllByRole("link", { name: "Check an ad" }))
+      expect(link).toHaveAttribute("href", "/home");
+    expect(screen.queryByRole("link", { name: /open snapback/i })).toBeNull();
   });
 
   it("draws the 3D hero first, then the labelled sample verdict", () => {
@@ -30,6 +30,32 @@ describe("SNAPBACK Worlds front door", () => {
     expect(verdict).toHaveTextContent("Hold off: it asks for money before you’ve seen the place");
     expect(verdict).toHaveTextContent("SYNTHETIC");
     expect(canvas).toHaveAttribute("aria-label", expect.stringMatching(/drawing, not a real home/));
+  });
+
+  it("tells the scroll story in three beats over the drawing", () => {
+    render(<WorldsLanding />);
+    const beats = screen.getAllByTestId("wl-beat");
+    expect(beats.map((b) => within(b).getByRole("heading").textContent)).toEqual(
+      LANDING_BEATS.map((b) => b.title),
+    );
+    expect(beats[2]).toHaveTextContent("never an accusation");
+    // the hero's one h1 comes before the beats
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.compareDocumentPosition(beats[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("labels the Taken here drawing as a synthetic sample and offers three photos", () => {
+    render(<WorldsLanding />);
+    const taken = document.querySelector<HTMLElement>("#taken")!;
+    expect(taken).toHaveTextContent("Drawn sample · SYNTHETIC");
+    const picks = within(taken).getAllByRole("button");
+    expect(picks.map((b) => b.textContent)).toEqual(["Photo 1", "Photo 2", "Another home"]);
+    expect(picks[0]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("wl-res")).toHaveTextContent("in this drawn sample");
+    expect(screen.getByTestId("wl-twin")).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/drawn sample, not a real home/),
+    );
   });
 
   it("states the measured number with its n and label, and nothing stronger", () => {
@@ -56,6 +82,15 @@ describe("SNAPBACK Worlds front door", () => {
     );
     expect(within(reviews).getByTestId("realtor-quote")).toHaveTextContent("Ashwin Veeravalli");
     expect(within(reviews).getByTestId("realtor-quote")).toHaveTextContent("The Agency, Los Gatos");
+  });
+
+  it("offers the 30-second game as a fourth way in, above the three", () => {
+    render(<WorldsLanding />);
+    const spot = screen.getByTestId("wl-col-spot");
+    expect(spot).toHaveAttribute("href", "/spot");
+    expect(spot).toHaveTextContent("Spot the scam in 30 seconds");
+    const stories = screen.getByTestId("wl-col-stories");
+    expect(spot.compareDocumentPosition(stories) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps copy honest: no AWS claim, no Apartments.com detection claim, no em dashes", () => {
