@@ -194,6 +194,23 @@
     font-size: var(--fs-sm);
     white-space: nowrap;
   }
+  /* The bottom bar is a light bar even over a photograph (Home), so its tabs take the ink
+     tokens, not the cream the floating top bar uses: the cream was 1.02:1 on the bar. */
+  :is(.app[data-bar="photo"], .app:has([data-bar="photo"])) > .app-bar .app-tabs .app-tab {
+    color: var(--muted);
+  }
+  :is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+    > .app-bar
+    .app-tabs
+    :is(.app-tab[data-in="true"], .app-tab[aria-current="page"]) {
+    color: var(--ink);
+  }
+  :is(.app[data-bar="photo"], .app:has([data-bar="photo"]))
+    > .app-bar
+    .app-tabs
+    .app-tab[aria-current="page"]::after {
+    background: var(--ink);
+  }
   /* The current tab: a 3px ink line on top. */
   .app-tab[aria-current="page"]::after {
     left: var(--sp-2);

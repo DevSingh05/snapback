@@ -317,7 +317,9 @@ def test_rules_run_on_the_text_the_renter_posted(client):
     quiet = finish(client, create(client, text="Two bed near the park.", renter_id=renter("a")))
     asked = finish(client, create(client, text=ZELLE_ASK, renter_id=renter("b")))
     assert quiet.rows[2].lines[0].text == "No risky payment ask found in the text you sent."
-    assert "Zelle before a viewing. Red flag." in [line.text for line in asked.rows[2].lines]
+    assert "Zelle and a deposit or holding fee before a viewing. Red flag." in [
+        line.text for line in asked.rows[2].lines
+    ]
 
 
 def test_text_written_for_an_ai_system_is_noticed_and_changes_nothing(client):

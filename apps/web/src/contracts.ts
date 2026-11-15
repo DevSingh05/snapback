@@ -161,6 +161,9 @@ export interface CaseTimeline {
   source: DataSource;
   mode: "policy" | "deepagents";
   fell_back: boolean;
+  // The deep agent is still working this case in the background (SNAPBACK_AGENT=deepagents_async).
+  // Absent from older servers, which means "not running".
+  running?: boolean;
   steps: TimelineStep[];
   todos: TimelineTodo[];
   plan: string[];

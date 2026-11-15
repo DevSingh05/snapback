@@ -44,7 +44,7 @@ describe("locked wording", () => {
     ["verified", "Checks passed. Still follow the two rules."],
     ["unverified", "Could not place these photos"],
   ] as const)("headline for %s", (state, words) => {
-    render(<CardView card={{ ...card, state }} variant="result" />);
+    render(<CardView card={{ ...card, state, headline: null }} variant="result" />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(words);
   });
 
@@ -86,7 +86,7 @@ describe("ad vs record row", () => {
 
   it("the row does not change the headline", () => {
     render(<CardView card={claims} variant="result" />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Hold off for now");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(card.headline as string);
   });
 });
 
