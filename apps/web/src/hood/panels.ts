@@ -18,8 +18,8 @@ export const MERGED = {
   caseFile: false,
   /** f/paraphrase-attack: the reworded-ads run, eval/forensics/paraphrase_results.json. */
   paraphraseEval: false,
-  /** The real-photo count re-measured on the stricter match bar (#296). */
-  locateRemeasured: false,
+  /** The real-photo count re-measured on the stricter match bar (#296). Done Nov 15. */
+  locateRemeasured: true,
   /** The voice reply timed on a phone, n stated, on the rubric board as a done item. */
   voiceTimed: false,
 } as const;
@@ -118,12 +118,14 @@ export const PANELS: Panel[] = [
     ],
     numbers: [
       {
-        value: "0 of 48",
-        what: "real listing photos placed in the wrong building",
+        // Re-measured on main after #296 raised the strict bar (Nov 15): the same counts.
+        when: "locateRemeasured",
+        value: "43 of 48",
+        what: "real listing photos placed in the right home, 0 in the wrong one",
         n: 48,
         unit: "photos",
         label: "LIVE",
-        source: `${LOCATE} locate_real,wrong_building`,
+        source: `${LOCATE} locate_real,right_building and locate_real,wrong_building`,
         evalFile: LOCATE,
       },
       {
@@ -133,17 +135,6 @@ export const PANELS: Panel[] = [
         unit: "decoys",
         label: "LIVE",
         source: `${LOCATE} locate_real,decoy_false_placement`,
-        evalFile: LOCATE,
-      },
-      {
-        // Frozen Nov 14 16:38, before #296 raised the strict bar: shown again once re-measured.
-        when: "locateRemeasured",
-        value: "43 of 48",
-        what: "real listing photos placed in the right building",
-        n: 48,
-        unit: "photos",
-        label: "LIVE",
-        source: `${LOCATE} locate_real,right_building`,
         evalFile: LOCATE,
       },
     ],
@@ -262,15 +253,15 @@ export const PANELS: Panel[] = [
         source: `${BOARD} Arlequin: "0.927 of ring ads caught, 0 of 2,684 honest flagged (SYNTHETIC, n=1 seed, #268)"`,
       },
       {
-        // Robustness. The figure is the in-flight branch's own table (Nov 15 01:40); check it
-        // against the merged file before turning the switch on.
+        // Robustness, with the phone and photo fallback on (the shipped finder once #312
+        // merges). Check the figure against the merged file before turning the switch on.
         when: "paraphraseEval",
-        value: "7 of 10",
+        value: "9 of 10",
         what: "rings still found after every ring ad is reworded (keyword search: 0 of 10)",
         n: 10,
         unit: "rings",
         label: "SYNTHETIC",
-        source: `${PARAPHRASE} variants.paraphrased.pipeline`,
+        source: `${PARAPHRASE} variants.paraphrased, finder with the fallback on`,
         evalFile: PARAPHRASE,
       },
     ],

@@ -79,10 +79,12 @@ describe("the panels", () => {
 
   it("the real-photo numbers are the eval file's own rows", () => {
     const csv = readFileSync(path.join(REPO, "eval/locate_real.csv"), "utf8");
+    expect(csv).toContain("locate_real,right_building,43,48,");
     expect(csv).toContain("locate_real,wrong_building,0,48,");
     expect(csv).toContain("locate_real,decoy_false_placement,0,30,");
     const costar = PANELS.find((p) => p.id === "costar")!;
-    expect(costar.numbers.map((m) => m.value)).toEqual(["0 of 48", "0 of 30", "43 of 48"]);
+    expect(costar.numbers.map((m) => m.value)).toEqual(["43 of 48", "0 of 30"]);
+    expect(costar.numbers[0]!.what).toContain("0 in the wrong one");
   });
 
   it("every Show me link that is shown opens a route the router has", () => {
