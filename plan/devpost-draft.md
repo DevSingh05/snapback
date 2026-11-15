@@ -226,7 +226,6 @@ imagery (provided), GitHub Actions.
 > - **Not on `main` yet, so not claimed:**
 >   - the deep agent's per-ad plan, re-planning and next-step draft;
 >   - the Arlequin ring case file, case study and reworded-ads test;
->   - photo auto-fade;
 >   - `/under-the-hood`;
 >   - the loose-match warning (#297) and the evidence image (#283).
 >     Each goes in once it merges.
@@ -250,7 +249,9 @@ sends the renter back to the real listing.
 
 - the report at `/case/<id>`: the ad beside the real listing, with "See the real listing" (#250,
   #299);
-- the photos placed in the 3D scan at `/case/<id>/twin`;
+- the photos placed in the 3D scan at `/case/<id>/twin`. Each ad photo fades by itself so the scan
+  shows through behind it, with big "Show ad photo", "Show 3D scan" and "Side by side" buttons
+  (#305);
 - the draft note to the real leasing office, in the report and in iMessage (#250, #276).
 
 ### LangChain · deepagents
