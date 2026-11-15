@@ -13,6 +13,7 @@ Routes the web app and the iMessage sidecar call:
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
+    GET  /eval/ads.csv                    measured ad batch: ad type by verdict, n, misses
     GET  /healthz                         liveness and the data source
     POST /voice/tts, POST /voice/stt      the Finder's voice (ElevenLabs; see api/voice.py)
     POST /verdict                         decide() on evidence the caller already has
@@ -58,7 +59,7 @@ from snapback.api.cases import (
     SessionCase,
     UnknownProperty,
 )
-from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.eval_results import ADS_COLUMNS, RESULTS_COLUMNS, NotTheAgreedCsv, read_results
 from snapback.api.finder import make_router as finder_router
 from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
@@ -141,7 +142,9 @@ from snapback.tour import (
     map_locate,
     must_have_kinds_of,
     office_on_record,
+    rooms_to_see_line,
     scan_model_of,
+    with_summary,
 )
 from snapback.verdict import decide
 
@@ -1218,17 +1221,19 @@ def create_app(
             )
             if tile is not None:
                 aerial_on, aerial_ok = tile.captured_on, tile.source == DataSource.LIVE
-        return build_tour(
-            property_id=property_id,
-            kind=place.kind if place else "apartment",
-            source=source,
-            sweeps=sweeps,
-            has_scan=place.has_3d_scan if place else bool(record and record.model_ids),
-            place=place,
-            record=record,
-            aerial_on=aerial_on,
-            aerial_image=aerial_ok,
-            plan_key=place.plan_key if place else None,
+        return with_summary(
+            build_tour(
+                property_id=property_id,
+                kind=place.kind if place else "apartment",
+                source=source,
+                sweeps=sweeps,
+                has_scan=place.has_3d_scan if place else bool(record and record.model_ids),
+                place=place,
+                record=record,
+                aerial_on=aerial_on,
+                aerial_image=aerial_ok,
+                plan_key=place.plan_key if place else None,
+            )
         )
 
     @app.get("/places/{property_id}/tour")
@@ -1278,13 +1283,17 @@ def create_app(
             model = scan_model_of(locate, other)
             plan = tour_for(other, None, any_plan=True, model_id=model)
             plan, fields = map_elsewhere(plan, locate, other, office_of(other))
-            return choose_walk(plan), locate, fields, model
+            return with_summary(choose_walk(plan)), locate, fields, model
         if case.property_id is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
+        return claimed_walk(case, locate)
+
+    def claimed_walk(case, locate) -> tuple:
+        """The case's own building walk (the claimed home), with its placed photos and summary."""
         model = scan_model_of(locate)
         plan = tour_for(case.property_id, None, any_plan=True, model_id=model)
         if locate is None:
-            return plan, None, {}, model
+            return with_summary(plan), None, {}, model
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(
             plan,
@@ -1295,7 +1304,12 @@ def create_app(
         )
         plan = attach_claims(plan, ad_notes_of(case))
         prefs = getattr(case, "preferences", None)
-        return choose_walk(plan, None, must_have_kinds_of(prefs)), locate, fields, model
+        return (
+            with_summary(choose_walk(plan, None, must_have_kinds_of(prefs))),
+            locate,
+            fields,
+            model,
+        )
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(
@@ -1404,6 +1418,16 @@ def create_app(
             aerial_on=capture_date_of(record),
         )
 
+    def rooms_line_for(case, property_id: str) -> str | None:
+        """The rooms the ad left out, only for the case's own building and only when the walk
+        knows them. Any trouble building the walk just leaves the line out."""
+        if case.property_id is None or case.property_id != property_id:
+            return None
+        try:
+            return rooms_to_see_line(claimed_walk(case, case.evidence.locate)[0])
+        except HTTPException:
+            return None
+
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(
         case_id: str,
@@ -1429,7 +1453,7 @@ def create_app(
         if place is None:
             raise HTTPException(status_code=404, detail="No researched place with that id.")
         try:
-            return draft_tour_request(place, body.brief)
+            return draft_tour_request(place, body.brief, rooms_line_for(case, body.property_id))
         except NoOfficeOnRecord:
             raise HTTPException(
                 status_code=422, detail="That place has no leasing office on record."
@@ -1533,10 +1557,10 @@ def create_app(
             challenge_text=status.challenge_text,
         )
 
-    def eval_file(path: Path, missing: str) -> Response:
+    def eval_file(path: Path, missing: str, columns: tuple[str, ...] = RESULTS_COLUMNS) -> Response:
         """One of the eval harness's CSVs, as written. Only the agreed format is served."""
         try:
-            results = read_results(path)
+            results = read_results(path, columns)
         except NotTheAgreedCsv:
             raise HTTPException(
                 status_code=500, detail="The results file is not the agreed eval results CSV."
@@ -1567,6 +1591,19 @@ def create_app(
         return eval_file(
             settings.snapback_eval_locate_real,
             "No locate results yet. Run `make eval-locate-real`.",
+        )
+
+    @app.get("/eval/ads.csv")
+    def get_eval_ads() -> Response:
+        """The measured ad batch (`make eval-ads`): ad type by verdict, with n and a miss flag.
+
+        Same rules as `/eval/results.csv`: public, read-only, a fixed path, only the agreed CSV.
+        Composed ads are labelled composed in the file; it holds counts only, no ad text.
+        """
+        return eval_file(
+            settings.snapback_eval_ads,
+            "No ad results yet. Run `make eval-ads`.",
+            ADS_COLUMNS,
         )
 
     return app

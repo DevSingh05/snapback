@@ -514,6 +514,12 @@ EN: dict[str, str] = {
     "tone.not_shown": "Not confirmed",
     "tone.not_checked": "Not checked",
     "state.hold": "Hold off for now",
+    # A HOLD with nothing against it: every line matches and only the presence step is left.
+    # Same state, different words, so an honest ad does not read like a scam (#10, Sat 19:0x).
+    "state.hold_clean": (
+        "Everything we checked matches the record. "
+        "One step left before you pay: ask them to prove they're inside."
+    ),
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -1053,6 +1059,10 @@ ES: dict[str, str] = {
     "tone.not_shown": "Sin confirmar",
     "tone.not_checked": "No comprobado",
     "state.hold": "Espere por ahora",
+    "state.hold_clean": (
+        "Todo lo que revisamos coincide con el registro. "
+        "Falta un paso antes de pagar: pídales que demuestren que están dentro."
+    ),
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
     "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",

@@ -20,6 +20,11 @@ export const STATE_WORD: Record<VerdictState, string> = {
   verified: "Checks passed. Still follow the two rules.",
 };
 
+// The words at the top of a card: the API's own headline when it sends one, else the state's.
+export function headlineOf(card: { state: VerdictState; headline?: string | null }): string {
+  return card.headline || STATE_WORD[card.state];
+}
+
 // Same two row exceptions as strings.py tone_word; they pick the word, never the line text or tone.
 export function toneWord(tone: CardTone, row?: CardRowKind): string {
   if (tone === "red_flag" && row === "price") return "Warning"; // a risky ask, not a mismatch

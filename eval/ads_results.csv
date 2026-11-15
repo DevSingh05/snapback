@@ -1,0 +1,29 @@
+# FIXTURE: composed ads and team-labelled messages, not real ads
+# n=82: 33 composed from the synthetic FIXTURE kit, 49 labelled messages (fixtures/rules/cases.json)
+# stand-ins: placed-photo result and challenge reply are composed; the photo locator is not run
+# miss = verdict differs from the expected one for the type (expected is fixed in eval/ads.py)
+ad_type,origin,expected,got,k,n,rate,ci_low,ci_high,miss,frozen_at
+clone_phone,composed,hold,hold,9,9,1.0000,0.7009,1.0000,0,FIXTURE
+clone_phone,composed,hold,(as expected),9,9,1.0000,0.7009,1.0000,0,FIXTURE
+clone_phone,composed,hold,(missed),0,9,0.0000,0.0000,0.2991,1,FIXTURE
+other_building_photos,composed,dont_pay,dont_pay,6,6,1.0000,0.6097,1.0000,0,FIXTURE
+other_building_photos,composed,dont_pay,(as expected),6,6,1.0000,0.6097,1.0000,0,FIXTURE
+other_building_photos,composed,dont_pay,(missed),0,6,0.0000,0.0000,0.3903,1,FIXTURE
+price_cut,composed,hold,hold,9,9,1.0000,0.7009,1.0000,0,FIXTURE
+price_cut,composed,hold,(as expected),9,9,1.0000,0.7009,1.0000,0,FIXTURE
+price_cut,composed,hold,(missed),0,9,0.0000,0.0000,0.2991,1,FIXTURE
+for_sale_as_rental,composed,hold,hold,3,3,1.0000,0.4385,1.0000,0,FIXTURE
+for_sale_as_rental,composed,hold,(as expected),3,3,1.0000,0.4385,1.0000,0,FIXTURE
+for_sale_as_rental,composed,hold,(missed),0,3,0.0000,0.0000,0.5615,1,FIXTURE
+clean_own_details,composed,verified,verified,6,6,1.0000,0.6097,1.0000,0,FIXTURE
+clean_own_details,composed,verified,(as expected),6,6,1.0000,0.6097,1.0000,0,FIXTURE
+clean_own_details,composed,verified,(missed),0,6,0.0000,0.0000,0.3903,1,FIXTURE
+labelled_message_asks,labelled,hold,verified,6,32,0.1875,0.0889,0.3531,1,FIXTURE
+labelled_message_asks,labelled,hold,hold,26,32,0.8125,0.6469,0.9111,0,FIXTURE
+labelled_message_asks,labelled,hold,(as expected),26,32,0.8125,0.6469,0.9111,0,FIXTURE
+labelled_message_asks,labelled,hold,(missed),6,32,0.1875,0.0889,0.3531,1,FIXTURE
+labelled_message_clean,labelled,verified,verified,17,17,1.0000,0.8157,1.0000,0,FIXTURE
+labelled_message_clean,labelled,verified,(as expected),17,17,1.0000,0.8157,1.0000,0,FIXTURE
+labelled_message_clean,labelled,verified,(missed),0,17,0.0000,0.0000,0.1843,1,FIXTURE
+all,mixed,per type,(as expected),76,82,0.9268,0.8494,0.9660,0,FIXTURE
+all,mixed,per type,(missed),6,82,0.0732,0.0340,0.1506,1,FIXTURE

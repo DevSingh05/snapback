@@ -351,7 +351,7 @@ class Snapback:
         return {
             "case_id": card.get("case_id", case_id),
             "source": card_source,
-            "verdict": strings.text(f"state.{state}"),
+            "verdict": card.get("headline") or strings.text(f"state.{state}"),
             "verdict_set_by": "code (snapback.verdict.decide), never a language model",
             "status": status,
             "checks": checks,

@@ -495,6 +495,9 @@ class Card(BaseModel):
     footer: list[str]
     verify_url: str | None = None
     lang: str = "en"
+    # Words for the headline when the state's own words would mislead: today only a HOLD with
+    # nothing against it. None means "use the state's headline". It never changes the state.
+    headline: str | None = None
     # A7 (#67): set when the home is listed for sale or was rented recently, so the web can
     # draw the dates as a history strip. The sentence about it is a PLACE line like any other.
     for_sale: ForSaleMatch | None = None

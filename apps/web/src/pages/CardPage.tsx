@@ -9,7 +9,7 @@ import { loadBrief } from "../search/api";
 import { OfficeConfirm } from "../office/OfficeConfirm";
 import { PlacesStrip } from "../search/PlacesStrip";
 import { replayForCase } from "../replay";
-import { STATE_WORD, historySteps, shortDate, toneWord } from "../cardStrings";
+import { headlineOf, historySteps, shortDate, toneWord } from "../cardStrings";
 import type { Card, CardLine, CardRowKind, CardTone, VerdictState } from "../contracts";
 
 const ROW_LABEL = {
@@ -149,7 +149,7 @@ export function CardView({
           </span>
         </p>
         <h1 id="card-title" className={`state state-${stateTone}`}>
-          {STATE_WORD[card.state]}
+          {headlineOf(card)}
         </h1>
         <p className="meta">
           <span>

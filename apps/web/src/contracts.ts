@@ -73,6 +73,8 @@ export interface Card {
   footer: string[];
   verify_url?: string | null;
   lang: string;
+  // Set by the API when the state's own words would mislead (a HOLD with nothing against it).
+  headline?: string | null;
 }
 
 export type TraceKind =
@@ -423,6 +425,9 @@ export interface TourPlan {
   mode_line?: string | null;
   coverage?: WalkCoverage | null;
   director?: TourDirector | null;
+  scan_date_line?: string | null; // "Scanned Mar 2026 (Matterport)" or "Scan date not on record"
+  scan_age_note?: string | null; // set when the scan is older than 12 months
+  summary?: { know: string[]; see: string[] } | null; // the last screen's two columns
 }
 
 // Mirrors PackLine and TourPrepPack in src/snapback/pack.py (GET /cases/{id}/tour-prep and

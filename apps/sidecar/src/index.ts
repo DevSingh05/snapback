@@ -18,8 +18,8 @@
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { type MessageClient } from "./handler";
-import { connectPhoton, publicWebUrl, runPhoton } from "./photon";
+import { CaseMemory, type MessageClient } from "./handler";
+import { connectPhoton, publicWebUrl, runPhoton, stageOptions } from "./photon";
 import { WatchBook, pushEvents, readEvents } from "./watch";
 
 try {
@@ -95,9 +95,19 @@ if (photon) {
     console.log("[sidecar] SNAPBACK_EVENTS_TOKEN is not set: watch alerts will not be sent.");
   }
   // Voice replies (Best Voice Agent): the SDK's own builder sends a native voice memo bubble.
-  const { voice } = await import("spectrum-ts");
+  const { voice, attachment } = await import("spectrum-ts");
+  const stage = stageOptions(process.env);
   await runPhoton(app, {
     makeVoice: (bytes: Uint8Array, mimeType: string) => voice(Buffer.from(bytes), { mimeType }),
+    // the card picture and the "checking" reply can each be turned off on stage
+    ...(stage.sendCardImage
+      ? {
+          makeImage: (bytes: Uint8Array, mimeType: string) =>
+            attachment(Buffer.from(bytes), { mimeType, name: "snapback-card.png" }),
+        }
+      : {}),
+    memory: new CaseMemory(),
+    acknowledge: stage.acknowledge,
     watches,
     apiUrl: API_URL,
     webUrl,

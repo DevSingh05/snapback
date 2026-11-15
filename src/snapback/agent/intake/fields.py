@@ -47,6 +47,32 @@ _COMPANY = re.compile(
     r"([A-Z][\w&'-]{0,40}(?:\s{1,3}[A-Z&][\w&'-]{0,40}){0,5})"
 )
 
+# The same claim made in the first person: "this is Fixture Living LLC", "I'm Sam from Harbor
+# Point Properties", "we are ...", "the property manager at ...". Only a name that ends in a
+# company word counts, so "this is John Smith" and "we are located near the park" are not one.
+_COMPANY_WORD = (
+    r"(?:LLC|Inc\.?|Realty|Properties|Property\s{1,3}Management|Management|Mgmt|Group|Homes|"
+    r"Living|Apartments|Rentals|Associates|Partners|Residential|Communities|Holdings|Company)"
+)
+_COMPANY_NAME = (
+    r"((?:[A-Z][\w&'-]{0,40}\s{1,3}){1,5}" + _COMPANY_WORD + r"(?:\s{1,3}(?:LLC|Inc\.?))?)"
+    r"(?![\w-])"
+)
+_PERSON = r"[A-Z][a-z'-]{1,30}"
+_ROLE = r"(?:property\s{1,3}manager|leasing\s{1,3}(?:agent|manager|office)|manager|agent)"
+_COMPANY_FIRST_PERSON = re.compile(
+    r"(?:"
+    r"(?i:\bthis\s{1,3}is|\bi\s{1,3}am|\bi'm)\s{1,3}"
+    + _PERSON
+    + r"\s{1,3}(?i:with|from|at|of)\s{1,3}"
+    r"|(?i:\b(?:i\s{1,3}am|i'm)\s{1,3}(?:the|a)\s{1,3})"
+    + _ROLE
+    + r"\s{1,3}(?i:at|for|of|with)\s{1,3}"
+    r"|(?i:\bthis\s{1,3}is|\bi\s{1,3}am\s{1,3}(?:with|from)|\bi'm\s{1,3}(?:with|from)|\bwe\s{1,3}are"
+    r"|\bwe're|\bon\s{1,3}behalf\s{1,3}of|\bsomos|\bsoy\s{1,3}de)\s{1,3}"
+    r")" + _COMPANY_NAME
+)
+
 
 # The poster says they own the home: "I am the owner", "for rent by owner", "owner here",
 # "I own this property", "my house". Not "the owner's agent", "not the owner", "a pet owner".
@@ -216,7 +242,7 @@ def _phones(text: str) -> list[str]:
 
 def extract_contacts(text: str) -> ContactClaims:
     text = normalise(text)
-    company = _COMPANY.search(text)
+    company = _COMPANY.search(text) or _COMPANY_FIRST_PERSON.search(text)
     return ContactClaims(
         company=company.group(1).strip() if company else None,
         phones=_phones(text),
