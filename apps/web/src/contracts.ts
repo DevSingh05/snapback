@@ -182,6 +182,8 @@ export interface TimelineStep {
   // The check or sub-agent the step belongs to ("record", "owner", "locate", "place", ...), so a
   // reason can be tied to the step behind it. null when the step is not one check.
   kind?: string | null;
+  // Which source answered the step: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+  source_name?: string | null;
   // The plan left this check out; `result` says why.
   skipped?: boolean;
 }
@@ -401,6 +403,17 @@ export interface ReportPack {
   twin_url?: string | null;
   platforms?: ReportSteps[];
   not_checked: string[];
+  // Every source that answered a line of the card, by name, and the public-data lines (HUD,
+  // Census, RDAP) with their source and LIVE or FIXTURE. Lines about a person are not copied.
+  source_names?: string[];
+  sources?: ReportSource[];
+}
+
+export interface ReportSource {
+  source_name: string; // "HUD", "Census" or "RDAP"
+  label: string;
+  text: string;
+  data_source: DataSource;
 }
 
 // Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a

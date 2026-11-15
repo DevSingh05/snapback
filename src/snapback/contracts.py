@@ -868,6 +868,15 @@ class ReportSteps(BaseModel):
     steps: list[str]  # what to click, in order, in the pack's language
 
 
+class ReportSource(BaseModel):
+    """One public-data line of the evidence, with the source that answered it."""
+
+    source_name: str  # "HUD", "Census" or "RDAP"
+    label: str
+    text: str
+    data_source: DataSource  # LIVE or FIXTURE
+
+
 class ReportResponse(BaseModel):
     """`GET /cases/{case_id}/report`: one pack for reporting a copied listing to a platform.
 
@@ -889,6 +898,11 @@ class ReportResponse(BaseModel):
     aerial_url: str | None = None  # our /cases/{id}/aerial route, when the case names a building
     platforms: list[ReportSteps] = Field(default_factory=list)
     not_checked: list[str]  # the card's standing list: what this does not show
+    # Every source that answered a line of the card, by name (CoStar record, HUD, Census, HCAD,
+    # RDAP, TREC), and the public-data lines themselves. Lines about the poster or the owner are
+    # not copied here, only the source's name.
+    source_names: list[str] = Field(default_factory=list)
+    sources: list[ReportSource] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------------------------

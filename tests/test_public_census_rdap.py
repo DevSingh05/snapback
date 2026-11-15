@@ -257,3 +257,51 @@ def test_an_old_domain_line_reads_info_only_in_both_languages():
         (line,) = card_lines(modules, "label.link_domain", lang)
         assert line.source_name == "RDAP" and line.tone is CardTone.NOT_CHECKED
         assert "17" in line.text
+
+
+# --- every line names its source, in the card, the timeline and the report ------------------
+
+
+def _evidence_with_public_data():
+    from snapback.contracts import PriceResult
+
+    place = PlaceCheck(
+        status=PublicStatus.FOUND, zip="77096", county="Harris", source=DataSource.FIXTURE
+    )
+    domain = rdap.check("old-property-co.example", RecordedFetcher(), today=TODAY)
+    price = PriceResult(
+        status=PriceStatus.BELOW_RANGE,
+        listed_rent=1000,
+        baseline_source="hud_safmr",
+        baseline_rent=1930,
+        baseline_zip="77096",
+        baseline_beds=3,
+    )
+    return ModuleEvidence(
+        case_id="fx-1",
+        source=DataSource.FIXTURE,
+        price=price,
+        place_check=place,
+        domain_check=domain,
+    )
+
+
+def test_the_report_names_every_source_and_copies_only_the_public_lines():
+    from snapback.api.report import build_report
+
+    modules = _evidence_with_public_data()
+    card = build_card(modules)
+    report = build_report(modules, card, case_id="7Q2M", lang="en", aerial=False)
+    assert {"HUD", "Census", "RDAP"} <= set(report.source_names)
+    assert {s.source_name for s in report.sources} == {"HUD", "Census", "RDAP"}
+    assert all(s.data_source is DataSource.FIXTURE for s in report.sources)
+
+
+def test_the_timeline_steps_carry_the_source_name():
+    from snapback.agent.timeline import _Builder
+
+    builder = _Builder(DataSource.FIXTURE, _evidence_with_public_data(), "en")
+    builder.record_lines(0)
+    names = {step["source_name"] for step in builder.steps}
+    assert {"HUD", "Census", "RDAP"} <= names
+    assert all(step["result"] for step in builder.steps)
