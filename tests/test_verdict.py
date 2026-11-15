@@ -344,3 +344,36 @@ def test_below_range_sets_the_price_flag_but_is_not_dont_pay_alone():
 @pytest.mark.parametrize("status", ["within_range", "not_checked"])
 def test_other_price_statuses_do_not_set_the_price_flag(status):
     assert to_evidence(modules(price={"status": status})).price_flag is False
+
+
+# Issue #10 (Jeffrey's live dry run): a case with no photos and four red flags read "Could not
+# place these photos". "No photos" must never soften a red flag.
+JEFFREY_FLAGS = {
+    "lookalike_link_flag": True,
+    "license_flag": True,
+    "payment_flag": True,
+    "rule_flag": True,
+}
+
+
+@pytest.mark.parametrize("photos", [[], [photo(LocateStatus.NOT_LOCATED)]])
+def test_red_flags_with_no_photo_placed_give_the_verdict_they_give_with_photos(photos):
+    without = decide(evidence(photos=photos, **JEFFREY_FLAGS))
+    with_photos = decide(evidence(**JEFFREY_FLAGS))
+    assert without.state is with_photos.state is VerdictState.HOLD
+    for key in ("reason.lookalike_link", "reason.license_not_found", "reason.payment_flag"):
+        assert strings.text(key) in without.reasons
+
+
+@pytest.mark.parametrize(
+    "flag", ["price_flag", "payment_flag", "rule_flag", "lookalike_link_flag", "license_flag"]
+)
+def test_each_red_flag_alone_holds_a_case_with_no_photos(flag):
+    result = decide(evidence(photos=[], **{flag: True}))
+    assert result.state is VerdictState.HOLD
+
+
+def test_no_photos_and_nothing_but_a_phone_not_confirmed_is_still_unverified():
+    # "Not confirmed" is not a red flag: it does not outrank "could not place".
+    result = decide(evidence(photos=[], phone_flag=True))
+    assert result.state is VerdictState.UNVERIFIED
