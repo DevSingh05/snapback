@@ -17,7 +17,7 @@ import { tookText } from "../case/answer";
 import { VERDICT_TONE } from "../case/model";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { Tag } from "../ui/Tag";
-import { Badge } from "./Badge";
+import { Badge, CastPoster } from "./Badge";
 import { CrewScene } from "./CrewScene";
 import {
   floorAt,
@@ -161,6 +161,7 @@ function MeetTheTeam({
 }) {
   return (
     <div className="pr-meet" data-testid="meet-the-team">
+      <CastPoster agents={roster.agents} label={w.team} />
       {roster.teams.map((team) => (
         <section key={team.id} className="pr-team" data-team={team.id}>
           <header className="pr-team-head">

@@ -124,6 +124,30 @@
   stroke-width: 1.6;
 }
 
+/* The cast in one row, over the team's cards. */
+.crew-cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-2);
+  margin: 0;
+  padding: 0 0 var(--sp-2);
+  list-style: none;
+}
+.crew-cast li {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 68px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+.crew-cast li span {
+  border-bottom: 2px solid var(--crew);
+  padding-bottom: 2px;
+}
+
 /* ---------- the stage ---------- */
 .cs {
   min-width: 0;
@@ -135,6 +159,9 @@
   margin-inline: auto;
   overflow: hidden;
   background: linear-gradient(180deg, var(--sky) 0%, var(--paper) 58%);
+}
+.cs-stage {
+  container-type: inline-size;
 }
 .cs-svg {
   position: absolute;
@@ -562,6 +589,47 @@
 .pr-strip-item .crew-badge {
   grid-row: 1 / span 2;
   align-self: center;
+}
+
+/* A phone: the stage is narrower than its words were sized for, so they step down. */
+@container (max-width: 380px) {
+  .cs-tag-name {
+    font-size: 0.625rem;
+    gap: 3px;
+  }
+  .cs-tag-name .crew-badge {
+    width: 16px;
+    height: 16px;
+  }
+  .cs-tag-line {
+    font-size: 0.5625rem;
+  }
+  .cs-tag > button,
+  .cs-tag-in {
+    padding: 1px 3px 2px;
+  }
+  .cs-bubble {
+    padding: 4px 6px 5px 5px;
+    font-size: 0.625rem;
+    line-height: 1.2;
+  }
+  .cs-bubble .crew-badge {
+    width: 20px;
+    height: 20px;
+  }
+  .cs-bubble[data-side="ring"] {
+    translate: 0 6px;
+  }
+  .cs-verdict {
+    max-width: 38%;
+    padding: 5px 7px;
+    font-size: 0.6875rem;
+    translate: -10px 0;
+  }
+  .cs-bench {
+    max-width: 25%;
+    font-size: 0.5625rem;
+  }
 }
 
 /* Beside the twin the crew gets a wider column than the diagram needed. */

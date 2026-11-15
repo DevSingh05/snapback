@@ -346,5 +346,9 @@ describe("the panel", () => {
     expect(screen.getByRole("button", { name: "Diagram" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Crew" }));
     expect(screen.getByTestId("crew-scene")).toBeInTheDocument();
+    // Meet the team opens with the whole cast: one badge for every member of the roster.
+    const cast = screen.getByTestId("crew-cast");
+    expect(cast.querySelectorAll("svg.crew-badge")).toHaveLength(roster.agents.length);
+    expect(cast).toHaveTextContent("Phone and office");
   });
 });

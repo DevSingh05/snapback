@@ -127,7 +127,7 @@ export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
         place: "wing",
         side: "right",
         sx: VIEW.w - 20 - k * 27,
-        sy: VIEW.h - 58,
+        sy: VIEW.h - 64,
         scale: 0.72,
         depth: 9_000 + k,
       });
@@ -159,7 +159,7 @@ export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
       place: "bench",
       side: "left",
       sx: r1(18 + i * gap),
-      sy: VIEW.h - 58,
+      sy: VIEW.h - 64,
       scale: 0.72,
       depth: 10_000 + i,
     });

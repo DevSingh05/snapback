@@ -329,7 +329,7 @@ export function CrewScene({
             const body = (
               <>
                 <span className="cs-tag-name">
-                  <Badge id={a.id} size={16} />
+                  <Badge id={a.id} size={20} />
                   {shortName(a.card.name)}
                 </span>
                 <span className="cs-tag-line">
@@ -403,7 +403,7 @@ export function CrewScene({
                 data-tone={b.tone}
                 data-side={aside ? "lead" : "ring"}
               >
-                <Badge id={b.deskId} size={20} />
+                <Badge id={b.deskId} size={26} />
                 <span className="cs-bubble-text">
                   <span className="cs-bubble-who">
                     {shortName(a.card.name)}

@@ -3,7 +3,7 @@
 // it shows: on its name tag in the scene, in its speech bubble, beside its lines in the thread,
 // on its card and in the strips. Decoration only: aria-hidden, the name beside it carries the
 // meaning.
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 import "./crew.css";
 import { personaOf, type Persona } from "./crew";
@@ -174,7 +174,9 @@ const PARTS: Record<Persona, { hat: ReactNode; prop?: ReactNode; face?: ReactNod
 export function Badge({ id, size = 28 }: { id: string; size?: number }) {
   const persona = personaOf(id);
   const part = PARTS[persona];
-  const clip = `crew-badge-${id}`;
+  // Its own clip for each badge drawn: a shared one stops working when the first copy on the
+  // page sits in a hidden tab.
+  const clip = `crew-badge-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
     <svg
       className="crew-badge"
@@ -203,5 +205,25 @@ export function Badge({ id, size = 28 }: { id: string; size?: number }) {
       </g>
       <circle className="b-ring" cx="20" cy="20" r="18.4" />
     </svg>
+  );
+}
+
+/** The whole cast in one row: every member's badge with its name, as one family. */
+export function CastPoster({
+  agents,
+  label,
+}: {
+  agents: { id: string; name: string }[];
+  label: string;
+}) {
+  return (
+    <ol className="crew-cast" aria-label={label} data-testid="crew-cast">
+      {agents.map((a) => (
+        <li key={a.id} data-who={a.id}>
+          <Badge id={a.id} size={46} />
+          <span>{a.name.replace(/ agent$/i, "")}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
