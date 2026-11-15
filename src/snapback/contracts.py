@@ -409,6 +409,23 @@ class AdNote(BaseModel):
     record_value: str | None = None
 
 
+class RecordLine(BaseModel):
+    """One fact read from a Texas public record (the Comptroller, HUD, the City of Houston).
+
+    Facts only: the words live in card/strings.py (`records.<key>`), and no verdict reads it.
+    `source` names the registry the fact came from; `data_source` says whether the lookup was
+    LIVE or FIXTURE. A company name is the ad's own; a phone number is never kept, only the
+    yes/no that the ad's number is not the one on HUD's record.
+    """
+
+    key: str  # comptroller_active | comptroller_inactive | comptroller_none | hud_manager | ...
+    source: str  # "Texas Comptroller", "HUD", "City of Houston"
+    data_source: DataSource
+    company: str | None = None  # a company, never a person's name
+    year: int | None = None
+    zip_code: str | None = None
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -443,6 +460,9 @@ class ModuleEvidence(BaseModel):
     # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
     # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
     ad_notes: list[AdNote] = Field(default_factory=list)
+    # Texas public records (Comptroller, HUD, Houston address points). Information only: no
+    # verdict reads it. Empty means nothing was looked up or nothing was found.
+    public_records: list[RecordLine] = Field(default_factory=list)
     # X1: when a photo was placed in a different home, that home's office on CoStar's record
     # (company only). Information for the card; no verdict reads it.
     matched_office: str | None = None

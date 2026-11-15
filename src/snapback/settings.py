@@ -132,6 +132,9 @@ class Settings(BaseSettings):
     # Run the web checks on LIVE cases. Off by default so tests, CI and a public host never call
     # out; set SNAPBACK_WEB_CHECKS=1 in the demo laptop's .env with the three keys.
     snapback_web_checks: bool = False
+    # Texas public records (Comptroller, HUD manager, Houston address points): live calls only
+    # when this is on AND the run is LIVE. Three seconds each; an error means "not checked".
+    snapback_tx_records: bool = False
     # Browser Use spend cap per link check, in dollars (the account has little credit).
     browser_use_max_cost_usd: float = 0.10
     # At most this many cases start web checks in any rolling hour (each case starts them once).
