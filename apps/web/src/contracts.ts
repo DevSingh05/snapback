@@ -85,6 +85,16 @@ export interface Card {
   does_not?: string[]; // red flag, hold and not-shown lines
   // Set by the API when the state's own words would mislead (a HOLD with nothing against it).
   headline?: string | null;
+  // Set by GET /cases/{id}/card: false when the case has no evidence file, so the page does not
+  // ask for one. Missing means not said.
+  has_evidence?: boolean | null;
+}
+
+// The body of a 202 from the report's reads while the check is still running (not ready, not
+// failed). Ask again after retry_after_ms.
+export interface StillChecking {
+  status: string; // CaseProgress
+  retry_after_ms: number;
 }
 
 export type TraceKind =

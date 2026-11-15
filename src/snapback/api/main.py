@@ -42,7 +42,7 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
@@ -79,6 +79,7 @@ from snapback.contracts import (
     AlternativesResponse,
     Card,
     CasePreferences,
+    CaseProgress,
     CopyAlert,
     CreateCaseResponse,
     DataSource,
@@ -91,6 +92,7 @@ from snapback.contracts import (
     ReplyResponse,
     ReportResponse,
     SearchResponse,
+    StillChecking,
     TourDraft,
     TourDraftRequest,
     Verdict,
@@ -438,6 +440,31 @@ def create_app(
             raise HTTPException(status_code=403, detail="That token is not for this case.")
         raise HTTPException(status_code=401, detail="This needs the case's read token.")
 
+    NO_STORE = {"Cache-Control": "private, no-store"}
+
+    RETRY_AFTER_MS = 500
+    STILL_CHECKING = {202: {"model": StillChecking, "description": "The check is still running."}}
+
+    def still_checking(case: RecordedCase | SessionCase) -> JSONResponse | None:
+        """202 with the case's status while the check is still running, else None.
+
+        The report's reads (evidence, real listing, copy alert, report, alternatives) have
+        nothing true to say before the modules have run. Asking early is not a failure, so it
+        is answered 202 `{"status", "retry_after_ms"}` plus a Retry-After header, and the page
+        shows a quiet "still checking" and asks again. A case waiting for the renter or the
+        poster has its evidence so far, which is served as before."""
+        status = case.status(with_challenge=False).status
+        if status is not CaseProgress.RUNNING:
+            return None
+        return JSONResponse(
+            StillChecking(status=status, retry_after_ms=RETRY_AFTER_MS).model_dump(mode="json"),
+            status_code=202,
+            headers={
+                **NO_STORE,
+                "Retry-After": str(max(1, -(-RETRY_AFTER_MS // 1000))),
+            },
+        )
+
     def no_token_in_the_address(request: Request) -> None:
         """Refuse a request whose address carries a token, valid or not (locked ruling, Sat
         02:27). Addresses are what servers and proxies log; a secret belongs in a header."""
@@ -620,7 +647,13 @@ def create_app(
     @app.get("/cases/{case_id}/card")
     def get_card(case_id: str, lang: Language = "en") -> Card:
         """The card for what is known so far. Its state is decide() on the evidence gathered."""
-        return find(case_id).card(settings.snapback_public_base_url, lang)
+        case = find(case_id)
+        card = case.card(settings.snapback_public_base_url, lang)
+        # So the page asks for the evidence file only when there is one to read.
+        files = case_files(case, case_id)
+        return card.model_copy(
+            update={"has_evidence": files is not None and files.evidence is not None}
+        )
 
     @app.get("/cases/{case_id}/card.png")
     def get_card_png(
@@ -726,7 +759,7 @@ def create_app(
             beds = case.evidence.price.compared_beds
         return claimed, matched, beds, getattr(listing, "unit", None)
 
-    @app.get("/cases/{case_id}/real-listing")
+    @app.get("/cases/{case_id}/real-listing", response_model=RealListing, responses=STILL_CHECKING)
     def get_real_listing(
         case_id: str,
         request: Request,
@@ -734,7 +767,7 @@ def create_app(
         lang: Language = "en",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
-    ) -> RealListing:
+    ) -> RealListing | JSONResponse:
         """The ad's building as CoStar's record has it, beside what the ad says. The building
         the photos were placed in wins when it is not the claimed one. Record figures show for a
         LIVE case only when SNAPBACK_SHOW_RECORD_FIGURES is on. Needs the case's read token in a
@@ -743,6 +776,9 @@ def create_app(
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
         response.headers["Cache-Control"] = "no-store"
+        waiting = still_checking(case)
+        if waiting is not None:
+            return waiting
         modules = case.evidence
         claimed, matched, beds, unit = proof_inputs(case)
         panel = real_listing(
@@ -758,7 +794,7 @@ def create_app(
             raise HTTPException(status_code=404, detail=strings.text("real.no_record", lang))
         return panel.model_copy(update={"case_id": case_id})
 
-    @app.get("/cases/{case_id}/copy-alert")
+    @app.get("/cases/{case_id}/copy-alert", response_model=CopyAlert, responses=STILL_CHECKING)
     def get_copy_alert(
         case_id: str,
         request: Request,
@@ -766,7 +802,7 @@ def create_app(
         lang: Language = "en",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
-    ) -> CopyAlert:
+    ) -> CopyAlert | JSONResponse:
         """A DRAFT note for the leasing office on record when the ad's photos sit in its
         building's scan and the ad's number is not the office's. Nothing is ever sent. Same
         token rule as the real-listing route: header only, never in the address. Never cached."""
@@ -774,6 +810,9 @@ def create_app(
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
         response.headers["Cache-Control"] = "no-store"
+        waiting = still_checking(case)
+        if waiting is not None:
+            return waiting
         claimed, matched, beds, unit = proof_inputs(case)
         pack = build_report(
             case.evidence,
@@ -846,9 +885,7 @@ def create_app(
             return CaseFiles(evidence=fixture)
         return None
 
-    NO_STORE = {"Cache-Control": "private, no-store"}
-
-    @app.get("/cases/{case_id}/evidence")
+    @app.get("/cases/{case_id}/evidence", responses=STILL_CHECKING)
     def get_evidence(
         case_id: str,
         request: Request,
@@ -860,6 +897,9 @@ def create_app(
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
+        waiting = still_checking(case)
+        if waiting is not None:
+            return waiting
         files = case_files(case, case_id)
         if files is None or files.evidence is None:
             raise HTTPException(status_code=404, detail="No evidence file for this case yet.")
@@ -915,14 +955,14 @@ def create_app(
             headers={**NO_STORE, "X-Content-Type-Options": "nosniff"},
         )
 
-    @app.get("/cases/{case_id}/report")
+    @app.get("/cases/{case_id}/report", response_model=ReportResponse, responses=STILL_CHECKING)
     def get_report(
         case_id: str,
         request: Request,
         lang: Language = "en",
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
-    ) -> ReportResponse:
+    ) -> ReportResponse | JSONResponse:
         """The "Report this copy" pack (A20): what a listing agent takes to the platform.
 
         The home's own record, the reasons the check gave, which photos were matched, and
@@ -936,6 +976,9 @@ def create_app(
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
+        waiting = still_checking(case)
+        if waiting is not None:
+            return waiting
         return build_report(
             case.evidence,
             case.card(settings.snapback_public_base_url, lang),
@@ -1314,14 +1357,18 @@ def create_app(
             message = "Thank you. We recorded that this ad is not yours. You can close this page."
         return OfficeAnswered(decision=body.decision, domain=domain, message=message)
 
-    @app.get("/cases/{case_id}/alternatives")
+    @app.get(
+        "/cases/{case_id}/alternatives",
+        response_model=AlternativesResponse,
+        responses=STILL_CHECKING,
+    )
     def get_alternatives(
         case_id: str,
         request: Request,
         n: Annotated[int, Query(ge=1, le=10)] = 3,
         authorization: Annotated[str | None, Header()] = None,
         x_case_token: Annotated[str | None, Header()] = None,
-    ) -> AlternativesResponse:
+    ) -> AlternativesResponse | JSONResponse:
         """Up to `n` researched places near the checked ad's price and size, never its own
         building and never one the renter rejected. Up to three get the deep check; `decisions`
         says who chose. Needs the case's read token in a header; a token in the address is
@@ -1329,6 +1376,9 @@ def create_app(
         case = find(case_id)
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
+        waiting = still_checking(case)
+        if waiting is not None:
+            return waiting
         try:
             return agentic_alternatives(
                 case,
