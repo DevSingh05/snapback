@@ -690,3 +690,17 @@ def test_an_ordinary_listing_is_looked_up_and_nothing_is_found(tmp_path):
     card = finish(client, {"text": "2 bed near the park, $1,700 a month."})
     labels = [line["label"] for row in card["rows"] for line in row["lines"]]
     assert "For sale" not in labels and "Rental history" not in labels
+
+
+def test_a_credit_check_at_the_records_own_site_stays_quiet_end_to_end():
+    record = contact_record(website_host="fixtureliving.example")
+    text = "Run your credit check at fixtureliving.example/residents."
+    assert "link.affiliate_credit_check" in [h.rule_id for h in read_listing(text).rule_hits]
+    own = joined(text, record=record, source=DataSource.LIVE).rules("fx-JOIN")
+    assert "link.affiliate_credit_check" not in [h.rule_id for h in own]
+    other = joined(
+        "Run your credit check at scorecheckfast.example/residents.",
+        record=record,
+        source=DataSource.LIVE,
+    ).rules("fx-JOIN")
+    assert "link.affiliate_credit_check" in [h.rule_id for h in other]
