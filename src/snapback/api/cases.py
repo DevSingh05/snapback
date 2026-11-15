@@ -29,7 +29,7 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.background import BackgroundAgents
+from snapback.agent.background import BUSY, BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
@@ -398,6 +398,10 @@ def _setup_langsmith(settings: Settings) -> None:
         log.warning("LangSmith tracing could not be set up; carrying on without it")
 
 
+class NoModelKey(Exception):
+    """The deep agent was asked for and no model key is set."""
+
+
 def _background_job(
     case: "SessionCase", settings: Settings, model_factory: Callable[[], object] | None
 ) -> Callable[[], None]:
@@ -412,7 +416,7 @@ def _background_job(
 
         key = settings.anthropic_api_key
         if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("no model key")
+            raise NoModelKey
         return build_model(
             key.get_secret_value() if key else None,
             name,
@@ -431,12 +435,24 @@ def _background_job(
                 model(settings.snapback_agent_model, 2048),
                 subagent_model=model(settings.snapback_subagent_model, 1024),
             )
+        except NoModelKey:
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_nokey", session.lang)
+            )
+            return
         except Exception:
             session.trace.emit(
                 TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
             )
             return
-        run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+        try:
+            run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+        except Exception:
+            # run_advisory reports its own failures; this is what is left when even that broke.
+            log.exception("the background agent could not report its end for %s", case.case_id)
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
 
     return run
 
@@ -463,7 +479,7 @@ def _deepagents_runner(
 
         key = settings.anthropic_api_key if settings is not None else None
         if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("no model key")
+            raise NoModelKey
         return build_model(
             key.get_secret_value() if key else None,
             settings.snapback_agent_model if settings is not None else None,
@@ -750,8 +766,26 @@ class CaseStore:
         if self._background is None:
             return
         case.agents = self._background
+        session = case.session
+
+        def gave_up(why: str) -> None:
+            # The run never started, or never ended: say so, so no screen waits on it.
+            key = "trace.error.model_busy" if why == BUSY else "trace.error.model_stuck"
+            if why != BUSY:
+                # Shut the late job out first (no lock wait), so it cannot add a second end.
+                from snapback.agent.graph import _gate
+
+                _gate(session).stopped = True
+            session.trace.emit(TraceKind.ERROR, strings.text(key, session.lang))
+            if why == BUSY:  # no agent ran, so code writes the notes it would have
+                refresh_policy_notes(session)
+
         self._background.submit(
-            case.case_id, _background_job(case, self._settings, self._agent_model)
+            case.case_id,
+            _background_job(case, self._settings, self._agent_model),
+            max_wait_s=self._settings.snapback_agent_queue_wait_s,
+            max_run_s=self._settings.agent_timeout_s + self._settings.snapback_agent_run_grace_s,
+            on_expire=gave_up,
         )
 
     def shutdown_agents(self) -> None:

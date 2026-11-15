@@ -1444,6 +1444,16 @@ ES.update(
 EN.update(
     {
         "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "trace.error.model_nokey": "No model key is set, so code finished the checks.",
+        "trace.error.model_busy": (
+            "The agent waited too long behind other checks, so code finished the checks."
+        ),
+        "trace.error.model_stuck": "The agent stopped answering, so code finished the checks.",
+        "timeline.fallback.timeout": "it ran out of time",
+        "timeline.fallback.failed": "the model could not be used",
+        "timeline.fallback.nokey": "no model key is set",
+        "timeline.fallback.busy": "it waited too long behind other checks",
+        "timeline.fallback.stuck": "it stopped answering",
         "trace.updated": 'More checks changed the result from "{old}" to "{new}": {reason}',
         "trace.updated.short": "More checks changed the result.",
         "timeline.updated": "Updated after more checks",
@@ -1502,7 +1512,7 @@ EN.update(
         "timeline.delegate": "Handed the {name} checks to a sub-agent",
         "timeline.note": "Wrote a working note",
         "timeline.unsure": "Flagged a close call",
-        "timeline.fallback": "The agent stopped, so code finished the checks",
+        "timeline.fallback": "The deep agent stopped: {reason}; code set the verdict",
         "timeline.error": "Code used its own pick",
         "timeline.verdict": "Code worked out the result",
         "timeline.result.done": "Done.",
@@ -1595,6 +1605,21 @@ ES.update(
         "trace.error.model_timeout": (
             "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
         ),
+        "trace.error.model_nokey": (
+            "No hay clave del modelo, así que el código terminó las comprobaciones."
+        ),
+        "trace.error.model_busy": (
+            "El agente esperó demasiado detrás de otras comprobaciones, así que el código las"
+            " terminó."
+        ),
+        "trace.error.model_stuck": (
+            "El agente dejó de responder, así que el código terminó las comprobaciones."
+        ),
+        "timeline.fallback.timeout": "se le acabó el tiempo",
+        "timeline.fallback.failed": "no se pudo usar el modelo",
+        "timeline.fallback.nokey": "no hay clave del modelo",
+        "timeline.fallback.busy": "esperó demasiado detrás de otras comprobaciones",
+        "timeline.fallback.stuck": "dejó de responder",
         "trace.updated": (
             'Más comprobaciones cambiaron el resultado de "{old}" a "{new}": {reason}'
         ),
@@ -1655,7 +1680,7 @@ ES.update(
         "timeline.delegate": "Pasó las comprobaciones de {name} a un subagente",
         "timeline.note": "Escribió una nota de trabajo",
         "timeline.unsure": "Marcó un caso dudoso",
-        "timeline.fallback": "El agente se detuvo, así que el código terminó las comprobaciones",
+        "timeline.fallback": "El agente profundo se detuvo: {reason}; el código fijó el resultado",
         "timeline.error": "El código usó su propia opción",
         "timeline.verdict": "El código calculó el resultado",
         "timeline.result.done": "Hecho.",
