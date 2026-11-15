@@ -14,6 +14,7 @@
 
 import { createHmac } from "node:crypto";
 
+import { howCheckedText, type Timeline } from "./howchecked";
 import {
   PHONE_LIKE,
   learnFrom,
@@ -179,7 +180,7 @@ const WORDS = {
 } as const;
 export const STILL_CHECKING = "Still checking, one moment.";
 
-type Intent = "why" | "now" | "call" | "safe" | "places";
+type Intent = "why" | "now" | "call" | "safe" | "places" | "how";
 const TAIL = String.raw`(\s+(now|then))?\s*[?.!]*\s*$`;
 const INTENTS: [Intent, RegExp][] = [
   [
@@ -221,6 +222,8 @@ const SPANISH_INTENTS: [Intent, RegExp][] = [
   ["call", /^\s*(a qui[eé]n (llamo|le llamo|contacto))\s*[?.!]*\s*$/i],
   ["safe", /^\s*(es (seguro|real|una estafa|confiable))\s*[?.!]*\s*$/i],
 ];
+const HOW =
+  /^\s*(how did you (check|know|do that|figure (it|that) out|work (it|that) out)|how do you know|how does (it|this) work|show (me )?your work|c[oó]mo lo (revisaste|revis[oó]|sabes|supiste|hiciste))\s*[?.!]*\s*$/i;
 const PLACES =
   /^\s*(show me( some| other| real| safer)? (places|homes|apartments|listings)|(other|safer|real) (places|homes|apartments)|find me (a place|places|a home|homes)|mu[eé]strame (lugares|opciones|casas|departamentos)|otras opciones|busca(me)? (un lugar|lugares|departamentos))\s*[?.!]*\s*$/i;
 
@@ -232,6 +235,7 @@ export function intentOf(raw: string): Intent | null {
     .replace(/[¿¡]/g, "")
     .trim();
   if (PLACES.test(text)) return "places";
+  if (HOW.test(text)) return "how";
   for (const [intent, pattern] of SPANISH_INTENTS) if (pattern.test(text)) return intent;
   for (const [intent, pattern] of INTENTS) if (pattern.test(text)) return intent;
   if (/^why\b/i.test(text) && text.length < 40 && !/https?:|www\./i.test(text)) return "why";
@@ -435,7 +439,7 @@ async function answerFollowUp(
   config: SidecarConfig,
   profile: Profile | null = null,
 ): Promise<string> {
-  const lang: Lang = profile?.lang ?? "en";
+  const lang: Lang = profile?.lang ?? learnFrom(msg.text ?? "").lang ?? "en";
   const w = WORDS[lang];
   if (intent === "places") return saferHomes(config, profile, lang);
   const key = renterId(msg.threadId, config.renterSalt);
@@ -448,6 +452,13 @@ async function answerFollowUp(
   if (intent === "why") return whyText(card, link, lang);
   if (intent === "now") return whatNowText(card, link, last.challenge, lang);
   if (intent === "safe") return reportText(card, link, last.challenge, null, false, lang);
+  if (intent === "how") {
+    const timeline = last.readToken
+      ? await fetchTimeline(config, last.caseId, last.readToken, lang)
+      : null;
+    if (!timeline) return COULD_NOT_CHECK;
+    return howCheckedText(timeline, card, link, lang, headlineOf(card, lang));
+  }
   const office = last.readToken ? await officeOnRecord(config, last.caseId, last.readToken) : null;
   return whoToCall(card, link, office, lang);
 }
@@ -568,6 +579,26 @@ function rememberedText(profile: Profile, lang: Lang): string {
     : `Got it: ${parts.join(", ")}. I'll remember that for 30 days. Text "show me places" for safer homes that fit, or "forget me" to delete it.`;
 }
 
+/** D5: the case's own timeline (#267), with the read token in a header. Null if it fails. */
+async function fetchTimeline(
+  config: SidecarConfig,
+  caseId: string,
+  readToken: string,
+  lang: Lang,
+): Promise<Timeline | null> {
+  const get = config.fetch ?? fetch;
+  const api = config.apiUrl.replace(/\/$/, "");
+  const query = lang === "es" ? "?lang=es" : "";
+  try {
+    const res = await get(`${api}/cases/${encodeURIComponent(caseId)}/timeline${query}`, {
+      headers: { Authorization: `Bearer ${readToken}` },
+    });
+    return res.ok ? ((await res.json()) as Timeline) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Who is on record and where (#250), with the read token in a header. Only the company and
  * the host are kept: never a phone, an address or a rent. Null when there is no record. */
 async function officeOnRecord(
@@ -672,7 +703,7 @@ export async function handleMessage(
     profile = config.profiles.get(key);
     if (!profile?.lang && learned.lang) profile = { ...(profile ?? {}), lang: learned.lang };
   }
-  const lang: Lang = profile?.lang ?? "en";
+  const lang: Lang = profile?.lang ?? learnFrom(text).lang ?? "en";
   const intent = followUpIntent(msg);
   if (intent !== null) {
     // Ruling (#255 review): a follow-up never creates a case, whatever happens here.
