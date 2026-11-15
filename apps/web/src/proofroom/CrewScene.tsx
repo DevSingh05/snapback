@@ -141,10 +141,10 @@ function Figure({
         </g>
       </g>
       {speaking ? (
-        // On the member's outer side, its tail toward the head, clear of whoever stands behind.
+        // Beside the head on the member's outer side, under its name tag, its tail toward it.
         <g
           className="cs-speaking"
-          transform={actor.side === "left" ? "translate(-22 -72) scale(-1 1)" : "translate(22 -72)"}
+          transform={actor.side === "left" ? "translate(-25 -47) scale(-1 1)" : "translate(25 -47)"}
         >
           <path d="M-11 -9h22v14h-13l-5 6v-6h-4z" />
           <circle cx="-5" cy="-2" r="1.5" />
