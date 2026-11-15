@@ -405,6 +405,58 @@ def test_alternatives_fall_back_to_the_price_the_check_compared():
     assert [m.property_id for m in got] == ["fx-near"]
 
 
+# --- the Apartments.com hand-off (proof plan 3.3) -----------------------------------------------
+
+
+def _handoff_places(*records, source=DataSource.FIXTURE):
+    lookups = Fake(list(records))
+    places = search_places(RenterBrief(), lookups)
+    return lookups, [p.model_copy(update={"source": source}) for p in places]
+
+
+def test_a_place_gets_its_plans_availability_page_first():
+    rec = building(
+        "fx-h1",
+        [
+            plan(lo=1000, hi=1100, availability_url="https://pm.example/one-bed"),
+            plan("2 bed / 2 bath", 2, lo=1500, hi=1600),
+        ],
+        availability_url="https://pm.example/building",
+        website_host="pm.example",
+    )
+    lookups, places = _handoff_places(rec)
+    got = {p.floor_plan: p for p in search_module.with_handoff(places, lookups)}
+    assert got["1 bed / 1 bath"].handoff_url == "https://pm.example/one-bed"
+    assert got["1 bed / 1 bath"].handoff_label == "Its listing on Apartments.com"
+    # the plan with no link of its own takes the building's availability page
+    assert got["2 bed / 2 bath"].handoff_url == "https://pm.example/building"
+
+
+def test_without_an_availability_page_the_buildings_own_site_is_the_hand_off():
+    rec = building("fx-h2", [plan()], website_host="pm.example")
+    lookups, places = _handoff_places(rec)
+    (got,) = search_module.with_handoff(places, lookups)
+    assert got.handoff_url == "https://pm.example"
+    assert got.handoff_label == "The building's own site"
+
+
+def test_with_neither_there_is_no_hand_off():
+    lookups, places = _handoff_places(building("fx-h3", [plan()]))
+    (got,) = search_module.with_handoff(places, lookups)
+    assert got.handoff_url is None and got.handoff_label is None
+
+
+def test_a_live_place_gets_no_hand_off_unless_the_figures_flag_is_on():
+    rec = building(
+        "fx-h4", [plan()], website_host="pm.example", availability_url="https://pm.example/a"
+    )
+    lookups, places = _handoff_places(rec, source=DataSource.LIVE)
+    (off,) = search_module.with_handoff(places, lookups)
+    assert off.handoff_url is None and off.handoff_label is None
+    (on,) = search_module.with_handoff(places, lookups, show_live_links=True)
+    assert on.handoff_url == "https://pm.example/a" and on.source is DataSource.LIVE
+
+
 # --- the tour request draft --------------------------------------------------------------------
 
 

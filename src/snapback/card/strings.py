@@ -161,6 +161,9 @@ EN: dict[str, str] = {
     "contact.lookalike_link": (
         "A link in the listing imitates this building's website but is not it. Red flag."
     ),
+    "contact.lookalike_sender": (
+        "An email address in the listing imitates this building's website. Red flag."
+    ),
     "contact.office_confirmed": (
         "Confirmed by the office: someone at {domain}, the website CoStar has on record for "
         "this office, said this ad is theirs."
@@ -262,6 +265,19 @@ EN: dict[str, str] = {
     "rule.data.id_before_viewing": "A photo of your ID before a viewing. Red flag.",
     "rule.pressure.cannot_show": "They say they cannot show the unit in person. Red flag.",
     "rule.link.payment_link": "A payment link sent by the poster. Red flag.",
+    "rule.impersonation.platform_holds_money": (
+        "Says a site such as Apartments.com or Airbnb will hold your money. CoStar's "
+        "own page on fraud lists a claim of affiliation with it as a red flag. Red flag."
+    ),
+    "rule.impersonation.escrow_agent": (
+        "A rental deposit goes to the owner's office, not to an escrow agent. Red flag."
+    ),
+    "rule.data.credit_score_screenshot": "A screenshot of your credit score. Red flag.",
+    "rule.data.paystub_before_viewing": ("Pay stubs sent to a person before a viewing. Red flag."),
+    "rule.data.sevis_before_viewing": ("Your I-20 or SEVIS papers before a viewing. Red flag."),
+    "rule.link.affiliate_credit_check": (
+        "A link to run your own credit check, which can enrol you in a paid plan. Red flag."
+    ),
     "rule_category.payment_method": (
         "A payment that cannot be taken back, asked for before a viewing. Red flag."
     ),
@@ -456,7 +472,7 @@ EN: dict[str, str] = {
     "reason.forged_copy_unknown": "The reply is a copy of one of the listing photos.",
     "reason.photo_elsewhere": "At least one listing photo was taken in a different property.",
     "reason.price_flag": "The rent is far below comparable units.",
-    "reason.payment_flag": "Payment was requested before any viewing.",
+    "reason.payment_flag": "Money or personal papers were asked for before any viewing.",
     "reason.rule_flag": "Something in the text you sent is a red flag.",
     "reason.for_sale": (
         "This home is listed for sale. Confirm with the listing brokerage that it is also "
@@ -674,6 +690,9 @@ ES: dict[str, str] = {
     "contact.lookalike_link": (
         "Un enlace del anuncio imita el sitio web de este edificio, pero no lo es. Señal de alerta."
     ),
+    "contact.lookalike_sender": (
+        "Una dirección de correo del anuncio imita el sitio web de este edificio. Señal de alerta."
+    ),
     "contact.office_confirmed": (
         "Confirmado por la oficina: alguien en {domain}, el sitio web que CoStar tiene "
         "registrado para esta oficina, dijo que este anuncio es suyo."
@@ -782,6 +801,28 @@ ES: dict[str, str] = {
     ),
     "rule.link.payment_link": (
         "Un enlace de pago enviado por quien publicó el anuncio. Señal de alerta."
+    ),
+    "rule.impersonation.platform_holds_money": (
+        "Dice que un sitio como Apartments.com o Airbnb guardará su dinero. La página de "
+        "CoStar sobre fraude lista una supuesta afiliación con ellos como señal de "
+        "alerta. Señal de alerta."
+    ),
+    "rule.impersonation.escrow_agent": (
+        "Un depósito de renta va a la oficina del dueño, no a un agente de depósito en "
+        "garantía. Señal de alerta."
+    ),
+    "rule.data.credit_score_screenshot": (
+        "Una captura de pantalla de su puntaje de crédito. Señal de alerta."
+    ),
+    "rule.data.paystub_before_viewing": (
+        "Talones de pago enviados a una persona antes de una visita. Señal de alerta."
+    ),
+    "rule.data.sevis_before_viewing": (
+        "Sus documentos I-20 o SEVIS antes de una visita. Señal de alerta."
+    ),
+    "rule.link.affiliate_credit_check": (
+        "Un enlace para revisar su propio crédito, que puede inscribirle en un plan de pago. "
+        "Señal de alerta."
     ),
     "rule_category.payment_method": (
         "Un pago que no se puede recuperar, pedido antes de una visita. Señal de alerta."
@@ -994,7 +1035,7 @@ ES: dict[str, str] = {
     "reason.forged_copy_unknown": "La respuesta es una copia de una de las fotos del anuncio.",
     "reason.photo_elsewhere": "Al menos una foto del anuncio se tomó en otra propiedad.",
     "reason.price_flag": "La renta está muy por debajo de unidades comparables.",
-    "reason.payment_flag": "Se pidió un pago antes de cualquier visita.",
+    "reason.payment_flag": ("Se pidió dinero o documentos personales antes de cualquier visita."),
     "reason.rule_flag": "Algo en el texto que envió es una señal de alerta.",
     "reason.for_sale": (
         "Esta vivienda está en venta. Confirme con la agencia que la anuncia que también se "
@@ -1416,6 +1457,76 @@ EN.update(
     }
 )
 
+EN.update(
+    {
+        "real.as_of": "as of CoStar's last research",
+        "real.plan_studio": "studio",
+        "real.plan_beds": "{beds}-bed",
+        "real.plan_unnamed": "matching floor plan",
+        "real.ad_rent": "The ad asks {ad_rent} a month.",
+        "real.ad_no_rent": "The ad's rent could not be read.",
+        "real.ad_irreversible": (
+            "It asks for a payment that cannot be taken back, before a viewing."
+        ),
+        "real.range": "{low} to {high}",
+        "real.record_one": (
+            "Its Apartments.com listing on CoStar's record says {band} a month for a {plan}."
+        ),
+        "real.record_many": (
+            "Its Apartments.com listing on CoStar's record says {band} a month across "
+            "{n} matching floor plans."
+        ),
+        "real.record_hidden": (
+            "CoStar's record has this building's Apartments.com listing; its rent figures "
+            "are not shown here."
+        ),
+        "real.record_no_rent": "CoStar's record has no rent for a matching floor plan.",
+        "real.record_no_plan": (
+            "CoStar's record has this building, with no whole-unit floor plan that matches the ad."
+        ),
+        "real.managed_by": "Managed by {company}.",
+        "real.website": "Its own website: {host}.",
+        "real.provenance_scan": (
+            "{n} of {m} of the ad's photos are in CoStar's own scan of this building."
+        ),
+        "real.provenance_elsewhere": (
+            "{n} of {m} of the ad's photos are in CoStar's scan of a different building "
+            "than the one the ad names."
+        ),
+        "real.provenance_none": (
+            "None of the ad's {m} photos could be placed in CoStar's scan of this building."
+        ),
+        "real.phone_office": "The ad's number is the office's on record.",
+        "real.phone_not_office": "The ad's number is not the office's on record.",
+        "real.cta": "See the real listing",
+        "real.no_record": "CoStar has no record of the building this ad names.",
+        "copy.subject": "An ad using photos of your building was checked",
+        "copy.to_company": "To the leasing office at {company},",
+        "copy.to_office": "To the leasing office,",
+        "copy.photos_claimed": (
+            "SNAPBACK checked an ad today. {n} of its {m} photos sit in CoStar's own 3D scan "
+            "of your building."
+        ),
+        "copy.photos_matched": (
+            "SNAPBACK checked an ad today. {n} of its {m} photos sit in CoStar's own 3D scan "
+            "of your building, though the ad names a different one."
+        ),
+        "copy.phone_not_office": "The number in the ad is not the office's number on record.",
+        "copy.rent_under": "Its asked rent is {percent}% under your listed plan.",
+        "copy.ask": (
+            "This may be a copy of your listing, or an agent you work with. Please confirm "
+            "whether you posted it."
+        ),
+        "copy.report_line": "If you did not, the {report} for this check shows where to report it.",
+        "copy.report_name": "evidence pack",
+        "copy.draft_only": "This is a draft. Nothing has been sent.",
+        "handoff.listing": "Its listing on Apartments.com",
+        "handoff.site": "The building's own site",
+        "summary.price_gap": "The rent is {percent}% under this building's {plan} listing.",
+        "summary.price_gap_any": "The rent is {percent}% under this building's listings.",
+    }
+)
+
 ES.update(
     {
         "trace.error.model_timeout": (
@@ -1472,7 +1583,89 @@ ES.update(
         "timeline.result.verdict": (
             "Calculado por el código a partir de la evidencia. Ningún modelo lo elige."
         ),
+        "real.as_of": "según la última investigación de CoStar",
+        "real.plan_studio": "estudio",
+        "real.plan_beds": "de {beds} dormitorios",
+        "real.plan_unnamed": "plano que coincide",
+        "real.ad_rent": "El anuncio pide {ad_rent} al mes.",
+        "real.ad_no_rent": "No se pudo leer el alquiler del anuncio.",
+        "real.ad_irreversible": (
+            "Pide un pago que no se puede recuperar, antes de cualquier visita."
+        ),
+        "real.range": "{low} a {high}",
+        "real.record_one": (
+            "Su anuncio en Apartments.com, en el registro de CoStar, dice {band} al mes "
+            "por un plano {plan}."
+        ),
+        "real.record_many": (
+            "Su anuncio en Apartments.com, en el registro de CoStar, dice {band} al mes "
+            "en {n} planos que coinciden."
+        ),
+        "real.record_hidden": (
+            "El registro de CoStar tiene el anuncio de este edificio en Apartments.com; "
+            "aquí no se muestran sus cifras de alquiler."
+        ),
+        "real.record_no_rent": (
+            "El registro de CoStar no tiene alquiler para un plano que coincida."
+        ),
+        "real.record_no_plan": (
+            "El registro de CoStar tiene este edificio, sin un plano de unidad completa que "
+            "coincida con el anuncio."
+        ),
+        "real.managed_by": "Administrado por {company}.",
+        "real.website": "Su sitio web: {host}.",
+        "real.provenance_scan": (
+            "{n} de {m} fotos del anuncio están en el escaneo propio de CoStar de este edificio."
+        ),
+        "real.provenance_elsewhere": (
+            "{n} de {m} fotos del anuncio están en el escaneo de CoStar de un edificio "
+            "distinto al que nombra el anuncio."
+        ),
+        "real.provenance_none": (
+            "Ninguna de las {m} fotos del anuncio se pudo ubicar en el escaneo de CoStar "
+            "de este edificio."
+        ),
+        "real.phone_office": "El número del anuncio es el de la oficina en el registro.",
+        "real.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
+        "real.cta": "Ver el anuncio real",
+        "real.no_record": "CoStar no tiene registro del edificio que nombra este anuncio.",
+        "copy.subject": "Se revisó un anuncio que usa fotos de su edificio",
+        "copy.to_company": "A la oficina de arrendamiento de {company}:",
+        "copy.to_office": "A la oficina de arrendamiento:",
+        "copy.photos_claimed": (
+            "SNAPBACK revisó hoy un anuncio. {n} de sus {m} fotos están en el escaneo 3D "
+            "propio de CoStar de su edificio."
+        ),
+        "copy.photos_matched": (
+            "SNAPBACK revisó hoy un anuncio. {n} de sus {m} fotos están en el escaneo 3D "
+            "propio de CoStar de su edificio, aunque el anuncio nombra otro."
+        ),
+        "copy.phone_not_office": "El número del anuncio no es el de la oficina en el registro.",
+        "copy.rent_under": "La renta que pide está {percent}% por debajo de su plano publicado.",
+        "copy.ask": (
+            "Puede ser una copia de su anuncio, o de un agente con quien trabajan. Confirme "
+            "si lo publicaron."
+        ),
+        "copy.report_line": "Si no fue así, el {report} de esta revisión muestra dónde reportarlo.",
+        "copy.report_name": "paquete de evidencia",
+        "copy.draft_only": "Este es un borrador. No se ha enviado nada.",
+        "handoff.listing": "Su anuncio en Apartments.com",
+        "handoff.site": "El sitio del propio edificio",
+        "summary.price_gap": (
+            "La renta está {percent}% por debajo de lo que el edificio anuncia para {plan}."
+        ),
+        "summary.price_gap_any": (
+            "La renta está {percent}% por debajo de los anuncios de este edificio."
+        ),
     }
+)
+
+# CoStar's own published line (apartmenthomeliving.com/info/avoid-scams-and-fraud, "What we ask
+# you to do", read Nov 14 2026), quoted exactly where a surface explains the impersonation rule.
+# Kept out of the string tables: the quote has to say "Scammers", a word the card never uses.
+COSTAR_AFFILIATION_QUOTE = (
+    "Claim of affiliation with us. Scammers may impersonate Apartments.com or Apartment Finder "
+    "to make it seem like we participate in the lease transaction or transfer of funds."
 )
 
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
