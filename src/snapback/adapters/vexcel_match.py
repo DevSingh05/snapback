@@ -36,6 +36,9 @@ class GeoMatch:
     inliers: int
     matches: int  # pairs that passed the ratio test
     offset_m: float | None  # claimed centre to ad centre on the ground; None if no transform
+    # With a footprint (nadir tiles): does the ad tile's centre land inside the claimed
+    # building's outline, carried into the ad tile by the same transform? None: not asked.
+    in_footprint: bool | None = None
 
     @property
     def inlier_ratio(self) -> float:
@@ -61,7 +64,22 @@ def _load(cv2, path: str):
     return img
 
 
-def geo_match(claimed_path: str, expected_path: str) -> GeoMatch | None:
+def _inside(poly: list[tuple[float, float]], x: float, y: float) -> bool:
+    inside = False
+    n = len(poly)
+    for i in range(n):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % n]
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def geo_match(
+    claimed_path: str,
+    expected_path: str,
+    footprint_uv: list[tuple[float, float]] | None = None,
+) -> GeoMatch | None:
     """None when opencv is missing or a tile cannot be read or has nothing to match; otherwise
     the match."""
     try:
@@ -97,4 +115,14 @@ def geo_match(claimed_path: str, expected_path: str) -> GeoMatch | None:
     bh, bw = b.shape
     dx_m = (cx - bw / 2) * GROUND_M / bw
     dy_m = (cy - bh / 2) * GROUND_M / bh
-    return GeoMatch(inliers=inliers, matches=len(good), offset_m=round(math.hypot(dx_m, dy_m), 1))
+    in_footprint = None
+    if footprint_uv:
+        # the claimed outline, in claimed-tile pixels, carried into the ad tile
+        mapped = [tuple(model @ np.float32([u * aw, v * ah, 1.0])) for u, v in footprint_uv]
+        in_footprint = _inside([(float(x), float(y)) for x, y in mapped], bw / 2, bh / 2)
+    return GeoMatch(
+        inliers=inliers,
+        matches=len(good),
+        offset_m=round(math.hypot(dx_m, dy_m), 1),
+        in_footprint=in_footprint,
+    )

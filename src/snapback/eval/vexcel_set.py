@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from snapback.adapters import vexcel, vexcel_match
+from snapback.adapters import footprints, vexcel, vexcel_match
 from snapback.contracts import AerialResult, AerialStatus, DataSource, PropertyRecord
 
 SAME_BUILDING_M = 12.0  # two points this close are one building (right cases are offset 8 m)
@@ -455,4 +455,108 @@ def extend_cases(
     return {
         "properties": {**doc["properties"], **{p: props[p] for p in keep}},
         "cases": doc["cases"] + new,
+    }
+
+
+# --- Footprints (#11, 02:47): the claimed building's outline vs a neighbour ---------------------
+# Anti-circularity: the image arm sees ONLY the claimed point's footprint and the two tiles, never
+# the ad building's coordinates. The footprint-only baseline does use them (it is the "just compare
+# coordinates" answer), so the image arm must beat it before Vexcel may feed the verdict.
+
+FootprintFn = Callable[[float | None, float | None], list[tuple[float, float]] | None]
+ARMS = ("image_footprint", "footprint_only")
+
+
+def footprint_case(
+    claimed: PropertyRecord,
+    expected: PropertyRecord,
+    *,
+    tile_fn: TileFn,
+    footprint_fn: FootprintFn,
+) -> dict[str, AerialStatus]:
+    """Both arms for one case. NOT_CHECKED when there is no footprint, tile or match."""
+    none = {arm: AerialStatus.NOT_CHECKED for arm in ARMS}
+    if None in (claimed.lat, claimed.lon):
+        return none
+    poly = footprint_fn(claimed.lat, claimed.lon)  # the claimed address only
+    if not poly:
+        return none
+    lat0, lon0 = float(claimed.lat), float(claimed.lon)  # type: ignore[arg-type]
+    out = dict(none)
+    if expected.lat is not None and expected.lon is not None:
+        local = [footprints.to_local_m(lat0, lon0, a, b) for a, b in poly]
+        east, north = footprints.to_local_m(lat0, lon0, expected.lat, expected.lon)
+        out["footprint_only"] = _status(footprints.contains(local, east, north))
+    try:
+        tiles = [tile_fn(r, "nadir", source=DataSource.LIVE) for r in (claimed, expected)]
+    except (vexcel.VexcelKeyMissingError, OSError):
+        return out
+    if any(t is None or not t.path for t in tiles):
+        return out
+    uv = footprints.footprint_uv(lat0, lon0, poly, vexcel_match.GROUND_M)
+    geo = vexcel_match.geo_match(tiles[0].path, tiles[1].path, footprint_uv=uv)
+    if geo is None or geo.in_footprint is None:
+        return out
+    out["image_footprint"] = _status(geo.inliers >= vexcel_match.MIN_INLIERS and geo.in_footprint)
+    return out
+
+
+def _tally(rows: list[dict[str, Any]], ids: set[str], arm: str) -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for r in rows:
+        if r["case_id"] not in ids:
+            continue
+        t = out.setdefault(r["kind"], {"n": 0, "hits": 0, "not_checked": 0})
+        t["n"] += 1
+        got = r[arm]
+        if got == AerialStatus.NOT_CHECKED.value:
+            t["not_checked"] += 1
+        want = AerialStatus.RIGHT_BUILDING if r["label"] == "right" else AerialStatus.WRONG_BUILDING
+        t["hits"] += got == want.value
+    return out
+
+
+def run_ablation(
+    doc: dict[str, Any],
+    *,
+    tile_fn: TileFn = vexcel.get_tile,
+    footprint_fn: FootprintFn,
+) -> dict[str, Any]:
+    """Both arms on every case; the held-out half (split_ids) decides. Counts and case ids only."""
+    props = doc["properties"]
+    rows: list[dict[str, Any]] = []
+    for case in doc["cases"]:
+        claimed = _record(
+            case["claimed_property_id"], props[case["claimed_property_id"]], DataSource.LIVE
+        )
+        expected = _record(
+            case["expected_property_id"], props[case["expected_property_id"]], DataSource.LIVE
+        )
+        if case.get("expected_offset_m"):
+            expected = _shifted(expected, float(case["expected_offset_m"]))
+        got = footprint_case(claimed, expected, tile_fn=tile_fn, footprint_fn=footprint_fn)
+        kind = case.get("kind") or ("right" if case["label"] == "right" else "wrong")
+        rows.append(
+            {"case_id": case["case_id"], "kind": kind, "label": case["label"]}
+            | {arm: got[arm].value for arm in ARMS}
+        )
+    tune, held = split_ids(rows)
+    report = {
+        arm: {"held_out": _tally(rows, held, arm), "all": _tally(rows, tune | held, arm)}
+        for arm in ARMS
+    }
+    image_ok = gate_met(report["image_footprint"]["held_out"])
+    hits = {arm: sum(t["hits"] for t in report[arm]["held_out"].values()) for arm in ARMS}
+    beats = hits["image_footprint"] > hits["footprint_only"]
+    return {
+        "label": "LIVE ablation: image+footprint vs footprint-only (coordinates)",
+        "n": len(rows),
+        "held_out_ids": sorted(held),
+        "arms": report,
+        "held_out_hits": hits,
+        "image_gate_met": image_ok,
+        "beats_footprint_only": beats,
+        "gate_open": image_ok and beats,
+        "rule": "Vexcel feeds the verdict only if image+footprint meets the held-out gate "
+        "AND beats footprint-only on held-out hits",
     }
