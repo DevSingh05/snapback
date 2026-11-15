@@ -3,7 +3,8 @@
 // value of this shape; nothing is typed into the web.
 import type { DataSource, LocateStatus } from "../contracts";
 
-export type BarFailed = "inliers" | "ratio" | "spread" | "ambiguity";
+// "loose": enough matched points to name a building, too few of them consistent (#297).
+export type BarFailed = "inliers" | "ratio" | "spread" | "ambiguity" | "loose";
 
 export interface PlaceStep {
   option: string; // "base", "focus_scan:S2", "wider_index", "deeper_claimed" or "stop"
