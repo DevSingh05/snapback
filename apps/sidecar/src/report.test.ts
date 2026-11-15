@@ -366,12 +366,55 @@ test("U1: through Photon, one 'checking' reply goes out before the report", asyn
     { messages: messages as AsyncIterable<[typeof renter, never]> },
     { ...config(calls), quietMs: 5, acknowledge: true },
   );
-  assert.equal(
-    sent[0],
-    "Got it. Checking this against CoStar's record before you pay anyone. About a minute.",
-  );
-  assert.equal(sent.filter((x) => typeof x === "string" && x.startsWith("Got it.")).length, 1);
+  // P1 (#11, Photon v2): photos get the placing line at once, never 20 s of silence
+  assert.equal(sent[0], "Got 1 photo. Placing it in the building's 3D scan, about 20 seconds.");
+  assert.equal(sent.filter((x) => typeof x === "string" && x.startsWith("Got ")).length, 1);
   assert.match(String(sent[1]), /^Hold off for now/);
+});
+
+test("P1: the 'checking' reply counts the photos, and text alone keeps the record line", async () => {
+  const blob = () => new Blob([new Uint8Array([1])], { type: "image/jpeg" });
+  const said: string[] = [];
+  const onChecking = async (text?: string) => void said.push(text ?? "");
+  await handleMessage(
+    { ...ad("2 bed $900, Zelle first"), images: [blob(), blob(), blob()] },
+    client(),
+    config([]),
+    onChecking,
+  );
+  assert.equal(said[0], "Got 3 photos. Placing them in the building's 3D scan, about 20 seconds.");
+  await handleMessage(ad("2 bed $900, Zelle first"), client(), config([]), onChecking);
+  assert.match(said[1] ?? "", /^Got it\. Checking this against CoStar's record/);
+});
+
+test("P1: in Spanish, the photo line is in Spanish", async () => {
+  const blob = () => new Blob([new Uint8Array([1])], { type: "image/jpeg" });
+  const said: string[] = [];
+  await handleMessage(
+    {
+      ...ad("Hola, busco departamento. Renta $900, mande el depósito por Zelle"),
+      images: [blob(), blob()],
+    },
+    client(),
+    config([]),
+    async (text?: string) => void said.push(text ?? ""),
+  );
+  assert.equal(
+    said[0],
+    "Recibí 2 fotos. Las ubico en el escaneo 3D del edificio, unos 20 segundos.",
+  );
+});
+
+test("P1: the count never goes past the photos that will be checked", async () => {
+  const blob = () => new Blob([new Uint8Array([1])], { type: "image/jpeg" });
+  const said: string[] = [];
+  await handleMessage(
+    { ...ad("2 bed $900, Zelle first"), images: Array.from({ length: 14 }, blob) },
+    client(),
+    config([]),
+    async (text?: string) => void said.push(text ?? ""),
+  );
+  assert.match(said[0] ?? "", /^Got 10 photos\./);
 });
 
 test("U1: a follow-up gets no 'checking' reply", async () => {

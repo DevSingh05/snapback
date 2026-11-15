@@ -195,6 +195,22 @@ const WORDS = {
 } as const;
 export const STILL_CHECKING = "Still checking, one moment.";
 
+/** P1 (#11, Photon v2): photos get a line at once that says what the 20 s are for. Text alone
+ * keeps the record line. The count is the photos that will be checked (capped). */
+function checkingText(msg: InboundMessage, config: SidecarConfig, lang: Lang): string {
+  const max = config.maxPhotos ?? MAX_PHOTOS;
+  const n = Math.min((msg.images?.length ?? 0) + msg.imageUrls.length, max);
+  if (n === 0) return WORDS[lang].checking;
+  if (lang === "es") {
+    return n === 1
+      ? "Recibí 1 foto. La ubico en el escaneo 3D del edificio, unos 20 segundos."
+      : `Recibí ${n} fotos. Las ubico en el escaneo 3D del edificio, unos 20 segundos.`;
+  }
+  return n === 1
+    ? "Got 1 photo. Placing it in the building's 3D scan, about 20 seconds."
+    : `Got ${n} photos. Placing them in the building's 3D scan, about 20 seconds.`;
+}
+
 type Intent = "why" | "now" | "call" | "safe" | "places" | "how";
 const TAIL = String.raw`(\s+(now|then))?\s*[?.!]*\s*$`;
 const INTENTS: [Intent, RegExp][] = [
@@ -822,7 +838,7 @@ export async function handleMessage(
   config.memory?.begin(key);
   try {
     try {
-      await onChecking?.(WORDS[lang].checking);
+      await onChecking?.(checkingText(msg, config, lang));
     } catch {
       // a failed "checking" reply never skips the check
     }
