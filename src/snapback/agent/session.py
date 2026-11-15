@@ -15,6 +15,7 @@ from a record, and derived facts (counts and yes/no), never sponsor images or re
 """
 
 import random
+import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -56,6 +57,7 @@ STOP = "stop at hold"
 SEND = "send"
 EDIT = "edit"
 CANCEL = "cancel"
+UPDATED = "updated"  # a STATUS event's pick: the state moved after more checks
 DECISIONS = (SEND, EDIT, CANCEL)
 
 
@@ -129,6 +131,9 @@ class CaseSession:
         self._late = False  # the reply being weighed now is one of those
         self._replied = False  # a real reply was checked at least once (A14)
         self.verdict: Verdict | None = None
+        # Taken by `add_evidence`. The API swaps in the case's own lock, so evidence added from a
+        # background thread cannot race the policy.
+        self.evidence_lock: Any = threading.RLock()
         self.pending_challenge: ChallengeDraft | None = None
 
         self._candidates: list[FloorPlanCandidate] = []
@@ -813,6 +818,42 @@ class CaseSession:
         if self.verdict is not None:
             self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
             self._emit_verdict()
+
+    def add_evidence(self, update: Mapping[str, Any]) -> bool:
+        """More evidence from outside the choice flow, e.g. an extra check the deep agent ran
+        after the case was answered. Returns True when the state changed.
+
+        The state is decided again by `decide` and nowhere else. When it moves, the trace gets
+        an "updated after more checks" step with the first reason, then a new verdict event, so
+        the trace matches the card. A case still running carries the evidence into its eventual
+        decision. Nothing here lets a model pick a state: it can only supply evidence fields,
+        and the fields are validated as `ModuleEvidence` fields."""
+        with self.evidence_lock:
+            self.evidence = ModuleEvidence.model_validate(
+                {**dict(self.evidence), **{k: v for k, v in update.items()}}
+            )
+            if self.verdict is None:
+                return False
+            before = self.verdict.state
+            self.verdict = decide(to_evidence(self.evidence, self.lang), self.lang)
+            if self.verdict.state is before:
+                return False
+            reason = self.verdict.reasons[0] if self.verdict.reasons else ""
+            self.trace.emit(
+                TraceKind.STATUS,
+                clean_reason(
+                    self._say(
+                        "trace.updated",
+                        old=self._say(f"state.{before.value}"),
+                        new=self._say(f"state.{self.verdict.state.value}"),
+                        reason=reason,
+                    ),
+                    self._say("trace.updated.short"),
+                ),
+                pick=UPDATED,
+            )
+            self._emit_verdict()
+            return True
 
     def _finish(self) -> None:
         """Decide on the evidence gathered. This is the only way a case gets a state."""

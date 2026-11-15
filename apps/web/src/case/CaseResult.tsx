@@ -8,11 +8,22 @@ import type { ReactNode } from "react";
 import "../ui/ui.css";
 import "./case.css";
 import { headlineOf, historySteps, shortDate } from "../cardStrings";
-import type { Card, CardLine, CardRowKind, CopyAlert, ReportPack } from "../contracts";
+import type {
+  Card,
+  CardLine,
+  CardRowKind,
+  CaseTimeline,
+  CopyAlert,
+  ReportPack,
+} from "../contracts";
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
+import type { Lang } from "../lang";
+import { ReportTeam } from "../proofroom/ReportTeam";
+import { AnswerPanel } from "./AnswerPanel";
 import { Checks } from "./Checks";
 import { Ledger } from "./Ledger";
+import { LangSwitch } from "./LangSwitch";
 import {
   VERDICT_TONE,
   checkedStamp,
@@ -30,6 +41,7 @@ import { APARTMENTS_SEARCH, NextSteps, caseSteps } from "./NextSteps";
 import { ProofPair } from "./ProofPair";
 import { RealListing } from "./RealListing";
 import { SaferTiles } from "./SaferTiles";
+import { StillChecking } from "./StillChecking";
 import { VerdictBand } from "./VerdictBand";
 import { WhatNext } from "./WhatNext";
 
@@ -54,10 +66,17 @@ export interface CaseResultProps {
   copyAlert?: CopyAlert | null;
   // GET /cases/{id}/report: the pack behind "File this report".
   reportPack?: ReportPack | null;
+  // GET /cases/{id}/timeline: the "How we got this answer" panel. Left out or empty: no panel.
+  timeline?: CaseTimeline | null;
+  // Sections whose read answered 202 (the check is still running): each shows "Still checking…".
+  checking?: { proof?: boolean; real?: boolean; next?: boolean; safer?: boolean };
   // Where "Find me safer places like this" goes. Left out: the tiles below, else the Finder.
   saferHref?: string;
   // Anything the page adds under the next steps (the safer places, the office check).
   children?: ReactNode;
+  // The report's language switch (EN | ES), when the caller can refetch in the other one.
+  lang?: Lang;
+  onLang?: (lang: Lang) => void;
 }
 
 export function CaseResult({
@@ -74,8 +93,12 @@ export function CaseResult({
   saferPlaces: safer_places = [],
   copyAlert = null,
   reportPack = null,
+  timeline = null,
   saferHref: saferTo,
+  checking = {},
   children,
+  lang,
+  onLang,
 }: CaseResultProps) {
   const id = encodeURIComponent(card.case_id);
   const key = inline ? `-${card.case_id}` : "";
@@ -94,7 +117,7 @@ export function CaseResult({
   // The one primary button. A result that did not pass points at what to do next; one that
   // passed opens the walk when a photo was placed, else the safer places.
   const primary = !passed
-    ? { label: "What to do next", href: `#next${key}` }
+    ? { label: failed ? "Who do I call?" : "What to do next", href: `#next${key}` }
     : walk
       ? walkTo
       : { label: "Find me safer places like this", href: saferHref };
@@ -106,6 +129,7 @@ export function CaseResult({
           CASE <span data-testid="case-id">{card.case_id}</span>
         </span>
         <Tag source={card.source} testId="source-chip" />
+        {lang && onLang ? <LangSwitch lang={lang} onChange={onLang} /> : null}
       </p>
 
       <VerdictBand
@@ -131,11 +155,14 @@ export function CaseResult({
           )
         }
         primary={own ? primary : null}
-        link={own && !passed && walk ? walkTo : null}
+        link={own && !passed && !failed && walk ? walkTo : null}
       >
         {proof ? <ProofPair {...proof} handoff={own && !inline} /> : null}
+        {!proof && checking.proof ? <StillChecking testId="checking-proof" /> : null}
       </VerdictBand>
+      {own ? <ReportTeam card={card} timeline={timeline} realListing={realListing} /> : null}
 
+      {!realListing && checking.real ? <StillChecking testId="checking-real" /> : null}
       {beside ? (
         <div
           className={`case-beside${realListing && adText ? " case-beside-two" : ""}`}
@@ -156,6 +183,13 @@ export function CaseResult({
         titleId={`case-checks-title${key}`}
       />
 
+      {own ? (
+        <AnswerPanel card={card} timeline={timeline} realListing={realListing} idSuffix={key} />
+      ) : null}
+
+      {own && !passed && checking.next && !copyAlert && !reportPack ? (
+        <StillChecking testId="checking-next" />
+      ) : null}
       {own && !passed ? (
         <WhatNext
           id={`next${key}`}
@@ -182,6 +216,7 @@ export function CaseResult({
         >
           <h2 id={`case-safer-title${key}`}>Safer homes on Apartments.com</h2>
           {tiles ? <SaferTiles places={safer_places} /> : null}
+          {!tiles && checking.safer ? <StillChecking testId="checking-safer" /> : null}
           <p className="case-safer-more">
             <a
               className="ui-btn-quiet"

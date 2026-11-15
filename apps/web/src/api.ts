@@ -1,5 +1,6 @@
 import cardHold from "../../../fixtures/contracts/card_hold.json";
 import type { Card, DataSource } from "./contracts";
+import type { Lang } from "./lang";
 
 const fixtureCard = cardHold as Card;
 
@@ -30,7 +31,7 @@ export function saveCaseToken(caseId: string, token: string): void {
 
 // The read-only secret (POST /cases `read_token`). It opens the SSE trace, sent in an
 // Authorization header by fetch. It is never put in a URL, and the write token above never is.
-const READ_TOKEN_PREFIX = "snapback.case-read-token.";
+export const READ_TOKEN_PREFIX = "snapback.case-read-token.";
 
 export function saveCaseReadToken(caseId: string, token: string): void {
   try {
@@ -85,13 +86,63 @@ export function apiFetchRead(
   return apiFetch(path, { ...init, headers });
 }
 
-export async function fetchCard(caseId: string, signal?: AbortSignal): Promise<Card> {
+export async function fetchCard(caseId: string, signal?: AbortSignal, lang?: Lang): Promise<Card> {
   if (!apiBase()) {
     if (caseId.toUpperCase() === fixtureCard.case_id) return fixtureCard;
     throw new CaseNotFound(caseId);
   }
-  const res = await apiFetch(`/cases/${encodeURIComponent(caseId)}/card`, { signal });
+  const res = await apiFetch(
+    `/cases/${encodeURIComponent(caseId)}/card${lang ? `?lang=${lang}` : ""}`,
+    {
+      signal,
+    },
+  );
   if (res.status === 404) throw new CaseNotFound(caseId);
   if (!res.ok) throw new Error(`The server answered ${res.status}.`);
   return (await res.json()) as Card;
+}
+
+// The report's reads answer 202 `{status, retry_after_ms}` while the check is still running:
+// not ready, not failed. This asks again with a growing wait (the server's first, then 1.5x,
+// capped) until it lands or about 30 s have gone, and tells the caller while it waits so the
+// page can say "Still checking…". Anything but a 202 is returned as it came; a 202 left after
+// the time is up comes back as is, which is not `ok`-with-a-body and is treated as no section.
+export const READY_WAIT_MS = 30_000;
+const READY_STEP_CAP_MS = 3_000;
+
+export async function apiFetchReadWhenReady(
+  path: string,
+  caseId: string,
+  init: RequestInit = {},
+  onWaiting?: (waiting: boolean) => void,
+): Promise<Response | null> {
+  const first = apiFetchRead(path, caseId, init);
+  if (!first) return null;
+  const signal = init.signal;
+  const started = Date.now();
+  let res = await first;
+  let step = 0;
+  while (res.status === 202 && !signal?.aborted) {
+    if (Date.now() - started >= READY_WAIT_MS) break;
+    onWaiting?.(true);
+    let hint = 500;
+    try {
+      const said = (await res.clone().json()) as { retry_after_ms?: number };
+      if (typeof said.retry_after_ms === "number") hint = said.retry_after_ms;
+    } catch {
+      // A body we cannot read: keep the default.
+    }
+    const wait = Math.min(Math.max(hint, 500) * 1.5 ** step, READY_STEP_CAP_MS);
+    step += 1;
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, wait);
+      signal?.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
+    });
+    if (signal?.aborted) break;
+    const again = apiFetchRead(path, caseId, init);
+    if (!again) break;
+    res = await again;
+  }
+  onWaiting?.(false);
+  return res;
 }

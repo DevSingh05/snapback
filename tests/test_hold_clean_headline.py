@@ -125,11 +125,10 @@ def test_the_stronger_line_is_kept_when_everything_matches():
 @pytest.mark.parametrize(
     "sections",
     [
-        {"rules": ZELLE},  # a red flag in the PRICE row
-        {"rules": ZELLE, "authority": {"status": "unknown", "manager_on_record": None}},
+        {"authority": MATCHES | {"office_phone_match": "no"}},  # a contact that is not confirmed
     ],
 )
-def test_a_hold_with_a_red_flag_keeps_the_plain_headline(sections):
+def test_a_hold_with_something_not_confirmed_keeps_the_plain_headline(sections):
     made = card(honest(**sections))
     assert made.state is VerdictState.HOLD
     assert made.headline is None
@@ -237,7 +236,8 @@ def test_the_png_and_the_mcp_server_read_the_same_headline():
 
     made = card(honest())
     assert render.headline(made) == CLEAN_EN
-    assert render.headline(card(honest(rules=ZELLE))) == strings.text("state.hold")
+    zelle = card(honest(rules=ZELLE))
+    assert render.headline(zelle) == strings.text("state.hold_red_money")
 
 
 def test_photos_that_could_not_be_placed_never_get_either_line():
@@ -253,3 +253,81 @@ def test_photos_that_could_not_be_placed_never_get_either_line():
     )
     assert made.state is VerdictState.UNVERIFIED
     assert made.headline is None
+
+
+def _rule(rule_id: str, category: str) -> list[dict]:
+    return [{"rule_id": rule_id, "category": category, "evidence_span": "x", "red_flag": True}]
+
+
+@pytest.mark.parametrize(
+    ("rules", "key"),
+    [
+        (ZELLE, "state.hold_red_money"),
+        (_rule("data.ssn_before_viewing", "data_ask"), "state.hold_red_papers"),
+        (_rule("pressure.act_now", "pressure"), "state.hold_red_pressure"),
+    ],
+)
+def test_a_red_flag_hold_says_why_in_its_headline_and_stays_hold(rules, key):
+    modules = honest(rules=rules)
+    assert decide(to_evidence(modules)).state is VerdictState.HOLD
+    for lang in ("en", "es"):
+        made = card(modules, lang)
+        assert made.state is VerdictState.HOLD
+        assert made.headline == strings.text(key, lang)
+        assert headline_text(made) == made.headline
+        assert made.headline != strings.text("state.hold", lang)
+    assert card(modules).headline.startswith("Hold off: ")
+
+
+def test_the_red_flag_headlines_keep_the_wording_rules():
+    for lang in ("en", "es"):
+        for key in (
+            "state.hold_red_money",
+            "state.hold_red_papers",
+            "state.hold_red_pressure",
+            "state.hold_red",
+        ):
+            text = strings.text(key, lang)
+            assert "—" not in text and "–" not in text
+            assert "scam" not in text.lower() and "estaf" not in text.lower()
+
+
+def test_a_red_flag_ad_and_an_honest_ad_no_longer_read_the_same():
+    assert card(honest()).headline == CLEAN_EN
+    assert card(honest(rules=ZELLE)).headline != card(honest()).headline
+
+
+def test_a_dont_pay_card_keeps_its_own_headline_even_with_a_red_flag():
+    raw = json.loads((CONTRACTS / "module_evidence_forged.json").read_text())
+    forged = card(ModuleEvidence.model_validate(raw | {"rules": ZELLE}))
+    assert forged.state is VerdictState.DONT_PAY and forged.headline is None
+
+
+NO_PHOTOS = {"case_id": "fx-0000", "thresholds_version": "v1", "photos": []}
+
+
+def test_no_photos_and_a_zelle_ad_headlines_the_red_flag_never_placing_photos():
+    for lang in ("en", "es"):
+        for locate in (None, NO_PHOTOS):
+            made = card(evidence(locate=locate, rules=ZELLE), lang)
+            assert made.state is VerdictState.HOLD
+            assert made.headline == strings.text("state.hold_red_money", lang)
+            assert "photo" not in headline_text(made).lower()
+            assert "foto" not in headline_text(made).lower()
+
+
+def test_no_photos_and_nothing_flagged_reads_the_plain_hold_line_not_placing_photos():
+    for locate in (None, NO_PHOTOS):
+        made = card(honest(locate=locate))
+        assert made.state is VerdictState.UNVERIFIED
+        assert headline_text(made) == strings.text("state.hold")
+        assert "photo" not in headline_text(made).lower()
+
+
+def test_photos_that_were_sent_and_did_not_place_keep_the_could_not_place_line():
+    raw = json.loads((CONTRACTS / "module_evidence_hold.json").read_text())
+    photos = [p | {"status": "not_located"} for p in raw["locate"]["photos"]]
+    assert photos
+    made = card(honest(locate=raw["locate"] | {"photos": photos, "identified_photos": 0}))
+    assert made.state is VerdictState.UNVERIFIED and made.headline is None
+    assert headline_text(made) == strings.text("state.unverified")

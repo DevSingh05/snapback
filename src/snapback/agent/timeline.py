@@ -21,6 +21,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from snapback.agent.planner import PlanKind
+from snapback.agent.session import UPDATED
 from snapback.card import strings
 from snapback.contracts import (
     ChoiceKind,
@@ -45,6 +46,11 @@ class TimelineStep(BaseModel):
     result: str  # one short line
     source: DataSource
     by: By
+    # Which check or sub-agent the step belongs to (a module id such as "record", "owner",
+    # "locate", or a sub-agent's own name), so a page can tie a reason to the step behind it.
+    # None for steps that are not one check (reading the ad, the verdict, a retry).
+    kind: str | None = None
+    skipped: bool = False  # the plan left this check out; `result` says why
 
 
 class TimelineTodo(BaseModel):
@@ -59,6 +65,7 @@ class CaseTimeline(BaseModel):
     source: DataSource
     mode: Literal["policy", "deepagents"]
     fell_back: bool  # the agent stopped (error or time limit) and code finished the case
+    running: bool = False  # the deep agent is still working this case in the background
     steps: list[TimelineStep]
     todos: list[TimelineTodo] = Field(default_factory=list)  # the agent's last todo list
     plan: list[str] = Field(default_factory=list)  # sub-agents handed work, in order
@@ -111,6 +118,15 @@ _CHECK_KEYS = {
     PlanKind.ASK.value: "timeline.ask_license",
     PlanKind.REPORT.value: "timeline.report",
 }
+_CHECK_KINDS = {
+    PlanKind.RECORD.value: "record",
+    PlanKind.BROKERAGE.value: "for_sale",
+    PlanKind.LICENSE.value: "license",
+    PlanKind.OWNER.value: "owner",
+    PlanKind.CLAIMS.value: "claims",
+    PlanKind.ASK.value: "ask_license",
+    PlanKind.REPORT.value: "report",
+}
 _CHOICE_KEYS = {
     ChoiceKind.WHICH_CHECKS: "timeline.which_checks",
     ChoiceKind.WHICH_FLOOR_PLAN: "timeline.floor_plan",
@@ -159,6 +175,8 @@ class _Builder:
         took: int | None = None,
         model: bool = False,
         source: DataSource | None = None,
+        kind: str | None = None,
+        skipped: bool = False,
         **v: object,
     ) -> None:
         self.steps.append(
@@ -169,6 +187,8 @@ class _Builder:
                 "result": scrub(result, self.say("timeline.result.done"), model=model),
                 "source": source or self.source,
                 "by": by,
+                "kind": kind,
+                "skipped": skipped,
                 "derived": took is not None,
             }
         )
@@ -184,6 +204,7 @@ class _Builder:
                 "code",
                 took=0,
                 source=self.evidence.record_source,
+                kind="rent",
                 n=price.n_floor_plans,
             )
         authority = self.evidence.authority
@@ -195,6 +216,7 @@ class _Builder:
                 "code",
                 took=0,
                 source=self.evidence.record_source,
+                kind="phone",
             )
 
 
@@ -204,8 +226,11 @@ def build_timeline(
     events: Sequence[TraceEvent],
     evidence: ModuleEvidence,
     lang: str = strings.DEFAULT_LANG,
+    *,
+    running: bool = False,
 ) -> CaseTimeline:
-    """The case's steps in trace order. Reads only; never changes the case."""
+    """The case's steps in trace order. Reads only; never changes the case. `running` says the
+    deep agent is still at work on it (SNAPBACK_AGENT=deepagents_async)."""
     b = _Builder(source, evidence, lang)
     events = sorted(events, key=lambda e: e.seq)
     t0 = events[0].at if events else None
@@ -252,7 +277,14 @@ def build_timeline(
             else:
                 name = pick.removeprefix("sub-agent: ")
                 plan.append(name)
-                b.add("timeline.delegate", at, b.say("timeline.result.handed"), "agent", name=name)
+                b.add(
+                    "timeline.delegate",
+                    at,
+                    b.say("timeline.result.handed"),
+                    "agent",
+                    kind=name,
+                    name=name,
+                )
                 open_handoffs[name] = len(b.steps) - 1
         elif event.kind is TraceKind.FILE:
             ran_agent = True
@@ -268,17 +300,31 @@ def build_timeline(
         elif event.kind is TraceKind.TOOL and event.pick == "locate":
             counts = _placed(evidence)
             if counts is None:
-                b.add("timeline.locate_none", at, event.reason, "code")
+                b.add("timeline.locate_none", at, event.reason, "code", kind="locate")
             else:
                 b.add(
-                    "timeline.locate", at, event.reason, "code", placed=counts[0], total=counts[1]
+                    "timeline.locate",
+                    at,
+                    event.reason,
+                    "code",
+                    kind="locate",
+                    placed=counts[0],
+                    total=counts[1],
                 )
         elif event.kind is TraceKind.TOOL:
-            b.add(_TOOL_KEYS.get(event.pick or "", "timeline.tool"), at, event.reason, "code")
+            b.add(
+                _TOOL_KEYS.get(event.pick or "", "timeline.tool"),
+                at,
+                event.reason,
+                "code",
+                kind=event.pick if event.pick in _TOOL_KEYS else None,
+            )
+        elif event.kind is TraceKind.STATUS and event.pick == UPDATED:
+            b.add("timeline.updated", at, event.reason, "code")
         elif event.kind is TraceKind.STATUS and event.pick in _CHECK_KEYS:
             # a check the plan skipped: say which, and why
             skip_key = _CHECK_KEYS[event.pick].replace("timeline.", "timeline.skip.")
-            b.add(skip_key, at, event.reason, "code")
+            b.add(skip_key, at, event.reason, "code", kind=_CHECK_KINDS[event.pick], skipped=True)
         elif event.kind is TraceKind.STATUS:
             b.add("timeline.status", at, event.reason, "code")
         elif event.kind is TraceKind.HITL:
@@ -297,6 +343,7 @@ def build_timeline(
                 by,
                 model=by == "agent",
                 source=evidence.record_source if on_record else None,
+                kind=_CHECK_KINDS.get(event.pick or ""),
             )
             if key == "timeline.record":
                 b.record_lines(at)
@@ -320,8 +367,9 @@ def build_timeline(
     return CaseTimeline(
         case_id=case_id,
         source=source,
-        mode="deepagents" if ran_agent else "policy",
+        mode="deepagents" if ran_agent or running else "policy",
         fell_back=fell_back,
+        running=running,
         steps=[
             TimelineStep(step=i, **{k: v for k, v in step.items() if k != "derived"})
             for i, step in enumerate(b.steps)
