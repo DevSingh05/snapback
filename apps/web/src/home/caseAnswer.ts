@@ -21,12 +21,12 @@ const REPORT_LINKS = [
 
 const HINT = "You can ask why, who to call, what to do now, or whether it is safe.";
 
-/** True when the result is a red flag or a hold: something stands against the ad. */
+/** True when something stands against the ad: a don't-pay state, or a line that is a red flag
+ *  or a hold. A hold with nothing against it (the clean original ad) is not against. */
 export function isAgainst(card: Card): boolean {
   return (
     card.state === "dont_pay" ||
-    card.state === "hold" ||
-    card.rows.some((r) => r.lines.some((l) => l.tone === "red_flag"))
+    card.rows.some((r) => r.lines.some((l) => l.tone === "red_flag" || l.tone === "hold"))
   );
 }
 
@@ -86,11 +86,11 @@ export function answerAbout(card: Card, topic: CaseTopic): CaseAnswer {
       return {
         lead: against
           ? "Not the number in the ad. The office on record, and where to report this:"
-          : "The office on record is in the full report, with its own website to reach it.",
+          : "Use the number on the office's own website, not the one in the ad. The full report shows the office on record when we found one.",
         sections: against
           ? [
               ...section(null, [
-                "The full report lists the leasing office on record and its own website. Reach them there, not through the ad.",
+                "Use the number on the office's own website, not the one in the ad. The full report shows the office on record when we found one.",
               ]),
               ...section("What stands in the way", doesNot(card)),
             ]

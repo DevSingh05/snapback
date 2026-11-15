@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import type { Card } from "../contracts";
 import type { CreateCase } from "../upload/api";
+import { isAgainst } from "./caseAnswer";
 import { EXAMPLES, FB_ASK, HOW, MEASURED, OneBox, VerdictView, sendLabel } from "./OneBox";
 
 // The box's button names what it will do: it follows the routing of what is typed.
@@ -191,6 +192,17 @@ describe("routing each message, shown honestly", () => {
     expect(within(verdict).getAllByRole("term")).toHaveLength(5);
   });
 
+  it("live mode records 'cancel' once on its own and never 'send'", async () => {
+    const user = userEvent.setup();
+    const approve = vi.fn(async () => {});
+    render(<OneBox mode="live" createCase={made()} approveChallenge={approve} checkingMs={0} />);
+    await say(user, AD);
+    await screen.findByTestId("ob-verdict");
+    expect(approve).toHaveBeenCalledTimes(1);
+    expect(approve).toHaveBeenCalledWith("7Q2M", "cancel");
+    expect(approve).not.toHaveBeenCalledWith(expect.anything(), "send");
+  });
+
   it("asking the poster for proof is offered after the verdict, as a second step", async () => {
     const user = userEvent.setup();
     render(<OneBox mode="fixture" createCase={made()} checkingMs={0} />);
@@ -219,6 +231,31 @@ describe("routing each message, shown honestly", () => {
       expect(names).not.toContain(gone);
     expect(within(verdict).queryByText("Get ready to visit")).not.toBeInTheDocument();
     expect(within(verdict).queryByTestId("ob-walk")).not.toBeInTheDocument();
+  });
+
+  it("a hold with nothing against it (the clean original) keeps every path", () => {
+    const clean: Card = {
+      ...(cardHold as Card),
+      state: "hold",
+      headline: "Nothing against it, nothing confirmed",
+      rows: (cardHold as Card).rows.map((r) => ({
+        ...r,
+        lines: r.lines.map((l) => ({ ...l, tone: "ok" as const })),
+      })),
+    };
+    render(<VerdictView card={clean} source="fixture" onFollow={() => {}} />);
+    const verdict = screen.getByTestId("ob-verdict");
+    expect(within(verdict).getByTestId("ob-walk")).toBeInTheDocument();
+    expect(within(verdict).queryByRole("button", { name: "Who do I call?" })).toBeNull();
+    // A single hold line is something against it.
+    const held: Card = {
+      ...clean,
+      rows: [
+        { ...clean.rows[0]!, lines: [{ ...clean.rows[0]!.lines[0]!, tone: "hold" as const }] },
+      ],
+    };
+    expect(isAgainst(held)).toBe(true);
+    expect(isAgainst(clean)).toBe(false);
   });
 
   it("a clean result keeps every path", () => {

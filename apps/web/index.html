@@ -13,11 +13,19 @@
       // tour.css opts pages in to view transitions. When the page we came from has not opted in,
       // the browser skips the transition and reports "Transition was skipped" as a page error.
       // That is not a fault of the page: keep it out of the console.
-      const skipped = (m) => /transition/i.test(m || "");
-      window.addEventListener("error", (e) => skipped(e.message) && e.preventDefault());
+      const SKIPPED = /^Transition was (skipped|aborted because of invalid state)/;
+      window.addEventListener(
+        "error",
+        (e) =>
+          SKIPPED.test(e.message.replace(/^(Uncaught )?(InvalidStateError: )?/, "")) &&
+          e.preventDefault(),
+      );
       window.addEventListener(
         "unhandledrejection",
-        (e) => skipped(e.reason?.message) && e.preventDefault(),
+        (e) =>
+          e.reason?.name === "InvalidStateError" &&
+          SKIPPED.test(e.reason.message || "") &&
+          e.preventDefault(),
       );
     </script>
   </head>

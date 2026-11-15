@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useReducer, useRef, useState } from "react";
 
 import { apiBase, apiFetchRead, fetchCard } from "../api";
 import { answerAbout, isAgainst, type CaseAnswer } from "./caseAnswer";
@@ -1415,10 +1415,9 @@ function CheckRun({
       </article>
     );
 
-  const active = Math.min(
-    1,
-    CHECK_STEPS.findIndex((s) => s.key === state.step),
-  );
+  // The approval step passes at once; it shows as the check still running.
+  const found = CHECK_STEPS.findIndex((s) => s.key === state.step);
+  const active = found === -1 ? 1 : found;
   const source: DataSource = "source" in state ? state.source : mode;
   return (
     <article className="ob-card ob-check" data-testid="ob-check">
@@ -1426,7 +1425,7 @@ function CheckRun({
         <p className="ob-card-kicker">Checking the ad</p>
         <SourceChip source={source} />
       </header>
-      <CheckSteps active={Math.max(active, 0)} steps={CHECK_STEPS} />
+      <CheckSteps active={active} steps={CHECK_STEPS} />
     </article>
   );
 }
@@ -1700,6 +1699,11 @@ export function VerdictView({
 function ProofAsk({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const fieldId = useId();
+  const draft = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) draft.current?.scrollIntoView?.({ block: "nearest" });
+  }, [open]);
   return (
     <section className="ob-proof-ask" aria-label="Ask the poster for proof">
       <button
@@ -1712,16 +1716,20 @@ function ProofAsk({ text }: { text: string }) {
         Ask the poster for proof
       </button>
       {open && (
-        <div className="ob-approve">
+        <div
+          className="ob-approve"
+          ref={draft}
+          style={{ scrollMarginBottom: "calc(var(--ob-dock-h, 0px) + 12px)" }}
+        >
           <p className="ob-card-text">
             A real landlord can send a fresh photo from inside the unit. Copy this and send it
             yourself. Nothing is sent for you.
           </p>
-          <label htmlFor="challenge" className="sr-only">
+          <label htmlFor={fieldId} className="sr-only">
             Message to send
           </label>
           <textarea
-            id="challenge"
+            id={fieldId}
             className="ob-message"
             rows={4}
             readOnly
