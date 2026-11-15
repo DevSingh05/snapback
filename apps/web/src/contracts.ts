@@ -65,6 +65,26 @@ export interface PriceResult {
   baseline_beds?: number | null;
 }
 
+// Public data (Census Geocoder, RDAP). Mirrors PublicStatus, PlaceCheck and DomainCheck in
+// src/snapback/contracts.py.
+export type PublicStatus = "found" | "no_match" | "not_checked";
+
+export interface PlaceCheck {
+  status: PublicStatus;
+  zip?: string | null;
+  county_fips?: string | null;
+  county?: string | null;
+  source: DataSource;
+}
+
+export interface DomainCheck {
+  host: string;
+  status: PublicStatus;
+  registered_on?: string | null; // ISO date
+  age_days?: number | null;
+  source: DataSource;
+}
+
 export interface AuthorityResult {
   status: string; // AuthorityStatus: matches_record, mismatch, unknown
   manager_on_record?: string | null; // company name only

@@ -30,6 +30,8 @@ EN: dict[str, str] = {
     "label.data_ask": "Data ask",
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
+    "label.address": "Address",
+    "label.link_domain": "Link domain",
     "label.seen_before": "Seen before",
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
@@ -316,6 +318,27 @@ EN: dict[str, str] = {
         "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
     ),
     # HUD's Small Area Fair Market Rent, when CoStar has no rent for the home (public baseline).
+    # Census Geocoder: the address check. Evidence only, never a flag.
+    "place.census_found": (
+        "The address is in the Census address list ({county} County, ZIP {zip}). That shows the "
+        "address exists, not who is offering it."
+    ),
+    "place.census_found_bare": (
+        "The address is in the Census address list. That shows the address exists, not who is "
+        "offering it."
+    ),
+    "place.census_no_match": (
+        "The Census address list has no match for this address. New homes are often missing, so "
+        "this is information only."
+    ),
+    "place.census_not_checked": "Not checked (the Census address list did not answer).",
+    # RDAP: how old the domain of a link in the ad is.
+    "rule.link.new_domain": (
+        "A link in the ad is on a domain registered in the last few weeks. Red flag."
+    ),
+    "link.domain_age": "A link in the ad is on a domain registered {years}+ years ago. No flag.",
+    "link.domain_age_months": "A link in the ad is on a domain registered {days} days ago.",
+    "link.domain_not_checked": "Not checked (the domain registry did not answer).",
     "rent.hud_within": "In line with the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
     "rent.hud_below": (
         "Typical rent here (HUD, ZIP {zip}, {size}): {rent}. This rent is {percent}% under it. "
@@ -610,6 +633,8 @@ ES: dict[str, str] = {
     "label.data_ask": "Datos que piden",
     "label.pressure": "Presión",
     "label.rent_vs_record": "Renta frente al registro",
+    "label.address": "Dirección",
+    "label.link_domain": "Dominio del enlace",
     "label.seen_before": "Visto antes",
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
@@ -915,6 +940,27 @@ ES: dict[str, str] = {
         "{percent}% por debajo de la renta más baja que figura en el registro de este edificio "
         "para {plan}. Pregunte por qué; hay descuentos."
     ),
+    "place.census_found": (
+        "La dirección está en la lista de direcciones del Censo (condado de {county}, código "
+        "postal {zip}). Eso muestra que la dirección existe, no quién la ofrece."
+    ),
+    "place.census_found_bare": (
+        "La dirección está en la lista de direcciones del Censo. Eso muestra que la dirección "
+        "existe, no quién la ofrece."
+    ),
+    "place.census_no_match": (
+        "La lista de direcciones del Censo no tiene esta dirección. Las casas nuevas suelen "
+        "faltar, así que es solo información."
+    ),
+    "place.census_not_checked": "No comprobado (la lista de direcciones del Censo no respondió).",
+    "rule.link.new_domain": (
+        "Un enlace del anuncio está en un dominio registrado hace pocas semanas. Señal de alerta."
+    ),
+    "link.domain_age": "Un enlace del anuncio está en un dominio registrado hace {years}+ años.",
+    "link.domain_age_months": (
+        "Un enlace del anuncio está en un dominio registrado hace {days} días."
+    ),
+    "link.domain_not_checked": "No comprobado (el registro de dominios no respondió).",
     "rent.hud_within": (
         "Acorde con la renta típica de la zona (HUD, código postal {zip}, {size}): {rent}."
     ),

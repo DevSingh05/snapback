@@ -39,6 +39,7 @@ from snapback.contracts import (
     PresenceStatus,
     PriceResult,
     PriceStatus,
+    PublicStatus,
     PublishedRule,
     RuleCategory,
     UnitStatus,
@@ -590,6 +591,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_record_lines(modules, lang, place=True),
             *_seen_before_lines(modules, lang, replies=False),
+            *_place_check_lines(modules, lang),
         ],
     )
 
@@ -601,9 +603,56 @@ def _from_record(modules: ModuleEvidence, lines: list[CardLine]) -> list[CardLin
     as a whole then stays FIXTURE, and these lines say for themselves that they are LIVE.
     """
     source = modules.record_source
+    lines = _named(lines, "CoStar record")
     if source is None or source is modules.source:
         return lines
     return [line.model_copy(update={"source": source}) for line in lines]
+
+
+def _named(lines: list[CardLine], name: str) -> list[CardLine]:
+    """Say which source answered each line (every evidence line names its source)."""
+    return [
+        line if line.source_name else line.model_copy(update={"source_name": name})
+        for line in lines
+    ]
+
+
+def _place_check_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """The Census Geocoder's answer about the ad's address. Evidence only: a miss or a failure
+    is an information line (tone not-checked), never a flag, and a match is not presence."""
+    found = modules.place_check
+    if found is None:
+        return []
+    if found.status is PublicStatus.FOUND:
+        if found.zip and found.county:
+            key, values = "place.census_found", {"zip": found.zip, "county": found.county}
+        else:
+            key, values = "place.census_found_bare", {}
+        tone = CardTone.OK
+    elif found.status is PublicStatus.NO_MATCH:
+        key, values, tone = "place.census_no_match", {}, CardTone.NOT_CHECKED
+    else:
+        key, values, tone = "place.census_not_checked", {}, CardTone.NOT_CHECKED
+    line = _line(lang, "label.address", tone, key, **values)
+    return [line.model_copy(update={"source": found.source, "source_name": "Census"})]
+
+
+def _domain_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
+    """RDAP: the age of a link's domain. A new domain is the `link.new_domain` red flag in the
+    rule lines, so this line is for an older domain or a lookup that could not answer."""
+    found = modules.domain_check
+    if found is None or any(hit.rule_id == "link.new_domain" for hit in modules.rules):
+        return []
+    if found.status is PublicStatus.FOUND and found.age_days is not None:
+        years = found.age_days // 365
+        key = "link.domain_age"
+        values: dict[str, object] = {"years": max(years, 1)} if years >= 1 else {}
+        if years < 1:
+            key, values = "link.domain_age_months", {"days": found.age_days}
+    else:
+        key, values = "link.domain_not_checked", {}
+    line = _line(lang, "label.link_domain", CardTone.NOT_CHECKED, key, **values)
+    return [line.model_copy(update={"source": found.source, "source_name": "RDAP"})]
 
 
 MAX_BROKERAGE_CHARS = 80
@@ -955,9 +1004,9 @@ def _person_row(modules: ModuleEvidence, lang: str, zone: tzinfo) -> CardRow:
                 ],
             ),
             # Not from the record: the licence list is the state's, and public.
-            *_license_lines(modules, lang),
+            *_named(_license_lines(modules, lang), "TREC"),
             # Nor this: the owner roll is the county's, and public.
-            *_owner_lines(modules, lang),
+            *_named(_owner_lines(modules, lang), "HCAD"),
             *_record_lines(modules, lang, place=False),
             *_seen_before_lines(modules, lang, replies=True),
         ],
@@ -1012,7 +1061,12 @@ def _rule_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         if not strings.has(key, lang):
             key = f"rule_category.{hit.category.value}"
         label = _RULE_LABELS[hit.category]
-        by_label[label].append(_line(lang, label, CardTone.RED_FLAG, key))
+        line = _line(lang, label, CardTone.RED_FLAG, key)
+        if hit.rule_id == "link.new_domain" and modules.domain_check is not None:
+            line = line.model_copy(
+                update={"source": modules.domain_check.source, "source_name": "RDAP"}
+            )
+        by_label[label].append(line)
     if shown >= _BOTH_MONEY_RULES:
         # Zelle and a deposit or holding fee before a viewing are one ask to the renter: one
         # line that names both, standing where the first of the two stood.
@@ -1142,7 +1196,10 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
                 tone=CardTone.HOLD,
             ),
         )
-    return CardRow(kind=CardRowKind.PRICE, lines=[*lines, *_rent_lines(modules, lang)])
+    return CardRow(
+        kind=CardRowKind.PRICE,
+        lines=[*lines, *_domain_lines(modules, lang), *_rent_lines(modules, lang)],
+    )
 
 
 def _join_words(words: list[str], lang: str) -> str:

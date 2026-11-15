@@ -33,7 +33,14 @@ from snapback.agent.background import BUSY, BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
-from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of, owner_of
+from snapback.agent.join import (
+    JoinedModules,
+    KitLookups,
+    Lookups,
+    license_of,
+    owner_of,
+    public_checks_of,
+)
 from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
@@ -684,7 +691,7 @@ class CaseStore:
         # fixtures, on any server: it is a staged example, so it is never a LIVE card and
         # calls no lookup.
         asked_by_name = demo_case is not None
-        for_sale = license = owner = None
+        for_sale = license = owner = place_check = domain_check = None
         if not asked_by_name:
             for_sale = self._lookups.for_sale(listing.text) if listing.text else None
             for_sale = self._for_sale_by_position(listing.text, record, for_sale)
@@ -693,6 +700,8 @@ class CaseStore:
             license = license_of(self._lookups, listing.text)
             # D12: the owner of record of the home the listing claims, when lane D holds one.
             owner = owner_of(self._lookups, listing.text)
+            # Public data: the Census address check and the age of a link's domain (RDAP).
+            place_check, domain_check = public_checks_of(self._lookups, listing.text)
 
         live = not asked_by_name and (
             self._settings.snapback_data_source is DataSource.LIVE
@@ -717,6 +726,8 @@ class CaseStore:
                     for_sale=for_sale,
                     license=license,
                     owner=owner,
+                    place_check=place_check,
+                    domain_check=domain_check,
                     salt=phone_salt(self._settings),
                     record_source=record.source if record else source,
                     live_locate=self._live_locate if live else None,

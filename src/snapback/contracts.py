@@ -434,6 +434,35 @@ class RecordLine(BaseModel):
     zip_code: str | None = None
 
 
+class PublicStatus(StrEnum):
+    """What a public-data lookup (Census, RDAP) came back with."""
+
+    FOUND = "found"
+    NO_MATCH = "no_match"  # the service answered and has no such address (information only)
+    NOT_CHECKED = "not_checked"  # timeout, error, or no recording: never a finding
+
+
+class PlaceCheck(BaseModel):
+    """Census Geocoder: is the ad's address in the Census address list, and its ZIP and county.
+    Evidence only: a miss is an information line, never a flag (new homes are often missing)."""
+
+    status: PublicStatus
+    zip: str | None = None
+    county_fips: str | None = None  # "48201" is Harris County
+    county: str | None = None
+    source: DataSource  # LIVE (called now) or FIXTURE (a recorded answer)
+
+
+class DomainCheck(BaseModel):
+    """RDAP: how long ago the domain of a link in the ad was registered."""
+
+    host: str
+    status: PublicStatus
+    registered_on: date | None = None
+    age_days: int | None = None
+    source: DataSource
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -474,6 +503,9 @@ class ModuleEvidence(BaseModel):
     # X1: when a photo was placed in a different home, that home's office on CoStar's record
     # (company only). Information for the card; no verdict reads it.
     matched_office: str | None = None
+    # Public data for the homes CoStar does not cover. None means not looked up.
+    place_check: PlaceCheck | None = None
+    domain_check: DomainCheck | None = None
 
 
 # ---------------------------------------------------------------------------------------------
