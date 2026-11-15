@@ -220,6 +220,7 @@ class KitLookups:
         self._kit_dir = kit_dir
         self._records: dict[str, PropertyRecord] | None = None
         self._by_address: dict[tuple[str, str], list[PropertyRecord]] | None = None
+        self._by_name: dict[tuple[str, ...], list[PropertyRecord]] | None = None
         self._rentals: list[RentalHouse] | None = None
         self._lock = threading.Lock()
 
@@ -263,6 +264,20 @@ class KitLookups:
                 self._by_address = build_index(records.values())
             index = self._by_address
         return match_address(listing_text, index)
+
+    def website_for_name(self, listing_text: str) -> str | None:
+        """The website host of the one live building whose exact name the ad gives (#351). Used
+        only to compare the ad's links; no record is joined. A fixture run never matches."""
+        from snapback.agent.address_match import build_name_index, website_for_name
+
+        if self.source is not DataSource.LIVE:
+            return None
+        records = self.records()
+        with self._lock:
+            if self._by_name is None:
+                self._by_name = build_name_index(records.values())
+            index = self._by_name
+        return website_for_name(listing_text, index)
 
     def rentals(self) -> list[RentalHouse]:
         """The active house rentals in the kit (search supply), read once and kept."""
@@ -519,7 +534,16 @@ class JoinedModules:
         # Sat 01:20). Lane D's lookup carries those names once D7 (#95) is on main.
         self._identify(case_id)
         offices = getattr(self._for_sale, "offices", None) or ()
-        return check_authority(self._listing.contacts, self._record, self._salt, offices)
+        named_site = None
+        lookup = getattr(self._lookups, "website_for_name", None)
+        if self._record is None and lookup is not None and self._listing.text:
+            try:  # string work on the kit only; a failure leaves the check as it was
+                named_site = lookup(self._listing.text)
+            except Exception as error:
+                log.warning("name match failed (%s); no site to compare", type(error).__name__)
+        return check_authority(
+            self._listing.contacts, self._record, self._salt, offices, named_site=named_site
+        )
 
     def for_sale(self, case_id: str) -> ForSaleMatch | None:
         self._identify(case_id)

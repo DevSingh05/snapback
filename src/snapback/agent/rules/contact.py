@@ -298,6 +298,7 @@ def check_authority(
     record: PropertyRecord | None,
     salt: str,
     marketers: Sequence[str] = (),
+    named_site: str | None = None,
 ) -> AuthorityResult:
     """Compare what the listing says about the poster with the record. Yes/no only.
 
@@ -335,6 +336,13 @@ def check_authority(
             # True when there was a brokerage to compare with. The card and the reasons then
             # speak of the listing brokerage, never of a manager or a leasing office.
             brokerage_only=bool(on_record),
+            # No record, but the ad names one building exactly: only a lookalike of its site
+            # counts. A match or another site stays "not checked", as with no record.
+            link_domain=LinkDomain.LOOKALIKE
+            if named_site
+            and check_link(claims.links, named_site, getattr(claims, "emails", ()))
+            is LinkDomain.LOOKALIKE
+            else LinkDomain.NOT_CHECKED,
         )
 
     emails = getattr(claims, "emails", ())

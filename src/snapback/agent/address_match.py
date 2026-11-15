@@ -112,3 +112,46 @@ def match_address(
         if _agree(ad.zip, theirs.zip) and _agree(ad.city, theirs.city):
             found.append(record)
     return found[0] if len(found) == 1 else None
+
+
+MIN_NAME_TOKENS = 2
+MIN_TOKEN_CHARS = 3
+
+
+def _tokens(text: str) -> list[str]:
+    return _WORD.findall(text.lower())
+
+
+def build_name_index(
+    records: Iterable[PropertyRecord],
+) -> dict[tuple[str, ...], list[PropertyRecord]]:
+    """Records that carry a website, under their building name as lowercase word tokens. A name
+    of one word, or with a word under 3 letters, is too common to name one building."""
+    index: dict[tuple[str, ...], list[PropertyRecord]] = {}
+    for record in records:
+        name = tuple(_tokens(record.building_name or ""))
+        if name[:1] == ("the",):  # "The Oaks" is one word of name
+            name = name[1:]
+        if (
+            record.website_host
+            and len(name) >= MIN_NAME_TOKENS
+            and all(len(word) >= MIN_TOKEN_CHARS for word in name)
+        ):
+            index.setdefault(name, []).append(record)
+    return index
+
+
+def website_for_name(
+    listing_text: str, index: dict[tuple[str, ...], list[PropertyRecord]]
+) -> str | None:
+    """The website host of the one building whose whole name the ad contains as whole words, or
+    None (no name, several buildings, or several different names). Exact, never fuzzy."""
+    words = _tokens(listing_text)
+    found: set[str] = set()
+    for name, records in index.items():
+        size = len(name)
+        if any(tuple(words[i : i + size]) == name for i in range(len(words) - size + 1)):
+            if len(records) != 1:
+                return None
+            found.add(records[0].website_host or "")
+    return found.pop() if len(found) == 1 else None
