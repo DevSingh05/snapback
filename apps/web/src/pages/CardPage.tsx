@@ -10,6 +10,7 @@ import {
   useRealListing,
   useReportPack,
   useSaferPlaces,
+  useTimeline,
 } from "../case";
 import "../case/case.css";
 import { asLang, loadLang, saveLang, type Lang } from "../lang";
@@ -71,6 +72,7 @@ function ResultPage({
   const realListing = useRealListing(card.case_id, card.lang);
   const copyAlert = useCopyAlert(card.case_id, card.lang);
   const reportPack = useReportPack(card.case_id, card.lang);
+  const timeline = useTimeline(card.case_id, card.lang);
   const saferPlaces = useSaferPlaces(
     card.case_id,
     card.state === "hold" || card.state === "dont_pay",
@@ -83,6 +85,7 @@ function ResultPage({
       realListing={realListing}
       copyAlert={copyAlert}
       reportPack={reportPack}
+      timeline={timeline}
       saferPlaces={saferPlaces}
       lang={lang}
       onLang={onLang}

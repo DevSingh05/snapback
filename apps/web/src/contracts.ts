@@ -9,6 +9,9 @@ export interface CardLine {
   label: string;
   text: string;
   tone: CardTone;
+  source?: DataSource | null;
+  // The label's table key ("label.payment_ask"): which check the line came from, in any language.
+  key?: string | null;
 }
 
 export interface CardRow {
@@ -138,6 +141,11 @@ export interface TimelineStep {
   result: string;
   source: DataSource;
   by: "agent" | "code";
+  // The check or sub-agent the step belongs to ("record", "owner", "locate", "place", ...), so a
+  // reason can be tied to the step behind it. null when the step is not one check.
+  kind?: string | null;
+  // The plan left this check out; `result` says why.
+  skipped?: boolean;
 }
 
 export interface TimelineTodo {

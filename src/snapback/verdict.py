@@ -478,7 +478,10 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
 
 def _line(lang: str, label_key: str, tone: CardTone, text_key: str, **values: object) -> CardLine:
     return CardLine(
-        label=strings.text(label_key, lang), text=strings.text(text_key, lang, **values), tone=tone
+        label=strings.text(label_key, lang),
+        text=strings.text(text_key, lang, **values),
+        tone=tone,
+        key=label_key,
     )
 
 
@@ -904,7 +907,7 @@ def _owner_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     # what the rule speaks to), and here otherwise.
     if owner.published_rule is not None and not _rule_sits_beside_payment(modules):
         text = f"{text} {_quoted_rule(owner.published_rule, lang, 'owner.rule')}"
-    return [CardLine(label=strings.text(label, lang), text=text, tone=tone)]
+    return [CardLine(label=strings.text(label, lang), text=text, tone=tone, key=label)]
 
 
 def _office_declined_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
@@ -1070,6 +1073,7 @@ def _price_row(modules: ModuleEvidence, lang: str) -> CardRow:
             (places[-1] + 1) if places else len(lines),
             CardLine(
                 label=strings.text("label.owner_rule", lang),
+                key="label.owner_rule",
                 text=_quoted_rule(rule, lang, "owner.rule_beside_payment"),
                 tone=CardTone.HOLD,
             ),
@@ -1100,6 +1104,7 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
         lines.append(
             CardLine(
                 label=strings.text(label, lang),
+                key=label,
                 text=strings.text(
                     f"claims.{note.key}",
                     lang,

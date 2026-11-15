@@ -479,6 +479,9 @@ class CardLine(BaseModel):
     # card can hold lines from a real record beside stand-ins for the twin and the challenge.
     # None means "the same as the card".
     source: DataSource | None = None
+    # The label's table key ("label.payment_ask"), so a page can tell which check a line came
+    # from in any language. None on an older card.
+    key: str | None = None
 
 
 class CardRow(BaseModel):

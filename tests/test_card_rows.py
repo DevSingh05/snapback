@@ -143,11 +143,7 @@ def test_hold_fixture_card_matches_card_hold_json():
 
 
 def test_hold_fixture_card_equals_card_hold_json_word_for_word():
-    # The headline is left out on purpose: card_hold.json is the web app's fixture and keeps the
-    # plain state word there. The built card's red-flag headline is pinned in
-    # test_hold_clean_headline.py.
-    built = card_for(modules()).model_copy(update={"headline": None})
-    assert built == Card.model_validate(raw("card_hold.json"))
+    assert card_for(modules()) == Card.model_validate(raw("card_hold.json"))
 
 
 @pytest.mark.parametrize("name", VARIANTS)
