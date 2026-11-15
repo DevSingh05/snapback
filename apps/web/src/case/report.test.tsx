@@ -15,6 +15,7 @@ import {
   FilePanel,
   WhatNext,
   couldNotDo,
+  missingFact,
   reportText,
   withoutPhoneDigits,
 } from ".";
@@ -251,6 +252,58 @@ describe("what this check could not do", () => {
     }));
     render(<CaseResult card={{ ...card, not_checked: [], rows }} />);
     expect(screen.queryByTestId("case-could-not")).toBeNull();
+  });
+});
+
+describe("the one fact that would settle an unsure card", () => {
+  const line = (label: string, key: string | null, tone: Card["rows"][0]["lines"][0]["tone"]) => ({
+    label,
+    text: "x",
+    tone,
+    key,
+  });
+  const withRows = (state: Card["state"], rows: Card["rows"]): Card => ({ ...card, state, rows });
+
+  it("names the office confirming the number on the Hold fixture, from its Not confirmed row", () => {
+    expect(card.state).toBe("hold");
+    expect(missingFact(card)).toBe("the office confirms this number");
+    render(<CaseResult card={card} />);
+    expect(screen.getByTestId("case-settle")).toHaveTextContent(
+      "Would settle it: the office confirms this number",
+    );
+  });
+
+  it("names the photos placed in the scan when the photo row is not checked", () => {
+    const c = withRows("unverified", [
+      { kind: "place", lines: [line("Real", "label.real", "not_checked")] },
+    ]);
+    expect(missingFact(c)).toBe("the photos placed in this building's scan");
+  });
+
+  it("names exactly one fact, the first rule with an unsure line", () => {
+    const c = withRows("hold", [
+      { kind: "price", lines: [line("Rent vs record", "label.rent_vs_record", "not_checked")] },
+      { kind: "place", lines: [line("Real", "label.real", "not_shown")] },
+    ]);
+    expect(missingFact(c)).toBe("the photos placed in this building's scan");
+  });
+
+  it("falls back to the row's kind when a line has no key", () => {
+    const c = withRows("hold", [{ kind: "price", lines: [line("Rent", null, "not_checked")] }]);
+    expect(missingFact(c)).toBe("a rent on record for this home to compare with");
+  });
+
+  it("is absent for a clear result, a red-flag result, or a card with nothing unsure", () => {
+    const unsure = [
+      { kind: "person" as const, lines: [line("Allowed", "label.allowed", "not_shown")] },
+    ];
+    expect(missingFact(withRows("verified", unsure))).toBeNull();
+    expect(missingFact(withRows("dont_pay", unsure))).toBeNull();
+    expect(
+      missingFact(withRows("hold", [{ kind: "place", lines: [line("Real", "label.real", "ok")] }])),
+    ).toBeNull();
+    render(<CaseResult card={withRows("dont_pay", unsure)} />);
+    expect(screen.queryByTestId("case-settle")).toBeNull();
   });
 });
 
