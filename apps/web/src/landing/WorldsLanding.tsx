@@ -673,6 +673,19 @@ function SeeForYourself() {
         </a>
         <div className="wl-three">
           <div className="wl-col" data-testid="wl-col-stories">
+            <span className="wl-peek wl-peek-story" aria-hidden="true">
+              <span className="wl-peek-play" />
+              <span className="wl-peek-lines">
+                <b>Three stories, under a minute each</b>
+                <span className="wl-peek-track">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="ui-mono">Check · Walk it first · Safer places · Tour request</span>
+              </span>
+            </span>
             <h3 className="wl-h3">Stories</h3>
             <p className="wl-p">
               Three renters&rsquo; stories, played out on the real app with sample data. Press play,
@@ -683,6 +696,15 @@ function SeeForYourself() {
             </a>
           </div>
           <div className="wl-col" data-testid="wl-col-reviews">
+            <span className="wl-peek wl-peek-report" aria-hidden="true">
+              <span className="ui-mono">Sample report 7Q2M · FIXTURE</span>
+              <b>Hold off for now</b>
+              <span className="wl-peek-rows">
+                <State kind="warn" />
+                <State kind="unconfirmed" />
+                <State kind="ok" />
+              </span>
+            </span>
             <h3 className="wl-h3">Reviews &amp; reports</h3>
             <p className="wl-p">
               What people who tried SNAPBACK said, counted with the number of people stated. And a
@@ -699,6 +721,10 @@ function SeeForYourself() {
             <RealtorQuote />
           </div>
           <div className="wl-col" data-testid="wl-col-app">
+            <span className="wl-peek wl-peek-box" aria-hidden="true">
+              <span className="wl-peek-field">Paste the ad you were sent, or its link</span>
+              <span className="wl-peek-send">Check it</span>
+            </span>
             <h3 className="wl-h3">Your own ad</h3>
             <p className="wl-p">
               The quickest proof is your own listing. Paste it into the one box and read the card.
