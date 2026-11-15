@@ -150,7 +150,8 @@ function Hero({ reduced }: { reduced: boolean }) {
       span = 1,
       track = 0,
       raf = 0,
-      at = -1;
+      at = -1,
+      moved = false;
     const apply = () => {
       raf = 0;
       const p = clamp01((window.scrollY - top) / span);
@@ -158,6 +159,7 @@ function Hero({ reduced }: { reduced: boolean }) {
       if (dot.current) dot.current.style.transform = `translate3d(0,${(p * track).toFixed(1)}px,0)`;
       const k = p < 0.15 ? 0 : p < 0.44 ? 1 : p < 0.74 ? 2 : 3;
       if (k !== at && rail.current) rail.current.dataset.at = String((at = k));
+      if (p > 0.02 !== moved) el.classList.toggle("is-moved", (moved = p > 0.02));
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(apply);
@@ -229,6 +231,10 @@ function Hero({ reduced }: { reduced: boolean }) {
             On record: for sale
           </div>
         </div>
+        <p className="wl-cue ui-mono" aria-hidden="true">
+          Scroll to open the home
+          <i />
+        </p>
         <ol className="wl-rail" ref={rail} data-at="0" aria-hidden="true">
           {RAIL.map((t, i) => (
             <li key={t} className="ui-mono">{`0${i}`}</li>

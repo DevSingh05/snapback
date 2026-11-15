@@ -240,6 +240,54 @@
   background: var(--warn-soft);
   color: var(--ink);
 }
+/* a quiet cue under the house until the first scroll (desktop; the phone card says it) */
+.wl-cue {
+  position: absolute;
+  z-index: 1;
+  left: 66%;
+  bottom: 26px;
+  margin: 0;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--glass);
+  border-radius: var(--radius-pill);
+  transform: translateX(-50%);
+  transition: opacity 0.3s var(--ease-out);
+  pointer-events: none;
+}
+.wl-live .wl-cue {
+  display: inline-flex;
+}
+.wl-live.is-moved .wl-cue {
+  opacity: 0;
+}
+.wl-cue i {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--act);
+  border-bottom: 2px solid var(--act);
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wl-cue i {
+    animation: wl-cue 1.6s var(--ease-out) infinite;
+  }
+  @keyframes wl-cue {
+    0%,
+    100% {
+      transform: translate3d(0, -2px, 0) rotate(45deg);
+    }
+    50% {
+      transform: translate3d(0, 3px, 0) rotate(45deg);
+    }
+  }
+}
 /* the sheet's margin: where you are in the drawing */
 .wl-rail {
   position: absolute;
@@ -1233,7 +1281,8 @@
   .wl-still .wl-over {
     grid-template-columns: minmax(0, 1fr);
   }
-  .wl-rail {
+  .wl-rail,
+  .wl-live .wl-cue {
     display: none;
   }
   /* phone: the beats share one slot at the bottom and cross-fade (WorldsLanding marks the
