@@ -178,3 +178,27 @@ def test_a_doubtful_claimed_match_is_never_flipped_into_another_building(twins, 
     assert placed.status is not LocateStatus.LOCATED_ELSEWHERE
     assert placed.status is LocateStatus.NOT_LOCATED
     assert placed.bar_failed == "spread" and not placed.flipped
+
+
+def test_a_flipped_match_below_the_strict_ratio_is_not_placed_elsewhere(twins, monkeypatch):
+    """#296 composition: the flip runs under the same strict bar, 60 percent consistent included.
+    Mirrored, building B clears the counts but only 43 percent of its matches agree."""
+    import hashlib
+
+    import numpy as np
+
+    from snapback.vision.locate.verify import FEATURE_KEY, Verification
+
+    sweeps, _, _ = twins
+    photo = crop(sweeps, "fx-model-b", 1, 2)
+    sent_hash = hashlib.sha256(photo.convert("RGB").tobytes()).hexdigest()
+
+    def recorded(matcher, image, face, ransac_px):
+        model = face.info[FEATURE_KEY].split("/")[0]
+        if hashlib.sha256(image.tobytes()).hexdigest() == sent_hash or model != "fx-model-b":
+            return Verification(4, 0, None, 0.0)
+        return Verification(140, 60, np.eye(3), 0.3)
+
+    monkeypatch.setattr("snapback.vision.locate.locate.verify", recorded)
+    result = locator(twins).locate("c", {"p": photo}, "fx-prop-1")
+    assert result.photos[0].status is LocateStatus.NOT_LOCATED
