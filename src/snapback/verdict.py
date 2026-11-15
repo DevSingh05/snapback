@@ -37,6 +37,7 @@ from snapback.contracts import (
     OwnerMatch,
     PhoneMatch,
     PresenceStatus,
+    PriceResult,
     PriceStatus,
     PublishedRule,
     RuleCategory,
@@ -1052,6 +1053,8 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     # Only how the asked rent compares. The record's own figures are sponsor data and stay off
     # the card.
     status = modules.price.status if modules.price else PriceStatus.NOT_CHECKED
+    if modules.price is not None and modules.price.baseline_source == "hud_safmr":
+        return _hud_rent_line(modules.price, lang)
     if modules.price is not None and modules.price.per_bed:
         return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.per_bed")
     if status is PriceStatus.WITHIN_RANGE:
@@ -1078,11 +1081,34 @@ def _rent_line(modules: ModuleEvidence, lang: str) -> CardLine:
     return _line(lang, "label.rent_vs_record", CardTone.NOT_CHECKED, "rent.not_checked")
 
 
+def _hud_rent_line(price: PriceResult, lang: str) -> CardLine:
+    """The rent against HUD's public typical rent for the ZIP and size (the home has no CoStar
+    rent). HUD's figures are public, so the card shows them and names HUD as the source."""
+    beds = price.baseline_beds or 0
+    size = (
+        strings.text("rent.hud_size.studio", lang)
+        if price.baseline_beds == 0
+        else strings.text("rent.hud_size.beds", lang, beds=beds)
+    )
+    typical = price.baseline_rent or 0
+    values = {"zip": price.baseline_zip, "size": size, "rent": f"${typical:,}"}
+    if price.status is PriceStatus.BELOW_RANGE and price.listed_rent and typical:
+        percent = round(100 * (typical - price.listed_rent) / typical)
+        line = _line(
+            lang, "label.rent_vs_record", CardTone.HOLD, "rent.hud_below", percent=percent, **values
+        )
+    else:
+        line = _line(lang, "label.rent_vs_record", CardTone.OK, "rent.hud_within", **values)
+    return line.model_copy(update={"source_name": "HUD"})
+
+
 def _rent_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     line = _rent_line(modules, lang)
     price = modules.price
     # A rent line that compared nothing says nothing about the record.
     compared = price is not None and (price.status is not PriceStatus.NOT_CHECKED or price.per_bed)
+    if price is not None and price.baseline_source == "hud_safmr":
+        return [line]  # HUD is public data, not the building's record: no record source mark
     return _from_record(modules, [line]) if compared else [line]
 
 

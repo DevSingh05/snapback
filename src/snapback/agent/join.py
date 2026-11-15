@@ -40,6 +40,7 @@ from snapback.contracts import (
     OwnerResult,
     PhotoLocation,
     PriceResult,
+    PriceStatus,
     PropertyRecord,
     RecordLine,
     RentalHouse,
@@ -341,7 +342,22 @@ class JoinedModules:
     def price(self, case_id: str) -> PriceResult | None:
         self._identify(case_id)
         listing = self._listing
-        return check_price(listing.listed_rent, self._record, beds=listing.beds, unit=listing.unit)
+        found = check_price(listing.listed_rent, self._record, beds=listing.beds, unit=listing.unit)
+        if found.status is not PriceStatus.NOT_CHECKED or found.per_bed:
+            return found
+        # CoStar has no rent for this home (a house or condo it does not cover): HUD's typical
+        # rent for the ZIP and size is the baseline, and the card names it.
+        return self._hud_price(found)
+
+    def _hud_price(self, found: PriceResult) -> PriceResult:
+        from snapback.public import hud
+        from snapback.settings import get_settings
+
+        if not get_settings().snapback_hud_baseline:
+            return found
+        listing = self._listing
+        compared = hud.check_price(listing.listed_rent, listing.beds, hud.zip_in(listing.text))
+        return found if compared is None else compared.model_copy(update={"unit": found.unit})
 
     def authority(self, case_id: str) -> AuthorityResult | None:
         # The listing brokerage on record may market the home as the manager may (ruling,

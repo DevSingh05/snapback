@@ -315,6 +315,14 @@ EN: dict[str, str] = {
     "rent.below_floor_plan": (
         "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
     ),
+    # HUD's Small Area Fair Market Rent, when CoStar has no rent for the home (public baseline).
+    "rent.hud_within": "In line with the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
+    "rent.hud_below": (
+        "Typical rent here (HUD, ZIP {zip}, {size}): {rent}. This rent is {percent}% under it. "
+        "Ask why; discounts happen."
+    ),
+    "rent.hud_size.studio": "studio",
+    "rent.hud_size.beds": "{beds} bed",
     "rent.plan.studio": "studio",
     "rent.plan.beds": "{beds} bed",
     "rent.per_bed": "Not checked (priced per bed here, so the rent was not compared).",
@@ -907,6 +915,15 @@ ES: dict[str, str] = {
         "{percent}% por debajo de la renta más baja que figura en el registro de este edificio "
         "para {plan}. Pregunte por qué; hay descuentos."
     ),
+    "rent.hud_within": (
+        "Acorde con la renta típica de la zona (HUD, código postal {zip}, {size}): {rent}."
+    ),
+    "rent.hud_below": (
+        "Renta típica de la zona (HUD, código postal {zip}, {size}): {rent}. Esta renta está "
+        "{percent}% por debajo. Pregunte por qué; hay descuentos."
+    ),
+    "rent.hud_size.studio": "estudio",
+    "rent.hud_size.beds": "{beds} hab.",
     "rent.plan.studio": "un estudio",
     "rent.plan.beds": "{beds} hab.",
     "rent.per_bed": "No comprobado (aquí se cobra por cama, así que la renta no se comparó).",

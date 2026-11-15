@@ -12,6 +12,8 @@ export interface CardLine {
   source?: DataSource | null;
   // The label's table key ("label.payment_ask"): which check the line came from, in any language.
   key?: string | null;
+  // Which source answered the line: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+  source_name?: string | null;
 }
 
 export interface CardRow {
@@ -55,6 +57,12 @@ export interface PriceResult {
   n_floor_plans?: number | null;
   unit: UnitStatus;
   per_bed: boolean;
+  // "costar" (the building's record) or "hud_safmr" (HUD's typical rent for the ZIP). The HUD
+  // fields name the ZIP, bedroom count and rent that were compared.
+  baseline_source?: "costar" | "hud_safmr" | null;
+  baseline_rent?: number | null;
+  baseline_zip?: string | null;
+  baseline_beds?: number | null;
 }
 
 export interface AuthorityResult {

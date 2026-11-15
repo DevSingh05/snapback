@@ -275,6 +275,14 @@ class PriceResult(BaseModel):
     unit: UnitStatus = UnitStatus.NOT_CHECKED
     per_bed: bool = False  # the record prices by the bed, so the rent was not compared
     compared_beds: int | None = None  # the rent was compared with floor plans of this size
+    # Where the rent baseline came from: "costar" (the building's record) or "hud_safmr" (HUD's
+    # Small Area Fair Market Rent for the ZIP, a public baseline used only when CoStar has none).
+    # None when nothing was compared.
+    baseline_source: Literal["costar", "hud_safmr"] | None = None
+    # HUD baseline only: the typical rent for this ZIP and bedroom count, and which ZIP and size.
+    baseline_rent: int | None = None
+    baseline_zip: str | None = None
+    baseline_beds: int | None = None
 
 
 class PhoneMatch(StrEnum):
@@ -502,6 +510,9 @@ class CardLine(BaseModel):
     # The label's table key ("label.payment_ask"), so a page can tell which check a line came
     # from in any language. None on an older card.
     key: str | None = None
+    # Which source answered this line, by name ("CoStar record", "HUD", "Census", "HCAD",
+    # "RDAP", "TREC"). None on an older card or a line no outside source answered.
+    source_name: str | None = None
 
 
 class CardRow(BaseModel):
