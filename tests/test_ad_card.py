@@ -122,6 +122,26 @@ def test_a_quiet_confirming_line_reads_plainly_and_is_alone():
     )
 
 
+@pytest.mark.parametrize(
+    ("lang", "expected"),
+    [
+        (
+            "en",
+            "The ad says 3 bedrooms. CoStar's record of this home agrees (as of CoStar's last "
+            "research).",
+        ),
+        ("es", "3 recámaras"),
+    ],
+)
+def test_a_bedroom_count_that_matches_names_the_number(lang, expected):
+    # Issue #10 (Jeffrey's live dry run): the line read "The ad says  bedrooms".
+    record = PropertyRecord(property_id="fx-home-3", source=DataSource.FIXTURE, beds_range=(3, 3))
+    _, card = run(modules_for("3 bed house near the park", record), lang)
+    texts = [text for _, text in claims_lines(card)]
+    assert any(expected in text for text in texts), texts
+    assert not any("  " in text for text in texts)
+
+
 def test_no_claims_row_when_the_record_is_silent_or_the_ad_says_nothing_checkable():
     quiet = PropertyRecord(property_id="fx-home-3", source=DataSource.FIXTURE)
     for ad, record in (("Hardwood floors, pool", quiet), ("Nice home near the park", CARPET_HOME)):
