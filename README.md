@@ -7,39 +7,27 @@ screenshots. It checks the place, the person and the price against the home's ow
 you a short report with one verdict, and hands you back to the real listing and the office on
 record. Code sets every verdict. SNAPBACK never pays, books or sends anything for you.
 
+**Try it:** [snapback-navy.vercel.app](https://snapback-navy.vercel.app) · the app is one click in
+at [`/home`](https://snapback-navy.vercel.app/home) · a 30-second game at
+[`/spot`](https://snapback-navy.vercel.app/spot)
+
 [![CI](https://github.com/DevSingh05/snapback/actions/workflows/ci.yml/badge.svg)](https://github.com/DevSingh05/snapback/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
 ![Node 22](https://img.shields.io/badge/node-22-5FA04E?logo=nodedotjs&logoColor=white)
 
-[Why](#why) · [Screenshots](#screenshots) · [What it checks](#what-it-checks) ·
-[How it works](#how-it-works) · [Measured](#measured) · [Quickstart](#quickstart) ·
+![The SNAPBACK landing page, a 3D house under the line "Trust the home, not the ad"](docs/screenshots/readme/landing-hero.webp)
+
+[Why](#why) · [What it checks](#what-it-checks) · [How it works](#how-it-works) ·
+[What's new](#whats-new) · [Measured](#measured) · [Honest limits](#honest-limits) ·
+[Reproduce every number](#reproduce-every-number) · [Quick start](#quick-start) ·
 [Data and privacy](#data-and-privacy) · [Team](#team)
-
-The app also has an Under the hood page (`/under-the-hood`): one panel per technology with its measured numbers and a Show me link.
-
-## Screenshots
-
-Every screen below is FIXTURE: synthetic sample data made by the team, with 555 numbers and no
-real address. No sponsor image or record appears in this repo.
-
-![The landing page: Trust the home, not the ad](docs/screenshots/readme/landing-hero.webp)
-
-| Paste an ad, get one verdict                                                              | The report                                                                                |
-| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| ![A pasted ad and its Hold off verdict](docs/screenshots/readme/inside-chat-verdict.webp) | ![The report for case 7Q2M](docs/screenshots/readme/report.webp)                          |
-| **Walk it first: the ad photo over the 3D scan**                                          | **A synthetic case file of related ads**                                                  |
-| ![The twin page with the photo fade controls](docs/screenshots/readme/twin.webp)          | ![A case file laid out for a fraud report](docs/screenshots/readme/case-file.webp)        |
-| **Spot the scam: a 30-second game**                                                       | **Your check team: who ran, who was skipped, and why**                                    |
-| ![Spot the scam start card](docs/screenshots/readme/spot.webp)                            | ![The check team crew and the Decider's verdict](docs/screenshots/readme/check-team.webp) |
 
 ## Why
 
 In February 2025 a renter near Houston found a house on Craigslist, paid $2,200 in rent and
 deposit, and moved in. Two days later the real owner, a rental company, said the person who took
-the money did not own the house
-(ABC13 Houston, Feb 15 2025).
-The photos were of a real house. The person and the offer were fake, and the home's own record
-could have shown it.
+the money did not own the house (ABC13 Houston, Feb 15 2025). The photos were of a real house.
+The person and the offer were fake, and the home's own record could have shown it.
 
 | Number                                                                                                | Source                                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -60,11 +48,13 @@ The report sorts them into three rows.
 **The place: is this the real home?**
 
 - **CoStar's record of the building.** The address, the units and floor plans, and whether the
-  home is listed for sale on Homes.com while the ad offers it for rent.
+  home is listed for sale on Homes.com while the ad offers it for rent. A typed street address
+  joins the record it names.
 - **The building's Matterport 3D scan.** The ad's photos are matched against the scan. The report
-  says "Taken in this building (3 of 3 photos)" or "Taken in a different building. Red flag."
+  says "Taken in this building (3 of 3 photos)" or "Taken in a different building. Red flag." A
+  photo that matches only loosely gets a hold line, because it may be edited or made by AI.
 - **Vexcel aerial imagery**, shown on the place sheet as a picture of the building. It is evidence
-  for you to look at and never changes the verdict (see [Measured](#measured)).
+  for you to look at and never changes the verdict (see [Honest limits](#honest-limits)).
 
 **The person: are you talking to the people who rent it?**
 
@@ -85,16 +75,20 @@ The report sorts them into three rows.
 - **The ad's own words.** Asks for money, papers or haste before a viewing: "Zelle before a
   viewing. Red flag."
 
-**Then the hand-off.** The report shows the ad beside the real listing, with a "See the real
-listing" link to it on Apartments.com, and the office on record to call. When a listing is being
-copied, SNAPBACK drafts a note to that office. Every draft says "Draft, not sent. You send it."
+**One verdict, then the hand-off.** The report gives one of four verdicts: **Hold off for now**,
+**Don't pay. Something here doesn't match.**, **Could not place these photos** or **Checks passed.
+Still follow the two rules.** "Don't pay" needs proof: a listing photo taken in a different
+property, or a reply that copies one of the ad's own photos. A for-sale listing, a phone that
+isn't the office's or a name that isn't the owner's holds the payment but never says "Don't pay"
+alone. SNAPBACK never calls a named person a scammer.
 
-The report gives one of four verdicts: **Hold off for now**, **Don't pay. Something here doesn't
-match.**, **Could not place these photos** or **Checks passed. Still follow the two rules.** "Don't
-pay" needs proof: a listing photo taken in a different property, or a reply that copies one of the
-ad's own photos. A for-sale listing, a phone that isn't the office's or a name that isn't the
-owner's holds the payment but never says "Don't pay" alone. SNAPBACK never calls a named person a
-scammer.
+The report then shows the ad beside the real listing, with a "See the real listing" link to it on
+Apartments.com, and the office on record to call. When a listing is being copied, SNAPBACK drafts
+a note to that office. Every draft says "Draft, not sent. You send it."
+
+| Paste an ad, get one verdict                                                                                       | The report                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| ![The inside chat box with a pasted ad and its Hold off verdict](docs/screenshots/readme/inside-chat-verdict.webp) | ![The report for sample case 7Q2M, sorted into place, person and price](docs/screenshots/readme/report.webp) |
 
 ## How it works
 
@@ -108,8 +102,8 @@ flowchart TD
     decide{"verdict.decide()<br/>code sets the verdict"} --> report
     report["Report<br/>verdict, sourced lines,<br/>real listing, office to call"]
     checks -.-> planner
-    planner["deepagents Planner<br/>todo plan for this ad"] --> subs
-    subs["Sub-agents<br/>Rules, Record, Phone and office,<br/>Owner and licence, Photo, Web"] --> notes
+    planner["deepagents Planner<br/>todo plan, up to 2 follow-up checks,<br/>a drafted next step"] --> subs
+    subs["Check team<br/>Rules, Record, Phone and office,<br/>Owner and licence, Photo, Web"] --> notes
     notes["Case notes and trace<br/>LangSmith"] -.-> report
 ```
 
@@ -117,53 +111,84 @@ flowchart TD
    web app, or through the MCP server. Screenshots are read with local OCR, and the listing fields
    are pulled out behind a prompt-injection guard.
 2. **The checks run in code.** Each one reads its source and returns evidence with its origin.
-3. **`verdict.decide()`** in `src/snapback/verdict.py` turns that evidence into one verdict. It is
-   the only place a verdict is chosen. No model sees or sets it.
-4. **The deepagents Planner runs on every case,** in the background. It writes a todo plan, hands
-   each check family to its own sub-agent, and each sub-agent has one read-only tool and writes its
-   findings as notes in the agent file system. It explains the case and never moves it. The report
-   never waits on it, and a hard time limit stops it.
-   For each ad the Planner also picks up to 2 follow-up checks for the card's open gaps from a fixed
-   menu, and drafts one next step for the renter. It never sends that step, and the verdict code
-   never reads these picks.
-5. **The report.** The web report shows the verdict, the sourced lines, the ad beside the real
-   listing and a check team you can watch work beside the 3D scan. A readable trace shows each
-   member's model, tools, findings and time, and links out to the LangSmith run.
+3. **Code sets the verdict.** `verdict.decide()` in `src/snapback/verdict.py` turns that evidence
+   into one verdict. It is the only place a verdict is chosen. No model sees or sets it.
+4. **The Planner works the open gaps.** A LangChain deepagents Planner runs on every case in the
+   background. It writes a todo plan and hands each check family to its own member of the check
+   team. Each member has one read-only tool and writes its findings as notes in the agent file
+   system. For each ad the Planner picks up to 2 follow-up checks from a fixed menu, each tied to
+   one open gap on the card, and drafts one next step for the renter. A pick that names no open
+   gap is refused. The report never waits on the Planner, a hard time limit stops it, and the
+   verdict code never reads its picks.
+5. **You approve the next step.** The report shows the Planner's choice with a link to its trace,
+   and reloads when the Planner finishes. The drafted next step sits behind **Approve** and
+   **Edit**. Approve gives "Ready: you send it" and a Copy button. SNAPBACK never sends it.
+6. **The report.** The verdict, the sourced lines, the ad beside the real listing, and a check team
+   you can watch work beside the 3D scan. The trace shows each member's model, tools, findings and
+   time, and links out to the LangSmith run.
+
+| Your check team: who ran, who was skipped, and why                                        | Walk it first: the ad photo over the 3D scan                                     |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| ![The check team crew and the Decider's verdict](docs/screenshots/readme/check-team.webp) | ![The Twin page with the photo fade controls](docs/screenshots/readme/twin.webp) |
 
 **In iMessage it is a conversation.** Photos get an instant "checking" line, then a short report
-with a picture of the card: the verdict, the top two reasons and one next step. "Why?", "Who do I
-call?", "Is it safe?" and "How did you check?" are answered from the same case without a new check.
-It remembers your language, budget and beds for 30 days, and "forget me" deletes them. A voice memo
-in gets a spoken reply of 15 seconds or less, which never reads out a phone number, a rent or a
-link. Only allowlisted threads are answered, and it never texts first.
+with a picture of the card: the verdict, the top two reasons and one next step. Each red flag links
+to its proof on the case card, at most 3 links per reply. "Why?", "Who do I call?", "Is it safe?"
+and "How did you check?" are answered from the same case without a new check. It remembers your
+language, budget and beds for 30 days, and "forget me" deletes them. A voice memo in gets a spoken
+reply of 15 seconds or less, which never reads out a phone number, a rent or a link. Only
+allowlisted threads are answered, and it never texts first.
 
 **MCP server.** `src/snapback/mcp_server.py` exposes SNAPBACK as tools for any agent:
 `snapback_check_listing`, `snapback_get_verdict`, `snapback_why`, `snapback_what_to_do`,
 `snapback_find_places`, `snapback_accept_preference`, `snapback_walk_summary` and
-`snapback_draft_tour_request` (a draft only). It is a thin client over the
-API, so every rule and verdict stays in code. Setup: [docs/mcp.md](docs/mcp.md).
+`snapback_draft_tour_request` (a draft only). It is a thin client over the API, so every rule and
+verdict stays in code. Setup: [docs/mcp.md](docs/mcp.md).
 
 **Ring finder.** One renter's check answers one ad. An investigator needs the ring behind many.
 `src/snapback/forensics/` links ads by reworded text, shared photos, phone numbers and wordings,
 groups them with Louvain communities, and gives every finding its evidence: ad ids, the matched
 sentence, photo ids and a score. The investigator view at `/investigate` plays a 90-day stream day
-by day, shows each ring forming and its time to detect, and exports a case file per group. It runs
-on synthetic data only.
+by day, shows each ring forming and its time to detect, and opens a case file per group showing
+which phones, photos and wording tie the ads together. It runs on synthetic data only.
 
-Each flagged ring opens a case file with a detector-grounded case study, so an investigator sees which phones, photos and wording tie the ads together.
+![A synthetic case file of related ads, laid out for a fraud report](docs/screenshots/readme/case-file.webp)
 
 | Path                         | What it is                                                                        |
 | ---------------------------- | --------------------------------------------------------------------------------- |
 | `src/snapback/verdict.py`    | Evidence in, verdict out. Pure code, no model                                     |
-| `src/snapback/agent/`        | Case runner, intake, rules, deepagents graph and sub-agents, web checks, trace    |
+| `src/snapback/agent/`        | Case runner, intake, rules, deepagents graph and sub-agents, follow-ups, trace    |
 | `src/snapback/adapters/`     | CoStar records, Matterport, Vexcel, Harris County owner roll, TREC, Texas records |
 | `src/snapback/public/`       | HUD rents, Census address check, domain age (RDAP), reverse image search          |
 | `src/snapback/vision/`       | Photo placement in 3D scans: DINOv2 retrieval, DISK and LightGlue, RANSAC         |
-| `src/snapback/forensics/`    | The ring finder and its synthetic data generator                                  |
+| `src/snapback/forensics/`    | The ring finder, its case files and its synthetic data generator                  |
 | `src/snapback/api/`          | FastAPI: cases, report, card image, trace stream, search, drafts                  |
 | `src/snapback/mcp_server.py` | MCP server over the API                                                           |
 | `apps/web/`                  | Vite, React and TypeScript web app                                                |
 | `apps/sidecar/`              | iMessage sidecar on Photon 2.0, with voice                                        |
+
+## What's new
+
+Since the last full rewrite of this README:
+
+- **Worlds landing.** `/` opens on a 3D house, then how a check works, how you can use it, and
+  "Taken here". The app is one click in at `/home`.
+- **The chat box is the home inside.** One large box, two starter chips, and clear ways into the
+  map and the Finder.
+- **"Would settle it."** A Hold or unverified card names the one fact that would settle it (for
+  example, the office confirms this number), picked from the card's own Not confirmed and Not
+  checked lines.
+- **Approve or Edit the next step.** The Planner's drafted step is shown on your report. You
+  approve it, edit it, and copy it. Nothing is sent.
+- **iMessage flags link to proof.** Each red flag in a reply links to its line on the case card.
+- **Spot the scam (`/spot`).** Four composed ads, one per screen, with Looks fine and Hold off
+  buttons. The reveal highlights each phrase SNAPBACK's text rules held off on. Every ad is
+  SYNTHETIC, and the verdicts were precomputed by the real rules engine.
+- **Why trust this.** The Under the hood page (`/under-the-hood`) has one panel per technology and
+  a table of each eval beside its baseline on the same set, with n and its label. Rows with no
+  baseline say "None measured".
+
+![Spot the scam, the start card of the 30-second game](docs/screenshots/readme/spot.webp)
 
 ## Measured
 
@@ -178,12 +203,11 @@ photos. FIXTURE means team-made data through the real pipeline. SYNTHETIC means 
 | Batch run: composed ads and labelled messages through the real pipeline (`eval/ads_results.csv`, #262)           | 117 of 123 handled as expected, including 43 of 43 clean messages left alone                                                                                                                 | 123                                | FIXTURE   |
 | Deep agent in the background (#273, real model runs)                                                             | Report returns in 0.03 to 0.09 s without waiting; agent done in a median 22.9 s, no fallbacks                                                                                                | 6 cases, 5 timed runs              | FIXTURE   |
 | Ring finder over a 90-day stream of 3,039 ads with 10 seeded rings (#293)                                        | 10 of 10 rings flagged, median 2.5 days after a ring's first ad; 0 of 2,684 honest ads flagged                                                                                               | 10 rings, 2,684 honest ads         | SYNTHETIC |
+| Ring finder on reworded ads, phone and photo-link fallback on (#312)                                             | 9 of 10 rings flagged; 0 of 2,684 honest ads flagged; a keyword baseline found 0 of 10; only 171 of 355 ring ads (48%) caught once reworded                                                  | 10 rings, 2,684 honest ads         | SYNTHETIC |
 | Ring finder on a 301-ad corpus with 4 seeded rings                                                               | 4 of 4 rings, 0 of 244 honest ads flagged; a keyword search found 0 of 4                                                                                                                     | 301 ads                            | SYNTHETIC |
 | Vexcel aerial matcher v2, SIFT with RANSAC (`eval/vexcel/results.json`)                                          | 52 of 54 placed right (right building 23 of 24, next-door 17 of 18, other wrong 12 of 12). Held-out half, with thresholds tuned on the other half: right building 11 of 12, next-door 8 of 9 | 54 cases                           | LIVE      |
 
-| Ring finder on reworded ads, phone and photo-link fallback on (#312) | 9 of 10 rings flagged; 0 of 2,684 honest ads flagged; a keyword baseline found 0 of 10; only 171 of 355 ring ads (48%) caught once reworded | 10 rings, 2,684 honest ads | SYNTHETIC |
-
-**What the numbers mean, and where they stop.**
+## Honest limits
 
 - **Aerials are evidence only.** The first matcher (v1, perceptual hashes) scored 17 of 28 because a
   shifted view of the same building looked like the building next door. The v2 matcher fixes most
@@ -197,8 +221,13 @@ photos. FIXTURE means team-made data through the real pipeline. SYNTHETIC means 
 - **Not every home has a scan or a record.** Without a scan the photo row says "Not checked", and
   the person and price rows run on public records. HUD's rent cutoff is not measured yet.
 - **Houston and Texas first.** Search, the owner roll and the licence list cover Houston and Texas.
+- **The ring finder flags rings; it does not yet tell them apart.** The 10 seeded rings land in 6
+  groups, and 0 of 10 is a group of its own at a 70 percent overlap bar (SYNTHETIC,
+  `eval/forensics/paraphrase_results.json`).
 - **The ring finder is tested on data built alongside it,** so its numbers show the method works
   on rings shaped like these. They are not an accuracy claim for real listings.
+- **iMessage answers allowlisted threads only.** It never texts first, so a stranger's phone gets
+  no reply until its thread is added.
 
 ## Reproduce every number
 
@@ -214,14 +243,14 @@ Rows marked **Open** run on what is committed. Where no script exists we say so.
 | Batch of composed ads (117 of 123)                     | `make eval-ads`                                                                                                                                  | **Open** (FIXTURE). With the kit it writes `data/eval/ads_results.live.csv` instead                                                                |
 | Deep agent in the background (22.9 s)                  | No script. Timed by hand on `make api` with `uv sync --extra agent`, reading the case timeline                                                   | Model key in `.env`; **Kit** for the LIVE cases                                                                                                    |
 | Ring finder over 90 days (10 of 10, 0 of 2,684)        | `uv run python -m snapback.forensics.detect`                                                                                                     | **Open** (SYNTHETIC); rewrites `fixtures/forensics/stream_timeline.json`                                                                           |
-| Ring finder on 301 ads (4 of 4, keyword 0 of 4)        | `uv run pytest tests/test_forensics.py`                                                                                                          | **Open** (SYNTHETIC); the test asserts 4 of 4 rings and that the keyword baseline finds under half; the exact 0 of 4 is in the `evaluate()` output |
 | Ring finder on reworded ads (9 of 10, keyword 0 of 10) | `PYTHONPATH=src uv run python -m snapback.forensics.paraphrase`                                                                                  | **Open** (SYNTHETIC); rewrites `eval/forensics/paraphrase_results.json`                                                                            |
+| Ring finder on 301 ads (4 of 4, keyword 0 of 4)        | `uv run pytest tests/test_forensics.py`                                                                                                          | **Open** (SYNTHETIC); the test asserts 4 of 4 rings and that the keyword baseline finds under half; the exact 0 of 4 is in the `evaluate()` output |
 | Vexcel aerial matcher (52 of 54)                       | `uv run python scripts/measure_vexcel.py --mode live`                                                                                            | **Kit** and a Vexcel key for LIVE; without them `--mode fixture` runs the committed synthetic set, which is not this row                           |
 
 `make eval` also rewrites `eval/results.csv` and runs the regression gate against
 `eval/baseline.csv`. Counts only are written to the eval files; no listing text, phone or photo.
 
-## Quickstart
+## Quick start
 
 Needs [uv](https://docs.astral.sh/uv/), Python 3.12, Node 22 and npm.
 
@@ -233,7 +262,8 @@ make web                 # web app on http://localhost:5173, in a second termina
 ```
 
 Fixture mode (`SNAPBACK_DATA_SOURCE=fixture`, the default) runs on synthetic, team-made data, and
-every screen and number says FIXTURE. To see staged cases end to end:
+every screen and number says FIXTURE. Every screenshot in this README is FIXTURE, with 555 numbers
+and no real address. To see staged cases end to end:
 
 ```bash
 uv run python -m snapback.agent.demo   # prints the staged cards
@@ -286,7 +316,7 @@ The full account is in [DATA_USE.md](DATA_USE.md).
   Every phone number in the fixtures is a 555 number.
 - **Names stay out.** A private owner reads "a private owner". A company is named only when it
   matches one we already know. No real addresses or renter names are in code, fixtures, tests or
-  docs.
+  docs. No sponsor image or record appears in this repo.
 - **Photos are kept as hashes, never pixels,** for 7 days.
 - **Delete anytime.** `make purge` deletes everything in `data/`. To remove one renter's cases:
 
@@ -294,6 +324,16 @@ The full account is in [DATA_USE.md](DATA_USE.md).
   uv run python -m snapback.safety delete-case <case_id>
   uv run python -m snapback.safety delete-renter <renter_id>
   ```
+
+## What a realtor said
+
+A realtor reviewed SNAPBACK as rental tour prep, with scam safety built in: find a place, see it on
+the map, walk it in 3D before you go, and check the ad before any money moves.
+
+> "If he can add in additional safety features for preventing further scams and financial scams, I
+> think this would be a very good app to have in the marketplace."
+>
+> Ashwin Veeravalli, Realtor, The Agency, Los Gatos CA
 
 ## Team
 
@@ -314,18 +354,12 @@ Read [AGENTS.md](AGENTS.md) before contributing. It holds the hard rules: no spo
 secrets in git, code sets the verdict, LIVE or FIXTURE on everything, no number before it is
 measured, and never call a named person a scammer.
 
-## What a realtor said
-
-A realtor reviewed SNAPBACK as rental tour prep, with scam safety built in: find a place, see it on
-the map, walk it in 3D before you go, and check the ad before any money moves.
-
-> "If he can add in additional safety features for preventing further scams and financial scams, I
-> think this would be a very good app to have in the marketplace."
->
-> Ashwin Veeravalli, Realtor, The Agency, Los Gatos CA
-
 ## Rights
 
 Rights in this project are assigned to CoStar Realty Information, Inc. under the HackPrinceton Fall
 2026 hackathon agreement. No licence is granted. Third-party libraries remain under their own
 licences.
+
+---
+
+Built at HackPrinceton 2026.
