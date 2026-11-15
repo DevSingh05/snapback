@@ -19,6 +19,8 @@ export const CHOICE_LABELS: Record<ChoiceKind, string> = {
   which_photo: "Which photo to search for",
   dwell_rooms: "Which rooms to dwell on",
   lead_checks: "Which checks lead",
+  follow_up: "Which follow-up check",
+  next_step: "Which next step to draft",
 };
 
 const KIND_LABELS: Record<TraceEvent["kind"], string> = {
