@@ -36,18 +36,9 @@
     }
   },
   "hash_diff_range": {
-    "right": [
-      5,
-      31
-    ],
-    "next_door": [
-      14,
-      42
-    ],
-    "wrong": [
-      27,
-      38
-    ]
+    "right": [5, 31],
+    "next_door": [14, 42],
+    "wrong": [27, 38]
   },
   "hash_threshold": 8,
   "bar": "18 of 20 (at least 20 cases, 90 percent), and 6+ next-door cases at 90 percent",
