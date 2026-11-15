@@ -10,6 +10,8 @@
 :root .pane,
 :root .lcard,
 :root .lcard-inset,
+:root .legend,
+:root .attribution,
 :root .fd-honest,
 :root .fd-example,
 :root .fd-composer,
@@ -33,7 +35,17 @@
 :root .uh-thread,
 :root .uh-bubble,
 :root .uh-nums,
-:root .uh-foot {
+:root .uh-foot,
+:root .uh-jump,
+:root .uh-panel,
+:root .sw-strip,
+:root .sw-board,
+:root .sw-lanes,
+:root .inv-robust,
+:root .inv-error,
+:root .case-band,
+:root .ob-photo,
+:root .of-panel {
   border-radius: var(--radius);
 }
 /* a card that holds a photograph or a coloured band clips it to the same corner */
@@ -42,7 +54,10 @@
 :root .st-pick,
 :root .st-frame,
 :root .uh-show,
-:root .replay-page {
+:root .replay-page,
+:root .sw-strip,
+:root .sw-board,
+:root .ob-photo {
   overflow: hidden;
 }
 
@@ -64,7 +79,10 @@
 :root .st-ad-count,
 :root .st-ctl,
 :root .uh-mark,
-:root .uh-stamp {
+:root .uh-stamp,
+:root .inv-chip,
+:root .sw-play,
+:root .ui-pin {
   border-radius: var(--radius-pill);
 }
 
