@@ -11,11 +11,26 @@ record. Code sets every verdict. SNAPBACK never pays, books or sends anything fo
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
 ![Node 22](https://img.shields.io/badge/node-22-5FA04E?logo=nodedotjs&logoColor=white)
 
-[Why](#why) · [What it checks](#what-it-checks) · [How it works](#how-it-works) ·
-[Measured](#measured) · [Quickstart](#quickstart) · [Data and privacy](#data-and-privacy) ·
-[Team](#team)
+[Why](#why) · [Screenshots](#screenshots) · [What it checks](#what-it-checks) ·
+[How it works](#how-it-works) · [Measured](#measured) · [Quickstart](#quickstart) ·
+[Data and privacy](#data-and-privacy) · [Team](#team)
 
 The app also has an Under the hood page (`/under-the-hood`): one panel per technology with its measured numbers and a Show me link.
+
+## Screenshots
+
+Every screen below is FIXTURE: synthetic sample data made by the team, with 555 numbers and no
+real address. No sponsor image or record appears in this repo.
+
+![The landing page: Trust the home, not the ad](docs/screenshots/readme/landing-hero.webp)
+
+| Paste an ad, get one verdict                                                              | The report                                                                                |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ![A pasted ad and its Hold off verdict](docs/screenshots/readme/inside-chat-verdict.webp) | ![The report for case 7Q2M](docs/screenshots/readme/report.webp)                          |
+| **Walk it first: the ad photo over the 3D scan**                                          | **A synthetic case file of related ads**                                                  |
+| ![The twin page with the photo fade controls](docs/screenshots/readme/twin.webp)          | ![A case file laid out for a fraud report](docs/screenshots/readme/case-file.webp)        |
+| **Spot the scam: a 30-second game**                                                       | **Your check team: who ran, who was skipped, and why**                                    |
+| ![Spot the scam start card](docs/screenshots/readme/spot.webp)                            | ![The check team crew and the Decider's verdict](docs/screenshots/readme/check-team.webp) |
 
 ## Why
 
