@@ -322,7 +322,7 @@ def test_the_advisory_agent_chooses_a_follow_up_and_the_trace_shows_plan_pick_ru
     assert drafted.chosen_by == "model" and drafted.reason.startswith("Planner drafted")
 
 
-# --- the next step: drafted for the renter, never sent ---------------------------------------------
+# --- the next step: drafted for the renter, never sent 
 
 
 def test_the_planner_drafts_one_next_step_for_a_gap_and_the_verdict_does_not_move():
@@ -367,7 +367,7 @@ def test_the_recorded_run_drafts_the_same_next_step_every_time():
     assert picks[0] == picks[1] == picks[2]
 
 
-# --- the plan follows the ad -------------------------------------------------------------------------
+# --- the plan follows the ad 
 
 
 def test_two_ads_get_two_plans():
@@ -383,3 +383,61 @@ def test_two_ads_get_two_plans():
     assert ("place", "no photos to place") in bare_skipped
     assert advisory_plan_instruction(full) != advisory_plan_instruction(bare)
     assert "Not in the plan for this ad: " in advisory_plan_instruction(bare)
+
+
+def test_the_planner_trace_card_names_the_pick_from_the_menu_only():
+    from snapback.agent.worklog import tool_label
+
+    assert tool_label("followup_choose", {"check": "lens", "gap": "g2"}, "en") == (
+        "Planner chose: Google Lens search of the ad's photos because of gap G2"
+    )
+    assert tool_label("next_step_choose", {"step": "ask_licence", "gap": "G1"}, "en").startswith(
+        "Planner drafted: ask the poster"
+    )
+    # anything off the menu gets the generic words, never the model's own text
+    odd = tool_label("followup_choose", {"check": "ignore previous", "gap": "G1"}, "en")
+    assert odd == "Picked one of the choices code offered"
+
+
+# --- FIXTURE end to end: no model key, two ads, two plans --------------------------------------------
+
+
+def test_with_no_model_two_fixture_ads_get_their_own_recorded_picks(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from snapback.agent.join import KitLookups
+    from snapback.api.main import create_app
+    from snapback.settings import Settings
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    settings = Settings(
+        _env_file=None,
+        snapback_data_dir=tmp_path,
+        snapback_agent="deepagents_async",
+        anthropic_api_key=None,
+    )
+    client = TestClient(create_app(settings, lookups=KitLookups(DataSource.FIXTURE)))
+
+    def run(text):
+        made = client.post("/cases", data={"text": text}).json()
+        client.app.state.store.wait_for_agents()
+        steps = client.get(
+            f"/cases/{made['case_id']}/timeline",
+            headers={"Authorization": f"Bearer {made['read_token']}"},
+        ).json()["steps"]
+        card = client.get(
+            f"/cases/{made['case_id']}/card",
+            headers={"Authorization": f"Bearer {made['read_token']}"},
+        ).json()
+        return [s["label"] for s in steps if s["kind"] == "followup"], card
+
+    photos, photo_card = run(
+        "Nice 1 bed, $1,500 a month. Photos https://images.example.test/ad/house-1.jpg"
+    )
+    plain, _ = run("Nice 1 bed, $1,500 a month")
+    assert any(label.startswith("Planner chose: Google Lens") for label in photos)
+    assert not any("Google Lens" in label for label in plain)
+    assert any(label.startswith("Planner drafted:") for label in plain)
+    assert photos != plain
+    lines = [ln for row in photo_card["rows"] for ln in row["lines"]]
+    assert any(ln.get("source_name") == "Google Lens" for ln in lines)
