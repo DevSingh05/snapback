@@ -166,3 +166,17 @@ test("P4: 'who do I call?' by voice gets a spoken answer, and no new case", asyn
   assert.match(said, /Call Fixture Living LLC through oakcourt\.example/);
   assert.doesNotMatch(said, /https?:/);
 });
+
+test("#281 review: unseparated numbers and street addresses are never spoken", () => {
+  const leaky = REPORT.replace(
+    "- We could not confirm who is allowed to rent this unit.",
+    "- The poster asks you to text 7135550100 first.",
+  ).replace("Call Fixture Living LLC", "Call Fixture Living LLC at 2100 Travis St");
+  const said = spokenReply(leaky);
+  assert.doesNotMatch(said, /7135550100|2100|Travis/);
+  assert.match(said, /^Hold off for now\. A fresh photo proved/);
+});
+
+test("#281 review: a reply with nothing safe to say speaks nothing", () => {
+  assert.equal(spokenReply("Case 7135550100"), "");
+});

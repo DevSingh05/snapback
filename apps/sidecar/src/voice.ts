@@ -127,8 +127,9 @@ export function heardFailure(fail: "off" | "too_long" | "unheard"): string {
 /** P4 (#11): 15 s of speech at about 150 words a minute. */
 export const SPOKEN_MAX_WORDS = 38;
 
+// a phone (separated or not), a rent, any 4+ digit run, or a street address (#281 review)
 const NO_DIGITS =
-  /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]\d{4}|\b\d{3}[-.\s]\d{4}\b|\$\s?\d|\b\d{1,3},\d{3}\b/;
+  /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]\d{4}|\b\d{3}[-.\s]\d{4}\b|\$\s?\d|\b\d{1,3},\d{3}\b|\d{4,}|\d{2,}\s+\w+\s+(st|ave|rd|dr|blvd|ln|way)\b/i;
 const LINK = /https?:\/\/|\/case\//i;
 const REASONS = /^(Before you pay|Why|Antes de pagar|Por qué):\s*$/i;
 const NEXT = /^(Next|Siguiente):\s*/i;

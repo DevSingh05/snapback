@@ -367,7 +367,7 @@ test("U1: through Photon, one 'checking' reply goes out before the report", asyn
     { ...config(calls), quietMs: 5, acknowledge: true },
   );
   // P1 (#11, Photon v2): photos get the placing line at once, never 20 s of silence
-  assert.equal(sent[0], "Got 1 photo. Placing it in the building's 3D scan, about 20 seconds.");
+  assert.equal(sent[0], "Got 1 photo. Checking where it was taken, about 20 seconds.");
   assert.equal(sent.filter((x) => typeof x === "string" && x.startsWith("Got ")).length, 1);
   assert.match(String(sent[1]), /^Hold off for now/);
 });
@@ -382,7 +382,7 @@ test("P1: the 'checking' reply counts the photos, and text alone keeps the recor
     config([]),
     onChecking,
   );
-  assert.equal(said[0], "Got 3 photos. Placing them in the building's 3D scan, about 20 seconds.");
+  assert.equal(said[0], "Got 3 photos. Checking where they were taken, about 20 seconds.");
   await handleMessage(ad("2 bed $900, Zelle first"), client(), config([]), onChecking);
   assert.match(said[1] ?? "", /^Got it\. Checking this against CoStar's record/);
 });
@@ -399,10 +399,7 @@ test("P1: in Spanish, the photo line is in Spanish", async () => {
     config([]),
     async (text?: string) => void said.push(text ?? ""),
   );
-  assert.equal(
-    said[0],
-    "Recibí 2 fotos. Las ubico en el escaneo 3D del edificio, unos 20 segundos.",
-  );
+  assert.equal(said[0], "Recibí 2 fotos. Reviso dónde se tomaron, unos 20 segundos.");
 });
 
 test("P2: pictures with no typed words are read as the ad first, then placed", async () => {
@@ -412,7 +409,7 @@ test("P2: pictures with no typed words are read as the ad first, then placed", a
   await handleMessage({ ...ad(""), images: [blob()] }, client(), config([]), onChecking);
   assert.equal(
     said[0],
-    "Got 1 picture. Reading the ad and placing any photos in the building's 3D scan, about 20 seconds.",
+    "Got 1 picture. Reading the ad and checking where any photos were taken, about 20 seconds.",
   );
   await handleMessage({ ...ad("  "), images: [blob(), blob()] }, client(), config([]), onChecking);
   assert.match(said[1] ?? "", /^Got 2 pictures\. Reading the ad/);
@@ -432,7 +429,7 @@ test("P2: in Spanish (a learned language), the screenshot line is in Spanish", a
   );
   assert.equal(
     said[0],
-    "Recibí 1 imagen. Leo el anuncio y ubico las fotos en el escaneo 3D del edificio, unos 20 segundos.",
+    "Recibí 1 imagen. Leo el anuncio y reviso dónde se tomaron las fotos, unos 20 segundos.",
   );
 });
 
@@ -608,4 +605,13 @@ test("the card's own headline (#256) is used when set, in the report and in foll
   assert.equal((c.texts[0] ?? "").split("\n")[0], honest.headline);
   // without one, the locked headline for the state
   assert.equal(reportText(summarised, LINK).split("\n")[0], "Hold off for now");
+});
+
+test("#281 review: the photo line never promises a 3D scan before one is known", async () => {
+  const blob = () => new Blob([new Uint8Array([1])], { type: "image/jpeg" });
+  const said: string[] = [];
+  const onChecking = async (text?: string) => void said.push(text ?? "");
+  await handleMessage({ ...ad("2 bed $900"), images: [blob()] }, client(), config([]), onChecking);
+  await handleMessage({ ...ad(""), images: [blob(), blob()] }, client(), config([]), onChecking);
+  for (const line of said) assert.doesNotMatch(line, /3D scan|escaneo/);
 });

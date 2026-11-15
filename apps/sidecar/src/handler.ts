@@ -204,18 +204,18 @@ function checkingText(msg: InboundMessage, config: SidecarConfig, lang: Lang): s
   if ((msg.text ?? "").trim() === "") {
     // P2: no typed words, so a picture is likely the ad's screenshot (the API reads it locally)
     if (lang === "es") {
-      return `Recibí ${n} ${n === 1 ? "imagen" : "imágenes"}. Leo el anuncio y ubico las fotos en el escaneo 3D del edificio, unos 20 segundos.`;
+      return `Recibí ${n} ${n === 1 ? "imagen" : "imágenes"}. Leo el anuncio y reviso dónde se tomaron las fotos, unos 20 segundos.`;
     }
-    return `Got ${n} ${n === 1 ? "picture" : "pictures"}. Reading the ad and placing any photos in the building's 3D scan, about 20 seconds.`;
+    return `Got ${n} ${n === 1 ? "picture" : "pictures"}. Reading the ad and checking where any photos were taken, about 20 seconds.`;
   }
   if (lang === "es") {
     return n === 1
-      ? "Recibí 1 foto. La ubico en el escaneo 3D del edificio, unos 20 segundos."
-      : `Recibí ${n} fotos. Las ubico en el escaneo 3D del edificio, unos 20 segundos.`;
+      ? "Recibí 1 foto. Reviso dónde se tomó, unos 20 segundos."
+      : `Recibí ${n} fotos. Reviso dónde se tomaron, unos 20 segundos.`;
   }
   return n === 1
-    ? "Got 1 photo. Placing it in the building's 3D scan, about 20 seconds."
-    : `Got ${n} photos. Placing them in the building's 3D scan, about 20 seconds.`;
+    ? "Got 1 photo. Checking where it was taken, about 20 seconds."
+    : `Got ${n} photos. Checking where they were taken, about 20 seconds.`;
 }
 
 type Intent = "why" | "now" | "call" | "safe" | "places" | "how";
