@@ -83,16 +83,22 @@ _HARRIS_CITIES = (
     "West University Place", "Seabrook", "Crosby", "Highlands", "Kingwood", "Atascocita",
     "Aldine", "Katy Heights",
 )  # fmt: skip
+# The city counts only in the city slot: right before the state or a ZIP ("Houston, TX 77096",
+# "Houston 77096"). "500 Houston St, Fort Worth TX" names a street, not a Harris County city.
 _HARRIS_CITY = re.compile(
-    r"(?<![A-Za-z])(?:" + "|".join(re.escape(c) for c in _HARRIS_CITIES) + r")(?![A-Za-z])", re.I
+    r"(?<![A-Za-z])(?:"
+    + "|".join(re.escape(c) for c in _HARRIS_CITIES)
+    + r")\s{0,3},?\s{0,3}(?:TX\b|Texas\b|\d{5}\b)",
+    re.I,
 )
 
 
 def in_harris_county(text: str, place: PlaceCheck | None) -> bool:
     """May the HCAD owner roll be asked about this ad? When the Census check found the address,
     its county decides (48201 is Harris). Without that, only an ad that names a Harris County
-    city. The HCAD street key has no city or county, so a street in Dallas must never be matched
-    against a Harris street of the same name."""
+    city, in the city slot (before the state or a ZIP). The HCAD street key has no city or
+    county, so a street in Dallas must never be matched against a Harris street of the same
+    name."""
     if place is not None and place.status is PublicStatus.FOUND and place.county_fips:
         return place.county_fips == HARRIS_FIPS
     return _HARRIS_CITY.search(text or "") is not None

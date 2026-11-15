@@ -57,7 +57,7 @@ def verify(matcher: Matcher, a: Image.Image, b: Image.Image, ransac_px: float) -
     if len(pa) < 4:
         return Verification(len(pa), 0, None)
     h, mask = ransac_homography(pa, pb, ransac_px)
-    if h is not None and reflects(h, a.size):
+    if h is not None and reflects(h, tuple(pa[mask].mean(axis=0))):
         # A photo and a scan view of the same scene are never related by a mirror image. A
         # reflecting homography is a coincidence (often a mirrored photo matching some other
         # room's mirror-image layout): no inliers. A truly mirrored copy is placed by the flipped
@@ -68,22 +68,17 @@ def verify(matcher: Matcher, a: Image.Image, b: Image.Image, ransac_px: float) -
     )
 
 
-def reflects(h: np.ndarray, size: tuple[int, int]) -> bool:
-    """True when the homography turns the photo into its mirror image: three corners of the photo
-    keep their orientation (signed area) under any real view change, and swap it under a mirror."""
-    w, ht = size
-    corners = np.array([[0.0, 0.0, 1.0], [w, 0.0, 1.0], [0.0, ht, 1.0]])
-    mapped = corners @ h.T
-    if np.any(np.abs(mapped[:, 2]) < 1e-12):
-        return True  # a corner sent to infinity: not a usable view change
-    xy = mapped[:, :2] / mapped[:, 2:3]
-
-    def area(p: np.ndarray) -> float:
-        return float(
-            (p[1, 0] - p[0, 0]) * (p[2, 1] - p[0, 1]) - (p[1, 1] - p[0, 1]) * (p[2, 0] - p[0, 0])
-        )
-
-    return area(corners[:, :2]) * area(xy) < 0
+def reflects(h: np.ndarray, point: tuple[float, float]) -> bool:
+    """True when the homography mirrors the photo around `point` (where the inliers are). The
+    local orientation of a homography is the sign of det(H) / w^3 there; a real view change keeps
+    it positive and a mirror image makes it negative. Unlike the signed area of three mapped
+    corners, it stays right on a wide view turned far enough that a corner lands behind the
+    camera (w < 0)."""
+    x, y = point
+    w = float(h[2, 0] * x + h[2, 1] * y + h[2, 2])
+    if abs(w) < 1e-12:
+        return True  # sent to infinity: not a usable view change
+    return float(np.linalg.det(h)) / w**3 < 0
 
 
 def _spread(points: np.ndarray, size: tuple[int, int]) -> float:

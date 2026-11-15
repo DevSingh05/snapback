@@ -559,6 +559,9 @@ EN: dict[str, str] = {
         "The poster says they are the owner, and the owner of record is someone else."
     ),
     "reason.unit_flag": "The unit in the listing does not fit the record for this building.",
+    "reason.aerial_wrong_building": (
+        "The aerial photo of the address in the listing shows a different building."
+    ),
     "reason.not_indexed": (
         "This property has no 3D twin in our index, so the photos could not be checked."
     ),
@@ -1214,6 +1217,9 @@ ES: dict[str, str] = {
         "Quien publica dice ser el propietario, y el propietario registrado es otro."
     ),
     "reason.unit_flag": "La unidad del anuncio no encaja con el registro de este edificio.",
+    "reason.aerial_wrong_building": (
+        "La foto aérea de la dirección del anuncio muestra un edificio distinto."
+    ),
     "reason.not_indexed": (
         "Esta propiedad no tiene un gemelo 3D en nuestro índice, así que no se pudieron "
         "revisar las fotos."
@@ -1600,6 +1606,10 @@ EN.update(
         "worklog.tool.task": "Handed work to: {name}",
         "worklog.tool.task_other": "Handed work to another helper",
         "worklog.tool.other": "Used one of its tools",
+        "worklog.tool.followup_open": "Read the card's open gaps and the follow-up menu",
+        "worklog.tool.next_open": "Looked at the next steps code can draft",
+        "worklog.tool.followup": "Planner chose: {check} because of gap {gap}",
+        "worklog.tool.next": "Planner drafted: {check} for gap {gap}",
         "worklog.result.done": "Done.",
         "worklog.result.running": "Still working.",
         "worklog.result.saved": "Saved. Derived text only; no result in it.",
@@ -1780,6 +1790,10 @@ ES.update(
         "worklog.tool.task": "Pasó trabajo a: {name}",
         "worklog.tool.task_other": "Pasó trabajo a otro ayudante",
         "worklog.tool.other": "Usó una de sus herramientas",
+        "worklog.tool.followup_open": "Leyó los huecos de la tarjeta y el menú de seguimiento",
+        "worklog.tool.next_open": "Miró los siguientes pasos que el código puede redactar",
+        "worklog.tool.followup": "El planificador eligió: {check} por el hueco {gap}",
+        "worklog.tool.next": "El planificador redactó: {check} para el hueco {gap}",
         "worklog.result.done": "Hecho.",
         "worklog.result.running": "Sigue trabajando.",
         "worklog.result.saved": "Guardado. Solo texto derivado; sin resultado.",
@@ -1933,6 +1947,128 @@ COSTAR_AFFILIATION_QUOTE = (
     "Claim of affiliation with us. Scammers may impersonate Apartments.com or Apartment Finder "
     "to make it seem like we participate in the lease transaction or transfer of funds."
 )
+
+# The Planner's follow-up checks (agent/followups.py): information lines only, never a finding.
+EN.update(
+    {
+        "label.followup": "Follow-up",
+        "followup.not_checked": "Not checked",
+        "followup.result": "{text} (source: {source})",
+        "followup.lens.found": "The ad's photos were found on a listing page",
+        "followup.lens.no_match": "The ad's photos were not found on a listing page",
+        "followup.lens.not_checked": "The photo search did not finish, so it was not checked",
+        "followup.phrase_search.found": "The ad's own words were found in {count} other posts",
+        "followup.phrase_search.no_match": "The ad's own words were not found anywhere else",
+        "followup.phrase_search.not_checked": (
+            "The web search did not finish, so it was not checked"
+        ),
+        "followup.census.found": "The Census found the ad's address",
+        "followup.census.no_match": "The Census has no such address",
+        "followup.census.not_checked": "The Census check did not finish, so it was not checked",
+        "followup.rdap.found": "The link's domain age was found",
+        "followup.rdap.no_match": "The link's domain has no registration record",
+        "followup.rdap.not_checked": "The domain lookup did not finish, so it was not checked",
+        "followup.reason.lens": ("The photos are the open question, so search the web for them."),
+        "followup.reason.phrase_search": (
+            "The poster is not confirmed, so look for the ad's words posted elsewhere."
+        ),
+        "followup.reason.census": "The address was not checked, so try the Census again.",
+        "followup.reason.rdap": "The link was not checked, so look up its domain again.",
+        "trace.followup.pick": "Planner chose: {check} because {gap}. {reason}",
+        "trace.followup.recorded": "Recorded pick (FIXTURE): {reason}",
+        "trace.followup.ran": "Follow-up {check}: {result}",
+        "timeline.followup": "Planner chose: {check} because {gap}",
+        "timeline.followup_result": "Follow-up check",
+        "trace.next.pick": "Planner drafted the next step: {step} because {gap}. {reason}",
+        "timeline.next_step": "Planner drafted: {step} because {gap}",
+        "next.done": "Drafted for the renter, not sent: {draft}",
+        "next.note": (
+            "Next step (draft, never sent): {step}\nFor: {gap}\nWhy: {reason}\nDraft: {draft}"
+        ),
+        "next.draft.ask_licence": (
+            "Before we go further, what is your Texas real estate licence number, and which "
+            "brokerage sponsors it?"
+        ),
+        "next.draft.call_office": (
+            "Call the leasing office on record, using the number on its own website, not the one "
+            "in the ad, and ask whether this home is theirs to rent."
+        ),
+        "next.draft.tour_questions": (
+            "Bring the tour questions to the viewing, and pay nothing before you have seen the "
+            "home and signed a lease."
+        ),
+        "next.reason.ask_poster": (
+            "Nobody has shown they are at the home, so ask for a photo there."
+        ),
+        "next.reason.ask_licence": "The poster's licence is not confirmed, so ask for its number.",
+        "next.reason.call_office": "The poster is not confirmed, so ask the office on record.",
+        "next.reason.tour_questions": (
+            "The lease is not checked, so take the questions to the tour."
+        ),
+    }
+)
+ES.update(
+    {
+        "label.followup": "Seguimiento",
+        "followup.not_checked": "No comprobado",
+        "followup.result": "{text} (fuente: {source})",
+        "followup.lens.found": "Las fotos del anuncio aparecen en una página de anuncios",
+        "followup.lens.no_match": "Las fotos del anuncio no aparecen en una página de anuncios",
+        "followup.lens.not_checked": "La búsqueda de fotos no terminó; no se comprobó",
+        "followup.phrase_search.found": (
+            "El texto del anuncio aparece en otras {count} publicaciones"
+        ),
+        "followup.phrase_search.no_match": "El texto del anuncio no aparece en ningún otro sitio",
+        "followup.phrase_search.not_checked": "La búsqueda web no terminó; no se comprobó",
+        "followup.census.found": "El Censo encontró la dirección del anuncio",
+        "followup.census.no_match": "El Censo no tiene esa dirección",
+        "followup.census.not_checked": "La consulta al Censo no terminó; no se comprobó",
+        "followup.rdap.found": "Se encontró la antigüedad del dominio del enlace",
+        "followup.rdap.no_match": "El dominio del enlace no tiene registro",
+        "followup.rdap.not_checked": "La consulta del dominio no terminó; no se comprobó",
+        "followup.reason.lens": "Las fotos son la duda, así que se buscan en la web.",
+        "followup.reason.phrase_search": (
+            "La persona no está confirmada, así que se busca el texto del anuncio en otros sitios."
+        ),
+        "followup.reason.census": "La dirección no se comprobó; se consulta otra vez al Censo.",
+        "followup.reason.rdap": "El enlace no se comprobó; se consulta otra vez su dominio.",
+        "trace.followup.pick": "El planificador eligió: {check} porque {gap}. {reason}",
+        "trace.followup.recorded": "Elección grabada (FIXTURE): {reason}",
+        "trace.followup.ran": "Seguimiento {check}: {result}",
+        "timeline.followup": "El planificador eligió: {check} porque {gap}",
+        "timeline.followup_result": "Comprobación de seguimiento",
+        "trace.next.pick": (
+            "El planificador redactó el siguiente paso: {step} porque {gap}. {reason}"
+        ),
+        "timeline.next_step": "El planificador redactó: {step} porque {gap}",
+        "next.done": "Borrador para el inquilino, no enviado: {draft}",
+        "next.note": (
+            "Siguiente paso (borrador, nunca enviado): {step}\nPara: {gap}\nPor qué: {reason}\n"
+            "Borrador: {draft}"
+        ),
+        "next.draft.ask_licence": (
+            "Antes de seguir, ¿cuál es su número de licencia inmobiliaria de Texas y qué "
+            "corredora la patrocina?"
+        ),
+        "next.draft.call_office": (
+            "Llame a la oficina de alquiler que consta en el registro, con el número de su propia "
+            "web y no el del anuncio, y pregunte si esta vivienda es suya para alquilar."
+        ),
+        "next.draft.tour_questions": (
+            "Lleve las preguntas a la visita y no pague nada antes de ver la vivienda y firmar "
+            "un contrato."
+        ),
+        "next.reason.ask_poster": (
+            "Nadie ha mostrado que está en la vivienda; se pide una foto allí."
+        ),
+        "next.reason.ask_licence": "La licencia no está confirmada; se pide su número.",
+        "next.reason.call_office": "La persona no está confirmada; se pregunta a la oficina.",
+        "next.reason.tour_questions": (
+            "El contrato no se comprobó; se llevan preguntas a la visita."
+        ),
+    }
+)
+
 
 TABLES: dict[str, dict[str, str]] = {DEFAULT_LANG: EN, "es": ES}
 
