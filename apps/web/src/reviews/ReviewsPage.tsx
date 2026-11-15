@@ -1,4 +1,4 @@
-import { EmptyRows } from "../ui";
+import { RealtorQuote } from "../landing/RealtorQuote";
 import data from "./reviews.json";
 import { publicQuotes, summarize, type ReviewsFile } from "./summary";
 import "./reviews.css";
@@ -6,6 +6,8 @@ import "./reviews.css";
 // /reviews: what people who tried SNAPBACK said, counted from a static file the team refreshes
 // before each deploy. Every response is in the numbers; only reviewers who wrote a quote for us
 // to share appear in the quotes.
+
+const RATE_URL = "https://forms.gle/rDczNc1TT1EAJcw6A";
 
 const fmt = (v: number | null) => (v === null ? "n/a" : v.toFixed(1));
 
@@ -24,10 +26,18 @@ export function ReviewsPage({ file = data as ReviewsFile }: { file?: ReviewsFile
     <div className="rv" data-testid="reviews">
       <h1 className="rv-title">Reviews</h1>
       {s.n === 0 ? (
-        <>
-          <EmptyRows message="Reviews open tonight. The first results go up before judging." />
-          {button}
-        </>
+        <section className="rv-empty" data-testid="reviews-empty">
+          <RealtorQuote lang="en" />
+          <p className="rv-empty-line">Hallway test tonight: results posted after 08:30 with n</p>
+          <a
+            className="ui-btn-quiet rv-cta"
+            href={formUrl || RATE_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Rate SNAPBACK (2 minutes)
+          </a>
+        </section>
       ) : (
         <>
           <section aria-labelledby="rv-sum" className="rv-sum">

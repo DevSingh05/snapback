@@ -1258,3 +1258,15 @@
   opacity: 0.7;
   font-size: 0.8125rem;
 }
+
+.case-settle {
+  max-width: 50ch;
+  margin: var(--sp-4) 0 0;
+  color: var(--on-matte-muted);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+.case-settle b {
+  color: var(--on-matte);
+  font-weight: 600;
+}

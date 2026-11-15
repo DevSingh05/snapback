@@ -1,6 +1,6 @@
 # SNAPBACK shared memory
 
-Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sun Nov 15 2026, 02:58. Standing rules for agents are in AGENTS.md; this file holds the changing facts. Morning direction and decisions (before 11:12): `docs/shared-memory-archive.md`.
+Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf). Newest at the bottom of each list. Times are EST. Last updated Sun Nov 15 2026, 03:16. Standing rules for agents are in AGENTS.md; this file holds the changing facts. Morning direction and decisions (before 11:12): `docs/shared-memory-archive.md`.
 
 ## Product direction (Sat afternoon, Vidyut)
 
@@ -27,14 +27,14 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (Sun 02:58)
+## Who is doing what (Sun 03:16)
 
 Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Freeze 04:30. Standing merge OK (Vidyut 02:5x): review PASS + green CI merges.
 
-- **Dev (DevSingh05, A):** #310 gate PASS 02:53 (43/48, 0 wrong, 0/30 decoys on 81d6b67). Next: redeploy main @29687bd (asked #8 02:58), #323 FIX (state/city + street direction), #325 landing review 03:55, demo walk 04:15, photo-fade clip, repo homepage/topics (admin only).
-- **Vidyut + conductor (vs-githjk, T):** #325 Worlds landing (node lint red: @ts-nocheck, any, unused 'dead'), #326 inside home (green, waits Rishit review), #322 Vexcel v2 (Rishit PASS, CI re-running after #324), video 2:00 cut.
-- **Jeffrey (jeffrey-g05, V):** bot restarted on 6ec3726 (#318 live). #297 FIX High (claimed-address 'ratio' path) due 03:15, no new head; live phrase table; phone pass on #325.
-- **Rishit (RishitRai, D):** re-reviews #312/#313 PASS (merged), #322 PASS, #324 prettier (merged). Next: review #326, Vexcel footprints PR by 04:00 (flag stays OFF).
+- **Dev (DevSingh05, A):** URGENT (Vidyut 03:01, #8): photo-fade re-record on a real listing photo, then redeploy main. Repo homepage = snapback-navy.vercel.app + topics done 03:03. #323 FIX pushed fbb6374 (state/city, street direction), waits re-review. Demo walk 04:15.
+- **Vidyut + conductor (vs-githjk, T):** #325 Worlds landing MERGED b205e3e. #326 inside home: softer pass b3df9b7 + main merged, head c1f9cdf, merges clean, waits Rishit PASS on c1f9cdf. #331 landing soft pass (stacked on #326; merges after it). #329, #330 merged. Video 2:00 cut.
+- **Jeffrey (jeffrey-g05, V):** #297 High fix pushed 59f1e8f (own bar value "loose"), waits reviewer delta. Next: phone QA #325/#326 03:45, iMessage sweep 04:10, judging kit 04:30 (#10, 03:16).
+- **Rishit (RishitRai, D):** #326 PASS at c1154df (stale head), #327 footprints opened 03:58 ahead of 04:00 (XO retargeted base to main; waits reviewer; flag stays OFF). #332 Devpost merged; #333 ring limit line (XO PASS, waits python). Next: re-review #326 newest head b9df0c0 (#11).
 
 ## Open questions
 
@@ -45,8 +45,8 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 
 ## Live facts
 
-- **main = 29687bd** (#310, 02:57). Merged since 02:41: #318 6ec3726, #320 038b370, #319 44f835a, #312 1f2c491, #313 03459c5, #310 29687bd; #324 into v/vexcel-match-v2. CI on 29687bd NOT CHECKED this tick.
-- **Which build is live on Vercel:** Dev reported 02:35 c236f0b (dpl_GgM2vK1oqwx9FS9yaPm4vAXhfV6t READY); **stale**, master-guardian owns `plan/live.json`. Redeploy of 29687bd asked 02:58.
+- **main = 27cb9dc** (#332, 03:22). Merged since 02:58: #322 3795ced (Vexcel v2, flag off), #328 48510aa (Devpost), #325 b205e3e (Worlds landing), #329 2cdcf87 (README), #330 00c34e8 (Reviews empty state), #332 27cb9dc (Devpost Vexcel v2). Main CI on these NOT CHECKED this tick (runs in progress 03:12).
+- **Which build is live on Vercel:** Dev reported 02:35 c236f0b (dpl_GgM2vK1oqwx9FS9yaPm4vAXhfV6t READY); **stale**, master-guardian owns `plan/live.json`. Redeploy of 27cb9dc asked 03:22 on #8.
 - SNAPBACK_VEXCEL_IN_VERDICT stays OFF (held-out 11/12 right, 8/9 next-door misses the 90% bar).
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only). Timeline, copy-alert, evidence-image all read the token from a header.
 
@@ -97,4 +97,5 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 - Sat 11:03 `styles.test` bans raw hex colours in app CSS (#122 token rule): a CSS file written before #122 (replay.css in #198) passed its own PR CI and still turned main red on merge. Use tokens (`--on-act`, etc.) and merge main into old CSS branches before review.
 - Sat 11:04 The auto-mode classifier denies some builder actions (`gh pr create`, unattended merge loops, branch deletes): never retry a denied action; ask Vidyut, then the conductor does it.
 - Sat 10:31 Record-leak tests that grep logs for record numbers can match timestamps or tokens ('1600' in .160025Z); #210 tightens them.
+- Sun 03:10 Stacked PRs: when the base PR squash-merges, retarget the child to `main` (`gh pr edit <n> --base main`) so its diff shows only its own work (#327 on v/vexcel-match-v2). Python CI took about 12 min on #325 under queue load: pending is not stuck.
 - 21:35 URL guards: `httpx.URL` keeps percent-encoding in the host (`face%62ook.com`), but a real browser decodes it to facebook.com. Allow only `^[a-z0-9.-]+$` hosts and refuse any userinfo (`x@host`). `rules/contact.host_of` keeps the part before `@` on purpose (lookalike rule); never reuse it as an open-guard.

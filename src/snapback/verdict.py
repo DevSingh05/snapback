@@ -583,6 +583,21 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     else:
         main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
 
+    # A near miss (#10): enough matched points to name a building, too few of them consistent.
+    # An AI-edited or regenerated photo looked like this; the photo is not placed, and says why.
+    loose = sum(
+        photo.status is LocateStatus.NOT_LOCATED and photo.bar_failed == "loose" for photo in photos
+    )
+    loosely = (
+        [_line(lang, "label.loose", CardTone.HOLD, "place.loose", loose=loose, total=total)]
+        if loose
+        else []
+    )
+    if loosely and not located and not elsewhere:
+        # Nothing placed: the loose match is the reason, so it leads the row (and the iMessage
+        # reply, which shows a row's first line) instead of the plain "could not be placed".
+        main, loosely = loosely[0], []
+
     # "Match this building": only photos placed in it. A flipped photo placed in another building
     # already carries the red "different building" line.
     flipped = sum(
@@ -617,6 +632,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         kind=CardRowKind.PLACE,
         lines=[
             main,
+            *loosely,
             *mirrored,
             *_from_record(modules, matched),
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),

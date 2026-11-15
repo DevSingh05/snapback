@@ -64,22 +64,19 @@ describe("the page", () => {
     expect(data.responses).toEqual([]);
     expect(data.form_url).toBe("");
   });
-  it("empty state, no button without a URL", () => {
+  it("empty state shows the realtor quote, the hallway line and the rate link", () => {
     render(<ReviewsPage file={{ updated: "", form_url: "", responses: [] }} />);
+    expect(screen.getByTestId("realtor-quote")).toHaveTextContent("Ashwin Veeravalli");
+    expect(screen.getByTestId("realtor-quote")).not.toHaveTextContent(/main focus/);
     expect(
-      screen.getByText("Reviews open tonight. The first results go up before judging."),
+      screen.getByText("Hallway test tonight: results posted after 08:30 with n"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Leave a review" })).toBeNull();
-    expect(screen.queryByText(/out of 5/)).toBeNull();
-  });
-  it("empty state still shows the button when the URL is set", () => {
-    render(
-      <ReviewsPage file={{ updated: "", form_url: "https://forms.example/x", responses: [] }} />,
-    );
-    expect(screen.getByRole("link", { name: "Leave a review" })).toHaveAttribute(
+    expect(screen.queryByText(/go up before judging/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Rate SNAPBACK (2 minutes)" })).toHaveAttribute(
       "href",
-      "https://forms.example/x",
+      "https://forms.gle/rDczNc1TT1EAJcw6A",
     );
+    expect(screen.queryByText(/out of 5/)).toBeNull();
   });
   it("shows summary with n on every number, only shared quotes, and the transparency line", () => {
     render(<ReviewsPage file={{ updated: "", form_url: "", responses: THREE }} />);

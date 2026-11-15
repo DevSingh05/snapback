@@ -11,10 +11,10 @@
 > - No named person is called a scammer.
 > - Nothing is said about whether any listing site detects scams.
 >
-> **Open PRs are not claimed:** #272 (mirrored photos), #297 (the loose-match warning) and #322
-> (Vexcel matcher v2). Each moves into the text only once it merges. Merged and claimed: #296 (the
-> strict 60% bar, `63f3122`), #302 (public data) and #310 (the evidence image, which supersedes
-> #283).
+> **Open PRs are not claimed:** #272 (mirrored photos) and #297 (the loose-match warning). Each
+> moves into the text only once it merges. Merged and claimed: #296 (the strict 60% bar,
+> `63f3122`), #302 (public data), #310 (the evidence image, which supersedes #283) and #322 (Vexcel
+> matcher v2, `3795ced`, as evidence only: `SNAPBACK_VEXCEL_IN_VERDICT` stays off).
 >
 > **Vexcel** is listed only as data we were given. No verdict line uses it until the labelled set
 > merges.
@@ -229,9 +229,9 @@ imagery (provided), GitHub Actions.
 >   (evidence image) and #314 (`/under-the-hood`).
 > - **Not on `main` yet, so not claimed:**
 >   - the loose-match warning (#297);
->   - the Vexcel matcher v2 numbers (#322; the flag stays off, so the aerial is evidence only);
 >   - the Worlds landing (#325) and the chat box as the inside home (#326).
->     Each goes in once it merges.
+> - **#322 (Vexcel matcher v2) is merged:** its numbers are in, as evidence only (the flag is off).
+>   Each goes in once it merges.
 
 ### CoStar · Inside and Out
 
@@ -245,6 +245,11 @@ sends the renter back to the real listing.
 - **Live tamper test (LIVE; a real listing and tampered copies of it, nothing posted):**
   - a changed phone number, a "Zelle before the tour" ask and a lookalike website link;
   - each was caught 6 of 6 on real photos and 2 of 2 on scan renders.
+- **Vexcel aerials, is it the same building from above?** (LIVE, n=54 labelled cases, #322):
+  - 52 of 54 right overall;
+  - on the held-out half: same building 11 of 12, next door 8 of 9, other buildings 6 of 6.
+  - That's one case short of our 90% bar, so the aerial is shown as evidence and doesn't feed
+    the verdict.
 - **Respects the data:** record figures (rents) are off by default. Only derived yes/no facts
   reach a model, and the kit is deleted after Sun Nov 15 16:00.
 

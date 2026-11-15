@@ -28,6 +28,7 @@ import {
   VERDICT_TONE,
   checkedStamp,
   couldNotDo,
+  missingFact,
   expiryText,
   flaggedLines,
   photosPlaced,
@@ -145,6 +146,7 @@ export function CaseResult({
         }
         why={flaggedLines(card)}
         reasons={card.summary ?? []}
+        settles={own ? missingFact(card) : null}
         reasonsTitle={failed ? "WHY THIS IS NOT A GOOD DEAL" : null}
         summary={
           own ? null : (
