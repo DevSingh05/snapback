@@ -31,7 +31,9 @@ jobs:
       - run: uv sync --locked --extra agent --extra intake
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run pytest -n auto # pytest-xdist: one worker per CPU; same tests, run in parallel
+      - run: uv run pytest -n auto --ignore=tests/test_pattern_speed.py # pytest-xdist: one worker per CPU
+      # The wall-clock speed gate runs alone, so parallel workers can't slow it into a false fail.
+      - run: uv run pytest tests/test_pattern_speed.py
       # V6 eval gate (#62): fixture case bank only, headless, no network. Writes to the runner's
       # temp dir so the tracked eval/results.csv is never changed by CI. Exit 1 = gate failed.
       - name: Eval gate (python -m snapback.eval)
