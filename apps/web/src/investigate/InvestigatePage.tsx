@@ -544,7 +544,14 @@ function StreamSection() {
 type ParaphraseVariant =
   "original" | "paraphrased" | "paraphrased_photos_reshot" | "paraphrased_wording_only";
 type ParaphraseArm = "pipeline" | "pipeline_wording_seeds" | "keyword_baseline";
-type ParaphraseCount = { rings_found: number; honest_flagged: number };
+type ParaphraseCount = {
+  rings_found: number;
+  honest_flagged: number;
+  // How the finder grouped them: groups it reported, and rings that got a group of their own
+  // (the 70% overlap rule in `evaluate`). Older result files may not carry these.
+  groups_reported?: number;
+  rings_told_apart?: number;
+};
 
 export type ParaphraseResults = {
   n_ads: number;
@@ -566,6 +573,14 @@ export function robustnessText(r: ParaphraseResults) {
       `Keyword search on the reworded ads: ${para.keyword_baseline.rings_found} of ${n}. ` +
       `Seeded by wording only: ${para.pipeline_wording_seeds.rings_found} of ${n}. ` +
       `Honest ads flagged: ${para.pipeline.honest_flagged} of ${r.n_honest}.`,
+    // The honest limit, beside the found line (judge question: "can you tell the rings apart?").
+    limit:
+      orig.pipeline.groups_reported === undefined || orig.pipeline.rings_told_apart === undefined
+        ? null
+        : `The ${n} seeded rings land in ${orig.pipeline.groups_reported} groups, and ` +
+          `${orig.pipeline.rings_told_apart} of ${n} is a group of its own ` +
+          `(70% overlap bar, synthetic, n=${n} rings). ` +
+          `Every ring's ads are caught; telling which ring each ad belongs to is not solved yet.`,
   };
 }
 
@@ -576,6 +591,11 @@ export function RobustnessLine({ results }: { results: ParaphraseResults }) {
     <section className="inv-robust" aria-label="Robustness to reworded ads">
       <p className="inv-robust-head">{t.headline}</p>
       <p className="inv-sub">{t.detail}</p>
+      {t.limit ? (
+        <p className="inv-sub inv-robust-limit" data-testid="ring-limit">
+          <strong>Limit:</strong> {t.limit}
+        </p>
+      ) : null}
     </section>
   );
 }
