@@ -292,5 +292,251 @@
     "category": "fee_ask",
     "text": "Move-in ready. No deposit is needed before move-in.",
     "expect": []
+  },
+  {
+    "id": "fx-rule-imp-apartments-payment-team",
+    "category": "pressure",
+    "text": "The Apartments.com payment team will hold your deposit until you check the apartment.",
+    "expect": ["impersonation.platform_holds_money"]
+  },
+  {
+    "id": "fx-rule-imp-airbnb-agent-holds",
+    "category": "pressure",
+    "text": "An agent from Airbnb will hold and insure your money until you decide if you want the place.",
+    "expect": ["impersonation.platform_holds_money", "impersonation.escrow_agent"]
+  },
+  {
+    "id": "fx-rule-imp-zillow-escrow",
+    "category": "pressure",
+    "text": "Zillow will keep your deposit in escrow until move-in and then release it to me.",
+    "expect": ["impersonation.platform_holds_money"]
+  },
+  {
+    "id": "fx-rule-imp-escrow-agent-sends",
+    "category": "pressure",
+    "text": "Send the deposit to the escrow agent and they will hold it until you get the keys.",
+    "expect": ["impersonation.escrow_agent"]
+  },
+  {
+    "id": "fx-rule-imp-escrow-company-holds",
+    "category": "pressure",
+    "text": "Our escrow company will hold your money safely during the two day inspection period.",
+    "expect": ["impersonation.escrow_agent"]
+  },
+  {
+    "id": "fx-rule-imp-platform-holds-deposit",
+    "category": "pressure",
+    "text": "The platform holds your deposit until you inspect the apartment.",
+    "expect": ["impersonation.escrow_agent"]
+  },
+  {
+    "id": "fx-rule-imp-quiet-never-holds",
+    "category": "pressure",
+    "text": "Apartments.com never takes part in payments and will never hold your deposit.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-deposit-with-office",
+    "category": "pressure",
+    "text": "Also listed on Zillow, Apartments.com and Trulia; the deposit is held by our management office.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-airbnb-stays",
+    "category": "pressure",
+    "text": "Find us on Airbnb for short stays; long-term tenants pay rent to our office.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-warning",
+    "category": "pressure",
+    "text": "Never pay anyone who says an escrow agent will hold your deposit.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-sale-escrow",
+    "category": "pressure",
+    "text": "For sale: the buyer's earnest money goes into escrow with the title company.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-credit-screenshot",
+    "category": "data_ask",
+    "text": "Text me a screenshot of your credit score so I can approve you before the viewing.",
+    "expect": ["data.credit_score_screenshot"]
+  },
+  {
+    "id": "fx-rule-credit-report-photo",
+    "category": "data_ask",
+    "text": "Send a photo of your credit report from Credit Karma and I will hold the unit.",
+    "expect": ["data.credit_score_screenshot"]
+  },
+  {
+    "id": "fx-rule-credit-quiet-portal",
+    "category": "data_ask",
+    "text": "Minimum credit score 650; we run a credit check through our portal when you apply.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-credit-quiet-screenshot-plan",
+    "category": "data_ask",
+    "text": "Take a screenshot of the floor plan for your records. Credit score of 650 required.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-paystub-and-ssn",
+    "category": "data_ask",
+    "text": "Email me your last two pay stubs and your SSN and I will put you first in line.",
+    "expect": ["data.paystub_before_viewing", "data.ssn_before_viewing"]
+  },
+  {
+    "id": "fx-rule-paystubs-to-my-email",
+    "category": "data_ask",
+    "text": "Send your paystubs to my email before we can schedule a viewing.",
+    "expect": ["data.paystub_before_viewing"]
+  },
+  {
+    "id": "fx-rule-paystub-quiet-proof-of-income",
+    "category": "data_ask",
+    "text": "Applicants need proof of income such as recent pay stubs; apply through our website.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-paystub-quiet-after-approval",
+    "category": "data_ask",
+    "text": "Upload your pay stubs to our online portal after approval.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-sevis-i20-send",
+    "category": "data_ask",
+    "text": "Please send a copy of your I-20 and SEVIS number so I can reserve the room before you arrive.",
+    "expect": ["data.sevis_before_viewing"]
+  },
+  {
+    "id": "fx-rule-sevis-email-me",
+    "category": "data_ask",
+    "text": "Email me your SEVIS ID and visa today and the room is yours.",
+    "expect": ["data.sevis_before_viewing"]
+  },
+  {
+    "id": "fx-rule-sevis-quiet-accepted-at-signing",
+    "category": "data_ask",
+    "text": "International students welcome! We accept an I-20 in place of a US credit history, shown at lease signing.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-sevis-quiet-portal",
+    "category": "data_ask",
+    "text": "Students must upload an I-20 through our resident portal when applying.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-credit-run",
+    "category": "link",
+    "text": "Run your credit at www.freecreditnow.example and send me the results.",
+    "expect": ["link.affiliate_credit_check"]
+  },
+  {
+    "id": "fx-rule-affiliate-credit-bare-domain",
+    "category": "link",
+    "text": "Get your credit report at scorecheckfast.example so I can approve your application.",
+    "expect": ["link.affiliate_credit_check"]
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-own-check",
+    "category": "link",
+    "text": "We run a credit check on all applicants when you apply on our website.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-federal-site",
+    "category": "link",
+    "text": "Get your free credit report at annualcreditreport.com before you apply.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-application-link",
+    "category": "link",
+    "text": "Floor plans at https://fixtureliving.example/plans; a credit check is run at application.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-escrow-account",
+    "category": "pressure",
+    "text": "Your deposit is held in an escrow account.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-escrow-bank",
+    "category": "pressure",
+    "text": "Your security deposit is kept in a separate escrow account at our bank.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-account-holds",
+    "category": "pressure",
+    "text": "Our escrow account holds your security deposit as Texas law requires.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-rhino",
+    "category": "pressure",
+    "text": "Rhino deposit insurance insures your security deposit.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-leaselock",
+    "category": "pressure",
+    "text": "LeaseLock deposit insurance: insure your deposit for $15 a month.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-renters-insurance",
+    "category": "pressure",
+    "text": "Renters insurance is required; it can insure your deposit and belongings.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-we-list-zillow",
+    "category": "pressure",
+    "text": "We list on Zillow and keep your deposit in a trust account.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-quiet-we-hold-facebook",
+    "category": "pressure",
+    "text": "Message us on Facebook and we hold your deposit until move-in.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-creditkarma",
+    "category": "link",
+    "text": "Get your free credit report at creditkarma.com before you apply.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-experian",
+    "category": "link",
+    "text": "Check your credit at www.experian.com first.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-affiliate-quiet-own-portal",
+    "category": "link",
+    "text": "Run your credit check through our portal at fixtureliving.example/residents.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-sevis-quiet-process-application",
+    "category": "data_ask",
+    "text": "We need your I-20 to process your application.",
+    "expect": []
+  },
+  {
+    "id": "fx-rule-imp-cousin-at-zillow",
+    "category": "pressure",
+    "text": "My cousin at Zillow will hold your deposit.",
+    "expect": ["impersonation.platform_holds_money"]
   }
 ]
