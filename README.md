@@ -22,7 +22,7 @@ record. Code sets every verdict. SNAPBACK never pays, books or sends anything fo
 In February 2025 a renter near Houston found a house on Craigslist, paid $2,200 in rent and
 deposit, and moved in. Two days later the real owner, a rental company, said the person who took
 the money did not own the house
-([ABC13, Feb 15 2025](https://abc13.com/post/conroe-woman-loses-2200-fears-homelessness-renting-home-landlord-did-not-own-property/15907951/)).
+(ABC13 Houston, Feb 15 2025).
 The photos were of a real house. The person and the offer were fake, and the home's own record
 could have shown it.
 
