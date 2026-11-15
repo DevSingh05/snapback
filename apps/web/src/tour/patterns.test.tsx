@@ -46,10 +46,13 @@ afterEach(() => vi.useRealTimers());
 const title = () => screen.getByRole("heading", { level: 1 }).textContent;
 
 describe("the sample walk", () => {
-  it("stays on the drawn 3D view and offers the real scan only through the scan card", () => {
+  it("opens on the stock aerial stamped SAMPLE PHOTO, never loads the scan, and offers it only through the scan card", () => {
     render(<TourView plan={FIXTURE_TOUR} sdkKey="k" modelId="m" sample />);
     expect(screen.queryByTitle("Matterport 3D view")).toBeNull();
-    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "drawing");
+    // The opening frame is the stock exterior, marked as a sample (never a runtime aerial).
+    expect(screen.getByTestId("aerial-opening")).toHaveAttribute("data-live", "false");
+    expect(screen.getByTestId("aerial-opening")).toHaveTextContent("SAMPLE PHOTO");
+    expect(screen.getByTestId("stage-views")).toHaveAttribute("data-main", "real");
     expect(screen.getByTestId("scan-offer")).toBeInTheDocument();
     expect(screen.queryByText(/Loading the 3D/)).toBeNull();
     expect(screen.getByTestId("walk-player")).toHaveAttribute("data-mode", "playing");
@@ -83,21 +86,20 @@ describe("a scan that is slow to connect", () => {
 });
 
 describe("the highlight strip and the ad photo over the view", () => {
-  it("shows the ad photos in the bar, lights the current one, and a tap jumps to its stop", () => {
+  it("docks the stop's ad photo top right, stamped, and a room name in the strip jumps there", () => {
     render(<TourView plan={FIXTURE_TOUR} />);
-    const shots = screen.getAllByTestId("wp-shot");
-    expect(shots).toHaveLength(FIXTURE_TOUR.stops.filter((s) => s.photos.length > 0).length);
+    // No ad photo at the front door: nothing is docked (and nothing is made up).
+    expect(screen.queryByTestId("wp-dock")).toBeNull();
     const kitchen = screen.getByRole("button", { name: "Chapter 4: Kitchen" });
-    expect(within(kitchen).getByTestId("wp-shot")).toHaveTextContent("P2");
-    // Stops with no ad photo stay text-only chapters.
-    expect(
-      within(screen.getByRole("button", { name: "Chapter 2: Front door" })).queryByTestId(
-        "wp-shot",
-      ),
-    ).toBeNull();
     fireEvent.click(kitchen);
     expect(title()).toBe("Kitchen");
     expect(kitchen).toHaveAttribute("aria-current", "true");
+    const dock = screen.getByTestId("wp-dock");
+    expect(dock).toHaveTextContent("Ad photo P2");
+    // The drawn stand-in carries the SAMPLE PHOTO stamp, never an ad stamp.
+    expect(dock).toHaveTextContent("SAMPLE PHOTO");
+    expect(dock).not.toHaveTextContent("FROM THE AD");
+    expect(dock).toHaveAttribute("data-stand-in", "true");
   });
 
   it("fades the ad photo over the view after arrival, captioned and labelled a stand-in", () => {

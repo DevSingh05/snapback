@@ -35,10 +35,8 @@ export function ReplayIndexView({
             </h2>
             {r.source && !r.fictional ? (
               <p className="replay-source">
-                {t.source}:{" "}
-                <a href={r.source.url} rel="noopener noreferrer" target="_blank">
-                  {r.source.name}
-                </a>
+                {/* Plain text, no link: a public report can print a renter's name. */}
+                {t.source}: {r.source.name}
                 {", "}
                 {shortDate(r.source.published_on, lang)}
               </p>
