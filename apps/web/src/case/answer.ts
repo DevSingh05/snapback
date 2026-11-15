@@ -32,6 +32,7 @@ const LINE_CHECK: Record<string, CheckId> = {
   "label.real": "photos",
   "label.matched_home": "photos",
   "label.seen_before": "photos",
+  "label.mirrored": "photos",
   "label.here_now": "photos",
   "label.for_sale": "forsale",
   "label.recently_rented": "record",

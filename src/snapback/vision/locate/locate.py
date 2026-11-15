@@ -28,7 +28,7 @@ from dataclasses import dataclass, field, fields, replace
 from functools import lru_cache
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from snapback.adapters.matterport import Sweep
 from snapback.contracts import (
@@ -200,6 +200,10 @@ class _Placement:
     sweep: Sweep
     face: int
     check: Verification
+
+
+# Bars that mark a doubtful match: the flip must never override them.
+_NO_FLIP_BARS = frozenset({"ambiguity", "spread"})
 
 
 @dataclass(frozen=True)
@@ -634,19 +638,39 @@ class Locator:
         rivals: dict[str, float | None] = {}  # photo id -> best rival over its claimed match
         points: dict[str, EvidencePoints] = {}
         tangled = False  # a photo passed in more than one property
+        flipped: dict[str, Image.Image] = {}  # photo id -> the mirrored copy that placed it
+
+        def attempt(img: Image.Image):
+            """(placed, bar that stopped it, rival ratio, ambiguous) for one image."""
+            if identify:
+                found, ambiguous = self._identify(img, t)
+                bar = "ambiguity" if ambiguous else (None if found else "inliers")
+                return found, bar, None, ambiguous
+            outcome = self._place_detail(img, claimed_models, t, None, claimed_search)
+            return outcome.placed, outcome.bar_failed, outcome.rival_ratio, False
+
+        flip_search = (t or self.thresholds).flip_search
         for photo_id, image in photos.items():
             if not identify and not claimed_models:
                 placements[photo_id] = None
                 continue
             photo = image.convert("RGB")
-            if identify:
-                placed, ambiguous = self._identify(photo, t)
-                tangled = tangled or ambiguous
-                bars[photo_id] = "ambiguity" if ambiguous else (None if placed else "inliers")
-            else:
-                outcome = self._place_detail(photo, claimed_models, t, None, claimed_search)
-                placed = outcome.placed
-                bars[photo_id], rivals[photo_id] = outcome.bar_failed, outcome.rival_ratio
+            placed, bar, rival, ambiguous = attempt(photo)
+            if placed is None and flip_search and not ambiguous and bar not in _NO_FLIP_BARS:
+                # V1 (#10): copied ads are often mirrored. Search the photo once more flipped left
+                # to right, under the very same bars and guards; only a placement counts. Never
+                # after a doubtful result (ambiguity or spread): a doubtful photo is not searched
+                # elsewhere (ruling 07:43, #28), and a flip would do exactly that.
+                mirrored = ImageOps.mirror(photo)
+                m_placed, m_bar, m_rival, m_ambiguous = attempt(mirrored)
+                ambiguous = ambiguous or m_ambiguous
+                if m_placed is not None:
+                    placed, bar, rival = m_placed, m_bar, m_rival
+                    flipped[photo_id] = mirrored
+            tangled = tangled or ambiguous
+            bars[photo_id] = bar
+            if not identify:
+                rivals[photo_id] = rival
             if (
                 placed is not None
                 and placed.model_id not in claimed_models
@@ -656,6 +680,7 @@ class Locator:
                 # missing the claimed property's own twin. Not trustworthy enough to place.
                 placed = None
                 bars[photo_id] = "ambiguity"
+                flipped.pop(photo_id, None)
             placements[photo_id] = placed
 
         identified_by_scan = conflict = False
@@ -730,13 +755,24 @@ class Locator:
                     room_label=self.catalog.room(placed.model_id, placed.sweep.sweep_id),
                     spread=round(placed.check.spread, 4),
                     rival_ratio=rivals.get(photo_id),
+                    flipped=True if photo_id in flipped else None,
+                    scan_face=placed.face,
                 )
             )
+            # A flipped placement was matched on the mirrored copy: its pose is the real view,
+            # and its points are mapped back onto the photo as the ad sent it.
+            used = flipped.get(photo_id) or photos[photo_id].convert("RGB")
             face_size = self._face(placed.model_id, placed.sweep.sweep_id, placed.face).size
-            sample = evidence_points(placed, photos[photo_id].size, face_size)
+            sample = evidence_points(placed, used.size, face_size)
+            if sample is not None and photo_id in flipped:
+                sample = sample.model_copy(
+                    update={
+                        "sampled": [(round(1 - x, 4), y, u, v) for x, y, u, v in sample.sampled]
+                    }
+                )
             if sample is not None:
                 points[photo_id] = sample
-            pose = self._pose(photos[photo_id].convert("RGB"), placed)
+            pose = self._pose(used, placed)
             if pose is not None:
                 poses[photo_id] = pose
             if in_claimed:

@@ -57,9 +57,28 @@ def verify(matcher: Matcher, a: Image.Image, b: Image.Image, ransac_px: float) -
     if len(pa) < 4:
         return Verification(len(pa), 0, None)
     h, mask = ransac_homography(pa, pb, ransac_px)
+    if h is not None and reflects(h, tuple(pa[mask].mean(axis=0))):
+        # A photo and a scan view of the same scene are never related by a mirror image. A
+        # reflecting homography is a coincidence (often a mirrored photo matching some other
+        # room's mirror-image layout): no inliers. A truly mirrored copy is placed by the flipped
+        # search instead (V1, #10).
+        return Verification(len(pa), 0, None)
     return Verification(
         len(pa), int(mask.sum()), h, _spread(pa[mask], a.size), np.c_[pa[mask], pb[mask]]
     )
+
+
+def reflects(h: np.ndarray, point: tuple[float, float]) -> bool:
+    """True when the homography mirrors the photo around `point` (where the inliers are). The
+    local orientation of a homography is the sign of det(H) / w^3 there; a real view change keeps
+    it positive and a mirror image makes it negative. Unlike the signed area of three mapped
+    corners, it stays right on a wide view turned far enough that a corner lands behind the
+    camera (w < 0)."""
+    x, y = point
+    w = float(h[2, 0] * x + h[2, 1] * y + h[2, 2])
+    if abs(w) < 1e-12:
+        return True  # sent to infinity: not a usable view change
+    return float(np.linalg.det(h)) / w**3 < 0
 
 
 def _spread(points: np.ndarray, size: tuple[int, int]) -> float:

@@ -1,41 +1,41 @@
 {
  "answer_key": {
   "honest_flagged": 0,
-  "median_gap_days": 3.0,
+  "median_gap_days": 2.5,
   "n_gap": 10,
   "n_honest": 2684,
   "n_seeded": 10,
   "n_single_group_gap": 10,
   "ring_ads": 355,
-  "ring_ads_flagged": 329,
+  "ring_ads_flagged": 354,
   "seeded": [
    {
-    "ad_days_before_flag": 9,
-    "ads_before_flag": 4,
+    "ad_days_before_flag": 5,
+    "ads_before_flag": 3,
     "first_day": 18,
-    "flag_day": 21,
-    "flagged_ads": 26,
-    "gap_days": 3,
+    "flag_day": 20,
+    "flagged_ads": 29,
+    "gap_days": 2,
     "n_ads": 29,
     "name": "R01",
-    "renters_est": 270,
+    "renters_est": 150,
     "separated": false,
-    "single_group_flag_day": 21,
-    "single_group_gap_days": 3
+    "single_group_flag_day": 20,
+    "single_group_gap_days": 2
    },
    {
-    "ad_days_before_flag": 7,
-    "ads_before_flag": 4,
+    "ad_days_before_flag": 3,
+    "ads_before_flag": 3,
     "first_day": 37,
-    "flag_day": 39,
-    "flagged_ads": 35,
-    "gap_days": 2,
+    "flag_day": 38,
+    "flagged_ads": 41,
+    "gap_days": 1,
     "n_ads": 42,
     "name": "R02",
-    "renters_est": 210,
+    "renters_est": 90,
     "separated": false,
-    "single_group_flag_day": 40,
-    "single_group_gap_days": 3
+    "single_group_flag_day": 38,
+    "single_group_gap_days": 1
    },
    {
     "ad_days_before_flag": 3,
@@ -56,7 +56,7 @@
     "ads_before_flag": 8,
     "first_day": 4,
     "flag_day": 12,
-    "flagged_ads": 33,
+    "flagged_ads": 39,
     "gap_days": 8,
     "n_ads": 39,
     "name": "R04",
@@ -84,7 +84,7 @@
     "ads_before_flag": 2,
     "first_day": 32,
     "flag_day": 36,
-    "flagged_ads": 36,
+    "flagged_ads": 38,
     "gap_days": 4,
     "n_ads": 38,
     "name": "R06",
@@ -108,18 +108,18 @@
     "single_group_gap_days": 2
    },
    {
-    "ad_days_before_flag": 8,
-    "ads_before_flag": 4,
+    "ad_days_before_flag": 0,
+    "ads_before_flag": 0,
     "first_day": 31,
-    "flag_day": 33,
-    "flagged_ads": 33,
-    "gap_days": 2,
+    "flag_day": 31,
+    "flagged_ads": 40,
+    "gap_days": 0,
     "n_ads": 40,
     "name": "R08",
-    "renters_est": 240,
+    "renters_est": 0,
     "separated": false,
-    "single_group_flag_day": 37,
-    "single_group_gap_days": 6
+    "single_group_flag_day": 31,
+    "single_group_gap_days": 0
    },
    {
     "ad_days_before_flag": 10,
@@ -140,7 +140,7 @@
     "ads_before_flag": 4,
     "first_day": 24,
     "flag_day": 28,
-    "flagged_ads": 31,
+    "flagged_ads": 32,
     "gap_days": 4,
     "n_ads": 32,
     "name": "R10",
@@ -152,7 +152,7 @@
   ],
   "seeded_flagged": 10,
   "seeded_separated": 0,
-  "single_group_median_gap_days": 4.5
+  "single_group_median_gap_days": 4.0
  },
  "days": 90,
  "flagged_ads_by_day": [
@@ -168,105 +168,1482 @@
   0,
   0,
   0,
-  6,
-  10,
-  14,
-  17,
-  20,
+  7,
+  12,
+  16,
+  19,
+  19,
+  23,
   24,
   25,
-  26,
-  28,
-  38,
-  47,
-  58,
-  62,
+  34,
+  40,
+  51,
+  60,
   67,
   72,
-  76,
-  89,
-  93,
+  77,
+  81,
+  95,
   99,
-  107,
-  113,
+  105,
+  116,
   123,
-  125,
   135,
-  147,
-  156,
-  164,
+  138,
+  149,
+  162,
   171,
-  184,
-  192,
-  202,
+  180,
+  187,
+  201,
   209,
-  219,
-  226,
-  234,
-  240,
-  247,
-  256,
-  264,
-  268,
-  275,
+  220,
+  228,
+  238,
+  245,
+  252,
+  258,
+  266,
+  276,
+  284,
   290,
-  295,
-  303,
-  308,
-  309,
-  310,
-  317,
+  297,
+  312,
   319,
-  322,
-  323,
-  324,
-  324,
-  328,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329,
-  329
+  327,
+  331,
+  332,
+  333,
+  340,
+  342,
+  345,
+  346,
+  347,
+  347,
+  352,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354,
+  354
  ],
  "groups": [
   {
-   "ad_days_before_flag": 10,
+   "ad_days_before_flag": 22,
    "ads": [
+    {
+     "day": 4,
+     "flag_day": 13,
+     "hood": "Millrace",
+     "id": 148,
+     "phone": "555-8467",
+     "rent": 1025
+    },
+    {
+     "day": 5,
+     "flag_day": 13,
+     "hood": "Kestrel Row",
+     "id": 176,
+     "phone": "555-8467",
+     "rent": 1040
+    },
     {
      "day": 10,
      "flag_day": 12,
      "hood": "Millrace",
-     "id": 320,
-     "phone": "555-6345",
+     "id": 321,
+     "phone": "555-8398",
+     "rent": 1030
+    },
+    {
+     "day": 11,
+     "flag_day": 12,
+     "hood": "Westering",
+     "id": 354,
+     "phone": "555-8398",
+     "rent": 1050
+    },
+    {
+     "day": 13,
+     "flag_day": 13,
+     "hood": "Alder Flats",
+     "id": 425,
+     "phone": "555-2724",
+     "rent": 1100
+    },
+    {
+     "day": 13,
+     "flag_day": 13,
+     "hood": "Quarry Hill",
+     "id": 426,
+     "phone": "555-2724",
+     "rent": 1070
+    },
+    {
+     "day": 13,
+     "flag_day": 13,
+     "hood": "Tern Point",
+     "id": 427,
+     "phone": "555-2724",
+     "rent": 840
+    },
+    {
+     "day": 15,
+     "flag_day": 15,
+     "hood": "Alder Flats",
+     "id": 490,
+     "phone": "555-2724",
+     "rent": 655
+    },
+    {
+     "day": 16,
+     "flag_day": 16,
+     "hood": "Millrace",
+     "id": 525,
+     "phone": "555-5648",
+     "rent": 830
+    },
+    {
+     "day": 17,
+     "flag_day": 17,
+     "hood": "Ashgrove",
+     "id": 554,
+     "phone": "555-5648",
+     "rent": 610
+    },
+    {
+     "day": 17,
+     "flag_day": 17,
+     "hood": "Kestrel Row",
+     "id": 555,
+     "phone": "555-9843",
+     "rent": 1030
+    },
+    {
+     "day": 19,
+     "flag_day": 19,
+     "hood": "Westering",
+     "id": 624,
+     "phone": "555-9843",
+     "rent": 650
+    },
+    {
+     "day": 20,
+     "flag_day": 21,
+     "hood": "Oakbend",
+     "id": 659,
+     "phone": "555-5267",
+     "rent": 1020
+    },
+    {
+     "day": 22,
+     "flag_day": 22,
+     "hood": "Saltmarsh",
+     "id": 736,
+     "phone": "555-8594",
+     "rent": 1070
+    },
+    {
+     "day": 23,
+     "flag_day": 23,
+     "hood": "Alder Flats",
+     "id": 777,
+     "phone": "555-5676",
+     "rent": 605
+    },
+    {
+     "day": 23,
+     "flag_day": 23,
+     "hood": "Kestrel Row",
+     "id": 778,
+     "phone": "555-2484",
+     "rent": 805
+    },
+    {
+     "day": 23,
+     "flag_day": 23,
+     "hood": "Ashgrove",
+     "id": 779,
+     "phone": "555-3640",
+     "rent": 620
+    },
+    {
+     "day": 23,
+     "flag_day": 23,
+     "hood": "Oakbend",
+     "id": 780,
+     "phone": "555-3640",
+     "rent": 845
+    },
+    {
+     "day": 25,
+     "flag_day": 25,
+     "hood": "Saltmarsh",
+     "id": 839,
+     "phone": "555-4650",
+     "rent": 640
+    },
+    {
+     "day": 26,
+     "flag_day": 26,
+     "hood": "Kestrel Row",
+     "id": 872,
+     "phone": "555-4650",
+     "rent": 830
+    },
+    {
+     "day": 27,
+     "flag_day": 27,
+     "hood": "Quarry Hill",
+     "id": 912,
+     "phone": "555-5676",
+     "rent": 840
+    },
+    {
+     "day": 28,
+     "flag_day": 28,
+     "hood": "Alder Flats",
+     "id": 951,
+     "phone": "555-9647",
+     "rent": 605
+    },
+    {
+     "day": 28,
+     "flag_day": 28,
+     "hood": "Pelham Green",
+     "id": 954,
+     "phone": "555-1724",
+     "rent": 1025
+    },
+    {
+     "day": 30,
+     "flag_day": 30,
+     "hood": "Quarry Hill",
+     "id": 1027,
+     "phone": "555-9647",
+     "rent": 1020
+    },
+    {
+     "day": 30,
+     "flag_day": 30,
+     "hood": "Kestrel Row",
+     "id": 1028,
+     "phone": "555-4914",
+     "rent": 610
+    },
+    {
+     "day": 31,
+     "flag_day": 31,
+     "hood": "Westering",
+     "id": 1059,
+     "phone": "555-5177",
+     "rent": 1085
+    },
+    {
+     "day": 31,
+     "flag_day": 31,
+     "hood": "Pelham Green",
+     "id": 1060,
+     "phone": "555-5177",
+     "rent": 885
+    },
+    {
+     "day": 32,
+     "flag_day": 32,
+     "hood": "Alder Flats",
+     "id": 1100,
+     "phone": "555-5177",
      "rent": 825
     },
     {
-     "day": 12,
-     "flag_day": 12,
-     "hood": "Pelham Green",
-     "id": 389,
-     "phone": "555-8398",
+     "day": 33,
+     "flag_day": 33,
+     "hood": "Kestrel Row",
+     "id": 1142,
+     "phone": "555-4914",
      "rent": 640
     },
+    {
+     "day": 33,
+     "flag_day": 33,
+     "hood": "Ashgrove",
+     "id": 1144,
+     "phone": "555-7309",
+     "rent": 675
+    },
+    {
+     "day": 33,
+     "flag_day": 33,
+     "hood": "Oakbend",
+     "id": 1147,
+     "phone": "555-3035",
+     "rent": 1035
+    },
+    {
+     "day": 33,
+     "flag_day": 33,
+     "hood": "Pelham Green",
+     "id": 1148,
+     "phone": "555-3035",
+     "rent": 1075
+    },
+    {
+     "day": 34,
+     "flag_day": 35,
+     "hood": "Kestrel Row",
+     "id": 1184,
+     "phone": "555-4424",
+     "rent": 1075
+    },
+    {
+     "day": 35,
+     "flag_day": 35,
+     "hood": "Quarry Hill",
+     "id": 1218,
+     "phone": "555-5760",
+     "rent": 665
+    },
+    {
+     "day": 35,
+     "flag_day": 35,
+     "hood": "Oakbend",
+     "id": 1219,
+     "phone": "555-3932",
+     "rent": 895
+    },
+    {
+     "day": 35,
+     "flag_day": 35,
+     "hood": "Pelham Green",
+     "id": 1222,
+     "phone": "555-4424",
+     "rent": 610
+    },
+    {
+     "day": 35,
+     "flag_day": 35,
+     "hood": "Tern Point",
+     "id": 1224,
+     "phone": "555-2651",
+     "rent": 1055
+    },
+    {
+     "day": 36,
+     "flag_day": 36,
+     "hood": "Tern Point",
+     "id": 1264,
+     "phone": "555-2651",
+     "rent": 665
+    },
+    {
+     "day": 38,
+     "flag_day": 38,
+     "hood": "Oakbend",
+     "id": 1340,
+     "phone": "555-5760",
+     "rent": 665
+    },
+    {
+     "day": 38,
+     "flag_day": 38,
+     "hood": "Saltmarsh",
+     "id": 1343,
+     "phone": "555-9888",
+     "rent": 1080
+    },
+    {
+     "day": 38,
+     "flag_day": 38,
+     "hood": "Saltmarsh",
+     "id": 1344,
+     "phone": "555-9888",
+     "rent": 1100
+    },
+    {
+     "day": 38,
+     "flag_day": 38,
+     "hood": "Tern Point",
+     "id": 1345,
+     "phone": "555-2502",
+     "rent": 1070
+    },
+    {
+     "day": 39,
+     "flag_day": 39,
+     "hood": "Saltmarsh",
+     "id": 1385,
+     "phone": "555-2502",
+     "rent": 895
+    },
+    {
+     "day": 39,
+     "flag_day": 39,
+     "hood": "Pelham Green",
+     "id": 1386,
+     "phone": "555-8563",
+     "rent": 1035
+    },
+    {
+     "day": 40,
+     "flag_day": 40,
+     "hood": "Oakbend",
+     "id": 1422,
+     "phone": "555-2502",
+     "rent": 610
+    },
+    {
+     "day": 40,
+     "flag_day": 40,
+     "hood": "Saltmarsh",
+     "id": 1423,
+     "phone": "555-2502",
+     "rent": 1045
+    },
+    {
+     "day": 40,
+     "flag_day": 40,
+     "hood": "Pelham Green",
+     "id": 1427,
+     "phone": "555-8563",
+     "rent": 1085
+    },
+    {
+     "day": 41,
+     "flag_day": 41,
+     "hood": "Westering",
+     "id": 1461,
+     "phone": "555-3772",
+     "rent": 1015
+    },
+    {
+     "day": 41,
+     "flag_day": 41,
+     "hood": "Tern Point",
+     "id": 1463,
+     "phone": "555-5285",
+     "rent": 880
+    },
+    {
+     "day": 44,
+     "flag_day": 44,
+     "hood": "Millrace",
+     "id": 1577,
+     "phone": "555-2762",
+     "rent": 615
+    },
+    {
+     "day": 44,
+     "flag_day": 44,
+     "hood": "Quarry Hill",
+     "id": 1578,
+     "phone": "555-3803",
+     "rent": 685
+    },
+    {
+     "day": 44,
+     "flag_day": 44,
+     "hood": "Ashgrove",
+     "id": 1580,
+     "phone": "555-7567",
+     "rent": 880
+    },
+    {
+     "day": 45,
+     "flag_day": 45,
+     "hood": "Tern Point",
+     "id": 1618,
+     "phone": "555-2240",
+     "rent": 1050
+    },
+    {
+     "day": 45,
+     "flag_day": 45,
+     "hood": "Westering",
+     "id": 1619,
+     "phone": "555-7567",
+     "rent": 600
+    },
+    {
+     "day": 45,
+     "flag_day": 45,
+     "hood": "Tern Point",
+     "id": 1620,
+     "phone": "555-4744",
+     "rent": 815
+    },
+    {
+     "day": 46,
+     "flag_day": 46,
+     "hood": "Millrace",
+     "id": 1658,
+     "phone": "555-2240",
+     "rent": 630
+    },
+    {
+     "day": 46,
+     "flag_day": 46,
+     "hood": "Alder Flats",
+     "id": 1660,
+     "phone": "555-4744",
+     "rent": 1100
+    },
+    {
+     "day": 46,
+     "flag_day": 46,
+     "hood": "Alder Flats",
+     "id": 1661,
+     "phone": "555-4744",
+     "rent": 635
+    },
+    {
+     "day": 47,
+     "flag_day": 47,
+     "hood": "Oakbend",
+     "id": 1694,
+     "phone": "555-2240",
+     "rent": 1035
+    },
+    {
+     "day": 47,
+     "flag_day": 47,
+     "hood": "Alder Flats",
+     "id": 1697,
+     "phone": "555-2762",
+     "rent": 1065
+    },
+    {
+     "day": 47,
+     "flag_day": 47,
+     "hood": "Oakbend",
+     "id": 1698,
+     "phone": "555-5005",
+     "rent": 630
+    },
+    {
+     "day": 48,
+     "flag_day": 48,
+     "hood": "Kestrel Row",
+     "id": 1735,
+     "phone": "555-2762",
+     "rent": 840
+    },
+    {
+     "day": 49,
+     "flag_day": 49,
+     "hood": "Ashgrove",
+     "id": 1775,
+     "phone": "555-1346",
+     "rent": 1055
+    },
+    {
+     "day": 49,
+     "flag_day": 49,
+     "hood": "Westering",
+     "id": 1777,
+     "phone": "555-5005",
+     "rent": 880
+    },
+    {
+     "day": 50,
+     "flag_day": 50,
+     "hood": "Tern Point",
+     "id": 1814,
+     "phone": "555-5005",
+     "rent": 885
+    },
+    {
+     "day": 52,
+     "flag_day": 52,
+     "hood": "Pelham Green",
+     "id": 1887,
+     "phone": "555-8422",
+     "rent": 840
+    },
+    {
+     "day": 52,
+     "flag_day": 52,
+     "hood": "Alder Flats",
+     "id": 1888,
+     "phone": "555-2325",
+     "rent": 890
+    },
+    {
+     "day": 52,
+     "flag_day": 52,
+     "hood": "Westering",
+     "id": 1889,
+     "phone": "555-2325",
+     "rent": 650
+    },
+    {
+     "day": 53,
+     "flag_day": 53,
+     "hood": "Tern Point",
+     "id": 1925,
+     "phone": "555-8422",
+     "rent": 650
+    },
+    {
+     "day": 53,
+     "flag_day": 53,
+     "hood": "Alder Flats",
+     "id": 1927,
+     "phone": "555-8422",
+     "rent": 845
+    },
+    {
+     "day": 55,
+     "flag_day": 55,
+     "hood": "Ashgrove",
+     "id": 2002,
+     "phone": "555-8184",
+     "rent": 835
+    },
+    {
+     "day": 55,
+     "flag_day": 55,
+     "hood": "Saltmarsh",
+     "id": 2005,
+     "phone": "555-2355",
+     "rent": 1090
+    },
+    {
+     "day": 56,
+     "flag_day": 56,
+     "hood": "Oakbend",
+     "id": 2043,
+     "phone": "555-9619",
+     "rent": 670
+    },
+    {
+     "day": 57,
+     "flag_day": 57,
+     "hood": "Millrace",
+     "id": 2072,
+     "phone": "555-9619",
+     "rent": 635
+    },
+    {
+     "day": 58,
+     "flag_day": 58,
+     "hood": "Millrace",
+     "id": 2099,
+     "phone": "555-9619",
+     "rent": 850
+    },
+    {
+     "day": 59,
+     "flag_day": 59,
+     "hood": "Kestrel Row",
+     "id": 2133,
+     "phone": "555-9619",
+     "rent": 805
+    },
+    {
+     "day": 59,
+     "flag_day": 59,
+     "hood": "Tern Point",
+     "id": 2134,
+     "phone": "555-7440",
+     "rent": 890
+    },
+    {
+     "day": 59,
+     "flag_day": 59,
+     "hood": "Pelham Green",
+     "id": 2135,
+     "phone": "555-7440",
+     "rent": 620
+    },
+    {
+     "day": 61,
+     "flag_day": 61,
+     "hood": "Millrace",
+     "id": 2194,
+     "phone": "555-2727",
+     "rent": 660
+    },
+    {
+     "day": 65,
+     "flag_day": 65,
+     "hood": "Oakbend",
+     "id": 2325,
+     "phone": "555-9012",
+     "rent": 1050
+    },
+    {
+     "day": 66,
+     "flag_day": 66,
+     "hood": "Saltmarsh",
+     "id": 2356,
+     "phone": "555-9012",
+     "rent": 1015
+    }
+   ],
+   "ads_before_flag": 4,
+   "answer_key": {
+    "R03": 19,
+    "R04": 23,
+    "R08": 16,
+    "R09": 23
+   },
+   "by_kind": {
+    "phone": {
+     "ads": 68,
+     "values": 28,
+     "weight": 2
+    },
+    "photo": {
+     "ads": 21,
+     "values": 6,
+     "weight": 3
+    },
+    "site": {
+     "ads": 38,
+     "values": 8,
+     "weight": 0
+    },
+    "wording": {
+     "ads": 76,
+     "values": 4,
+     "weight": 2
+    }
+   },
+   "findings": [
+    {
+     "kind": "photo_reuse",
+     "score": 1.0,
+     "summary": "6 pictures are reused across 54 ad postings of this ring, re-cropped between ads (ids within 12 bits).",
+     "title": "Photo-sets reused across ads"
+    },
+    {
+     "kind": "phone_rotation",
+     "score": 1.0,
+     "summary": "41 different numbers across 81 ads; each number serves 1 to 4 of them.",
+     "title": "Contact numbers rotate"
+    },
+    {
+     "kind": "shared_phrasing",
+     "score": 0.85,
+     "summary": "28 ads ask for money before the keys in 13 wordings of one template.",
+     "title": "Pay-before-move-in wording, reworded"
+    },
+    {
+     "kind": "shared_phrasing",
+     "score": 0.89,
+     "summary": "24 ads ask for money before the keys in 9 wordings of one template.",
+     "title": "Pay-before-move-in wording, reworded"
+    },
+    {
+     "kind": "shared_phrasing",
+     "score": 0.86,
+     "summary": "21 ads ask for money before the keys in 16 wordings of one template.",
+     "title": "Pay-before-move-in wording, reworded"
+    },
+    {
+     "kind": "shared_phrasing",
+     "score": 0.95,
+     "summary": "3 ads ask for money before the keys in 3 wordings of one template.",
+     "title": "Pay-before-move-in wording, reworded"
+    },
+    {
+     "kind": "copied_listing",
+     "score": 1.0,
+     "summary": "20 ads reuse photos from 19 older ads with a different number.",
+     "title": "Photos copied from older listings under new contact details"
+    },
+    {
+     "kind": "pretext",
+     "score": 0.67,
+     "summary": "Ads explain why nobody can show it: owner away (54), cant show (39), new management (15)",
+     "title": "The same reasons for not showing the home"
+    }
+   ],
+   "first_day": 4,
+   "flag_day": 13,
+   "gap_days": 9,
+   "id": "A",
+   "label": "Ring A",
+   "n_ads": 81,
+   "n_phones": 41,
+   "renters_est": 660,
+   "score": 1.0,
+   "signals": [
+    {
+     "ad_ids": [
+      1618,
+      1658,
+      1694
+     ],
+     "key": "555-2240",
+     "kind": "phone",
+     "label": "555-2240",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1888,
+      1889
+     ],
+     "key": "555-2325",
+     "kind": "phone",
+     "label": "555-2325",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1345,
+      1385,
+      1422,
+      1423
+     ],
+     "key": "555-2502",
+     "kind": "phone",
+     "label": "555-2502",
+     "n_ads": 4,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1224,
+      1264
+     ],
+     "key": "555-2651",
+     "kind": "phone",
+     "label": "555-2651",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      425,
+      426,
+      427,
+      490
+     ],
+     "key": "555-2724",
+     "kind": "phone",
+     "label": "555-2724",
+     "n_ads": 4,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1577,
+      1697,
+      1735
+     ],
+     "key": "555-2762",
+     "kind": "phone",
+     "label": "555-2762",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1147,
+      1148
+     ],
+     "key": "555-3035",
+     "kind": "phone",
+     "label": "555-3035",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      779,
+      780
+     ],
+     "key": "555-3640",
+     "kind": "phone",
+     "label": "555-3640",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1184,
+      1222
+     ],
+     "key": "555-4424",
+     "kind": "phone",
+     "label": "555-4424",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      839,
+      872
+     ],
+     "key": "555-4650",
+     "kind": "phone",
+     "label": "555-4650",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1620,
+      1660,
+      1661
+     ],
+     "key": "555-4744",
+     "kind": "phone",
+     "label": "555-4744",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1028,
+      1142
+     ],
+     "key": "555-4914",
+     "kind": "phone",
+     "label": "555-4914",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1698,
+      1777,
+      1814
+     ],
+     "key": "555-5005",
+     "kind": "phone",
+     "label": "555-5005",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1059,
+      1060,
+      1100
+     ],
+     "key": "555-5177",
+     "kind": "phone",
+     "label": "555-5177",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      525,
+      554
+     ],
+     "key": "555-5648",
+     "kind": "phone",
+     "label": "555-5648",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      777,
+      912
+     ],
+     "key": "555-5676",
+     "kind": "phone",
+     "label": "555-5676",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1218,
+      1340
+     ],
+     "key": "555-5760",
+     "kind": "phone",
+     "label": "555-5760",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      2134,
+      2135
+     ],
+     "key": "555-7440",
+     "kind": "phone",
+     "label": "555-7440",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1580,
+      1619
+     ],
+     "key": "555-7567",
+     "kind": "phone",
+     "label": "555-7567",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      321,
+      354
+     ],
+     "key": "555-8398",
+     "kind": "phone",
+     "label": "555-8398",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1887,
+      1925,
+      1927
+     ],
+     "key": "555-8422",
+     "kind": "phone",
+     "label": "555-8422",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      148,
+      176
+     ],
+     "key": "555-8467",
+     "kind": "phone",
+     "label": "555-8467",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1386,
+      1427
+     ],
+     "key": "555-8563",
+     "kind": "phone",
+     "label": "555-8563",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      2325,
+      2356
+     ],
+     "key": "555-9012",
+     "kind": "phone",
+     "label": "555-9012",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      2043,
+      2072,
+      2099,
+      2133
+     ],
+     "key": "555-9619",
+     "kind": "phone",
+     "label": "555-9619",
+     "n_ads": 4,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      951,
+      1027
+     ],
+     "key": "555-9647",
+     "kind": "phone",
+     "label": "555-9647",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      555,
+      624
+     ],
+     "key": "555-9843",
+     "kind": "phone",
+     "label": "555-9843",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1343,
+      1344
+     ],
+     "key": "555-9888",
+     "kind": "phone",
+     "label": "555-9888",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1224,
+      1264,
+      1386,
+      1427,
+      1580,
+      1619,
+      1620,
+      1660,
+      1661,
+      2072,
+      2356
+     ],
+     "key": "photo-049eb9ce",
+     "kind": "photo",
+     "label": "photo-set 049eb9ce",
+     "n_ads": 11,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1578,
+      1698,
+      1777,
+      1814,
+      2005,
+      2043,
+      2194
+     ],
+     "key": "photo-10540a1b",
+     "kind": "photo",
+     "label": "photo-set 10540a1b",
+     "n_ads": 7,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1578,
+      1698,
+      1777,
+      1814,
+      2005,
+      2043,
+      2133
+     ],
+     "key": "photo-60f50788",
+     "kind": "photo",
+     "label": "photo-set 60f50788",
+     "n_ads": 7,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1224,
+      1264,
+      1386,
+      1427,
+      1580,
+      1619,
+      1620,
+      1660,
+      1661,
+      2072
+     ],
+     "key": "photo-745597e0",
+     "kind": "photo",
+     "label": "photo-set 745597e0",
+     "n_ads": 10,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1224,
+      1264,
+      1386,
+      1427,
+      1580,
+      1619,
+      1620,
+      1660,
+      1661,
+      2072,
+      2099,
+      2356
+     ],
+     "key": "photo-8189b475",
+     "kind": "photo",
+     "label": "photo-set 8189b475",
+     "n_ads": 12,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1578,
+      1698,
+      1777,
+      1814,
+      2005,
+      2043,
+      2135
+     ],
+     "key": "photo-b95d54c1",
+     "kind": "photo",
+     "label": "photo-set b95d54c1",
+     "n_ads": 7,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      176,
+      426,
+      427,
+      554,
+      555,
+      777,
+      1027,
+      1028,
+      1218,
+      1340,
+      1427,
+      1577,
+      1580,
+      1618,
+      1698,
+      1888,
+      1889,
+      2133,
+      2134,
+      2135,
+      2194
+     ],
+     "key": "phrase-0",
+     "kind": "wording",
+     "label": "The deposit has to be paid ahead of you collect the keys, no exceptions.",
+     "n_ads": 21,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1619,
+      1620,
+      2072
+     ],
+     "key": "phrase-1",
+     "kind": "wording",
+     "label": "Pay the booking fee ahead of the key handover.",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      659,
+      778,
+      779,
+      839,
+      1060,
+      1144,
+      1148,
+      1219,
+      1222,
+      1224,
+      1343,
+      1344,
+      1422,
+      1578,
+      1660,
+      1694,
+      1735,
+      1775,
+      1777,
+      1814,
+      1887,
+      1925,
+      1927,
+      2005,
+      2043,
+      2099,
+      2325,
+      2356
+     ],
+     "key": "phrase-26",
+     "kind": "wording",
+     "label": "Send the reservation payment first and I will mail the keys and the lease to you.",
+     "n_ads": 28,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      321,
+      354,
+      425,
+      490,
+      525,
+      624,
+      736,
+      872,
+      912,
+      951,
+      954,
+      1142,
+      1147,
+      1264,
+      1345,
+      1385,
+      1386,
+      1423,
+      1461,
+      1463,
+      1658,
+      1661,
+      1697,
+      2002
+     ],
+     "key": "phrase-3",
+     "kind": "wording",
+     "label": "A reservation sum must reach me before the keys are released;",
+     "n_ads": 24,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1660,
+      1661,
+      1698,
+      1777,
+      1814,
+      2005,
+      2043,
+      2072
+     ],
+     "key": "easy-deposit-75.example",
+     "kind": "site",
+     "label": "easy-deposit-75.example",
+     "n_ads": 8,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1343,
+      1344,
+      1345,
+      1385,
+      1422,
+      1423
+     ],
+     "key": "fast-deposit-30.example",
+     "kind": "site",
+     "label": "fast-deposit-30.example",
+     "n_ads": 6,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      525,
+      554,
+      555,
+      624,
+      778,
+      779,
+      780,
+      839,
+      872
+     ],
+     "key": "fast-deposit-33.example",
+     "kind": "site",
+     "label": "fast-deposit-33.example",
+     "n_ads": 9,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1059,
+      1618,
+      1694,
+      1775,
+      1887,
+      2002
+     ],
+     "key": "harborrowhomes.example",
+     "kind": "site",
+     "label": "harborrowhomes.example",
+     "n_ads": 6,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      954,
+      1060,
+      1888
+     ],
+     "key": "harborrowliving.example",
+     "kind": "site",
+     "label": "harborrowliving.example",
+     "n_ads": 3,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1697,
+      1927
+     ],
+     "key": "harborrownow.example",
+     "kind": "site",
+     "label": "harborrownow.example",
+     "n_ads": 2,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1658,
+      1735
+     ],
+     "key": "harrborrow.example",
+     "kind": "site",
+     "label": "harrborrow.example",
+     "n_ads": 2,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1144,
+      1219
+     ],
+     "key": "hharborrow.example",
+     "kind": "site",
+     "label": "hharborrow.example",
+     "n_ads": 2,
+     "weight": 0
+    }
+   ]
+  },
+  {
+   "ad_days_before_flag": 4,
+   "ads": [
     {
      "day": 12,
      "flag_day": 14,
@@ -308,14 +1685,6 @@
      "rent": 625
     },
     {
-     "day": 15,
-     "flag_day": 15,
-     "hood": "Millrace",
-     "id": 492,
-     "phone": "555-2579",
-     "rent": 825
-    },
-    {
      "day": 16,
      "flag_day": 16,
      "hood": "Tern Point",
@@ -349,27 +1718,11 @@
     },
     {
      "day": 18,
-     "flag_day": 18,
+     "flag_day": 20,
      "hood": "Tern Point",
      "id": 589,
      "phone": "555-5657",
      "rent": 635
-    },
-    {
-     "day": 20,
-     "flag_day": 20,
-     "hood": "Quarry Hill",
-     "id": 660,
-     "phone": "555-2484",
-     "rent": 875
-    },
-    {
-     "day": 20,
-     "flag_day": 20,
-     "hood": "Tern Point",
-     "id": 661,
-     "phone": "555-5657",
-     "rent": 1075
     },
     {
      "day": 20,
@@ -382,34 +1735,10 @@
     {
      "day": 21,
      "flag_day": 21,
-     "hood": "Kestrel Row",
-     "id": 701,
-     "phone": "555-2484",
-     "rent": 1015
-    },
-    {
-     "day": 21,
-     "flag_day": 21,
      "hood": "Ashgrove",
      "id": 702,
      "phone": "555-4474",
      "rent": 870
-    },
-    {
-     "day": 22,
-     "flag_day": 22,
-     "hood": "Alder Flats",
-     "id": 737,
-     "phone": "555-8594",
-     "rent": 1015
-    },
-    {
-     "day": 22,
-     "flag_day": 22,
-     "hood": "Tern Point",
-     "id": 738,
-     "phone": "555-4474",
-     "rent": 680
     },
     {
      "day": 22,
@@ -450,22 +1779,6 @@
      "id": 743,
      "phone": "555-3969",
      "rent": 680
-    },
-    {
-     "day": 22,
-     "flag_day": 22,
-     "hood": "Pelham Green",
-     "id": 744,
-     "phone": "555-3969",
-     "rent": 845
-    },
-    {
-     "day": 22,
-     "flag_day": 22,
-     "hood": "Oakbend",
-     "id": 745,
-     "phone": "555-3969",
-     "rent": 880
     },
     {
      "day": 23,
@@ -510,26 +1823,10 @@
     {
      "day": 25,
      "flag_day": 25,
-     "hood": "Quarry Hill",
-     "id": 841,
-     "phone": "555-5780",
-     "rent": 620
-    },
-    {
-     "day": 25,
-     "flag_day": 25,
      "hood": "Ashgrove",
      "id": 842,
      "phone": "555-4294",
      "rent": 815
-    },
-    {
-     "day": 26,
-     "flag_day": 26,
-     "hood": "Pelham Green",
-     "id": 871,
-     "phone": "555-5676",
-     "rent": 1085
     },
     {
      "day": 26,
@@ -564,46 +1861,6 @@
      "rent": 685
     },
     {
-     "day": 28,
-     "flag_day": 28,
-     "hood": "Oakbend",
-     "id": 952,
-     "phone": "555-1724",
-     "rent": 880
-    },
-    {
-     "day": 28,
-     "flag_day": 28,
-     "hood": "Kestrel Row",
-     "id": 955,
-     "phone": "555-8288",
-     "rent": 1015
-    },
-    {
-     "day": 30,
-     "flag_day": 30,
-     "hood": "Quarry Hill",
-     "id": 1029,
-     "phone": "555-1724",
-     "rent": 1070
-    },
-    {
-     "day": 30,
-     "flag_day": 30,
-     "hood": "Ashgrove",
-     "id": 1030,
-     "phone": "555-5177",
-     "rent": 875
-    },
-    {
-     "day": 30,
-     "flag_day": 30,
-     "hood": "Tern Point",
-     "id": 1031,
-     "phone": "555-3559",
-     "rent": 660
-    },
-    {
      "day": 31,
      "flag_day": 31,
      "hood": "Alder Flats",
@@ -618,30 +1875,6 @@
      "id": 1062,
      "phone": "555-3985",
      "rent": 1085
-    },
-    {
-     "day": 31,
-     "flag_day": 31,
-     "hood": "Pelham Green",
-     "id": 1067,
-     "phone": "555-6132",
-     "rent": 1045
-    },
-    {
-     "day": 32,
-     "flag_day": 32,
-     "hood": "Millrace",
-     "id": 1101,
-     "phone": "555-7309",
-     "rent": 875
-    },
-    {
-     "day": 32,
-     "flag_day": 32,
-     "hood": "Oakbend",
-     "id": 1102,
-     "phone": "555-3559",
-     "rent": 1080
     },
     {
      "day": 32,
@@ -660,67 +1893,11 @@
      "rent": 885
     },
     {
-     "day": 33,
-     "flag_day": 33,
-     "hood": "Millrace",
-     "id": 1146,
-     "phone": "555-1517",
-     "rent": 660
-    },
-    {
-     "day": 34,
-     "flag_day": 34,
-     "hood": "Westering",
-     "id": 1181,
-     "phone": "555-3932",
-     "rent": 630
-    },
-    {
-     "day": 34,
-     "flag_day": 34,
-     "hood": "Alder Flats",
-     "id": 1182,
-     "phone": "555-1517",
-     "rent": 600
-    },
-    {
      "day": 35,
      "flag_day": 35,
      "hood": "Pelham Green",
      "id": 1220,
      "phone": "555-7597",
-     "rent": 625
-    },
-    {
-     "day": 35,
-     "flag_day": 35,
-     "hood": "Oakbend",
-     "id": 1221,
-     "phone": "555-7597",
-     "rent": 845
-    },
-    {
-     "day": 36,
-     "flag_day": 36,
-     "hood": "Quarry Hill",
-     "id": 1258,
-     "phone": "555-1679",
-     "rent": 690
-    },
-    {
-     "day": 36,
-     "flag_day": 36,
-     "hood": "Westering",
-     "id": 1260,
-     "phone": "555-8718",
-     "rent": 635
-    },
-    {
-     "day": 36,
-     "flag_day": 36,
-     "hood": "Westering",
-     "id": 1261,
-     "phone": "555-7205",
      "rent": 625
     },
     {
@@ -734,34 +1911,18 @@
     {
      "day": 37,
      "flag_day": 37,
-     "hood": "Alder Flats",
-     "id": 1301,
-     "phone": "555-2962",
-     "rent": 650
-    },
-    {
-     "day": 37,
-     "flag_day": 37,
-     "hood": "Alder Flats",
-     "id": 1303,
-     "phone": "555-1679",
-     "rent": 1045
-    },
-    {
-     "day": 37,
-     "flag_day": 37,
      "hood": "Tern Point",
-     "id": 1304,
-     "phone": "555-1679",
-     "rent": 1025
+     "id": 1300,
+     "phone": "555-2962",
+     "rent": 1065
     },
     {
      "day": 38,
      "flag_day": 38,
-     "hood": "Millrace",
-     "id": 1342,
-     "phone": "555-7205",
-     "rent": 1045
+     "hood": "Saltmarsh",
+     "id": 1339,
+     "phone": "555-2962",
+     "rent": 1080
     },
     {
      "day": 39,
@@ -804,36 +1965,12 @@
      "rent": 805
     },
     {
-     "day": 40,
-     "flag_day": 40,
-     "hood": "Tern Point",
-     "id": 1421,
-     "phone": "555-2323",
-     "rent": 845
-    },
-    {
-     "day": 41,
-     "flag_day": 41,
-     "hood": "Millrace",
-     "id": 1464,
-     "phone": "555-2323",
-     "rent": 850
-    },
-    {
      "day": 42,
      "flag_day": 42,
      "hood": "Ashgrove",
      "id": 1497,
      "phone": "555-6553",
      "rent": 1090
-    },
-    {
-     "day": 42,
-     "flag_day": 42,
-     "hood": "Ashgrove",
-     "id": 1502,
-     "phone": "555-7995",
-     "rent": 1050
     },
     {
      "day": 43,
@@ -854,34 +1991,10 @@
     {
      "day": 44,
      "flag_day": 44,
-     "hood": "Pelham Green",
-     "id": 1572,
-     "phone": "555-8407",
-     "rent": 865
-    },
-    {
-     "day": 44,
-     "flag_day": 44,
      "hood": "Oakbend",
      "id": 1573,
      "phone": "555-8407",
      "rent": 610
-    },
-    {
-     "day": 44,
-     "flag_day": 44,
-     "hood": "Quarry Hill",
-     "id": 1575,
-     "phone": "555-6700",
-     "rent": 805
-    },
-    {
-     "day": 44,
-     "flag_day": 44,
-     "hood": "Quarry Hill",
-     "id": 1579,
-     "phone": "555-3803",
-     "rent": 625
     },
     {
      "day": 45,
@@ -890,14 +2003,6 @@
      "id": 1616,
      "phone": "555-8407",
      "rent": 635
-    },
-    {
-     "day": 45,
-     "flag_day": 45,
-     "hood": "Ashgrove",
-     "id": 1617,
-     "phone": "555-6700",
-     "rent": 880
     },
     {
      "day": 46,
@@ -951,41 +2056,17 @@
      "day": 48,
      "flag_day": 48,
      "hood": "Millrace",
-     "id": 1733,
+     "id": 1732,
      "phone": "555-5364",
-     "rent": 890
+     "rent": 680
     },
     {
      "day": 48,
      "flag_day": 48,
-     "hood": "Oakbend",
-     "id": 1736,
-     "phone": "555-2338",
-     "rent": 875
-    },
-    {
-     "day": 49,
-     "flag_day": 49,
-     "hood": "Quarry Hill",
-     "id": 1769,
-     "phone": "555-5364",
-     "rent": 895
-    },
-    {
-     "day": 49,
-     "flag_day": 49,
-     "hood": "Westering",
-     "id": 1770,
-     "phone": "555-1555",
-     "rent": 845
-    },
-    {
-     "day": 49,
-     "flag_day": 49,
      "hood": "Millrace",
-     "id": 1771,
-     "phone": "555-1660",
-     "rent": 605
+     "id": 1733,
+     "phone": "555-5364",
+     "rent": 890
     },
     {
      "day": 49,
@@ -1004,12 +2085,12 @@
      "rent": 620
     },
     {
-     "day": 50,
-     "flag_day": 50,
-     "hood": "Oakbend",
-     "id": 1809,
-     "phone": "555-8608",
-     "rent": 1050
+     "day": 51,
+     "flag_day": 51,
+     "hood": "Westering",
+     "id": 1851,
+     "phone": "555-7930",
+     "rent": 605
     },
     {
      "day": 51,
@@ -1026,14 +2107,6 @@
      "id": 1853,
      "phone": "555-9154",
      "rent": 690
-    },
-    {
-     "day": 52,
-     "flag_day": 52,
-     "hood": "Westering",
-     "id": 1884,
-     "phone": "555-2578",
-     "rent": 620
     },
     {
      "day": 52,
@@ -1062,14 +2135,6 @@
     {
      "day": 53,
      "flag_day": 53,
-     "hood": "Ashgrove",
-     "id": 1923,
-     "phone": "555-6482",
-     "rent": 875
-    },
-    {
-     "day": 53,
-     "flag_day": 53,
      "hood": "Alder Flats",
      "id": 1924,
      "phone": "555-6482",
@@ -1086,10 +2151,26 @@
     {
      "day": 54,
      "flag_day": 54,
+     "hood": "Millrace",
+     "id": 1965,
+     "phone": "555-6482",
+     "rent": 1040
+    },
+    {
+     "day": 54,
+     "flag_day": 54,
      "hood": "Tern Point",
      "id": 1966,
      "phone": "555-6482",
      "rent": 1065
+    },
+    {
+     "day": 54,
+     "flag_day": 54,
+     "hood": "Alder Flats",
+     "id": 1967,
+     "phone": "555-2610",
+     "rent": 665
     },
     {
      "day": 54,
@@ -1118,14 +2199,6 @@
     {
      "day": 55,
      "flag_day": 55,
-     "hood": "Tern Point",
-     "id": 2000,
-     "phone": "555-1751",
-     "rent": 680
-    },
-    {
-     "day": 55,
-     "flag_day": 55,
      "hood": "Saltmarsh",
      "id": 2001,
      "phone": "555-9695",
@@ -1142,50 +2215,10 @@
     {
      "day": 56,
      "flag_day": 56,
-     "hood": "Ashgrove",
-     "id": 2040,
-     "phone": "555-8184",
-     "rent": 605
-    },
-    {
-     "day": 56,
-     "flag_day": 56,
      "hood": "Pelham Green",
      "id": 2041,
      "phone": "555-4549",
      "rent": 1055
-    },
-    {
-     "day": 59,
-     "flag_day": 59,
-     "hood": "Kestrel Row",
-     "id": 2130,
-     "phone": "555-5377",
-     "rent": 1060
-    },
-    {
-     "day": 59,
-     "flag_day": 59,
-     "hood": "Kestrel Row",
-     "id": 2131,
-     "phone": "555-5377",
-     "rent": 660
-    },
-    {
-     "day": 59,
-     "flag_day": 59,
-     "hood": "Quarry Hill",
-     "id": 2132,
-     "phone": "555-5377",
-     "rent": 1045
-    },
-    {
-     "day": 65,
-     "flag_day": 65,
-     "hood": "Millrace",
-     "id": 2322,
-     "phone": "555-9684",
-     "rent": 1065
     },
     {
      "day": 65,
@@ -1196,36 +2229,31 @@
      "rent": 840
     }
    ],
-   "ads_before_flag": 5,
+   "ads_before_flag": 3,
    "answer_key": {
-    "R02": 35,
-    "R03": 6,
-    "R04": 9,
-    "R05": 21,
-    "R06": 7,
-    "R07": 37,
-    "R09": 1,
-    "R10": 2
+    "R02": 34,
+    "R05": 9,
+    "R07": 30
    },
    "by_kind": {
     "phone": {
-     "ads": 101,
-     "values": 37,
+     "ads": 63,
+     "values": 23,
      "weight": 2
     },
     "photo": {
-     "ads": 36,
-     "values": 19,
+     "ads": 20,
+     "values": 13,
      "weight": 3
     },
     "site": {
-     "ads": 55,
-     "values": 13,
+     "ads": 31,
+     "values": 9,
      "weight": 0
     },
     "wording": {
-     "ads": 112,
-     "values": 6,
+     "ads": 61,
+     "values": 4,
      "weight": 2
     }
    },
@@ -1233,72 +2261,60 @@
     {
      "kind": "photo_reuse",
      "score": 1.0,
-     "summary": "19 pictures are reused across 111 ad postings of this ring, re-cropped between ads (ids within 11 bits).",
+     "summary": "13 pictures are reused across 61 ad postings of this ring, re-cropped between ads (ids within 11 bits).",
      "title": "Photo-sets reused across ads"
     },
     {
      "kind": "phone_rotation",
      "score": 1.0,
-     "summary": "54 different numbers across 118 ads; each number serves 1 to 4 of them.",
+     "summary": "33 different numbers across 73 ads; each number serves 1 to 4 of them.",
      "title": "Contact numbers rotate"
     },
     {
      "kind": "shared_phrasing",
-     "score": 1.0,
-     "summary": "42 ads ask for money before the keys in 3 wordings of one template.",
-     "title": "Pay-before-move-in wording, reworded"
-    },
-    {
-     "kind": "shared_phrasing",
      "score": 0.82,
-     "summary": "19 ads ask for money before the keys in 5 wordings of one template.",
+     "summary": "18 ads ask for money before the keys in 5 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "18 ads ask for money before the keys in 1 wordings of one template.",
+     "summary": "17 ads ask for money before the keys in 3 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "18 ads ask for money before the keys in 3 wordings of one template.",
+     "summary": "15 ads ask for money before the keys in 1 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "12 ads ask for money before the keys in 1 wordings of one template.",
-     "title": "Pay-before-move-in wording, reworded"
-    },
-    {
-     "kind": "shared_phrasing",
-     "score": 1.0,
-     "summary": "3 ads ask for money before the keys in 3 wordings of one template.",
+     "summary": "11 ads ask for money before the keys in 1 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "copied_listing",
      "score": 1.0,
-     "summary": "40 ads reuse photos from 35 older ads with a different number.",
+     "summary": "28 ads reuse photos from 24 older ads with a different number.",
      "title": "Photos copied from older listings under new contact details"
     },
     {
      "kind": "pretext",
-     "score": 0.65,
-     "summary": "Ads explain why nobody can show it: owner away (77), cant show (48), new management (29)",
+     "score": 0.67,
+     "summary": "Ads explain why nobody can show it: owner away (49), cant show (30), new management (19)",
      "title": "The same reasons for not showing the home"
     }
    ],
-   "first_day": 10,
+   "first_day": 12,
    "flag_day": 14,
-   "gap_days": 4,
-   "id": "A",
-   "label": "Ring A",
-   "n_ads": 118,
-   "n_phones": 54,
-   "renters_est": 300,
+   "gap_days": 2,
+   "id": "B",
+   "label": "Ring B",
+   "n_ads": 73,
+   "n_phones": 33,
+   "renters_est": 120,
    "score": 1.0,
    "signals": [
     {
@@ -1349,87 +2365,17 @@
     },
     {
      "ad_ids": [
-      1146,
-      1182
-     ],
-     "key": "555-1517",
-     "kind": "phone",
-     "label": "555-1517",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
       1695,
-      1771,
       1772
      ],
      "key": "555-1660",
      "kind": "phone",
      "label": "555-1660",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1258,
-      1303,
-      1304
-     ],
-     "key": "555-1679",
-     "kind": "phone",
-     "label": "555-1679",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      952,
-      1029
-     ],
-     "key": "555-1724",
-     "kind": "phone",
-     "label": "555-1724",
      "n_ads": 2,
      "weight": 2
     },
     {
      "ad_ids": [
-      1999,
-      2000
-     ],
-     "key": "555-1751",
-     "kind": "phone",
-     "label": "555-1751",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1421,
-      1464,
-      1540
-     ],
-     "key": "555-2323",
-     "kind": "phone",
-     "label": "555-2323",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      660,
-      701
-     ],
-     "key": "555-2484",
-     "kind": "phone",
-     "label": "555-2484",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1884,
       1885,
       1921,
       1922
@@ -1437,52 +2383,41 @@
      "key": "555-2578",
      "kind": "phone",
      "label": "555-2578",
-     "n_ads": 4,
+     "n_ads": 3,
      "weight": 2
     },
     {
      "ad_ids": [
-      492,
       526,
       527
      ],
      "key": "555-2579",
      "kind": "phone",
      "label": "555-2579",
-     "n_ads": 3,
+     "n_ads": 2,
      "weight": 2
     },
     {
      "ad_ids": [
+      1967,
       1968,
       1998
      ],
      "key": "555-2610",
      "kind": "phone",
      "label": "555-2610",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 2
     },
     {
      "ad_ids": [
       1299,
-      1301
+      1300,
+      1339
      ],
      "key": "555-2962",
      "kind": "phone",
      "label": "555-2962",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1031,
-      1102,
-      1145
-     ],
-     "key": "555-3559",
-     "kind": "phone",
-     "label": "555-3559",
      "n_ads": 3,
      "weight": 2
     },
@@ -1497,18 +2432,6 @@
      "kind": "phone",
      "label": "555-3693",
      "n_ads": 4,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      743,
-      744,
-      745
-     ],
-     "key": "555-3969",
-     "kind": "phone",
-     "label": "555-3969",
-     "n_ads": 3,
      "weight": 2
     },
     {
@@ -1536,13 +2459,12 @@
     {
      "ad_ids": [
       662,
-      702,
-      738
+      702
      ],
      "key": "555-4474",
      "kind": "phone",
      "label": "555-4474",
-     "n_ads": 3,
+     "n_ads": 2,
      "weight": 2
     },
     {
@@ -1560,8 +2482,8 @@
     {
      "ad_ids": [
       1731,
-      1733,
-      1769
+      1732,
+      1733
      ],
      "key": "555-5364",
      "kind": "phone",
@@ -1571,46 +2493,32 @@
     },
     {
      "ad_ids": [
-      2130,
-      2131,
-      2132
-     ],
-     "key": "555-5377",
-     "kind": "phone",
-     "label": "555-5377",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
       556,
       557,
-      589,
-      661
+      589
      ],
      "key": "555-5657",
      "kind": "phone",
      "label": "555-5657",
-     "n_ads": 4,
+     "n_ads": 3,
      "weight": 2
     },
     {
      "ad_ids": [
       810,
       811,
-      840,
-      841
+      840
      ],
      "key": "555-5780",
      "kind": "phone",
      "label": "555-5780",
-     "n_ads": 4,
+     "n_ads": 3,
      "weight": 2
     },
     {
      "ad_ids": [
-      1923,
       1924,
+      1965,
       1966
      ],
      "key": "555-6482",
@@ -1633,17 +2541,6 @@
     },
     {
      "ad_ids": [
-      1575,
-      1617
-     ],
-     "key": "555-6700",
-     "kind": "phone",
-     "label": "555-6700",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
       1381,
       1382,
       1383,
@@ -1653,28 +2550,6 @@
      "kind": "phone",
      "label": "555-6914",
      "n_ads": 4,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1261,
-      1342
-     ],
-     "key": "555-7205",
-     "kind": "phone",
-     "label": "555-7205",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1220,
-      1221
-     ],
-     "key": "555-7597",
-     "kind": "phone",
-     "label": "555-7597",
-     "n_ads": 2,
      "weight": 2
     },
     {
@@ -1692,35 +2567,12 @@
     },
     {
      "ad_ids": [
-      955,
-      1061
-     ],
-     "key": "555-8288",
-     "kind": "phone",
-     "label": "555-8288",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1572,
       1573,
       1616
      ],
      "key": "555-8407",
      "kind": "phone",
      "label": "555-8407",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1808,
-      1809
-     ],
-     "key": "555-8608",
-     "kind": "phone",
-     "label": "555-8608",
      "n_ads": 2,
      "weight": 2
     },
@@ -1737,47 +2589,15 @@
     },
     {
      "ad_ids": [
-      2131,
-      2132
-     ],
-     "key": "photo-067a18ec",
-     "kind": "photo",
-     "label": "photo-set 067a18ec",
-     "n_ads": 2,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1031,
-      1146,
-      1182,
-      1221,
-      1258,
-      1303,
-      1421,
-      1464,
-      1771,
-      2322
-     ],
-     "key": "photo-0c8612a9",
-     "kind": "photo",
-     "label": "photo-set 0c8612a9",
-     "n_ads": 10,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1102,
       1145,
       1220,
-      1304,
       1695,
       1772
      ],
      "key": "photo-20924b79",
      "kind": "photo",
      "label": "photo-set 20924b79",
-     "n_ads": 6,
+     "n_ads": 4,
      "weight": 3
     },
     {
@@ -1793,99 +2613,30 @@
     },
     {
      "ad_ids": [
-      1301,
       1657,
+      1851,
       1852,
       1885,
-      1923,
       1966
      ],
      "key": "photo-2dbf8b19",
      "kind": "photo",
      "label": "photo-set 2dbf8b19",
-     "n_ads": 6,
+     "n_ads": 5,
      "weight": 3
     },
     {
      "ad_ids": [
-      1301,
       1657,
+      1851,
       1852,
       1885,
-      1923,
       1966
      ],
      "key": "photo-4d192e83",
      "kind": "photo",
      "label": "photo-set 4d192e83",
-     "n_ads": 6,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1031,
-      1146,
-      1182,
-      1221,
-      1258,
-      1303,
-      1421,
-      1464,
-      1771,
-      2322
-     ],
-     "key": "photo-515f01b4",
-     "kind": "photo",
-     "label": "photo-set 515f01b4",
-     "n_ads": 10,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1031,
-      1146,
-      1182,
-      1221,
-      1258,
-      1303,
-      1421,
-      1464,
-      1771
-     ],
-     "key": "photo-52963406",
-     "kind": "photo",
-     "label": "photo-set 52963406",
-     "n_ads": 9,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1031,
-      1146,
-      1182,
-      1221,
-      1258,
-      1303,
-      1421,
-      1464,
-      1771,
-      2322
-     ],
-     "key": "photo-5629bfe1",
-     "kind": "photo",
-     "label": "photo-set 5629bfe1",
-     "n_ads": 10,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      2130,
-      2131
-     ],
-     "key": "photo-58044ab8",
-     "kind": "photo",
-     "label": "photo-set 58044ab8",
-     "n_ads": 2,
+     "n_ads": 5,
      "weight": 3
     },
     {
@@ -1901,10 +2652,8 @@
     },
     {
      "ad_ids": [
-      1102,
       1145,
       1220,
-      1304,
       1540,
       1695,
       1772,
@@ -1914,16 +2663,16 @@
      "key": "photo-6378aea6",
      "kind": "photo",
      "label": "photo-set 6378aea6",
-     "n_ads": 9,
+     "n_ads": 7,
      "weight": 3
     },
     {
      "ad_ids": [
+      1300,
       1382,
       1383,
       1418,
       1733,
-      1809,
       1998
      ],
      "key": "photo-6cb23fbc",
@@ -1934,11 +2683,11 @@
     },
     {
      "ad_ids": [
+      1300,
       1382,
       1383,
       1418,
       1733,
-      1809,
       1998
      ],
      "key": "photo-7d42603b",
@@ -1949,11 +2698,11 @@
     },
     {
      "ad_ids": [
+      1300,
       1382,
       1383,
       1418,
-      1733,
-      1809
+      1733
      ],
      "key": "photo-85e55213",
      "kind": "photo",
@@ -1963,10 +2712,8 @@
     },
     {
      "ad_ids": [
-      1102,
       1145,
       1220,
-      1304,
       1540,
       1695,
       1772
@@ -1974,11 +2721,12 @@
      "key": "photo-94a524d8",
      "kind": "photo",
      "label": "photo-set 94a524d8",
-     "n_ads": 7,
+     "n_ads": 5,
      "weight": 3
     },
     {
      "ad_ids": [
+      1300,
       1382,
       1383,
       1418,
@@ -1988,13 +2736,13 @@
      "key": "photo-9ee90130",
      "kind": "photo",
      "label": "photo-set 9ee90130",
-     "n_ads": 5,
+     "n_ads": 6,
      "weight": 3
     },
     {
      "ad_ids": [
-      1301,
       1657,
+      1851,
       1852,
       1966
      ],
@@ -2006,8 +2754,8 @@
     },
     {
      "ad_ids": [
-      1301,
       1657,
+      1851,
       1852,
       1966
      ],
@@ -2023,7 +2771,6 @@
       743,
       1220,
       1299,
-      1303,
       1381,
       1418,
       1497,
@@ -2035,7 +2782,7 @@
      "key": "phrase-11",
      "kind": "wording",
      "label": "To secure it, transfer the first month up front;",
-     "n_ads": 12,
+     "n_ads": 11,
      "weight": 2
     },
     {
@@ -2044,76 +2791,22 @@
       557,
       811,
       1105,
-      1182,
       1382,
       1616,
       1730,
       1733,
-      1771,
       1772,
       1808,
       1924,
       1966,
       1968,
       1998,
-      1999,
-      2322
+      1999
      ],
      "key": "phrase-16",
      "kind": "wording",
      "label": "Upfront reservation funds are needed prior to key handover.",
-     "n_ads": 18,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      320,
-      389,
-      492,
-      660,
-      661,
-      701,
-      737,
-      738,
-      744,
-      745,
-      841,
-      871,
-      952,
-      955,
-      1029,
-      1030,
-      1067,
-      1101,
-      1102,
-      1146,
-      1181,
-      1260,
-      1261,
-      1301,
-      1304,
-      1342,
-      1502,
-      1572,
-      1575,
-      1579,
-      1617,
-      1736,
-      1769,
-      1770,
-      1809,
-      1884,
-      1923,
-      2000,
-      2040,
-      2130,
-      2131,
-      2132
-     ],
-     "key": "phrase-2",
-     "kind": "wording",
-     "label": "forward the move-in funds and the key courier is booked the same day.",
-     "n_ads": 42,
+     "n_ads": 15,
      "weight": 2
     },
     {
@@ -2127,7 +2820,6 @@
       1062,
       1383,
       1417,
-      1421,
       1540,
       1573,
       1656,
@@ -2140,19 +2832,7 @@
      "key": "phrase-20",
      "kind": "wording",
      "label": "Kindly forward the reservation funds before the viewing.",
-     "n_ads": 18,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1031,
-      1221,
-      1258
-     ],
-     "key": "phrase-29",
-     "kind": "wording",
-     "label": "The first month and the holding amount go through prior to any viewing is arranged.",
-     "n_ads": 3,
+     "n_ads": 17,
      "weight": 2
     },
     {
@@ -2169,7 +2849,6 @@
       914,
       915,
       1145,
-      1464,
       1695,
       1852,
       1853,
@@ -2180,35 +2859,19 @@
      "key": "phrase-7",
      "kind": "wording",
      "label": "Reservation funds go first, the keys follow by post.",
-     "n_ads": 19,
+     "n_ads": 18,
      "weight": 2
     },
     {
      "ad_ids": [
-      660,
-      701,
-      952
-     ],
-     "key": "fast-deposit-33.example",
-     "kind": "site",
-     "label": "fast-deposit-33.example",
-     "n_ads": 3,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      1304,
-      1421,
-      1464,
       1540,
       1695,
-      1771,
       1772
      ],
      "key": "fast-deposit-50.example",
      "kind": "site",
      "label": "fast-deposit-50.example",
-     "n_ads": 7,
+     "n_ads": 3,
      "weight": 0
     },
     {
@@ -2218,10 +2881,10 @@
       1693,
       1730,
       1731,
+      1732,
       1733,
-      1769,
       1808,
-      1809,
+      1851,
       1852,
       1853
      ],
@@ -2244,16 +2907,14 @@
     },
     {
      "ad_ids": [
-      1181,
       1921,
       1922,
-      2001,
-      2131
+      2001
      ],
      "key": "harborroow.example",
      "kind": "site",
      "label": "harborroow.example",
-     "n_ads": 5,
+     "n_ads": 3,
      "weight": 0
     },
     {
@@ -2271,25 +2932,23 @@
      "ad_ids": [
       915,
       916,
-      1030,
       1924
      ],
      "key": "harborrow-leasing.example",
      "kind": "site",
      "label": "harborrow-leasing.example",
-     "n_ads": 4,
+     "n_ads": 3,
      "weight": 0
     },
     {
      "ad_ids": [
       840,
-      1101,
-      1770
+      1965
      ],
      "key": "harborrow-office.example",
      "kind": "site",
      "label": "harborrow-office.example",
-     "n_ads": 3,
+     "n_ads": 2,
      "weight": 0
     },
     {
@@ -2306,60 +2965,28 @@
     },
     {
      "ad_ids": [
-      955,
-      1617,
-      2000,
-      2130,
-      2132
-     ],
-     "key": "harborrowhomes.example",
-     "kind": "site",
-     "label": "harborrowhomes.example",
-     "n_ads": 5,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      1029,
-      1061,
-      2040
-     ],
-     "key": "harborrowliving.example",
-     "kind": "site",
-     "label": "harborrowliving.example",
-     "n_ads": 3,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
       811,
-      1736,
-      1884,
       1966
      ],
      "key": "harborrownow.example",
      "kind": "site",
      "label": "harborrownow.example",
-     "n_ads": 4,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      841,
-      1105,
-      1923
-     ],
-     "key": "harborrrow.example",
-     "kind": "site",
-     "label": "harborrrow.example",
-     "n_ads": 3,
+     "n_ads": 2,
      "weight": 0
     }
    ]
   },
   {
-   "ad_days_before_flag": 37,
+   "ad_days_before_flag": 44,
    "ads": [
+    {
+     "day": 7,
+     "flag_day": 12,
+     "hood": "Ashgrove",
+     "id": 233,
+     "phone": "555-6345",
+     "rent": 1020
+    },
     {
      "day": 7,
      "flag_day": 12,
@@ -2417,6 +3044,14 @@
      "rent": 625
     },
     {
+     "day": 31,
+     "flag_day": 31,
+     "hood": "Westering",
+     "id": 1066,
+     "phone": "555-8972",
+     "rent": 1085
+    },
+    {
      "day": 32,
      "flag_day": 32,
      "hood": "Millrace",
@@ -2443,10 +3078,26 @@
     {
      "day": 33,
      "flag_day": 33,
+     "hood": "Oakbend",
+     "id": 1149,
+     "phone": "555-4907",
+     "rent": 820
+    },
+    {
+     "day": 33,
+     "flag_day": 33,
      "hood": "Kestrel Row",
      "id": 1150,
      "phone": "555-4907",
      "rent": 1065
+    },
+    {
+     "day": 34,
+     "flag_day": 34,
+     "hood": "Quarry Hill",
+     "id": 1183,
+     "phone": "555-4907",
+     "rent": 815
     },
     {
      "day": 36,
@@ -2471,6 +3122,14 @@
      "id": 1259,
      "phone": "555-8718",
      "rent": 870
+    },
+    {
+     "day": 36,
+     "flag_day": 36,
+     "hood": "Ashgrove",
+     "id": 1263,
+     "phone": "555-5348",
+     "rent": 635
     },
     {
      "day": 37,
@@ -2531,6 +3190,14 @@
     {
      "day": 42,
      "flag_day": 42,
+     "hood": "Saltmarsh",
+     "id": 1498,
+     "phone": "555-4248",
+     "rent": 680
+    },
+    {
+     "day": 42,
+     "flag_day": 42,
      "hood": "Alder Flats",
      "id": 1499,
      "phone": "555-4248",
@@ -2580,6 +3247,14 @@
      "day": 43,
      "flag_day": 43,
      "hood": "Millrace",
+     "id": 1542,
+     "phone": "555-7104",
+     "rent": 1070
+    },
+    {
+     "day": 43,
+     "flag_day": 43,
+     "hood": "Millrace",
      "id": 1543,
      "phone": "555-7104",
      "rent": 660
@@ -2599,22 +3274,6 @@
      "id": 1576,
      "phone": "555-7995",
      "rent": 615
-    },
-    {
-     "day": 45,
-     "flag_day": 45,
-     "hood": "Westering",
-     "id": 1619,
-     "phone": "555-7567",
-     "rent": 600
-    },
-    {
-     "day": 45,
-     "flag_day": 45,
-     "hood": "Tern Point",
-     "id": 1620,
-     "phone": "555-4744",
-     "rent": 815
     },
     {
      "day": 46,
@@ -2769,14 +3428,6 @@
      "rent": 605
     },
     {
-     "day": 57,
-     "flag_day": 57,
-     "hood": "Millrace",
-     "id": 2072,
-     "phone": "555-9619",
-     "rent": 635
-    },
-    {
      "day": 60,
      "flag_day": 60,
      "hood": "Westering",
@@ -2801,6 +3452,14 @@
      "rent": 640
     },
     {
+     "day": 63,
+     "flag_day": 65,
+     "hood": "Pelham Green",
+     "id": 2258,
+     "phone": "555-6323",
+     "rent": 645
+    },
+    {
      "day": 65,
      "flag_day": 65,
      "hood": "Kestrel Row",
@@ -2812,29 +3471,29 @@
    "ads_before_flag": 3,
    "answer_key": {
     "R03": 8,
-    "R04": 5,
-    "R06": 29,
-    "R08": 9,
-    "R09": 5
+    "R04": 6,
+    "R06": 31,
+    "R08": 14,
+    "R09": 2
    },
    "by_kind": {
     "phone": {
-     "ads": 38,
-     "values": 15,
+     "ads": 50,
+     "values": 19,
      "weight": 2
     },
     "photo": {
-     "ads": 18,
-     "values": 15,
+     "ads": 15,
+     "values": 12,
      "weight": 3
     },
     "site": {
-     "ads": 30,
-     "values": 8,
+     "ads": 31,
+     "values": 9,
      "weight": 0
     },
     "wording": {
-     "ads": 56,
+     "ads": 53,
      "values": 4,
      "weight": 2
     }
@@ -2843,19 +3502,19 @@
     {
      "kind": "photo_reuse",
      "score": 1.0,
-     "summary": "15 pictures are reused across 57 ad postings of this ring, re-cropped between ads (ids within 10 bits).",
+     "summary": "12 pictures are reused across 48 ad postings of this ring, re-cropped between ads (ids within 10 bits).",
      "title": "Photo-sets reused across ads"
     },
     {
      "kind": "phone_rotation",
      "score": 1.0,
-     "summary": "33 different numbers across 56 ads; each number serves 1 to 4 of them.",
+     "summary": "30 different numbers across 61 ads; each number serves 1 to 4 of them.",
      "title": "Contact numbers rotate"
     },
     {
      "kind": "shared_phrasing",
-     "score": 0.92,
-     "summary": "34 ads ask for money before the keys in 7 wordings of one template.",
+     "score": 0.91,
+     "summary": "31 ads ask for money before the keys in 7 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
@@ -2878,25 +3537,25 @@
     },
     {
      "kind": "copied_listing",
-     "score": 1.0,
-     "summary": "9 ads reuse photos from 8 older ads with a different number.",
+     "score": 0.88,
+     "summary": "7 ads reuse photos from 7 older ads with a different number.",
      "title": "Photos copied from older listings under new contact details"
     },
     {
      "kind": "pretext",
-     "score": 0.71,
-     "summary": "Ads explain why nobody can show it: owner away (37), cant show (25), new management (17)",
+     "score": 0.75,
+     "summary": "Ads explain why nobody can show it: owner away (43), cant show (27), new management (21)",
      "title": "The same reasons for not showing the home"
     }
    ],
    "first_day": 7,
-   "flag_day": 26,
-   "gap_days": 19,
-   "id": "B",
-   "label": "Ring B",
-   "n_ads": 56,
-   "n_phones": 33,
-   "renters_est": 1110,
+   "flag_day": 23,
+   "gap_days": 16,
+   "id": "C",
+   "label": "Ring C",
+   "n_ads": 61,
+   "n_phones": 30,
+   "renters_est": 1320,
    "score": 1.0,
    "signals": [
     {
@@ -2947,11 +3606,24 @@
      "ad_ids": [
       1384,
       1465,
+      1498,
       1499
      ],
      "key": "555-4248",
      "kind": "phone",
      "label": "555-4248",
+     "n_ads": 4,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1149,
+      1150,
+      1183
+     ],
+     "key": "555-4907",
+     "kind": "phone",
+     "label": "555-4907",
      "n_ads": 3,
      "weight": 2
     },
@@ -2969,6 +3641,17 @@
     },
     {
      "ad_ids": [
+      1263,
+      1306
+     ],
+     "key": "555-5348",
+     "kind": "phone",
+     "label": "555-5348",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
       1256,
       1302
      ],
@@ -2980,14 +3663,37 @@
     },
     {
      "ad_ids": [
+      2258,
+      2324
+     ],
+     "key": "555-6323",
+     "kind": "phone",
+     "label": "555-6323",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      233,
+      234
+     ],
+     "key": "555-6345",
+     "kind": "phone",
+     "label": "555-6345",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
       1505,
       1541,
+      1542,
       1543
      ],
      "key": "555-7104",
      "kind": "phone",
      "label": "555-7104",
-     "n_ads": 3,
+     "n_ads": 4,
      "weight": 2
     },
     {
@@ -3027,12 +3733,13 @@
     {
      "ad_ids": [
       1063,
-      1064
+      1064,
+      1066
      ],
      "key": "555-8972",
      "kind": "phone",
      "label": "555-8972",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 2
     },
     {
@@ -3071,18 +3778,6 @@
      "label": "555-9753",
      "n_ads": 4,
      "weight": 2
-    },
-    {
-     "ad_ids": [
-      1619,
-      1620,
-      2072
-     ],
-     "key": "photo-049eb9ce",
-     "kind": "photo",
-     "label": "photo-set 049eb9ce",
-     "n_ads": 3,
-     "weight": 3
     },
     {
      "ad_ids": [
@@ -3162,18 +3857,6 @@
     },
     {
      "ad_ids": [
-      1619,
-      1620,
-      2072
-     ],
-     "key": "photo-745597e0",
-     "kind": "photo",
-     "label": "photo-set 745597e0",
-     "n_ads": 3,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
       1259,
       1465,
       1499,
@@ -3185,18 +3868,6 @@
      "kind": "photo",
      "label": "photo-set 791c4c1a",
      "n_ads": 6,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1619,
-      1620,
-      2072
-     ],
-     "key": "photo-8189b475",
-     "kind": "photo",
-     "label": "photo-set 8189b475",
-     "n_ads": 3,
      "weight": 3
     },
     {
@@ -3289,22 +3960,19 @@
       1541,
       1543,
       1574,
-      1619,
-      1620,
       1696,
       1778,
       1811,
       1886,
       1932,
       1935,
-      2072,
       2164,
       2193
      ],
      "key": "phrase-1",
      "kind": "wording",
      "label": "Pay the booking fee ahead of the key handover.",
-     "n_ads": 34,
+     "n_ads": 31,
      "weight": 2
     },
     {
@@ -3380,13 +4048,12 @@
     {
      "ad_ids": [
       1778,
-      1935,
-      2072
+      1935
      ],
      "key": "easy-deposit-75.example",
      "kind": "site",
      "label": "easy-deposit-75.example",
-     "n_ads": 3,
+     "n_ads": 2,
      "weight": 0
     },
     {
@@ -3449,6 +4116,17 @@
     },
     {
      "ad_ids": [
+      1542,
+      1934
+     ],
+     "key": "harborrownow.example",
+     "kind": "site",
+     "label": "harborrownow.example",
+     "n_ads": 2,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
       2042,
       2257
      ],
@@ -3461,15 +4139,55 @@
    ]
   },
   {
-   "ad_days_before_flag": 8,
+   "ad_days_before_flag": 5,
    "ads": [
     {
      "day": 18,
-     "flag_day": 21,
+     "flag_day": 20,
+     "hood": "Tern Point",
+     "id": 587,
+     "phone": "555-4231",
+     "rent": 690
+    },
+    {
+     "day": 18,
+     "flag_day": 20,
      "hood": "Oakbend",
      "id": 588,
      "phone": "555-4231",
      "rent": 685
+    },
+    {
+     "day": 19,
+     "flag_day": 20,
+     "hood": "Quarry Hill",
+     "id": 623,
+     "phone": "555-4231",
+     "rent": 675
+    },
+    {
+     "day": 20,
+     "flag_day": 20,
+     "hood": "Alder Flats",
+     "id": 658,
+     "phone": "555-6715",
+     "rent": 1055
+    },
+    {
+     "day": 21,
+     "flag_day": 22,
+     "hood": "Tern Point",
+     "id": 697,
+     "phone": "555-6715",
+     "rent": 1020
+    },
+    {
+     "day": 21,
+     "flag_day": 21,
+     "hood": "Quarry Hill",
+     "id": 698,
+     "phone": "555-8746",
+     "rent": 865
     },
     {
      "day": 21,
@@ -3481,7 +4199,7 @@
     },
     {
      "day": 22,
-     "flag_day": 23,
+     "flag_day": 24,
      "hood": "Saltmarsh",
      "id": 735,
      "phone": "555-7730",
@@ -3490,6 +4208,14 @@
     {
      "day": 23,
      "flag_day": 23,
+     "hood": "Millrace",
+     "id": 773,
+     "phone": "555-7730",
+     "rent": 820
+    },
+    {
+     "day": 23,
+     "flag_day": 24,
      "hood": "Kestrel Row",
      "id": 774,
      "phone": "555-7791",
@@ -3586,6 +4312,22 @@
     {
      "day": 29,
      "flag_day": 29,
+     "hood": "Saltmarsh",
+     "id": 991,
+     "phone": "555-7189",
+     "rent": 895
+    },
+    {
+     "day": 29,
+     "flag_day": 29,
+     "hood": "Oakbend",
+     "id": 993,
+     "phone": "555-7189",
+     "rent": 865
+    },
+    {
+     "day": 29,
+     "flag_day": 29,
      "hood": "Oakbend",
      "id": 994,
      "phone": "555-1818",
@@ -3600,12 +4342,28 @@
      "rent": 835
     },
     {
+     "day": 31,
+     "flag_day": 31,
+     "hood": "Oakbend",
+     "id": 1069,
+     "phone": "555-6132",
+     "rent": 630
+    },
+    {
      "day": 32,
      "flag_day": 32,
      "hood": "Westering",
      "id": 1106,
      "phone": "555-6132",
      "rent": 635
+    },
+    {
+     "day": 33,
+     "flag_day": 33,
+     "hood": "Westering",
+     "id": 1141,
+     "phone": "555-7189",
+     "rent": 1015
     },
     {
      "day": 33,
@@ -3646,6 +4404,14 @@
      "id": 1225,
      "phone": "555-6709",
      "rent": 620
+    },
+    {
+     "day": 36,
+     "flag_day": 36,
+     "hood": "Kestrel Row",
+     "id": 1254,
+     "phone": "555-5541",
+     "rent": 1075
     },
     {
      "day": 36,
@@ -3762,6 +4528,14 @@
     {
      "day": 45,
      "flag_day": 45,
+     "hood": "Quarry Hill",
+     "id": 1615,
+     "phone": "555-5442",
+     "rent": 1035
+    },
+    {
+     "day": 45,
+     "flag_day": 45,
      "hood": "Ashgrove",
      "id": 1621,
      "phone": "555-2338",
@@ -3826,28 +4600,28 @@
    ],
    "ads_before_flag": 3,
    "answer_key": {
-    "R01": 16,
-    "R10": 29
+    "R01": 27,
+    "R10": 30
    },
    "by_kind": {
     "phone": {
-     "ads": 41,
-     "values": 14,
+     "ads": 55,
+     "values": 19,
      "weight": 2
     },
     "photo": {
-     "ads": 27,
-     "values": 19,
+     "ads": 39,
+     "values": 23,
      "weight": 3
     },
     "site": {
-     "ads": 22,
+     "ads": 27,
      "values": 5,
      "weight": 0
     },
     "wording": {
-     "ads": 42,
-     "values": 5,
+     "ads": 49,
+     "values": 6,
      "weight": 2
     }
    },
@@ -3855,25 +4629,25 @@
     {
      "kind": "photo_reuse",
      "score": 1.0,
-     "summary": "19 pictures are reused across 96 ad postings of this ring, re-cropped between ads (ids within 10 bits).",
+     "summary": "23 pictures are reused across 139 ad postings of this ring, re-cropped between ads (ids within 10 bits).",
      "title": "Photo-sets reused across ads"
     },
     {
      "kind": "phone_rotation",
      "score": 1.0,
-     "summary": "18 different numbers across 45 ads; each number serves 1 to 4 of them.",
+     "summary": "21 different numbers across 57 ads; each number serves 1 to 4 of them.",
      "title": "Contact numbers rotate"
     },
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "11 ads ask for money before the keys in 1 wordings of one template.",
+     "summary": "13 ads ask for money before the keys in 1 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "shared_phrasing",
-     "score": 0.92,
-     "summary": "10 ads ask for money before the keys in 3 wordings of one template.",
+     "score": 0.91,
+     "summary": "12 ads ask for money before the keys in 4 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
@@ -3885,7 +4659,13 @@
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "9 ads ask for money before the keys in 1 wordings of one template.",
+     "summary": "10 ads ask for money before the keys in 1 wordings of one template.",
+     "title": "Pay-before-move-in wording, reworded"
+    },
+    {
+     "kind": "shared_phrasing",
+     "score": 1.0,
+     "summary": "2 ads ask for money before the keys in 2 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
@@ -3896,19 +4676,19 @@
     },
     {
      "kind": "pretext",
-     "score": 0.62,
-     "summary": "Ads explain why nobody can show it: owner away (28), cant show (23), new management (5)",
+     "score": 0.68,
+     "summary": "Ads explain why nobody can show it: owner away (39), cant show (32), new management (7)",
      "title": "The same reasons for not showing the home"
     }
    ],
    "first_day": 18,
-   "flag_day": 23,
-   "gap_days": 5,
-   "id": "C",
-   "label": "Ring C",
-   "n_ads": 45,
-   "n_phones": 18,
-   "renters_est": 240,
+   "flag_day": 20,
+   "gap_days": 2,
+   "id": "D",
+   "label": "Ring D",
+   "n_ads": 57,
+   "n_phones": 21,
+   "renters_est": 150,
    "score": 1.0,
    "signals": [
     {
@@ -3960,13 +4740,26 @@
     },
     {
      "ad_ids": [
+      587,
+      588,
+      623
+     ],
+     "key": "555-4231",
+     "kind": "phone",
+     "label": "555-4231",
+     "n_ads": 3,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
       1216,
-      1217
+      1217,
+      1254
      ],
      "key": "555-5541",
      "kind": "phone",
      "label": "555-5541",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 2
     },
     {
@@ -3985,12 +4778,13 @@
     {
      "ad_ids": [
       1068,
+      1069,
       1106
      ],
      "key": "555-6132",
      "kind": "phone",
      "label": "555-6132",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 2
     },
     {
@@ -4021,6 +4815,17 @@
     },
     {
      "ad_ids": [
+      658,
+      697
+     ],
+     "key": "555-6715",
+     "kind": "phone",
+     "label": "555-6715",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
       1856,
       1890
      ],
@@ -4028,6 +4833,18 @@
      "kind": "phone",
      "label": "555-6968",
      "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      991,
+      993,
+      1141
+     ],
+     "key": "555-7189",
+     "kind": "phone",
+     "label": "555-7189",
+     "n_ads": 3,
      "weight": 2
     },
     {
@@ -4041,6 +4858,17 @@
      "kind": "phone",
      "label": "555-7663",
      "n_ads": 4,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      735,
+      773
+     ],
+     "key": "555-7730",
+     "kind": "phone",
+     "label": "555-7730",
+     "n_ads": 2,
      "weight": 2
     },
     {
@@ -4069,6 +4897,17 @@
     },
     {
      "ad_ids": [
+      698,
+      699
+     ],
+     "key": "555-8746",
+     "kind": "phone",
+     "label": "555-8746",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
       1506,
       1544
      ],
@@ -4080,53 +4919,91 @@
     },
     {
      "ad_ids": [
+      587,
+      623,
+      658,
+      698,
+      773,
+      991,
+      1254
+     ],
+     "key": "photo-00deabbe",
+     "kind": "photo",
+     "label": "photo-set 00deabbe",
+     "n_ads": 7,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
       699,
       735,
       774,
       910,
       911,
+      1141,
       1380
      ],
      "key": "photo-03f0839b",
      "kind": "photo",
      "label": "photo-set 03f0839b",
+     "n_ads": 7,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      588,
+      697,
+      1217
+     ],
+     "key": "photo-06d9ccec",
+     "kind": "photo",
+     "label": "photo-set 06d9ccec",
+     "n_ads": 3,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      587,
+      623,
+      658,
+      698,
+      773,
+      991,
+      993,
+      1254,
+      1615
+     ],
+     "key": "photo-16292125",
+     "kind": "photo",
+     "label": "photo-set 16292125",
+     "n_ads": 9,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      699,
+      735,
+      774,
+      910,
+      911,
+      1141
+     ],
+     "key": "photo-1abda86a",
+     "kind": "photo",
+     "label": "photo-set 1abda86a",
      "n_ads": 6,
      "weight": 3
     },
     {
      "ad_ids": [
       588,
-      1217
-     ],
-     "key": "photo-06d9ccec",
-     "kind": "photo",
-     "label": "photo-set 06d9ccec",
-     "n_ads": 2,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      699,
-      735,
-      774,
-      910,
-      911
-     ],
-     "key": "photo-1abda86a",
-     "kind": "photo",
-     "label": "photo-set 1abda86a",
-     "n_ads": 5,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      588,
+      697,
       1217
      ],
      "key": "photo-23a0f99b",
      "kind": "photo",
      "label": "photo-set 23a0f99b",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 3
     },
     {
@@ -4152,23 +5029,25 @@
       774,
       910,
       911,
+      1141,
       1380
      ],
      "key": "photo-33c4ccd7",
      "kind": "photo",
      "label": "photo-set 33c4ccd7",
-     "n_ads": 6,
+     "n_ads": 7,
      "weight": 3
     },
     {
      "ad_ids": [
       588,
+      697,
       1217
      ],
      "key": "photo-51810000",
      "kind": "photo",
      "label": "photo-set 51810000",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 3
     },
     {
@@ -4211,12 +5090,13 @@
       774,
       910,
       911,
+      1141,
       1380
      ],
      "key": "photo-66d74207",
      "kind": "photo",
      "label": "photo-set 66d74207",
-     "n_ads": 6,
+     "n_ads": 7,
      "weight": 3
     },
     {
@@ -4241,12 +5121,13 @@
       735,
       774,
       910,
-      911
+      911,
+      1141
      ],
      "key": "photo-7500e0ff",
      "kind": "photo",
      "label": "photo-set 7500e0ff",
-     "n_ads": 5,
+     "n_ads": 6,
      "weight": 3
     },
     {
@@ -4309,13 +5190,32 @@
     },
     {
      "ad_ids": [
+      587,
+      623,
+      658,
+      698,
+      773,
+      991,
+      993,
+      1254,
+      1615
+     ],
+     "key": "photo-c494a88c",
+     "kind": "photo",
+     "label": "photo-set c494a88c",
+     "n_ads": 9,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
       588,
+      697,
       1217
      ],
      "key": "photo-ced1513a",
      "kind": "photo",
      "label": "photo-set ced1513a",
-     "n_ads": 2,
+     "n_ads": 3,
      "weight": 3
     },
     {
@@ -4347,6 +5247,24 @@
     },
     {
      "ad_ids": [
+      587,
+      623,
+      658,
+      698,
+      773,
+      991,
+      993,
+      1254,
+      1496
+     ],
+     "key": "photo-f9f75868",
+     "kind": "photo",
+     "label": "photo-set f9f75868",
+     "n_ads": 9,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
       958,
       1106
      ],
@@ -4358,6 +5276,7 @@
     },
     {
      "ad_ids": [
+      587,
       699,
       911,
       956,
@@ -4367,21 +5286,24 @@
       1217,
       1347,
       1416,
-      1428
+      1428,
+      1615
      ],
      "key": "phrase-22",
      "kind": "wording",
-     "label": "Your booking amount has to be paid in advance of collecting the keys and the lease.",
-     "n_ads": 10,
+     "label": "Your booking amount has to be paid in advance of collecting the keys.",
+     "n_ads": 12,
      "weight": 2
     },
     {
      "ad_ids": [
       588,
+      623,
       809,
       875,
       910,
       1152,
+      1254,
       1298,
       1506,
       1662,
@@ -4392,12 +5314,24 @@
      "key": "phrase-23",
      "kind": "wording",
      "label": "Forward the booking amount today and the apartment is reserved in your name.",
-     "n_ads": 11,
+     "n_ads": 13,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      698,
+      993
+     ],
+     "key": "phrase-29",
+     "kind": "wording",
+     "label": "The first month and the deposit go through before any viewing is arranged.",
+     "n_ads": 2,
      "weight": 2
     },
     {
      "ad_ids": [
       735,
+      773,
       1068,
       1151,
       1266,
@@ -4410,7 +5344,7 @@
      "key": "phrase-34",
      "kind": "wording",
      "label": "Booking amount first, keys afterwards.",
-     "n_ads": 9,
+     "n_ads": 10,
      "weight": 2
     },
     {
@@ -4437,17 +5371,22 @@
       809,
       910,
       911,
+      991,
+      993,
+      1141,
       1216,
-      1217
+      1217,
+      1254
      ],
      "key": "easy-deposit-96.example",
      "kind": "site",
      "label": "easy-deposit-96.example",
-     "n_ads": 5,
+     "n_ads": 9,
      "weight": 0
     },
     {
      "ad_ids": [
+      1069,
       1106,
       1151,
       1152,
@@ -4462,7 +5401,7 @@
      "key": "fast-deposit-50.example",
      "kind": "site",
      "label": "fast-deposit-50.example",
-     "n_ads": 10,
+     "n_ads": 11,
      "weight": 0
     },
     {
@@ -4502,776 +5441,713 @@
    ]
   },
   {
-   "ad_days_before_flag": 13,
+   "ad_days_before_flag": 23,
    "ads": [
-    {
-     "day": 5,
-     "flag_day": 13,
-     "hood": "Kestrel Row",
-     "id": 176,
-     "phone": "555-8467",
-     "rent": 1040
-    },
     {
      "day": 10,
      "flag_day": 12,
      "hood": "Millrace",
-     "id": 321,
-     "phone": "555-8398",
-     "rent": 1030
+     "id": 320,
+     "phone": "555-6345",
+     "rent": 825
     },
     {
-     "day": 11,
+     "day": 12,
      "flag_day": 12,
-     "hood": "Westering",
-     "id": 354,
+     "hood": "Pelham Green",
+     "id": 389,
      "phone": "555-8398",
-     "rent": 1050
-    },
-    {
-     "day": 13,
-     "flag_day": 13,
-     "hood": "Alder Flats",
-     "id": 425,
-     "phone": "555-2724",
-     "rent": 1100
-    },
-    {
-     "day": 13,
-     "flag_day": 13,
-     "hood": "Quarry Hill",
-     "id": 426,
-     "phone": "555-2724",
-     "rent": 1070
-    },
-    {
-     "day": 13,
-     "flag_day": 13,
-     "hood": "Tern Point",
-     "id": 427,
-     "phone": "555-2724",
-     "rent": 840
+     "rent": 640
     },
     {
      "day": 15,
      "flag_day": 15,
-     "hood": "Alder Flats",
-     "id": 490,
-     "phone": "555-2724",
-     "rent": 655
-    },
-    {
-     "day": 16,
-     "flag_day": 16,
      "hood": "Millrace",
-     "id": 525,
-     "phone": "555-5648",
-     "rent": 830
+     "id": 492,
+     "phone": "555-2579",
+     "rent": 825
     },
     {
-     "day": 17,
-     "flag_day": 17,
-     "hood": "Ashgrove",
-     "id": 554,
-     "phone": "555-5648",
-     "rent": 610
+     "day": 20,
+     "flag_day": 20,
+     "hood": "Quarry Hill",
+     "id": 660,
+     "phone": "555-2484",
+     "rent": 875
     },
     {
-     "day": 17,
-     "flag_day": 17,
+     "day": 20,
+     "flag_day": 20,
+     "hood": "Tern Point",
+     "id": 661,
+     "phone": "555-5657",
+     "rent": 1075
+    },
+    {
+     "day": 21,
+     "flag_day": 21,
      "hood": "Kestrel Row",
-     "id": 555,
-     "phone": "555-9843",
-     "rent": 1030
-    },
-    {
-     "day": 19,
-     "flag_day": 19,
-     "hood": "Westering",
-     "id": 624,
-     "phone": "555-9843",
-     "rent": 650
+     "id": 701,
+     "phone": "555-2484",
+     "rent": 1015
     },
     {
      "day": 22,
      "flag_day": 22,
-     "hood": "Saltmarsh",
-     "id": 736,
+     "hood": "Alder Flats",
+     "id": 737,
      "phone": "555-8594",
-     "rent": 1070
+     "rent": 1015
     },
     {
-     "day": 23,
-     "flag_day": 23,
-     "hood": "Alder Flats",
-     "id": 777,
-     "phone": "555-5676",
-     "rent": 605
+     "day": 22,
+     "flag_day": 22,
+     "hood": "Tern Point",
+     "id": 738,
+     "phone": "555-4474",
+     "rent": 680
+    },
+    {
+     "day": 22,
+     "flag_day": 22,
+     "hood": "Pelham Green",
+     "id": 744,
+     "phone": "555-3969",
+     "rent": 845
+    },
+    {
+     "day": 22,
+     "flag_day": 22,
+     "hood": "Oakbend",
+     "id": 745,
+     "phone": "555-3969",
+     "rent": 880
+    },
+    {
+     "day": 25,
+     "flag_day": 25,
+     "hood": "Quarry Hill",
+     "id": 841,
+     "phone": "555-5780",
+     "rent": 620
     },
     {
      "day": 26,
      "flag_day": 26,
-     "hood": "Kestrel Row",
-     "id": 872,
-     "phone": "555-4650",
-     "rent": 830
-    },
-    {
-     "day": 27,
-     "flag_day": 27,
-     "hood": "Quarry Hill",
-     "id": 912,
-     "phone": "555-5676",
-     "rent": 840
-    },
-    {
-     "day": 28,
-     "flag_day": 28,
-     "hood": "Alder Flats",
-     "id": 951,
-     "phone": "555-9647",
-     "rent": 605
-    },
-    {
-     "day": 28,
-     "flag_day": 28,
      "hood": "Pelham Green",
-     "id": 954,
-     "phone": "555-1724",
-     "rent": 1025
+     "id": 871,
+     "phone": "555-5676",
+     "rent": 1085
     },
     {
-     "day": 30,
-     "flag_day": 30,
-     "hood": "Quarry Hill",
-     "id": 1027,
-     "phone": "555-9647",
-     "rent": 1020
-    },
-    {
-     "day": 30,
-     "flag_day": 30,
-     "hood": "Kestrel Row",
-     "id": 1028,
-     "phone": "555-4914",
-     "rent": 610
-    },
-    {
-     "day": 33,
-     "flag_day": 33,
-     "hood": "Kestrel Row",
-     "id": 1142,
-     "phone": "555-4914",
-     "rent": 640
-    },
-    {
-     "day": 33,
-     "flag_day": 33,
+     "day": 28,
+     "flag_day": 28,
      "hood": "Oakbend",
-     "id": 1147,
-     "phone": "555-3035",
-     "rent": 1035
+     "id": 952,
+     "phone": "555-1724",
+     "rent": 880
     },
     {
-     "day": 35,
-     "flag_day": 35,
+     "day": 28,
+     "flag_day": 28,
+     "hood": "Oakbend",
+     "id": 953,
+     "phone": "555-1724",
+     "rent": 870
+    },
+    {
+     "day": 28,
+     "flag_day": 28,
+     "hood": "Kestrel Row",
+     "id": 955,
+     "phone": "555-8288",
+     "rent": 1015
+    },
+    {
+     "day": 30,
+     "flag_day": 30,
      "hood": "Quarry Hill",
-     "id": 1218,
-     "phone": "555-5760",
-     "rent": 665
+     "id": 1029,
+     "phone": "555-1724",
+     "rent": 1070
+    },
+    {
+     "day": 30,
+     "flag_day": 30,
+     "hood": "Ashgrove",
+     "id": 1030,
+     "phone": "555-5177",
+     "rent": 875
+    },
+    {
+     "day": 31,
+     "flag_day": 31,
+     "hood": "Pelham Green",
+     "id": 1067,
+     "phone": "555-6132",
+     "rent": 1045
+    },
+    {
+     "day": 32,
+     "flag_day": 32,
+     "hood": "Millrace",
+     "id": 1101,
+     "phone": "555-7309",
+     "rent": 875
+    },
+    {
+     "day": 32,
+     "flag_day": 32,
+     "hood": "Oakbend",
+     "id": 1102,
+     "phone": "555-3559",
+     "rent": 1080
+    },
+    {
+     "day": 34,
+     "flag_day": 34,
+     "hood": "Westering",
+     "id": 1181,
+     "phone": "555-3932",
+     "rent": 630
     },
     {
      "day": 36,
      "flag_day": 36,
+     "hood": "Westering",
+     "id": 1260,
+     "phone": "555-8718",
+     "rent": 635
+    },
+    {
+     "day": 36,
+     "flag_day": 36,
+     "hood": "Westering",
+     "id": 1261,
+     "phone": "555-7205",
+     "rent": 625
+    },
+    {
+     "day": 37,
+     "flag_day": 37,
+     "hood": "Alder Flats",
+     "id": 1301,
+     "phone": "555-2962",
+     "rent": 650
+    },
+    {
+     "day": 37,
+     "flag_day": 37,
      "hood": "Tern Point",
-     "id": 1264,
-     "phone": "555-2651",
-     "rent": 665
+     "id": 1304,
+     "phone": "555-1679",
+     "rent": 1025
     },
     {
      "day": 38,
      "flag_day": 38,
-     "hood": "Oakbend",
-     "id": 1340,
-     "phone": "555-5760",
-     "rent": 665
-    },
-    {
-     "day": 38,
-     "flag_day": 38,
-     "hood": "Tern Point",
-     "id": 1345,
-     "phone": "555-2502",
-     "rent": 1070
-    },
-    {
-     "day": 39,
-     "flag_day": 39,
-     "hood": "Saltmarsh",
-     "id": 1385,
-     "phone": "555-2502",
-     "rent": 895
-    },
-    {
-     "day": 39,
-     "flag_day": 39,
-     "hood": "Pelham Green",
-     "id": 1386,
-     "phone": "555-8563",
-     "rent": 1035
-    },
-    {
-     "day": 40,
-     "flag_day": 40,
-     "hood": "Saltmarsh",
-     "id": 1423,
-     "phone": "555-2502",
+     "hood": "Millrace",
+     "id": 1342,
+     "phone": "555-7205",
      "rent": 1045
     },
     {
-     "day": 40,
-     "flag_day": 40,
-     "hood": "Pelham Green",
-     "id": 1427,
-     "phone": "555-8563",
-     "rent": 1085
-    },
-    {
-     "day": 41,
-     "flag_day": 41,
-     "hood": "Westering",
-     "id": 1461,
-     "phone": "555-3772",
-     "rent": 1015
-    },
-    {
-     "day": 41,
-     "flag_day": 41,
-     "hood": "Tern Point",
-     "id": 1463,
-     "phone": "555-5285",
-     "rent": 880
-    },
-    {
-     "day": 44,
-     "flag_day": 44,
-     "hood": "Millrace",
-     "id": 1577,
-     "phone": "555-2762",
-     "rent": 615
-    },
-    {
-     "day": 44,
-     "flag_day": 44,
+     "day": 42,
+     "flag_day": 42,
      "hood": "Ashgrove",
-     "id": 1580,
-     "phone": "555-7567",
-     "rent": 880
+     "id": 1502,
+     "phone": "555-7995",
+     "rent": 1050
+    },
+    {
+     "day": 44,
+     "flag_day": 44,
+     "hood": "Pelham Green",
+     "id": 1572,
+     "phone": "555-8407",
+     "rent": 865
+    },
+    {
+     "day": 44,
+     "flag_day": 44,
+     "hood": "Quarry Hill",
+     "id": 1575,
+     "phone": "555-6700",
+     "rent": 805
+    },
+    {
+     "day": 44,
+     "flag_day": 44,
+     "hood": "Quarry Hill",
+     "id": 1579,
+     "phone": "555-3803",
+     "rent": 625
     },
     {
      "day": 45,
      "flag_day": 45,
-     "hood": "Tern Point",
-     "id": 1618,
-     "phone": "555-2240",
+     "hood": "Ashgrove",
+     "id": 1617,
+     "phone": "555-6700",
+     "rent": 880
+    },
+    {
+     "day": 48,
+     "flag_day": 48,
+     "hood": "Oakbend",
+     "id": 1736,
+     "phone": "555-2338",
+     "rent": 875
+    },
+    {
+     "day": 49,
+     "flag_day": 49,
+     "hood": "Quarry Hill",
+     "id": 1769,
+     "phone": "555-5364",
+     "rent": 895
+    },
+    {
+     "day": 49,
+     "flag_day": 49,
+     "hood": "Westering",
+     "id": 1770,
+     "phone": "555-1555",
+     "rent": 845
+    },
+    {
+     "day": 50,
+     "flag_day": 50,
+     "hood": "Oakbend",
+     "id": 1809,
+     "phone": "555-8608",
      "rent": 1050
-    },
-    {
-     "day": 46,
-     "flag_day": 46,
-     "hood": "Millrace",
-     "id": 1658,
-     "phone": "555-2240",
-     "rent": 630
-    },
-    {
-     "day": 46,
-     "flag_day": 46,
-     "hood": "Alder Flats",
-     "id": 1661,
-     "phone": "555-4744",
-     "rent": 635
-    },
-    {
-     "day": 47,
-     "flag_day": 47,
-     "hood": "Alder Flats",
-     "id": 1697,
-     "phone": "555-2762",
-     "rent": 1065
-    },
-    {
-     "day": 52,
-     "flag_day": 52,
-     "hood": "Alder Flats",
-     "id": 1888,
-     "phone": "555-2325",
-     "rent": 890
     },
     {
      "day": 52,
      "flag_day": 52,
      "hood": "Westering",
-     "id": 1889,
-     "phone": "555-2325",
-     "rent": 650
+     "id": 1884,
+     "phone": "555-2578",
+     "rent": 620
+    },
+    {
+     "day": 53,
+     "flag_day": 53,
+     "hood": "Ashgrove",
+     "id": 1923,
+     "phone": "555-6482",
+     "rent": 875
     },
     {
      "day": 55,
      "flag_day": 55,
+     "hood": "Tern Point",
+     "id": 2000,
+     "phone": "555-1751",
+     "rent": 680
+    },
+    {
+     "day": 56,
+     "flag_day": 56,
      "hood": "Ashgrove",
-     "id": 2002,
+     "id": 2040,
      "phone": "555-8184",
-     "rent": 835
+     "rent": 605
     },
     {
      "day": 59,
      "flag_day": 59,
      "hood": "Kestrel Row",
-     "id": 2133,
-     "phone": "555-9619",
-     "rent": 805
+     "id": 2130,
+     "phone": "555-5377",
+     "rent": 1060
     },
     {
      "day": 59,
      "flag_day": 59,
-     "hood": "Tern Point",
-     "id": 2134,
-     "phone": "555-7440",
-     "rent": 890
-    },
-    {
-     "day": 59,
-     "flag_day": 59,
-     "hood": "Pelham Green",
-     "id": 2135,
-     "phone": "555-7440",
-     "rent": 620
-    },
-    {
-     "day": 61,
-     "flag_day": 61,
-     "hood": "Millrace",
-     "id": 2194,
-     "phone": "555-2727",
+     "hood": "Kestrel Row",
+     "id": 2131,
+     "phone": "555-5377",
      "rent": 660
+    },
+    {
+     "day": 59,
+     "flag_day": 59,
+     "hood": "Quarry Hill",
+     "id": 2132,
+     "phone": "555-5377",
+     "rent": 1045
     }
    ],
    "ads_before_flag": 3,
    "answer_key": {
-    "R03": 14,
-    "R04": 13,
-    "R08": 8,
-    "R09": 9
+    "R02": 7,
+    "R03": 6,
+    "R04": 10,
+    "R05": 2,
+    "R06": 7,
+    "R07": 7,
+    "R09": 1,
+    "R10": 2
    },
    "by_kind": {
     "phone": {
-     "ads": 31,
-     "values": 14,
+     "ads": 14,
+     "values": 6,
      "weight": 2
     },
     "photo": {
-     "ads": 5,
-     "values": 3,
+     "ads": 7,
+     "values": 7,
      "weight": 3
     },
     "site": {
-     "ads": 12,
-     "values": 4,
+     "ads": 21,
+     "values": 8,
      "weight": 0
     },
     "wording": {
-     "ads": 44,
-     "values": 2,
+     "ads": 41,
+     "values": 1,
      "weight": 2
     }
    },
    "findings": [
     {
      "kind": "photo_reuse",
-     "score": 0.83,
-     "summary": "3 pictures are reused across 15 ad postings of this ring, re-cropped between ads (ids within 9 bits).",
+     "score": 0.33,
+     "summary": "7 pictures are reused across 14 ad postings of this ring, re-cropped between ads (ids within 6 bits).",
      "title": "Photo-sets reused across ads"
     },
     {
      "kind": "phone_rotation",
      "score": 1.0,
-     "summary": "27 different numbers across 44 ads; each number serves 1 to 4 of them.",
+     "summary": "34 different numbers across 42 ads; each number serves 1 to 3 of them.",
      "title": "Contact numbers rotate"
     },
     {
      "kind": "shared_phrasing",
-     "score": 0.89,
-     "summary": "24 ads ask for money before the keys in 9 wordings of one template.",
-     "title": "Pay-before-move-in wording, reworded"
-    },
-    {
-     "kind": "shared_phrasing",
-     "score": 0.86,
-     "summary": "20 ads ask for money before the keys in 15 wordings of one template.",
+     "score": 1.0,
+     "summary": "41 ads ask for money before the keys in 3 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "copied_listing",
      "score": 1.0,
-     "summary": "16 ads reuse photos from 15 older ads with a different number.",
+     "summary": "14 ads reuse photos from 13 older ads with a different number.",
      "title": "Photos copied from older listings under new contact details"
     },
     {
      "kind": "pretext",
-     "score": 0.75,
-     "summary": "Ads explain why nobody can show it: owner away (33), cant show (25), new management (8)",
+     "score": 0.69,
+     "summary": "Ads explain why nobody can show it: owner away (29), cant show (21), new management (8)",
      "title": "The same reasons for not showing the home"
     }
    ],
-   "first_day": 5,
-   "flag_day": 13,
-   "gap_days": 8,
-   "id": "D",
-   "label": "Ring D",
-   "n_ads": 44,
-   "n_phones": 27,
-   "renters_est": 390,
+   "first_day": 10,
+   "flag_day": 20,
+   "gap_days": 10,
+   "id": "E",
+   "label": "Ring E",
+   "n_ads": 42,
+   "n_phones": 34,
+   "renters_est": 690,
    "score": 1.0,
    "signals": [
     {
      "ad_ids": [
-      1618,
-      1658
+      952,
+      953,
+      1029
      ],
-     "key": "555-2240",
+     "key": "555-1724",
      "kind": "phone",
-     "label": "555-2240",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1888,
-      1889
-     ],
-     "key": "555-2325",
-     "kind": "phone",
-     "label": "555-2325",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1345,
-      1385,
-      1423
-     ],
-     "key": "555-2502",
-     "kind": "phone",
-     "label": "555-2502",
+     "label": "555-1724",
      "n_ads": 3,
      "weight": 2
     },
     {
      "ad_ids": [
-      425,
-      426,
-      427,
-      490
+      660,
+      701
      ],
-     "key": "555-2724",
+     "key": "555-2484",
      "kind": "phone",
-     "label": "555-2724",
-     "n_ads": 4,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1577,
-      1697
-     ],
-     "key": "555-2762",
-     "kind": "phone",
-     "label": "555-2762",
+     "label": "555-2484",
      "n_ads": 2,
      "weight": 2
     },
     {
      "ad_ids": [
-      1028,
-      1142
+      744,
+      745
      ],
-     "key": "555-4914",
+     "key": "555-3969",
      "kind": "phone",
-     "label": "555-4914",
+     "label": "555-3969",
      "n_ads": 2,
      "weight": 2
     },
     {
      "ad_ids": [
-      525,
-      554
+      2130,
+      2131,
+      2132
      ],
-     "key": "555-5648",
+     "key": "555-5377",
      "kind": "phone",
-     "label": "555-5648",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      777,
-      912
-     ],
-     "key": "555-5676",
-     "kind": "phone",
-     "label": "555-5676",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1218,
-      1340
-     ],
-     "key": "555-5760",
-     "kind": "phone",
-     "label": "555-5760",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      2134,
-      2135
-     ],
-     "key": "555-7440",
-     "kind": "phone",
-     "label": "555-7440",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      321,
-      354
-     ],
-     "key": "555-8398",
-     "kind": "phone",
-     "label": "555-8398",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1386,
-      1427
-     ],
-     "key": "555-8563",
-     "kind": "phone",
-     "label": "555-8563",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      951,
-      1027
-     ],
-     "key": "555-9647",
-     "kind": "phone",
-     "label": "555-9647",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      555,
-      624
-     ],
-     "key": "555-9843",
-     "kind": "phone",
-     "label": "555-9843",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1264,
-      1386,
-      1427,
-      1580,
-      1661
-     ],
-     "key": "photo-049eb9ce",
-     "kind": "photo",
-     "label": "photo-set 049eb9ce",
-     "n_ads": 5,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1264,
-      1386,
-      1427,
-      1580,
-      1661
-     ],
-     "key": "photo-745597e0",
-     "kind": "photo",
-     "label": "photo-set 745597e0",
-     "n_ads": 5,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1264,
-      1386,
-      1427,
-      1580,
-      1661
-     ],
-     "key": "photo-8189b475",
-     "kind": "photo",
-     "label": "photo-set 8189b475",
-     "n_ads": 5,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      176,
-      426,
-      427,
-      554,
-      555,
-      777,
-      1027,
-      1028,
-      1218,
-      1340,
-      1427,
-      1577,
-      1580,
-      1618,
-      1888,
-      1889,
-      2133,
-      2134,
-      2135,
-      2194
-     ],
-     "key": "phrase-0",
-     "kind": "wording",
-     "label": "The deposit has to be paid ahead of you collect the keys, no exceptions.",
-     "n_ads": 20,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      321,
-      354,
-      425,
-      490,
-      525,
-      624,
-      736,
-      872,
-      912,
-      951,
-      954,
-      1142,
-      1147,
-      1264,
-      1345,
-      1385,
-      1386,
-      1423,
-      1461,
-      1463,
-      1658,
-      1661,
-      1697,
-      2002
-     ],
-     "key": "phrase-3",
-     "kind": "wording",
-     "label": "A reservation sum must reach me before the keys are released;",
-     "n_ads": 24,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1345,
-      1385,
-      1423
-     ],
-     "key": "fast-deposit-30.example",
-     "kind": "site",
-     "label": "fast-deposit-30.example",
+     "label": "555-5377",
      "n_ads": 3,
-     "weight": 0
+     "weight": 2
     },
     {
      "ad_ids": [
-      525,
-      554,
-      555,
-      624,
-      872
+      1575,
+      1617
+     ],
+     "key": "555-6700",
+     "kind": "phone",
+     "label": "555-6700",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1261,
+      1342
+     ],
+     "key": "555-7205",
+     "kind": "phone",
+     "label": "555-7205",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      2131,
+      2132
+     ],
+     "key": "photo-067a18ec",
+     "kind": "photo",
+     "label": "photo-set 067a18ec",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1102,
+      1304
+     ],
+     "key": "photo-20924b79",
+     "kind": "photo",
+     "label": "photo-set 20924b79",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1301,
+      1923
+     ],
+     "key": "photo-2dbf8b19",
+     "kind": "photo",
+     "label": "photo-set 2dbf8b19",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1301,
+      1923
+     ],
+     "key": "photo-4d192e83",
+     "kind": "photo",
+     "label": "photo-set 4d192e83",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      2130,
+      2131
+     ],
+     "key": "photo-58044ab8",
+     "kind": "photo",
+     "label": "photo-set 58044ab8",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1102,
+      1304
+     ],
+     "key": "photo-6378aea6",
+     "kind": "photo",
+     "label": "photo-set 6378aea6",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1102,
+      1304
+     ],
+     "key": "photo-94a524d8",
+     "kind": "photo",
+     "label": "photo-set 94a524d8",
+     "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      320,
+      389,
+      492,
+      660,
+      661,
+      701,
+      737,
+      738,
+      744,
+      745,
+      841,
+      871,
+      952,
+      955,
+      1029,
+      1030,
+      1067,
+      1101,
+      1102,
+      1181,
+      1260,
+      1261,
+      1301,
+      1304,
+      1342,
+      1502,
+      1572,
+      1575,
+      1579,
+      1617,
+      1736,
+      1769,
+      1770,
+      1809,
+      1884,
+      1923,
+      2000,
+      2040,
+      2130,
+      2131,
+      2132
+     ],
+     "key": "phrase-2",
+     "kind": "wording",
+     "label": "forward the move-in funds and the key courier is booked the same day.",
+     "n_ads": 41,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      660,
+      701,
+      952
      ],
      "key": "fast-deposit-33.example",
      "kind": "site",
      "label": "fast-deposit-33.example",
-     "n_ads": 5,
+     "n_ads": 3,
      "weight": 0
     },
     {
      "ad_ids": [
-      1618,
-      2002
+      1769,
+      1809
      ],
-     "key": "harborrowhomes.example",
+     "key": "fast-deposit-52.example",
      "kind": "site",
-     "label": "harborrowhomes.example",
+     "label": "fast-deposit-52.example",
      "n_ads": 2,
      "weight": 0
     },
     {
      "ad_ids": [
-      954,
-      1888
+      1181,
+      2131
+     ],
+     "key": "harborroow.example",
+     "kind": "site",
+     "label": "harborroow.example",
+     "n_ads": 2,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1101,
+      1770
+     ],
+     "key": "harborrow-office.example",
+     "kind": "site",
+     "label": "harborrow-office.example",
+     "n_ads": 2,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      955,
+      1617,
+      2000,
+      2130,
+      2132
+     ],
+     "key": "harborrowhomes.example",
+     "kind": "site",
+     "label": "harborrowhomes.example",
+     "n_ads": 5,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      1029,
+      2040
      ],
      "key": "harborrowliving.example",
      "kind": "site",
      "label": "harborrowliving.example",
      "n_ads": 2,
      "weight": 0
+    },
+    {
+     "ad_ids": [
+      953,
+      1736,
+      1884
+     ],
+     "key": "harborrownow.example",
+     "kind": "site",
+     "label": "harborrownow.example",
+     "n_ads": 3,
+     "weight": 0
+    },
+    {
+     "ad_ids": [
+      841,
+      1923
+     ],
+     "key": "harborrrow.example",
+     "kind": "site",
+     "label": "harborrrow.example",
+     "n_ads": 2,
+     "weight": 0
     }
    ]
   },
   {
-   "ad_days_before_flag": 5,
+   "ad_days_before_flag": 19,
    "ads": [
-    {
-     "day": 18,
-     "flag_day": 21,
-     "hood": "Tern Point",
-     "id": 587,
-     "phone": "555-4231",
-     "rent": 690
-    },
-    {
-     "day": 19,
-     "flag_day": 21,
-     "hood": "Quarry Hill",
-     "id": 623,
-     "phone": "555-4231",
-     "rent": 675
-    },
-    {
-     "day": 21,
-     "flag_day": 21,
-     "hood": "Quarry Hill",
-     "id": 698,
-     "phone": "555-8746",
-     "rent": 865
-    },
     {
      "day": 21,
      "flag_day": 21,
@@ -5279,14 +6155,6 @@
      "id": 700,
      "phone": "555-5267",
      "rent": 675
-    },
-    {
-     "day": 23,
-     "flag_day": 23,
-     "hood": "Millrace",
-     "id": 773,
-     "phone": "555-7730",
-     "rent": 820
     },
     {
      "day": 23,
@@ -5307,26 +6175,10 @@
     {
      "day": 29,
      "flag_day": 29,
-     "hood": "Saltmarsh",
-     "id": 991,
-     "phone": "555-7189",
-     "rent": 895
-    },
-    {
-     "day": 29,
-     "flag_day": 29,
      "hood": "Alder Flats",
      "id": 992,
      "phone": "555-7189",
      "rent": 680
-    },
-    {
-     "day": 29,
-     "flag_day": 29,
-     "hood": "Oakbend",
-     "id": 993,
-     "phone": "555-7189",
-     "rent": 865
     },
     {
      "day": 30,
@@ -5337,12 +6189,44 @@
      "rent": 630
     },
     {
+     "day": 30,
+     "flag_day": 30,
+     "hood": "Tern Point",
+     "id": 1031,
+     "phone": "555-3559",
+     "rent": 660
+    },
+    {
      "day": 31,
      "flag_day": 31,
      "hood": "Tern Point",
      "id": 1065,
      "phone": "555-8972",
      "rent": 880
+    },
+    {
+     "day": 33,
+     "flag_day": 33,
+     "hood": "Millrace",
+     "id": 1146,
+     "phone": "555-1517",
+     "rent": 660
+    },
+    {
+     "day": 34,
+     "flag_day": 34,
+     "hood": "Alder Flats",
+     "id": 1182,
+     "phone": "555-1517",
+     "rent": 600
+    },
+    {
+     "day": 35,
+     "flag_day": 35,
+     "hood": "Oakbend",
+     "id": 1221,
+     "phone": "555-7597",
+     "rent": 845
     },
     {
      "day": 35,
@@ -5355,18 +6239,18 @@
     {
      "day": 36,
      "flag_day": 36,
-     "hood": "Kestrel Row",
-     "id": 1254,
-     "phone": "555-5541",
-     "rent": 1075
-    },
-    {
-     "day": 36,
-     "flag_day": 36,
      "hood": "Saltmarsh",
      "id": 1255,
      "phone": "555-2787",
      "rent": 850
+    },
+    {
+     "day": 36,
+     "flag_day": 36,
+     "hood": "Quarry Hill",
+     "id": 1258,
+     "phone": "555-1679",
+     "rent": 690
     },
     {
      "day": 36,
@@ -5383,6 +6267,14 @@
      "id": 1265,
      "phone": "555-8563",
      "rent": 1050
+    },
+    {
+     "day": 37,
+     "flag_day": 37,
+     "hood": "Alder Flats",
+     "id": 1303,
+     "phone": "555-1679",
+     "rent": 1045
     },
     {
      "day": 37,
@@ -5411,6 +6303,14 @@
     {
      "day": 40,
      "flag_day": 40,
+     "hood": "Tern Point",
+     "id": 1421,
+     "phone": "555-2323",
+     "rent": 845
+    },
+    {
+     "day": 40,
+     "flag_day": 40,
      "hood": "Quarry Hill",
      "id": 1424,
      "phone": "555-3350",
@@ -5431,6 +6331,14 @@
      "id": 1426,
      "phone": "555-3350",
      "rent": 690
+    },
+    {
+     "day": 41,
+     "flag_day": 41,
+     "hood": "Millrace",
+     "id": 1464,
+     "phone": "555-2323",
+     "rent": 850
     },
     {
      "day": 41,
@@ -5457,12 +6365,12 @@
      "rent": 885
     },
     {
-     "day": 45,
-     "flag_day": 45,
-     "hood": "Quarry Hill",
-     "id": 1615,
-     "phone": "555-5442",
-     "rent": 1035
+     "day": 49,
+     "flag_day": 49,
+     "hood": "Millrace",
+     "id": 1771,
+     "phone": "555-1660",
+     "rent": 605
     },
     {
      "day": 49,
@@ -5479,6 +6387,14 @@
      "id": 1813,
      "phone": "555-1125",
      "rent": 610
+    },
+    {
+     "day": 51,
+     "flag_day": 51,
+     "hood": "Saltmarsh",
+     "id": 1855,
+     "phone": "555-1125",
+     "rent": 890
     },
     {
      "day": 53,
@@ -5537,6 +6453,14 @@
      "rent": 655
     },
     {
+     "day": 65,
+     "flag_day": 65,
+     "hood": "Millrace",
+     "id": 2322,
+     "phone": "555-9684",
+     "rent": 1065
+    },
+    {
      "day": 66,
      "flag_day": 66,
      "hood": "Millrace",
@@ -5545,22 +6469,22 @@
      "rent": 1015
     }
    ],
-   "ads_before_flag": 2,
+   "ads_before_flag": 4,
    "answer_key": {
-    "R01": 10,
+    "R01": 2,
     "R03": 9,
-    "R05": 4,
-    "R08": 9,
+    "R05": 14,
+    "R08": 10,
     "R09": 5
    },
    "by_kind": {
     "phone": {
-     "ads": 13,
-     "values": 5,
+     "ads": 19,
+     "values": 8,
      "weight": 2
     },
     "photo": {
-     "ads": 16,
+     "ads": 18,
      "values": 10,
      "weight": 3
     },
@@ -5571,7 +6495,7 @@
     },
     "wording": {
      "ads": 35,
-     "values": 3,
+     "values": 2,
      "weight": 2
     }
    },
@@ -5579,31 +6503,25 @@
     {
      "kind": "photo_reuse",
      "score": 1.0,
-     "summary": "10 pictures are reused across 44 ad postings of this ring, re-cropped between ads (ids within 9 bits).",
+     "summary": "10 pictures are reused across 54 ad postings of this ring, re-cropped between ads (ids within 9 bits).",
      "title": "Photo-sets reused across ads"
     },
     {
      "kind": "phone_rotation",
      "score": 1.0,
-     "summary": "29 different numbers across 37 ads; each number serves 1 to 3 of them.",
+     "summary": "29 different numbers across 40 ads; each number serves 1 to 3 of them.",
      "title": "Contact numbers rotate"
     },
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "31 ads ask for money before the keys in 9 wordings of one template.",
-     "title": "Pay-before-move-in wording, reworded"
-    },
-    {
-     "kind": "shared_phrasing",
-     "score": 0.9,
-     "summary": "2 ads ask for money before the keys in 2 wordings of one template.",
+     "summary": "32 ads ask for money before the keys in 9 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
      "kind": "shared_phrasing",
      "score": 1.0,
-     "summary": "2 ads ask for money before the keys in 1 wordings of one template.",
+     "summary": "3 ads ask for money before the keys in 1 wordings of one template.",
      "title": "Pay-before-move-in wording, reworded"
     },
     {
@@ -5614,21 +6532,66 @@
     },
     {
      "kind": "pretext",
-     "score": 0.81,
-     "summary": "Ads explain why nobody can show it: owner away (30), cant show (21), new management (9)",
+     "score": 0.65,
+     "summary": "Ads explain why nobody can show it: owner away (26), cant show (15), new management (11)",
      "title": "The same reasons for not showing the home"
     }
    ],
-   "first_day": 18,
-   "flag_day": 21,
-   "gap_days": 3,
-   "id": "E",
-   "label": "Ring E",
-   "n_ads": 37,
+   "first_day": 21,
+   "flag_day": 30,
+   "gap_days": 9,
+   "id": "F",
+   "label": "Ring F",
+   "n_ads": 40,
    "n_phones": 29,
-   "renters_est": 150,
+   "renters_est": 570,
    "score": 1.0,
    "signals": [
+    {
+     "ad_ids": [
+      1813,
+      1855
+     ],
+     "key": "555-1125",
+     "kind": "phone",
+     "label": "555-1125",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1146,
+      1182
+     ],
+     "key": "555-1517",
+     "kind": "phone",
+     "label": "555-1517",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1258,
+      1303
+     ],
+     "key": "555-1679",
+     "kind": "phone",
+     "label": "555-1679",
+     "n_ads": 2,
+     "weight": 2
+    },
+    {
+     "ad_ids": [
+      1305,
+      1421,
+      1464
+     ],
+     "key": "555-2323",
+     "kind": "phone",
+     "label": "555-2323",
+     "n_ads": 3,
+     "weight": 2
+    },
     {
      "ad_ids": [
       2165,
@@ -5666,40 +6629,32 @@
     },
     {
      "ad_ids": [
-      587,
-      623
+      2129,
+      2322
      ],
-     "key": "555-4231",
+     "key": "555-9684",
      "kind": "phone",
-     "label": "555-4231",
+     "label": "555-9684",
      "n_ads": 2,
      "weight": 2
     },
     {
      "ad_ids": [
-      991,
-      992,
-      993
+      1031,
+      1146,
+      1182,
+      1221,
+      1258,
+      1303,
+      1421,
+      1464,
+      1771,
+      2322
      ],
-     "key": "555-7189",
-     "kind": "phone",
-     "label": "555-7189",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      587,
-      623,
-      698,
-      773,
-      991,
-      1254
-     ],
-     "key": "photo-00deabbe",
+     "key": "photo-0c8612a9",
      "kind": "photo",
-     "label": "photo-set 00deabbe",
-     "n_ads": 6,
+     "label": "photo-set 0c8612a9",
+     "n_ads": 10,
      "weight": 3
     },
     {
@@ -5716,23 +6671,6 @@
     },
     {
      "ad_ids": [
-      587,
-      623,
-      698,
-      773,
-      991,
-      993,
-      1254,
-      1615
-     ],
-     "key": "photo-16292125",
-     "kind": "photo",
-     "label": "photo-set 16292125",
-     "n_ads": 8,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
       992,
       1255
      ],
@@ -5740,6 +6678,62 @@
      "kind": "photo",
      "label": "photo-set 23a0f99b",
      "n_ads": 2,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1031,
+      1146,
+      1182,
+      1221,
+      1258,
+      1303,
+      1421,
+      1464,
+      1771,
+      2322
+     ],
+     "key": "photo-515f01b4",
+     "kind": "photo",
+     "label": "photo-set 515f01b4",
+     "n_ads": 10,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1031,
+      1146,
+      1182,
+      1221,
+      1258,
+      1303,
+      1421,
+      1464,
+      1771
+     ],
+     "key": "photo-52963406",
+     "kind": "photo",
+     "label": "photo-set 52963406",
+     "n_ads": 9,
+     "weight": 3
+    },
+    {
+     "ad_ids": [
+      1031,
+      1146,
+      1182,
+      1221,
+      1258,
+      1303,
+      1421,
+      1464,
+      1771,
+      2322
+     ],
+     "key": "photo-5629bfe1",
+     "kind": "photo",
+     "label": "photo-set 5629bfe1",
+     "n_ads": 10,
      "weight": 3
     },
     {
@@ -5790,71 +6784,29 @@
     },
     {
      "ad_ids": [
-      587,
-      623,
-      698,
-      773,
-      991,
-      993,
-      1254,
-      1615
+      1182,
+      1771,
+      2322
      ],
-     "key": "photo-c494a88c",
-     "kind": "photo",
-     "label": "photo-set c494a88c",
-     "n_ads": 8,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      587,
-      623,
-      698,
-      773,
-      991,
-      993,
-      1254
-     ],
-     "key": "photo-f9f75868",
-     "kind": "photo",
-     "label": "photo-set f9f75868",
-     "n_ads": 7,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      587,
-      1615
-     ],
-     "key": "phrase-22",
+     "key": "phrase-16",
      "kind": "wording",
-     "label": "Your booking amount has to be paid in advance of collecting the keys.",
-     "n_ads": 2,
+     "label": "Upfront reservation funds are needed prior to key handover.",
+     "n_ads": 3,
      "weight": 2
     },
     {
      "ad_ids": [
-      623,
-      1254
-     ],
-     "key": "phrase-23",
-     "kind": "wording",
-     "label": "Forward the booking amount today and the apartment is reserved in your name.",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      698,
       700,
       775,
       950,
       992,
-      993,
       1026,
+      1031,
       1065,
+      1221,
       1223,
       1255,
+      1258,
       1262,
       1265,
       1305,
@@ -5879,22 +6831,9 @@
      ],
      "key": "phrase-29",
      "kind": "wording",
-     "label": "The first month and the deposit go through before any viewing is arranged.",
-     "n_ads": 31,
+     "label": "The first month and the reservation sum go through ahead of any viewing is arranged.",
+     "n_ads": 32,
      "weight": 2
-    },
-    {
-     "ad_ids": [
-      991,
-      992,
-      993,
-      1254
-     ],
-     "key": "easy-deposit-96.example",
-     "kind": "site",
-     "label": "easy-deposit-96.example",
-     "n_ads": 4,
-     "weight": 0
     },
     {
      "ad_ids": [
@@ -5908,551 +6847,18 @@
      "label": "fast-deposit-30.example",
      "n_ads": 4,
      "weight": 0
-    }
-   ]
-  },
-  {
-   "ad_days_before_flag": 9,
-   "ads": [
-    {
-     "day": 20,
-     "flag_day": 21,
-     "hood": "Oakbend",
-     "id": 659,
-     "phone": "555-5267",
-     "rent": 1020
-    },
-    {
-     "day": 23,
-     "flag_day": 23,
-     "hood": "Kestrel Row",
-     "id": 778,
-     "phone": "555-2484",
-     "rent": 805
-    },
-    {
-     "day": 23,
-     "flag_day": 23,
-     "hood": "Ashgrove",
-     "id": 779,
-     "phone": "555-3640",
-     "rent": 620
-    },
-    {
-     "day": 25,
-     "flag_day": 25,
-     "hood": "Saltmarsh",
-     "id": 839,
-     "phone": "555-4650",
-     "rent": 640
-    },
-    {
-     "day": 31,
-     "flag_day": 31,
-     "hood": "Pelham Green",
-     "id": 1060,
-     "phone": "555-5177",
-     "rent": 885
-    },
-    {
-     "day": 33,
-     "flag_day": 33,
-     "hood": "Ashgrove",
-     "id": 1144,
-     "phone": "555-7309",
-     "rent": 675
-    },
-    {
-     "day": 33,
-     "flag_day": 33,
-     "hood": "Pelham Green",
-     "id": 1148,
-     "phone": "555-3035",
-     "rent": 1075
-    },
-    {
-     "day": 35,
-     "flag_day": 35,
-     "hood": "Oakbend",
-     "id": 1219,
-     "phone": "555-3932",
-     "rent": 895
-    },
-    {
-     "day": 35,
-     "flag_day": 35,
-     "hood": "Pelham Green",
-     "id": 1222,
-     "phone": "555-4424",
-     "rent": 610
-    },
-    {
-     "day": 35,
-     "flag_day": 35,
-     "hood": "Tern Point",
-     "id": 1224,
-     "phone": "555-2651",
-     "rent": 1055
-    },
-    {
-     "day": 38,
-     "flag_day": 38,
-     "hood": "Saltmarsh",
-     "id": 1343,
-     "phone": "555-9888",
-     "rent": 1080
-    },
-    {
-     "day": 38,
-     "flag_day": 38,
-     "hood": "Saltmarsh",
-     "id": 1344,
-     "phone": "555-9888",
-     "rent": 1100
-    },
-    {
-     "day": 40,
-     "flag_day": 40,
-     "hood": "Oakbend",
-     "id": 1422,
-     "phone": "555-2502",
-     "rent": 610
-    },
-    {
-     "day": 44,
-     "flag_day": 44,
-     "hood": "Quarry Hill",
-     "id": 1578,
-     "phone": "555-3803",
-     "rent": 685
-    },
-    {
-     "day": 46,
-     "flag_day": 46,
-     "hood": "Alder Flats",
-     "id": 1660,
-     "phone": "555-4744",
-     "rent": 1100
-    },
-    {
-     "day": 47,
-     "flag_day": 47,
-     "hood": "Oakbend",
-     "id": 1694,
-     "phone": "555-2240",
-     "rent": 1035
-    },
-    {
-     "day": 47,
-     "flag_day": 47,
-     "hood": "Oakbend",
-     "id": 1698,
-     "phone": "555-5005",
-     "rent": 630
-    },
-    {
-     "day": 48,
-     "flag_day": 48,
-     "hood": "Kestrel Row",
-     "id": 1735,
-     "phone": "555-2762",
-     "rent": 840
-    },
-    {
-     "day": 49,
-     "flag_day": 49,
-     "hood": "Ashgrove",
-     "id": 1775,
-     "phone": "555-1346",
-     "rent": 1055
-    },
-    {
-     "day": 49,
-     "flag_day": 49,
-     "hood": "Westering",
-     "id": 1777,
-     "phone": "555-5005",
-     "rent": 880
-    },
-    {
-     "day": 50,
-     "flag_day": 50,
-     "hood": "Tern Point",
-     "id": 1814,
-     "phone": "555-5005",
-     "rent": 885
-    },
-    {
-     "day": 52,
-     "flag_day": 52,
-     "hood": "Pelham Green",
-     "id": 1887,
-     "phone": "555-8422",
-     "rent": 840
-    },
-    {
-     "day": 53,
-     "flag_day": 53,
-     "hood": "Tern Point",
-     "id": 1925,
-     "phone": "555-8422",
-     "rent": 650
-    },
-    {
-     "day": 53,
-     "flag_day": 53,
-     "hood": "Alder Flats",
-     "id": 1927,
-     "phone": "555-8422",
-     "rent": 845
-    },
-    {
-     "day": 55,
-     "flag_day": 55,
-     "hood": "Saltmarsh",
-     "id": 2005,
-     "phone": "555-2355",
-     "rent": 1090
-    },
-    {
-     "day": 56,
-     "flag_day": 56,
-     "hood": "Oakbend",
-     "id": 2043,
-     "phone": "555-9619",
-     "rent": 670
-    },
-    {
-     "day": 58,
-     "flag_day": 58,
-     "hood": "Millrace",
-     "id": 2099,
-     "phone": "555-9619",
-     "rent": 850
-    },
-    {
-     "day": 65,
-     "flag_day": 65,
-     "hood": "Oakbend",
-     "id": 2325,
-     "phone": "555-9012",
-     "rent": 1050
-    },
-    {
-     "day": 66,
-     "flag_day": 66,
-     "hood": "Saltmarsh",
-     "id": 2356,
-     "phone": "555-9012",
-     "rent": 1015
-    }
-   ],
-   "ads_before_flag": 3,
-   "answer_key": {
-    "R03": 5,
-    "R04": 6,
-    "R08": 7,
-    "R09": 11
-   },
-   "by_kind": {
-    "phone": {
-     "ads": 12,
-     "values": 5,
-     "weight": 2
-    },
-    "photo": {
-     "ads": 10,
-     "values": 6,
-     "weight": 3
-    },
-    "site": {
-     "ads": 17,
-     "values": 5,
-     "weight": 0
-    },
-    "wording": {
-     "ads": 28,
-     "values": 1,
-     "weight": 2
-    }
-   },
-   "findings": [
-    {
-     "kind": "photo_reuse",
-     "score": 1.0,
-     "summary": "6 pictures are reused across 27 ad postings of this ring, re-cropped between ads (ids within 12 bits).",
-     "title": "Photo-sets reused across ads"
-    },
-    {
-     "kind": "phone_rotation",
-     "score": 1.0,
-     "summary": "22 different numbers across 29 ads; each number serves 1 to 3 of them.",
-     "title": "Contact numbers rotate"
-    },
-    {
-     "kind": "shared_phrasing",
-     "score": 0.85,
-     "summary": "28 ads ask for money before the keys in 13 wordings of one template.",
-     "title": "Pay-before-move-in wording, reworded"
-    },
-    {
-     "kind": "copied_listing",
-     "score": 0.75,
-     "summary": "6 ads reuse photos from 5 older ads with a different number.",
-     "title": "Photos copied from older listings under new contact details"
-    },
-    {
-     "kind": "pretext",
-     "score": 0.59,
-     "summary": "Ads explain why nobody can show it: owner away (17), cant show (11), new management (6)",
-     "title": "The same reasons for not showing the home"
-    }
-   ],
-   "first_day": 20,
-   "flag_day": 25,
-   "gap_days": 5,
-   "id": "F",
-   "label": "Ring F",
-   "n_ads": 29,
-   "n_phones": 22,
-   "renters_est": 270,
-   "score": 1.0,
-   "signals": [
-    {
-     "ad_ids": [
-      1698,
-      1777,
-      1814
-     ],
-     "key": "555-5005",
-     "kind": "phone",
-     "label": "555-5005",
-     "n_ads": 3,
-     "weight": 2
     },
     {
      "ad_ids": [
-      1887,
-      1925,
-      1927
+      1305,
+      1421,
+      1464,
+      1771
      ],
-     "key": "555-8422",
-     "kind": "phone",
-     "label": "555-8422",
-     "n_ads": 3,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      2325,
-      2356
-     ],
-     "key": "555-9012",
-     "kind": "phone",
-     "label": "555-9012",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      2043,
-      2099
-     ],
-     "key": "555-9619",
-     "kind": "phone",
-     "label": "555-9619",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1343,
-      1344
-     ],
-     "key": "555-9888",
-     "kind": "phone",
-     "label": "555-9888",
-     "n_ads": 2,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1224,
-      1660,
-      2356
-     ],
-     "key": "photo-049eb9ce",
-     "kind": "photo",
-     "label": "photo-set 049eb9ce",
-     "n_ads": 3,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1578,
-      1698,
-      1777,
-      1814,
-      2005,
-      2043
-     ],
-     "key": "photo-10540a1b",
-     "kind": "photo",
-     "label": "photo-set 10540a1b",
-     "n_ads": 6,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1578,
-      1698,
-      1777,
-      1814,
-      2005,
-      2043
-     ],
-     "key": "photo-60f50788",
-     "kind": "photo",
-     "label": "photo-set 60f50788",
-     "n_ads": 6,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1224,
-      1660
-     ],
-     "key": "photo-745597e0",
-     "kind": "photo",
-     "label": "photo-set 745597e0",
-     "n_ads": 2,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1224,
-      1660,
-      2099,
-      2356
-     ],
-     "key": "photo-8189b475",
-     "kind": "photo",
-     "label": "photo-set 8189b475",
+     "key": "fast-deposit-50.example",
+     "kind": "site",
+     "label": "fast-deposit-50.example",
      "n_ads": 4,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      1578,
-      1698,
-      1777,
-      1814,
-      2005,
-      2043
-     ],
-     "key": "photo-b95d54c1",
-     "kind": "photo",
-     "label": "photo-set b95d54c1",
-     "n_ads": 6,
-     "weight": 3
-    },
-    {
-     "ad_ids": [
-      659,
-      778,
-      779,
-      839,
-      1060,
-      1144,
-      1148,
-      1219,
-      1222,
-      1224,
-      1343,
-      1344,
-      1422,
-      1578,
-      1660,
-      1694,
-      1735,
-      1775,
-      1777,
-      1814,
-      1887,
-      1925,
-      1927,
-      2005,
-      2043,
-      2099,
-      2325,
-      2356
-     ],
-     "key": "phrase-26",
-     "kind": "wording",
-     "label": "Send the reservation payment first and I will mail the keys and the lease to you.",
-     "n_ads": 28,
-     "weight": 2
-    },
-    {
-     "ad_ids": [
-      1660,
-      1698,
-      1777,
-      1814,
-      2005,
-      2043
-     ],
-     "key": "easy-deposit-75.example",
-     "kind": "site",
-     "label": "easy-deposit-75.example",
-     "n_ads": 6,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      1343,
-      1344,
-      1422
-     ],
-     "key": "fast-deposit-30.example",
-     "kind": "site",
-     "label": "fast-deposit-30.example",
-     "n_ads": 3,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      778,
-      779,
-      839
-     ],
-     "key": "fast-deposit-33.example",
-     "kind": "site",
-     "label": "fast-deposit-33.example",
-     "n_ads": 3,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      1694,
-      1775,
-      1887
-     ],
-     "key": "harborrowhomes.example",
-     "kind": "site",
-     "label": "harborrowhomes.example",
-     "n_ads": 3,
-     "weight": 0
-    },
-    {
-     "ad_ids": [
-      1144,
-      1219
-     ],
-     "key": "hharborrow.example",
-     "kind": "site",
-     "label": "hharborrow.example",
-     "n_ads": 2,
      "weight": 0
     }
    ]
@@ -6479,7 +6885,7 @@
   3,
   3,
   2,
-  3,
+  4,
   4,
   4,
   6,
@@ -6487,44 +6893,44 @@
   6,
   6,
   5,
+  5,
+  6,
+  6,
+  7,
+  7,
+  7,
+  7,
+  8,
+  9,
+  9,
+  9,
+  9,
+  8,
+  8,
+  7,
+  7,
+  7,
+  7,
+  6,
+  6,
+  6,
+  6,
   6,
   5,
-  7,
-  7,
-  8,
-  8,
-  8,
-  8,
-  8,
-  8,
-  8,
-  8,
-  8,
-  8,
-  7,
-  7,
-  7,
-  7,
-  6,
-  6,
-  6,
-  7,
-  6,
-  6,
-  6,
-  6,
-  7,
-  6,
-  7,
-  7,
-  7,
-  7,
   6,
   6,
   6,
   6,
   6,
   7,
+  7,
+  7,
+  5,
+  5,
+  6,
+  6,
+  6,
+  6,
   6,
   6,
   6,
@@ -6558,13 +6964,13 @@
   31,
   28,
   28,
-  33,
-  27,
-  29,
-  28,
-  26,
   32,
   27,
+  29,
+  27,
+  26,
+  32,
+  27,
   31,
   34,
   34,
@@ -6574,50 +6980,50 @@
   26,
   29,
   33,
+  33,
   34,
-  35,
   32,
-  28,
+  27,
   26,
   26,
   27,
   34,
-  33,
-  31,
-  31,
-  30,
-  31,
-  36,
-  30,
-  31,
-  29,
-  32,
-  33,
-  32,
-  29,
-  30,
-  29,
-  31,
-  26,
-  34,
-  34,
-  30,
   32,
   31,
-  30,
-  36,
+  31,
   27,
   30,
-  31,
-  26,
   34,
   28,
+  31,
+  28,
+  31,
+  32,
+  32,
+  29,
+  30,
+  28,
+  30,
+  26,
+  34,
+  34,
+  30,
+  31,
+  31,
+  30,
+  34,
+  27,
+  30,
+  29,
+  26,
+  34,
+  28,
   26,
   29,
   28,
   27,
   32,
-  29,
+  28,
   33,
   30,
   29,
@@ -6650,9 +7056,9 @@
  "start": "2026-08-17",
  "summary": {
   "groups_found": 6,
-  "median_gap_days": 5.0,
+  "median_gap_days": 9.0,
   "n_gap": 6,
-  "renters_est": 2460
+  "renters_est": 3510
  },
  "synthetic": true,
  "views_per_ad_day": 30,

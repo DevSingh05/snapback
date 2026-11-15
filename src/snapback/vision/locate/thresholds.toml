@@ -29,6 +29,10 @@ ambiguity_ratio = 3.0
 # A claimed match must also spread over this share of the photo: inliers packed on one small
 # patch (an identical appliance or picture) do not place a photo (seed-6 replay, #28).
 claimed_min_spread = 0.05
+# A photo that is not placed as sent is searched once more flipped left to right (copied ads are
+# often mirrored to dodge photo checks), under every bar above. Off if it ever places a photo in
+# a wrong home on the measured sets (#10, V1).
+flip_search = true
 
 [pose]
 default_hfov_deg = 65.0  # used when the photo carries no focal length

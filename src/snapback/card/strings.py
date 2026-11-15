@@ -75,6 +75,11 @@ EN: dict[str, str] = {
     # A house is a home, not a building.
     "place.located_home": "Taken in this home ({located} of {total} photos).",
     "place.elsewhere": "Taken in a different building ({elsewhere} of {total} photos). Red flag.",
+    "label.mirrored": "Mirrored",
+    "place.mirrored": (
+        "{flipped} of {total} photos match this building only when flipped left to right. "
+        "Copied ads are often mirrored to dodge photo checks."
+    ),
     "place.not_located": "NOT SHOWN. These photos could not be placed in this building's 3D scan.",
     "place.not_indexed": "Not checked (we have no 3D scan of this building).",
     "place.not_indexed_yet": "Not checked (this building's scan is not indexed yet).",
@@ -689,6 +694,12 @@ ES: dict[str, str] = {
     "place.located": "Tomadas en este edificio ({located} de {total} fotos).",
     "place.located_home": "Tomadas en esta vivienda ({located} de {total} fotos).",
     "place.elsewhere": "Tomadas en otro edificio ({elsewhere} de {total} fotos). Señal de alerta.",
+    "label.mirrored": "Invertida",
+    "place.mirrored": (
+        "{flipped} de {total} fotos coinciden con este edificio solo al invertirlas de "
+        "izquierda a derecha. Los anuncios copiados suelen invertirse para evadir la "
+        "comprobación de fotos."
+    ),
     "place.not_located": (
         "NO DEMOSTRADO. Estas fotos no se pudieron ubicar en el escaneo 3D de este edificio."
     ),

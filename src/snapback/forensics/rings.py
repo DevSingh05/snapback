@@ -132,9 +132,24 @@ def _week(day: str) -> str:
     return date.fromordinal(d.toordinal() - d.weekday()).isoformat()
 
 
-def find_rings(graph: LinkGraph) -> list[Ring]:
+def _one_hop(graph: LinkGraph, seeds: set[int], copiers: dict[int, int]) -> set[int]:
+    """Seeds plus the ads one exact link away: an ad that shares a phone number with a seed, or
+    that reposted a seed's photos under another number. The robust fallback for an operator who
+    rewords the ask so the wording stops marking it: the number and the pictures do not change
+    when the words do. An older ad whose photos were copied is never pulled in: it is the source."""
+    seed_phones = {graph.ads[a].phone for a in seeds}
+    hopped = {a for a, ad in graph.ads.items() if ad.phone in seed_phones}
+    hopped |= {a for a, older in copiers.items() if older in seeds}
+    return seeds | hopped
+
+
+def find_rings(graph: LinkGraph, *, hop: bool = True) -> list[Ring]:
+    """`hop=True` (the default) widens the seeds by one phone or photo-copy link (see `_one_hop`);
+    `hop=False` keeps the wording-only seeds."""
     seeds = _pressure(graph)
     copiers = _copiers(graph)
+    if hop:
+        seeds = _one_hop(graph, seeds, copiers)
     phrase_ads = graph.phrase_ads()
     phone_ads = graph.phone_ads
     order = sorted(graph.ads.values(), key=lambda ad: (ad.posted_at, ad.id))
