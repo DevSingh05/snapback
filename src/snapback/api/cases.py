@@ -37,6 +37,8 @@ from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
+from snapback.agent.web.inputs import web_inputs_for
+from snapback.agent.web.run import start_web_checks
 from snapback.api.casefiles import CaseFiles
 from snapback.card import strings
 from snapback.contracts import (
@@ -644,6 +646,16 @@ class CaseStore:
                 Trace(full_id, source),
                 ask_enabled=self._settings.snapback_ask_renter,
             )
+            if live and self._settings.snapback_web_checks:
+                # W1: in the background; the sub-agent and the notes read it when it lands.
+                job = start_web_checks(
+                    web_inputs_for(listing, record, phone_salt(self._settings)),
+                    self._settings,
+                    salt=phone_salt(self._settings),
+                    trace=session.trace,
+                    source=source,
+                )
+                session.web_facts = job.facts
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
