@@ -21,6 +21,7 @@ import { initialState, reduce } from "./machine";
 import { MAX_FILES, addFiles, classifyListingText, validateSubmission } from "./validate";
 import { HeroStreet } from "../landing/HeroStreet";
 import { HowItWorks } from "../landing/HowItWorks";
+import { RealtorQuote } from "../landing/RealtorQuote";
 import "./upload.css";
 
 export function goToCase(caseId: string) {
@@ -354,6 +355,7 @@ export function UploadPage({
             <PlacesStrip caseId={null} brief={shownBrief} />
           )}
           <HowItWorks />
+          <RealtorQuote />
         </form>
       </div>
     );
