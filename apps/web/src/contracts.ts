@@ -189,6 +189,9 @@ export interface TimelineStep {
   source_name?: string | null;
   // The plan left this check out; `result` says why.
   skipped?: boolean;
+  // The Planner's own choices: a check it chose for a gap ("follow_up") or a step it drafted
+  // and never sent ("next_step"). Absent on older servers.
+  choice?: "follow_up" | "next_step" | null;
 }
 
 export interface TimelineTodo {

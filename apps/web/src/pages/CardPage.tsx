@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CaseNotFound, apiBase, fetchCard } from "../api";
 import {
@@ -11,6 +11,7 @@ import {
   useRealListingRead,
   useReportPackRead,
   useSaferPlacesRead,
+  openTimelineStream,
   useTimeline,
 } from "../case";
 import "../case/case.css";
@@ -18,7 +19,7 @@ import { asLang, loadLang, saveLang, type Lang } from "../lang";
 import { OfficeConfirm } from "../office/OfficeConfirm";
 import { replayForCase } from "../replay";
 import { Loading, Problem } from "../ui";
-import type { Card } from "../contracts";
+import type { Card, CaseTimeline } from "../contracts";
 
 export { expiryText };
 
@@ -35,6 +36,33 @@ function ReplayLink({ caseId }: { caseId: string }) {
       </a>
     </p>
   );
+}
+
+// While the deep agent is still working (`running`), follow its timeline; when it finishes, reload
+// the card so the Planner's follow-up lines and choice appear without a manual refresh.
+export function useLiveTimeline(
+  caseId: string,
+  lang: string | undefined,
+  first: CaseTimeline | null,
+  onDone: () => void,
+): CaseTimeline | null {
+  const [live, setLive] = useState<CaseTimeline | null>(null);
+  const done = useRef(onDone);
+  done.current = onDone;
+  const running = first?.running === true;
+  useEffect(() => {
+    setLive(null);
+    if (!running) return;
+    return openTimelineStream({
+      caseId,
+      lang,
+      onTimeline: setLive,
+      onFeed: (feed) => {
+        if (feed === "done") done.current();
+      },
+    });
+  }, [caseId, lang, running]);
+  return live ?? first;
 }
 
 // The card as a case result (design v4 ticket 3). The pieces live in ../case; this file only
@@ -73,7 +101,8 @@ function ResultPage({
   const realListing = useRealListingRead(card.case_id, card.lang);
   const copyAlert = useCopyAlertRead(card.case_id, card.lang);
   const reportPack = useReportPackRead(card.case_id, card.lang);
-  const timeline = useTimeline(card.case_id, card.lang);
+  const first = useTimeline(card.case_id, card.lang);
+  const timeline = useLiveTimeline(card.case_id, card.lang, first, onChanged);
   const saferPlaces = useSaferPlacesRead(
     card.case_id,
     card.state === "hold" || card.state === "dont_pay",
