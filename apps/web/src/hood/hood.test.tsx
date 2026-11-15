@@ -188,7 +188,13 @@ describe("the page", () => {
     expect(text).not.toMatch(/\(?\d{3}\)?[ -]\d{3}-\d{4}/); // no phone
     expect(text).not.toMatch(/doesn.t detect scams/i);
     expect(text).not.toMatch(/[–—]/);
-    expect(container.querySelector("img")).toBeNull();
+    // The only pictures are crops of our own screens, each with words for a screen reader.
+    const imgs = [...container.querySelectorAll("img")];
+    expect(imgs.length).toBe(PANELS.filter((p) => p.shot.kind === "screen").length);
+    for (const img of imgs) {
+      expect(img.closest(".uh-shot")).not.toBeNull();
+      expect(img.getAttribute("alt")?.trim()).toBeTruthy();
+    }
   });
 
   it("jumps to a sponsor's panel from the strip at the top", () => {
@@ -199,6 +205,25 @@ describe("the page", () => {
         .getAllByRole("link")
         .map((a) => a.getAttribute("href")),
     ).toEqual(PANELS.map((p) => `#${p.id}`));
+  });
+});
+
+describe("the screen pictures", () => {
+  it("every panel shows the screen its Show me opens, or the sample thread, inside the link", () => {
+    render(<HoodPage />);
+    for (const p of PANELS) {
+      const link = within(screen.getByTestId(`hood-${p.id}`)).getByRole("link", {
+        name: new RegExp(p.show.label),
+      });
+      if (p.shot.kind === "screen") {
+        expect(within(link).getByRole("img", { name: p.shot.alt })).toBeInTheDocument();
+        expect(existsSync(path.join(REPO, `apps/web/src/assets/hood/show-${p.id}.webp`))).toBe(
+          true,
+        );
+      } else {
+        expect(within(link).getByRole("img", { name: /sample iMessage thread/i })).toBeVisible();
+      }
+    }
   });
 });
 

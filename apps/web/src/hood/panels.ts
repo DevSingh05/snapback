@@ -84,6 +84,9 @@ export interface Panel {
   more: ShowLink[];
   /** A short line under the links, for what cannot be shown in a browser. */
   aside?: string;
+  /** The small picture of the Show me screen: a crop of the app's own screen in fixture mode
+   *  (assets/hood/show-<id>.webp), or the drawn sample thread. */
+  shot: { kind: "screen"; alt: string } | { kind: "thread" };
 }
 
 const BOARD = "plan/artifact/board.json";
@@ -94,6 +97,10 @@ const PARAPHRASE = "eval/forensics/paraphrase_results.json";
 export const PANELS: Panel[] = [
   {
     id: "costar",
+    shot: {
+      kind: "screen",
+      alt: "Sample report: the ad's photo beside the same room found in the building's 3D scan",
+    },
     sponsor: "CoStar",
     track: "Inside and Out",
     mark: "Co",
@@ -154,6 +161,10 @@ export const PANELS: Panel[] = [
   },
   {
     id: "langchain",
+    shot: {
+      kind: "screen",
+      alt: "The check team at work round a house: Rules, Record, Phone, Owner and Photo, each with its model",
+    },
     sponsor: "LangChain",
     track: "deepagents",
     mark: "Lc",
@@ -212,6 +223,10 @@ export const PANELS: Panel[] = [
   },
   {
     id: "arlequin",
+    shot: {
+      kind: "screen",
+      alt: "The 90-day view on day 45: rings of linked ads, with ring B selected",
+    },
     sponsor: "Arlequin",
     track: "AI forensics",
     mark: "Ar",
@@ -282,6 +297,7 @@ export const PANELS: Panel[] = [
   },
   {
     id: "photon",
+    shot: { kind: "thread" },
     sponsor: "Photon",
     track: "Messaging agent",
     mark: "Ph",
@@ -326,6 +342,10 @@ export const PANELS: Panel[] = [
   },
   {
     id: "amazon",
+    shot: {
+      kind: "screen",
+      alt: "The one box on Home: paste the ad you were sent, then Check it",
+    },
     sponsor: "Amazon",
     track: "Best Practical AI",
     mark: "Am",

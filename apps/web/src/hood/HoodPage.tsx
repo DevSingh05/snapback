@@ -1,3 +1,9 @@
+import { useEffect, useState } from "react";
+
+import amazonShot from "../assets/hood/show-amazon.webp";
+import arlequinShot from "../assets/hood/show-arlequin.webp";
+import costarShot from "../assets/hood/show-costar.webp";
+import langchainShot from "../assets/hood/show-langchain.webp";
 import "../ui/ui.css";
 import {
   LABEL_HINT,
@@ -12,11 +18,30 @@ import {
 } from "./panels";
 import "./hood.css";
 
-// /under-the-hood: a map for a judge at the table. One panel per sponsor track: what it does
-// for the person, what of theirs we used, what we measured (with n), and a button that opens
-// the exact screen where it is working. All of the content lives in panels.ts.
+// /under-the-hood: a map for a judge at the table. One section per sponsor track, read top to
+// bottom in five seconds: what it does for the person, the measured number, what of theirs we
+// used, and a picture of the screen that opens it. All of the content lives in panels.ts.
 
 const LABELS: DataLabel[] = ["LIVE", "FIXTURE", "SYNTHETIC"];
+
+/** Crops of the app's own screens in fixture mode: team-made sample data, never sponsor data. */
+const SHOTS: Record<string, string> = {
+  costar: costarShot,
+  langchain: langchainShot,
+  arlequin: arlequinShot,
+  amazon: amazonShot,
+};
+
+// The sample thread, drawn. The reply lines are the sidecar's and the card's own words
+// (apps/sidecar/src/handler.ts, fixtures/contracts/card_hold.json); the ad is the team's sample.
+const THREAD: Array<{ from: "renter" | "snapback"; text: string }> = [
+  { from: "renter", text: "Is this one real? They want the deposit by Zelle before a viewing." },
+  {
+    from: "snapback",
+    text: "Got it. Checking this against CoStar's record before you pay anyone. About a minute.",
+  },
+  { from: "snapback", text: "Hold off: it asks for money before you've seen the place." },
+];
 
 function DataTag({ label }: { label: DataLabel }) {
   return (
@@ -36,6 +61,18 @@ function Figure({ m }: { m: Measured }) {
         <DataTag label={m.label} />
       </p>
     </div>
+  );
+}
+
+function Thread() {
+  return (
+    <span className="uh-thread" role="img" aria-label="A sample iMessage thread with SNAPBACK">
+      {THREAD.map((line) => (
+        <span key={line.text} className="uh-bubble" data-from={line.from} aria-hidden="true">
+          {line.text}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -59,64 +96,102 @@ function PanelView({ panel }: { panel: Panel }) {
       aria-labelledby={title}
       data-testid={`hood-${panel.id}`}
     >
-      <div className="uh-who">
+      <header className="uh-who">
         <span className="uh-mark ui-mono" aria-hidden="true">
           {panel.mark}
         </span>
-        <div>
-          <h2 id={title} className="uh-sponsor">
-            {panel.sponsor}
-          </h2>
-          <p className="uh-track ui-mono">{panel.track}</p>
-        </div>
-      </div>
-      <div className="uh-what">
-        <p className="uh-does">{panel.does}</p>
-        <ul className="uh-used" aria-label="What we used">
-          {panel.used.map((u) => (
-            <li key={u.tech}>
-              <strong>{u.tech}</strong>
-              <span>{u.text}</span>
-            </li>
+        <h2 id={title} className="uh-sponsor">
+          {panel.sponsor}
+        </h2>
+        <p className="uh-track ui-mono">{panel.track}</p>
+      </header>
+      <p className="uh-does">{panel.does}</p>
+      {panel.numbers.length > 0 && (
+        <dl className="uh-nums" aria-label="What we measured">
+          {panel.numbers.map((m) => (
+            <Figure key={m.value + m.what} m={m} />
           ))}
-        </ul>
-      </div>
-      <div className="uh-proof ui-on-matte">
-        {panel.numbers.length > 0 && (
-          <dl className="uh-nums" aria-label="What we measured">
-            {panel.numbers.map((m) => (
-              <Figure key={m.value + m.what} m={m} />
-            ))}
-          </dl>
-        )}
-        {lead && <p className="uh-live">{panel.aside}</p>}
-        <div className="uh-go">
-          <a className="uh-show" href={panel.show.href}>
+        </dl>
+      )}
+      {lead && <p className="uh-nums uh-live">{panel.aside}</p>}
+      <ul className="uh-used" aria-label="What we used">
+        {panel.used.map((u) => (
+          <li key={u.tech}>
+            <strong>{u.tech}</strong>
+            <span>{u.text}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="uh-see">
+        <a className="uh-show" href={panel.show.href}>
+          <span className="uh-shot">
+            {panel.shot.kind === "thread" ? (
+              <Thread />
+            ) : (
+              <img
+                src={SHOTS[panel.id]}
+                alt={panel.shot.alt}
+                width={800}
+                height={450}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            <span className="uh-stamp ui-mono" aria-hidden="true">
+              {panel.shot.kind === "thread" ? "Sample thread" : "The screen it opens"}
+            </span>
+          </span>
+          <span className="uh-go">
             <span>{panel.show.label}</span>
             <span className="uh-arrow" aria-hidden="true">
               →
             </span>
-          </a>
-          <p className="uh-opens">
-            <DataTag label={panel.show.data} />
-            <span className="ui-mono uh-path">{panel.show.href}</span>
-          </p>
-          {panel.more.length > 0 && (
-            <ul className="uh-more" aria-label="Also see">
-              {panel.more.map((l) => (
-                <More key={l.href} link={l} />
-              ))}
-            </ul>
-          )}
-          {panel.aside && !lead && <p className="uh-aside">{panel.aside}</p>}
-        </div>
+          </span>
+        </a>
+        <p className="uh-opens">
+          <DataTag label={panel.show.data} />
+          <span className="ui-mono uh-path">{panel.show.href}</span>
+        </p>
+        {panel.more.length > 0 && (
+          <ul className="uh-more" aria-label="Also see">
+            {panel.more.map((l) => (
+              <More key={l.href} link={l} />
+            ))}
+          </ul>
+        )}
+        {panel.aside && !lead && <p className="uh-aside">{panel.aside}</p>}
       </div>
     </section>
   );
 }
 
+/** Which sponsor's section is under the index right now, so its chip can say so. */
+function useHere(ids: string[]): string | null {
+  const [here, setHere] = useState<string | null>(null);
+  const key = ids.join(" ");
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const seen = new Map<string, boolean>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+        setHere(key.split(" ").find((id) => seen.get(id)) ?? null);
+      },
+      // A band across the upper middle of the screen: the section crossing it is "here".
+      { rootMargin: "-30% 0px -60% 0px" },
+    );
+    for (const id of key.split(" ")) {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    }
+    return () => io.disconnect();
+  }, [key]);
+  return here;
+}
+
 export function HoodPage({ switches = MERGED }: { switches?: Switches } = {}) {
   const panels = shownPanels(switches);
+  const here = useHere(panels.map((p) => p.id));
   return (
     <div className="uh" data-testid="hood">
       <header className="uh-head">
@@ -125,16 +200,6 @@ export function HoodPage({ switches = MERGED }: { switches?: Switches } = {}) {
           What SNAPBACK is built on, what we measured, and the exact screen where you can see each
           part working.
         </p>
-        <nav className="uh-jump" aria-label="Sponsors">
-          {panels.map((p) => (
-            <a key={p.id} href={`#${p.id}`}>
-              <span className="uh-mark uh-mark-sm ui-mono" aria-hidden="true">
-                {p.mark}
-              </span>
-              {p.sponsor}
-            </a>
-          ))}
-        </nav>
         <ul className="uh-key" aria-label="What the labels mean">
           {LABELS.map((l) => (
             <li key={l}>
@@ -144,6 +209,16 @@ export function HoodPage({ switches = MERGED }: { switches?: Switches } = {}) {
           ))}
         </ul>
       </header>
+      <nav className="uh-jump" aria-label="Sponsors">
+        {panels.map((p) => (
+          <a key={p.id} href={`#${p.id}`} aria-current={here === p.id ? "true" : undefined}>
+            <span className="uh-mark uh-mark-sm ui-mono" aria-hidden="true">
+              {p.mark}
+            </span>
+            {p.sponsor}
+          </a>
+        ))}
+      </nav>
       {panels.map((p) => (
         <PanelView key={p.id} panel={p} />
       ))}

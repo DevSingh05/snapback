@@ -51,3 +51,7 @@ CoStar, Matterport or Vexcel imagery is in the repo.
 | `living-balcony.webp`   | Living room with a balcony door (walk)                    | Huy Nguyen                  | https://unsplash.com/photos/white-and-brown-living-room-set-QGxBeUDkeWk                         |
 | `counter-island.webp`   | Kitchen with an island and yellow stools (walk)           | Raphael (Ajani Kamali Akio) | https://unsplash.com/photos/ImHGMkJ_Mvg                                                         |
 | `living-sectional.webp` | Living room with a sectional sofa (walk)                  | Aalo Lens                   | https://unsplash.com/photos/modern-living-room-with-sectional-sofa-and-large-window-yxO8YG082v8 |
+
+`hood/show-*.webp` are crops of this app's own screens running on fixture data (the sample
+report, the check team, the 90-day view, the one box), taken for the Under the hood page. They
+show team-made sample data and the stock photographs listed above; no sponsor imagery.
