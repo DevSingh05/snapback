@@ -657,10 +657,10 @@ export function mountHouse(
       ca = ease(seg(st.p, 0.28, 0.4)),
       cb = ease(seg(st.p, 0.6, 0.74)),
       cy0 = 6 + 2.2 * ca - 2.8 * cb,
-      ppu = Math.min(43, cw / 15.4, ch / (wide ? 19.5 : 30)) * (1 + 0.16 * ca - 0.1 * cb);
+      ppu = Math.min(58, cw / 15.4, ch / (wide ? 19.5 : 30)) * (1 + 0.16 * ca - 0.1 * cb);
     setCam({
       ppu,
-      cx: cw * (wide ? 0.66 : 0.5),
+      cx: cw * (wide ? (cw < 1200 ? 0.72 : 0.66) : 0.5),
       cy: ch * (wide ? 0.56 : 0.27),
       y: cy0,
       pit: ob.pit,
