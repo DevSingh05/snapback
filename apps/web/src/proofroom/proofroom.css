@@ -258,18 +258,6 @@
   opacity: 0;
 }
 
-/* A hand-off: a small square that travels between two lights. */
-.pr-packet {
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  width: 8px;
-  height: 8px;
-  background: var(--act);
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* ---------- the thread ---------- */
 .pr-sub {
   margin: 0;
@@ -576,22 +564,6 @@
     transform: scale(2.6);
   }
 }
-@keyframes pr-travel {
-  0% {
-    opacity: 0;
-    transform: translate(var(--x0), var(--y0));
-  }
-  15% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--x1), var(--y1));
-  }
-}
 @keyframes pr-in {
   from {
     opacity: 0;
@@ -615,9 +587,6 @@
 @media (prefers-reduced-motion: no-preference) {
   .pr-panel[data-still="no"] .pr-strip-item[data-state="working"] .pr-strip-light::after {
     animation: pr-pulse 1100ms var(--ease-out) infinite;
-  }
-  .pr-panel[data-still="no"] .pr-packet {
-    animation: pr-travel 620ms var(--ease-out) 1 forwards;
   }
   .pr-panel[data-still="no"][data-phase="running"] .pr-line {
     animation: pr-in 260ms var(--ease-out) 1 backwards;
@@ -670,5 +639,255 @@
   .pr-home-link:hover,
   .pr-evidence summary:hover {
     color: var(--act);
+  }
+}
+
+/* ---------- the graph: Planner, members, Decider, and the lines between them ---------- */
+.pr-graph {
+  position: relative;
+  width: 100%;
+}
+.pr-wires {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.pr-wire {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
+}
+.pr-wire-in,
+.pr-wire-out {
+  stroke: var(--ink);
+}
+[data-state="working"] > .pr-wire-in {
+  stroke: var(--scan);
+  stroke-width: 2.5;
+}
+.pr-nodes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-node {
+  --pr-plate: var(--surface);
+  --pr-frame: var(--st-unchecked);
+  --pr-glyph: var(--ink);
+  --pr-accent: var(--act);
+  --pr-word: var(--muted);
+  position: absolute;
+}
+.pr-node > button,
+.pr-node-in {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+.pr-node > button {
+  cursor: pointer;
+}
+.pr-node > button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+/* The words hold one height (a name may take two lines), so every member is the same size and
+   the lines meet it; spare room falls under the words, never between them. */
+.pr-node-text {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  height: 57px;
+  min-width: 0;
+  max-width: 100%;
+}
+.pr-node-name {
+  max-height: 30px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 15px;
+  overflow: hidden;
+}
+.pr-node-role {
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-node-state {
+  color: var(--pr-word);
+  line-height: 14px;
+  white-space: nowrap;
+}
+/* The Planner and the Decider: the mark on the centre line, the words beside it. */
+.pr-node-wide {
+  right: 0;
+}
+.pr-node-wide > button,
+.pr-node-wide > .pr-node-in {
+  grid-template-columns: 48px minmax(0, 1fr);
+  justify-items: start;
+  align-items: center;
+  gap: var(--sp-3);
+  width: auto;
+  text-align: left;
+}
+.pr-node-wide .pr-node-text {
+  justify-items: start;
+  height: auto;
+}
+.pr-node-wide .pr-node-name {
+  height: auto;
+  font-size: var(--fs-md);
+  line-height: 1.2;
+}
+.pr-avatar {
+  display: block;
+  overflow: visible;
+}
+.pr-avatar-plate {
+  fill: var(--pr-plate);
+  stroke: var(--pr-frame);
+  stroke-width: 3;
+}
+.pr-avatar-pulse {
+  fill: none;
+  stroke: var(--scan);
+  stroke-width: 3;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.g-ink {
+  fill: var(--pr-glyph);
+}
+.g-act {
+  fill: var(--pr-accent);
+}
+.g-cut {
+  fill: var(--pr-plate);
+}
+.pr-node[data-state="idle"],
+.pr-node[data-state="skipped"],
+.pr-node[data-state="unused"] {
+  --pr-glyph: var(--st-unchecked);
+  --pr-accent: var(--st-unchecked);
+  --pr-frame: var(--line);
+}
+.pr-node[data-state="skipped"] .pr-avatar-plate,
+.pr-node[data-state="unused"] .pr-avatar-plate {
+  stroke: var(--st-unchecked);
+  stroke-dasharray: 5 4;
+}
+.pr-node[data-state="skipped"] .pr-node-name,
+.pr-node[data-state="unused"] .pr-node-name,
+.pr-node[data-state="idle"] .pr-node-name {
+  color: var(--muted);
+}
+.pr-node[data-state="working"] {
+  --pr-plate: var(--amber-soft);
+  --pr-frame: var(--scan);
+  --pr-word: var(--amber);
+}
+.pr-node[data-state="done"] {
+  --pr-frame: var(--ink);
+  --pr-word: var(--ink);
+}
+.pr-node[data-state="done"][data-tone="ok"] {
+  --pr-plate: var(--teal-soft);
+  --pr-frame: var(--st-ok);
+  --pr-word: var(--teal);
+}
+.pr-node[data-state="done"][data-tone="hold"],
+.pr-node[data-state="done"][data-tone="not_shown"] {
+  --pr-plate: var(--amber-soft);
+  --pr-frame: var(--st-warn);
+  --pr-word: var(--amber);
+}
+.pr-node[data-state="done"][data-tone="red_flag"] {
+  --pr-plate: var(--coral-soft);
+  --pr-frame: var(--st-mismatch);
+  --pr-word: var(--coral);
+}
+/* The Decider, once the verdict is set: the matte of the stamp, so the eye ends there. */
+.pr-node-wide[data-agent="decider"][data-state="done"] {
+  --pr-plate: var(--v-band);
+  --pr-frame: var(--v-band);
+  --pr-glyph: var(--on-v-band);
+  --pr-accent: var(--scan);
+}
+/* A hand-off: a small square that runs along its line. */
+.pr-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: var(--scan);
+  box-shadow: 0 0 0 2px var(--surface);
+  offset-rotate: 0deg;
+  offset-distance: 0%;
+  opacity: 0;
+  pointer-events: none;
+}
+.pr-dot-out {
+  background: var(--ink);
+}
+@keyframes pr-run {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+@keyframes pr-ring {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.38);
+  }
+}
+@media (hover: hover) {
+  .pr-node > button:hover .pr-node-name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pr-graph[data-moving="yes"] .pr-dot {
+    animation: pr-run 760ms cubic-bezier(0.4, 0, 0.2, 1) 1 forwards;
+  }
+  .pr-graph[data-moving="yes"] .pr-node[data-state="working"] .pr-avatar-pulse {
+    animation: pr-ring 1100ms var(--ease-out) infinite;
+  }
+  .pr-graph[data-moving="yes"] .pr-wire-in,
+  .pr-graph[data-moving="yes"] .pr-wire-out {
+    animation: pr-in 320ms var(--ease-out) 1 backwards;
   }
 }

@@ -27,6 +27,7 @@ export interface RoomWords extends Words {
   meet: string;
   deciderWaits: string;
   notNeeded: string;
+  codePlan: string;
   team: string;
   onIt: string;
   watch: string;
@@ -74,6 +75,7 @@ export const WORDS: Record<Lang, RoomWords> = {
     meet: "Meet the team",
     deciderWaits: "Waiting for the team's evidence",
     notNeeded: "Not needed for this ad",
+    codePlan: "Code ran the standard plan and handed out the checks. No model planned this case.",
     team: "Your check team",
     onIt: "Your check team is on it",
     watch: "Watch them work",
@@ -120,6 +122,7 @@ export const WORDS: Record<Lang, RoomWords> = {
     meet: "Conoce al equipo",
     deciderWaits: "Esperando las pruebas del equipo",
     notNeeded: "No hizo falta para este anuncio",
+    codePlan: "El código siguió el plan estándar y repartió las comprobaciones.",
     team: "Tu equipo de revisión",
     onIt: "Tu equipo de revisión está en ello",
     watch: "Verlos trabajar",

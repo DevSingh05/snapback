@@ -7,7 +7,7 @@
 // Everything on screen is tied to a recorded step. A finished run replays from its timeline;
 // a run that is still live shows steps as the API reports them. With reduced motion there is no
 // replay clock and no movement, only the states. Nothing here works out a result.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import "../ui/ui.css";
 import "../case/case.css";
@@ -17,7 +17,6 @@ import { tookText } from "../case/answer";
 import { VERDICT_TONE } from "../case/model";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { Tag } from "../ui/Tag";
-import { AgentStrip } from "./AgentStrip";
 import {
   floorAt,
   statusLine,
@@ -27,6 +26,7 @@ import {
   type Lang,
   type Roster,
 } from "./model";
+import { TeamGraph } from "./TeamGraph";
 import { usePlayer, type Speed } from "./usePlayer";
 import { useRoster, useRun, type Run } from "./useRun";
 import { WORDS, type RoomWords } from "./words";
@@ -34,14 +34,6 @@ import { WORDS, type RoomWords } from "./words";
 /** Where "See how they got this" goes: the report's "How we got this answer". */
 export const answerHref = (caseId: string) =>
   `/case/${encodeURIComponent(caseId)}#case-answer-title`;
-
-interface Packet {
-  id: number;
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
 
 function DeskCard({
   desk,
@@ -107,6 +99,8 @@ function DeskCard({
                     </li>
                   ))}
                 </ul>
+              ) : desk.byCode ? (
+                <p className="pr-quiet">{w.codePlan}</p>
               ) : desk.why ? (
                 <p className="pr-quiet">
                   {w.notChecked}: {desk.why}
@@ -242,45 +236,6 @@ export function TeamPanel({
     if (el && moving) el.scrollTop = el.scrollHeight;
   }, [floor.log.length, moving]);
 
-  // Hand-offs: when the Planner is part of the run and work reaches a member, a mark travels
-  // to it from the Planner's light. Each is set off by a real step, once.
-  const strip = useRef<HTMLDivElement>(null);
-  const seen = useRef<Record<string, string>>({});
-  const nextId = useRef(0);
-  const [packets, setPackets] = useState<Packet[]>([]);
-  const states = floor.desks.map((d) => `${d.card.id}:${d.state}`).join(",");
-  useLayoutEffect(() => {
-    const box = strip.current;
-    const before = seen.current;
-    const now: Record<string, string> = {};
-    const fresh: Packet[] = [];
-    const centre = (id: string) => {
-      const el = box?.querySelector<HTMLElement>(`[data-agent="${id}"] .pr-strip-light`);
-      if (!el || !box) return null;
-      const a = el.getBoundingClientRect();
-      const b = box.getBoundingClientRect();
-      return { x: a.left - b.left + a.width / 2, y: a.top - b.top + a.height / 2 };
-    };
-    const planner = floor.desks.find((d) => d.card.team === "planner")?.card.id;
-    const decider = floor.desks.find((d) => d.card.team === "decider")?.card.id;
-    for (const desk of floor.desks) {
-      const id = desk.card.id;
-      now[id] = desk.state;
-      if (!moving || before[id] === desk.state || id === planner || id === decider) continue;
-      if (desk.state !== "working" || !planner) continue;
-      const from = centre(planner);
-      const to = centre(id);
-      if (from && to)
-        fresh.push({ id: nextId.current++, x0: from.x, y0: from.y, x1: to.x, y1: to.y });
-    }
-    seen.current = now;
-    if (fresh.length > 0) setPackets((old) => [...old.slice(-8), ...fresh]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [states, moving]);
-  useEffect(() => {
-    if (!moving) setPackets([]);
-  }, [moving]);
-
   const source = floor.source ?? run.card?.source ?? dataMode();
   const status =
     run.status === "missing"
@@ -342,6 +297,51 @@ export function TeamPanel({
           </div>
           <p className="pr-rule">{w.deciderRule}</p>
         </div>
+      </header>
+
+      <div className="pr-tabs" role="tablist" aria-label={w.team}>
+        <button
+          type="button"
+          role="tab"
+          id="pr-tab-live"
+          aria-selected={tab === "live"}
+          aria-controls="pr-pane-live"
+          onClick={() => setTab("live")}
+        >
+          {w.liveTab}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="pr-tab-team"
+          aria-selected={tab === "team"}
+          aria-controls="pr-pane-team"
+          onClick={() => setTab("team")}
+          data-testid="team-tab-meet"
+        >
+          {w.meet}
+        </button>
+      </div>
+
+      <div
+        id="pr-pane-live"
+        role="tabpanel"
+        aria-labelledby="pr-tab-live"
+        className="pr-pane"
+        hidden={tab !== "live"}
+      >
+        <TeamGraph
+          desks={team.shown}
+          lang={lang}
+          label={w.team}
+          moving={moving}
+          onPick={openDesk}
+        />
+        {team.notNeeded.length > 0 ? (
+          <p className="pr-quiet" data-testid="team-not-needed">
+            {w.notNeeded}: {team.notNeeded.map((a) => a.name).join(", ")}
+          </p>
+        ) : null}
         {run.timeline ? (
           <div className="pr-controls">
             <button
@@ -378,64 +378,6 @@ export function TeamPanel({
           </div>
         ) : null}
         {run.timeline ? <p className="pr-note">{w.held}</p> : null}
-      </header>
-
-      <div className="pr-tabs" role="tablist" aria-label={w.team}>
-        <button
-          type="button"
-          role="tab"
-          id="pr-tab-live"
-          aria-selected={tab === "live"}
-          aria-controls="pr-pane-live"
-          onClick={() => setTab("live")}
-        >
-          {w.liveTab}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="pr-tab-team"
-          aria-selected={tab === "team"}
-          aria-controls="pr-pane-team"
-          onClick={() => setTab("team")}
-          data-testid="team-tab-meet"
-        >
-          {w.meet}
-        </button>
-      </div>
-
-      <div
-        id="pr-pane-live"
-        role="tabpanel"
-        aria-labelledby="pr-tab-live"
-        className="pr-pane"
-        hidden={tab !== "live"}
-      >
-        <div className="pr-strip-wrap" ref={strip}>
-          <AgentStrip desks={team.shown} lang={lang} label={w.team} onPick={openDesk} />
-          {packets.map((p) => (
-            <span
-              key={p.id}
-              className="pr-packet"
-              aria-hidden="true"
-              style={
-                {
-                  "--x0": `${p.x0}px`,
-                  "--y0": `${p.y0}px`,
-                  "--x1": `${p.x1}px`,
-                  "--y1": `${p.y1}px`,
-                } as CSSProperties
-              }
-              onAnimationEnd={() => setPackets((old) => old.filter((q) => q.id !== p.id))}
-            />
-          ))}
-        </div>
-
-        {team.notNeeded.length > 0 ? (
-          <p className="pr-quiet" data-testid="team-not-needed">
-            {w.notNeeded}: {team.notNeeded.map((a) => a.name).join(", ")}
-          </p>
-        ) : null}
 
         <h3 className="pr-sub ui-mono">{w.thread}</h3>
         <ol

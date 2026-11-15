@@ -2,7 +2,7 @@
 // state and finding come from the card and the timeline (never invented), a member nothing
 // reached says so, the verdict shows only after the last step and is the card's own, and the
 // links go where they say.
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { matchRoute, proofRoomTarget } from "../App";
@@ -11,6 +11,8 @@ import { CaseResult } from "../case/CaseResult";
 import { headlineOf } from "../cardStrings";
 import type { Card, CaseTimeline, TimelineStep } from "../contracts";
 import { AgentStrip } from "./AgentStrip";
+import { hasGlyph } from "./Avatar";
+import { EDGE, NODE_H, graphLayout } from "./graph";
 import { HomeTeam } from "./HomeTeam";
 import {
   MIN_BEAT,
@@ -27,6 +29,7 @@ import {
 } from "./model";
 import { ReportTeam, teamHref } from "./ReportTeam";
 import { sampleCard, sampleTimeline } from "./sample";
+import { TeamGraph, shortName } from "./TeamGraph";
 import { TeamPanel, answerHref } from "./TeamPanel";
 import { runFollower, type Run } from "./useRun";
 import { WORDS } from "./words";
@@ -193,7 +196,7 @@ describe("findings come from the card, through the report's mapping", () => {
 
   it("a desk nothing reached is unused, and one the plan left out says why", () => {
     const end = floor();
-    for (const id of ["web", "finder", "tour_prep", "planner"]) {
+    for (const id of ["web", "finder", "tour_prep"]) {
       expect(desk(end, id).state, id).toBe("unused");
       expect(desk(end, id).findings, id).toEqual([]);
     }
@@ -261,7 +264,7 @@ describe("findings come from the card, through the report's mapping", () => {
     const end = floor(END, skipped);
     const view = teamView(end, end);
     expect(view.shown.find((d) => d.card.id === "owner_licence")?.state).toBe("skipped");
-    expect(view.notNeeded.map((a) => a.id)).toEqual(["planner", "web", "finder", "tour_prep"]);
+    expect(view.notNeeded.map((a) => a.id)).toEqual(["web", "finder", "tour_prep"]);
     // Mid-replay the same members show, so no light appears or leaves as the run plays.
     const mid = teamView(floor(beatOf("locate").start + 10, skipped), end);
     expect(mid.shown.map((d) => d.card.id)).toEqual(view.shown.map((d) => d.card.id));
@@ -316,6 +319,19 @@ describe("findings come from the card, through the report's mapping", () => {
     expect(deep.web).toBe("Claude Haiku"); // no step: the roster's chip, greyed as not used
   });
 
+  it("under the code plan the Planner still heads the team, as code, and claims no model", () => {
+    const end = floor();
+    const planner = desk(end, "planner");
+    expect(planner.state).toBe("done");
+    expect(planner.byCode).toBe(true);
+    expect(planner.model).toBe("code");
+    expect(planner.findings).toEqual([]);
+    // It never takes the status line: no model is "writing the plan" on this case.
+    const first = schedule(sampleTimeline)[0]!;
+    expect(statusLine(floor(first.start + 1), w)).not.toContain("writing the plan");
+    expect(desk(floor(first.start - 1), "planner").state).toBe("idle");
+  });
+
   it("when the deep agent ran, the Planner and the sub-agents it handed work to light up", () => {
     const end = floor(END, deepTimeline());
     expect(desk(end, "planner").state).toBe("done");
@@ -349,8 +365,9 @@ describe("the panel beside the twin", () => {
       `/case/${card.case_id}#case-answer-title`,
     );
     // Only the members this ad needed get a light, in the order they acted, the Decider last.
-    const lights = screen.getAllByTestId("agent-strip-item");
+    const lights = screen.getAllByTestId("team-node");
     expect(lights.map((l) => l.getAttribute("data-agent"))).toEqual([
+      "planner",
       "rules",
       "record",
       "phone_office",
@@ -359,7 +376,7 @@ describe("the panel beside the twin", () => {
       "decider",
     ]);
     expect(screen.getByTestId("team-not-needed")).toHaveTextContent(
-      "Not needed for this ad: Planner, Web agent, Finder, Tour prep",
+      "Not needed for this ad: Web agent, Finder, Tour prep",
     );
     const rules = lights.find((l) => l.getAttribute("data-agent") === "rules")!;
     expect(rules).toHaveAttribute("data-tone", "red_flag");
@@ -395,7 +412,7 @@ describe("the panel beside the twin", () => {
     vi.useFakeTimers();
     render(<TeamPanel caseId={card.case_id} run={ready} roster={roster} reduced={false} />);
     const light = (id: string) =>
-      screen.getAllByTestId("agent-strip-item").find((l) => l.getAttribute("data-agent") === id)!;
+      screen.getAllByTestId("team-node").find((l) => l.getAttribute("data-agent") === id)!;
     expect(screen.queryByTestId("team-verdict")).toBeNull();
     expect(screen.queryByTestId("team-reason")).toBeNull();
     expect(screen.queryByTestId("team-how")).toBeNull();
@@ -489,6 +506,85 @@ describe("a run that was watched live", () => {
     runFollower(card, null, refetch, (r) => runs.push(r))(finished);
     expect(refetch).not.toHaveBeenCalled();
     expect(runs.at(-1)!.settling).toBe(false);
+  });
+});
+
+describe("the graph", () => {
+  const ids = ["rules", "record", "phone_office", "photo", "owner_licence"];
+  const layout = graphLayout(360, "planner", ids, "decider");
+
+  it("puts the Planner on top, the members in rows of three, the Decider at the bottom", () => {
+    expect(layout.planner.y).toBe(0);
+    expect(layout.members.map((m) => m.row)).toEqual([0, 0, 0, 1, 1]);
+    expect(layout.decider.y).toBeGreaterThan(Math.max(...layout.members.map((m) => m.y)) + NODE_H);
+    expect(layout.height).toBe(layout.decider.y + 48);
+    // Everyone is inside the box, with room for the trunks at the edges.
+    for (const m of layout.members) {
+      expect(m.x - layout.colWidth / 2).toBeGreaterThanOrEqual(EDGE);
+      expect(m.x + layout.colWidth / 2).toBeLessThanOrEqual(360 - EDGE);
+    }
+    // A short second row is centred.
+    expect((layout.members[3]!.x + layout.members[4]!.x) / 2).toBeCloseTo(180, 0);
+  });
+
+  it("runs a line from the Planner to every member and from every member to the Decider", () => {
+    for (const m of layout.members) {
+      expect(layout.inPath[m.id]).toMatch(new RegExp(`^M180 48 .* V${m.y}$`));
+      expect(layout.outPath[m.id]).toMatch(
+        new RegExp(`^M${m.x} ${m.y + NODE_H} .* V${layout.decider.y}$`),
+      );
+    }
+    // Lower rows are fed down the left edge and upper rows report down the right edge, so no
+    // line crosses a member.
+    expect(layout.inPath.photo).toContain(`H${EDGE} `);
+    expect(layout.outPath.rules).toContain(`H${360 - EDGE} `);
+    expect(layout.inPath.rules).not.toContain(`H${EDGE} `);
+  });
+
+  it("fits a phone: three members across at 326 px, lines inside the box", () => {
+    const narrow = graphLayout(326, "planner", ids, "decider");
+    expect(narrow.colWidth).toBeGreaterThanOrEqual(96);
+    expect(narrow.members.every((m) => m.x > 0 && m.x < 326)).toBe(true);
+  });
+
+  it("names each member with its role and its state in words, and lights its lines", () => {
+    const end = floor();
+    const view = teamView(end, end);
+    render(<TeamGraph desks={view.shown} label="Your check team" moving={false} />);
+    const list = screen.getByRole("list", { name: "Your check team" });
+    const node = (id: string) =>
+      within(list)
+        .getAllByTestId("team-node")
+        .find((n) => n.getAttribute("data-agent") === id)!;
+    expect(node("photo")).toHaveTextContent("Photo");
+    expect(node("photo")).toHaveTextContent("3D scan");
+    expect(within(node("photo")).getByTestId("node-state")).toHaveTextContent("Checks out");
+    expect(node("rules")).toHaveAttribute("data-tone", "red_flag");
+    expect(within(node("rules")).getByTestId("node-state")).toHaveTextContent("Red flag");
+    expect(node("planner")).toHaveTextContent("Plans the checks");
+    expect(node("decider")).toHaveTextContent("Sets the verdict");
+    // Every member that reported has a lit line in and a lit line out; nothing travels.
+    expect(screen.getAllByTestId("wire-out")).toHaveLength(5);
+    expect(screen.queryAllByTestId("team-dot")).toHaveLength(0);
+  });
+
+  it("sends a dot only when a member's state changes while the run is playing", () => {
+    const at = (t: number) => teamView(floor(t), floor()).shown;
+    const start = beatOf("locate").start;
+    const { rerender } = render(<TeamGraph desks={at(start - 1)} label="t" moving />);
+    expect(screen.queryAllByTestId("team-dot")).toHaveLength(0); // nothing on arrival
+    rerender(<TeamGraph desks={at(start + 10)} label="t" moving />);
+    expect(screen.getAllByTestId("team-dot").length).toBeGreaterThanOrEqual(1);
+    // With motion off the same change sends nothing.
+    cleanup();
+    const still = render(<TeamGraph desks={at(start - 1)} label="t" moving={false} />);
+    still.rerender(<TeamGraph desks={at(start + 10)} label="t" moving={false} />);
+    expect(screen.queryAllByTestId("team-dot")).toHaveLength(0);
+  });
+
+  it("every card in the roster has its own mark", () => {
+    for (const a of roster.agents) expect(hasGlyph(a.id), a.id).toBe(true);
+    expect(shortName("Phone and office agent")).toBe("Phone and office");
   });
 });
 
