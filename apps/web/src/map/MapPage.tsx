@@ -197,7 +197,7 @@ export default function MapPage({ MapView = CityMap }: { MapView?: typeof CityMa
         <div className="col-left">
           <div className="hud">
             <div className="hud-top">
-              <a className="hud-brand" href="/">
+              <a className="hud-brand" href="/home">
                 <Wordmark />
               </a>
               <span className="hud-city mono">

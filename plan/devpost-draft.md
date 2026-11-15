@@ -11,9 +11,10 @@
 > - No named person is called a scammer.
 > - Nothing is said about whether any listing site detects scams.
 >
-> **Open PRs are not claimed:** #272 (mirrored photos), #283 (evidence image) and #302 (public
-> data). Each moves into the text only once it merges. #296 (the strict 60% bar) is merged as
-> `63f3122`.
+> **Open PRs are not claimed:** #272 (mirrored photos), #297 (the loose-match warning) and #322
+> (Vexcel matcher v2). Each moves into the text only once it merges. Merged and claimed: #296 (the
+> strict 60% bar, `63f3122`), #302 (public data) and #310 (the evidence image, which supersedes
+> #283).
 >
 > **Vexcel** is listed only as data we were given. No verdict line uses it until the labelled set
 > merges.
@@ -223,11 +224,13 @@ imagery (provided), GitHub Actions.
 >   SYNTHETIC.
 > - **The A8 photo line is current.** Dev re-measured it on main `f3d17f0`, after #296's strict
 >   bar (M1, #8), and got the same counts: 43 of 48, 0 of 48 wrong, 0 of 30 decoys.
+> - **Added in this pass (all merged):** #316 (the Planner's per-ad plan, follow-ups and next
+>   step), #307 (crew polish), #293 (90-day view), #312 (reworded ads), #313 (case file), #310
+>   (evidence image) and #314 (`/under-the-hood`).
 > - **Not on `main` yet, so not claimed:**
->   - the deep agent's per-ad plan, re-planning and next-step draft;
->   - the Arlequin ring case file, case study and reworded-ads test;
->   - `/under-the-hood`;
->   - the loose-match warning (#297) and the evidence image (#283).
+>   - the loose-match warning (#297);
+>   - the Vexcel matcher v2 numbers (#322; the flag stays off, so the aerial is evidence only);
+>   - the Worlds landing (#325) and the chat box as the inside home (#326).
 >     Each goes in once it merges.
 
 ### CoStar · Inside and Out
@@ -252,7 +255,9 @@ sends the renter back to the real listing.
 - the photos placed in the 3D scan at `/case/<id>/twin`. Each ad photo fades by itself so the scan
   shows through behind it, with big "Show ad photo", "Show 3D scan" and "Side by side" buttons
   (#305);
-- the draft note to the real leasing office, in the report and in iMessage (#250, #276).
+- the draft note to the real leasing office, in the report and in iMessage (#250, #276);
+- in iMessage, after the verdict, the ad's photo beside the 3D-scan view it matched, cropped to
+  where the photo lands (#281, #310).
 
 ### LangChain · deepagents
 
@@ -263,6 +268,13 @@ sends the renter back to the real listing.
   read-only tool and writes its findings as notes in the agent file system.
 - It never sets the verdict. It has none of the choice tools, so it can't move a case, and
   `decide()` in code sets every verdict.
+- **It decides what happens next, within hard limits (#316):**
+  - **A plan per ad:** only the check families the ad gives something to read, with a reason for
+    each one it leaves out.
+  - **A re-plan from the card's gaps:** it may pick at most 2 follow-up checks from a fixed menu
+    of existing lookups, each under an 8 s limit. A check that fails comes back "not checked".
+  - **A next step:** it picks one drafted step, such as asking the poster for a photo of a spot,
+    or calling the leasing office on record. Code writes the draft, and it is never sent.
 
 **Measured (FIXTURE backend, real model runs, #273):**
 
@@ -273,7 +285,8 @@ sends the renter back to the real listing.
 **Where to see it:**
 
 - the check team working beside the 3D scan at `/case/<id>/twin`, also at
-  `/proof-room?case=<id>`;
+  `/proof-room?case=<id>`. Each member is a character with readable speech, and the whole scene
+  fits one screen (#300, #307). The Planner's follow-up picks land on its desk (#316);
 - the step-by-step trace at `/case/<id>/trace`;
 - "How did you check?" in iMessage, which answers with one line per agent (#275).
 
@@ -289,12 +302,21 @@ claim for real listings):**
 - **300-ad corpus** (n = 301, 4 seeded rings): 4 of 4 rings recovered, 57 of 57 ring ads found
   and 0 of 244 honest ads flagged. A keyword baseline recovered 0 of 4. On 10 held-out seeds, ring
   precision was 0.88 and recall 0.93.
-- **90-day stream** (n = 1 seed, 3,039 ads, 10 rings, #268): ad recall 0.927 and 0 of 2,684
-  honest ads flagged, against a keyword baseline's recall of 0.014. Honest limit: it merges
-  separate rings into larger groups, so 0 of 10 rings were recovered at the 0.7 overlap bar.
-  Splitting them is next.
+- **90-day stream** (n = 1 seed, 3,039 ads, 10 seeded rings, #268, #293):
+  - 10 of 10 rings flagged, with a median time to detect of 3 days from a ring's first ad;
+  - 329 of 355 ring ads flagged, and 0 of 2,684 honest ads;
+  - a keyword baseline's ad recall was 0.014.
+  - **Honest limit:** rings that share wording blend into one group, so 0 of 10 rings were told
+    apart at the 70% rule. The ads are caught, but tying them to one operator isn't solved.
+- **Reworded ads** (the same stream, every ring ad rephrased, #312): 9 of 10 rings still found,
+  0 of 2,684 honest ads flagged, and a keyword baseline found 0 of 10. The test regenerates these
+  numbers from the seed.
 
-**Where to see it:** `/investigate`.
+**Where to see it:**
+
+- the 90-day view and the ring-by-ring view at `/investigate`;
+- a ring's case file, downloadable as JSON or printed as a plain summary, both labelled
+  SYNTHETIC (#313).
 
 ### Photon · Build a Messaging Agent (+ Best Voice Agent)
 
@@ -361,4 +383,6 @@ These answer the packet's five focus areas.
   - tour prep on the home page and `/map`;
   - the reported cases replayed at `/replay`;
   - renters' stories at `/stories`;
-  - ratings at `/reviews`.
+  - ratings at `/reviews`;
+  - a judge's map of every sponsor's part, measured, with a "Show me" link to each screen, at
+    `/under-the-hood` (#314).

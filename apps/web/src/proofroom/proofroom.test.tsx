@@ -703,9 +703,9 @@ describe("the strip and its links", () => {
     expect(matchRoute("/proof-room")).toEqual({ name: "proof-room" });
     expect(proofRoomTarget("?case=7Q2M")).toBe("/case/7Q2M/twin");
     expect(proofRoomTarget("?case=fx-7Q2M")).toBe("/case/fx-7Q2M/twin");
-    expect(proofRoomTarget("")).toBe("/");
-    expect(proofRoomTarget("?case=../x")).toBe("/");
-    expect(proofRoomTarget("?case=a%2Fb")).toBe("/");
+    expect(proofRoomTarget("")).toBe("/home");
+    expect(proofRoomTarget("?case=../x")).toBe("/home");
+    expect(proofRoomTarget("?case=a%2Fb")).toBe("/home");
     expect(teamHref("7Q2M")).toBe("/case/7Q2M/twin");
     expect(answerHref("7Q2M")).toBe("/case/7Q2M#case-answer-title");
   });
