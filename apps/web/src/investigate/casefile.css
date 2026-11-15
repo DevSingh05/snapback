@@ -1,0 +1,350 @@
+/* The ring case file, the printable attachment and the case study. Tokens only, no red, no amber:
+   a link is a pattern, not an accusation. */
+
+.cf-panel,
+.cs {
+  background: var(--surface);
+  padding: 22px 26px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 14px;
+  color: var(--ink);
+}
+
+.cf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cf-head h2 {
+  margin: 0 0 6px;
+}
+
+.cf-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cf-actions button,
+.cf-actions a,
+.cf-print-bar button,
+.inv-casebtn,
+.inv-modes button {
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--act);
+  color: var(--on-act);
+  border: 0;
+  text-decoration: none;
+}
+
+.inv-casebtn {
+  justify-self: start;
+}
+
+.inv-modes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inv-modes button {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.inv-modes button[aria-pressed="true"] {
+  background: var(--act);
+  color: var(--on-act);
+}
+
+.cf-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.cf-facts > div {
+  background: var(--blue-soft);
+  padding: 12px 16px;
+  display: grid;
+  gap: 2px;
+}
+
+.cf-k {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cf-facts strong {
+  font-size: 1.15rem;
+}
+
+.cf-facts small,
+.cf-method,
+.cf-meta {
+  color: var(--muted);
+}
+
+.cf-method {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.cf-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  border-left: 4px solid var(--blue);
+  padding-left: 18px;
+}
+
+.cf-timeline > li {
+  display: grid;
+  gap: 4px;
+}
+
+.cf-adbtn {
+  justify-self: start;
+  font: inherit;
+  font-weight: 800;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.cf-ties {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 0.92rem;
+}
+
+.cf-ties li {
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+}
+
+.cf-ties li[data-kind="phone"] {
+  border-left-color: var(--zing);
+}
+.cf-ties li[data-kind="photo"] {
+  border-left-color: var(--blue);
+}
+.cf-ties li[data-kind="wording"] {
+  border-left-color: var(--ink);
+}
+
+.cf-none {
+  color: var(--muted);
+}
+
+.cf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.cf-table th,
+.cf-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.cf-unknown {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+/* case study */
+.cs-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.cs-step {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.cs-day {
+  display: grid;
+  gap: 0;
+  align-content: start;
+}
+
+.cs-day span {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cs-day strong {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.cs-day time {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.cs-what p {
+  margin: 0 0 6px;
+}
+
+.cs-detector {
+  font-weight: 700;
+}
+
+.cs-step[data-flagged="true"] .cs-detector {
+  background: var(--act);
+  color: var(--on-act);
+  padding: 6px 10px;
+}
+
+.cs-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cs-chip {
+  background: var(--blue-soft);
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.cs-after {
+  margin: 0;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .cs-step {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* the printable attachment: plain, black on white, laid out like a form */
+.cf-print-page {
+  width: min(960px, 100%);
+  margin-inline: auto;
+  padding-block: 24px 72px;
+  display: grid;
+  gap: 16px;
+}
+
+.cf-print-bar {
+  display: flex;
+  gap: 10px;
+}
+
+.cf-print {
+  background: #fff;
+  color: #111;
+  padding: 36px 40px;
+  box-shadow: var(--shadow);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.cf-print h1 {
+  font-size: 1.5rem;
+  margin: 0 0 6px;
+}
+
+.cf-print h2 {
+  font-size: 1.05rem;
+  margin: 22px 0 8px;
+  border-bottom: 2px solid #111;
+  padding-bottom: 3px;
+}
+
+.cf-print-synth {
+  font-family: system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border: 2px solid #111;
+  padding: 6px 10px;
+}
+
+.cf-print .cf-table th,
+.cf-print .cf-table td {
+  border: 1px solid #888;
+  font-size: 0.8rem;
+}
+
+.cf-print .cf-table th {
+  background: #eee;
+}
+
+.cf-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 18px;
+  margin: 0;
+}
+
+.cf-dl dt {
+  font-weight: 700;
+}
+
+.cf-dl dd {
+  margin: 0;
+}
+
+.cf-print-foot {
+  font-size: 0.8rem;
+  margin-top: 18px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .cf-print,
+  .cf-print * {
+    visibility: visible;
+  }
+  .cf-print {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    box-shadow: none;
+    padding: 0;
+  }
+  .cf-table tr {
+    break-inside: avoid;
+  }
+}
