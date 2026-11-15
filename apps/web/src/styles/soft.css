@@ -95,3 +95,40 @@
     transform: translateY(0) scale(0.98);
   }
 }
+
+/* the page frame itself (the Finder and the listings sit in one) */
+:root .view {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* A place row inside the Finder's narrow side column stacks, as it already does on a phone:
+   the drawing across the top, the words under it at full width. */
+:root .fd-side .pf-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+:root .fd-side .pf-art {
+  grid-row: 1;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 104px;
+  padding: var(--w-2) var(--w-4);
+  background: linear-gradient(90deg, var(--w-sky-a), var(--w-sky-b));
+}
+:root .fd-side .pf-art .kit-art,
+:root .fd-side .pf-art .kit-art-house {
+  width: auto;
+  height: 118px;
+  margin: 0 0 -22px;
+}
+:root .fd-side .pf-body {
+  padding: var(--w-4) var(--w-4) var(--w-2);
+}
+:root .fd-side .pf-price {
+  font-size: var(--w-h3);
+}
+:root .fd-side .pf-actions {
+  grid-column: 1 / -1;
+  padding: var(--w-2) var(--w-4) var(--w-4);
+}
