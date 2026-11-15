@@ -405,6 +405,37 @@ test("P1: in Spanish, the photo line is in Spanish", async () => {
   );
 });
 
+test("P2: pictures with no typed words are read as the ad first, then placed", async () => {
+  const blob = () => new Blob([new Uint8Array([1])], { type: "image/png" });
+  const said: string[] = [];
+  const onChecking = async (text?: string) => void said.push(text ?? "");
+  await handleMessage({ ...ad(""), images: [blob()] }, client(), config([]), onChecking);
+  assert.equal(
+    said[0],
+    "Got 1 picture. Reading the ad and placing any photos in the building's 3D scan, about 20 seconds.",
+  );
+  await handleMessage({ ...ad("  "), images: [blob(), blob()] }, client(), config([]), onChecking);
+  assert.match(said[1] ?? "", /^Got 2 pictures\. Reading the ad/);
+});
+
+test("P2: in Spanish (a learned language), the screenshot line is in Spanish", async () => {
+  const { ProfileStore } = await import("./profile");
+  const blob = () => new Blob([new Uint8Array([1])], { type: "image/png" });
+  const cfg = { ...config([]), profiles: new ProfileStore() };
+  await handleMessage(ad("en español"), client(), cfg);
+  const said: string[] = [];
+  await handleMessage(
+    { ...ad(""), images: [blob()] },
+    client(),
+    cfg,
+    async (text?: string) => void said.push(text ?? ""),
+  );
+  assert.equal(
+    said[0],
+    "Recibí 1 imagen. Leo el anuncio y ubico las fotos en el escaneo 3D del edificio, unos 20 segundos.",
+  );
+});
+
 test("P1: the count never goes past the photos that will be checked", async () => {
   const blob = () => new Blob([new Uint8Array([1])], { type: "image/jpeg" });
   const said: string[] = [];

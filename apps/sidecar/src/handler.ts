@@ -201,6 +201,13 @@ function checkingText(msg: InboundMessage, config: SidecarConfig, lang: Lang): s
   const max = config.maxPhotos ?? MAX_PHOTOS;
   const n = Math.min((msg.images?.length ?? 0) + msg.imageUrls.length, max);
   if (n === 0) return WORDS[lang].checking;
+  if ((msg.text ?? "").trim() === "") {
+    // P2: no typed words, so a picture is likely the ad's screenshot (the API reads it locally)
+    if (lang === "es") {
+      return `Recibí ${n} ${n === 1 ? "imagen" : "imágenes"}. Leo el anuncio y ubico las fotos en el escaneo 3D del edificio, unos 20 segundos.`;
+    }
+    return `Got ${n} ${n === 1 ? "picture" : "pictures"}. Reading the ad and placing any photos in the building's 3D scan, about 20 seconds.`;
+  }
   if (lang === "es") {
     return n === 1
       ? "Recibí 1 foto. La ubico en el escaneo 3D del edificio, unos 20 segundos."
