@@ -75,12 +75,14 @@ from snapback.contracts import (
     AlternativesResponse,
     Card,
     CasePreferences,
+    CopyAlert,
     CreateCaseResponse,
     DataSource,
     Evidence,
     EvidenceFile,
     LocateStatus,
     PreferencesUpdate,
+    RealListing,
     RenterBrief,
     ReplyResponse,
     ReportResponse,
@@ -89,6 +91,7 @@ from snapback.contracts import (
     TourDraftRequest,
     Verdict,
 )
+from snapback.copy_alert import copy_alert
 from snapback.events import EventBus
 from snapback.events.bus import seq_of
 from snapback.office.context import listing_context
@@ -116,6 +119,7 @@ from snapback.places_map import (
     source_of,
 )
 from snapback.preferences import merge as merge_preferences
+from snapback.real_listing import real_listing
 from snapback.replays import SLUG as REPLAY_SLUG
 from snapback.replays import Replay, load_replays
 from snapback.safety.paths import resolve_data_dir
@@ -660,6 +664,93 @@ def create_app(
             update={"claimed": trimmed(proof.claimed), "matched": trimmed(proof.matched)}
         )
 
+    def proof_inputs(case: RecordedCase | SessionCase):
+        """The claimed and the matched building's records and the ad's beds and unit, for the
+        real-listing panel and the copy alert. 503 when the kit is missing."""
+        try:
+            # A session case's property id comes from the form only; when the photos identified the
+            # building (the ad named none), locate holds it, as RecordedCase reads it.
+            locate = case.evidence.locate
+            claimed_id = case.property_id or (locate.claimed_property_id if locate else None)
+            claimed = lookups.record(claimed_id) if claimed_id else None
+            matched_id = matched_id_of(case)
+            matched = lookups.record(matched_id) if matched_id else None
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        listing = getattr(case, "listing", None)
+        beds = getattr(listing, "beds", None)
+        if beds is None and case.evidence.price is not None:
+            beds = case.evidence.price.compared_beds
+        return claimed, matched, beds, getattr(listing, "unit", None)
+
+    @app.get("/cases/{case_id}/real-listing")
+    def get_real_listing(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> RealListing:
+        """The ad's building as CoStar's record has it, beside what the ad says. The building
+        the photos were placed in wins when it is not the claimed one. Record figures show for a
+        LIVE case only when SNAPBACK_SHOW_RECORD_FIGURES is on. Needs the case's read token in a
+        header; a token in the address is refused. Never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers["Cache-Control"] = "no-store"
+        modules = case.evidence
+        claimed, matched, beds, unit = proof_inputs(case)
+        panel = real_listing(
+            modules,
+            claimed,
+            matched,
+            settings,
+            ad_beds=beds,
+            ad_unit=unit,
+            lang=lang,
+        )
+        if panel is None:
+            raise HTTPException(status_code=404, detail=strings.text("real.no_record", lang))
+        return panel.model_copy(update={"case_id": case_id})
+
+    @app.get("/cases/{case_id}/copy-alert")
+    def get_copy_alert(
+        case_id: str,
+        request: Request,
+        response: Response,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> CopyAlert:
+        """A DRAFT note for the leasing office on record when the ad's photos sit in its
+        building's scan and the ad's number is not the office's. Nothing is ever sent. Same
+        token rule as the real-listing route: header only, never in the address. Never cached."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        response.headers["Cache-Control"] = "no-store"
+        claimed, matched, beds, unit = proof_inputs(case)
+        pack = build_report(
+            case.evidence,
+            case.card(settings.snapback_public_base_url, lang),
+            case_id=case_id,
+            lang=lang,
+            aerial=case.property_id is not None,
+        )
+        return copy_alert(
+            case.evidence,
+            claimed,
+            matched,
+            settings,
+            case_id=case_id,
+            ad_beds=beds,
+            ad_unit=unit,
+            report_ready=pack.reportable,
+            lang=lang,
+        )
+
     @app.get("/cases/{case_id}/aerial/{side}.jpg")
     def get_aerial_image(
         case_id: str,
@@ -1153,7 +1244,13 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         try:
             return agentic_alternatives(
-                case, lookups, chooser, n, case.preferences, settings.snapback_data_source
+                case,
+                lookups,
+                chooser,
+                n,
+                case.preferences,
+                settings.snapback_data_source,
+                settings.snapback_show_record_figures,
             )
         except KitMissing as missing:
             raise HTTPException(status_code=503, detail=str(missing)) from None
