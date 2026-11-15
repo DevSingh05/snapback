@@ -39,14 +39,18 @@ export const personaOf = (id: string): Persona => PERSONAS[id] ?? "helper";
 
 // The stage, in SVG user units. The plot is a square lawn seen in the drawing kit's isometric
 // view; scene point (0, 0) is its far corner.
-export const VIEW = { w: 420, h: 392 };
-export const ORIGIN = { ox: 210, oy: 100 };
+export const VIEW = { w: 420, h: 456 };
+export const ORIGIN = { ox: 210, oy: 138 };
 export const PLOT = 220;
 const INSET = 20;
 // The home in the ad, in the middle of the plot.
 export const HOME = { x: 78, y: 84, w: 64, d: 50, h: 26 };
 
-export type Place = "lead" | "ring" | "desk" | "bench";
+// lead: the Planner. ring: round the home. desk: the Decider. wing: waiting at the edge for a
+// turn, when more members are in the run than the ring holds. bench: not needed for this ad.
+export type Place = "lead" | "ring" | "desk" | "wing" | "bench";
+// The ring holds three members a side: more would stand on each other's name tags.
+export const RING_MAX = 6;
 
 export interface CrewActor {
   id: string;
@@ -89,9 +93,11 @@ function along(side: "left" | "right", t: number): [number, number] {
  *  changes place as the run plays), and the ones it did not need sit on the bench at the edge. */
 export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
   const benched = new Set(team.notNeeded.map((a) => a.id));
-  const members = floor.desks.filter(
+  const everyone = floor.desks.filter(
     (d) => d.card.team !== "planner" && d.card.team !== "decider" && !benched.has(d.card.id),
   );
+  const members = everyone.slice(0, RING_MAX);
+  const wing = everyone.slice(RING_MAX);
   const leftN = Math.ceil(members.length / 2);
   const cast: CrewActor[] = [];
   const base = (d: Desk) => ({
@@ -114,6 +120,17 @@ export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
         scale: 1,
         ...onStage(PLOT - 14, PLOT - 14),
       });
+    } else if (wing.includes(d)) {
+      const k = wing.indexOf(d);
+      cast.push({
+        ...base(d),
+        place: "wing",
+        side: "right",
+        sx: VIEW.w - 20 - k * 27,
+        sy: VIEW.h - 58,
+        scale: 0.72,
+        depth: 9_000 + k,
+      });
     } else {
       const i = members.indexOf(d);
       const left = i < leftN;
@@ -129,10 +146,9 @@ export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
       });
     }
   }
-  // The bench: the two near corners of the stage, outside the plot. Three a side.
+  // The bench: one row in the near left corner of the stage, outside the plot.
+  const gap = Math.min(27, 96 / Math.max(1, team.notNeeded.length - 1));
   team.notNeeded.forEach((card, i) => {
-    const left = i < 3;
-    const k = left ? i : i - 3;
     cast.push({
       id: card.id,
       persona: personaOf(card.id),
@@ -141,9 +157,9 @@ export function crewCast(floor: Floor, team: TeamView): CrewActor[] {
       state: "unused",
       tone: "none",
       place: "bench",
-      side: left ? "left" : "right",
-      sx: left ? 26 + k * 30 : VIEW.w - 26 - k * 30,
-      sy: VIEW.h - 46,
+      side: "left",
+      sx: r1(18 + i * gap),
+      sy: VIEW.h - 58,
       scale: 0.72,
       depth: 10_000 + i,
     });
@@ -188,7 +204,7 @@ export function reported(floor: Floor): { id: string; flag: boolean }[] {
 
 // ---------- speech ----------
 
-export const SAY_MAX = 78;
+export const SAY_MAX = 70;
 
 /** A line short enough for a speech bubble, cut at a word. */
 export function shortSay(text: string, max = SAY_MAX): string {

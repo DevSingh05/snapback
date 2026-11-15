@@ -20,6 +20,7 @@ import { makeScene, part, project, type Part, type Prim } from "../draw/kit";
 import { deskWord } from "./AgentStrip";
 import { Badge } from "./Badge";
 import {
+  BUBBLES_MAX,
   HOME,
   ORIGIN,
   PLOT,
@@ -81,7 +82,12 @@ function ground(): { lawn: Part[]; home: Part[] } {
   };
 }
 
+/** A member on the far side of the plot: its name tag goes over its head, into the sky. */
+const isBack = (a: CrewActor) =>
+  a.place === "lead" || (a.place === "ring" && a.sy < ORIGIN.oy + PLOT / 2 - 1);
 const HOME_DEPTH = HOME.x + HOME.w / 2 + HOME.y + HOME.d / 2;
+// How wide a speech bubble is, in stage units.
+const BUBBLE_W = 182;
 const [PILE_X, PILE_Y] = project(DESK_TOP, { ox: 0, oy: 0 });
 const pct = (v: number, of: number) => `${Math.round((v / of) * 10000) / 100}%`;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -171,7 +177,8 @@ export function CrewScene({
   const turn = new Map(team.shown.map((d, i) => [d.card.id, i]));
   const tagged = [...staged].sort((a, b) => (turn.get(a.id) ?? 0) - (turn.get(b.id) ?? 0));
   const bench = cast.filter((a) => a.place === "bench");
-  const bubbles = crewBubbles(floor, cast);
+  // While the run plays, the two newest speakers; once it is over, the one line that matters.
+  const bubbles = crewBubbles(floor, cast, floor.phase === "done" ? 1 : BUBBLES_MAX);
   const filed = reported(floor);
   const scene = useMemo(ground, []);
   const spot = (id: string) => cast.find((a) => a.id === id);
@@ -197,8 +204,8 @@ export function CrewScene({
         continue;
       }
       const member = spot(act.kind === "brief" ? act.to : act.from);
-      if (!member || member.place !== "ring") continue;
-      const hand: [number, number] = [member.sx, member.sy - 34];
+      if (!member || (member.place !== "ring" && member.place !== "wing")) continue;
+      const hand: [number, number] = [member.sx, member.sy - 34 * member.scale];
       if (act.kind === "brief" && lead)
         fresh.push({
           id: nextId.current++,
@@ -228,6 +235,7 @@ export function CrewScene({
     if (!moving) setNotes([]);
   }, [moving]);
 
+  const wingRow = (a: CrewActor) => staged.filter((x) => x.place === "wing").indexOf(a);
   const far = staged.filter((a) => a.depth < HOME_DEPTH);
   const near = staged.filter((a) => a.depth >= HOME_DEPTH);
   const flying = new Set(notes.filter((n) => n.kind === "report").map((n) => n.id));
@@ -299,25 +307,38 @@ export function CrewScene({
         <ol className="cs-tags" aria-label={w.team}>
           {tagged.map((a) => {
             const desk = a.desk!;
-            const side = a.place === "ring" ? a.side : a.place;
+            const above = isBack(a);
             const x =
               a.place === "lead"
-                ? a.sx + 62
+                ? a.sx + 36
                 : a.place === "desk"
-                  ? a.sx - 84
-                  : clamp(a.sx + (a.side === "left" ? -14 : 14), 62, VIEW.w - 62);
-            const y = a.place === "lead" ? a.sy - 52 : a.place === "desk" ? a.sy - 12 : a.sy + 9;
+                  ? a.sx - 44
+                  : a.place === "wing"
+                    ? VIEW.w - 62
+                    : clamp(a.sx + (a.side === "left" ? -10 : 10), 64, VIEW.w - 64);
+            const y =
+              a.place === "lead"
+                ? a.sy - 60
+                : a.place === "desk"
+                  ? a.sy + 26
+                  : a.place === "wing"
+                    ? VIEW.h - 38 + wingRow(a) * 20
+                    : above
+                      ? a.sy - 58
+                      : a.sy + 9;
             const body = (
               <>
                 <span className="cs-tag-name">
-                  <Badge id={a.id} size={18} />
+                  <Badge id={a.id} size={16} />
                   {shortName(a.card.name)}
                 </span>
-                <span className="cs-tag-model ui-mono" title={w.runsOn} data-testid="node-model">
-                  {desk.model === "code" ? w.code : desk.model}
-                </span>
-                <span className="cs-tag-state ui-mono" data-testid="node-state">
-                  {deskWord(desk, lang)}
+                <span className="cs-tag-line">
+                  <span className="cs-tag-model" title={w.runsOn} data-testid="node-model">
+                    {desk.model === "code" ? w.code : desk.model}
+                  </span>
+                  <span className="cs-tag-state" data-testid="node-state">
+                    {deskWord(desk, lang)}
+                  </span>
                 </span>
               </>
             );
@@ -326,7 +347,7 @@ export function CrewScene({
                 key={a.id}
                 className="cs-tag"
                 style={{ left: pct(x, VIEW.w), top: pct(y, VIEW.h) }}
-                data-side={side}
+                data-at={above ? "above" : "below"}
                 data-who={a.id}
                 data-agent={a.id}
                 data-state={a.state}
@@ -349,19 +370,26 @@ export function CrewScene({
         <div className="cs-bubbles" aria-hidden="true">
           {[...bubbles].reverse().map((b) => {
             const a = spot(b.deskId)!;
-            const top = a.sy - 62 * a.scale;
-            const style: CSSProperties =
-              a.place === "lead"
-                ? { right: pct(VIEW.w - a.sx + 20, VIEW.w), top: pct(6, VIEW.h) }
-                : a.side === "right"
-                  ? {
-                      right: pct(clamp(VIEW.w - a.sx - 16, 2, VIEW.w), VIEW.w),
-                      bottom: pct(VIEW.h - top, VIEW.h),
-                    }
-                  : {
-                      left: pct(clamp(a.sx - 16, 2, VIEW.w), VIEW.w),
-                      bottom: pct(VIEW.h - top, VIEW.h),
-                    };
+            // A bubble opens away from the home, into the empty corner on its member's side,
+            // and its tail points back at the member.
+            // The Planner and the Decider speak to the side of where they stand (the Decider
+            // where its stamp will land); a member speaks over its own head.
+            const aside = a.place === "lead" || a.place === "desk";
+            const out = a.side !== "right";
+            const left = aside
+              ? a.sx + (a.place === "desk" ? 46 : 16)
+              : clamp(out ? a.sx + 16 - BUBBLE_W : a.sx - 16, 3, VIEW.w - BUBBLE_W - 3);
+            const tail = clamp(((a.sx - left) / BUBBLE_W) * 100, 6, 94);
+            const style = {
+              left: pct(left, VIEW.w),
+              width: pct(Math.min(BUBBLE_W, VIEW.w - left - 3), VIEW.w),
+              "--tail": `${Math.round(tail)}%`,
+              ...(a.place === "lead"
+                ? { top: pct(4, VIEW.h) }
+                : a.place === "desk"
+                  ? { top: pct(a.sy + 8, VIEW.h) }
+                  : { bottom: pct(VIEW.h - (a.sy - 62 * a.scale - (isBack(a) ? 46 : 0)), VIEW.h) }),
+            } as unknown as CSSProperties;
             const desk = a.desk!;
             return (
               <p
@@ -373,13 +401,13 @@ export function CrewScene({
                 data-who={b.deskId}
                 data-kind={b.kind}
                 data-tone={b.tone}
-                data-side={a.place === "lead" ? "lead" : a.side === "right" ? "right" : "left"}
+                data-side={aside ? "lead" : "ring"}
               >
                 <Badge id={b.deskId} size={20} />
                 <span className="cs-bubble-text">
-                  <span className="cs-bubble-who ui-mono">
+                  <span className="cs-bubble-who">
                     {shortName(a.card.name)}
-                    {b.kind === "finding" ? ` · ${deskWord(desk, lang)}` : ""}
+                    {b.kind === "finding" ? `: ${deskWord(desk, lang)}` : ""}
                   </span>
                   {b.text}
                   {b.kind === "working" ? "…" : ""}
@@ -392,7 +420,7 @@ export function CrewScene({
         {floor.verdict && judge ? (
           <p
             className="cs-verdict"
-            style={{ left: pct(judge.sx + 34, VIEW.w), top: pct(judge.sy - 30, VIEW.h) }}
+            style={{ left: pct(judge.sx + 46, VIEW.w), top: pct(judge.sy + 12, VIEW.h) }}
             data-testid="crew-verdict"
             data-verdict={verdictTone}
             data-stamped={stamped ? "yes" : "no"}
@@ -403,12 +431,8 @@ export function CrewScene({
         ) : null}
 
         {bench.length > 0 ? (
-          <p
-            className="cs-bench"
-            style={{ top: pct(VIEW.h - 40, VIEW.h) }}
-            data-testid="team-not-needed"
-          >
-            <span className="ui-mono">{w.notNeeded}: </span>
+          <p className="cs-bench" data-testid="team-not-needed">
+            <span className="cs-bench-why">{w.notNeeded}: </span>
             {bench.map((a) => a.card.name).join(", ")}
           </p>
         ) : null}

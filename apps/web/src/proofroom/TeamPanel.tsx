@@ -70,7 +70,7 @@ function DeskCard({
     >
       <header className="pr-desk-head">
         <h4>
-          <Badge id={card.id} size={30} />
+          <Badge id={card.id} size={36} />
           {card.name}
         </h4>
         <span className="pr-model ui-mono" title={w.runsOn}>

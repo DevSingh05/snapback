@@ -24,7 +24,6 @@ const floor = (at = END, timeline: CaseTimeline = sampleTimeline, c: Card = card
   floorAt({ roster, card: c, timeline, at, hold });
 const whole = floor();
 const castAt = (f: Floor, all: Floor = whole) => crewCast(f, teamView(f, all));
-const actor = (f: Floor, id: string) => castAt(f).find((a) => a.id === id)!;
 const desk = (f: Floor, id: string) => f.desks.find((d) => d.card.id === id)!;
 
 // The first moment a member is done on the replay clock (its last step has played).
@@ -82,7 +81,11 @@ describe("who stands where", () => {
     const now = floor(END, live);
     const cast = crewCast(now, teamView(now, now));
     expect(cast.filter((a) => a.place === "bench")).toHaveLength(0);
-    expect(cast.filter((a) => a.place === "ring")).toHaveLength(8);
+    // The ring holds six; the two that come last in the roster wait at the edge, in the run.
+    expect(cast.filter((a) => a.place === "ring")).toHaveLength(6);
+    const wing = cast.filter((a) => a.place === "wing");
+    expect(wing.map((a) => a.id)).toEqual(["finder", "tour_prep"]);
+    for (const a of wing) expect(a.state).toBe("idle");
   });
 
   it("a check the plan left out stays in the ring as not checked", () => {

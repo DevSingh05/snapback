@@ -288,7 +288,7 @@
 }
 /* Waiting for its turn: there, and quiet. */
 .cs-actor[data-state="idle"] .cs-figure {
-  opacity: 0.62;
+  opacity: 0.72;
 }
 /* Not checked: a dashed outline where the member would have worked. */
 .cs-actor[data-state="skipped"] .cs-figure :is(polygon, circle) {
@@ -362,22 +362,25 @@
 }
 .cs-tag {
   position: absolute;
+  z-index: 1;
   transform: translateX(-50%);
   width: max-content;
-  max-width: 116px;
+}
+.cs-tag[data-at="above"] {
+  transform: translate(-50%, -100%);
 }
 .cs-tag > button,
 .cs-tag-in {
   display: grid;
   justify-items: center;
-  gap: 1px;
+  gap: 2px;
   padding: 2px 5px 3px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   border: 0;
   border-bottom: 2px solid var(--crew);
   color: var(--ink);
   font: inherit;
-  line-height: 1.14;
+  line-height: 1.1;
   text-align: center;
 }
 .cs-tag > button {
@@ -395,43 +398,43 @@
   font-weight: 700;
   white-space: nowrap;
 }
-.cs-tag-model {
+.cs-tag-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.5938rem;
-  color: var(--muted);
   white-space: nowrap;
+}
+.cs-tag-model {
+  font-family: var(--font-mono);
+  color: var(--muted);
 }
 .cs-tag-state {
-  font-size: 0.5938rem;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
+  padding: 1px 4px;
+  background: var(--unchecked-soft);
+  color: var(--unchecked);
+  font-weight: 700;
 }
 .cs-tag[data-state="working"] .cs-tag-state {
-  padding-inline: 4px;
   background: var(--scan);
   color: var(--on-scan);
 }
 .cs-tag[data-state="done"] .cs-tag-state {
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
 }
 .cs-tag[data-state="done"][data-tone="ok"] .cs-tag-state {
-  padding-inline: 4px;
   background: var(--teal-soft);
   color: var(--teal);
 }
 .cs-tag[data-state="done"][data-tone="hold"] .cs-tag-state,
 .cs-tag[data-state="done"][data-tone="not_shown"] .cs-tag-state {
-  padding-inline: 4px;
   background: var(--amber-soft);
   color: var(--amber);
 }
 .cs-tag[data-state="done"][data-tone="red_flag"] .cs-tag-state {
-  padding-inline: 4px;
   background: var(--coral);
   color: var(--surface);
-}
-.cs-tag[data-state="idle"] {
-  opacity: 0.78;
 }
 .cs-tag[data-state="skipped"] > button,
 .cs-tag[data-state="skipped"] > .cs-tag-in {
@@ -446,36 +449,32 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  width: max-content;
-  max-width: min(196px, 58%);
   margin: 0;
-  padding: 6px 8px 7px;
+  padding: 6px 8px 7px 6px;
   background: var(--surface);
   border-left: 4px solid var(--crew);
   box-shadow: var(--shadow);
   color: var(--ink);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   line-height: 1.24;
 }
 .cs-bubble::after {
   content: "";
   position: absolute;
   bottom: -5px;
-  left: 14px;
+  left: var(--tail, 14px);
   width: 10px;
   height: 10px;
+  margin-left: -5px;
   background: var(--surface);
   transform: rotate(45deg);
 }
-.cs-bubble[data-side="right"]::after {
-  left: auto;
-  right: 14px;
-}
 .cs-bubble[data-side="lead"]::after {
   bottom: auto;
-  left: auto;
-  top: 16px;
-  right: -5px;
+  top: 18px;
+  left: -5px;
+  margin-left: 0;
+  background: var(--crew);
 }
 .cs-bubble-text {
   display: grid;
@@ -483,8 +482,8 @@
   min-width: 0;
 }
 .cs-bubble-who {
-  font-size: 0.5938rem;
-  font-weight: 600;
+  font-size: 0.625rem;
+  font-weight: 700;
   color: var(--muted);
 }
 .cs-bubble[data-tone="red_flag"] {
@@ -507,11 +506,11 @@
   z-index: 3;
   max-width: 34%;
   margin: 0;
-  padding: 7px 10px;
+  padding: 6px 9px;
   border-left: 6px solid var(--v-slate);
   background: var(--v-band);
   color: var(--on-v-band);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 800;
   line-height: 1.16;
   transform: rotate(-3deg);
@@ -531,16 +530,16 @@
 .cs-bench {
   position: absolute;
   left: 6px;
-  max-width: 30%;
+  bottom: 4px;
+  max-width: 34%;
   margin: 0;
   color: var(--muted);
   font-size: 0.625rem;
   line-height: 1.2;
 }
-.cs-bench .ui-mono {
+.cs-bench-why {
   display: block;
-  font-size: 0.5938rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ---------- the view switch (TeamPanel) ---------- */
@@ -563,6 +562,13 @@
 .pr-strip-item .crew-badge {
   grid-row: 1 / span 2;
   align-self: center;
+}
+
+/* Beside the twin the crew gets a wider column than the diagram needed. */
+@media (min-width: 1280px) {
+  .twin-body.twin-with-team:has(> .pr-panel) {
+    grid-template-columns: minmax(0, 1fr) 500px;
+  }
 }
 
 /* ---------- motion, each tied to a recorded step ---------- */
