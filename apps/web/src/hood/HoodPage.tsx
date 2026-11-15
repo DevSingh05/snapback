@@ -224,7 +224,8 @@ export function HoodPage({ switches = MERGED }: { switches?: Switches } = {}) {
       ))}
       <p className="uh-foot">
         Every figure here was measured by the team, with its n beside it. Nothing from CoStar's
-        record is printed on this page.
+        record is printed on this page. Want to try your own eye first?{" "}
+        <a href="/spot">Spot the scam in 30 seconds</a>.
       </p>
     </div>
   );
