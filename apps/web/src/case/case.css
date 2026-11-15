@@ -1130,3 +1130,114 @@
     animation: case-row 420ms var(--ease-out) calc(720ms + var(--i, 0) * 80ms) 1 backwards;
   }
 }
+
+/* How we got this answer: a thread. Square bubbles on the app's own tones, no new palette. */
+.case-answer {
+  padding-top: var(--sp-8);
+}
+.case-answer-lede {
+  max-width: 62ch;
+  margin: var(--sp-3) 0 0;
+  color: var(--muted);
+}
+.case-thread {
+  display: grid;
+  gap: var(--sp-4);
+  max-width: 680px;
+  margin: var(--sp-5) 0 0;
+}
+.case-msg {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  max-width: 92%;
+}
+.case-msg-out {
+  justify-self: end;
+  justify-items: end;
+  max-width: 100%;
+}
+.case-msg-from {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.case-bubble {
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 4px solid var(--unchecked);
+  background: var(--unchecked-soft);
+  overflow-wrap: anywhere;
+  scroll-margin-top: var(--sp-6);
+}
+.case-bubble[data-tone="red_flag"] {
+  border-left-color: var(--coral);
+  background: var(--coral-soft);
+}
+.case-bubble[data-tone="hold"],
+.case-bubble[data-tone="not_shown"] {
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+.case-bubble[data-tone="ok"] {
+  border-left-color: var(--teal);
+  background: var(--teal-soft);
+}
+.case-bubble:target {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+.case-bubble ul {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.case-bubble-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--sp-3);
+  margin: var(--sp-3) 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.case-bubble-out {
+  border-left: 0;
+  border-right: 4px solid var(--ink);
+  background: var(--surface);
+  text-align: left;
+}
+.case-thread-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-align: center;
+  text-transform: none;
+}
+.case-answer-headline {
+  margin: 0 0 var(--sp-3);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.case-answer-reasons .case-text-link {
+  min-height: 40px;
+  font-size: 0.9375rem;
+}
+.case-bubble summary {
+  min-height: 40px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.case-bubble details ul,
+.case-bubble[open] ul {
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.case-bubble .case-answer-todos {
+  padding-left: 0;
+  list-style: none;
+}

@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 
 import { apiBase, apiFetchRead } from "../api";
-import type { CopyAlert, RealListing, ReportPack } from "../contracts";
+import type { CaseTimeline, CopyAlert, RealListing, ReportPack } from "../contracts";
 import { fetchAlternatives } from "../search/api";
 import type { SaferPlace } from "./model";
 
@@ -52,6 +52,11 @@ export function useCopyAlert(caseId: string, lang?: string): CopyAlert | null {
 /** GET /cases/{id}/report: the pack a renter can file. */
 export function useReportPack(caseId: string, lang?: string): ReportPack | null {
   return useCaseRead<ReportPack>(caseId, "report", lang);
+}
+
+/** GET /cases/{id}/timeline: what the agent did. Null until it lands, and for good if it fails. */
+export function useTimeline(caseId: string, lang?: string): CaseTimeline | null {
+  return useCaseRead<CaseTimeline>(caseId, "timeline", lang);
 }
 
 export function useSaferPlaces(caseId: string, wanted: boolean): SaferPlace[] {
