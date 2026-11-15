@@ -27,6 +27,8 @@ still `decide()` on the evidence gathered.
 
 import json
 import os
+import time
+from collections.abc import Callable
 from typing import Any
 
 from deepagents import FilesystemPermission, create_deep_agent
@@ -154,12 +156,31 @@ def _stems_of(case: CaseSession) -> tuple[str, ...]:
     return (*casework.STEMS, casework.WALK) if case.walk_plan is not None else casework.STEMS
 
 
+def build_model(
+    api_key: str | None = None, name: str | None = None, timeout_s: float | None = None
+) -> Any:
+    """Claude through langchain. The key comes from the environment or the caller (settings,
+    which read it from the environment); it is never printed or stored. `timeout_s` bounds each
+    model call, so one slow answer cannot hold a renter's case past the agent's time limit."""
+    from langchain_anthropic import ChatAnthropic
+
+    kwargs: dict[str, Any] = {"model": name or DEFAULT_MODEL, "max_tokens": 4096}
+    if api_key:
+        kwargs["api_key"] = api_key
+    if timeout_s is not None:
+        kwargs["timeout"] = timeout_s
+        kwargs["max_retries"] = 1
+    return ChatAnthropic(**kwargs)
+
+
+class AgentTimeout(Exception):
+    """The deep agent used up its time; code finishes the case."""
+
+
 def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = None) -> Any:
     """A deep agent bound to one case. Pass a chat model, or leave it to use Claude."""
     if model is None:
-        from langchain_anthropic import ChatAnthropic
-
-        model = ChatAnthropic(model=DEFAULT_MODEL, max_tokens=4096)
+        model = build_model()
 
     @tool
     def open_choice() -> str:
@@ -576,21 +597,29 @@ def run_case_with_agent(
     approver: Approver | None = None,
     *,
     thread_id: str | None = None,
+    deadline_s: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> Verdict | None:
     """Run `case` with a deep agent. Returns None while it is paused for the renter.
 
     To carry on after a pause, record the answer with `case.approve(...)` and call this again
-    with the same agent and thread id.
+    with the same agent and thread id. With `deadline_s`, the agent gets that long (checked
+    after each step it streams); past it, the trace says so and code finishes the case.
     """
     try:
-        return _drive(case, agent, approver, thread_id)
+        return _drive(case, agent, approver, thread_id, deadline_s, clock)
     finally:
         # Whatever happened, every family has a note: any a sub-agent did not write, code does.
         casework.refresh_policy_notes(case)
 
 
 def _drive(
-    case: CaseSession, agent: Any, approver: Approver | None, thread_id: str | None
+    case: CaseSession,
+    agent: Any,
+    approver: Approver | None,
+    thread_id: str | None,
+    deadline_s: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> Verdict | None:
     case.settle()
     if case.step in (Step.REPLY, Step.ASK):
@@ -602,6 +631,7 @@ def _drive(
         "metadata": {"case_id": case.case_id, "source": case.trace.source.value},
     }
     watch = case.__dict__.setdefault("_run_watch", RunWatch(case))  # one per case, across pauses
+    started = clock()
     try:
         payload: Any = None if _paused(agent, config) else {"messages": [("user", KICKOFF)]}
         while not case.done:
@@ -625,13 +655,19 @@ def _drive(
                     payload = Command(resume={"decisions": [{"type": "approve"}]})
             for chunk in agent.stream(payload, config, stream_mode="updates"):
                 watch.update(chunk)
+                if deadline_s is not None and clock() - started > deadline_s:
+                    raise AgentTimeout
             # The stream shows each file as it lands; the final state is the catch-all.
             watch.update({"state": {"files": agent.get_state(config).values.get("files")}})
             if not _paused(agent, config):
                 break
             payload = None
+    except AgentTimeout:
+        case.__dict__["agent_fell_back"] = True
+        case.trace.emit(TraceKind.ERROR, strings.text("trace.error.model_timeout", case.lang))
     except Exception:
         # A model that is down, refuses or loops must not stall a renter's case.
+        case.__dict__["agent_fell_back"] = True
         case.trace.emit(TraceKind.ERROR, strings.text("trace.error.model_failed", case.lang))
 
     # Whatever the model did or left undone, code finishes the case.

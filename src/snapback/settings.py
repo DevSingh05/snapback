@@ -64,6 +64,10 @@ class Settings(BaseSettings):
 
     # Who makes the agent's choices: the code policy (no key needed) or the deepagents graph.
     snapback_agent: Literal["policy", "deepagents"] = "policy"
+    # The deep agent's time per run (seconds) before code finishes the case, and which Claude
+    # model it uses (None: the graph's default). The key is ANTHROPIC_API_KEY, from the env.
+    snapback_agent_timeout_s: float = 25.0
+    snapback_agent_model: str | None = None
     # LangSmith tracing for the deepagents path. A human creates the key (AGENTS.md rule 8); with
     # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
     langsmith_api_key: SecretStr | None = None

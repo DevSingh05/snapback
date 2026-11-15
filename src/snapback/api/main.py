@@ -264,6 +264,7 @@ def create_app(
     office_clock: Callable[[], float] | None = None,
     search_chooser: object | None = None,
     finder_model: object | None = None,
+    case_model: Callable[[], object] | None = None,
     voice_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """The API. `lookups` replaces lane D's adapters, for tests. `registry` records who
@@ -272,7 +273,9 @@ def create_app(
     settings = settings or get_settings()
     # One set of lane D lookups for the case store and the aerial route: the kit is parsed once.
     lookups = lookups or KitLookups(settings.snapback_data_source)
-    store = CaseStore(settings, lookups)
+    # `case_model` makes the chat model for the deep agent on cases (tests pass a scripted one);
+    # it is used only when SNAPBACK_AGENT=deepagents.
+    store = CaseStore(settings, lookups, agent_model=case_model)
     if registry is _DEFAULT:
         registry = SafetyRegistry(settings.snapback_data_dir)
     # One allowance per renter or per browser, and a ceiling per network address so that
