@@ -164,7 +164,9 @@ describe("desk states on a replay", () => {
     expect(during.checksDone).toBeLessThan(during.checksTotal);
     const end = floor();
     expect(end.checksDone).toBe(end.checksTotal);
-    expect(statusLine(end, w)).toContain(`code set the result: ${headlineOf(card)}`);
+    expect(statusLine(end, w)).toBe(
+      `${end.checksTotal} of ${end.checksTotal} checks done · code set the result`,
+    );
     expect(end.progress).toBe(1);
     expect(during.progress).toBeGreaterThan(0);
     expect(during.progress).toBeLessThan(1);

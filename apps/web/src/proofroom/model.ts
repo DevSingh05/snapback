@@ -392,7 +392,7 @@ export function floorAt({
 export interface Words {
   rest: string;
   checks: (done: number, total: number) => string;
-  setBy: (headline: string) => string;
+  setBy: string; // the last words of the line: the verdict itself is the Decider's to show
   starting: string;
 }
 
@@ -400,8 +400,7 @@ export interface Words {
 export function statusLine(floor: Floor, w: Words): string {
   if (floor.phase === "rest") return w.rest;
   const count = w.checks(floor.checksDone, floor.checksTotal);
-  if (floor.phase === "done")
-    return floor.verdict ? `${count} · ${w.setBy(floor.verdict.headline)}` : count;
+  if (floor.phase === "done") return floor.verdict ? `${count} · ${w.setBy}` : count;
   const now = floor.desks.find((d) => d.card.id === floor.nowDeskId);
   // Between desks, the line is the newest step's own label.
   const last = floor.log.filter((l) => !l.finding).at(-1)?.text ?? w.starting;
