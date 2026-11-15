@@ -47,6 +47,36 @@ export interface Run {
   card: Card | null;
   timeline: CaseTimeline | null;
   listing: RealListing | null;
+  // The agent just finished and the card is being read again; no verdict shows meanwhile.
+  settling?: boolean;
+}
+
+/** What to do with each timeline as it arrives. While the agent runs, the card in hand is the
+ *  one from before it started. When it ends, that card may be out of date, so the run is marked
+ *  `settling` (no verdict may be shown) until the card has been read again. If that read fails
+ *  the run stays settling: an old verdict is never shown as the result. */
+export function runFollower(
+  first: Card,
+  listing: RealListing | null,
+  refetch: () => Promise<Card>,
+  emit: (run: Run) => void,
+): (timeline: CaseTimeline) => void {
+  let card = first;
+  let wasRunning = false;
+  return (timeline) => {
+    const ended = wasRunning && timeline.running !== true;
+    wasRunning = timeline.running === true;
+    emit({ status: "ready", card, timeline, listing, settling: ended });
+    if (!ended) return;
+    refetch()
+      .then((fresh) => {
+        card = fresh;
+        emit({ status: "ready", card, timeline, listing, settling: false });
+      })
+      .catch(() => {
+        // Still settling: the stamp stays held.
+      });
+  };
 }
 
 const NONE: Run = { status: "none", card: null, timeline: null, listing: null };
@@ -90,24 +120,17 @@ export function useRun(caseId: string | null, lang = "en"): Run {
       if (signal.aborted) return;
       // The timeline, live: a stream when the server has one, else a read each second, for as
       // long as the agent is running (case/useTimelineStream). It stops by itself when done.
-      let wasRunning = false;
       stop = openTimelineStream({
         caseId,
         lang,
-        onTimeline: (timeline) => {
-          if (signal.aborted) return;
-          setRun({ status: "ready", card, timeline, listing });
-          // The agent's extra checks can change the result: read the card again once it ends.
-          if (wasRunning && timeline.running !== true) {
-            fetchCard(caseId, signal)
-              .then((fresh) => {
-                card = fresh;
-                if (!signal.aborted) setRun({ status: "ready", card, timeline, listing });
-              })
-              .catch(() => {});
-          }
-          wasRunning = timeline.running === true;
-        },
+        onTimeline: runFollower(
+          card,
+          listing,
+          () => fetchCard(caseId, signal),
+          (next) => {
+            if (!signal.aborted) setRun(next);
+          },
+        ),
         onFeed: (feed) => {
           if (feed !== "off" || signal.aborted) return;
           // No timeline could be read at all: the steps stay closed; the card still shows.

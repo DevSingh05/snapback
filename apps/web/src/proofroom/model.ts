@@ -21,7 +21,8 @@ export interface AgentCard {
   job: string;
   doing: string;
   tools: string[];
-  model: "Claude Sonnet" | "Claude Haiku" | "code";
+  // What runs it on the server that sent the roster: a Claude model's name, or "code".
+  model: string;
   never: string[];
   availability?: string | null;
   kinds: string[];
@@ -80,6 +81,9 @@ export interface Desk {
   source: DataSource | null;
   tookMs: number | null; // recorded time over its steps; null when it has none
   startedAt: number | null; // play clock, when work first reached this desk
+  // What ran this desk on this case: "code" when the policy ran the case or code made every one
+  // of its steps happen; else the roster's model. With no case, the roster's.
+  model: string;
   // Where this desk first comes into the run (the index of its first step); Infinity if never.
   order: number;
 }
@@ -154,6 +158,9 @@ const TONE_RANK: Record<CardTone | "none", number> = {
   none: 3,
 };
 
+// Checks that happen as the ad is read (the rules table), so "Read the ad" is their step.
+const INTAKE_CHECKS: readonly string[] = ["rules"];
+
 function deskOfKind(roster: Roster, kind: string | null | undefined): AgentCard | null {
   if (!kind) return null;
   return roster.agents.find((a) => a.kinds.includes(kind)) ?? null;
@@ -174,6 +181,7 @@ const restDesk = (card: AgentCard): Desk => ({
   source: null,
   tookMs: null,
   startedAt: null,
+  model: card.model,
   order: Infinity,
 });
 
@@ -185,6 +193,9 @@ export interface FloorInput {
   // The play clock in ms. Infinity (the default) is the whole run.
   at?: number;
   snapback?: string; // who speaks for a step that is nobody's desk
+  // The agent has just finished and the card it may have changed is being read again: treat
+  // the run as still going, so the old card's verdict is never stamped.
+  hold?: boolean;
 }
 
 /** The floor at one moment of the run. With no timeline it is the roster at rest. */
@@ -195,6 +206,7 @@ export function floorAt({
   listing = null,
   at = Infinity,
   snapback = "SNAPBACK",
+  hold = false,
 }: FloorInput): Floor {
   const steps = timeline?.steps ?? [];
   if (!timeline || steps.length === 0) {
@@ -212,7 +224,7 @@ export function floorAt({
       source: null,
     };
   }
-  const live = timeline.running === true;
+  const live = timeline.running === true || hold;
   const beats = schedule(timeline);
   const length = runLength(beats);
   const over = !live && at >= length;
@@ -234,15 +246,30 @@ export function floorAt({
       mine = deep ? steps.map((s, i) => ({ s, i })).filter(({ s }) => s.by === "agent") : [];
     }
     if (mine.length > 0) desk.order = mine[0]!.i;
+    if (!deep || (mine.length > 0 && mine.every(({ s }) => s.by === "code"))) desk.model = "code";
     const ran = mine.filter(({ s }) => !s.skipped);
     const skipped = mine.filter(({ s }) => s.skipped);
     const begun = ran.filter(({ i }) => started(i));
     const bubbles = (view?.bubbles ?? []).filter((b) => agent.checks.includes(b.check));
     const quiet = (view?.notChecked ?? []).filter((n) => agent.checks.includes(n.check));
 
+    const intake = agent.checks.some((c) => INTAKE_CHECKS.includes(c));
+    if (ran.length === 0 && bubbles.length > 0 && skipped.length === 0 && !intake) {
+      // The card holds a finding for this desk and the timeline has no step for it. No step is
+      // claimed: the finding shows once the run is over, with no time and no evidence line.
+      if (!over) return desk;
+      desk.state = "done";
+      desk.source = bubbles[0]!.source;
+      desk.findings = bubbles.flatMap((b) => b.findings);
+      desk.tone = bubbles.reduce<CardTone | "none">(
+        (worst, b) => (TONE_RANK[b.tone] < TONE_RANK[worst] ? b.tone : worst),
+        "none",
+      );
+      return desk;
+    }
     if (ran.length === 0 && bubbles.length > 0 && skipped.length === 0) {
-      // The card holds a finding for this desk but the timeline has no step of its own for it
-      // (the rules read the ad as it comes in). It is tied to the first step, reading the ad.
+      // The rules read the ad as it comes in, so the timeline has no step of their own for
+      // them: their finding is tied to the first step, reading the ad.
       desk.order = 0;
       if (!started(0)) return desk;
       desk.startedAt = beats[0]!.start;
@@ -334,7 +361,7 @@ export function floorAt({
     });
     if (i === 0)
       for (const d of desks)
-        if (d.state === "done" && d.card.team !== "planner" && lastStepOf(d.card) === -1)
+        if (d.state === "done" && d.evidence.length > 0 && lastStepOf(d.card) === -1)
           sayFindings(d, s);
     const desk = owner ? desks.find((d) => d.card.id === owner.id) : null;
     if (!desk || desk.state !== "done" || desk.card.team === "planner") return;
@@ -366,6 +393,11 @@ export function floorAt({
           })),
         }
       : null;
+  // A finding no step stands behind is said at the end, just before the result.
+  if (over)
+    for (const d of desks)
+      if (d.state === "done" && d.findings.length > 0 && d.evidence.length === 0)
+        sayFindings(d, steps[steps.length - 1]!);
   if (over && decider && verdict) {
     log.push({
       step: steps.length,

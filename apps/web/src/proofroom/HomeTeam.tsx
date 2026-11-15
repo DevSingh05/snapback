@@ -12,7 +12,12 @@ import { WORDS } from "./words";
 export function HomeTeam({ caseId, lang = "en" }: { caseId: string | null; lang?: Lang }) {
   const run = useRun(caseId, lang);
   const w = WORDS[lang];
-  const floor = floorAt({ roster: bundledRoster(lang), card: run.card, timeline: run.timeline });
+  const floor = floorAt({
+    roster: bundledRoster(lang),
+    card: run.card,
+    timeline: run.timeline,
+    hold: run.settling,
+  });
   // The check team and the Decider; the listing helpers are not part of a check.
   const team = floor.desks.filter(
     (d) => d.card.team === "decider" || (d.card.team === "scam_check" && d.state !== "unused"),

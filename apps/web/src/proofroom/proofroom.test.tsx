@@ -28,7 +28,7 @@ import {
 import { ReportTeam, teamHref } from "./ReportTeam";
 import { sampleCard, sampleTimeline } from "./sample";
 import { TeamPanel, answerHref } from "./TeamPanel";
-import type { Run } from "./useRun";
+import { runFollower, type Run } from "./useRun";
 import { WORDS } from "./words";
 
 const roster = bundledRoster("en");
@@ -271,6 +271,51 @@ describe("findings come from the card, through the report's mapping", () => {
     expect(teamView(now, now).shown).toHaveLength(roster.agents.length);
   });
 
+  it("a finding with no step on a desk that does not read the ad claims no step", () => {
+    // The card says who may rent it (the phone and office desk) but no step ran for that desk.
+    const bare: CaseTimeline = {
+      ...sampleTimeline,
+      steps: sampleTimeline.steps.filter((s) => s.kind !== "phone"),
+    };
+    const first = schedule(bare)[0]!;
+    expect(desk(floor(first.end + 1, bare), "phone_office").state).toBe("idle");
+    const end = floor(END, bare);
+    const phone = desk(end, "phone_office");
+    expect(phone.state).toBe("done");
+    expect(phone.findings.map((f) => f.label)).toEqual(["Allowed to rent it"]);
+    expect(phone.evidence).toEqual([]);
+    expect(phone.tookMs).toBeNull();
+    // Its finding is said at the end, just before the result, not under "Read the ad".
+    const said = end.log.map((l) => `${l.who}: ${l.text}`);
+    expect(said[1]).not.toContain("Phone and office agent");
+    expect(said.at(-2)).toContain("Phone and office agent: Allowed to rent it");
+  });
+
+  it("the chip says code when the policy ran the case, and the model only where one worked", () => {
+    const withModels = {
+      ...roster,
+      agents: roster.agents.map((a) =>
+        a.model === "code"
+          ? a
+          : { ...a, model: a.team === "planner" ? "Claude Sonnet" : "Claude Haiku" },
+      ),
+    };
+    const at = (timeline: CaseTimeline | null) =>
+      Object.fromEntries(
+        floorAt({ roster: withModels, card, timeline }).desks.map((d) => [d.card.id, d.model]),
+      );
+    // No case: the roster's own chips. Policy: no model ran, every chip says code.
+    expect(at(null).record).toBe("Claude Haiku");
+    expect(new Set(Object.values(at(sampleTimeline)))).toEqual(new Set(["code"]));
+    const deep = at(deepTimeline());
+    expect(deep.planner).toBe("Claude Sonnet");
+    expect(deep.photo).toBe("Claude Haiku"); // handed to a sub-agent
+    expect(deep.finder).toBe("Claude Haiku");
+    expect(deep.rules).toBe("code"); // every step on this desk was code's
+    expect(deep.decider).toBe("code");
+    expect(deep.web).toBe("Claude Haiku"); // no step: the roster's chip, greyed as not used
+  });
+
   it("when the deep agent ran, the Planner and the sub-agents it handed work to light up", () => {
     const end = floor(END, deepTimeline());
     expect(desk(end, "planner").state).toBe("done");
@@ -381,6 +426,69 @@ describe("the panel beside the twin", () => {
     render(<TeamPanel caseId={card.case_id} run={locked} roster={roster} reduced />);
     expect(screen.getByTestId("team-status")).toHaveTextContent("only in the browser that started");
     expect(screen.queryByTestId("team-verdict")).toBeNull();
+  });
+});
+
+describe("a run that was watched live", () => {
+  const running = { ...sampleTimeline, running: true, steps: sampleTimeline.steps.slice(0, 4) };
+  const finished = { ...sampleTimeline, running: false };
+  const fresh: Card = { ...card, state: "dont_pay", headline: "Don't pay" };
+
+  it("holds the stamp until the card has been read again, then stamps the fresh verdict", async () => {
+    const runs: Run[] = [];
+    let land: (c: Card) => void = () => {};
+    const refetch = vi.fn(() => new Promise<Card>((resolve) => (land = resolve)));
+    const follow = runFollower(card, null, refetch, (r) => runs.push(r));
+    follow(running);
+    expect(refetch).not.toHaveBeenCalled();
+    follow(finished);
+    // The agent is done, but the card in hand is from before it ran: no verdict yet.
+    const held = runs.at(-1)!;
+    expect(held.settling).toBe(true);
+    const heldFloor = floorAt({
+      roster,
+      card: held.card,
+      timeline: held.timeline,
+      hold: held.settling,
+    });
+    expect(heldFloor.verdict).toBeNull();
+    expect(heldFloor.phase).toBe("running");
+    const { unmount } = render(
+      <TeamPanel caseId={card.case_id} run={held} roster={roster} reduced />,
+    );
+    expect(screen.queryByTestId("team-verdict")).toBeNull();
+    expect(screen.getByTestId("team-panel")).not.toHaveTextContent(headlineOf(card));
+    unmount();
+    land(fresh);
+    await Promise.resolve();
+    const done = runs.at(-1)!;
+    expect(done.settling).toBe(false);
+    expect(done.card).toBe(fresh);
+    render(<TeamPanel caseId={card.case_id} run={done} roster={roster} reduced />);
+    expect(screen.getByTestId("team-verdict")).toHaveTextContent("Don't pay");
+  });
+
+  it("keeps holding when the card cannot be read again: an old verdict is never the result", async () => {
+    const runs: Run[] = [];
+    const follow = runFollower(
+      card,
+      null,
+      () => Promise.reject(new Error("offline")),
+      (r) => runs.push(r),
+    );
+    follow(running);
+    follow(finished);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(runs.at(-1)!.settling).toBe(true);
+  });
+
+  it("a run that was already over when it was opened stamps at once", () => {
+    const runs: Run[] = [];
+    const refetch = vi.fn(() => Promise.resolve(fresh));
+    runFollower(card, null, refetch, (r) => runs.push(r))(finished);
+    expect(refetch).not.toHaveBeenCalled();
+    expect(runs.at(-1)!.settling).toBe(false);
   });
 });
 

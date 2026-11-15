@@ -92,10 +92,36 @@ def test_only_the_decider_sets_the_verdict_and_it_is_code() -> None:
     assert decider.model == "code"
     assert "verdict" in decider.job
     assert next(c for c in cards if c.id == "rules").model == "code"
-    assert next(c for c in cards if c.id == "planner").model == "Claude Sonnet"
     for card in cards:
-        assert card.job and card.tools and card.never, card.id
-        assert card.model in ("Claude Sonnet", "Claude Haiku", "code")
+        assert card.job and card.doing and card.tools and card.never, card.id
+
+
+def models(by: dict) -> dict[str, str]:
+    return {c.id: c.model for c in roster.cards("en", by)}
+
+
+def test_with_the_policy_no_card_claims_a_model() -> None:
+    assert set(models(roster.runners("policy")).values()) == {"code"}
+
+
+def test_the_deep_agent_on_the_request_path_runs_sub_agents_on_the_planners_model() -> None:
+    got = models(roster.runners("deepagents", "claude-sonnet-5-5", "claude-haiku-5-5"))
+    assert got["planner"] == "Claude Sonnet"
+    assert got["record"] == got["photo"] == got["finder"] == "Claude Sonnet"
+    assert got["rules"] == got["decider"] == "code"
+
+
+def test_the_background_agent_gives_sub_agents_the_small_model_and_follows_overrides() -> None:
+    got = models(roster.runners("deepagents_async", "claude-sonnet-5-5", "claude-haiku-5-5"))
+    assert (got["planner"], got["record"], got["rules"]) == (
+        "Claude Sonnet",
+        "Claude Haiku",
+        "code",
+    )
+    swapped = models(roster.runners("deepagents_async", "claude-opus-5-5", "some-other-model"))
+    assert (swapped["planner"], swapped["web"]) == ("Claude Opus", "some-other-model")
+    # Left out, the models are the settings' own defaults, never a second hard-coded copy.
+    assert models(roster.runners("deepagents_async")) == got
 
 
 def test_the_web_agent_says_when_it_is_available() -> None:
@@ -123,9 +149,25 @@ def test_get_agents_is_public_and_static(client: TestClient) -> None:
     r = client.get("/agents")
     assert r.status_code == 200
     body = r.json()
-    assert body == json.loads(roster.roster("en").model_dump_json())
+    # The test server runs the policy: no model runs, so no card claims one.
+    assert body == json.loads(roster.roster("en", roster.runners("policy")).model_dump_json())
+    assert {a["model"] for a in body["agents"]} == {"code"}
     assert [t["id"] for t in body["teams"]] == ["planner", "scam_check", "listing_help", "decider"]
     assert client.get("/agents").json() == body
+
+
+def test_get_agents_names_the_models_this_server_runs(tmp_path) -> None:
+    settings = Settings(
+        _env_file=None,
+        snapback_data_dir=tmp_path,
+        snapback_agent="deepagents_async",
+        snapback_agent_model="claude-opus-5-5",
+    )
+    app = create_app(settings, lookups=KitLookups(DataSource.FIXTURE))
+    by_id = {a["id"]: a["model"] for a in TestClient(app).get("/agents").json()["agents"]}
+    assert by_id["planner"] == "Claude Opus"
+    assert by_id["record"] == "Claude Haiku"
+    assert by_id["decider"] == "code"
 
 
 def test_get_agents_in_spanish(client: TestClient) -> None:

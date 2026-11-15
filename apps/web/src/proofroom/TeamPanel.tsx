@@ -77,7 +77,7 @@ function DeskCard({
       <header className="pr-desk-head">
         <h4>{card.name}</h4>
         <span className="pr-model ui-mono" title={w.runsOn}>
-          {card.model === "code" ? w.code : card.model}
+          {desk.model === "code" ? w.code : desk.model}
         </span>
       </header>
       <p className="pr-job">{card.job}</p>
@@ -218,6 +218,7 @@ export function TeamPanel({
     listing: run.listing,
     at: player.at,
     snapback: w.snapback,
+    hold: run.settling,
   });
   // The same run with every step played: who this ad needed, and the room the end will take.
   const whole = floorAt({
@@ -226,6 +227,7 @@ export function TeamPanel({
     timeline: run.timeline,
     listing: run.listing,
     snapback: w.snapback,
+    hold: run.settling,
   });
   const team = teamView(floor, whole);
   const ending = floor.verdict ?? (whole.phase === "done" ? whole.verdict : null);

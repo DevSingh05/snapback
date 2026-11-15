@@ -1,7 +1,8 @@
 """SNAPBACK's team of agents, as one roster (GET /agents, and the Proof Room page).
 
 One card per agent: its name, its team, its job in one plain line, the tools and data it uses,
-what runs it (a Claude model, or code) and what it never does. `kinds` ties a card to the
+what runs it on this server (a Claude model, or code) and what it never does. `kinds` ties a
+card to the
 sub-agent names (`casework.AGENT_NAMES`) and the timeline step kinds (`timeline.py`) that
 belong to it, and `checks` to the report's checks, so a page can light the right desk for a
 case. A test fails when a sub-agent name or a step kind has no card.
@@ -19,8 +20,14 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from snapback.settings import Settings
+
 Team = Literal["planner", "scam_check", "listing_help", "decider"]
-Model = Literal["Claude Sonnet", "Claude Haiku", "code"]
+# What runs a card: the planner's model, a sub-agent's model, or code. Which Claude model that
+# is (or "code", when no model runs at all) depends on the server's agent mode and settings.
+Runner = Literal["planner", "sub", "code"]
+AgentMode = Literal["policy", "deepagents", "deepagents_async"]
+CODE = "code"
 Lang = Literal["en", "es"]
 
 TEAM_ORDER: tuple[Team, ...] = ("planner", "scam_check", "listing_help", "decider")
@@ -33,7 +40,7 @@ class AgentCard(BaseModel):
     job: str  # one plain line
     doing: str  # what a page says while it works, in plain words
     tools: list[str]  # named tools and data sources, shown as chips
-    model: Model
+    model: str  # "Claude Sonnet", "Claude Haiku", ... or "code": what runs it on this server
     never: list[str]  # things it never does
     # Set when the agent sits behind a switch: the words say when it is there.
     availability: str | None = None
@@ -88,7 +95,7 @@ _CARDS: list[dict] = [
     {
         "id": "planner",
         "team": "planner",
-        "model": "Claude Sonnet",
+        "runner": "planner",
         "kinds": [],
         "checks": [],
         "en": {
@@ -109,7 +116,7 @@ _CARDS: list[dict] = [
     {
         "id": "rules",
         "team": "scam_check",
-        "model": "code",
+        "runner": "code",
         "kinds": ["claims"],
         "checks": ["rules"],
         "en": {
@@ -133,7 +140,7 @@ _CARDS: list[dict] = [
     {
         "id": "record",
         "team": "scam_check",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["record", "rent", "for_sale"],
         "checks": ["record", "forsale"],
         "en": {
@@ -157,7 +164,7 @@ _CARDS: list[dict] = [
     {
         "id": "phone_office",
         "team": "scam_check",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["phone", "office-and-licence"],
         "checks": ["phone"],
         "en": {
@@ -178,7 +185,7 @@ _CARDS: list[dict] = [
     {
         "id": "owner_licence",
         "team": "scam_check",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["owner", "license", "ask_license"],
         "checks": ["owner"],
         "en": {
@@ -199,7 +206,7 @@ _CARDS: list[dict] = [
     {
         "id": "photo",
         "team": "scam_check",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["locate", "place", "reply"],
         "checks": ["photos"],
         "en": {
@@ -223,7 +230,7 @@ _CARDS: list[dict] = [
     {
         "id": "web",
         "team": "scam_check",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["web"],
         "checks": [],
         "en": {
@@ -246,7 +253,7 @@ _CARDS: list[dict] = [
     {
         "id": "finder",
         "team": "listing_help",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["search"],
         "checks": [],
         "en": {
@@ -267,7 +274,7 @@ _CARDS: list[dict] = [
     {
         "id": "tour_prep",
         "team": "listing_help",
-        "model": "Claude Haiku",
+        "runner": "sub",
         "kinds": ["walk"],
         "checks": [],
         "en": {
@@ -288,7 +295,7 @@ _CARDS: list[dict] = [
     {
         "id": "decider",
         "team": "decider",
-        "model": "code",
+        "runner": "code",
         "kinds": ["report"],
         "checks": [],
         "en": {
@@ -309,14 +316,46 @@ _CARDS: list[dict] = [
 ]
 
 
-def cards(lang: str = "en") -> list[AgentCard]:
-    """Every agent's card in floor order, in `lang` (English for a language we do not have)."""
+def model_label(model_id: str) -> str:
+    """A model id as the chip shows it: the family, never a version or a key."""
+    low = model_id.lower()
+    for family in ("Sonnet", "Haiku", "Opus"):
+        if family.lower() in low:
+            return f"Claude {family}"
+    return model_id
+
+
+def _default(field: str) -> str:
+    return str(Settings.model_fields[field].default)
+
+
+def runners(
+    mode: AgentMode = "deepagents_async",
+    agent_model: str | None = None,
+    subagent_model: str | None = None,
+) -> dict[Runner, str]:
+    """What runs each kind of card on a server in `mode`. With the policy no model runs, so
+    every card is code. With the deep agent on the request path the sub-agents run on the
+    planner's model (graph.py hands them none of their own); only the background agent
+    (`deepagents_async`) gives them the smaller one."""
+    if mode == "policy":
+        return {"planner": CODE, "sub": CODE, "code": CODE}
+    main = model_label(agent_model or _default("snapback_agent_model"))
+    small = model_label(subagent_model or _default("snapback_subagent_model"))
+    return {"planner": main, "sub": small if mode == "deepagents_async" else main, "code": CODE}
+
+
+def cards(lang: str = "en", by: dict[Runner, str] | None = None) -> list[AgentCard]:
+    """Every agent's card in floor order, in `lang` (English for a language we do not have).
+    `by` says what runs each kind of card (`runners`); left out, it is the background agent
+    with the default models, which is what the web app's bundled copy describes."""
     use: Lang = "es" if lang == "es" else "en"
+    by = by or runners()
     return [
         AgentCard(
             id=c["id"],
             team=c["team"],
-            model=c["model"],
+            model=by[c["runner"]],
             kinds=list(c["kinds"]),
             checks=list(c["checks"]),
             **c[use],
@@ -330,13 +369,21 @@ def card_for(kind: str, lang: str = "en") -> AgentCard | None:
     return next((c for c in cards(lang) if kind in c.kinds), None)
 
 
-def roster(lang: str = "en") -> Roster:
+def roster(lang: str = "en", by: dict[Runner, str] | None = None) -> Roster:
     use: Lang = "es" if lang == "es" else "en"
     return Roster(
         lang=use,
         teams=[TeamInfo(id=t, name=_TEAMS[t][use][0], about=_TEAMS[t][use][1]) for t in TEAM_ORDER],
-        agents=cards(use),
+        agents=cards(use, by),
     )
+
+
+def roster_for(settings: Settings, lang: str = "en") -> Roster:
+    """The roster as this server runs it: each card's model from the agent mode and settings."""
+    by = runners(
+        settings.snapback_agent, settings.snapback_agent_model, settings.snapback_subagent_model
+    )
+    return roster(lang, by)
 
 
 def web_copy() -> dict:

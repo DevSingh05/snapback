@@ -52,7 +52,7 @@ from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
-from snapback.agent.roster import Roster, roster
+from snapback.agent.roster import Roster, roster_for
 from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.agent.timeline import CaseTimeline, build_timeline
 from snapback.api.card_cache import CardPictures
@@ -403,9 +403,10 @@ def create_app(
 
     @app.get("/agents")
     def agents(lang: Language = "en") -> Roster:
-        """SNAPBACK's team of agents: each one's job, tools, model and what it never does.
-        Public and the same for everyone; it holds no case data and runs nothing."""
-        return roster(lang)
+        """SNAPBACK's team of agents: each one's job, tools and what it never does, and what
+        runs it on this server (from the agent mode and model settings; "code" when no model
+        runs). Public and the same for everyone; it holds no case data and runs nothing."""
+        return roster_for(settings, lang)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
