@@ -396,6 +396,95 @@ export const PANELS: Panel[] = [
   },
 ];
 
+/** One row of "Why trust this": our method beside the naive baseline, on the same set. */
+export interface TrustRow {
+  /** The eval, in plain words. */
+  eval: string;
+  /** Our result as shown, e.g. "9 of 10 rings". */
+  ours: string;
+  /** The baseline's result on the same set, or null when no baseline was measured. */
+  baseline: string | null;
+  /** What the baseline is, when there is one. */
+  baselineIs?: string;
+  n: number;
+  unit: string;
+  label: DataLabel;
+  /** Where the figure comes from. Not shown. */
+  source: string;
+  /** Repo path of the eval file, when there is one. The test checks it exists. */
+  evalFile?: string;
+}
+
+const README = "README.md Measured table";
+
+/** The honest comparison. Ring rows are SYNTHETIC seeded rings: they show the method works on
+ *  rings shaped like these, not an accuracy claim for real listings. Rows with no baseline say
+ *  so; we do not invent one. */
+export const TRUST: TrustRow[] = [
+  {
+    eval: "Ring finder, ads in the original wording",
+    ours: "10 of 10 rings found; 0 of 2,684 honest ads flagged",
+    baseline: "1 of 10 rings found",
+    baselineIs: "payment-word search grouped by exact phone or photo",
+    n: 10,
+    unit: "seeded rings",
+    label: "SYNTHETIC",
+    source: `${PARAPHRASE} variants.original, pipeline and keyword_baseline`,
+    evalFile: PARAPHRASE,
+  },
+  {
+    eval: "Ring finder, every ring ad reworded",
+    ours: "9 of 10 rings found; 0 of 2,684 honest ads flagged",
+    baseline: "0 of 10 rings found",
+    baselineIs: "payment-word search grouped by exact phone or photo",
+    n: 10,
+    unit: "seeded rings",
+    label: "SYNTHETIC",
+    source: `${PARAPHRASE} variants.paraphrased, pipeline and keyword_baseline`,
+    evalFile: PARAPHRASE,
+  },
+  {
+    eval: "Ring finder, 301-ad corpus",
+    ours: "4 of 4 rings found; 0 of 244 honest ads flagged",
+    baseline: "0 of 4 rings found",
+    baselineIs: "keyword search",
+    n: 4,
+    unit: "seeded rings",
+    label: "SYNTHETIC",
+    source: README,
+  },
+  {
+    eval: "Real listing photos placed in the right home",
+    ours: "43 of 48 right home, 0 in a wrong home",
+    baseline: null,
+    n: 48,
+    unit: "photos",
+    label: "LIVE",
+    source: "eval/locate_real.csv locate_real,right_building",
+    evalFile: LOCATE,
+  },
+  {
+    eval: "Decoy photos placed in the claimed building",
+    ours: "0 of 30 accepted",
+    baseline: null,
+    n: 30,
+    unit: "decoys",
+    label: "LIVE",
+    source: "eval/locate_real.csv locate_real,decoy_false_placement",
+    evalFile: LOCATE,
+  },
+  {
+    eval: "Composed ads and labelled messages through the real pipeline",
+    ours: "117 of 123 handled as expected",
+    baseline: null,
+    n: 123,
+    unit: "ads and messages",
+    label: "FIXTURE",
+    source: `${ADS} summary`,
+    evalFile: ADS,
+  },
+];
+
 const on = (g: Gated, switches: Switches) => g.when === undefined || switches[g.when];
 
 /** A panel with only the lines whose work has merged. */
