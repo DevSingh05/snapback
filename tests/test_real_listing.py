@@ -149,7 +149,7 @@ def test_a_fixture_case_always_shows_the_figures():
     assert "The ad asks $1,200 a month" in got.headline
 
 
-def test_live_with_the_flag_off_hides_rents_units_links_and_the_name():
+def test_live_with_the_flag_off_hides_rents_units_and_the_name_but_keeps_the_link():
     live = record(source=DataSource.LIVE)
     got = real_listing(modules(source=DataSource.LIVE), live, None, settings(), ad_beds=1)
     assert got.figures_shown is False
@@ -158,7 +158,10 @@ def test_live_with_the_flag_off_hides_rents_units_links_and_the_name():
         (p.rent_min, p.rent_max, p.units_available, p.availability_host) == (None,) * 4
         for p in got.plans
     )
-    assert got.building_name is None and got.cta_url is None and got.cta_label is None
+    assert got.building_name is None
+    # The hand-off link and its label stay: only the rent figures sit behind the flag.
+    assert got.cta_url == "https://fixtureliving.example/avail/1"
+    assert got.cta_label == "See the real listing"
     # company and host still show
     assert got.manager_company == "Fixture Living LLC"
     assert got.website_host == "fixtureliving.example"
@@ -177,6 +180,8 @@ def test_live_with_the_flag_on_shows_the_figures():
     )
     assert got.figures_shown is True and got.plans[0].rent_min == 1700
     assert got.building_name == "Fixture Court"
+    assert got.cta_url == "https://fixtureliving.example/avail/1"
+    assert got.cta_label == "See the real listing"
 
 
 def test_the_link_falls_back_to_the_availability_page_then_the_website_then_nothing():
@@ -391,3 +396,29 @@ def test_the_route_uses_the_building_the_scan_identified_when_the_form_named_non
     assert panel.json()["property_id"] == "fx-prop-1" and panel.json()["photos_in_scan"] == 2
     note = client.get(f"/cases/{made['case_id']}/copy-alert", headers=headers).json()
     assert note["why_not"] != "no_record" and note["property_id"] == "fx-prop-1"
+
+
+def test_the_hand_off_link_shows_with_the_flag_off_and_no_rent_number_leaves_with_it():
+    live = record(source=DataSource.LIVE)
+    for flag in (False, True):
+        got = real_listing(
+            modules(source=DataSource.LIVE),
+            live,
+            None,
+            settings(snapback_show_record_figures=flag),
+            ad_beds=1,
+        )
+        assert got.cta_url == "https://fixtureliving.example/avail/1"
+        assert got.cta_label == "See the real listing"
+        dump = got.model_dump_json()
+        assert ("1,700" in dump or "1700" in dump) is flag
+        assert ("1,900" in dump or "1900" in dump) is flag
+
+
+def test_with_the_flag_off_the_link_falls_back_to_the_website_and_es_has_its_label():
+    live = record(source=DataSource.LIVE, floor_plan_rents=[plan(1, 1700, 1900)])
+    got = real_listing(
+        modules(source=DataSource.LIVE), live, None, settings(), ad_beds=1, lang="es"
+    )
+    assert got.cta_url == "https://fixtureliving.example"
+    assert got.cta_label == "Ver el anuncio real"

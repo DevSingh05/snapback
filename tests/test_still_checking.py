@@ -83,3 +83,22 @@ def test_card_says_whether_there_is_an_evidence_file(client):
     assert client.get(url).json()["has_evidence"] is True
     case.files = None
     assert client.get(url).json()["has_evidence"] is False
+
+
+@pytest.mark.parametrize(
+    "progress",
+    [
+        CaseProgress.WAITING_FOR_APPROVAL,
+        CaseProgress.WAITING_FOR_REPLY,
+        CaseProgress.WAITING_FOR_ANSWER,
+        CaseProgress.DONE,
+    ],
+)
+@pytest.mark.parametrize("what", READS)
+def test_a_case_waiting_for_a_person_is_not_202(client, monkeypatch, what, progress):
+    """Only RUNNING is "still checking". A case waiting on the renter or the poster has its
+    evidence so far, and the report is served (a long wait must not look like a check)."""
+    body, case = started(client)
+    monkeypatch.setattr(case, "status", lambda *a, **k: SimpleNamespace(status=progress))
+    res = client.get(f"/cases/{body['case_id']}/{what}", headers=headers(body))
+    assert res.status_code != 202

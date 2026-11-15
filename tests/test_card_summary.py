@@ -51,12 +51,12 @@ def test_a_photo_elsewhere_leads_the_summary_and_the_state_is_dont_pay():
     assert "different building" in got.summary[0] or "photo" in got.summary[0].lower()
 
 
-def test_the_summary_is_at_most_three_sentences_and_is_decides_reasons_in_order():
+def test_the_summary_is_at_most_three_sentences_and_all_of_them_are_decides_reasons():
     m = modules()
     reasons = decide(to_evidence(m), "en").reasons
     got = card(m).summary
     assert 1 <= len(got) <= 3
-    assert got == reasons[: len(got)]
+    assert set(got) <= set(reasons)
 
 
 def test_the_measured_price_gap_replaces_the_generic_price_reason():
@@ -69,8 +69,7 @@ def test_the_measured_price_gap_replaces_the_generic_price_reason():
     )
     m = modules(price=price.model_dump())
     got = card(m).summary
-    assert got[-1] == "The rent is 44% under this building's 2 bed listing."
-    assert got[:2] == decide(to_evidence(m), "en").reasons[:2]
+    assert got[0] == "The rent is 44% under this building's 2 bed listing."
     assert len(got) == 3 and strings.text("reason.price_flag") not in got
 
 
@@ -79,7 +78,7 @@ def test_the_price_gap_without_a_plan_size_still_gives_the_percent():
         status=PriceStatus.BELOW_RANGE, listed_rent=1200, record_min=1600, record_max=2300
     )
     got = card(modules(price=price.model_dump())).summary
-    assert got[-1] == "The rent is 25% under this building's listings."
+    assert got[0] == "The rent is 25% under this building's listings."
 
 
 def test_checks_out_is_the_ok_lines_and_does_not_is_flags_holds_and_not_shown():
@@ -123,3 +122,96 @@ def test_the_summary_never_calls_anyone_a_scammer_or_names_a_person():
     for m in (modules(), elsewhere(modules()), modules("module_evidence_forged.json")):
         text = " ".join(card(m).summary + card(m).does_not).lower()
         assert "scam" not in text and "fraud" not in text and "liar" not in text
+
+
+GOOD_NEWS_EN = (
+    "reason.located",
+    "reason.authority_matches",
+    "reason.presence_proven",
+)
+
+
+def test_a_zelle_ad_puts_the_red_flag_first_and_never_lists_good_news():
+    # The demo ad: photos placed in the claimed home, a Zelle ask. decide() lists the placed
+    # photos among its reasons (good news) and its payment reason last, which the old cut of
+    # the first three dropped.
+    m = modules()
+    got = card(m)
+    assert got.state is VerdictState.HOLD
+    reasons = decide(to_evidence(m), "en").reasons
+    assert strings.text("reason.located") in reasons  # decide() does list it
+    assert got.summary[0] == strings.text("reason.payment_flag")
+    for key in GOOD_NEWS_EN:
+        assert strings.text(key) not in got.summary
+
+
+def test_red_flags_come_before_holds_in_the_summary_and_decide_is_unchanged():
+    m = modules()
+    before = decide(to_evidence(m), "en")
+    got = card(m).summary
+    flags = {strings.text(k) for k in ("reason.payment_flag", "reason.price_flag")}
+    seen_hold = False
+    for sentence in got:
+        if sentence in flags:
+            assert not seen_hold
+        else:
+            seen_hold = True
+    assert card(m).state is before.state
+
+
+def test_the_summary_in_spanish_also_leads_with_the_red_flag():
+    got = card(modules(), "es")
+    assert got.summary[0] == strings.text("reason.payment_flag", "es")
+    assert strings.text("reason.located", "es") not in got.summary
+
+
+def test_a_card_that_passed_keeps_decides_order_and_its_good_news():
+    matches = {
+        "status": "matches_record",
+        "manager_on_record": "Fixture Living LLC",
+        "office_phone_match": "yes",
+    }
+    m = modules(authority=matches, rules=[], price=None)
+    got = card(m)
+    assert got.state is VerdictState.VERIFIED
+    assert got.summary == decide(to_evidence(m), "en").reasons[:3]
+    assert strings.text("reason.located") in got.summary
+
+
+def test_a_zelle_and_a_deposit_ask_make_one_payment_line_naming_both():
+    both = [
+        {
+            "rule_id": rid,
+            "category": cat,
+            "evidence_span": "x",
+            "red_flag": True,
+        }
+        for rid, cat in (
+            ("payment.zelle_before_viewing", "payment_method"),
+            ("fee.holding_deposit_before_viewing", "fee_ask"),
+        )
+    ]
+    for lang, word in (("en", "Zelle"), ("es", "Zelle")):
+        got = card(modules(rules=both), lang)
+        asks = [
+            ln
+            for row in got.rows
+            for ln in row.lines
+            if ln.label == strings.text("label.payment_ask", lang)
+        ]
+        assert len(asks) == 1 and word in asks[0].text and asks[0].tone is CardTone.RED_FLAG
+    en = card(modules(rules=both)).rows[2].lines[0].text
+    assert "deposit" in en and "Zelle" in en
+
+
+def test_one_of_the_two_money_asks_alone_keeps_its_own_line():
+    zelle = [
+        {
+            "rule_id": "payment.zelle_before_viewing",
+            "category": "payment_method",
+            "evidence_span": "x",
+            "red_flag": True,
+        }
+    ]
+    texts = [ln.text for row in card(modules(rules=zelle)).rows for ln in row.lines]
+    assert strings.text("rule.payment.zelle_before_viewing") in texts

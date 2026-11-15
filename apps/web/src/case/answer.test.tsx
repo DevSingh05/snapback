@@ -115,7 +115,9 @@ describe("one message per check", () => {
     expect(bubbles()[0]).toHaveAttribute("data-tone", "red_flag");
     expect(bubbles()[1]).toHaveAttribute("data-tone", "hold");
     expect(bubbles()[2]).toHaveAttribute("data-tone", "ok");
-    expect(screen.getByTestId("answer-verdict")).toHaveTextContent("Hold off for now");
+    expect(screen.getByTestId("answer-verdict")).toHaveTextContent(
+      "Hold off: it asks for money before you've seen the place",
+    );
   });
 
   it("links every red flag to its message: rules to Rules, phone to Phone", () => {

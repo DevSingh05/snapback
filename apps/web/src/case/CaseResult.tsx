@@ -18,9 +18,11 @@ import type {
 } from "../contracts";
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
+import type { Lang } from "../lang";
 import { AnswerPanel } from "./AnswerPanel";
 import { Checks } from "./Checks";
 import { Ledger } from "./Ledger";
+import { LangSwitch } from "./LangSwitch";
 import {
   VERDICT_TONE,
   checkedStamp,
@@ -71,6 +73,9 @@ export interface CaseResultProps {
   saferHref?: string;
   // Anything the page adds under the next steps (the safer places, the office check).
   children?: ReactNode;
+  // The report's language switch (EN | ES), when the caller can refetch in the other one.
+  lang?: Lang;
+  onLang?: (lang: Lang) => void;
 }
 
 export function CaseResult({
@@ -91,6 +96,8 @@ export function CaseResult({
   saferHref: saferTo,
   checking = {},
   children,
+  lang,
+  onLang,
 }: CaseResultProps) {
   const id = encodeURIComponent(card.case_id);
   const key = inline ? `-${card.case_id}` : "";
@@ -109,7 +116,7 @@ export function CaseResult({
   // The one primary button. A result that did not pass points at what to do next; one that
   // passed opens the walk when a photo was placed, else the safer places.
   const primary = !passed
-    ? { label: "What to do next", href: `#next${key}` }
+    ? { label: failed ? "Who do I call?" : "What to do next", href: `#next${key}` }
     : walk
       ? walkTo
       : { label: "Find me safer places like this", href: saferHref };
@@ -121,6 +128,7 @@ export function CaseResult({
           CASE <span data-testid="case-id">{card.case_id}</span>
         </span>
         <Tag source={card.source} testId="source-chip" />
+        {lang && onLang ? <LangSwitch lang={lang} onChange={onLang} /> : null}
       </p>
 
       <VerdictBand
@@ -146,7 +154,7 @@ export function CaseResult({
           )
         }
         primary={own ? primary : null}
-        link={own && !passed && walk ? walkTo : null}
+        link={own && !passed && !failed && walk ? walkTo : null}
       >
         {proof ? <ProofPair {...proof} handoff={own && !inline} /> : null}
         {!proof && checking.proof ? <StillChecking testId="checking-proof" /> : null}
