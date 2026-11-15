@@ -1085,8 +1085,10 @@ EN.update(
         "claimword.yard": "a yard",
         "claimword.pets": "pets are allowed",
         "claimword.beds": "{ad_value} bedrooms",
+        "claimword.beds_one": "1 bedroom",
         "claimword.beds_studio": "a studio",
         "claimword.baths": "{ad_value} bathrooms",
+        "claimword.baths_one": "1 bathroom",
         "claimword.sqft": "{ad_value} square feet",
         "claimword.new_management": "new management",
         "claimword.new_ownership": "new ownership",
@@ -1223,8 +1225,10 @@ ES.update(
         "claimword.yard": "patio o jardín",
         "claimword.pets": "se aceptan mascotas",
         "claimword.beds": "{ad_value} recámaras",
+        "claimword.beds_one": "1 recámara",
         "claimword.beds_studio": "un estudio",
         "claimword.baths": "{ad_value} baños",
+        "claimword.baths_one": "1 baño",
         "claimword.sqft": "{ad_value} pies cuadrados",
         "claimword.new_management": "nueva administración",
         "claimword.new_ownership": "nuevos dueños",
@@ -1364,6 +1368,16 @@ def has(key: str, lang: str = DEFAULT_LANG) -> bool:
 def text(key: str, lang: str = DEFAULT_LANG, **values: object) -> str:
     """The wording for `key`, with `{placeholders}` filled in. A missing key is a bug: KeyError."""
     return _table(lang)[key].format(**values)
+
+
+def claim_word(claim: str, ad_value: str | None, lang: str = DEFAULT_LANG) -> str:
+    """The ad's claim in the table's words: "a studio" for 0 beds, singular for 1 (#257)."""
+    key = claim
+    if claim == "beds" and ad_value == "0":
+        key = "beds_studio"
+    elif claim in ("beds", "baths") and ad_value == "1":
+        key = f"{claim}_one"
+    return text(f"claimword.{key}", lang, ad_value=ad_value or "", record_value="")
 
 
 def tone_word(tone: str, row: str, lang: str = DEFAULT_LANG) -> str:

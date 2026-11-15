@@ -1066,12 +1066,7 @@ def _claims_lines(modules: ModuleEvidence, lang: str) -> list[CardLine]:
     for note in modules.ad_notes:
         if not strings.has(f"claims.{note.key}", lang):
             continue
-        claim_key = note.claim
-        if note.claim == "beds" and note.ad_value == "0":
-            claim_key = "beds_studio"
-        claim = strings.text(
-            f"claimword.{claim_key}", lang, ad_value=note.ad_value or "", record_value=""
-        )
+        claim = strings.claim_word(note.claim, note.ad_value, lang)
         label = "label.ad_claim"
         if note.pretext:
             label = "label.ad_pretext"

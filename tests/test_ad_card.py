@@ -142,6 +142,24 @@ def test_a_bedroom_count_that_matches_names_the_number(lang, expected):
     assert not any("  " in text for text in texts)
 
 
+@pytest.mark.parametrize(
+    ("lang", "expected"),
+    [("en", ("The ad says 1 bedroom.", "1 bathroom.")), ("es", ("1 recámara.", "1 baño."))],
+)
+def test_one_bedroom_and_one_bathroom_are_singular(lang, expected):
+    # Review of #257 (L1): the line read "The ad says 1 bedrooms".
+    # Beds agree (the one quiet confirmation), baths differ, so both lines are shown.
+    record = PropertyRecord(
+        property_id="fx-home-4", source=DataSource.FIXTURE, beds_range=(1, 1), baths_range=(3, 3)
+    )
+    _, card = run(modules_for("1 bed, 1 bath condo near the park", record), lang)
+    texts = " ".join(text for _, text in claims_lines(card))
+    for words in expected:
+        assert words in texts, texts
+    assert "1 bedrooms" not in texts and "1 bathrooms" not in texts
+    assert "1 recámaras" not in texts and "1 baños" not in texts
+
+
 def test_no_claims_row_when_the_record_is_silent_or_the_ad_says_nothing_checkable():
     quiet = PropertyRecord(property_id="fx-home-3", source=DataSource.FIXTURE)
     for ad, record in (("Hardwood floors, pool", quiet), ("Nice home near the park", CARPET_HOME)):
