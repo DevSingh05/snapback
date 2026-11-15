@@ -9,6 +9,9 @@ import { WORDS } from "./words";
 export function deskWord(desk: Desk, lang: Lang): string {
   const w = WORDS[lang];
   if (desk.state !== "done") return w.state[desk.state];
+  // Code handed out the checks (no model planned), and code set the verdict: say so.
+  if (desk.byCode) return lang === "es" ? "Por código" : "By code";
+  if (desk.card.team === "decider") return lang === "es" ? "Resultado fijado" : "Verdict set";
   const tone = { red_flag: "Red flag", hold: "Hold", not_shown: "Not shown", ok: "Checks out" }[
     desk.tone as string
   ];

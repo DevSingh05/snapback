@@ -18,6 +18,7 @@ export interface AgentCard {
   id: string;
   name: string;
   team: TeamId;
+  role: string;
   job: string;
   doing: string;
   tools: string[];
@@ -57,6 +58,7 @@ export function asRoster(body: unknown): Roster | null {
     (a) =>
       typeof a?.id === "string" &&
       typeof a.name === "string" &&
+      typeof a.role === "string" &&
       Array.isArray(a.kinds) &&
       Array.isArray(a.tools) &&
       Array.isArray(a.never),
@@ -84,6 +86,9 @@ export interface Desk {
   // What ran this desk on this case: "code" when the policy ran the case or code made every one
   // of its steps happen; else the roster's model. With no case, the roster's.
   model: string;
+  // The Planner's desk when no model planned: code ran the standard plan and handed out the
+  // checks. It stands at the head of the team all the same.
+  byCode?: boolean;
   // Where this desk first comes into the run (the index of its first step); Infinity if never.
   order: number;
 }
@@ -245,6 +250,17 @@ export function floorAt({
       // The planner has no check of its own: every step the model made happen is its work.
       mine = deep ? steps.map((s, i) => ({ s, i })).filter(({ s }) => s.by === "agent") : [];
     }
+    if (agent.team === "planner" && !deep) {
+      desk.model = "code";
+      desk.byCode = true;
+      desk.order = -1;
+      if (started(0)) {
+        desk.state = ended(0) ? "done" : "working";
+        desk.startedAt = beats[0]!.start;
+        desk.source = steps[0]!.source;
+      }
+      return desk;
+    }
     if (mine.length > 0) desk.order = mine[0]!.i;
     if (!deep || (mine.length > 0 && mine.every(({ s }) => s.by === "code"))) desk.model = "code";
     const ran = mine.filter(({ s }) => !s.skipped);
@@ -376,7 +392,7 @@ export function floorAt({
       (steps.some((s) => !s.skipped && d.card.kinds.includes(s.kind ?? "")) ||
         (view?.bubbles ?? []).some((b) => d.card.checks.includes(b.check))),
   );
-  const working = desks.filter((d) => d.state === "working");
+  const working = desks.filter((d) => d.state === "working" && !d.byCode);
   const nowDesk =
     working.find((d) => d.card.team === "scam_check") ??
     working.find((d) => d.card.team !== "planner") ??
