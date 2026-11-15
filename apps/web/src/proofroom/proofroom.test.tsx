@@ -680,6 +680,17 @@ describe("the strip and its links", () => {
     expect(screen.getByTestId("home-team-link")).toHaveTextContent("Watch them work");
   });
 
+  it("Home: Watch them work is there from the moment the case has an id, before any timeline", () => {
+    // An API that never answers: no card, no timeline, no read token. The link must not wait.
+    vi.stubEnv("VITE_API_URL", "http://api.test");
+    vi.stubGlobal("fetch", () => new Promise(() => {}));
+    render(<HomeTeam caseId="K4MZ" />);
+    expect(screen.getByTestId("home-team-link")).toHaveAttribute("href", "/case/K4MZ/twin");
+    expect(screen.getByTestId("home-team-link").tagName).toBe("A");
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
   it("AgentStrip names every member with its state in words", () => {
     render(<AgentStrip desks={floor().desks} label="Your check team" />);
     const list = screen.getByRole("list", { name: "Your check team" });

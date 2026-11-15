@@ -141,10 +141,26 @@ _CHOICE_KEYS = {
 _TOOL_KEYS = {"license": "timeline.license", "reply": "timeline.reply"}
 
 
+_FALLBACKS = {
+    "trace.error.model_failed": "failed",
+    "trace.error.model_timeout": "timeout",
+    "trace.error.model_nokey": "nokey",
+    "trace.error.model_busy": "busy",
+    "trace.error.model_stuck": "stuck",
+}
+
+
+def _fallback_reason(reason: str) -> str | None:
+    """Why the agent as a whole stopped (failed, no key, out of time, kept waiting, stuck), as
+    opposed to one bad pick: the short key of the reason, else None."""
+    for key, short in _FALLBACKS.items():
+        if any(reason == strings.text(key, lang) for lang in strings.TABLES):
+            return short
+    return None
+
+
 def _is_fallback(reason: str) -> bool:
-    """The agent as a whole stopped (failed or ran out of time), as opposed to one bad pick."""
-    keys = ("trace.error.model_failed", "trace.error.model_timeout")
-    return any(reason == strings.text(k, lang) for k in keys for lang in strings.TABLES)
+    return _fallback_reason(reason) is not None
 
 
 def _placed(evidence: ModuleEvidence) -> tuple[int, int] | None:
@@ -290,9 +306,16 @@ def build_timeline(
             ran_agent = True
             b.add("timeline.note", at, b.say("timeline.result.note"), "agent", took=0)
         elif event.kind is TraceKind.ERROR:
-            if _is_fallback(event.reason):
+            why = _fallback_reason(event.reason)
+            if why is not None:
                 fell_back = True
-                b.add("timeline.fallback", at, event.reason, "code")
+                b.add(
+                    "timeline.fallback",
+                    at,
+                    event.reason,
+                    "code",
+                    reason=b.say(f"timeline.fallback.{why}"),
+                )
             else:
                 b.add("timeline.error", at, event.reason, "code")
         elif event.kind is TraceKind.VERDICT:
