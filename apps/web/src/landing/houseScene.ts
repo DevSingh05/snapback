@@ -628,7 +628,7 @@ export function mountHouse(
   const put = (n: HTMLElement, v: THREE.Vector3, dx: number, dy: number, show: boolean) => {
     v.project(cam);
     const x = clamp(((v.x + 1) / 2) * dim.cw + dx, 8, dim.cw - (dim.cw > 900 ? 200 : 132)),
-      y = clamp(((1 - v.y) / 2) * dim.ch + dy, 64, dim.ch - 44);
+      y = clamp(((1 - v.y) / 2) * dim.ch + dy, 8, dim.ch - 44);
     let c = lbl.get(n);
     if (!c) lbl.set(n, (c = { x, y, o: "" }));
     c.x += (x - c.x) * (reduced ? 1 : 0.2);
@@ -661,7 +661,7 @@ export function mountHouse(
     setCam({
       ppu,
       cx: cw * (wide ? 0.66 : 0.5),
-      cy: ch * (wide ? 0.58 : 0.3),
+      cy: ch * (wide ? 0.56 : 0.27),
       y: cy0,
       pit: ob.pit,
     });

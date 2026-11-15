@@ -148,8 +148,11 @@ function Hero({ reduced }: { reduced: boolean }) {
       if (!raf) raf = requestAnimationFrame(apply);
     };
     const measure = () => {
-      top = el.getBoundingClientRect().top + window.scrollY;
-      span = Math.max(1, el.offsetHeight - window.innerHeight);
+      // the drawing pins under the bar: progress runs from the moment it sticks to the moment
+      // the stage's end lets it go
+      const pinH = pin.current?.offsetHeight ?? window.innerHeight;
+      top = el.getBoundingClientRect().top + window.scrollY - (window.innerHeight - pinH);
+      span = Math.max(1, el.offsetHeight - pinH);
       track = rail.current ? rail.current.offsetHeight - 10 : 0;
       onScroll();
     };

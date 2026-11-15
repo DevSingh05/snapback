@@ -107,12 +107,13 @@
    it). With reduced motion or no WebGL the stage is one screen and the beats sit under it. */
 .wl-stage {
   position: relative;
-  --wl-pin-h: 100vh;
+  --wl-bar: 60px;
+  --wl-pin-h: calc(100vh - var(--wl-bar));
   --wl-left: max(var(--gutter), calc((100vw - 1200px) / 2 + var(--gutter)));
 }
 @supports (height: 100svh) {
   .wl-stage {
-    --wl-pin-h: 100svh;
+    --wl-pin-h: calc(100svh - var(--wl-bar));
   }
 }
 .wl-still {
@@ -120,7 +121,7 @@
 }
 .wl-pin {
   position: sticky;
-  top: 0;
+  top: var(--wl-bar);
   height: var(--wl-pin-h);
   overflow: hidden;
   background:
@@ -162,7 +163,7 @@
   min-height: var(--wl-pin-h);
   display: flex;
   align-items: center;
-  padding: 72px var(--gutter) 24px var(--wl-left);
+  padding: 24px var(--gutter) 24px var(--wl-left);
 }
 .wl-step > * {
   pointer-events: auto;
@@ -302,7 +303,7 @@
   z-index: 2;
   inset: 0 0 auto;
   height: var(--wl-pin-h);
-  padding: 72px var(--gutter) 24px var(--wl-left);
+  padding: 24px var(--gutter) 24px var(--wl-left);
   align-items: center;
   pointer-events: none;
 }
@@ -1062,14 +1063,22 @@
   }
   .wl-step {
     align-items: flex-end;
-    padding: 72px var(--gutter) 20px;
+    padding: 24px var(--gutter) 20px;
+  }
+  .wl-hero-card .wl-acts {
+    flex-wrap: nowrap;
+  }
+  .wl-hero-card a.wl-btn {
+    padding: 0 16px;
+    font-size: 0.95rem;
+    white-space: nowrap;
   }
   .wl-hero-card,
   .wl-say {
     width: 100%;
   }
   .wl-still .wl-step-hero {
-    padding: 72px var(--gutter) 20px;
+    padding: 24px var(--gutter) 20px;
     align-items: flex-end;
   }
   .wl-still .wl-over {
