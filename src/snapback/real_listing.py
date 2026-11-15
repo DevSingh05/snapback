@@ -5,9 +5,9 @@ Rules held here:
 - the building the photos were placed in wins when it is not the claimed one;
 - plans are narrowed to the ad's unit or beds first, then per-bed plans are left out (as
   `check_price` does: a per-bed price is never compared with a whole-unit rent);
-- a fixture case always shows its (synthetic) figures; a LIVE case shows rents, units and links
-  only when `Settings.snapback_show_record_figures` is on (the local demo), else company, host and
-  counts;
+- a fixture case always shows its (synthetic) figures; a LIVE case shows rents, units and the
+  building's name only when `Settings.snapback_show_record_figures` is on (the local demo), else
+  company, host and counts. The "See the real listing" hand-off link shows either way;
 - no phone number and no street address ever leaves here, and the office phone is yes / no.
 """
 
@@ -130,11 +130,11 @@ def _plans(
     return out
 
 
-def _cta(record: PropertyRecord, plans: list[FloorPlanRent], figures: bool) -> str | None:
+def _cta(record: PropertyRecord, plans: list[FloorPlanRent]) -> str | None:
     """Where the renter goes to see the real listing: the availability link on the record, else
-    the building's own site. Links show only with the figures (the record's own data)."""
-    if not figures:
-        return None
+    the building's own site. The hand-off shows whenever the record has a link, with the
+    figures flag on or off: it is where the renter goes, not a rent. Only rents, units and
+    the building's name stay behind the flag."""
     for plan in plans:
         if plan.availability_url:
             return plan.availability_url
@@ -196,7 +196,7 @@ def real_listing(
         PhoneMatch.NO: strings.text("real.phone_not_office", lang),
         PhoneMatch.NOT_CHECKED: None,
     }[phone]
-    cta = _cta(record, raw_ours, figures)
+    cta = _cta(record, raw_ours)
 
     return RealListing(
         case_id=modules.case_id,

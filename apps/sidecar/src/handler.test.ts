@@ -40,7 +40,11 @@ function mockApi(calls: Call[], opts: { status?: number; state?: string; throws?
       );
     }
     if (url.endsWith(`/cases/${card.case_id}/card`)) {
-      return Response.json({ ...card, state: opts.state ?? card.state });
+      // An overridden state is a different card: the fixture's own (hold) headline no longer fits,
+      // so the sidecar falls back to the locked headline for that state.
+      return Response.json(
+        opts.state ? { ...card, state: opts.state, headline: undefined } : { ...card },
+      );
     }
     return new Response("not found", { status: 404 });
   }) as typeof fetch;
@@ -103,6 +107,13 @@ for (const [state, headline] of [
     assert.equal(HEADLINES[state], headline);
   });
 }
+
+test("the card's own headline (the shared fixture carries one) leads the reply when state is not overridden", async () => {
+  assert.ok(card.headline, "the contract fixture carries a code-built headline");
+  const photon = mockPhoton();
+  await handleMessage(msg, photon, config([]));
+  assert.equal(first(photon.sent).text.split("\n")[0], card.headline);
+});
 
 test("no case token ever appears in the reply", async () => {
   for (const state of ["hold", "unverified", "dont_pay", "verified"]) {
