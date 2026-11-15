@@ -158,6 +158,10 @@ def test_the_trace_and_timeline_show_the_pick_its_reason_and_the_result():
     assert pick.by == "agent" and pick.source_name == "Google Lens"
     assert any(s.label == "Follow-up check" and "Google Lens" in s.result for s in steps)
     assert "Google Lens" in case.notes[casework.FOLLOWUPS].text
+    # The report finds the Planner's choice by field, not by its (translated) label.
+    assert pick.choice == "follow_up"
+    assert [s for s in steps if s.choice == "follow_up"] == [pick]
+    assert all(s.choice is None for s in steps if s is not pick)
 
 
 # --- time limits
@@ -343,7 +347,8 @@ def test_the_planner_drafts_one_next_step_for_a_gap_and_the_verdict_does_not_mov
     assert "Draft:" in case.notes[casework.NEXT_STEP].text
     assert _snapshot(case) == before
     steps = build_timeline(case.case_id, DataSource.FIXTURE, case.trace.events, case.evidence).steps
-    assert any(s.label.startswith("Planner drafted: ask the poster") for s in steps)
+    drafted = next(s for s in steps if s.label.startswith("Planner drafted: ask the poster"))
+    assert drafted.choice == "next_step"
 
 
 def test_a_next_step_needs_a_reason_and_a_gap_it_covers():

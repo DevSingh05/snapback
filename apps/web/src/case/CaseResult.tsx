@@ -18,7 +18,7 @@ import type {
 } from "../contracts";
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
-import type { Lang } from "../lang";
+import { asLang, type Lang } from "../lang";
 import { ReportTeam } from "../proofroom/ReportTeam";
 import { AnswerPanel } from "./AnswerPanel";
 import { Checks } from "./Checks";
@@ -39,6 +39,7 @@ import {
   type SaferPlace,
 } from "./model";
 import { APARTMENTS_SEARCH, NextSteps, caseSteps } from "./NextSteps";
+import { PlannerChoice } from "./PlannerChoice";
 import { ProofPair } from "./ProofPair";
 import { RealListing } from "./RealListing";
 import { SaferTiles } from "./SaferTiles";
@@ -184,6 +185,13 @@ export function CaseResult({
         source={card.source}
         titleId={`case-checks-title${key}`}
       />
+      {own ? (
+        <PlannerChoice
+          caseId={card.case_id}
+          timeline={timeline}
+          lang={lang ?? asLang(card.lang) ?? undefined}
+        />
+      ) : null}
 
       {own ? (
         <AnswerPanel card={card} timeline={timeline} realListing={realListing} idSuffix={key} />
