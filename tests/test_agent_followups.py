@@ -349,6 +349,9 @@ def test_the_planner_drafts_one_next_step_for_a_gap_and_the_verdict_does_not_mov
     steps = build_timeline(case.case_id, DataSource.FIXTURE, case.trace.events, case.evidence).steps
     drafted = next(s for s in steps if s.label.startswith("Planner drafted: ask the poster"))
     assert drafted.choice == "next_step"
+    # The code-written draft rides on the step, so the report can offer Approve / Edit / Copy.
+    assert drafted.draft is not None and drafted.draft.startswith("Before we go further")
+    assert all(s.draft is None for s in steps if s is not drafted)
 
 
 def test_a_next_step_needs_a_reason_and_a_gap_it_covers():

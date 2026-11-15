@@ -192,6 +192,9 @@ export interface TimelineStep {
   // The Planner's own choices: a check it chose for a gap ("follow_up") or a step it drafted
   // and never sent ("next_step"). Absent on older servers.
   choice?: "follow_up" | "next_step" | null;
+  // For a "next_step" choice: the code-written draft the renter may approve, edit and send
+  // themselves. Nothing is ever sent from it.
+  draft?: string | null;
 }
 
 export interface TimelineTodo {

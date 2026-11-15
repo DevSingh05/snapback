@@ -30,7 +30,14 @@ export {
   type SaferPlace,
   type VerdictTone,
 } from "./model";
-export { APARTMENTS_SEARCH, NextSteps, caseSteps, type NextStep } from "./NextSteps";
+export {
+  APARTMENTS_SEARCH,
+  DraftedStep,
+  NextSteps,
+  caseSteps,
+  draftedStep,
+  type NextStep,
+} from "./NextSteps";
 export { PlannerChoice, plannerChoices } from "./PlannerChoice";
 export { PriceBar, priceScale } from "./PriceBar";
 export { ProofPair, stampPlace } from "./ProofPair";
