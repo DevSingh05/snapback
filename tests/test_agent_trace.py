@@ -6,7 +6,6 @@ model wrote is cleaned: no phone number, address, rent figure or result word rea
 With the policy no model runs, so there are no member cards at all.
 """
 
-import json
 import re
 import time
 
@@ -110,7 +109,17 @@ def test_nothing_a_model_wrote_leaks_a_phone_a_rent_an_address_or_a_result(
 ) -> None:
     client = make_client(tmp_path, monkeypatch, lambda: Loose())
     timeline = finished(client, start(client))
-    text = json.dumps(timeline["members"], ensure_ascii=False)
+    # Every word on the cards (the numbers that are times and counts are not words).
+    text = " | ".join(
+        str(part)
+        for m in timeline["members"]
+        for part in (
+            m["asked"],
+            m["said"],
+            *(x for t in m["tools"] for x in (t["label"], t["result"])),
+        )
+        if part
+    )
     assert len(timeline["members"]) == 1 + len(FAMILIES)
     assert not PHONE.search(text), text
     assert not MONEY.search(text)
