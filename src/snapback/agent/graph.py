@@ -680,14 +680,21 @@ def _stream_within(
     The real bound: the case is back in code's hands `remaining` seconds after the leg starts,
     plus the time an in-flight code tool needs to finish (milliseconds; the gate waits for it).
     A model call still in flight keeps running in the background until its client timeout, but
-    the gate is closed, so nothing it returns can move the case or reach the trace."""
+    the gate is closed, so nothing it returns can move the case or reach the trace, and the
+    worker leaves the stream at its next step, so no further model call is made."""
     if remaining is not None and remaining <= 0:
         raise AgentTimeout
     failure: list[BaseException] = []
 
+    gate = _gate(case)
+
     def leg() -> None:
         try:
             for chunk in agent.stream(payload, config, stream_mode="updates"):
+                if gate.stopped:
+                    # Past the limit: leaving the loop closes the stream, so the agent plans
+                    # no further step and makes no further paid model call.
+                    return
                 watch.update(chunk)
             # The stream shows each file as it lands; the final state is the catch-all.
             watch.update({"state": {"files": agent.get_state(config).values.get("files")}})
@@ -698,7 +705,6 @@ def _stream_within(
     worker.start()
     worker.join(remaining)
     if worker.is_alive():
-        gate = _gate(case)
         with gate.lock:  # waits for any tool that is mid-change, then shuts the agent out
             gate.stopped = True
         raise AgentTimeout
