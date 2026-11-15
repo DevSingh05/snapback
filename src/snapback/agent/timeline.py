@@ -79,10 +79,18 @@ _LONG_NUMBER = re.compile(r"\d[\d,.\s-]{5,}\d")
 _RENT_WORDS = re.compile(r"\b\d[\d,]{2,}\s?(dollars|dólares|/mo|a month|al mes)\b", re.IGNORECASE)
 
 
-def scrub(text: object, fallback: str = "") -> str:
-    """One short plain line with phone numbers, addresses and rents taken out."""
+_BARE_NUMBER = re.compile(r"\d[\d,]{2,}")
+
+
+def scrub(text: object, fallback: str = "", *, model: bool = False) -> str:
+    """One short plain line with phone numbers, addresses and rents taken out. Text a model
+    wrote (`model`) also loses every run of three or more digits, commas included: a model can
+    quote a bare rent, deposit or street number that no pattern above would recognise."""
     line = " ".join(str(text or "").split())
-    for pattern in (_ADDRESS, _PHONE, _MONEY, _RENT_WORDS, _LONG_NUMBER):
+    patterns = [_ADDRESS, _PHONE, _MONEY, _RENT_WORDS, _LONG_NUMBER]
+    if model:
+        patterns.append(_BARE_NUMBER)
+    for pattern in patterns:
         line = pattern.sub("…", line)
     line = re.sub(r"(…[\s,]*)+", "… ", line).strip(" ,")
     if not line or line == "…":
@@ -141,13 +149,25 @@ class _Builder:
     def say(self, key: str, **values: object) -> str:
         return strings.text(key, self.lang, **values)
 
-    def add(self, key: str, at_ms: int, result: str, by: By, *, took: int | None = None, **v):
+    def add(
+        self,
+        key: str,
+        at_ms: int,
+        result: str,
+        by: By,
+        *,
+        took: int | None = None,
+        model: bool = False,
+        source: DataSource | None = None,
+        **v: object,
+    ) -> None:
         self.steps.append(
             {
                 "label": self.say(key, **v),
                 "started_ms": at_ms,
                 "took_ms": took,  # None: filled from the next step's start
-                "result": scrub(result, self.say("timeline.result.done")),
+                "result": scrub(result, self.say("timeline.result.done"), model=model),
+                "source": source or self.source,
                 "by": by,
                 "derived": took is not None,
             }
@@ -163,6 +183,7 @@ class _Builder:
                 self.say(f"timeline.result.rent.{price.status.value}"),
                 "code",
                 took=0,
+                source=self.evidence.record_source,
                 n=price.n_floor_plans,
             )
         authority = self.evidence.authority
@@ -173,6 +194,7 @@ class _Builder:
                 self.say(f"timeline.result.phone.{authority.office_phone_match.value}"),
                 "code",
                 took=0,
+                source=self.evidence.record_source,
             )
 
 
@@ -204,7 +226,7 @@ def build_timeline(
             ran_agent = True
             todos = [
                 TimelineTodo(
-                    content=scrub(item[4:] if item[:1] == "[" else item, "step"),
+                    content=scrub(item[4:] if item[:1] == "[" else item, "step", model=True),
                     done=item.startswith("[x]"),
                 )
                 for item in event.options
@@ -267,11 +289,25 @@ def build_timeline(
             key = _CHECK_KEYS.get(event.pick or "", "timeline.tool")
             if key == "timeline.record" and evidence.price is None and evidence.authority is None:
                 key = "timeline.record_missing"
-            b.add(key, at, event.reason, by)
+            on_record = key in ("timeline.record", "timeline.record_missing")
+            b.add(
+                key,
+                at,
+                event.reason,
+                by,
+                model=by == "agent",
+                source=evidence.record_source if on_record else None,
+            )
             if key == "timeline.record":
                 b.record_lines(at)
         elif event.kind is TraceKind.CHOICE:
-            b.add(_CHOICE_KEYS.get(event.choice, "timeline.tool"), at, event.reason, by)
+            b.add(
+                _CHOICE_KEYS.get(event.choice, "timeline.tool"),
+                at,
+                event.reason,
+                by,
+                model=by == "agent",
+            )
         if by == "agent":
             ran_agent = True
 
@@ -287,7 +323,7 @@ def build_timeline(
         mode="deepagents" if ran_agent else "policy",
         fell_back=fell_back,
         steps=[
-            TimelineStep(step=i, source=source, **{k: v for k, v in step.items() if k != "derived"})
+            TimelineStep(step=i, **{k: v for k, v in step.items() if k != "derived"})
             for i, step in enumerate(b.steps)
         ],
         todos=todos,

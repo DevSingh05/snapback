@@ -27,8 +27,10 @@ still `decide()` on the evidence gathered.
 
 import json
 import os
+import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from deepagents import FilesystemPermission, create_deep_agent
@@ -177,6 +179,31 @@ class AgentTimeout(Exception):
     """The deep agent used up its time; code finishes the case."""
 
 
+STOPPED = "Time is up: code has finished this case. Stop now."
+
+
+class _Gate:
+    """Closed once the agent is stopped. Every tool that can move the case, and the stream
+    mirror, takes the lock and checks it, so an abandoned run cannot touch the case while (or
+    after) code finishes it."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.stopped = False
+
+
+def _gate(case: CaseSession) -> _Gate:
+    return case.__dict__.setdefault("_agent_gate", _Gate())
+
+
+@contextmanager
+def _turn(case: CaseSession) -> Iterator[bool]:
+    """Yields True when the agent may still act on the case, holding the gate meanwhile."""
+    gate = _gate(case)
+    with gate.lock:
+        yield not gate.stopped
+
+
 def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = None) -> Any:
     """A deep agent bound to one case. Pass a chat model, or leave it to use Claude."""
     if model is None:
@@ -185,7 +212,8 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
     @tool
     def open_choice() -> str:
         """Show the decision that is open now: its options and the facts derived so far."""
-        return describe(case)
+        with _turn(case) as live:
+            return describe(case) if live else STOPPED
 
     @tool
     def choose_option(option: str, reason: str) -> str:
@@ -194,6 +222,10 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
         `option` must be one of the options `open_choice` listed. `reason` is one plain
         sentence, about the facts, that the renter will read.
         """
+        with _turn(case) as live:
+            return _choose(option, reason) if live else STOPPED
+
+    def _choose(option: str, reason: str) -> str:
         if case.step is Step.PLACE:
             return "That decision belongs to the place sub-agent. " + describe(case)
         if case.offer() is None:
@@ -204,6 +236,10 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
     @tool
     def draw_spot() -> str:
         """Draw the spot for the photo challenge at random. Takes no arguments."""
+        with _turn(case) as live:
+            return _draw() if live else STOPPED
+
+    def _draw() -> str:
         if case.step is not Step.SPOT:
             return "No spot is due to be drawn right now. " + describe(case)
         case.draw_spot()
@@ -212,6 +248,10 @@ def build_agent(case: CaseSession, model: Any = None, *, checkpointer: Any = Non
     @tool
     def send_challenge() -> str:
         """Send the challenge message for the renter to pass on. Pauses for their approval."""
+        with _turn(case) as live:
+            return _send() if live else STOPPED
+
+    def _send() -> str:
         if case.step is not Step.APPROVAL:
             return "No challenge is waiting to be sent. " + describe(case)
         if case.waiting_for_approval:
@@ -321,6 +361,10 @@ def build_subagents(case: CaseSession) -> list[dict[str, Any]]:
         @tool
         def place_choose_option(option: str, reason: str) -> str:
             """Pick one option for the open place decision, with one plain sentence of reason."""
+            with _turn(case) as live:
+                return _place_choose(option, reason) if live else STOPPED
+
+        def _place_choose(option: str, reason: str) -> str:
             if case.step is not Step.PLACE or case.offer() is None:
                 return "No search decision is open right now."
             case.choose(option, reason, by="model")
@@ -438,6 +482,10 @@ def _walk_spec(case: CaseSession) -> dict[str, Any]:
     @tool
     def walk_choose_option(option: str, reason: str) -> str:
         """Pick one option for the open walk decision, with one plain sentence of reason."""
+        with _turn(case) as live:
+            return _walk_choose(option, reason) if live else STOPPED
+
+    def _walk_choose(option: str, reason: str) -> str:
         offered = desk().offer()
         done = desk().choose(option, reason)
         if done is None:
@@ -509,6 +557,11 @@ class RunWatch:
         )
 
     def update(self, chunk: Any) -> None:
+        with _turn(self.case) as live:
+            if live:
+                self._update(chunk)
+
+    def _update(self, chunk: Any) -> None:
         if not isinstance(chunk, dict):
             return
         for node_update in chunk.values():
@@ -603,14 +656,54 @@ def run_case_with_agent(
     """Run `case` with a deep agent. Returns None while it is paused for the renter.
 
     To carry on after a pause, record the answer with `case.approve(...)` and call this again
-    with the same agent and thread id. With `deadline_s`, the agent gets that long (checked
-    after each step it streams); past it, the trace says so and code finishes the case.
+    with the same agent and thread id. With `deadline_s`, the agent gets that long per call
+    (see `_stream_within` for the exact bound); past it, the trace says so, the agent is shut
+    out of the case and code finishes it.
     """
     try:
         return _drive(case, agent, approver, thread_id, deadline_s, clock)
     finally:
         # Whatever happened, every family has a note: any a sub-agent did not write, code does.
         casework.refresh_policy_notes(case)
+
+
+def _stream_within(
+    case: CaseSession,
+    agent: Any,
+    payload: Any,
+    config: dict[str, Any],
+    watch: "RunWatch",
+    remaining: float | None,
+) -> None:
+    """Stream one leg of the run in a worker thread and wait at most `remaining` seconds.
+
+    The real bound: the case is back in code's hands `remaining` seconds after the leg starts,
+    plus the time an in-flight code tool needs to finish (milliseconds; the gate waits for it).
+    A model call still in flight keeps running in the background until its client timeout, but
+    the gate is closed, so nothing it returns can move the case or reach the trace."""
+    if remaining is not None and remaining <= 0:
+        raise AgentTimeout
+    failure: list[BaseException] = []
+
+    def leg() -> None:
+        try:
+            for chunk in agent.stream(payload, config, stream_mode="updates"):
+                watch.update(chunk)
+            # The stream shows each file as it lands; the final state is the catch-all.
+            watch.update({"state": {"files": agent.get_state(config).values.get("files")}})
+        except BaseException as error:  # handed to the caller's thread
+            failure.append(error)
+
+    worker = threading.Thread(target=leg, name=f"agent-{case.case_id}", daemon=True)
+    worker.start()
+    worker.join(remaining)
+    if worker.is_alive():
+        gate = _gate(case)
+        with gate.lock:  # waits for any tool that is mid-change, then shuts the agent out
+            gate.stopped = True
+        raise AgentTimeout
+    if failure:
+        raise failure[0]
 
 
 def _drive(
@@ -653,12 +746,8 @@ def _drive(
                     )
                 else:
                     payload = Command(resume={"decisions": [{"type": "approve"}]})
-            for chunk in agent.stream(payload, config, stream_mode="updates"):
-                watch.update(chunk)
-                if deadline_s is not None and clock() - started > deadline_s:
-                    raise AgentTimeout
-            # The stream shows each file as it lands; the final state is the catch-all.
-            watch.update({"state": {"files": agent.get_state(config).values.get("files")}})
+            remaining = None if deadline_s is None else deadline_s - (clock() - started)
+            _stream_within(case, agent, payload, config, watch, remaining)
             if not _paused(agent, config):
                 break
             payload = None

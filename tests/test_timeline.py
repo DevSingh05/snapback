@@ -238,3 +238,73 @@ def test_a_fallback_is_shown_as_its_own_step():
     stop = next(s for s in tl.steps if s.label == "The agent stopped, so code finished the checks")
     assert stop.by == "code"
     assert "ran out of time" in stop.result
+
+
+BARE = [
+    "Check rent 1450 against the record's 1,900 floor plan",
+    "1200 Post Oak, unit 4B",
+    "deposit 900",
+]
+
+
+def test_model_written_todos_and_reasons_lose_every_bare_number():
+    events = [
+        ev(0, 0, TraceKind.TODO, "plan", options=[f"[ ] {t}" for t in BARE], chosen_by="model"),
+        *(
+            ev(
+                1 + i,
+                10 + i,
+                TraceKind.CHOICE,
+                t,
+                choice=ChoiceKind.WHICH_CHECKS,
+                pick="x",
+                chosen_by="model",
+            )
+            for i, t in enumerate(BARE)
+        ),
+    ]
+    tl = build_timeline("c1", DataSource.FIXTURE, events, evidence())
+    texts = [t.content for t in tl.todos] + [s.result for s in tl.steps if s.by == "agent"]
+    assert len(texts) >= 6
+    for text in texts:
+        assert not re.search(r"\d[\d,]{2,}", text), text
+        for gone in ("1450", "1,900", "1200", "900"):
+            assert gone not in text, text
+
+
+def test_code_written_counts_are_kept():
+    events = [
+        ev(
+            0,
+            0,
+            TraceKind.CHOICE,
+            "Plan A: 457 inliers vs 9.",
+            choice=ChoiceKind.WHICH_FLOOR_PLAN,
+            pick="p",
+        )
+    ]
+    tl = build_timeline("c1", DataSource.FIXTURE, events, evidence())
+    assert tl.steps[1].result == "Plan A: 457 inliers vs 9."
+
+
+def test_record_rent_and_phone_steps_carry_the_records_own_source():
+    from snapback.contracts import AuthorityResult, AuthorityStatus, PhoneMatch
+
+    events = [
+        ev(0, 0, TraceKind.CHOICE, "x", choice=ChoiceKind.NEXT_CHECK, pick="home record"),
+        ev(1, 5, TraceKind.VERDICT, "Hold.", pick="hold"),
+    ]
+    ev_ = evidence(
+        price=PriceResult(status=PriceStatus.WITHIN_RANGE, n_floor_plans=37),
+        authority=AuthorityResult(
+            status=list(AuthorityStatus)[0], office_phone_match=PhoneMatch.YES
+        ),
+        record_source=DataSource.LIVE,
+    )
+    tl = build_timeline("c1", DataSource.FIXTURE, events, ev_)
+    by_label = {s.label: s.source for s in tl.steps}
+    assert by_label["Found the building on CoStar's record"] is DataSource.LIVE
+    assert by_label["Compared the rent with 37 floor plans"] is DataSource.LIVE
+    assert by_label["Checked the phone against the leasing office"] is DataSource.LIVE
+    assert by_label["Read the ad"] is DataSource.FIXTURE
+    assert by_label["Code worked out the result"] is DataSource.FIXTURE

@@ -184,3 +184,31 @@ def test_a_model_that_breaks_on_the_route_is_finished_by_the_policy(tmp_path, mo
     errors = [e for e in stored.events() if e.kind is TraceKind.ERROR]
     assert len(errors) == 1  # once fallen back, the case stays on the policy
     assert stored.done
+
+
+def test_a_slow_model_call_is_cut_off_at_the_time_limit_and_cannot_touch_the_case_after():
+    import time
+
+    class Slow(ScriptedChat):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            time.sleep(1.5)  # one model call far longer than the agent's whole budget
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    case = new_case()
+    started = time.monotonic()
+    verdict = run_case_with_agent(
+        case,
+        build_agent(case, Slow(turns=scripted().turns, calls=[])),
+        lambda d: "send",
+        deadline_s=0.3,
+    )
+    took = time.monotonic() - started
+    assert took < 1.0, took  # bounded by the budget, not by the slow call
+    assert verdict == decide(to_evidence(case.evidence))
+    assert [e.reason for e in case.trace.events if e.kind is TraceKind.ERROR] == [
+        strings.text("trace.error.model_timeout")
+    ]
+    seen = len(case.trace.events)
+    time.sleep(2.0)  # the abandoned call returns a tool call; it must not land
+    assert len(case.trace.events) == seen
+    assert not any(e.chosen_by == "model" for e in case.trace.events)
