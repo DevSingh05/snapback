@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 
 import { apiBase } from "../api";
 import { layoutGraph, timeScale } from "./layout";
+import { readQuery } from "./stream";
+import type { StreamTimeline } from "./stream";
+import { StreamView } from "./StreamView";
 import type { Answer, Evidence, Finding, RingResponse, RingsResponse, Score } from "./types";
 import "./investigate.css";
 
@@ -384,7 +387,7 @@ export function InvestigateView({
       <header className="inv-head">
         <div>
           <p className="inv-eyebrow">Investigator view</p>
-          <h1>The ring behind the ads</h1>
+          <h2 className="inv-h1">The ring behind the ads</h2>
           <p className="inv-sub">
             One renter&apos;s check answers one ad. An investigator needs to see who is behind many.
           </p>
@@ -482,7 +485,36 @@ export function InvestigateView({
   );
 }
 
+// The 90-day stream sits above the ring-by-ring view. Its data is bundled (a FIXTURE made by
+// `snapback.forensics.detect`), so it draws with or without the API.
+function StreamSection() {
+  const [data, setData] = useState<StreamTimeline | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import("../../../../fixtures/forensics/stream_timeline.json").then((m) => {
+      if (live) setData(m.default as unknown as StreamTimeline);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!data) return <p className="inv-sub">Loading the 90-day stream.</p>;
+  const start = readQuery(window.location.search, data);
+  return <StreamView data={data} initialPos={start.pos} initialRing={start.ring} />;
+}
+
 export function InvestigatePage() {
+  return (
+    <>
+      <div className="inv-page inv-page-stream">
+        <StreamSection />
+      </div>
+      <RingsSection />
+    </>
+  );
+}
+
+function RingsSection() {
   const [rings, setRings] = useState<RingsResponse | null>(null);
   const [ringId, setRingId] = useState("A");
   const [ring, setRing] = useState<RingResponse | null>(null);
@@ -516,7 +548,8 @@ export function InvestigatePage() {
     return (
       <div className="inv-page">
         <p className="inv-error">
-          The investigator view needs the API (make api). It could not be reached.
+          The ring-by-ring view below the stream (300 synthetic ads, with questions) needs the API
+          (make api). It could not be reached.
         </p>
       </div>
     );

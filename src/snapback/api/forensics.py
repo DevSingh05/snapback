@@ -3,6 +3,7 @@
     GET  /forensics/rings           every ring (summary), the corpus label and the measured numbers
     GET  /forensics/rings/{id}      one ring in full: findings with evidence, timeline, graph
     POST /forensics/ask             {"question": "..."} -> an answer that cites its evidence
+    GET  /forensics/stream          the 90-day stream: groups, shared signals, time to detect
 
 Everything here is FIXTURE data (`fixtures/forensics/`), labelled SYNTHETIC in every response.
 The answer comes from the evidence graph in fixture mode; no model is called from this route.
@@ -12,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from snapback.forensics import SYNTHETIC_LABEL
+from snapback.forensics.detect import load_timeline
 from snapback.forensics.evaluate import evaluate
 from snapback.forensics.investigator import EXAMPLES, Answer, ask
 from snapback.forensics.pipeline import Analysis, default_analysis
@@ -126,3 +128,10 @@ def get_ring(ring_id: str) -> dict:
 @router.post("/ask")
 def post_ask(body: AskBody) -> Answer:
     return ask(default_analysis(), body.question)
+
+
+@router.get("/stream")
+def get_stream() -> dict:
+    """The day-by-day run over the SYNTHETIC 90-day stream, computed ahead of time by
+    `snapback.forensics.detect` (the finder is run once per day; about two minutes)."""
+    return load_timeline()
