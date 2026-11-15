@@ -190,6 +190,31 @@ def test_a_long_or_short_digit_run_is_not_a_phone(text):
     assert extract_contacts(text).phones == []
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "See https://houston.craigslist.org/apa/d/x/7801234567.html for photos.",
+        "houston.craigslist.org/apa/d/x/7801234567.html",
+        "Listing ID 4815162342",
+        "MLS# 8123456789",
+        "Account 1234567890",
+        "id=7135550142&a",
+        "ref #5550100142",
+        "x/5550100142",
+        "v.5550100142",
+    ],
+)
+def test_a_bare_digit_run_in_a_link_or_an_id_is_not_a_phone(text):
+    # Review of #257 (H1): a second "phone" makes check_phone say NO, and a real office ad
+    # loses its green Contact line.
+    assert extract_contacts(text).phones == []
+
+
+def test_an_office_ad_with_a_post_link_keeps_only_its_phone():
+    text = "Call 5550100142. Photos: https://houston.craigslist.org/apa/d/x/7801234567.html"
+    assert extract_contacts(text).phones == ["5550100142"]
+
+
 def test_no_contact_claims_in_plain_text():
     contacts = extract_contacts("Quiet street near the park, 2 bed / 2 bath.")
     assert (contacts.company, contacts.phones, contacts.emails) == (None, [], [])
