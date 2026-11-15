@@ -131,6 +131,8 @@ describe("trace cards", () => {
       "http://smith.langchain.com/o/team",
       "https://evil.example/smith.langchain.com",
       "https://user:pw@smith.langchain.com/o/team",
+      "https://smith.langchain.com/o/team/lsv2_pt_abc123",
+      "https://smith.langchain.com/sk-ant-abc123/o",
       "javascript:alert(1)",
       "",
       null,

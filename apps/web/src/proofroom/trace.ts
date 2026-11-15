@@ -117,7 +117,8 @@ export function safeTraceUrl(url: string | null | undefined): string | null {
       !u.search &&
       !u.hash &&
       !u.username &&
-      !u.password;
+      !u.password &&
+      !/(lsv2_|sk-)/i.test(u.pathname); // a key pasted into the path is still a key
     return ok ? url : null;
   } catch {
     return null;

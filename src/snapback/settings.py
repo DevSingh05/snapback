@@ -1,5 +1,6 @@
 """Runtime settings, read from the environment and an optional .env file."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -119,6 +120,9 @@ class Settings(BaseSettings):
             return None
         on_langsmith = host == "smith.langchain.com" or host.endswith(".smith.langchain.com")
         plain = not (parts.query or parts.fragment or parts.username or parts.password)
+        # A key pasted into the path is still a key in an address.
+        if re.search(r"(lsv2_|sk-)", parts.path, re.IGNORECASE):
+            return None
         return url if parts.scheme == "https" and on_langsmith and plain else None
 
     @field_validator("demo_case", mode="before")

@@ -114,6 +114,7 @@ def test_nothing_a_model_wrote_leaks_a_phone_a_rent_an_address_or_a_result(
         str(part)
         for m in timeline["members"]
         for part in (
+            m["kind"],
             m["asked"],
             m["said"],
             *(x for t in m["tools"] for x in (t["label"], t["result"])),
@@ -155,8 +156,49 @@ def test_the_langsmith_link_shows_only_for_an_agent_run_and_never_carries_a_toke
         "http://smith.langchain.com/o/team",
         "https://example.com/o/team",
         "https://user:pass@smith.langchain.com/o/team",
+        "https://smith.langchain.com/o/team/lsv2_pt_abc123",
+        "https://smith.langchain.com/sk-ant-abc123/o",
     ):
         assert Settings(_env_file=None, snapback_langsmith_url=bad).snapback_langsmith_url is None
+
+
+def test_a_member_name_the_planner_made_up_is_never_shown_as_written() -> None:
+    """The planner writes the name of the member it hands work to. Only a name the roster knows
+    is kept; anything else is filed under "other" and its text never reaches a card."""
+    work = AgentWork()
+    made_up = "call me 415 867 5309 jane@x.com"
+    work.model_call(None)
+    work.tool_start("r1", None, "task", {"subagent_type": made_up, "description": "Do it."})
+    work.model_call(made_up)
+    work.tool_end("r1", "Fine.")
+    cards = member_traces(work, {"planner": "Claude Sonnet", "sub": "Claude Haiku", "code": "code"})
+    assert [c.kind for c in cards] == ["planner", "other"]
+    text = " ".join(c.model_dump_json() for c in cards)
+    assert "415" not in text and "jane" not in text and "call me" not in text
+    assert cards[0].tools[0].label == "Handed work to another helper"
+    assert worklog.member_kind("record") == "record"
+    assert worklog.member_kind(None) == "planner"
+    assert worklog.member_kind("general-purpose") == "other"
+
+
+@pytest.mark.parametrize(
+    "leak",
+    [
+        "write to jane.doe+x@mail.example.com now",
+        "see https://evil.example/pay?id=1 for it",
+        "see www.evil.example/pay",
+        "rent is 1.5k a month",
+        "rent is 2k",
+        "key sk-ant-api03-AbCdEf123456",
+        "key lsv2_pt_abcdef0123456789",
+        "key sk-proj-abcdefgh12345678",
+    ],
+)
+def test_plain_drops_emails_addresses_money_shorthand_and_keys(leak: str) -> None:
+    out = worklog.plain(leak, "A plain line.")
+    for bad in ("@", "http", "www.", "1.5k", "2k", "sk-", "lsv2_", "evil"):
+        assert bad not in out.lower(), out
+    assert out
 
 
 def test_the_work_log_counts_and_orders_what_it_sees() -> None:

@@ -16,6 +16,7 @@ extra.
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -71,6 +72,25 @@ class _Member:
         self.last = now
 
 
+OTHER = "other"
+
+
+def member_kind(name: str | None) -> str:
+    """Which card a call belongs to. The planner writes the name of the member it hands work to,
+    so that name is a model's text: only a name the roster knows is ever kept. Anything else
+    (a made-up member, a sentence, a number) is filed under "other" and never shown as written."""
+    if not name or name == PLANNER:
+        return PLANNER
+    from snapback.agent.roster import card_for
+
+    return name if card_for(name) is not None else OTHER
+
+
+def _target(use: _Use) -> str | None:
+    raw = str(use.args.get("subagent_type") or "")
+    return member_kind(raw) if raw else None
+
+
 class AgentWork:
     """The running log for one case. Safe to write from the agent's threads."""
 
@@ -81,7 +101,7 @@ class AgentWork:
         self._open: dict[str, tuple[str, _Use]] = {}  # run id -> (member, use)
 
     def _member(self, name: str | None) -> _Member:
-        return self._members.setdefault(name or PLANNER, _Member())
+        return self._members.setdefault(member_kind(name), _Member())
 
     def model_call(self, member: str | None) -> None:
         with self._lock:
@@ -96,10 +116,10 @@ class AgentWork:
             use = _Use(run_id, tool, args if isinstance(args, dict) else {})
             if len(who.uses) < MAX_TOOLS:
                 who.uses.append(use)
-            self._open[run_id] = (member or PLANNER, use)
+            self._open[run_id] = (member_kind(member), use)
             if tool == "task":
                 # A hand-off: the instruction belongs on the card of the member it went to.
-                target = str(use.args.get("subagent_type") or "")
+                target = _target(use)
                 if target:
                     self._member(target).asked = str(use.args.get("description") or "")
 
@@ -112,7 +132,7 @@ class AgentWork:
             use.output = _text(output)
             self._member(name).touch(self._clock())
             if use.tool == "task":
-                target = str(use.args.get("subagent_type") or "")
+                target = _target(use)
                 if target:
                     self._member(target).said = use.output
 
@@ -137,14 +157,23 @@ def _text(output: Any) -> str:
     return str(content or "")
 
 
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_URL = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
+_K_MONEY = re.compile(r"\b\d+(?:\.\d+)?\s?k\b", re.IGNORECASE)
+_KEY = re.compile(r"\b(?:sk-ant|lsv2_|sk-)[\w-]{4,}", re.IGNORECASE)
+
+
 def plain(text: object, fallback: str) -> str:
-    """One short line a renter may read: no result word, phone, address, rent or long number."""
+    """One short line a renter may read: no result word, phone, address, rent or long number,
+    and no email, web address, "1.5k" money shorthand or anything shaped like a key."""
     from snapback.agent.casework import _banned  # a note's rule: it never announces a result
     from snapback.agent.timeline import scrub  # timeline imports this module for its models
 
     line = clean_reason(text, fallback)
     if _banned(line):
         line = fallback
+    for pattern in (_KEY, _EMAIL, _URL, _K_MONEY):
+        line = pattern.sub("…", line)
     return scrub(line, fallback, model=True)
 
 
@@ -173,11 +202,12 @@ _READ_TOOLS = {
 def tool_label(tool: str, args: dict[str, Any], lang: str) -> str:
     """What a tool call did, in plain words. A tool this table does not know still gets words."""
     if tool == "task":
-        from snapback.agent.roster import card_for  # the member's own name, not its id
+        from snapback.agent.roster import card_for  # the member's own name, never the raw text
 
-        kind = str(args.get("subagent_type") or "")
-        card = card_for(kind, lang)
-        return strings.text("worklog.tool.task", lang, name=card.name if card else kind)
+        card = card_for(str(args.get("subagent_type") or ""), lang)
+        if card is None:
+            return strings.text("worklog.tool.task_other", lang)
+        return strings.text("worklog.tool.task", lang, name=card.name)
     return strings.text(_READ_TOOLS.get(tool, "worklog.tool.other"), lang)
 
 
