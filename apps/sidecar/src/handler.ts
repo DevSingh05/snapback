@@ -258,7 +258,7 @@ const INTENTS: [Intent, RegExp][] = [
   [
     "safe",
     new RegExp(
-      String.raw`^\s*(is (it|this|that) (safe|real|legit|a scam|ok|okay)|can i (pay|trust (it|this)))` +
+      String.raw`^\s*(is (it|this|that) (safe|real|legit|a scam|ok|okay)|is (it|this|that) (a|the) real listing|can i (pay|trust (it|this)))` +
         TAIL,
       "i",
     ),
