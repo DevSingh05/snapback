@@ -25,7 +25,7 @@ export const LANDING_HOW = [
   },
   {
     title: "Code sets the verdict",
-    text: "You get a plain-words card: what matches, what does not, and what we could not check. A model only explains it; it never sets it.",
+    text: "You get a plain-words card: what matches, what does not, and what we could not check. A model can pick up to 2 extra checks and draft a next step; it never sets the verdict.",
   },
 ] as const;
 
@@ -360,8 +360,9 @@ export default function WorldsLanding() {
         <div className="wl-wrap">
           <p>
             SNAPBACK never messages anyone for you and never asks for money. Code sets every
-            verdict; a model only explains it. Every number here says how many it counts and whether
-            it is live, a fixture or synthetic.
+            verdict. A model picks up to 2 extra checks and drafts a next step it never sends; it
+            never sets the verdict. Every number here says how many it counts and whether it is
+            live, a fixture or synthetic.
           </p>
           <p className="wl-fine">
             Sample photos by Seb Doe, Collov Home Design and Minh Pham on Unsplash. They are not the
