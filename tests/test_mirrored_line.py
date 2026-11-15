@@ -49,7 +49,18 @@ def modules_for(*photos: PhotoLocation) -> ModuleEvidence:
 
 
 @pytest.mark.parametrize("lang", ["en", "es"])
-@pytest.mark.parametrize("status", PLACED)
+def test_a_flipped_photo_placed_elsewhere_gets_no_mirrored_line(lang):
+    """It already has the red different-building line; "match this building" would be untrue."""
+    modules = modules_for(
+        PhotoLocation(photo_id="fx-photo", status=LocateStatus.LOCATED_ELSEWHERE, flipped=True)
+    )
+    card = build_card(modules, checked_at=CHECKED_AT, lang=lang)
+    lines = next(row.lines for row in card.rows if row.kind is CardRowKind.PLACE)
+    assert not any(line.label == EXPECTED[lang][0] for line in lines)
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+@pytest.mark.parametrize("status", [LocateStatus.LOCATED_IN_CLAIMED])
 def test_mirrored_line_follows_real_with_hold_tone(lang, status):
     modules = modules_for(PhotoLocation(photo_id="fx-photo", status=status, flipped=True))
     card = build_card(modules, checked_at=CHECKED_AT, lang=lang)
@@ -64,8 +75,8 @@ def test_mirrored_line_follows_real_with_hold_tone(lang, status):
 
 @pytest.mark.parametrize("lang", ["en", "es"])
 def test_one_mirrored_line_counts_only_photos_placed_here_and_uses_all_photos_as_total(lang):
-    """\"Match this building\": a flipped photo placed in ANOTHER building is not counted (it has the
-    red different-building line already)."""
+    """A flipped photo placed in ANOTHER building is not counted: it has the red
+    different-building line already, and "match this building" would be untrue."""
     photos = [
         PhotoLocation(photo_id=f"fx-photo-{i}", status=status, flipped=flipped)
         for i, (status, flipped) in enumerate(
