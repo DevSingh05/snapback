@@ -712,7 +712,8 @@ function SeeForYourself() {
           <span className="wl-spot-k ui-mono">30 seconds</span>
           <span className="wl-spot-t">Spot the scam in 30 seconds</span>
           <span className="wl-spot-p">
-            A quick game first: can you spot the scam ad before the clock runs out?
+            Four rental ads, written by the team. Tap Looks fine or Hold off on each, then see what
+            SNAPBACK caught.
           </span>
           <span className="wl-spot-go" aria-hidden="true">
             Play
