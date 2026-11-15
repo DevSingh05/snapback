@@ -201,7 +201,7 @@ function TrustTable() {
       <h2 id="uh-trust-title" className="uh-sponsor">
         Why trust this
       </h2>
-      <p className="uh-does">
+      <p className="uh-lede">
         Our method beside a simple baseline, on the same set. The ring sets are SYNTHETIC: rings we
         seeded ourselves, so they show the method works on rings shaped like these, not how often it
         is right on real listings. Where no baseline was measured, we say so.

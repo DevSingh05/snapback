@@ -794,7 +794,7 @@ function SeeForYourself() {
               The quickest proof is your own listing. Paste it into the one box and read the card.
             </p>
             <a className="wl-btn wl-btn-main" href="/home">
-              Open SNAPBACK
+              Check your own ad
             </a>
           </div>
         </div>
@@ -822,7 +822,7 @@ export default function WorldsLanding() {
             <a href="/reviews">Reviews</a>
           </nav>
           <a className="wl-btn wl-btn-main wl-open" href="/home">
-            Open SNAPBACK
+            Check an ad
           </a>
         </div>
       </header>

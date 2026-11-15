@@ -23,9 +23,8 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  backdrop-filter: blur(16px) saturate(1.4);
+  /* solid, so it reads the same over the sky and over the dark bands */
+  background: var(--paper);
   border-bottom: 1px solid var(--line);
 }
 .wl-bar-in {

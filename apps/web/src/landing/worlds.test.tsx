@@ -14,12 +14,12 @@ describe("SNAPBACK Worlds front door", () => {
   it("has one clear way into the app and a Stories link in the bar", () => {
     render(<WorldsLanding />);
     const bar = document.querySelector<HTMLElement>(".wl-bar")!;
-    expect(within(bar).getByRole("link", { name: "Open SNAPBACK" })).toHaveAttribute(
-      "href",
-      "/home",
-    );
+    expect(within(bar).getByRole("link", { name: "Check an ad" })).toHaveAttribute("href", "/home");
     expect(within(bar).getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
-    expect(screen.getByRole("link", { name: "Check an ad" })).toHaveAttribute("href", "/home");
+    // one verb for the way in, wherever it appears
+    for (const link of screen.getAllByRole("link", { name: "Check an ad" }))
+      expect(link).toHaveAttribute("href", "/home");
+    expect(screen.queryByRole("link", { name: /open snapback/i })).toBeNull();
   });
 
   it("draws the 3D hero first, then the labelled sample verdict", () => {
