@@ -29,15 +29,25 @@ from snapback.agent import (
     Trace,
     run_case,
 )
-from snapback.agent.background import BackgroundAgents
+from snapback.agent.background import BUSY, BackgroundAgents
 from snapback.agent.casework import CaseNotes, notes_view, places_text, refresh_policy_notes
 from snapback.agent.demo import demo_modules, load_demo_case, staged
 from snapback.agent.intake import Listing, read_listing
-from snapback.agent.join import JoinedModules, KitLookups, Lookups, license_of, owner_of
+from snapback.agent.join import (
+    JoinedModules,
+    KitLookups,
+    Lookups,
+    license_of,
+    owner_of_county,
+    public_checks_of,
+)
 from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
 from snapback.agent.reply import ReplyModules
 from snapback.agent.rules.contact import phone_salt
+from snapback.agent.web.inputs import web_inputs_for
+from snapback.agent.web.run import start_web_checks
+from snapback.agent.worklog import AgentWork
 from snapback.api.casefiles import CaseFiles
 from snapback.card import strings
 from snapback.contracts import (
@@ -117,6 +127,7 @@ class RecordedCase:
     # What the renter rejected; a recorded case is read-only, so this stays empty.
     preferences = CasePreferences()
     agent_running = False  # no agent works a recorded case
+    work = None  # and no work log: its trace cards come from the trace alone
 
     def __init__(
         self,
@@ -272,6 +283,11 @@ class SessionCase:
     def events(self) -> list[TraceEvent]:
         return list(self.session.trace.events)
 
+    @property
+    def work(self) -> AgentWork | None:
+        """The deep agent's work log for this case (worklog.AgentWork), or None if none ran."""
+        return self.session.__dict__.get("_agent_work")
+
     def card(self, verify_base_url: str, lang: str = strings.DEFAULT_LANG) -> Card:
         card = build_card(
             self.session.evidence,
@@ -398,6 +414,10 @@ def _setup_langsmith(settings: Settings) -> None:
         log.warning("LangSmith tracing could not be set up; carrying on without it")
 
 
+class NoModelKey(Exception):
+    """The deep agent was asked for and no model key is set."""
+
+
 def _background_job(
     case: "SessionCase", settings: Settings, model_factory: Callable[[], object] | None
 ) -> Callable[[], None]:
@@ -412,7 +432,7 @@ def _background_job(
 
         key = settings.anthropic_api_key
         if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("no model key")
+            raise NoModelKey
         return build_model(
             key.get_secret_value() if key else None,
             name,
@@ -431,12 +451,24 @@ def _background_job(
                 model(settings.snapback_agent_model, 2048),
                 subagent_model=model(settings.snapback_subagent_model, 1024),
             )
+        except NoModelKey:
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_nokey", session.lang)
+            )
+            return
         except Exception:
             session.trace.emit(
                 TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
             )
             return
-        run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+        try:
+            run_advisory(session, agent, deadline_s=settings.agent_timeout_s)
+        except Exception:
+            # run_advisory reports its own failures; this is what is left when even that broke.
+            log.exception("the background agent could not report its end for %s", case.case_id)
+            session.trace.emit(
+                TraceKind.ERROR, strings.text("trace.error.model_failed", session.lang)
+            )
 
     return run
 
@@ -463,7 +495,7 @@ def _deepagents_runner(
 
         key = settings.anthropic_api_key if settings is not None else None
         if key is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError("no model key")
+            raise NoModelKey
         return build_model(
             key.get_secret_value() if key else None,
             settings.snapback_agent_model if settings is not None else None,
@@ -623,6 +655,16 @@ class CaseStore:
             return by_text
         return nearby
 
+    def _lens_for_sale(self, text: str) -> ForSaleMatch | None:
+        lookup = getattr(self._lookups, "lens_for_sale", None)
+        if lookup is None or not text:
+            return None
+        try:
+            return lookup(text)
+        except Exception as error:  # a lookup that broke is a lookup that did not happen
+            log.warning("lens lookup failed (%s); treated as not looked up", type(error).__name__)
+            return None
+
     def create(
         self,
         listing: Listing,
@@ -668,15 +710,23 @@ class CaseStore:
         # fixtures, on any server: it is a staged example, so it is never a LIVE card and
         # calls no lookup.
         asked_by_name = demo_case is not None
-        for_sale = license = owner = None
+        for_sale = license = owner = place_check = domain_check = None
         if not asked_by_name:
             for_sale = self._lookups.for_sale(listing.text) if listing.text else None
             for_sale = self._for_sale_by_position(listing.text, record, for_sale)
+            if for_sale is None and record is None:
+                # CoStar has no scan or for-sale record for this home: reverse image search of
+                # the ad's own photo links is the fallback. A failure is "not looked up".
+                for_sale = self._lens_for_sale(listing.text)
             # D10: only a live run calls the licence list, and a lookup that breaks is "not
             # looked up". It reads the poster's own claim in the text and keeps no name.
             license = license_of(self._lookups, listing.text)
+            # Public data: the Census address check and the age of a link's domain (RDAP).
+            place_check, domain_check = public_checks_of(self._lookups, listing.text)
             # D12: the owner of record of the home the listing claims, when lane D holds one.
-            owner = owner_of(self._lookups, listing.text)
+            # After the Census check, and only for a Harris County address: the HCAD roll is
+            # keyed by street alone, so another county's street could match a Harris one.
+            owner = owner_of_county(self._lookups, listing.text, place_check)
 
         live = not asked_by_name and (
             self._settings.snapback_data_source is DataSource.LIVE
@@ -701,6 +751,8 @@ class CaseStore:
                     for_sale=for_sale,
                     license=license,
                     owner=owner,
+                    place_check=place_check,
+                    domain_check=domain_check,
                     salt=phone_salt(self._settings),
                     record_source=record.source if record else source,
                     live_locate=self._live_locate if live else None,
@@ -720,6 +772,16 @@ class CaseStore:
                 Trace(full_id, source),
                 ask_enabled=self._settings.snapback_ask_renter,
             )
+            if live and self._settings.snapback_web_checks:
+                # W1: in the background; the sub-agent and the notes read it when it lands.
+                job = start_web_checks(
+                    web_inputs_for(listing, record, phone_salt(self._settings)),
+                    self._settings,
+                    salt=phone_salt(self._settings),
+                    trace=session.trace,
+                    source=source,
+                )
+                session.web_facts = job.facts
             if listing.truncated:
                 session.trace.emit(TraceKind.STATUS, strings.text("trace.intake.truncated"))
             if listing.injection_spans:
@@ -740,8 +802,26 @@ class CaseStore:
         if self._background is None:
             return
         case.agents = self._background
+        session = case.session
+
+        def gave_up(why: str) -> None:
+            # The run never started, or never ended: say so, so no screen waits on it.
+            key = "trace.error.model_busy" if why == BUSY else "trace.error.model_stuck"
+            if why != BUSY:
+                # Shut the late job out first (no lock wait), so it cannot add a second end.
+                from snapback.agent.graph import _gate
+
+                _gate(session).stopped = True
+            session.trace.emit(TraceKind.ERROR, strings.text(key, session.lang))
+            if why == BUSY:  # no agent ran, so code writes the notes it would have
+                refresh_policy_notes(session)
+
         self._background.submit(
-            case.case_id, _background_job(case, self._settings, self._agent_model)
+            case.case_id,
+            _background_job(case, self._settings, self._agent_model),
+            max_wait_s=self._settings.snapback_agent_queue_wait_s,
+            max_run_s=self._settings.agent_timeout_s + self._settings.snapback_agent_run_grace_s,
+            on_expire=gave_up,
         )
 
     def shutdown_agents(self) -> None:

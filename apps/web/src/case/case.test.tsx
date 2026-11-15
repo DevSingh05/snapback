@@ -268,6 +268,28 @@ describe("the ledger", () => {
     const lines = screen.getAllByTestId("record-line").map((el) => el.textContent);
     expect(lines).toEqual(["3D SCAN · FIXTURE"]);
   });
+
+  it("names the source that answered a line, with LIVE or FIXTURE", () => {
+    const hud: Card = {
+      ...card,
+      rows: card.rows.map((row) =>
+        row.kind === "price"
+          ? {
+              ...row,
+              lines: row.lines.map((line) =>
+                line.key === "label.rent_vs_record"
+                  ? { ...line, source_name: "HUD", source: "live" as const }
+                  : line,
+              ),
+            }
+          : row,
+      ),
+    };
+    render(<Ledger card={hud} />);
+    const named = screen.getAllByTestId("line-source").map((el) => el.textContent);
+    expect(named).toContain("HUD · live");
+    expect(named).toContain("CoStar record · fixture");
+  });
 });
 
 describe("the price bar", () => {
@@ -470,6 +492,24 @@ describe("the real listing", () => {
     render(<RealListing listing={sampleListing({ cta_url: null })} />);
     expect(screen.queryByTestId("real-link")).toBeNull();
     expect(screen.getByTestId("case-real").querySelectorAll("a")).toHaveLength(0);
+  });
+
+  it("still shows the link, and no rents, when the figures switch is off", () => {
+    render(
+      <RealListing
+        listing={sampleListing({
+          figures_shown: false,
+          building_name: null,
+          headline: "The ad asks $900 a month. Rents from the record are not shown.",
+          plans: [{ name: "2 bed / 2 bath", beds: 2, baths: 2 }],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("real-link")).toHaveAttribute(
+      "href",
+      "https://www.apartments.com/fixture-court/",
+    );
+    expect(screen.getByTestId("case-real")).not.toHaveTextContent(/\$1,[69]00 /);
   });
 
   it("never links to anything that is not a plain https address", () => {

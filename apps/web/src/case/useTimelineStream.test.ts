@@ -179,3 +179,72 @@ describe("openTimelineStream", () => {
     expect(paths[0]).not.toMatch(/token/i);
   });
 });
+
+describe("openTimelineStream never follows a run forever", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("shows a stopped run, with one step that says why, when no step lands for too long", async () => {
+    // The server says "running" and then nothing changes: a stream that stays open.
+    const get: TimelineGet = () => Promise.resolve(json(timeline(true, 2)));
+    const seen: CaseTimeline[] = [];
+    const feeds: TimelineFeed[] = [];
+    openTimelineStream({
+      caseId: "7Q2M",
+      get,
+      pollMs: 1000,
+      stallMs: 5000,
+      onTimeline: (t) => seen.push(t),
+      onFeed: (f) => feeds.push(f),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(6000);
+    const end = seen.at(-1)!;
+    expect(end.running).toBe(false);
+    expect(end.fell_back).toBe(true);
+    expect(end.steps.at(-1)!.label).toBe(
+      "The deep agent stopped: it stopped answering; code set the verdict",
+    );
+    expect(end.steps).toHaveLength(3);
+    expect(feeds.at(-1)).toBe("done");
+  });
+
+  it("a run that keeps landing steps is not cut off", async () => {
+    let n = 2;
+    const get: TimelineGet = () => Promise.resolve(json(timeline(true, n++)));
+    const seen: CaseTimeline[] = [];
+    openTimelineStream({
+      caseId: "7Q2M",
+      get,
+      pollMs: 1000,
+      stallMs: 5000,
+      onTimeline: (t) => seen.push(t),
+      onFeed: () => {},
+    });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(seen.every((t) => t.running)).toBe(true);
+  });
+
+  it("shows the run as stopped when the feed is lost while the agent was still working", async () => {
+    let calls = 0;
+    const get: TimelineGet = () => {
+      calls++;
+      if (calls <= 2) return Promise.resolve(json(timeline(true, 1))); // the stream try, then a poll
+      return Promise.reject(new Error("offline"));
+    };
+    const seen: CaseTimeline[] = [];
+    openTimelineStream({
+      caseId: "7Q2M",
+      get,
+      pollMs: 100,
+      onTimeline: (t) => seen.push(t),
+      onFeed: () => {},
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    const end = seen.at(-1)!;
+    expect(end.running).toBe(false);
+    expect(end.steps.at(-1)!.label).toBe(
+      "The deep agent stopped: the connection to it was lost; code set the verdict",
+    );
+  });
+});

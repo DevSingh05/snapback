@@ -510,6 +510,7 @@ def check_price(
             unit=unit_status,
             # Named on the card only when every plan compared has the same bedroom count.
             compared_beds=sizes.pop() if len(sizes) == 1 else None,
+            baseline_source="costar",
         )
 
     reference = record.rent_min if record.rent_min is not None else record.rent_median
@@ -527,4 +528,5 @@ def check_price(
         record_max=record.rent_max,
         n_floor_plans=len(record.floor_plans) or None,
         unit=unit_status,
+        baseline_source="costar",
     )

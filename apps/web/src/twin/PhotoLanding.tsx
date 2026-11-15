@@ -20,6 +20,10 @@ interface Props {
   sdk: SdkStatus;
   reduced: boolean;
   from?: FlyFrom;
+  /** How long a change of `opacity` takes, in ms. Left out, the stylesheet's own time is used. */
+  fadeMs?: number;
+  /** Side by side: the ad photo on the left half, the scan on the right. */
+  split?: boolean;
 }
 
 const VIEW = 240;
@@ -30,7 +34,17 @@ const clamp = (n: number, lim: number) => Math.max(-lim, Math.min(lim, n));
 
 // Photo layer, camera marker, view cone and the one-line caption laid over the twin. Everything
 // that moves does so with a CSS transform or transition on elements that stay mounted.
-export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, from }: Props) {
+export function PhotoLanding({
+  state,
+  photoSrc,
+  opacity,
+  phase,
+  sdk,
+  reduced,
+  from,
+  fadeMs,
+  split = false,
+}: Props) {
   const fov = state.kind === "match" ? state.fovDeg : null;
   const coneD = useMemo(() => viewCone(fov, CONE_RADIUS), [fov]);
   // Where the camera sits on the mini-map: the viewer-frame floor point, so the dot and the cone
@@ -54,6 +68,7 @@ export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, fr
       data-phase={phase}
       data-sdk={sdk}
       data-motion={reduced ? "reduced" : "full"}
+      data-split={split ? "yes" : "no"}
       style={style}
     >
       {state.kind === "match" && (
@@ -91,8 +106,16 @@ export function PhotoLanding({ state, photoSrc, opacity, phase, sdk, reduced, fr
               data-flying={flying ? "true" : undefined}
               src={photoSrc}
               alt={`Listing photo ${state.photoId}`}
-              style={{ opacity }}
+              style={
+                fadeMs === undefined ? { opacity } : { opacity, transitionDuration: `${fadeMs}ms` }
+              }
             />
+          )}
+          {photoSrc && split && (
+            <p className="landing-split" aria-hidden="true">
+              <span>Ad photo</span>
+              <span>3D scan</span>
+            </p>
           )}
         </>
       )}

@@ -1,8 +1,10 @@
 """Runtime settings, read from the environment and an optional .env file."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
@@ -49,6 +51,24 @@ class Settings(BaseSettings):
     # The zone a card's times are shown in: the building's, not the server's. Houston is
     # America/Chicago.
     snapback_card_timezone: str = "America/Chicago"
+    # Public data for the homes CoStar does not cover (HUD, Census, HCAD, RDAP). All free, no key.
+    # The rent baseline is a file in the repo. The two lookups call out and so run on LIVE cases
+    # only; a fixture case uses recorded answers. On by default; a failure is "not checked".
+    snapback_hud_baseline: bool = True
+    # The ad's rent is BELOW_RANGE against HUD when it is under this share of HUD's typical rent
+    # for the ZIP and size. Measured on the eval bank (see the PR); a flag holds, never DONT_PAY.
+    snapback_hud_below_ratio: float = 0.60
+    snapback_census_geocoder: bool = True
+    snapback_rdap: bool = True
+    snapback_public_timeout_s: float = 2.0
+    # Google Lens via SerpApi (reverse image search of the ad's own public photo links), only
+    # when CoStar has no 3D scan to place the photos in. The key is SERPAPI_API_KEY from the
+    # environment; without it the check is "not checked". Free plan: 250 searches a month.
+    serpapi_api_key: SecretStr | None = None
+    snapback_lens: bool = True
+    snapback_lens_timeout_s: float = 4.0
+    # A domain registered fewer days ago than this is a new domain (link.new_domain, HOLD).
+    snapback_new_domain_days: int = 30
 
     @property
     def agent_timeout_s(self) -> float:
@@ -82,6 +102,10 @@ class Settings(BaseSettings):
     # deepagents_async has no request waiting on it, so unless SNAPBACK_AGENT_TIMEOUT_S is set
     # explicitly its default is this longer budget (measured: a full run takes about 25 s).
     snapback_agent_async_default_timeout_s: float = 60.0
+    # A queued background run that has had no worker for this long is given up on (the trace says
+    # so and code's result stands), and so is one still running this long past the time limit.
+    snapback_agent_queue_wait_s: float = Field(default=60.0, gt=0)
+    snapback_agent_run_grace_s: float = Field(default=20.0, gt=0)
     snapback_agent_model: str = "claude-sonnet-5-5"
     # The sub-agents (one per check family) read a few facts and write a note: a small, fast model.
     snapback_subagent_model: str = "claude-haiku-5-5"
@@ -91,6 +115,10 @@ class Settings(BaseSettings):
     # none set, tracing stays off. Standard env vars LANGSMITH_API_KEY / LANGSMITH_PROJECT work too.
     langsmith_api_key: SecretStr | None = None
     langsmith_project: str = "snapback"
+    # The project's page in LangSmith, for the "LangSmith" link on the trace cards. A plain
+    # https address on smith.langchain.com with no query, fragment or sign-in in it: a key or
+    # a token never goes in an address, so anything else is dropped.
+    snapback_langsmith_url: str | None = None
     # Checks one renter (or one browser) may start per day, and a ceiling per network address
     # so that clearing cookies is not a way around it.
     snapback_daily_limit: int = 3
@@ -102,6 +130,22 @@ class Settings(BaseSettings):
     # A staged demo case from fixtures/demo (a, b or c), read from DEMO_CASE. With it set,
     # every new check runs on that case's stand-ins. Unset or empty for normal runs.
     demo_case: str | None = None
+
+    @field_validator("snapback_langsmith_url", mode="before")
+    @classmethod
+    def _a_plain_langsmith_address(cls, value: object) -> str | None:
+        url = str(value).strip() if value is not None else ""
+        try:
+            parts = urlsplit(url)
+            host = parts.hostname or ""
+        except ValueError:
+            return None
+        on_langsmith = host == "smith.langchain.com" or host.endswith(".smith.langchain.com")
+        plain = not (parts.query or parts.fragment or parts.username or parts.password)
+        # A key pasted into the path is still a key in an address.
+        if re.search(r"(lsv2_|sk-)", parts.path, re.IGNORECASE):
+            return None
+        return url if parts.scheme == "https" and on_langsmith and plain else None
 
     @field_validator("demo_case", mode="before")
     @classmethod
@@ -117,6 +161,31 @@ class Settings(BaseSettings):
     # Sponsor credentials. SecretStr keeps them out of logs and reprs.
     matterport_api_key: SecretStr | None = None
     matterport_api_token: SecretStr | None = None
+    # W1 web sub-agent (#8, Vidyut 20:10). A missing key means "not checked", never a failure.
+    brightdata_api_token: SecretStr | None = None
+    apify_token: SecretStr | None = None
+    browser_use_api_key: SecretStr | None = None
+    # Bright Data zone names (not secret): one Web Unlocker zone and one SERP API zone.
+    brightdata_unlocker_zone: str = "snapback_unlocker"
+    brightdata_serp_zone: str = "snapback_serp"
+    # Apify actors for the same home posted elsewhere, as "owner~name". None turns one off.
+    apify_zillow_actor: str | None = "maxcopell~zillow-scraper"
+    apify_craigslist_actor: str | None = None
+    # The three checks share one limit; past it a check reads "timed out" and the case goes on.
+    snapback_web_limit_s: float = 20.0  # Apify's search measured 8.9 to 14.2 s (n=3, LIVE)
+    # Run the web checks on LIVE cases. Off by default so tests, CI and a public host never call
+    # out; set SNAPBACK_WEB_CHECKS=1 in the demo laptop's .env with the three keys.
+    snapback_web_checks: bool = False
+    # Texas public records (Comptroller, HUD manager, Houston address points): live calls only
+    # when this is on AND the run is LIVE. Three seconds each; an error means "not checked".
+    snapback_tx_records: bool = False
+    # Browser Use spend cap per link check, in dollars (the account has little credit).
+    browser_use_max_cost_usd: float = 0.10
+    # At most this many cases start web checks in any rolling hour (each case starts them once).
+    snapback_web_max_per_hour: int = 30
+    # Without Bright Data zones, read the building's own site with a plain direct fetch (free).
+    # Off by default so a case with no keys makes no call; the demo laptop turns it on.
+    snapback_web_direct_fetch: bool = False
     vexcel_api_key: SecretStr | None = None
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None

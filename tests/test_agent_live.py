@@ -336,13 +336,52 @@ def test_a_model_that_breaks_leaves_the_case_and_the_answer_alone(tmp_path, monk
     assert read(client, case, "card")["state"] == "hold"
 
 
+def test_a_case_stuck_behind_busy_workers_ends_with_a_terminal_step_not_a_wait_forever(
+    tmp_path, monkeypatch
+):
+    client = make_client(
+        tmp_path,
+        monkeypatch,
+        lambda: Crew(delay=3.0),
+        snapback_agent_max_concurrent=1,
+        snapback_agent_queue_wait_s=0.4,
+    )
+    first = start(client)
+    second = start(client)
+    time.sleep(0.9)
+    waiting = read(client, second)
+    assert waiting["running"] is False and waiting["fell_back"] is True
+    assert (
+        "The deep agent stopped: it waited too long behind other checks; code set the verdict"
+        in [s["label"] for s in waiting["steps"]]
+    )
+    assert read(client, first)["running"] is True  # the one that got a worker is still at work
+    assert stored(client, second).session.waiting_for_approval  # code's answer stands
+
+
+def test_a_run_that_cannot_even_report_its_end_still_leaves_a_terminal_step(tmp_path, monkeypatch):
+    def broken(*_a, **_k):
+        raise RuntimeError("the report itself broke")
+
+    monkeypatch.setattr("snapback.agent.graph.run_advisory", broken)
+    client = make_client(tmp_path, monkeypatch, lambda: Crew())
+    case = start(client)
+    client.app.state.store.wait_for_agents()
+    body = read(client, case)
+    assert body["running"] is False and body["fell_back"] is True
+
+
 def test_with_no_key_and_no_factory_the_agent_is_skipped_and_the_trace_says_so(
     tmp_path, monkeypatch
 ):
     client = make_client(tmp_path, monkeypatch, None)
     case = start(client)
     client.app.state.store.wait_for_agents()
-    assert read(client, case)["fell_back"] is True
+    body = read(client, case)
+    assert body["fell_back"] is True and body["running"] is False
+    assert "The deep agent stopped: no model key is set; code set the verdict" in [
+        s["label"] for s in body["steps"]
+    ]
     assert stored(client, case).session.waiting_for_approval
 
 
@@ -369,6 +408,46 @@ def test_at_most_n_background_runs_work_at_once_and_the_rest_wait():
     for i in range(5):
         pool.wait(f"c{i}", 5)
     assert state["peak"] == 2 and not any(pool.running(f"c{i}") for i in range(5))
+    pool.shutdown()
+
+
+def test_a_case_that_gets_no_worker_in_time_is_given_up_on_and_never_starts():
+    pool = BackgroundAgents(1)
+    release = threading.Event()
+    ran: list[str] = []
+    gave_up: list[str] = []
+    pool.submit("hog", lambda: release.wait(5))
+    pool.submit("late", lambda: ran.append("late"), max_wait_s=0.2, on_expire=gave_up.append)
+    assert pool.running("late")
+    time.sleep(0.6)
+    assert gave_up == ["busy"] and not pool.running("late") and pool.running("hog")
+    release.set()
+    pool.wait("hog", 5)
+    time.sleep(0.2)
+    assert ran == []  # it was dropped, not run late
+    pool.shutdown()
+
+
+def test_a_job_that_runs_far_past_its_limit_is_given_up_on_so_nothing_waits_on_it():
+    pool = BackgroundAgents(1)
+    release = threading.Event()
+    gave_up: list[str] = []
+    pool.submit("stuck", lambda: release.wait(5), max_run_s=0.2, on_expire=gave_up.append)
+    time.sleep(0.1)
+    assert pool.running("stuck")
+    time.sleep(0.4)
+    assert gave_up == ["stuck"] and not pool.running("stuck")
+    release.set()
+    pool.shutdown()
+
+
+def test_a_job_that_ends_in_time_is_never_reported_as_given_up():
+    pool = BackgroundAgents(1)
+    gave_up: list[str] = []
+    pool.submit("ok", lambda: None, max_wait_s=0.2, max_run_s=0.2, on_expire=gave_up.append)
+    pool.wait("ok", 5)
+    time.sleep(0.5)
+    assert gave_up == []
     pool.shutdown()
 
 

@@ -17,7 +17,8 @@ format: ## fix style and formatting in place
 	npm run format
 
 test: ## run the python tests
-	uv run pytest
+	uv run pytest -n auto --ignore=tests/test_pattern_speed.py
+	uv run pytest tests/test_pattern_speed.py
 	npm run test -w apps/web
 	npm run test -w apps/sidecar
 

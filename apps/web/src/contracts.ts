@@ -12,6 +12,8 @@ export interface CardLine {
   source?: DataSource | null;
   // The label's table key ("label.payment_ask"): which check the line came from, in any language.
   key?: string | null;
+  // Which source answered the line: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+  source_name?: string | null;
 }
 
 export interface CardRow {
@@ -33,6 +35,7 @@ export interface ForSaleMatch {
   listed_on?: string | null; // ISO date
   changed_on?: string | null;
   offices?: string[]; // listing offices on record: brokerage companies, never a person
+  source_name?: string | null; // "Google Lens via SerpApi" when CoStar's record did not find it
 }
 
 export interface FloorPlanRent {
@@ -55,6 +58,32 @@ export interface PriceResult {
   n_floor_plans?: number | null;
   unit: UnitStatus;
   per_bed: boolean;
+  // "costar" (the building's record) or "hud_safmr" (HUD's typical rent for the ZIP). The HUD
+  // fields name the ZIP, bedroom count and rent that were compared.
+  baseline_source?: "costar" | "hud_safmr" | null;
+  baseline_rent?: number | null;
+  baseline_zip?: string | null;
+  baseline_beds?: number | null;
+}
+
+// Public data (Census Geocoder, RDAP). Mirrors PublicStatus, PlaceCheck and DomainCheck in
+// src/snapback/contracts.py.
+export type PublicStatus = "found" | "no_match" | "not_checked";
+
+export interface PlaceCheck {
+  status: PublicStatus;
+  zip?: string | null;
+  county_fips?: string | null;
+  county?: string | null;
+  source: DataSource;
+}
+
+export interface DomainCheck {
+  host: string;
+  status: PublicStatus;
+  registered_on?: string | null; // ISO date
+  age_days?: number | null;
+  source: DataSource;
 }
 
 export interface AuthorityResult {
@@ -85,6 +114,16 @@ export interface Card {
   does_not?: string[]; // red flag, hold and not-shown lines
   // Set by the API when the state's own words would mislead (a HOLD with nothing against it).
   headline?: string | null;
+  // Set by GET /cases/{id}/card: false when the case has no evidence file, so the page does not
+  // ask for one. Missing means not said.
+  has_evidence?: boolean | null;
+}
+
+// The body of a 202 from the report's reads while the check is still running (not ready, not
+// failed). Ask again after retry_after_ms.
+export interface StillChecking {
+  status: string; // CaseProgress
+  retry_after_ms: number;
 }
 
 export type TraceKind =
@@ -144,6 +183,8 @@ export interface TimelineStep {
   // The check or sub-agent the step belongs to ("record", "owner", "locate", "place", ...), so a
   // reason can be tied to the step behind it. null when the step is not one check.
   kind?: string | null;
+  // Which source answered the step: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+  source_name?: string | null;
   // The plan left this check out; `result` says why.
   skipped?: boolean;
 }
@@ -156,6 +197,25 @@ export interface TimelineTodo {
 // GET /cases/{id}/timeline. Read token in a header; served with Cache-Control no-store.
 // `todos` (the agent's last todo list) and `plan` (sub-agents it handed work to, in order)
 // are empty unless the deep agent ran. `fell_back`: the agent stopped and code finished.
+// One tool call on a member's trace card: the tool's own name, what it did in plain words and one
+// short line of what came back. Cleaned by the API: no phone, address, rent or result word.
+export interface TraceTool {
+  tool: string;
+  label: string;
+  result: string;
+}
+
+// One member's trace card (the planner first, then each sub-agent in the order work reached it).
+export interface MemberTrace {
+  kind: string; // "planner", or the sub-agent's name ("record", "owner", "place", ...)
+  model: string; // what ran it: "Claude Sonnet", "Claude Haiku", ...
+  asked?: string | null; // the planner's instruction to it; null for the planner
+  tools: TraceTool[];
+  said?: string | null; // what it handed back, trimmed
+  took_ms?: number | null;
+  model_calls: number;
+}
+
 export interface CaseTimeline {
   case_id: string;
   source: DataSource;
@@ -167,6 +227,10 @@ export interface CaseTimeline {
   steps: TimelineStep[];
   todos: TimelineTodo[];
   plan: string[];
+  // The trace cards when the deep agent ran; empty or absent with the policy and on older servers.
+  members?: MemberTrace[];
+  // The run's LangSmith project page, when the server names one. Never carries a key or token.
+  trace_url?: string | null;
 }
 
 // One working note the agent wrote (GET /cases/{id}/notes). Derived text only.
@@ -284,7 +348,8 @@ export interface AerialProofResponse {
 
 // Mirrors RealListingPlan and RealListing in src/snapback/contracts.py
 // (GET /cases/{id}/real-listing; read token in a header, never in the address; no-store).
-// Record figures (rents, units, links, building name) are null unless figures_shown. Words are
+// Record figures (rents, units, building name) are null unless figures_shown. The hand-off link
+// (cta_url) is not a figure: it is sent with figures_shown on or off. Words are
 // built by code in the asked language (?lang=en|es). No phone digits and no street address.
 export interface RealListingPlan {
   name?: string | null;
@@ -316,7 +381,7 @@ export interface RealListing {
   provenance?: string | null; // "N of M of the ad's photos are in CoStar's own scan..."
   phone_line?: string | null;
   cta_label?: string | null; // "See the real listing"
-  cta_url?: string | null; // availability link, else https://<website_host>; only with figures
+  cta_url?: string | null; // availability link, else https://<website_host>; shown with figures on or off
 }
 
 // Mirrors ReportSteps and ReportResponse in src/snapback/contracts.py (GET /cases/{id}/report;
@@ -339,6 +404,17 @@ export interface ReportPack {
   twin_url?: string | null;
   platforms?: ReportSteps[];
   not_checked: string[];
+  // Every source that answered a line of the card, by name, and the public-data lines (HUD,
+  // Census, RDAP) with their source and LIVE or FIXTURE. Lines about a person are not copied.
+  source_names?: string[];
+  sources?: ReportSource[];
+}
+
+export interface ReportSource {
+  source_name: string; // "HUD", "Census" or "RDAP"
+  label: string;
+  text: string;
+  data_source: DataSource;
 }
 
 // Mirrors CopyAlert in src/snapback/contracts.py (GET /cases/{id}/copy-alert; read token in a

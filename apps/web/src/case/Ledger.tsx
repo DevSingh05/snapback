@@ -106,6 +106,11 @@ function LedgerRow({
           {ROW_LABEL[row]}
         </span>
         <span className="case-check-name">{line.label}</span>
+        {line.source_name ? (
+          <span className="case-check-source ui-mono" data-testid="line-source">
+            {line.source_name} · {line.source ?? source}
+          </span>
+        ) : null}
       </th>
       {ad ? (
         <td className="case-cell-ad" data-label="The ad says">

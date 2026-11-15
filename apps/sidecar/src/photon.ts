@@ -225,13 +225,15 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
         : {}),
     };
     const checking = config.acknowledge
-      ? async () => void (await item.space.send(CHECKING))
+      ? async (text?: string) => void (await item.space.send(text ?? CHECKING))
       : undefined;
     await handleMessage(msg, client, config, checking);
     if (!spoken || !replied || !config.makeVoice) return;
     // A spoken ad gets a spoken answer too. If it fails, the text has already gone out.
     try {
-      const audio = await speak(spokenReply(replied), config.apiUrl, get);
+      const words = spokenReply(replied);
+      if (!words) return; // nothing safe to say: the text reply stands alone
+      const audio = await speak(words, config.apiUrl, get);
       if (audio) await item.space.send(config.makeVoice(audio.bytes, audio.mimeType));
     } catch {
       log("[sidecar] a voice reply could not be sent; the text reply went out");

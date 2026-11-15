@@ -31,7 +31,10 @@ jobs:
       - run: uv sync --locked --extra agent --extra intake
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run pytest
+      # Same tests, in parallel (pytest-xdist). The timing tests run alone after, because they
+      # measure wall-clock time and a busy CPU would make them flaky.
+      - run: uv run pytest -n auto --ignore=tests/test_pattern_speed.py
+      - run: uv run pytest tests/test_pattern_speed.py
       # V6 eval gate (#62): fixture case bank only, headless, no network. Writes to the runner's
       # temp dir so the tracked eval/results.csv is never changed by CI. Exit 1 = gate failed.
       - name: Eval gate (python -m snapback.eval)

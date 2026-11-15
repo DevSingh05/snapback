@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import hold from "../../../../fixtures/contracts/module_evidence_hold.json";
 import { SourceChip } from "../components/SourceChip";
 import type { LocateResult } from "../contracts";
+import { TeamPanel } from "../proofroom/TeamPanel";
 import { TracePanel } from "../trace";
 import { Photo } from "../ui/Photo";
 import { PathRail } from "../ui/PathRail";
@@ -31,7 +32,15 @@ const PLACEHOLDER_PHOTO = SAMPLE.src ?? "";
 
 const NO_LABELS: Record<string, string> = {};
 const FLIGHT_MS = 900;
-const LANDED_OPACITY = 0.6;
+// The photo fade: once a photo lands in the scan the ad photo shows at full for AD_HOLD_MS, then
+// eases down to FADED_OPACITY over FADE_MS so the scan shows through, and holds there. With
+// reduced motion it is at FADED_OPACITY at once. A press on any of the controls ends the auto
+// fade: from then on the person decides what they see.
+export const AD_HOLD_MS = 1200;
+export const FADE_MS = 1500;
+export const FADED_OPACITY = 0.45;
+// How long a press on "Show ad photo" or "Show 3D scan" takes to cross over.
+const SWAP_MS = 400;
 
 const fixtureLocate = hold.locate as unknown as LocateResult;
 
@@ -48,6 +57,8 @@ interface ViewProps {
   claimedAerial?: AerialSide;
   /** Fixture scenario: "copied" runs a fixture photo that was taken in a different building. */
   demo?: "copied";
+  /** "Your check team", open beside the twin (below it on a phone). */
+  team?: ReactNode;
 }
 
 function TwinViewInner({
@@ -60,6 +71,7 @@ function TwinViewInner({
   matchedAerial = FIXTURE_MATCHED,
   claimedAerial = FIXTURE_CLAIMED,
   demo,
+  team,
 }: ViewProps) {
   const fixtureBase = demo === "copied" ? COPIED_LOCATE : fixtureLocate;
   const locate = chooseLocate(liveLocate, liveResult, fixtureBase);
@@ -84,6 +96,16 @@ function TwinViewInner({
   const [sweeps, setSweeps] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("");
   const [opacity, setOpacity] = useState(0);
+  const [fadeMs, setFadeMs] = useState(0);
+  const [split, setSplit] = useState(false);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The person pressed a control since this landing began: their choice stands, the landing
+  // does not bring the photo back and no auto fade starts.
+  const userChose = useRef(false);
+  const stopAutoFade = useCallback(() => {
+    if (fadeTimer.current !== null) clearTimeout(fadeTimer.current);
+    fadeTimer.current = null;
+  }, []);
   const [phase, setPhase] = useState<LandingPhase>("idle");
   const [photoId, setPhotoId] = useState<string>(locate.photos[0]?.photo_id ?? "");
   const [from, setFrom] = useState<FlyFrom | undefined>();
@@ -122,8 +144,9 @@ function TwinViewInner({
     alive.current = true;
     return () => {
       alive.current = false;
+      stopAutoFade();
     };
-  }, []);
+  }, [stopAutoFade]);
 
   const sdkStatus = !live || sdkFailed ? "unavailable" : sdk ? "ready" : "connecting";
 
@@ -138,7 +161,11 @@ function TwinViewInner({
   const land = useCallback(
     async (id: string) => {
       const mine = ++run.current;
+      stopAutoFade();
+      userChose.current = false;
       setPhotoId(id);
+      setFadeMs(0);
+      setSplit(false);
       setOpacity(0);
       const target = landingFromLocate(locate, id, roomLabels, poseIsLive ? "z" : "y");
       if (target.kind !== "match") {
@@ -196,10 +223,32 @@ function TwinViewInner({
       }
       if (!alive.current || run.current !== mine) return;
       setPhase("landed");
-      setOpacity(LANDED_OPACITY);
+      if (userChose.current) return;
+      if (reduced) {
+        setOpacity(FADED_OPACITY);
+        return;
+      }
+      setOpacity(1);
+      fadeTimer.current = setTimeout(() => {
+        fadeTimer.current = null;
+        if (!alive.current || run.current !== mine) return;
+        setFadeMs(FADE_MS);
+        setOpacity(FADED_OPACITY);
+      }, AD_HOLD_MS);
     },
-    [locate, roomLabels, reduced, sdk, sdkStatus, sweeps, poseIsLive],
+    [locate, roomLabels, reduced, sdk, sdkStatus, sweeps, poseIsLive, stopAutoFade],
   );
+
+  // Nothing reads as chosen while the photo is still flying in.
+  const landed = phase === "landed";
+  // The person's own choice: it ends the auto fade and leaves side by side.
+  const show = (value: number, ms: number) => {
+    stopAutoFade();
+    userChose.current = true;
+    setSplit(false);
+    setFadeMs(reduced ? 0 : ms);
+    setOpacity(value);
+  };
 
   // Run the landing once on the first pose we can use: at once without a 3D view, or when the
   // model's sweeps are known with one.
@@ -252,7 +301,7 @@ function TwinViewInner({
           </a>
         )}
       </nav>
-      <div className="twin-body">
+      <div className={team ? "twin-body twin-with-team" : "twin-body"}>
         <section className="twin-stage" aria-label="3D view" ref={stageRef}>
           {live && sdkKey && modelId ? (
             <iframe
@@ -273,8 +322,60 @@ function TwinViewInner({
             sdk={sdkStatus}
             reduced={reduced}
             from={from}
+            fadeMs={fadeMs}
+            split={split}
           />
         </section>
+        {state.kind === "match" ? (
+          <div className="twin-fade" data-testid="twin-fade">
+            <p className="twin-fade-hint">
+              The ad photo fades so you can see the real home behind it.
+            </p>
+            <div className="twin-fade-row" role="group" aria-label="What to show">
+              <button
+                type="button"
+                className="twin-fade-btn"
+                aria-pressed={landed && !split && opacity === 1}
+                onClick={() => show(1, SWAP_MS)}
+              >
+                Show ad photo
+              </button>
+              <button
+                type="button"
+                className="twin-fade-btn"
+                aria-pressed={landed && !split && opacity === 0}
+                onClick={() => show(0, SWAP_MS)}
+              >
+                Show 3D scan
+              </button>
+              <button
+                type="button"
+                className="twin-fade-btn"
+                aria-pressed={landed && split}
+                onClick={() => {
+                  stopAutoFade();
+                  userChose.current = true;
+                  setSplit((on) => !on);
+                }}
+              >
+                Side by side
+              </button>
+            </div>
+            <label className="twin-fade-blend">
+              <span>Blend ad photo and 3D scan</span>
+              <input
+                type="range"
+                aria-label="Blend ad photo and 3D scan"
+                min={0}
+                max={1}
+                step={0.05}
+                value={opacity}
+                onChange={(e) => show(Number(e.target.value), 0)}
+              />
+            </label>
+          </div>
+        ) : null}
+        {team}
         <TwinOnStop photoId={photoId} state={state} src={PLACEHOLDER_PHOTO} sample />
         <aside className="twin-side">
           <figure className="listing-card" ref={cardRef}>
@@ -292,17 +393,6 @@ function TwinViewInner({
                 Fly to photo {id}
               </button>
             ))}
-            <label>
-              Photo fade
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={opacity}
-                onChange={(e) => setOpacity(Number(e.target.value))}
-              />
-            </label>
             <p className="twin-status">{status}</p>
           </div>
           <AerialProof
@@ -348,6 +438,7 @@ export function TwinPage({ caseId }: { caseId: string }) {
       modelId={import.meta.env.VITE_DEMO_MODEL_ID}
       liveLocate={import.meta.env.VITE_LIVE_LOCATE === "1"}
       demo={demoFromSearch(window.location.search)}
+      team={<TeamPanel caseId={caseId} />}
     />
   );
 }

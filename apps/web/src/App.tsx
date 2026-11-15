@@ -4,6 +4,7 @@ import { InvestigatePage } from "./investigate/InvestigatePage";
 import { ConfirmPage } from "./office/ConfirmPage";
 import { OneBox } from "./home/OneBox";
 import { CardPage } from "./pages/CardPage";
+import { ReviewsPage } from "./reviews/ReviewsPage";
 import { ReplayIndexPage } from "./replay/ReplayIndexPage";
 import { ReplayPage } from "./replay/ReplayPage";
 import { AppShell, type Section } from "./shell/AppShell";
@@ -35,14 +36,25 @@ type Route =
   | { name: "investigate" }
   | { name: "replays" }
   | { name: "stories" }
+  | { name: "reviews" }
+  | { name: "proof-room" }
   | { name: "home" };
 
+// /proof-room?case=<id> is the stable address for "watch your check team" (iMessage links to
+// it). The team works beside the 3D twin, so it lands there; with no case it lands on Home.
+export function proofRoomTarget(search: string): string {
+  const id = new URLSearchParams(search).get("case") ?? "";
+  return /^[A-Za-z0-9_-]+$/.test(id) ? `/case/${id}/twin` : "/";
+}
+
 export function matchRoute(path: string): Route {
+  if (/^\/proof-room\/?$/.test(path)) return { name: "proof-room" };
   if (/^\/map\/?$/.test(path)) return { name: "map" };
   if (/^\/listings\/?$/.test(path)) return { name: "listings" };
   if (/^\/finder\/?$/.test(path)) return { name: "finder" };
   if (/^\/confirm\/?$/.test(path)) return { name: "confirm" };
   if (/^\/stories\/?$/.test(path)) return { name: "stories" };
+  if (/^\/reviews\/?$/.test(path)) return { name: "reviews" };
   if (/^\/investigate\/?$/.test(path)) return { name: "investigate" };
   if (/^\/replay\/?$/.test(path)) return { name: "replays" };
   const replay = /^\/replay\/([A-Za-z0-9_-]+)\/?$/.exec(path);
@@ -82,20 +94,26 @@ export default function App() {
     if (window.location.pathname === "/" && first !== "home")
       window.location.replace(tabOf(first).href);
   }, []);
-  const section: Section | "stories" | null =
+  const toTwin = route.name === "proof-room";
+  useEffect(() => {
+    if (toTwin) window.location.replace(proofRoomTarget(window.location.search));
+  }, [toTwin]);
+  const section: Section | "stories" | "reviews" | null =
     route.name === "home"
       ? "home"
       : route.name === "stories"
         ? "stories"
-        : route.name === "map"
-          ? "map"
-          : route.name === "listings"
-            ? "listings"
-            : route.name === "finder"
-              ? "finder"
-              : route.name === "replays" || route.name === "replay"
-                ? "replays"
-                : null;
+        : route.name === "reviews"
+          ? "reviews"
+          : route.name === "map"
+            ? "map"
+            : route.name === "listings"
+              ? "listings"
+              : route.name === "finder"
+                ? "finder"
+                : route.name === "replays" || route.name === "replay"
+                  ? "replays"
+                  : null;
   // Inside a place, the bar says where you are.
   const here = window.location.pathname + window.location.search;
   const context =
@@ -106,6 +124,7 @@ export default function App() {
         : route.name === "result" || route.name === "verify"
           ? { label: "Report", href: here }
           : null;
+  if (toTwin) return null;
   if (route.name === "map") {
     return (
       <AppShell section="map">
@@ -128,6 +147,8 @@ export default function App() {
           <FinderPage />
         ) : route.name === "stories" ? (
           <StoriesPage />
+        ) : route.name === "reviews" ? (
+          <ReviewsPage />
         ) : route.name === "confirm" ? (
           <ConfirmPage />
         ) : route.name === "investigate" ? (

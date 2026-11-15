@@ -21,6 +21,8 @@ stop_at_inliers = 150  # good enough: stop verifying more candidates
 # twice the inliers, spread over enough of the photo that one planar object cannot carry it.
 elsewhere_min_inliers = 50  # p10 of true matches is 56 (n=30, #28); noise tops out at 5 to 7
 elsewhere_min_spread = 0.15  # inlier bounding box area / photo area
+elsewhere_min_ratio = 0.6   # strict bar only. Honest photo-like renders: 26 of 27 placed at >= 0.83 (n=42, #10); a
+                            # ChatGPT-regenerated photo matched ANOTHER building at 0.43 (60 of 140)
 # A claimed match is not trusted when another building clears the strict bar with at least
 # this many times its inliers: the photo is not placed at all (ruling 03:46, #28).
 ambiguity_ratio = 3.0

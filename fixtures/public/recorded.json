@@ -1,0 +1,107 @@
+{
+  "_note": "FIXTURE: synthetic answers in the shape of the real Census Geocoder and RDAP replies. No real address or domain. Read by snapback.public.fetch.RecordedFetcher.",
+  "census": {
+    "14 example lane, houston, tx 77096": {
+      "result": {
+        "input": {
+          "address": {
+            "address": "14 Example Lane, Houston, TX 77096"
+          }
+        },
+        "addressMatches": [
+          {
+            "matchedAddress": "14 EXAMPLE LN, HOUSTON, TX, 77096",
+            "addressComponents": {
+              "zip": "77096",
+              "city": "HOUSTON",
+              "state": "TX"
+            },
+            "geographies": {
+              "Counties": [
+                {
+                  "GEOID": "48201",
+                  "STATE": "48",
+                  "COUNTY": "201",
+                  "BASENAME": "Harris",
+                  "NAME": "Harris County"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "9 nowhere court, houston, tx 77096": {
+      "result": {
+        "input": {
+          "address": {
+            "address": "9 Nowhere Court, Houston, TX 77096"
+          }
+        },
+        "addressMatches": []
+      }
+    }
+  },
+  "rdap": {
+    "new-lease-portal.example": {
+      "ldhName": "NEW-LEASE-PORTAL.EXAMPLE",
+      "events": [
+        {
+          "eventAction": "registration",
+          "eventDate": "2026-11-09T04:00:00Z"
+        },
+        {
+          "eventAction": "last changed",
+          "eventDate": "2026-11-10T04:00:00Z"
+        }
+      ]
+    },
+    "old-property-co.example": {
+      "ldhName": "OLD-PROPERTY-CO.EXAMPLE",
+      "events": [
+        {
+          "eventAction": "registration",
+          "eventDate": "2009-03-02T05:00:00Z"
+        }
+      ]
+    },
+    "no-date.example": {
+      "ldhName": "NO-DATE.EXAMPLE",
+      "events": []
+    }
+  },
+  "lens": {
+    "https://images.example.test/ad/house-1.jpg": {
+      "search_metadata": {
+        "status": "Success"
+      },
+      "visual_matches": [
+        {
+          "position": 1,
+          "title": "14 Example Ln, Houston, TX 77096 | 3 beds house for sale",
+          "link": "https://www.zillow.com/homedetails/14-Example-Ln-Houston-TX-77096/0_zpid/",
+          "source": "Zillow"
+        }
+      ]
+    },
+    "https://images.example.test/ad/house-2.jpg": {
+      "visual_matches": [
+        {
+          "position": 1,
+          "title": "Home for rent",
+          "link": "https://www.zillow.com/homes/for_rent/14-Example-Ln/",
+          "source": "Zillow"
+        },
+        {
+          "position": 2,
+          "title": "Blog",
+          "link": "https://blog.example.test/decor",
+          "source": "Blog"
+        }
+      ]
+    },
+    "https://images.example.test/ad/house-3.jpg": {
+      "visual_matches": []
+    }
+  }
+}

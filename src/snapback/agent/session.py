@@ -163,6 +163,9 @@ class CaseSession:
         self.walk_plan: Callable[[], Any] | None = None
         self.walk_desk: Any = None
         self.walk_director: Any = None
+        # W1: the web checks, started by whoever opens the case (`agent/web/run.py`). Returns
+        # the WebFacts found so far, or None while they run. None (the default): no web checks.
+        self.web_facts: Callable[[], Any] | None = None
 
     # --- reading the state -----------------------------------------------------------------
 
@@ -250,6 +253,12 @@ class CaseSession:
             "record_source": self.modules.record_source(self.case_id),
             "property_type": self.modules.property_type(self.case_id),
         }
+        # Public data (Census address, RDAP link-domain age): only modules that looked it up
+        # offer these; None means not looked up.
+        for name in ("place_check", "domain_check"):
+            lookup = getattr(self.modules, name, None)
+            if callable(lookup):
+                update[name] = lookup(self.case_id)
         if pick == TWIN_RULES_CHALLENGE:
             self.trace.emit(
                 TraceKind.TOOL,

@@ -280,6 +280,14 @@ class PriceResult(BaseModel):
     unit: UnitStatus = UnitStatus.NOT_CHECKED
     per_bed: bool = False  # the record prices by the bed, so the rent was not compared
     compared_beds: int | None = None  # the rent was compared with floor plans of this size
+    # Where the rent baseline came from: "costar" (the building's record) or "hud_safmr" (HUD's
+    # Small Area Fair Market Rent for the ZIP, a public baseline used only when CoStar has none).
+    # None when nothing was compared.
+    baseline_source: Literal["costar", "hud_safmr"] | None = None
+    # HUD baseline only: the typical rent for this ZIP and bedroom count, and which ZIP and size.
+    baseline_rent: int | None = None
+    baseline_zip: str | None = None
+    baseline_beds: int | None = None
 
 
 class PhoneMatch(StrEnum):
@@ -331,6 +339,9 @@ class ForSaleMatch(BaseModel):
     # Listing offices on record (brokerage company names, Homes.com `offices[].name`). These
     # count as legitimate marketers. Companies only: an agent's personal name is never kept.
     offices: list[str] = Field(default_factory=list)
+    # Which source found it, when it is not CoStar's for-sale listings ("Google Lens via
+    # SerpApi"). None means CoStar's record.
+    source_name: str | None = None
 
 
 class LicenseStatus(StrEnum):
@@ -414,6 +425,52 @@ class AdNote(BaseModel):
     record_value: str | None = None
 
 
+class RecordLine(BaseModel):
+    """One fact read from a Texas public record (the Comptroller, HUD, the City of Houston).
+
+    Facts only: the words live in card/strings.py (`records.<key>`), and no verdict reads it.
+    `source` names the registry the fact came from; `data_source` says whether the lookup was
+    LIVE or FIXTURE. A company name is the ad's own; a phone number is never kept, only the
+    yes/no that the ad's number is not the one on HUD's record.
+    """
+
+    key: str  # comptroller_active | comptroller_inactive | comptroller_none | hud_manager | ...
+    source: str  # "Texas Comptroller", "HUD", "City of Houston"
+    data_source: DataSource
+    company: str | None = None  # a company, never a person's name
+    year: int | None = None
+    zip_code: str | None = None
+
+
+class PublicStatus(StrEnum):
+    """What a public-data lookup (Census, RDAP) came back with."""
+
+    FOUND = "found"
+    NO_MATCH = "no_match"  # the service answered and has no such address (information only)
+    NOT_CHECKED = "not_checked"  # timeout, error, or no recording: never a finding
+
+
+class PlaceCheck(BaseModel):
+    """Census Geocoder: is the ad's address in the Census address list, and its ZIP and county.
+    Evidence only: a miss is an information line, never a flag (new homes are often missing)."""
+
+    status: PublicStatus
+    zip: str | None = None
+    county_fips: str | None = None  # "48201" is Harris County
+    county: str | None = None
+    source: DataSource  # LIVE (called now) or FIXTURE (a recorded answer)
+
+
+class DomainCheck(BaseModel):
+    """RDAP: how long ago the domain of a link in the ad was registered."""
+
+    host: str
+    status: PublicStatus
+    registered_on: date | None = None
+    age_days: int | None = None
+    source: DataSource
+
+
 class ModuleEvidence(BaseModel):
     """Everything the modules produced for one case. Lane A flattens it into Evidence (A1)."""
 
@@ -448,9 +505,15 @@ class ModuleEvidence(BaseModel):
     # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
     # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
     ad_notes: list[AdNote] = Field(default_factory=list)
+    # Texas public records (Comptroller, HUD, Houston address points). Information only: no
+    # verdict reads it. Empty means nothing was looked up or nothing was found.
+    public_records: list[RecordLine] = Field(default_factory=list)
     # X1: when a photo was placed in a different home, that home's office on CoStar's record
     # (company only). Information for the card; no verdict reads it.
     matched_office: str | None = None
+    # Public data for the homes CoStar does not cover. None means not looked up.
+    place_check: PlaceCheck | None = None
+    domain_check: DomainCheck | None = None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -487,6 +550,9 @@ class CardLine(BaseModel):
     # The label's table key ("label.payment_ask"), so a page can tell which check a line came
     # from in any language. None on an older card.
     key: str | None = None
+    # Which source answered this line, by name ("CoStar record", "HUD", "Census", "HCAD",
+    # "RDAP", "TREC"). None on an older card or a line no outside source answered.
+    source_name: str | None = None
 
 
 class CardRow(BaseModel):
@@ -517,6 +583,9 @@ class Card(BaseModel):
     summary: list[str] = Field(default_factory=list)
     checks_out: list[str] = Field(default_factory=list)  # lines with tone OK
     does_not: list[str] = Field(default_factory=list)  # red flag, hold and not-shown lines
+    # Set only by GET /cases/{id}/card: whether the case has an evidence file to read. None means
+    # not said (an older server); the page then asks, as it always did.
+    has_evidence: bool | None = None
 
 
 class ChoiceKind(StrEnum):
@@ -807,6 +876,15 @@ class ReportSteps(BaseModel):
     steps: list[str]  # what to click, in order, in the pack's language
 
 
+class ReportSource(BaseModel):
+    """One public-data line of the evidence, with the source that answered it."""
+
+    source_name: str  # "HUD", "Census" or "RDAP"
+    label: str
+    text: str
+    data_source: DataSource  # LIVE or FIXTURE
+
+
 class ReportResponse(BaseModel):
     """`GET /cases/{case_id}/report`: one pack for reporting a copied listing to a platform.
 
@@ -828,6 +906,11 @@ class ReportResponse(BaseModel):
     aerial_url: str | None = None  # our /cases/{id}/aerial route, when the case names a building
     platforms: list[ReportSteps] = Field(default_factory=list)
     not_checked: list[str]  # the card's standing list: what this does not show
+    # Every source that answered a line of the card, by name (CoStar record, HUD, Census, HCAD,
+    # RDAP, TREC), and the public-data lines themselves. Lines about the poster or the owner are
+    # not copied here, only the source's name.
+    source_names: list[str] = Field(default_factory=list)
+    sources: list[ReportSource] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -844,6 +927,15 @@ class CaseProgress(StrEnum):
     # A24 stretch: the agent asked the renter for the license number the ad did not give.
     WAITING_FOR_ANSWER = "waiting_for_answer"
     DONE = "done"
+
+
+class StillChecking(BaseModel):
+    """The body of a 202 from the report's reads (evidence, real-listing, copy-alert, report,
+    alternatives) while the check is still running: not ready, not failed. Ask again after
+    `retry_after_ms` (the Retry-After header says the same in seconds)."""
+
+    status: CaseProgress
+    retry_after_ms: int
 
 
 class CreateCaseRequest(BaseModel):

@@ -30,6 +30,9 @@ EN: dict[str, str] = {
     "label.data_ask": "Data ask",
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
+    "label.rent_vs_hud": "Rent vs HUD typical",
+    "label.address": "Address",
+    "label.link_domain": "Link domain",
     "label.seen_before": "Seen before",
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
@@ -37,6 +40,30 @@ EN: dict[str, str] = {
     "label.office": "Office confirmation",
     "label.link": "Link",
     "label.license": "License",
+    "label.src_comptroller": "Texas Comptroller",
+    "label.src_hud": "HUD record",
+    "label.src_houston": "City of Houston",
+    "records.comptroller_active": (
+        "Texas Comptroller: {company} is an active Texas company since {year}."
+    ),
+    "records.comptroller_active_no_year": (
+        "Texas Comptroller: {company} is an active Texas company."
+    ),
+    "records.comptroller_inactive": (
+        "Texas Comptroller: {company} is on the list but not as an active company."
+    ),
+    "records.comptroller_none": (
+        "Texas Comptroller: {company} is not found in the Comptroller list "
+        "(sole proprietors aren't listed)."
+    ),
+    "records.hud_manager": "HUD's record lists the manager as {company}.",
+    "records.hud_phone_differs": "The ad's phone isn't the manager's number on HUD's record.",
+    "records.address_point": (
+        "City of Houston: this street address is on the city's address points (ZIP {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "City of Houston: this street address is on the city's address points."
+    ),
     "label.owner": "Owner of record",
     "label.owner_rule": "Owner's rule",
     "label.unit": "Unit on record",
@@ -302,6 +329,35 @@ EN: dict[str, str] = {
     "rent.below_floor_plan": (
         "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
     ),
+    # HUD's Small Area Fair Market Rent, when CoStar has no rent for the home (public baseline).
+    # Census Geocoder: the address check. Evidence only, never a flag.
+    "place.census_found": (
+        "The address is in the Census address list ({county} County, ZIP {zip}). That shows the "
+        "address exists, not who is offering it."
+    ),
+    "place.census_found_bare": (
+        "The address is in the Census address list. That shows the address exists, not who is "
+        "offering it."
+    ),
+    "place.census_no_match": (
+        "The Census address list has no match for this address. New homes are often missing, so "
+        "this is information only."
+    ),
+    "place.census_not_checked": "Not checked (the Census address list did not answer).",
+    # RDAP: how old the domain of a link in the ad is.
+    "rule.link.new_domain": (
+        "A link in the ad is on a domain registered in the last few weeks. Red flag."
+    ),
+    "link.domain_age": "A link in the ad is on a domain registered {years}+ years ago. No flag.",
+    "link.domain_age_months": "A link in the ad is on a domain registered {days} days ago.",
+    "link.domain_not_checked": "Not checked (the domain registry did not answer).",
+    "rent.hud_within": "Not far below the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
+    "rent.hud_below": (
+        "Typical rent here (HUD, ZIP {zip}, {size}): {rent}. This rent is {percent}% under it. "
+        "Ask why; discounts happen."
+    ),
+    "rent.hud_size.studio": "studio",
+    "rent.hud_size.beds": "{beds} bed",
     "rent.plan.studio": "studio",
     "rent.plan.beds": "{beds} bed",
     "rent.per_bed": "Not checked (priced per bed here, so the rent was not compared).",
@@ -589,6 +645,9 @@ ES: dict[str, str] = {
     "label.data_ask": "Datos que piden",
     "label.pressure": "Presión",
     "label.rent_vs_record": "Renta frente al registro",
+    "label.rent_vs_hud": "Renta frente a la típica de HUD",
+    "label.address": "Dirección",
+    "label.link_domain": "Dominio del enlace",
     "label.seen_before": "Visto antes",
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
@@ -596,6 +655,33 @@ ES: dict[str, str] = {
     "label.office": "Confirmación de la oficina",
     "label.link": "Enlace",
     "label.license": "Licencia",
+    "label.src_comptroller": "Contralor de Texas",
+    "label.src_hud": "Registro de HUD",
+    "label.src_houston": "Ciudad de Houston",
+    "records.comptroller_active": (
+        "Contralor de Texas: {company} es una empresa activa de Texas desde {year}."
+    ),
+    "records.comptroller_active_no_year": (
+        "Contralor de Texas: {company} es una empresa activa de Texas."
+    ),
+    "records.comptroller_inactive": (
+        "Contralor de Texas: {company} está en la lista, pero no como empresa activa."
+    ),
+    "records.comptroller_none": (
+        "Contralor de Texas: {company} no aparece en la lista del Contralor "
+        "(los propietarios individuales no figuran)."
+    ),
+    "records.hud_manager": "El registro de HUD indica que el administrador es {company}.",
+    "records.hud_phone_differs": (
+        "El teléfono del anuncio no es el número del administrador en el registro de HUD."
+    ),
+    "records.address_point": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad "
+        "(código postal {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad."
+    ),
     "label.owner": "Propietario registrado",
     "label.owner_rule": "Regla del propietario",
     "label.unit": "Unidad en el registro",
@@ -879,6 +965,37 @@ ES: dict[str, str] = {
         "{percent}% por debajo de la renta más baja que figura en el registro de este edificio "
         "para {plan}. Pregunte por qué; hay descuentos."
     ),
+    "place.census_found": (
+        "La dirección está en la lista de direcciones del Censo (condado de {county}, código "
+        "postal {zip}). Eso muestra que la dirección existe, no quién la ofrece."
+    ),
+    "place.census_found_bare": (
+        "La dirección está en la lista de direcciones del Censo. Eso muestra que la dirección "
+        "existe, no quién la ofrece."
+    ),
+    "place.census_no_match": (
+        "La lista de direcciones del Censo no tiene esta dirección. Las casas nuevas suelen "
+        "faltar, así que es solo información."
+    ),
+    "place.census_not_checked": "No comprobado (la lista de direcciones del Censo no respondió).",
+    "rule.link.new_domain": (
+        "Un enlace del anuncio está en un dominio registrado hace pocas semanas. Señal de alerta."
+    ),
+    "link.domain_age": "Un enlace del anuncio está en un dominio registrado hace {years}+ años.",
+    "link.domain_age_months": (
+        "Un enlace del anuncio está en un dominio registrado hace {days} días."
+    ),
+    "link.domain_not_checked": "No comprobado (el registro de dominios no respondió).",
+    "rent.hud_within": (
+        "No muy por debajo de la renta típica de la zona (HUD, código postal {zip}, {size}): "
+        "{rent}."
+    ),
+    "rent.hud_below": (
+        "Renta típica de la zona (HUD, código postal {zip}, {size}): {rent}. Esta renta está "
+        "{percent}% por debajo. Pregunte por qué; hay descuentos."
+    ),
+    "rent.hud_size.studio": "estudio",
+    "rent.hud_size.beds": "{beds} hab.",
     "rent.plan.studio": "un estudio",
     "rent.plan.beds": "{beds} hab.",
     "rent.per_bed": "No comprobado (aquí se cobra por cama, así que la renta no se comparó).",
@@ -1455,9 +1572,40 @@ ES.update(
 EN.update(
     {
         "trace.error.model_timeout": "The agent ran out of time, so code finished the checks.",
+        "trace.error.model_nokey": "No model key is set, so code finished the checks.",
+        "trace.error.model_busy": (
+            "The agent waited too long behind other checks, so code finished the checks."
+        ),
+        "trace.error.model_stuck": "The agent stopped answering, so code finished the checks.",
+        "timeline.fallback.timeout": "it ran out of time",
+        "timeline.fallback.failed": "the model could not be used",
+        "timeline.fallback.nokey": "no model key is set",
+        "timeline.fallback.busy": "it waited too long behind other checks",
+        "timeline.fallback.stuck": "it stopped answering",
         "trace.updated": 'More checks changed the result from "{old}" to "{new}": {reason}',
         "trace.updated.short": "More checks changed the result.",
         "timeline.updated": "Updated after more checks",
+        "worklog.tool.record": "Read the facts on CoStar's record of the building",
+        "worklog.tool.office": "Read how the ad's contact compares with the leasing office",
+        "worklog.tool.owner": "Read the county's owner of record",
+        "worklog.tool.place": "Read where the photos were placed in the 3D scan",
+        "worklog.tool.search": "Searched CoStar's record for places that fit",
+        "worklog.tool.todos": "Updated its to-do list",
+        "worklog.tool.write": "Wrote its working note",
+        "worklog.tool.read": "Read a working note",
+        "worklog.tool.open": "Looked at the choices code offered",
+        "worklog.tool.choose": "Picked one of the choices code offered",
+        "worklog.tool.spot": "Asked code to draw a spot for the photo",
+        "worklog.tool.challenge": "Asked code to draft the message for the poster",
+        "worklog.tool.task": "Handed work to: {name}",
+        "worklog.tool.task_other": "Handed work to another helper",
+        "worklog.tool.other": "Used one of its tools",
+        "worklog.result.done": "Done.",
+        "worklog.result.running": "Still working.",
+        "worklog.result.saved": "Saved. Derived text only; no result in it.",
+        "worklog.result.todos": "{done} of {count} steps done.",
+        "worklog.asked.fallback": "Check your part of this ad and write a short note.",
+        "worklog.said.fallback": "Handed back its findings in a note.",
         "timeline.read_ad": "Read the ad",
         "timeline.which_checks": "Chose which checks to run",
         "timeline.locate": "Placed {placed} of {total} photos in its 3D scan",
@@ -1465,6 +1613,9 @@ EN.update(
         "timeline.record": "Found the building on CoStar's record",
         "timeline.record_missing": "Looked for the building on CoStar's record",
         "timeline.rent": "Compared the rent with {n} floor plans",
+        "timeline.rent_hud": "Compared the rent with HUD's typical rent for the ZIP",
+        "timeline.census": "Looked up the address in the Census address list",
+        "timeline.rdap": "Looked up how old a link's domain is",
         "timeline.phone": "Checked the phone against the leasing office",
         "timeline.for_sale": "Looked for a for-sale listing",
         "timeline.license": "Looked up the license the ad names",
@@ -1480,9 +1631,9 @@ EN.update(
         "timeline.skip.ask_license": "Did not ask for a license number",
         "timeline.skip.report": "Skipped the report",
         "timeline.floor_plan": "Matched the photos to a floor plan",
-        "timeline.spot": "Drew a random spot for the photo challenge",
+        "timeline.spot": "Picked a spot for the poster to photograph",
         "timeline.approval": "Waited for your OK before sending anything",
-        "timeline.status": "Waited for an answer",
+        "timeline.status": "Waited for a reply",
         "timeline.retry": "Decided whether another photo was needed",
         "timeline.retry_search": "Chose one more search for an unplaced photo",
         "timeline.walk": "Planned the walk through the 3D scan",
@@ -1492,7 +1643,7 @@ EN.update(
         "timeline.delegate": "Handed the {name} checks to a sub-agent",
         "timeline.note": "Wrote a working note",
         "timeline.unsure": "Flagged a close call",
-        "timeline.fallback": "The agent stopped, so code finished the checks",
+        "timeline.fallback": "The deep agent stopped: {reason}; code set the verdict",
         "timeline.error": "Code used its own pick",
         "timeline.verdict": "Code worked out the result",
         "timeline.result.done": "Done.",
@@ -1500,6 +1651,15 @@ EN.update(
         "timeline.result.rent.within_range": "Inside the range on record.",
         "timeline.result.rent.below_range": "Below the range on record.",
         "timeline.result.rent.not_checked": "No rent on record to compare.",
+        "timeline.result.rent_hud.within_range": "Not far under HUD's typical rent.",
+        "timeline.result.rent_hud.below_range": "Far below HUD's typical rent.",
+        "timeline.result.rent_hud.not_checked": "No HUD rent to compare.",
+        "timeline.result.census.found": "The address is in the list.",
+        "timeline.result.census.no_match": "No match (information only).",
+        "timeline.result.census.not_checked": "Not checked.",
+        "timeline.result.rdap.found": "The registry gave the domain's age.",
+        "timeline.result.rdap.no_match": "No match.",
+        "timeline.result.rdap.not_checked": "Not checked.",
         "timeline.result.phone.yes": "It is the office's number.",
         "timeline.result.phone.no": "It is not the office's number.",
         "timeline.result.plan": "One todo per step; the agent keeps it up to date.",
@@ -1585,11 +1745,47 @@ ES.update(
         "trace.error.model_timeout": (
             "Al agente se le acabó el tiempo, así que el código terminó las comprobaciones."
         ),
+        "trace.error.model_nokey": (
+            "No hay clave del modelo, así que el código terminó las comprobaciones."
+        ),
+        "trace.error.model_busy": (
+            "El agente esperó demasiado detrás de otras comprobaciones, así que el código las"
+            " terminó."
+        ),
+        "trace.error.model_stuck": (
+            "El agente dejó de responder, así que el código terminó las comprobaciones."
+        ),
+        "timeline.fallback.timeout": "se le acabó el tiempo",
+        "timeline.fallback.failed": "no se pudo usar el modelo",
+        "timeline.fallback.nokey": "no hay clave del modelo",
+        "timeline.fallback.busy": "esperó demasiado detrás de otras comprobaciones",
+        "timeline.fallback.stuck": "dejó de responder",
         "trace.updated": (
             'Más comprobaciones cambiaron el resultado de "{old}" a "{new}": {reason}'
         ),
         "trace.updated.short": "Más comprobaciones cambiaron el resultado.",
         "timeline.updated": "Actualizado tras más comprobaciones",
+        "worklog.tool.record": "Leyó los datos del registro de CoStar sobre el edificio",
+        "worklog.tool.office": "Leyó cómo se compara el contacto con la oficina de arrendamiento",
+        "worklog.tool.owner": "Leyó el propietario registrado en el condado",
+        "worklog.tool.place": "Leyó dónde se ubicaron las fotos en el escaneo 3D",
+        "worklog.tool.search": "Buscó lugares que encajan en el registro de CoStar",
+        "worklog.tool.todos": "Actualizó su lista de tareas",
+        "worklog.tool.write": "Escribió su nota de trabajo",
+        "worklog.tool.read": "Leyó una nota de trabajo",
+        "worklog.tool.open": "Miró las opciones que ofreció el código",
+        "worklog.tool.choose": "Eligió una de las opciones que ofreció el código",
+        "worklog.tool.spot": "Pidió al código un punto para la foto",
+        "worklog.tool.challenge": "Pidió al código el borrador del mensaje",
+        "worklog.tool.task": "Pasó trabajo a: {name}",
+        "worklog.tool.task_other": "Pasó trabajo a otro ayudante",
+        "worklog.tool.other": "Usó una de sus herramientas",
+        "worklog.result.done": "Hecho.",
+        "worklog.result.running": "Sigue trabajando.",
+        "worklog.result.saved": "Guardado. Solo texto derivado; sin resultado.",
+        "worklog.result.todos": "{done} de {count} pasos hechos.",
+        "worklog.asked.fallback": "Revisa tu parte de este anuncio y escribe una nota breve.",
+        "worklog.said.fallback": "Devolvió lo que encontró en una nota.",
         "timeline.read_ad": "Leyó el anuncio",
         "timeline.which_checks": "Eligió qué comprobaciones hacer",
         "timeline.locate": "Ubicó {placed} de {total} fotos en su escaneo 3D",
@@ -1597,6 +1793,9 @@ ES.update(
         "timeline.record": "Encontró el edificio en el registro de CoStar",
         "timeline.record_missing": "Buscó el edificio en el registro de CoStar",
         "timeline.rent": "Comparó la renta con {n} planos",
+        "timeline.rent_hud": "Comparó la renta con la renta típica de HUD para el código postal",
+        "timeline.census": "Buscó la dirección en la lista de direcciones del Censo",
+        "timeline.rdap": "Buscó la antigüedad del dominio de un enlace",
         "timeline.phone": "Comparó el teléfono con el de la oficina de arrendamiento",
         "timeline.for_sale": "Buscó un anuncio de venta",
         "timeline.license": "Buscó la licencia que nombra el anuncio",
@@ -1612,7 +1811,7 @@ ES.update(
         "timeline.skip.ask_license": "No pidió un número de licencia",
         "timeline.skip.report": "Omitió el informe",
         "timeline.floor_plan": "Emparejó las fotos con un plano",
-        "timeline.spot": "Sorteó un punto para el reto de la foto",
+        "timeline.spot": "Eligió un punto para que quien publica lo fotografíe",
         "timeline.approval": "Esperó su visto bueno antes de enviar nada",
         "timeline.status": "Esperó una respuesta",
         "timeline.retry": "Decidió si hacía falta otra foto",
@@ -1624,7 +1823,7 @@ ES.update(
         "timeline.delegate": "Pasó las comprobaciones de {name} a un subagente",
         "timeline.note": "Escribió una nota de trabajo",
         "timeline.unsure": "Marcó un caso dudoso",
-        "timeline.fallback": "El agente se detuvo, así que el código terminó las comprobaciones",
+        "timeline.fallback": "El agente profundo se detuvo: {reason}; el código fijó el resultado",
         "timeline.error": "El código usó su propia opción",
         "timeline.verdict": "El código calculó el resultado",
         "timeline.result.done": "Hecho.",
@@ -1632,6 +1831,15 @@ ES.update(
         "timeline.result.rent.within_range": "Dentro del rango registrado.",
         "timeline.result.rent.below_range": "Por debajo del rango registrado.",
         "timeline.result.rent.not_checked": "No hay renta registrada para comparar.",
+        "timeline.result.rent_hud.within_range": "No muy por debajo de la renta típica de HUD.",
+        "timeline.result.rent_hud.below_range": "Muy por debajo de la renta típica de HUD.",
+        "timeline.result.rent_hud.not_checked": "No hay renta de HUD para comparar.",
+        "timeline.result.census.found": "La dirección está en la lista.",
+        "timeline.result.census.no_match": "Sin coincidencia (solo información).",
+        "timeline.result.census.not_checked": "No comprobado.",
+        "timeline.result.rdap.found": "El registro dio la antigüedad del dominio.",
+        "timeline.result.rdap.no_match": "Sin coincidencia.",
+        "timeline.result.rdap.not_checked": "No comprobado.",
         "timeline.result.phone.yes": "Es el número de la oficina.",
         "timeline.result.phone.no": "No es el número de la oficina.",
         "timeline.result.plan": "Una tarea por paso; el agente la mantiene al día.",
