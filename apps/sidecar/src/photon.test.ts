@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { cardText, renterId } from "./handler";
+import { renterId, reportText } from "./handler";
 import {
   connectPhoton,
   publicWebUrl,
@@ -96,7 +96,7 @@ test("a renter's text and photo in their own thread -> one case -> the card in t
   assert.equal(renter.sent.length, 1);
   // the reply is the API's card as plain text plus its link, line for line
   const link = `http://web.test/case/${card.case_id}`;
-  assert.equal(renter.sent[0], cardText(card, link));
+  assert.equal(renter.sent[0], reportText(card, link));
 });
 
 test("SNAPBACK never texts first: no inbound message, no send", async () => {

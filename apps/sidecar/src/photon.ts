@@ -16,6 +16,7 @@
  */
 
 import {
+  CHECKING,
   handleMessage,
   isAllowed,
   renterId,
@@ -73,11 +74,27 @@ export type PhotonConfig = SidecarConfig & {
   watches?: WatchBook;
   /** Voice replies: the SDK's `voice(buffer, { mimeType })` builder. Without it, text only. */
   makeVoice?: (bytes: Uint8Array, mimeType: string) => unknown;
+  /** U1: one "checking" reply per batch before a new check (not for follow-ups). */
+  acknowledge?: boolean;
+  /** The card picture: the SDK's `attachment(buffer, { mimeType, name })`. Without it, text only. */
+  makeImage?: (bytes: Uint8Array, mimeType: string) => unknown;
   /** CAF to m4a before speech to text. Defaults to ffmpeg. */
   convertVoice?: ConvertVoice;
 };
 
 type Log = (line: string) => void;
+
+/** Stage switches, so either can be turned off on stage: the card picture
+ * (SNAPBACK_SEND_CARD_IMAGE=1) and the "checking" reply (SNAPBACK_SEND_CHECKING=1). Off unless 1. */
+export function stageOptions(env: Record<string, string | undefined>): {
+  sendCardImage: boolean;
+  acknowledge: boolean;
+} {
+  return {
+    sendCardImage: env.SNAPBACK_SEND_CARD_IMAGE === "1",
+    acknowledge: env.SNAPBACK_SEND_CHECKING === "1",
+  };
+}
 
 const QUIET_MS = 4000;
 const MAX_PHOTOS = 10;
@@ -196,8 +213,21 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
         await item.space.send(text);
         replied = text;
       },
+      // the card picture, through the SDK's attachment builder, to the same space only
+      ...(config.makeImage
+        ? {
+            async image(threadId: string, bytes: Uint8Array, mimeType: string) {
+              if (threadId !== item.space.id)
+                throw new Error("a reply may only go to its own thread");
+              await item.space.send(config.makeImage!(bytes, mimeType));
+            },
+          }
+        : {}),
     };
-    await handleMessage(msg, client, config);
+    const checking = config.acknowledge
+      ? async () => void (await item.space.send(CHECKING))
+      : undefined;
+    await handleMessage(msg, client, config, checking);
     if (!spoken || !replied || !config.makeVoice) return;
     // A spoken ad gets a spoken answer too. If it fails, the text has already gone out.
     try {
