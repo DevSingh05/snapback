@@ -40,6 +40,7 @@ from snapback.agent.join import (
     license_of,
     owner_of_county,
     public_checks_of,
+    record_for_address,
 )
 from snapback.agent.locate_live import LiveLocate
 from snapback.agent.modules import CODE_ALPHABET, FIXTURES_DIR
@@ -688,6 +689,10 @@ class CaseStore:
             record = self._lookups.record(property_id)
             if record is None:
                 raise UnknownProperty
+        elif demo_case is None and listing.text:
+            # No id sent: the building the ad's own street address names, when the kit holds
+            # exactly one record there (#8 proof run). Otherwise the check runs on no record.
+            record = record_for_address(self._lookups, listing.text)
 
         demo_id = demo_case or self._settings.demo_case
         demo = load_demo_case(demo_id) if demo_id else None

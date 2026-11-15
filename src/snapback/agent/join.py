@@ -117,6 +117,20 @@ def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
         return None
 
 
+def record_for_address(lookups: object, listing_text: str) -> PropertyRecord | None:
+    """The kit record at the address the ad types, or None. Lookups without the method (older
+    ones, fixtures) and a lookup that breaks are "no match": the check runs as before."""
+    lookup = getattr(lookups, "record_for_address", None)
+    if lookup is None or not listing_text:
+        return None
+    try:
+        found = lookup(listing_text)
+    except Exception as error:
+        log.warning("address match failed (%s); no record joined", type(error).__name__)
+        return None
+    return found if isinstance(found, PropertyRecord) else None
+
+
 def owner_of_county(
     lookups: object, listing_text: str, place: PlaceCheck | None
 ) -> OwnerResult | None:
@@ -205,6 +219,7 @@ class KitLookups:
         self.source = source
         self._kit_dir = kit_dir
         self._records: dict[str, PropertyRecord] | None = None
+        self._by_address: dict[tuple[str, str], list[PropertyRecord]] | None = None
         self._rentals: list[RentalHouse] | None = None
         self._lock = threading.Lock()
 
@@ -234,6 +249,20 @@ class KitLookups:
 
     def record(self, property_id: str) -> PropertyRecord | None:
         return self.records().get(property_id)
+
+    def record_for_address(self, listing_text: str) -> PropertyRecord | None:
+        """The live kit record at the street address the ad gives, if exactly one (#8 proof
+        run). A fixture run never matches: its records are synthetic stand-ins."""
+        from snapback.agent.address_match import build_index, match_address
+
+        if self.source is not DataSource.LIVE:
+            return None
+        records = self.records()
+        with self._lock:
+            if self._by_address is None:
+                self._by_address = build_index(records.values())
+            index = self._by_address
+        return match_address(listing_text, index)
 
     def rentals(self) -> list[RentalHouse]:
         """The active house rentals in the kit (search supply), read once and kept."""
