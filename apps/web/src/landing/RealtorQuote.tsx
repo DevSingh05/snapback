@@ -1,7 +1,7 @@
 import { loadLang, type Lang } from "../lang";
 import "./landing.css";
 
-// A real realtor's words about who SNAPBACK is for, on the front door under the four steps. The
+// A real realtor's words about who SNAPBACK is for, on the front door, under the checks and above the footer. The
 // quote is his, word for word, and always shown in English; in Spanish a translation sits under
 // it in smaller text. The one line above it is ours. The rest of the front page is English only,
 // so this follows the saved language choice (src/lang.ts) without changing anything around it.
