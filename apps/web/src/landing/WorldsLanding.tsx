@@ -258,7 +258,28 @@ function Hero({ reduced }: { reduced: boolean }) {
   );
 }
 
-function Verdict() {
+function Verdict({ reduced }: { reduced: boolean }) {
+  const card = useRef<HTMLElement>(null);
+  // The sample card runs once when it scrolls into view: each row is checked in turn, then the
+  // verdict lands. Without the observer, or with reduced motion, it is simply there.
+  useEffect(() => {
+    const el = card.current;
+    if (!el || reduced || typeof IntersectionObserver === "undefined") return;
+    el.classList.add("is-armed");
+    const io = new IntersectionObserver(
+      (es) => {
+        if (!es.some((e) => e.isIntersecting)) return;
+        el.classList.add("is-run");
+        io.disconnect();
+      },
+      { threshold: 0.55 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      el.classList.remove("is-armed", "is-run");
+    };
+  }, [reduced]);
   return (
     <section className="wl-sec wl-check" id="check" aria-labelledby="wl-check-h">
       <div className="wl-wrap wl-split">
@@ -277,7 +298,12 @@ function Verdict() {
             SYNTHETIC: a test ad we wrote to show the card. No real home, person or phone number.
           </p>
         </div>
-        <article className="wl-card" data-testid="wl-verdict" aria-label="Sample verdict card">
+        <article
+          className="wl-card"
+          data-testid="wl-verdict"
+          aria-label="Sample verdict card"
+          ref={card}
+        >
           <header className="wl-card-band">
             <span className="wl-card-meta ui-mono">Sample case · SYNTHETIC</span>
             <h3 className="wl-card-head">
@@ -709,7 +735,7 @@ export default function WorldsLanding() {
       </header>
       <main>
         <Hero reduced={reduced} />
-        <Verdict />
+        <Verdict reduced={reduced} />
         <How />
         <Uses />
         <TakenHere reduced={reduced} />
