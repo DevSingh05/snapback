@@ -6,9 +6,14 @@ import { runPhoton, type PhotonApp, type PhotonMessage, type PhotonSpace } from 
 import { MAX_VOICE_BYTES, MAX_VOICE_SECONDS } from "./voice";
 import { WatchBook } from "./watch";
 
-const card = JSON.parse(
-  readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
-);
+// These tests pin the locked headline for the state, so the fixture's own headline (#256, built
+// by code and covered by its own test) is dropped here.
+const card = {
+  ...JSON.parse(
+    readFileSync(new URL("../../../fixtures/contracts/card_hold.json", import.meta.url), "utf8"),
+  ),
+  headline: undefined,
+};
 const RENTER = "fx-space-renter";
 const SPOKEN_AD = "Two bed for rent, the owner is abroad, send six hundred by Zelle to hold it";
 
