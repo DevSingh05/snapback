@@ -505,7 +505,7 @@
   }
 }
 
-/* The site footer: quiet links to /reviews and /under-the-hood. */
+/* The site footer: one quiet link to /under-the-hood (Reviews is in the bar). */
 .app-sitefoot {
   display: flex;
   flex-wrap: wrap;

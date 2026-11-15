@@ -101,6 +101,10 @@
   --shadow-lift: 0 1px 2px rgb(10 12 13 / 0.2), 0 24px 48px rgb(10 12 13 / 0.34);
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The one soft corner (surfaces, cards, the box) and the pill (chips, buttons). Nothing else
+     may set a radius (styles.test.ts). */
+  --radius: 12px;
+  --radius-pill: 999px;
 
   /* One spacing scale. Every gap, padding and margin on the shell, landing, walk and tour
      screens is one of these steps. */

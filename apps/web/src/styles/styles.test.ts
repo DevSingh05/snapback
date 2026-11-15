@@ -29,12 +29,14 @@ describe("locked design rules", () => {
     }
   });
 
-  it("uses sharp corners only", () => {
+  // Vidyut, Sun Nov 15 03:0x: sharp corners read as harsh. One soft radius and a pill are allowed,
+  // both as tokens; any other radius still fails.
+  it("rounds corners only with the one radius token or the pill", () => {
     for (const file of [...components, TOKENS]) {
       const css = strip(readFileSync(file, "utf8"));
       const radii = [...css.matchAll(/border-radius:\s*([^;]+);/g)].map((m) => m[1]!.trim());
       expect(
-        radii.filter((r) => r !== "0"),
+        radii.filter((r) => !["0", "var(--radius)", "var(--radius-pill)"].includes(r)),
         file,
       ).toEqual([]);
     }
