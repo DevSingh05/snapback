@@ -22,6 +22,7 @@ import {
   schedule,
   statusLine,
   teamSummary,
+  teamView,
   type Floor,
 } from "./model";
 import { ReportTeam, teamHref } from "./ReportTeam";
@@ -250,6 +251,26 @@ describe("findings come from the card, through the report's mapping", () => {
     expect(end.desks.filter((d) => d.card.id === "rules" && d.state === "unused")).toEqual([]);
   });
 
+  it("a check the plan left out keeps its light, and a live run collapses nobody", () => {
+    const skipped: CaseTimeline = {
+      ...sampleTimeline,
+      steps: sampleTimeline.steps.map((s) =>
+        s.kind === "owner" ? { ...s, skipped: true, result: "Skipped: no owner on record." } : s,
+      ),
+    };
+    const end = floor(END, skipped);
+    const view = teamView(end, end);
+    expect(view.shown.find((d) => d.card.id === "owner_licence")?.state).toBe("skipped");
+    expect(view.notNeeded.map((a) => a.id)).toEqual(["planner", "web", "finder", "tour_prep"]);
+    // Mid-replay the same members show, so no light appears or leaves as the run plays.
+    const mid = teamView(floor(beatOf("locate").start + 10, skipped), end);
+    expect(mid.shown.map((d) => d.card.id)).toEqual(view.shown.map((d) => d.card.id));
+    const live = { ...sampleTimeline, running: true, steps: sampleTimeline.steps.slice(0, 4) };
+    const now = floor(END, live);
+    expect(teamView(now, now).notNeeded).toEqual([]);
+    expect(teamView(now, now).shown).toHaveLength(roster.agents.length);
+  });
+
   it("when the deep agent ran, the Planner and the sub-agents it handed work to light up", () => {
     const end = floor(END, deepTimeline());
     expect(desk(end, "planner").state).toBe("done");
@@ -282,11 +303,19 @@ describe("the panel beside the twin", () => {
       "href",
       `/case/${card.case_id}#case-answer-title`,
     );
+    // Only the members this ad needed get a light, in the order they acted, the Decider last.
     const lights = screen.getAllByTestId("agent-strip-item");
-    expect(lights).toHaveLength(roster.agents.length);
-    const web = lights.find((l) => l.getAttribute("data-agent") === "web")!;
-    expect(web).toHaveAttribute("data-state", "unused");
-    expect(web).toHaveTextContent("Not used on this case");
+    expect(lights.map((l) => l.getAttribute("data-agent"))).toEqual([
+      "rules",
+      "record",
+      "phone_office",
+      "photo",
+      "owner_licence",
+      "decider",
+    ]);
+    expect(screen.getByTestId("team-not-needed")).toHaveTextContent(
+      "Not needed for this ad: Planner, Web agent, Finder, Tour prep",
+    );
     const rules = lights.find((l) => l.getAttribute("data-agent") === "rules")!;
     expect(rules).toHaveAttribute("data-tone", "red_flag");
     expect(rules).toHaveTextContent("Red flag");
@@ -323,6 +352,9 @@ describe("the panel beside the twin", () => {
     const light = (id: string) =>
       screen.getAllByTestId("agent-strip-item").find((l) => l.getAttribute("data-agent") === id)!;
     expect(screen.queryByTestId("team-verdict")).toBeNull();
+    expect(screen.queryByTestId("team-reason")).toBeNull();
+    expect(screen.queryByTestId("team-how")).toBeNull();
+    expect(screen.queryByRole("link", { name: /See how they got this/ })).toBeNull();
     expect(light("photo")).toHaveAttribute("data-state", "idle");
     act(() => {
       vi.advanceTimersByTime(beatOf("locate").start + 300);

@@ -26,6 +26,7 @@ export interface RoomWords extends Words {
   liveTab: string;
   meet: string;
   deciderWaits: string;
+  notNeeded: string;
   team: string;
   onIt: string;
   watch: string;
@@ -72,6 +73,7 @@ export const WORDS: Record<Lang, RoomWords> = {
     liveTab: "Live",
     meet: "Meet the team",
     deciderWaits: "Waiting for the team's evidence",
+    notNeeded: "Not needed for this ad",
     team: "Your check team",
     onIt: "Your check team is on it",
     watch: "Watch them work",
@@ -117,6 +119,7 @@ export const WORDS: Record<Lang, RoomWords> = {
     liveTab: "En vivo",
     meet: "Conoce al equipo",
     deciderWaits: "Esperando las pruebas del equipo",
+    notNeeded: "No hizo falta para este anuncio",
     team: "Tu equipo de revisión",
     onIt: "Tu equipo de revisión está en ello",
     watch: "Verlos trabajar",

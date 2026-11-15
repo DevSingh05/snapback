@@ -80,6 +80,8 @@ export interface Desk {
   source: DataSource | null;
   tookMs: number | null; // recorded time over its steps; null when it has none
   startedAt: number | null; // play clock, when work first reached this desk
+  // Where this desk first comes into the run (the index of its first step); Infinity if never.
+  order: number;
 }
 
 export interface LogLine {
@@ -172,6 +174,7 @@ const restDesk = (card: AgentCard): Desk => ({
   source: null,
   tookMs: null,
   startedAt: null,
+  order: Infinity,
 });
 
 export interface FloorInput {
@@ -230,6 +233,7 @@ export function floorAt({
       // The planner has no check of its own: every step the model made happen is its work.
       mine = deep ? steps.map((s, i) => ({ s, i })).filter(({ s }) => s.by === "agent") : [];
     }
+    if (mine.length > 0) desk.order = mine[0]!.i;
     const ran = mine.filter(({ s }) => !s.skipped);
     const skipped = mine.filter(({ s }) => s.skipped);
     const begun = ran.filter(({ i }) => started(i));
@@ -239,6 +243,7 @@ export function floorAt({
     if (ran.length === 0 && bubbles.length > 0 && skipped.length === 0) {
       // The card holds a finding for this desk but the timeline has no step of its own for it
       // (the rules read the ad as it comes in). It is tied to the first step, reading the ad.
+      desk.order = 0;
       if (!started(0)) return desk;
       desk.startedAt = beats[0]!.start;
       desk.source = bubbles[0]!.source;
@@ -407,6 +412,34 @@ export function statusLine(floor: Floor, w: Words): string {
   const said = now ? now.card.doing : last;
   const doing = said.charAt(0).toLowerCase() + said.slice(1);
   return `${count} · ${doing}`;
+}
+
+export interface TeamView {
+  // The members this ad needed, in the order they came into the run, the Decider last.
+  shown: Desk[];
+  // Members the whole run never reached: one quiet line, never a row of idle lights.
+  notNeeded: AgentCard[];
+}
+
+/** Who to show for the run. `whole` is the floor with every step played; `now` is the floor
+ *  at this moment. Until a run is over nobody is known to be unneeded, so everyone shows. A
+ *  desk whose check the plan left out stays in view: a gap is something the renter should see. */
+export function teamView(now: Floor, whole: Floor): TeamView {
+  if (whole.phase !== "done") return { shown: now.desks, notNeeded: [] };
+  const unneeded = new Set(whole.desks.filter((d) => d.state === "unused").map((d) => d.card.id));
+  const rank = (d: Desk) => (d.card.team === "decider" ? Infinity : d.order);
+  const orderOf = new Map(whole.desks.map((d, i) => [d.card.id, [rank(d), i] as const]));
+  const shown = now.desks
+    .filter((d) => !unneeded.has(d.card.id))
+    .sort((a, b) => {
+      const [ra, ia] = orderOf.get(a.card.id)!;
+      const [rb, ib] = orderOf.get(b.card.id)!;
+      return ra === rb ? ia - ib : ra < rb ? -1 : 1;
+    });
+  return {
+    shown,
+    notNeeded: whole.desks.filter((d) => unneeded.has(d.card.id)).map((d) => d.card),
+  };
 }
 
 /** The report's one-line summary: how many desks checked, and how many found a red flag. */

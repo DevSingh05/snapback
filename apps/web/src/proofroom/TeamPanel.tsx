@@ -18,7 +18,15 @@ import { VERDICT_TONE } from "../case/model";
 import { usePrefersReducedMotion } from "../twin/useReducedMotion";
 import { Tag } from "../ui/Tag";
 import { AgentStrip } from "./AgentStrip";
-import { floorAt, statusLine, type Desk, type Floor, type Lang, type Roster } from "./model";
+import {
+  floorAt,
+  statusLine,
+  teamView,
+  type Desk,
+  type Floor,
+  type Lang,
+  type Roster,
+} from "./model";
 import { usePlayer, type Speed } from "./usePlayer";
 import { useRoster, useRun, type Run } from "./useRun";
 import { WORDS, type RoomWords } from "./words";
@@ -33,7 +41,6 @@ interface Packet {
   y0: number;
   x1: number;
   y1: number;
-  out: boolean;
 }
 
 function DeskCard({
@@ -212,6 +219,16 @@ export function TeamPanel({
     at: player.at,
     snapback: w.snapback,
   });
+  // The same run with every step played: who this ad needed, and the room the end will take.
+  const whole = floorAt({
+    roster,
+    card: run.card,
+    timeline: run.timeline,
+    listing: run.listing,
+    snapback: w.snapback,
+  });
+  const team = teamView(floor, whole);
+  const ending = floor.verdict ?? (whole.phase === "done" ? whole.verdict : null);
   const [tab, setTab] = useState<"live" | "team">("live");
   const [focus, setFocus] = useState<string | null>(null);
   const moving = !reduced && floor.phase === "running";
@@ -223,8 +240,8 @@ export function TeamPanel({
     if (el && moving) el.scrollTop = el.scrollHeight;
   }, [floor.log.length, moving]);
 
-  // Hand-offs: when work reaches a member, a mark travels to it from the Planner's light; when
-  // it is done, one travels on to the Decider's. Each is set off by a real step, once.
+  // Hand-offs: when the Planner is part of the run and work reaches a member, a mark travels
+  // to it from the Planner's light. Each is set off by a real step, once.
   const strip = useRef<HTMLDivElement>(null);
   const seen = useRef<Record<string, string>>({});
   const nextId = useRef(0);
@@ -248,12 +265,11 @@ export function TeamPanel({
       const id = desk.card.id;
       now[id] = desk.state;
       if (!moving || before[id] === desk.state || id === planner || id === decider) continue;
-      const out = desk.state === "done";
-      if (!out && desk.state !== "working") continue;
-      const from = centre(out ? id : (planner ?? id));
-      const to = centre(out ? (decider ?? id) : id);
+      if (desk.state !== "working" || !planner) continue;
+      const from = centre(planner);
+      const to = centre(id);
       if (from && to)
-        fresh.push({ id: nextId.current++, x0: from.x, y0: from.y, x1: to.x, y1: to.y, out });
+        fresh.push({ id: nextId.current++, x0: from.x, y0: from.y, x1: to.x, y1: to.y });
     }
     seen.current = now;
     if (fresh.length > 0) setPackets((old) => [...old.slice(-8), ...fresh]);
@@ -295,6 +311,34 @@ export function TeamPanel({
         </p>
         <div className="pr-bar" aria-hidden="true">
           <span style={{ transform: `scaleX(${floor.progress})` }} />
+        </div>
+        <div
+          className="pr-decider"
+          data-stamped={floor.verdict ? "yes" : "no"}
+          data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
+          data-testid="team-decider"
+        >
+          <p className="pr-who ui-mono">
+            {floor.desks.find((d) => d.card.team === "decider")?.card.name}
+          </p>
+          {/* The slot is already as tall as the stamp will be, so the stamp lands in place. */}
+          <div className="pr-stamp-slot">
+            {floor.verdict ? (
+              <p className="pr-stamp" data-testid="team-verdict">
+                {floor.verdict.headline}
+              </p>
+            ) : (
+              <>
+                {ending ? (
+                  <p className="pr-stamp pr-held" aria-hidden="true">
+                    {ending.headline}
+                  </p>
+                ) : null}
+                <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
+              </>
+            )}
+          </div>
+          <p className="pr-rule">{w.deciderRule}</p>
         </div>
         {run.timeline ? (
           <div className="pr-controls">
@@ -366,11 +410,11 @@ export function TeamPanel({
         hidden={tab !== "live"}
       >
         <div className="pr-strip-wrap" ref={strip}>
-          <AgentStrip desks={floor.desks} lang={lang} label={w.team} onPick={openDesk} />
+          <AgentStrip desks={team.shown} lang={lang} label={w.team} onPick={openDesk} />
           {packets.map((p) => (
             <span
               key={p.id}
-              className={p.out ? "pr-packet pr-packet-out" : "pr-packet"}
+              className="pr-packet"
               aria-hidden="true"
               style={
                 {
@@ -384,6 +428,12 @@ export function TeamPanel({
             />
           ))}
         </div>
+
+        {team.notNeeded.length > 0 ? (
+          <p className="pr-quiet" data-testid="team-not-needed">
+            {w.notNeeded}: {team.notNeeded.map((a) => a.name).join(", ")}
+          </p>
+        ) : null}
 
         <h3 className="pr-sub ui-mono">{w.thread}</h3>
         <ol
@@ -416,59 +466,51 @@ export function TeamPanel({
         </ol>
         {floor.fellBack ? <p className="pr-note">{w.fellBack}</p> : null}
 
-        <div
-          className="pr-decider"
-          data-stamped={floor.verdict ? "yes" : "no"}
-          data-verdict={run.card ? VERDICT_TONE[run.card.state] : "slate"}
-          data-testid="team-decider"
-        >
-          <p className="pr-who ui-mono">
-            {floor.desks.find((d) => d.card.team === "decider")?.card.name}
-          </p>
-          <div className="pr-stamp-slot">
-            {floor.verdict ? (
-              <p className="pr-stamp" data-testid="team-verdict">
-                {floor.verdict.headline}
-              </p>
-            ) : (
-              <p className="pr-quiet">{floor.phase === "rest" ? w.rest : w.deciderWaits}</p>
-            )}
-          </div>
-          {floor.verdict && floor.verdict.reasons.length > 0 ? (
-            <>
-              <p className="pr-who ui-mono">{w.because}</p>
-              <ul className="pr-reasons">
-                {floor.verdict.reasons.map((reason) => {
-                  const desk = floor.desks.find((d) => d.card.id === reason.deskId);
-                  return (
-                    <li key={reason.text} data-testid="team-reason">
-                      <span>{reason.text}</span>
-                      {desk ? (
-                        <a
-                          className="case-text-link"
-                          href={`#desk-${desk.card.id}`}
-                          data-testid="team-reason-link"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            openDesk(desk.card.id);
-                          }}
-                        >
-                          {w.see} {desk.card.name}
-                        </a>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          ) : null}
-          <p className="pr-rule">{w.deciderRule}</p>
-          {floor.verdict ? (
-            <a className="pr-btn pr-btn-link" href={answerHref(caseId)} data-testid="team-how">
+        {/* The reasons hold their room from the start of a replay and show with the stamp. */}
+        {ending ? (
+          <div
+            className="pr-because"
+            data-shown={floor.verdict ? "yes" : "no"}
+            inert={!floor.verdict}
+            aria-hidden={!floor.verdict}
+          >
+            {ending.reasons.length > 0 ? (
+              <>
+                <p className="pr-who ui-mono">{w.because}</p>
+                <ul className="pr-reasons">
+                  {ending.reasons.map((reason) => {
+                    const desk = floor.desks.find((d) => d.card.id === reason.deskId);
+                    return (
+                      <li key={reason.text} data-testid={floor.verdict ? "team-reason" : undefined}>
+                        <span>{reason.text}</span>
+                        {desk ? (
+                          <a
+                            className="case-text-link"
+                            href={`#desk-${desk.card.id}`}
+                            data-testid={floor.verdict ? "team-reason-link" : undefined}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              openDesk(desk.card.id);
+                            }}
+                          >
+                            {w.see} {desk.card.name}
+                          </a>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : null}
+            <a
+              className="pr-btn pr-btn-link"
+              href={answerHref(caseId)}
+              data-testid={floor.verdict ? "team-how" : undefined}
+            >
               {w.how} <span aria-hidden="true">→</span>
             </a>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
       <div
         id="pr-pane-team"
