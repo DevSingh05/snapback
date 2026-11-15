@@ -17,12 +17,14 @@ def _rec(pid, name, host="exampleliving.com"):
     )
 
 
+DIST = _rec("fx-dist", "District at Example Greenbriar", "districtliving.com")
 GREEN = _rec("fx-green", "Example Greenbriar")
 PARK = _rec("fx-park", "Example Greenbriar Park", "examplegreenbriarpark.com")
 NO_SITE = _rec("fx-gardens", "Example Greenbriar Gardens", None)
 INDEX = build_name_index(
     [
         GREEN,
+        DIST,
         PARK,
         NO_SITE,
         _rec("fx-short", "The Oaks", "oaksliving.com"),
@@ -101,3 +103,18 @@ def test_a_name_inside_a_longer_buildings_name_never_matches():
     )
     # A longer building with no website still blocks the shorter name.
     assert website_for_name("1 bed at Example Greenbriar Gardens", INDEX) is None
+
+
+def test_a_name_with_a_connector_word_matches_and_its_lookalike_host_is_flagged():
+    ad = "1 bed at District at Example Greenbriar, $1,585. Apply on https://districtliving.co."
+    assert website_for_name(ad, INDEX) == "districtliving.com"
+    assert _link("https://districtliving.co", name="District at Example Greenbriar") is (
+        LinkDomain.LOOKALIKE
+    )
+    assert _link("https://districtliving.com", name="District at Example Greenbriar") is (
+        LinkDomain.NOT_CHECKED
+    )
+
+
+def test_connectors_alone_never_make_a_name():
+    assert build_name_index([_rec("fx-x", "At the Oaks"), _rec("fx-y", "Elm of")]) == {}
