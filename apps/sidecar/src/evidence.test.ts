@@ -46,7 +46,7 @@ function client() {
   const sent: { kind: "text" | "image"; first?: number }[] = [];
   return {
     sent,
-    reply: async (_t: string, _text: string) => void sent.push({ kind: "text" }),
+    reply: async () => void sent.push({ kind: "text" }),
     image: async (_t: string, bytes: Uint8Array) =>
       void sent.push({ kind: "image", first: bytes[4] }),
   };
