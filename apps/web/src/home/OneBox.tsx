@@ -36,6 +36,7 @@ import { MicButton, LevelMeter } from "../shell/FinderPage";
 import { markSignalsSent, loadFinderEvents, unsentSignals } from "../shell/finderStore";
 import { useVoiceInput, voiceStatus } from "../shell/voice";
 import { YourChecks } from "../shell/YourChecks";
+import { HomeTeam } from "../proofroom/HomeTeam";
 import { PhotoPin, State, type StateKind } from "../ui";
 import {
   MODE,
@@ -1304,9 +1305,6 @@ const STEPS = [
   { key: "waiting", label: "Waiting for the poster" },
 ] as const;
 
-/** What the check shows while it runs. The poster step comes after the verdict, not before. */
-const CHECK_STEPS = STEPS.slice(0, 2);
-
 function CheckRun({
   input,
   mode,
@@ -1415,9 +1413,9 @@ function CheckRun({
       </article>
     );
 
-  // The approval step passes at once; it shows as the check still running.
-  const found = CHECK_STEPS.findIndex((s) => s.key === state.step);
-  const active = found === -1 ? 1 : found;
+  // The approval step passes at once; it shows as the check still running. The check team
+  // stands in for the old progress steps: every member waits until the case exists, then the
+  // lights are the case's own recorded steps.
   const source: DataSource = "source" in state ? state.source : mode;
   return (
     <article className="ob-card ob-check" data-testid="ob-check">
@@ -1425,7 +1423,7 @@ function CheckRun({
         <p className="ob-card-kicker">Checking the ad</p>
         <SourceChip source={source} />
       </header>
-      <CheckSteps active={active} steps={CHECK_STEPS} />
+      <HomeTeam caseId={"caseId" in state ? state.caseId : null} />
     </article>
   );
 }
@@ -1585,6 +1583,7 @@ export function VerdictCard({
       onFollow={onFollow}
       challenge={challenge}
       scanLookup={scanLookup}
+      team={<HomeTeam caseId={caseId} />}
     />
   );
 }
@@ -1596,6 +1595,7 @@ export function VerdictView({
   source,
   onFollow,
   actions,
+  team,
   challenge = null,
   scanLookup = true,
 }: {
@@ -1603,6 +1603,8 @@ export function VerdictView({
   source: DataSource;
   onFollow?: (words: string) => void;
   actions?: React.ReactNode;
+  /** The check team's strip for this case, with "Watch them work". */
+  team?: React.ReactNode;
   challenge?: string | null;
   scanLookup?: boolean;
 }) {
@@ -1660,6 +1662,7 @@ export function VerdictView({
         </button>
       )}
       <p className="ob-muted">Not checked: {card.not_checked.join(", ")}.</p>
+      {team}
       <div className="ob-acts">
         {actions ?? (
           <>

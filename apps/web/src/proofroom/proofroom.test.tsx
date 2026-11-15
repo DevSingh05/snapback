@@ -11,6 +11,7 @@ import { CaseResult } from "../case/CaseResult";
 import { headlineOf } from "../cardStrings";
 import type { Card, CaseTimeline, TimelineStep } from "../contracts";
 import { AgentStrip } from "./AgentStrip";
+import { HomeTeam } from "./HomeTeam";
 import {
   MIN_BEAT,
   asRoster,
@@ -362,6 +363,30 @@ describe("the strip and its links", () => {
   it("is left off the page a QR code opens for someone else", () => {
     render(<CaseResult card={card} timeline={sampleTimeline} variant="verify" />);
     expect(screen.queryByTestId("report-team")).toBeNull();
+  });
+
+  it("Home: before the case exists every member waits, and there is no link to follow", () => {
+    render(<HomeTeam caseId={null} />);
+    expect(screen.getByTestId("home-team")).toHaveTextContent("Your check team is on it");
+    const lights = screen.getAllByTestId("agent-strip-item");
+    expect(lights.length).toBeGreaterThan(5);
+    expect(lights.every((l) => l.getAttribute("data-state") === "idle")).toBe(true);
+    expect(screen.queryByTestId("home-team-link")).toBeNull();
+    expect(screen.queryByTestId("home-team-status")).toBeNull();
+  });
+
+  it("Home: once the case exists the lights are its recorded steps, with Watch them work", () => {
+    // No API in tests: the fixture case reads the sample run.
+    render(<HomeTeam caseId={card.case_id} />);
+    const light = (id: string) =>
+      screen.getAllByTestId("agent-strip-item").find((l) => l.getAttribute("data-agent") === id)!;
+    expect(light("rules")).toHaveAttribute("data-tone", "red_flag");
+    expect(light("decider")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("home-team-link")).toHaveAttribute(
+      "href",
+      `/case/${card.case_id}/twin`,
+    );
+    expect(screen.getByTestId("home-team-link")).toHaveTextContent("Watch them work");
   });
 
   it("AgentStrip names every member with its state in words", () => {
