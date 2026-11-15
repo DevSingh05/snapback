@@ -19,6 +19,7 @@ import type {
 import { Tag } from "../ui";
 import { AnnotatedAd } from "./AnnotatedAd";
 import type { Lang } from "../lang";
+import { ReportTeam } from "../proofroom/ReportTeam";
 import { AnswerPanel } from "./AnswerPanel";
 import { Checks } from "./Checks";
 import { Ledger } from "./Ledger";
@@ -159,6 +160,7 @@ export function CaseResult({
         {proof ? <ProofPair {...proof} handoff={own && !inline} /> : null}
         {!proof && checking.proof ? <StillChecking testId="checking-proof" /> : null}
       </VerdictBand>
+      {own ? <ReportTeam card={card} timeline={timeline} realListing={realListing} /> : null}
 
       {!realListing && checking.real ? <StillChecking testId="checking-real" /> : null}
       {beside ? (
