@@ -1,7 +1,7 @@
 // What the case pieces read from a Card. Nothing here writes a sentence about a case: the
 // headline comes from cardStrings.ts, and every line's text and tone come from the API as given.
 import { toneWord } from "../cardStrings";
-import type { Card, CardLine, CardRowKind, CardTone, DataSource, VerdictState } from "../contracts";
+import type { Card, CardLine, CardRowKind, CardTone, VerdictState } from "../contracts";
 import { STATE_LABEL, type RecordSource, type StampKind, type StateKind } from "../ui";
 
 /** The colour of the bar beside the headline. A check that failed to load is always slate. */

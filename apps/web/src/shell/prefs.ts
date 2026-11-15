@@ -7,15 +7,21 @@ export interface Tab {
   id: Section;
   label: string;
   href: string;
+  // False: the page keeps its route but has no place in the top bar (the front cut, focus
+  // plan B4). The scam check is the one front door; these are reached from inside a report.
+  nav: boolean;
 }
 
 export const TABS: Tab[] = [
-  { id: "home", label: "Home", href: "/home" },
-  { id: "listings", label: "Listings", href: "/listings" },
-  { id: "map", label: "Map", href: "/map" },
-  { id: "finder", label: "Finder", href: "/finder" },
-  { id: "replays", label: "Replays", href: "/replay" },
+  { id: "home", label: "Home", href: "/home", nav: true },
+  { id: "listings", label: "Listings", href: "/listings", nav: false },
+  { id: "map", label: "Map", href: "/map", nav: false },
+  { id: "finder", label: "Finder", href: "/finder", nav: false },
+  { id: "replays", label: "Replays", href: "/replay", nav: false },
 ];
+
+/** The tabs the top bar shows. */
+export const NAV_TABS: Tab[] = TABS.filter((t) => t.nav);
 
 export interface Prefs {
   hidden: Section[]; // Home can never be hidden
@@ -32,7 +38,9 @@ export function clean(raw: unknown): Prefs {
   const hidden = Array.isArray(r.hidden)
     ? IDS.filter((id) => id !== "home" && (r.hidden as unknown[]).includes(id))
     : [];
-  const first = IDS.find((id) => id === r.first && !hidden.includes(id)) ?? "home";
+  // Only a tab in the bar can open first, so an old saved "open on Map" lands on Home.
+  const first =
+    NAV_TABS.map((t) => t.id).find((id) => id === r.first && !hidden.includes(id)) ?? "home";
   return { hidden, first };
 }
 

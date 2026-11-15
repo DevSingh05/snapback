@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Lockup } from "../ui/Mark";
-import { loadPrefs, savePrefs, TABS, type Prefs, type Section } from "./prefs";
+import { loadPrefs, NAV_TABS, savePrefs, type Prefs, type Section, type Tab } from "./prefs";
 import "./shell.css";
 
 export type { Section };
 
 interface Props {
   /** Which main tab the page belongs to. Null: none (a result, a walk). */
-  section: Section | null;
+  section: Section | "stories" | null;
+  /** The tabs in the bar. Left out: the ones flagged for the bar (Home), then Stories. */
+  tabs?: Tab[];
   /** A tab for where you are inside a place, shown only while you are there. */
   context?: { label: string; href: string } | null;
   /** "photo": the bar floats transparent over a photograph at the top of the page (Home,
@@ -19,7 +21,7 @@ interface Props {
 
 /** What each page is for, in one line. One purpose per page. */
 export const PURPOSE: Record<string, string> = {
-  home: "Ask anything: check an ad, find a place, or open any view.",
+  home: "Send a rental ad before you pay and get a report.",
   listings: "Browse the researched places.",
   map: "Find a home by where it is.",
   finder: "The agent that learns what you want and helps you find a home.",
@@ -47,10 +49,11 @@ function usePhone(): boolean {
   return phone;
 }
 
-// The app's frame: one bar on every page with the mark, the views the renter chose, Stories, the
-// Customize. On a phone the five views are words fixed at the bottom.
+// The app's frame: one bar on every page with the mark, Home, Stories, and the report while one
+// is open. Customize shows only when the bar has views to choose between. On a phone the tabs
+// are words fixed at the bottom.
 // No account, no sign-in: nothing here pretends there is one.
-export function AppShell({ section, context, bar, children }: Props) {
+export function AppShell({ section, context, bar, tabs = NAV_TABS, children }: Props) {
   const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs());
   const [open, setOpen] = useState(false);
   const phone = usePhone();
@@ -70,7 +73,9 @@ export function AppShell({ section, context, bar, children }: Props) {
     setPrefs(next);
     savePrefs(next);
   };
-  const shown = TABS.filter((t) => !prefs.hidden.includes(t.id));
+  const shown = tabs.filter((t) => !prefs.hidden.includes(t.id));
+  // With Home alone in the bar there is nothing to choose.
+  const canCustomize = tabs.some((t) => t.id !== "home");
 
   const customizeButton = (
     <button
@@ -108,6 +113,14 @@ export function AppShell({ section, context, bar, children }: Props) {
               {t.label}
             </a>
           ))}
+          <a
+            className="app-tab app-stories"
+            href="/stories"
+            aria-current={section === "stories" ? "page" : undefined}
+            data-in={section === "stories" ? "true" : undefined}
+          >
+            Stories
+          </a>
           {context && (
             <a className="app-tab app-tab-context" href={context.href} aria-current="page">
               {context.label}
@@ -115,10 +128,7 @@ export function AppShell({ section, context, bar, children }: Props) {
           )}
         </nav>
         <div className="app-tools">
-          <a className="app-tool app-stories" href="/stories">
-            Stories
-          </a>
-          {!phone && customizeButton}
+          {!phone && canCustomize && customizeButton}
           {!phone && siteLink}
         </div>
         {open && (
@@ -138,7 +148,7 @@ export function AppShell({ section, context, bar, children }: Props) {
               only.
             </p>
             <ul className="app-custom-list">
-              {TABS.map((t) => {
+              {tabs.map((t) => {
                 const hidden = prefs.hidden.includes(t.id);
                 return (
                   <li key={t.id} className="app-custom-row">
@@ -186,9 +196,9 @@ export function AppShell({ section, context, bar, children }: Props) {
           </p>
         )}
       {children}
-      {phone && section !== "map" && (
+      {phone && section !== "map" && (canCustomize || siteLink) && (
         <footer className="app-foot">
-          {customizeButton}
+          {canCustomize && customizeButton}
           {siteLink}
         </footer>
       )}

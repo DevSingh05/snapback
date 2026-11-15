@@ -39,7 +39,7 @@ import { bot, routed, you } from "./thread";
 
 // Three stories, each a list of beats. A beat is one thing happening in the app: a line of
 // narration on the stage, and the app's own screen beside it. People in the stories are
-// imagined: Sascha is a judge who gave us the idea, and nothing else about him is stated as fact.
+// imagined: Sascha is a judge who gave us the idea, and nothing else about Sascha is stated as fact.
 
 export interface Beat {
   key: string;
@@ -95,14 +95,14 @@ export const STORIES: Story[] = [
     slug: "sascha",
     name: "Sascha moves to Houston",
     imagine:
-      "Imagine Sascha is moving to Houston. Sascha is one of our judges, and he gave us this idea.",
+      "Imagine Sascha is moving to Houston. Sascha is one of our judges, who gave us this idea.",
     tile: { src: PHOTOS.citySkyline, alt: "Towers on a city skyline" },
-    did: "By hand, he'd reverse-search every photo, hunt down the real leasing office, call it in work hours and still face a Zelle deadline. SNAPBACK did it from one paste, and the $600 stayed with him.",
+    did: "By hand, Sascha would reverse-search every photo, hunt down the real leasing office, call it in work hours and still face a Zelle deadline. SNAPBACK did it from one paste, and the $600 stayed with Sascha.",
     beats: [
       {
         key: "ad",
         label: "The ad",
-        say: "He finds a 1 bed in Midtown on Facebook Marketplace: $1,150. The owner is “working abroad”, so no showings, and wants $600 by Zelle to hold it.",
+        say: "Sascha finds a 1 bed in Midtown on Facebook Marketplace: $1,150. The owner is “working abroad”, so no showings, and wants $600 by Zelle to hold it.",
         step: 1,
         ms: 6000,
         view: () => <AdScene ad={SASCHA_AD} />,
@@ -110,7 +110,7 @@ export const STORIES: Story[] = [
       {
         key: "paste",
         label: "Paste",
-        say: "Instead of paying, he pastes the ad and its three photos into one box.",
+        say: "Instead of paying, Sascha pastes the ad and its three photos into one box.",
         step: 1,
         ms: 5000,
         view: (ctx) => <TypeScene words={SASCHA_PASTE} files={AD_FILES} ctx={ctx} />,
@@ -144,7 +144,7 @@ export const STORIES: Story[] = [
       {
         key: "proof",
         label: "Proof",
-        say: "He sends the poster the drafted photo challenge. Never the money.",
+        say: "Sascha sends the poster the drafted photo challenge. Never the money.",
         step: 1,
         ms: 5000,
         view: () => (
@@ -157,7 +157,7 @@ export const STORIES: Story[] = [
       {
         key: "walk",
         label: "Walk it",
-        say: "Then he walks the real home. The ad's photo lands in the room it was taken in.",
+        say: "Then Sascha walks the real home. The ad's photo lands in the room it was taken in.",
         step: 2,
         ms: 9000,
         view: (ctx) => <WalkScene set={SASCHA_WALK} ctx={ctx} />,
@@ -165,7 +165,7 @@ export const STORIES: Story[] = [
       {
         key: "places",
         label: "Safer places",
-        say: "The Finder shows places like it that have a leasing office on record, and a scan he can walk.",
+        say: "The Finder shows places like it that have a leasing office on record, and a scan to walk.",
         step: 3,
         ms: 5000,
         view: () => (
@@ -189,7 +189,7 @@ export const STORIES: Story[] = [
       {
         key: "draft",
         label: "Tour request",
-        say: "It drafts a tour request to that office. He sends it himself.",
+        say: "It drafts a tour request to that office. Sascha sends it, not us.",
         step: 4,
         ms: 5000,
         view: () => <DraftScene draft={SASCHA_DRAFT} lead="Book me a visit to the first one." />,
@@ -197,7 +197,7 @@ export const STORIES: Story[] = [
       {
         key: "end",
         label: "What it did",
-        say: "Sascha keeps his $600.",
+        say: "Sascha keeps the $600.",
         step: 4,
         ms: 6000,
         view: () => null,

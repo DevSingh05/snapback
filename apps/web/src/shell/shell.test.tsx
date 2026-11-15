@@ -7,7 +7,7 @@ import { AppShell, PURPOSE } from "./AppShell";
 import { FinderPage } from "./FinderPage";
 import { briefFromChips, chipFromWords, loadLearned } from "./finderRules";
 import { loadFinderEvents, recordFinderEvent } from "./finderStore";
-import { clean, DEFAULT_PREFS, loadPrefs } from "./prefs";
+import { clean, DEFAULT_PREFS, loadPrefs, NAV_TABS, TABS } from "./prefs";
 import { YourChecks } from "./YourChecks";
 
 beforeEach(() => {
@@ -25,11 +25,59 @@ const tabs = () =>
     .map((a) => a.textContent);
 
 describe("the app shell", () => {
-  it("shows the views as tabs, marks the current one, and has no sign-in", () => {
-    render(<AppShell section="listings">page</AppShell>);
-    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
-    expect(screen.getByRole("link", { name: "Listings" })).toHaveAttribute("aria-current", "page");
+  it("the front cut: the bar is Home and Stories, and nothing else has a front door", () => {
+    render(<AppShell section="home">page</AppShell>);
+    expect(tabs()).toEqual(["Home", "Stories"]);
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
+    for (const name of ["Listings", "Map", "Finder", "Replays", "Investigate"])
+      expect(screen.queryByRole("link", { name })).toBeNull();
     expect(document.body.textContent).not.toMatch(/sign in|log in|account/i);
+  });
+
+  it("the nav flag hides a page from the bar and keeps it in the list of pages", () => {
+    expect(NAV_TABS.map((t) => t.id)).toEqual(["home"]);
+    expect(TABS.filter((t) => !t.nav).map((t) => t.id)).toEqual([
+      "listings",
+      "map",
+      "finder",
+      "replays",
+    ]);
+    // Each hidden page still has its address.
+    expect(TABS.map((t) => t.href)).toEqual(["/home", "/listings", "/map", "/finder", "/replay"]);
+  });
+
+  it("a hidden page still renders in the shell, with no tab marked for it", () => {
+    render(<AppShell section="listings">page</AppShell>);
+    expect(tabs()).toEqual(["Home", "Stories"]);
+    expect(document.querySelector("[aria-current='page']")).toBeNull();
+    expect(screen.getByTestId("page-purpose")).toHaveTextContent(PURPOSE.listings!);
+  });
+
+  it("with only Home to choose there is no Customize; Stories is marked on its own page", () => {
+    render(<AppShell section="stories">page</AppShell>);
+    expect(screen.queryByRole("button", { name: "Customize" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("the report gets a tab while one is open", () => {
+    render(
+      <AppShell section={null} context={{ label: "Report", href: "/case/7Q2M" }}>
+        page
+      </AppShell>,
+    );
+    expect(tabs()).toEqual(["Home", "Stories", "Report"]);
+    expect(screen.getByRole("link", { name: "Report" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("given every view, shows them as tabs and marks the current one", () => {
+    render(
+      <AppShell section="listings" tabs={TABS}>
+        page
+      </AppShell>,
+    );
+    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories"]);
+    expect(screen.getByRole("link", { name: "Listings" })).toHaveAttribute("aria-current", "page");
   });
 
   it("adds a tab for where you are inside a place", () => {
@@ -56,9 +104,12 @@ describe("the app shell", () => {
     window.history.replaceState(null, "", "/");
   });
 
-  it("has Stories as a link and orders the bar mark, tabs, Stories, Customize", () => {
-    render(<AppShell section="home">page</AppShell>);
-    expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute("href", "/stories");
+  it("orders the bar mark, tabs, Stories, then Customize when there are views to choose", () => {
+    render(
+      <AppShell section="home" tabs={TABS}>
+        page
+      </AppShell>,
+    );
     const order = [...document.querySelectorAll<HTMLElement>(".app-bar :is(a, button)")].map(
       (el) => el.getAttribute("aria-label") ?? el.textContent,
     );
@@ -76,7 +127,11 @@ describe("the app shell", () => {
       removeEventListener: () => {},
     })) as unknown as typeof window.matchMedia;
     try {
-      render(<AppShell section="home">page</AppShell>);
+      render(
+        <AppShell section="home" tabs={TABS}>
+          page
+        </AppShell>,
+      );
       expect(screen.queryByRole("button", { name: /Switch to (Day|Dusk)/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
       expect(
@@ -84,14 +139,18 @@ describe("the app shell", () => {
           name: "Customize",
         }),
       ).toBeInTheDocument();
-      expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays"]);
+      expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Replays", "Stories"]);
     } finally {
       window.matchMedia = real;
     }
   });
 
   it("Customize moves focus in, closes on Escape back to its button, and has no Menu", () => {
-    render(<AppShell section="home">page</AppShell>);
+    render(
+      <AppShell section="home" tabs={TABS}>
+        page
+      </AppShell>,
+    );
     expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
     const btn = screen.getByRole("button", { name: "Customize" });
     fireEvent.click(btn);
@@ -103,18 +162,25 @@ describe("the app shell", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Customize" }));
   });
 
-  it("Customize hides a tab and picks the one that opens first, and remembers both", () => {
-    render(<AppShell section="home">home</AppShell>);
+  it("Customize hides a tab and remembers it; a page out of the bar can never open first", () => {
+    render(
+      <AppShell section="home" tabs={TABS}>
+        home
+      </AppShell>,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Customize" }));
     const panel = screen.getByTestId("customize");
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Replays" }));
-    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder"]);
+    expect(tabs()).toEqual(["Home", "Listings", "Map", "Finder", "Stories"]);
     const firsts = within(panel).getAllByRole("radio", { name: "Opens first" });
     fireEvent.click(firsts[2]!); // Map
-    expect(loadPrefs()).toEqual({ hidden: ["replays"], first: "map" });
-    // Home can never be hidden, and a hidden tab cannot open first.
+    // The hidden tab is kept. Map is not in the bar, so the site still opens on Home.
+    expect(loadPrefs()).toEqual({ hidden: ["replays"], first: "home" });
     expect(within(panel).getByRole("checkbox", { name: "Home" })).toBeDisabled();
-    fireEvent.click(within(panel).getByRole("checkbox", { name: "Map" }));
+  });
+
+  it("an old saved choice to open on Map lands on Home", () => {
+    window.localStorage.setItem("snapback.space", JSON.stringify({ hidden: [], first: "map" }));
     expect(loadPrefs().first).toBe("home");
   });
 

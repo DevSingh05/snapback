@@ -75,24 +75,27 @@ export default function App() {
   }, []);
 
   const route = matchRoute(path);
-  // The site's root opens on the view the renter chose to see first. /home is always Home.
+  // The site's root opens on Home. Only a tab in the bar can open first (prefs.clean), so an
+  // old saved choice never lands anyone on a page the front cut took out of the bar.
   useEffect(() => {
     const first = loadPrefs().first;
     if (window.location.pathname === "/" && first !== "home")
       window.location.replace(tabOf(first).href);
   }, []);
-  const section: Section | null =
+  const section: Section | "stories" | null =
     route.name === "home"
       ? "home"
-      : route.name === "map"
-        ? "map"
-        : route.name === "listings"
-          ? "listings"
-          : route.name === "finder"
-            ? "finder"
-            : route.name === "replays" || route.name === "replay"
-              ? "replays"
-              : null;
+      : route.name === "stories"
+        ? "stories"
+        : route.name === "map"
+          ? "map"
+          : route.name === "listings"
+            ? "listings"
+            : route.name === "finder"
+              ? "finder"
+              : route.name === "replays" || route.name === "replay"
+                ? "replays"
+                : null;
   // Inside a place, the bar says where you are.
   const here = window.location.pathname + window.location.search;
   const context =
@@ -100,7 +103,9 @@ export default function App() {
       ? { label: "Walk", href: here }
       : route.name === "prep-case" || route.name === "prep-place"
         ? { label: "Tour prep", href: here }
-        : null;
+        : route.name === "result" || route.name === "verify"
+          ? { label: "Report", href: here }
+          : null;
   if (route.name === "map") {
     return (
       <AppShell section="map">
