@@ -257,7 +257,8 @@ export const PANELS: Panel[] = [
         n: 10,
         unit: "rings",
         label: "SYNTHETIC",
-        source: "/investigate time view: median time to detect 2.5 days over the 90-day seeded stream (synthetic, n=10) (#293)",
+        source:
+          "/investigate time view: median time to detect 2.5 days over the 90-day seeded stream (synthetic, n=10) (#293)",
       },
       {
         value: "0 of 2,684",
