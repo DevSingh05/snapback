@@ -48,6 +48,11 @@ class PhotoLocation(BaseModel):
     spread: float | None = None  # how widely the matched points cover the photo (0 to 1)
     rival_ratio: float | None = None  # best rival building's inliers over this one's
     bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
+    # Placed only after flipping the photo left to right: the ad's copy was mirrored (#10, V1).
+    flipped: bool | None = None
+    # Which cube face of the matched scan point verified it (1 front, 2 right, 3 back, 4 left):
+    # the evidence image draws that view (J1, #10).
+    scan_face: int | None = None
 
 
 class AuthorityStatus(StrEnum):
@@ -1388,6 +1393,7 @@ class EvidencePhoto(BaseModel):
     rival_ratio: float | None = None
     bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
     room_label: str | None = None
+    flipped: bool | None = None  # placed only when flipped left to right (a mirrored copy)
     scan_alias: str | None = None  # "S1", "S2": the scan it was placed in
     stop_alias: str | None = None  # the walk stop it belongs to (W1), if any
     searches: list[PlaceStep] = Field(default_factory=list)

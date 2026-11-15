@@ -24,6 +24,7 @@ class Thresholds:
     spots_top_n: int
     spots_overlap_deg: float
     version: str
+    flip_search: bool = True
     # The strict bar's own inlier ratio (identify with no claimed home, and placing elsewhere).
     # Defaults to min_inlier_ratio, so an older thresholds file reads as it did.
     elsewhere_min_ratio: float = 0.25
@@ -57,5 +58,6 @@ def load_thresholds(path: Path = THRESHOLDS_FILE) -> Thresholds:
         spots_top_n=data["spots"]["top_n"],
         spots_overlap_deg=data["spots"]["overlap_deg"],
         version="thresholds-" + hashlib.sha256(raw).hexdigest()[:12],
+        flip_search=bool(data["verify"].get("flip_search", True)),
         elsewhere_min_ratio=strict_ratio,
     )
