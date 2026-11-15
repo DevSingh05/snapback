@@ -11,7 +11,8 @@
         {
           "label": "Real",
           "text": "Taken in this building, in the 2 bed / 2 bath floor plan (3 of 3 photos).",
-          "tone": "ok"
+          "tone": "ok",
+          "key": "label.real"
         }
       ]
     },
@@ -21,23 +22,31 @@
         {
           "label": "Here now",
           "text": "Someone with access to a 2 bed / 2 bath unit here sent these just now (2 of 2 spots, code read, 21:44).",
-          "tone": "ok"
+          "tone": "ok",
+          "key": "label.here_now"
         },
         {
           "label": "Allowed to rent it",
           "text": "NOT SHOWN. Being inside does not mean they may rent it.",
-          "tone": "not_shown"
+          "tone": "not_shown",
+          "key": "label.allowed"
         }
       ]
     },
     {
       "kind": "price",
       "lines": [
-        { "label": "Payment ask", "text": "Zelle before a viewing. Red flag.", "tone": "red_flag" },
+        {
+          "label": "Payment ask",
+          "text": "Zelle before a viewing. Red flag.",
+          "tone": "red_flag",
+          "key": "label.payment_ask"
+        },
         {
           "label": "Rent vs record",
           "text": "Not checked (our data has no rent for this building).",
-          "tone": "not_checked"
+          "tone": "not_checked",
+          "key": "label.rent_vs_record"
         }
       ]
     }
