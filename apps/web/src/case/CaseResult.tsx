@@ -38,7 +38,7 @@ import {
   type RealListing as RealListingData,
   type SaferPlace,
 } from "./model";
-import { APARTMENTS_SEARCH, NextSteps, caseSteps } from "./NextSteps";
+import { APARTMENTS_SEARCH, DraftedStep, NextSteps, caseSteps } from "./NextSteps";
 import { PlannerChoice } from "./PlannerChoice";
 import { ProofPair } from "./ProofPair";
 import { RealListing } from "./RealListing";
@@ -190,6 +190,13 @@ export function CaseResult({
           caseId={card.case_id}
           timeline={timeline}
           lang={lang ?? asLang(card.lang) ?? undefined}
+        />
+      ) : null}
+      {own ? (
+        <DraftedStep
+          timeline={timeline}
+          lang={(lang ?? asLang(card.lang)) === "es" ? "es" : "en"}
+          titleId={`case-draft-title${key}`}
         />
       ) : null}
 

@@ -58,6 +58,10 @@ class TimelineStep(BaseModel):
     # The Planner's own choices, so a page can find them without reading a label: "follow_up"
     # (a check it chose for a gap on the card) or "next_step" (a step it drafted, never sent).
     choice: Literal["follow_up", "next_step"] | None = None
+    # For a "next_step" choice: the code-written draft the renter may approve, edit and send
+    # themselves. None when the step has no code draft here (asking the poster for a photo is
+    # the challenge, which has its own approval). Nothing is ever sent from it.
+    draft: str | None = None
 
 
 class TimelineTodo(BaseModel):
@@ -233,6 +237,7 @@ class _Builder:
         skipped: bool = False,
         source_name: str | None = None,
         choice: str | None = None,
+        draft: str | None = None,
         **v: object,
     ) -> None:
         self.steps.append(
@@ -247,6 +252,7 @@ class _Builder:
                 "skipped": skipped,
                 "source_name": source_name,
                 "choice": choice,
+                "draft": draft,
                 "derived": took is not None,
             }
         )
@@ -489,6 +495,9 @@ def build_timeline(
                 model=by == "agent",
                 kind="followup",
                 choice="next_step",
+                draft=b.say(f"next.draft.{event.pick}")
+                if strings.has(f"next.draft.{event.pick}", b.lang)
+                else None,
                 step=item.name if item is not None else (event.pick or ""),
                 gap=gap,
             )
