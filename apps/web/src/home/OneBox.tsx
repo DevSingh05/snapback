@@ -622,7 +622,8 @@ export function OneBox(props: Props) {
                 <SourceChip source={shownMode} />
                 <span>
                   SNAPBACK never messages anyone for you and never asks for money. Code sets every
-                  verdict; a model only explains it.
+                  verdict. A model, the Planner, picks up to 2 extra checks for what the card could
+                  not confirm and drafts a next step it never sends. It never sets the verdict.
                 </span>
               </p>
               <p className="ob-credits">
