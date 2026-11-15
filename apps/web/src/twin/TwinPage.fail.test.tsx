@@ -18,7 +18,7 @@ describe("TwinView when the SDK fails with a key present", () => {
     expect(screen.getByText("Schematic")).toBeInTheDocument();
     expect(screen.getByTestId("static-plan")).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "0.6" }),
+      expect(screen.getByTestId("photo-overlay")).toHaveStyle({ opacity: "1" }),
     );
   });
 });

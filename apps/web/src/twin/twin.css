@@ -152,3 +152,105 @@
     margin-left: 0;
   }
 }
+
+/* ---------- the photo fade ---------- */
+/* The ad photo eases down by itself (TwinPage: AD_HOLD_MS, FADE_MS); the time is set inline. */
+.landing-photo {
+  transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+}
+/* Side by side: the ad photo keeps the left half, the scan shows on the right. */
+.landing[data-split="yes"] .landing-photo {
+  opacity: 1 !important;
+  clip-path: inset(0 50% 0 0);
+}
+.landing-split {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  margin: 0;
+  pointer-events: none;
+}
+.landing-split span {
+  justify-self: start;
+  margin: var(--sp-3);
+  padding: 4px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+.landing-split span + span {
+  justify-self: stretch;
+  margin: 0;
+  padding: var(--sp-3);
+  background: none;
+  border-left: 3px solid var(--surface);
+  height: 100%;
+}
+.landing-split span + span::before {
+  content: "";
+}
+.twin-fade {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--page-pad);
+  border-bottom: 1px solid var(--line);
+}
+.twin-fade-hint {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.4;
+}
+.twin-fade-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.twin-fade-btn {
+  flex: 1 1 150px;
+  min-height: 48px;
+  padding: 0 var(--sp-4);
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  cursor: pointer;
+}
+.twin-fade-btn[aria-pressed="true"] {
+  border-color: var(--act);
+  background: var(--act);
+  color: var(--on-act);
+}
+.twin-fade-btn:focus-visible,
+.twin-fade-blend input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.twin-fade-blend {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  min-height: 44px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.twin-fade-blend input {
+  width: 100%;
+  min-height: 32px;
+  accent-color: var(--act);
+}
+@media (max-width: 480px) {
+  .twin-fade-blend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (hover: hover) {
+  .twin-fade-btn:hover {
+    box-shadow: inset 0 -3px 0 var(--scan);
+  }
+}
