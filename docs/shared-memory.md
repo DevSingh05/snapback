@@ -31,9 +31,9 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 
 Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Freeze 04:30 (design stack w/worlds-scroll iterates to 06:15; hard stop 07:30). Standing merge OK: review PASS + green CI. Merge with `--subject "<title> (#N)" --body ""` only.
 
-- **Dev (DevSingh05, A):** DEPLOYED 4e93181 05:51: dpl_28HS5FuzQxqT4f836MK36SuHeq4V READY prod (#8), carries #338 + #352 + #353; demo laptop API on 4e93181. Asked 05:55 on #8: DEPLOY @71ec179 (#354 copy) once python CI is green. Smoke every 20 min to 07:00.
-- **Vidyut + conductor (vs-githjk, T):** #338 MERGED 4c75c4c 05:40. #353 MERGED 8040b77 05:44. #354 MERGED 71ec179 (judge-0445 H2 copy; CI node+hygiene green, python pending 05:54). Open PRs: #327, #248 only, both HELD.
-- **Jeffrey's agent (jeffrey-g05, V):** #351 re-test 05:47 on laptop main 4e93181: FIXED LIVE, both texts give 'Hold off' + Link red_flag (n=1 each, text only). Earlier: #342, #343, #348 merged; judging kit done; iMessage sweep n=10 10/11 right (stand-in client).
+- **Dev (DevSingh05, A):** DEPLOYED 71ec179 05:57: dpl_4UZ4YNJKyJJG8jdxZTw4TrhxmyF6 READY prod (#8), bundle index-ix_Qu47g.js; demo laptop on c26c26d (web hot-reloaded #354, API unchanged). Smoke every 20 min to 07:00.
+- **Vidyut + conductor (vs-githjk, T):** #338 MERGED 4c75c4c 05:40. #353 MERGED 8040b77 05:44. #354 MERGED 71ec179 (CI 3/3 green, run 43706103927). Open PRs: #327, #248 only, both HELD.
+- **Jeffrey's agent (jeffrey-g05, V):** #351 FIXED LIVE (05:47). 06:05 assigned on #10: 390 phone pass of live landing + /home /stories /reviews, PASS or list by 06:30 (read-only).
 - **Rishit's agent (RishitRai, D):** #327 HELD (gate failed, final). Devpost numbers check CANCELLED 05:55 (plan/devpost-final.md is Mac-only; conductor checked it). Now: read-only README numbers vs eval files on GitHub, PASS or numbered list on #11 by 06:30.
 
 ## Open questions
@@ -45,6 +45,7 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 
 ## Live facts
 
+- **06:05 LIVE:** dpl_4UZ4YNJKyJJG8jdxZTw4TrhxmyF6 @71ec179 (+docs c26c26d) READY prod (Dev #8 05:57, dashboard). XO curl 06:04: / 200, bundle index-ix_Qu47g.js (was index-4wQJ9c4a.js). main = live code, #354 copy live. Rishit README numbers check due 06:30 on #11. plan/live.json updated.
 - **05:55 LIVE:** dpl_28HS5FuzQxqT4f836MK36SuHeq4V @4e93181 READY prod (Dev #8 05:51, dashboard). XO curl 05:54: / 200, bundle index-4wQJ9c4a.js (was index-BKTQAK6N.js). #338 landing + #352/#353 live; demo laptop API 4e93181. main = 71ec179: #354 NOT live (deploy asked 05:55). plan/live.json updated.
 
 - **05:45 LIVE:** dpl_8ZoPGgMhkVj5kqA7Y9xga4WRK7wY @fe2dc89 (+docs 54d65ae) READY prod (Dev #8 05:38, dashboard). XO curl 05:44: / 200, bundle index-BKTQAK6N.js (unchanged, #352 backend). main = 8040b77: #338 4c75c4c and #353 8040b77 NOT live (deploy asked, no dpl id). plan/live.json updated.
