@@ -315,6 +315,48 @@ function Verdict() {
   );
 }
 
+// A small drawn specimen over each step, so the three steps show the thing rather than only
+// say it: the ad as it arrives, the home's floors under the scan line, the three row states.
+// Decorative (the words beside them carry the meaning), and stamped as a sample.
+function HowSpecimen({ step }: { step: number }) {
+  if (step === 0)
+    return (
+      <span className="wl-spec wl-spec-ad" aria-hidden="true">
+        <span className="wl-spec-tag ui-mono">Sample ad</span>
+        <span className="wl-spec-bubble">
+          <i />
+          <i />
+          <b>&ldquo;Deposit tonight by Zelle&rdquo;</b>
+        </span>
+        <span className="wl-spec-send">Check it</span>
+      </span>
+    );
+  if (step === 1)
+    return (
+      <span className="wl-spec wl-spec-scan" aria-hidden="true">
+        <span className="wl-spec-tag ui-mono">Drawing</span>
+        <svg viewBox="44 4 112 88" focusable="false">
+          <path className="wl-spec-roof" d="M56 30 100 8l44 22z" />
+          <path className="wl-spec-floor" d="M62 30h76v18H62zM62 52h76v18H62zM62 74h76v14H62z" />
+          <path
+            className="wl-spec-win"
+            d="M72 35h12v9H72zM116 35h12v9h-12zM72 57h12v9H72zM94 76h12v12H94z"
+          />
+          <path className="wl-spec-ground" d="M20 88h160" />
+        </svg>
+        <span className="wl-spec-line" />
+      </span>
+    );
+  return (
+    <span className="wl-spec wl-spec-states" aria-hidden="true">
+      <span className="wl-spec-tag ui-mono">Sample card</span>
+      <State kind="ok" />
+      <State kind="mismatch" />
+      <State kind="unchecked" />
+    </span>
+  );
+}
+
 function How() {
   return (
     <section className="wl-sec wl-band" id="how" aria-labelledby="wl-how-h">
@@ -326,6 +368,7 @@ function How() {
         <ol className="wl-how">
           {LANDING_HOW.map((s, i) => (
             <li key={s.title}>
+              <HowSpecimen step={i} />
               <span className="wl-how-n ui-mono">{`0${i + 1}`}</span>
               <b>{s.title}</b>
               <span>{s.text}</span>

@@ -477,6 +477,124 @@
   color: var(--on-matte-muted);
 }
 
+/* a small specimen over each step */
+.wl-spec {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  height: 132px;
+  margin-bottom: 10px;
+  padding: 30px 18px 16px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(var(--wl-grid-matte) 1px, transparent 1px) 0 0 / 100% 22px,
+    linear-gradient(90deg, var(--wl-grid-matte) 1px, transparent 1px) 0 0 / 22px 100%,
+    color-mix(in srgb, var(--on-matte) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on-matte) 12%, transparent);
+}
+.wl-spec-tag {
+  position: absolute;
+  left: 14px;
+  top: 10px;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--on-matte-muted);
+}
+.wl-spec-bubble {
+  display: grid;
+  gap: 7px;
+  width: min(250px, 100%);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+}
+.wl-spec-bubble i {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+.wl-spec-bubble i + i {
+  width: 62%;
+}
+.wl-spec-bubble b {
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+.wl-spec-send {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--on-act-matte);
+  background: var(--act-matte);
+  border-radius: var(--radius-pill);
+}
+.wl-spec-scan svg {
+  width: auto;
+  height: 92px;
+  margin: 0 auto;
+  display: block;
+}
+.wl-spec-roof,
+.wl-spec-floor {
+  fill: color-mix(in srgb, var(--on-matte) 10%, transparent);
+  stroke: var(--on-matte);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.wl-spec-win {
+  fill: var(--act-matte);
+  opacity: 0.75;
+}
+.wl-spec-ground {
+  fill: none;
+  stroke: var(--on-matte-muted);
+  stroke-width: 1.2;
+}
+.wl-spec-line {
+  position: absolute;
+  left: calc(50% - 64px);
+  width: 128px;
+  top: 30px;
+  height: 2px;
+  background: var(--scan);
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--scan) 55%, transparent);
+  transform: translate3d(0, 44px, 0);
+}
+.wl-spec-states {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 8px;
+}
+.wl-spec-states .ui-state {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wl-spec-line {
+    animation: wl-sweep 3.6s var(--ease-out) infinite alternate;
+  }
+  @keyframes wl-sweep {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(0, 84px, 0);
+    }
+  }
+}
+
 /* uses */
 .wl-bigphoto {
   margin: 0;
