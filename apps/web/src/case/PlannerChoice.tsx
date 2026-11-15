@@ -4,10 +4,11 @@
 import type { CaseTimeline, TimelineStep } from "../contracts";
 import type { Lang } from "../lang";
 
-/** The Planner's follow-up choices in a timeline, oldest first. Empty when it chose none. */
+/** The follow-ups a model chose, oldest first. A follow-up picked by code (the policy or the
+ *  fixture, `by: "code"`) is left out: this line says a model chose, so only a model's pick counts. */
 export function plannerChoices(timeline: CaseTimeline | null | undefined): TimelineStep[] {
   if (!timeline || !Array.isArray(timeline.steps)) return [];
-  return timeline.steps.filter((s) => s.choice === "follow_up");
+  return timeline.steps.filter((s) => s.choice === "follow_up" && s.by === "agent");
 }
 
 const WORDS = {
