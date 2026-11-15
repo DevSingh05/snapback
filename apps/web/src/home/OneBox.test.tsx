@@ -212,6 +212,25 @@ describe("routing each message, shown honestly", () => {
     expect(approve).not.toHaveBeenCalledWith(expect.anything(), "send");
   });
 
+  it("fixture mode says once, above the card, that the public site shows the sample case", async () => {
+    const user = userEvent.setup();
+    render(<OneBox mode="fixture" createCase={made()} checkingMs={0} />);
+    await say(user, AD);
+    await screen.findByTestId("ob-verdict");
+    expect(screen.getByTestId("ob-fixture-note")).toHaveTextContent(
+      "This public site shows our sample case for any ad. Live checks run on our demo laptop and in iMessage.",
+    );
+  });
+
+  it("live mode never shows the sample-case line", async () => {
+    const user = userEvent.setup();
+    const approve = vi.fn(async () => {});
+    render(<OneBox mode="live" createCase={made()} approveChallenge={approve} checkingMs={0} />);
+    await say(user, AD);
+    await screen.findByTestId("ob-verdict");
+    expect(screen.queryByTestId("ob-fixture-note")).toBeNull();
+  });
+
   it("asking the poster for proof is offered after the verdict, as a second step", async () => {
     const user = userEvent.setup();
     render(<OneBox mode="fixture" createCase={made()} checkingMs={0} />);

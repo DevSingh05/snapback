@@ -204,16 +204,14 @@ function TwinViewInner({
           setStatus(
             result
               ? result.stand
-                ? "Showing the nearest spot in this scan. The sample photo's own spot is not in this model."
-                : "Moved to where the photo was taken"
-              : "This scan has no spots to stand in",
+                ? "Flew to a stand-in sweep (fixture pose does not exist in this model)"
+                : "Flew to the photo pose"
+              : "Model has no sweeps",
           );
         });
       } else {
         setStatus(
-          sdkStatus === "unavailable"
-            ? "The 3D scan could not load here, so this shows a drawn plan"
-            : "",
+          sdkStatus === "unavailable" ? "3D view unavailable: showing the static plan" : "",
         );
       }
       try {
@@ -314,7 +312,9 @@ function TwinViewInner({
               allow="fullscreen; xr-spatial-tracking"
             />
           ) : (
-            <p className="twin-placeholder">The 3D scan is not connected on this copy</p>
+            <p className="twin-placeholder">
+              The live 3D scan opens on our demo laptop. Here you see the sample.
+            </p>
           )}
           <PhotoLanding
             state={state}

@@ -142,10 +142,11 @@ export function CaseResult({
         meta={
           <>
             <span>THE RESULT · {checkedStamp(card.checked_at)}</span>
-            {/* A sample report is a fixture: it is always there, so it never reads "Expired". */}
-            <span data-testid="expiry">
-              {card.source === "fixture" ? "Sample: does not expire" : expiryText(card.expires_at)}
-            </span>
+            {/* Sample data never expires for the reader: a countdown or "Expired" on a FIXTURE card
+                reads as broken on the public site (judge-0445). Live cards keep it. */}
+            {card.source === "live" && (
+              <span data-testid="expiry">{expiryText(card.expires_at)}</span>
+            )}
           </>
         }
         why={flaggedLines(card)}

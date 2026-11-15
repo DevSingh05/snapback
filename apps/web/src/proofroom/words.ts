@@ -5,6 +5,8 @@ import type { DeskState, Lang, Words } from "./model";
 export interface RoomWords extends Words {
   room: string;
   replay: string;
+  /** While a replay runs: the report's own count, so it never reads lower than the report. */
+  ran: (total: number) => string;
   skip: string;
   skipShort: string;
   speed: string;
@@ -57,10 +59,11 @@ export const WORDS: Record<Lang, RoomWords> = {
   en: {
     room: "PROOF ROOM",
     rest: "Run a check to watch them work",
-    checks: (done, total) => `${done} of ${total} steps done`,
+    checks: (done, total) => `${done} of ${total} checks done`,
     setBy: "code set the result",
     starting: "reading the ad",
     replay: "Replay this run",
+    ran: (total) => `${total} checks in this run`,
     skip: "Skip to the result",
     skipShort: "Skip",
     speed: "Speed",
@@ -124,6 +127,7 @@ export const WORDS: Record<Lang, RoomWords> = {
     setBy: "el código fijó el resultado",
     starting: "leyendo el anuncio",
     replay: "Repetir esta revisión",
+    ran: (total) => `${total} comprobaciones en esta revisión`,
     skip: "Ir al resultado",
     skipShort: "Saltar",
     speed: "Velocidad",

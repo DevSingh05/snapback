@@ -27,14 +27,14 @@ Every person and agent reads this first. Owner: the XO agent (on Vidyut's behalf
 - 14:46 **Lane V (Jeffrey) owns the live evidence-file writer:** `LiveOutcome.points` into `EvidencePhoto.points`; the cache body keeps the pairs, never the cache key. (conductor, #231)
 - Standing: no "SAFE" or "SCAM" state; VERIFIED only with phone confirmed, or the brokerage domain confirmed plus photos placed. Card words come from code, never a model. Say "could not verify", never "scam", about a person. (spec v3)
 
-## Who is doing what (Sun 04:25)
+## Who is doing what (Sun 05:03)
 
 Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10, D #11; team inbox #41. Freeze 04:30 (design stack w/worlds-scroll iterates to 06:15; hard stop 07:30). Standing merge OK: review PASS + green CI. Merge with `--subject "<title> (#N)" --body ""` only.
 
-- **Dev (DevSingh05, A):** deployed 4c1feaa 03:52 (per Dev). 04:24 FREEZE DEPLOY @3f65762 posted on #8 (replaces the 5e134e7 ask); deployment id owed. #334 judge lens due 04:45.
-- **Vidyut + conductor (vs-githjk, T):** #344 MERGED 839e86b 04:2x (ring median 2.5 + Reviews copy, CI green). #338 scroll 3D (designer to 06:15). #248 stale.
-- **Jeffrey's agent (jeffrey-g05, V; Jeffrey asleep):** #342 MERGED c889e31 04:08 (by=agent filter + test). #343 Approve/Edit MERGED 3f65762 04:24 (reviewer PASS on 269e2d4; main merged + focus/copy-failed follow-up 981d484 checked by XO; CI 3/3 green).
-- **Rishit's agent (RishitRai, D):** #340 MERGED 5e134e7 04:08 (hash-scroll fix + 3 tests). #327 HELD (gate failed, final).
+- **Dev (DevSingh05, A):** FREEZE DEPLOYED 04:35 dpl_E3vdZZjxLbywuPo8jgHxHZjQtQDJ @5e5f776, READY prod (#8). #345 MERGED ae7146c; #346 report re-capture (no EXPIRED, fixture YCD7) MERGED 66c1367 04:55. #349 hide expiry on FIXTURE cards MERGED d76119f 05:05. Redeploy of main waits for conductor DEPLOY post (after #350). Smoke every 20 min to 07:00 (04:46: 9/9 200).
+- **Vidyut + conductor (vs-githjk, T):** #347 README final pass MERGED e0b16de 05:01 (conductor PASS, CI 3/3 green). #350 judge-0445 freeze fixes @5610d9d needs conductor review. #338 scroll 3D @9a6eb06 (designer to 06:15, reviewer). #248 stale.
+- **Jeffrey's agent (jeffrey-g05, V; Jeffrey asleep):** #342 MERGED c889e31 04:08 (by=agent filter + test). #343 Approve/Edit MERGED 3f65762 04:24 (reviewer PASS on 269e2d4; main merged + focus/copy-failed follow-up 981d484 checked by XO; CI 3/3 green). #334 phone lens posted 03:31. #348 Twin placeholder copy MERGED 2c16eca 05:06. #10 judging kit LATE (due 05:00, asked by 05:20); next: iMessage sweep n=10 LIVE table.
+- **Rishit's agent (RishitRai, D):** #340 MERGED 5e134e7 04:08 (hash-scroll fix + 3 tests). #327 HELD (gate failed, final). #334 wow lens 03:25 + Codex variants 03:51 posted. Owes judge-0445 H2 copy fix (CaseFile "needs the API") PR by 05:30 (#11). Then: Codex review of #338 diff when the designer asks.
 
 ## Open questions
 
@@ -45,7 +45,11 @@ Lanes and paths: `.github/CODEOWNERS`, `docs/ROLES.md`. Epics: A #8, T #9, V #10
 
 ## Live facts
 
+- **05:06 main = 2c16eca** (#346 66c1367, #347 e0b16de, #349 d76119f, #348 2c16eca; all CI 3/3 green). Prod still dpl_E3vd... @5e5f776: #348/#349 NOT live until redeploy.
+
+- **04:46 LIVE (Dev, #8 04:35):** dpl_E3vdZZjxLbywuPo8jgHxHZjQtQDJ, READY production, commit 5e5f776 (= freeze code 3f65762 + docs), bundle index-DTQecwLo.js; recorded in plan/live.json (source: Dev's dashboard). main = ae7146c (#345 docs only). Guardian health NOT run yet.
 - **main = 3f65762** (04:24): #343 3f65762, #344 839e86b. Freeze deploy @3f65762 asked 04:24 (#8). Earlier, main = 5e134e7 (04:08): #342 c889e31, #340 5e134e7 on a7f6d99 (shared memory) on 44fdef3. Freeze deploy @5e134e7 asked 04:09 (#8). Merged 03:55-03:58: #341 055954d, #335 44fdef3. Before: #339 641726c, #337 b22b83e, #336 3311405, #331 c739b1f, #326 11373e4. Main CI: 4c1feaa green; 055954d and 44fdef3 in progress at 03:59.
+- **04:35 live check (XO):** snapback-navy.vercel.app serves `index-DTQecwLo.js` (was `index-Dy-fdfeS.js` at 04:33); bundle contains #343 "A next step, drafted for you" and #344 "in a median of 2.5 days" = freeze code 3f65762 frontend is live. Vercel deployment id NOT posted yet (re-asked #8 04:36); plan/live.json not written. Main CI 5e5f776 3/3 green; 3f65762 python still running at 04:35.
 - **Which build is live on Vercel:** Dev reported 03:52 4c1feaa (dpl_4XfqJ1pwUiqatWCqxgbAVo3rFTTA READY, production); master-guardian owns `plan/live.json`, not refreshed by XO. Redeploy @44fdef3 asked 03:59 on #8.
 - SNAPBACK_VEXCEL_IN_VERDICT stays OFF (v2 held-out 8/9 next-door misses 90%; footprints gate FAILED 03:34, #327 held).
 - API: `POST /cases` returns `token` (write; Bearer header only) and `read_token` (header only). Timeline, copy-alert, evidence-image all read the token from a header.
