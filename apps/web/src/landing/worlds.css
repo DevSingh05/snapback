@@ -1273,9 +1273,18 @@
   .wl-say {
     width: 100%;
   }
+  /* #356: on a phone the still hero takes its own row above the cards instead of
+     sitting over the drawing, so it can never cover the first step's label */
+  .wl-still {
+    --wl-pin-h: clamp(360px, 52vh, 480px);
+  }
   .wl-still .wl-step-hero {
-    padding: 24px var(--gutter) 20px;
-    align-items: flex-end;
+    position: relative;
+    inset: auto;
+    height: auto;
+    padding: 0;
+    align-items: stretch;
+    pointer-events: auto;
   }
   .wl-still .wl-over {
     grid-template-columns: minmax(0, 1fr);
