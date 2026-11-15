@@ -772,14 +772,20 @@ def test_a_rival_under_the_elsewhere_inlier_floor_never_blocks_even_at_3x(twins,
 
 
 def test_each_claimed_face_is_verified_at_most_once(twins, locator, monkeypatch):
-    """A claimed match failing only the spread floor must not cost a second pass (#186 review)."""
+    """A claimed match failing only the spread floor must not cost a second pass (#186 review).
+    Per image: an unplaced photo is searched once more flipped (#10, V1), a different image."""
+    import hashlib
+
     from snapback.vision.locate.verify import FEATURE_KEY
 
     calls = {}
+    images = set()
     scripted = _scripted({"fx-model-a": (70, 0.018), "fx-model-b": (0, 0.0)})
 
     def counting(matcher, photo, face, ransac_px):
-        key = face.info[FEATURE_KEY]
+        image = hashlib.sha256(photo.tobytes()).hexdigest()
+        images.add(image)
+        key = (image, face.info[FEATURE_KEY])
         calls[key] = calls.get(key, 0) + 1
         return scripted(matcher, photo, face, ransac_px)
 
@@ -789,5 +795,6 @@ def test_each_claimed_face_is_verified_at_most_once(twins, locator, monkeypatch)
         "fx-once", {"p": listing_photo(sweeps, "fx-model-a", 2, 1)}, "fx-prop-1"
     )
     assert result.photos[0].status is LocateStatus.NOT_LOCATED
-    claimed = {k: n for k, n in calls.items() if k.startswith("fx-model-a/")}
+    claimed = {k: n for k, n in calls.items() if k[1].startswith("fx-model-a/")}
     assert claimed and max(claimed.values()) == 1
+    assert len(images) == 2  # as sent, then flipped once
