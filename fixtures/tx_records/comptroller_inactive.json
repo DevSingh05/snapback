@@ -1,1 +1,11 @@
-[{"taxpayer_number":"10000000002","taxpayer_name":"SAMPLE REALTY GROUP INC","taxpayer_city":"HOUSTON","taxpayer_state":"TX","sos_charter_date":"2009-03-12T00:00:00.000","sos_status_code":"F","right_to_transact_business_code":"F"}]
+[
+  {
+    "taxpayer_number": "10000000002",
+    "taxpayer_name": "SAMPLE REALTY GROUP INC",
+    "taxpayer_city": "HOUSTON",
+    "taxpayer_state": "TX",
+    "sos_charter_date": "2009-03-12T00:00:00.000",
+    "sos_status_code": "F",
+    "right_to_transact_business_code": "F"
+  }
+]

@@ -1,1 +1,18 @@
-[{"taxpayer_number":"10000000001","taxpayer_name":"FIXTURE PROPERTY MANAGEMENT COMPANY, L. L. C.","taxpayer_address":"100 FIXTURE LN","taxpayer_city":"HOUSTON","taxpayer_state":"TX","taxpayer_zip":"77000","taxpayer_organizational_type":"CI","record_type_code":"V","responsibility_beginning_date":"1994-08-01T00:00:00.000","secretary_of_state_sos_or_coa_file_number":"0000000001","sos_charter_date":"1994-08-01T00:00:00.000","sos_status_date":"1994-08-01T00:00:00.000","sos_status_code":"A","right_to_transact_business_code":"A"}]
+[
+  {
+    "taxpayer_number": "10000000001",
+    "taxpayer_name": "FIXTURE PROPERTY MANAGEMENT COMPANY, L. L. C.",
+    "taxpayer_address": "100 FIXTURE LN",
+    "taxpayer_city": "HOUSTON",
+    "taxpayer_state": "TX",
+    "taxpayer_zip": "77000",
+    "taxpayer_organizational_type": "CI",
+    "record_type_code": "V",
+    "responsibility_beginning_date": "1994-08-01T00:00:00.000",
+    "secretary_of_state_sos_or_coa_file_number": "0000000001",
+    "sos_charter_date": "1994-08-01T00:00:00.000",
+    "sos_status_date": "1994-08-01T00:00:00.000",
+    "sos_status_code": "A",
+    "right_to_transact_business_code": "A"
+  }
+]

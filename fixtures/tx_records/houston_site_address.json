@@ -1,1 +1,13 @@
-{"features":[{"attributes":{"source":"Fixture Source","fulladdr":"100 FIXTURE LN","municipality":"HOUSTON","zipcode":"77000","state":"TX"}}]}
+{
+  "features": [
+    {
+      "attributes": {
+        "source": "Fixture Source",
+        "fulladdr": "100 FIXTURE LN",
+        "municipality": "HOUSTON",
+        "zipcode": "77000",
+        "state": "TX"
+      }
+    }
+  ]
+}
