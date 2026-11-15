@@ -3,7 +3,8 @@
 A pure function of what the modules found and the records already read. Code only, no model.
 Rules held here:
 - the building the photos were placed in wins when it is not the claimed one;
-- per-bed plans are left out (a per-bed price is never compared with a whole-unit rent);
+- plans are narrowed to the ad's unit or beds first, then per-bed plans are left out (as
+  `check_price` does: a per-bed price is never compared with a whole-unit rent);
 - a fixture case always shows its (synthetic) figures; a LIVE case shows rents, units and links
   only when `Settings.snapback_show_record_figures` is on (the local demo), else company, host and
   counts;
@@ -87,8 +88,10 @@ def _headline(
             )
         else:
             parts.append(strings.text("real.record_many", lang, band=band, n=len(plans)))
-    elif not figures:
+    elif not figures and plans:
         parts.append(strings.text("real.record_hidden", lang))
+    elif not figures:
+        parts.append(strings.text("real.record_no_plan", lang))
     else:
         parts.append(strings.text("real.record_no_rent", lang))
     if company:
@@ -98,11 +101,19 @@ def _headline(
     return " ".join(parts)
 
 
+def _whole_unit_plans(
+    record: PropertyRecord, unit: str | None, beds: int | None
+) -> list[FloorPlanRent]:
+    """The ad's own floor plans on the record, narrowed first and per-bed ones dropped after, in
+    the order `check_price` uses: a unit in a per-bed plan matches no whole-unit plan."""
+    narrowed = _plans_to_compare(record.floor_plan_rents, unit, beds, record)
+    return [p for p in narrowed if not p.per_bed]
+
+
 def _plans(
     record: PropertyRecord, beds: int | None, unit: str | None, figures: bool
 ) -> list[RealListingPlan]:
-    whole = [p for p in record.floor_plan_rents if not p.per_bed]
-    ours: list[FloorPlanRent] = [p for p in _plans_to_compare(whole, unit, beds, record)]
+    ours = _whole_unit_plans(record, unit, beds)
     out = []
     for plan in ours[:MAX_PLANS]:
         out.append(
@@ -170,8 +181,7 @@ def real_listing(
         phone = modules.authority.office_phone_match
 
     plans = _plans(record, ad_beds, ad_unit, figures)
-    raw_plans = [p for p in record.floor_plan_rents if not p.per_bed]
-    raw_ours = _plans_to_compare(raw_plans, ad_unit, ad_beds, record)[:MAX_PLANS]
+    raw_ours = _whole_unit_plans(record, ad_unit, ad_beds)[:MAX_PLANS]
 
     if not photos:
         provenance = None
@@ -222,10 +232,9 @@ def rent_percent_under(
     record's rents are not returned."""
     if not ad_rent:
         return None
-    whole = [p for p in record.floor_plan_rents if not p.per_bed]
     lows = [
         p.rent_min if p.rent_min is not None else p.rent_max
-        for p in _plans_to_compare(whole, unit, beds, record)
+        for p in _whole_unit_plans(record, unit, beds)
     ]
     lows = [v for v in lows if v]
     if not lows:

@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from snapback.api.main import create_app
+from snapback.card import strings
 from snapback.contracts import (
     AuthorityResult,
     AuthorityStatus,
@@ -24,7 +25,7 @@ from snapback.contracts import (
     RuleHit,
     UnitOnRecord,
 )
-from snapback.real_listing import real_listing
+from snapback.real_listing import real_listing, rent_percent_under
 from snapback.settings import Settings
 
 PHONE = re.compile(r"\d{3}[-. )]*\d{3}[-. ]*\d{4}")
@@ -338,3 +339,55 @@ def test_a_live_route_hides_the_figures_unless_the_flag_is_on(tmp_path):
         assert got.status_code == 200, got.text
         body = got.json()
         assert body["source"] == "live" and body["figures_shown"] is shown
+
+
+def test_a_per_bed_unit_plan_is_not_swapped_for_a_whole_unit_plan_of_the_same_beds():
+    # The ad's unit sits in a per-bed plan: narrow first (as check_price does), then drop per-bed,
+    # so nothing is compared rather than the whole-unit 2-bed band.
+    rec = record(
+        floor_plan_rents=[
+            plan(2, 2300, 2600, name="Whole 2"),
+            plan(2, 900, 900, per_bed=True, name="Student 2x2"),
+        ],
+        units=[UnitOnRecord(unit="3A", beds=2, floor_plan="Student 2x2")],
+    )
+    got = real_listing(modules(rent=800), rec, None, settings(), ad_beds=2, ad_unit="3A")
+    assert got.plans == []
+    assert "2,300" not in got.headline
+    assert rent_percent_under(rec, 800, 2, "3A") is None
+
+
+def test_live_with_the_flag_off_and_no_plans_does_not_say_figures_are_hidden():
+    bare = record(source=DataSource.LIVE, floor_plan_rents=[])
+    for lang, hidden in (("en", "not shown here"), ("es", "no se muestran")):
+        got = real_listing(
+            modules(source=DataSource.LIVE), bare, None, settings(), ad_beds=1, lang=lang
+        )
+        assert hidden not in got.headline
+        assert strings.text("real.record_no_plan", lang) in got.headline
+    per_bed = [plan(2, 900, 900, per_bed=True)]
+    only_per_bed = record(source=DataSource.LIVE, floor_plan_rents=per_bed)
+    got = real_listing(modules(source=DataSource.LIVE), only_per_bed, None, settings(), ad_beds=2)
+    assert "not shown here" not in got.headline
+
+
+def test_the_route_uses_the_building_the_scan_identified_when_the_form_named_none(tmp_path):
+    client = _client(tmp_path, _Lookups({"fx-prop-1": record()}))
+    made = client.post("/cases", data={"text": "Two bed. 2 bed, $1,200 a month. Zelle only."})
+    made = made.json()
+    case = client.app.state.store.get(made["case_id"])
+    assert case.property_id is None
+    ev = case.session.evidence
+    ev.locate = LocateResult(
+        case_id=ev.case_id,
+        photos=[photo(1, IN), photo(2, IN)],
+        thresholds_version="fx-1",
+        claimed_property_id="fx-prop-1",
+        identified_by_scan=True,
+    )
+    headers = {"X-Case-Token": made["read_token"]}
+    panel = client.get(f"/cases/{made['case_id']}/real-listing", headers=headers)
+    assert panel.status_code == 200, panel.text
+    assert panel.json()["property_id"] == "fx-prop-1" and panel.json()["photos_in_scan"] == 2
+    note = client.get(f"/cases/{made['case_id']}/copy-alert", headers=headers).json()
+    assert note["why_not"] != "no_record" and note["property_id"] == "fx-prop-1"

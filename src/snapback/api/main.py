@@ -655,7 +655,11 @@ def create_app(
         """The claimed and the matched building's records and the ad's beds and unit, for the
         real-listing panel and the copy alert. 503 when the kit is missing."""
         try:
-            claimed = lookups.record(case.property_id) if case.property_id else None
+            # A session case's property id comes from the form only; when the photos identified the
+            # building (the ad named none), locate holds it, as RecordedCase reads it.
+            locate = case.evidence.locate
+            claimed_id = case.property_id or (locate.claimed_property_id if locate else None)
+            claimed = lookups.record(claimed_id) if claimed_id else None
             matched_id = matched_id_of(case)
             matched = lookups.record(matched_id) if matched_id else None
         except KitMissing as missing:

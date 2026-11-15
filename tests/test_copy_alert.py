@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from snapback.card import strings
 from snapback.contracts import CopyAlert, DataSource, LocateStatus, PhoneMatch
 from snapback.copy_alert import copy_alert
 from snapback.real_listing import rent_percent_under
@@ -183,3 +184,13 @@ def test_the_recorded_example_case_answers_both_routes(tmp_path):
     note = client.get("/cases/7Q2M/copy-alert")
     assert note.status_code == 200 and note.json()["sent"] is False
     assert note.json()["photos_in_scan"] == 3 and note.json()["fires"] is False
+
+
+def test_the_report_line_shows_only_when_the_report_is_ready():
+    mods = modules([photo(1, IN)], phone=PhoneMatch.NO)
+    for lang in ("en", "es"):
+        line = strings.text("copy.report_line", lang, report=strings.text("copy.report_name", lang))
+        not_ready = alert(mods, record(), lang=lang)
+        assert not_ready.fires and line not in not_ready.draft_body
+        ready = alert(mods, record(), report_ready=True, lang=lang)
+        assert ready.fires and line in ready.draft_body

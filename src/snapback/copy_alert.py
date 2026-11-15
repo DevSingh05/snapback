@@ -85,15 +85,13 @@ def copy_alert(
     if percent is not None:
         parts.append(strings.text("copy.rent_under", lang, percent=percent))
     report_url = f"/cases/{case_id}/report"
-    body = "\n\n".join(
-        [
-            to,
-            " ".join(parts),
-            strings.text("copy.ask", lang),
-            strings.text("copy.report_line", lang, report=strings.text("copy.report_name", lang)),
-            strings.text("copy.draft_only", lang),
-        ]
-    )
+    paragraphs = [to, " ".join(parts), strings.text("copy.ask", lang)]
+    # The note points to the evidence pack only once there is one to point to.
+    if report_ready:
+        report = strings.text("copy.report_name", lang)
+        paragraphs.append(strings.text("copy.report_line", lang, report=report))
+    paragraphs.append(strings.text("copy.draft_only", lang))
+    body = "\n\n".join(paragraphs)
     return CopyAlert(
         case_id=case_id,
         source=modules.source,

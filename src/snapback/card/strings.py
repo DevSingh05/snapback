@@ -1363,6 +1363,9 @@ EN.update(
             "are not shown here."
         ),
         "real.record_no_rent": "CoStar's record has no rent for a matching floor plan.",
+        "real.record_no_plan": (
+            "CoStar's record has this building, with no whole-unit floor plan that matches the ad."
+        ),
         "real.managed_by": "Managed by {company}.",
         "real.website": "Its own website: {host}.",
         "real.provenance_scan": (
@@ -1432,6 +1435,10 @@ ES.update(
         ),
         "real.record_no_rent": (
             "El registro de CoStar no tiene alquiler para un plano que coincida."
+        ),
+        "real.record_no_plan": (
+            "El registro de CoStar tiene este edificio, sin un plano de unidad completa que "
+            "coincida con el anuncio."
         ),
         "real.managed_by": "Administrado por {company}.",
         "real.website": "Su sitio web: {host}.",
