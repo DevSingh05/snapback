@@ -147,10 +147,10 @@ or sends anything for you.
     below the building's lowest rent, so honest discounts pass.
   - Cropped photos still match (14 of 18; 4 of 4). Mirrored photos mostly stop matching (4 of 18
     placed) and were never placed in a wrong home.
-- **Batch run, FIXTURE (composed ads, n per type):** cloned phone 9 of 9 held; another
-  building's photos 6 of 6 "Don't pay"; price cut 9 of 9 held; a for-sale home listed as a
-  rental 3 of 3 held; clean ads 6 of 6 cleared; clean messages 17 of 17 cleared; messages with
-  money asks 26 of 32 caught. Overall 76 of 82.
+- **Batch run, FIXTURE (composed ads, n per type, re-measured after the new rules):** cloned
+  phone 9 of 9 held; another building's photos 6 of 6 "Don't pay"; price cut 9 of 9 held; a
+  for-sale home listed as a rental 3 of 3 held; clean ads 6 of 6 cleared; clean messages 43 of 43
+  cleared; messages with money asks 41 of 47 caught. Overall 117 of 123.
 - **CoStar record coverage, LIVE kit (counts):** 3,339 records; 2,139 have the building's
   website; 1,747 have floor-plan rents; 708 have an availability page. The locate index on the
   demo machine holds 21 scans.
