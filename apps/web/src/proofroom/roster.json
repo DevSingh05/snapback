@@ -35,7 +35,7 @@
         "model": "Claude Sonnet",
         "never": ["Sets the verdict", "Changes a fact a check found"],
         "availability": null,
-        "kinds": [],
+        "kinds": ["followup"],
         "checks": []
       },
       {
@@ -209,7 +209,7 @@
         "model": "Claude Sonnet",
         "never": ["Fija el resultado", "Cambia un dato que halló una comprobación"],
         "availability": null,
-        "kinds": [],
+        "kinds": ["followup"],
         "checks": []
       },
       {
