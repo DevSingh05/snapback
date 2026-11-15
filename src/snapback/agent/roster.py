@@ -37,6 +37,7 @@ class AgentCard(BaseModel):
     id: str
     name: str
     team: Team
+    role: str  # two or three words under the name: what it looks at
     job: str  # one plain line
     doing: str  # what a page says while it works, in plain words
     tools: list[str]  # named tools and data sources, shown as chips
@@ -89,7 +90,7 @@ _TEAMS: dict[Team, dict[Lang, tuple[str, str]]] = {
     },
 }
 
-# Each card: the fixed facts, then its words in each language (name, job, doing, tools, never,
+# Each card: the fixed facts, then its words in each language (name, role, job, doing, tools, never,
 # availability). Tool names that are product names stay as they are in both languages.
 _CARDS: list[dict] = [
     {
@@ -100,6 +101,7 @@ _CARDS: list[dict] = [
         "checks": [],
         "en": {
             "name": "Planner",
+            "role": "Plans the checks",
             "job": "Writes the plan and the to-do list, then hands each check to its agent.",
             "doing": "Writing the plan and handing out the checks",
             "tools": ["deepagents plan", "To-do list", "Case notes"],
@@ -107,6 +109,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Planificador",
+            "role": "Planea la revisión",
             "job": "Escribe el plan y la lista de tareas, y reparte cada comprobación.",
             "doing": "Escribiendo el plan y repartiendo las comprobaciones",
             "tools": ["Plan de deepagents", "Lista de tareas", "Notas del caso"],
@@ -121,6 +124,7 @@ _CARDS: list[dict] = [
         "checks": ["rules"],
         "en": {
             "name": "Rules agent",
+            "role": "Reads the ad",
             "job": "Reads the ad for payment asks, pressure and claims that do not fit the record.",
             "doing": "Reading the ad for payment asks and pressure",
             "tools": ["Rules table", "Ad claims vs the record", "Vexcel aerial date"],
@@ -128,6 +132,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente de reglas",
+            "role": "Lee el anuncio",
             "job": "Busca en el anuncio pagos, presión y datos que no encajan con el registro.",
             "doing": "Leyendo el anuncio en busca de pagos y presión",
             "tools": ["Tabla de reglas", "Anuncio frente al registro", "Fecha aérea de Vexcel"],
@@ -145,6 +150,7 @@ _CARDS: list[dict] = [
         "checks": ["record", "forsale"],
         "en": {
             "name": "Record agent",
+            "role": "CoStar record",
             "job": "Finds the building on CoStar's record: office, manager, website and rents.",
             "doing": "Looking up the building on CoStar's record",
             "tools": ["CoStar record", "Floor-plan rents", "For-sale listings"],
@@ -152,6 +158,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente del registro",
+            "role": "Registro de CoStar",
             "job": "Busca el edificio en el registro de CoStar: oficina, gestor, web y rentas.",
             "doing": "Buscando el edificio en el registro de CoStar",
             "tools": ["Registro de CoStar", "Rentas por plano", "Anuncios de venta"],
@@ -169,6 +176,7 @@ _CARDS: list[dict] = [
         "checks": ["phone"],
         "en": {
             "name": "Phone and office agent",
+            "role": "Leasing office",
             "job": "Checks the ad's phone against the leasing office on record. Yes or no only.",
             "doing": "Checking the phone against the leasing office",
             "tools": ["CoStar record", "Keyed phone match"],
@@ -176,6 +184,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente de teléfono y oficina",
+            "role": "Oficina de renta",
             "job": "Compara el teléfono del anuncio con la oficina del registro. Solo sí o no.",
             "doing": "Comparando el teléfono con la oficina de arrendamiento",
             "tools": ["Registro de CoStar", "Comparación de teléfono con clave"],
@@ -190,6 +199,7 @@ _CARDS: list[dict] = [
         "checks": ["owner"],
         "en": {
             "name": "Owner and licence agent",
+            "role": "County and TREC",
             "job": "Looks up the county's owner of record and the licence the ad names.",
             "doing": "Looking up the county's owner of record",
             "tools": ["County owner of record", "TREC licence lookup"],
@@ -197,6 +207,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente de propietario y licencia",
+            "role": "Condado y TREC",
             "job": "Busca el propietario registrado en el condado y la licencia del anuncio.",
             "doing": "Buscando el propietario registrado en el condado",
             "tools": ["Propietario registrado en el condado", "Consulta de licencia TREC"],
@@ -211,6 +222,7 @@ _CARDS: list[dict] = [
         "checks": ["photos"],
         "en": {
             "name": "Photo agent",
+            "role": "3D scan",
             "job": "Places the ad's photos in the building's 3D scan, and says which it could not.",
             "doing": "Placing the photos in the building's 3D scan",
             "tools": ["Matterport scan", "Photo match"],
@@ -218,6 +230,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente de fotos",
+            "role": "Escaneo 3D",
             "job": "Ubica las fotos del anuncio en el escaneo 3D del edificio, y dice cuáles no.",
             "doing": "Ubicando las fotos en el escaneo 3D del edificio",
             "tools": ["Escaneo de Matterport", "Comparación de fotos"],
@@ -235,6 +248,7 @@ _CARDS: list[dict] = [
         "checks": [],
         "en": {
             "name": "Web agent",
+            "role": "Open web",
             "job": "Checks the building's own site, the ad's link and other listings on the web.",
             "doing": "Checking the building's own site and the ad's link",
             "tools": ["Bright Data", "Apify", "Browser Use"],
@@ -243,6 +257,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Agente web",
+            "role": "Web abierta",
             "job": "Revisa la web del edificio, el enlace del anuncio y otros anuncios en la red.",
             "doing": "Revisando la web del edificio y el enlace del anuncio",
             "tools": ["Bright Data", "Apify", "Browser Use"],
@@ -258,6 +273,7 @@ _CARDS: list[dict] = [
         "checks": [],
         "en": {
             "name": "Finder",
+            "role": "Safer homes",
             "job": "Searches CoStar's record for safer homes that fit the budget.",
             "doing": "Searching CoStar's record for safer homes",
             "tools": ["CoStar record search", "Apartments.com hand-off"],
@@ -265,6 +281,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Buscador",
+            "role": "Casas más seguras",
             "job": "Busca en el registro de CoStar casas más seguras dentro del presupuesto.",
             "doing": "Buscando casas más seguras en el registro de CoStar",
             "tools": ["Búsqueda en el registro de CoStar", "Paso a Apartments.com"],
@@ -279,6 +296,7 @@ _CARDS: list[dict] = [
         "checks": [],
         "en": {
             "name": "Tour prep",
+            "role": "Tour questions",
             "job": "Plans the walk through the 3D scan and what to ask on a tour.",
             "doing": "Planning the walk through the 3D scan",
             "tools": ["Matterport scan", "Case notes"],
@@ -286,6 +304,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Preparación de visita",
+            "role": "Para la visita",
             "job": "Planea el recorrido por el escaneo 3D y qué preguntar en una visita.",
             "doing": "Planeando el recorrido por el escaneo 3D",
             "tools": ["Escaneo de Matterport", "Notas del caso"],
@@ -300,6 +319,7 @@ _CARDS: list[dict] = [
         "checks": [],
         "en": {
             "name": "Decider",
+            "role": "Sets the verdict",
             "job": "Works out the verdict from the evidence. The only one that sets the verdict.",
             "doing": "Working out the verdict from the evidence",
             "tools": ["decide() in code", "Evidence from every desk", "Report pack"],
@@ -307,6 +327,7 @@ _CARDS: list[dict] = [
         },
         "es": {
             "name": "Decisor",
+            "role": "Fija el resultado",
             "job": "Calcula el resultado a partir de las pruebas. El único que lo fija.",
             "doing": "Calculando el resultado a partir de las pruebas",
             "tools": ["decide() en código", "Pruebas de cada puesto", "Informe"],
