@@ -30,6 +30,9 @@ EN: dict[str, str] = {
     "label.data_ask": "Data ask",
     "label.pressure": "Pressure",
     "label.rent_vs_record": "Rent vs record",
+    "label.rent_vs_hud": "Rent vs HUD typical",
+    "label.address": "Address",
+    "label.link_domain": "Link domain",
     "label.seen_before": "Seen before",
     "label.for_sale": "For sale",
     "label.recently_rented": "Rental history",
@@ -43,6 +46,9 @@ EN: dict[str, str] = {
     "records.comptroller_active": (
         "Texas Comptroller: {company} is an active Texas company since {year}."
     ),
+    "records.comptroller_active_no_year": (
+        "Texas Comptroller: {company} is an active Texas company."
+    ),
     "records.comptroller_inactive": (
         "Texas Comptroller: {company} is on the list but not as an active company."
     ),
@@ -54,6 +60,9 @@ EN: dict[str, str] = {
     "records.hud_phone_differs": "The ad's phone isn't the manager's number on HUD's record.",
     "records.address_point": (
         "City of Houston: this street address is on the city's address points (ZIP {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "City of Houston: this street address is on the city's address points."
     ),
     "label.owner": "Owner of record",
     "label.owner_rule": "Owner's rule",
@@ -320,6 +329,35 @@ EN: dict[str, str] = {
     "rent.below_floor_plan": (
         "{percent}% under this building's lowest {plan} on record. Ask why; discounts happen."
     ),
+    # HUD's Small Area Fair Market Rent, when CoStar has no rent for the home (public baseline).
+    # Census Geocoder: the address check. Evidence only, never a flag.
+    "place.census_found": (
+        "The address is in the Census address list ({county} County, ZIP {zip}). That shows the "
+        "address exists, not who is offering it."
+    ),
+    "place.census_found_bare": (
+        "The address is in the Census address list. That shows the address exists, not who is "
+        "offering it."
+    ),
+    "place.census_no_match": (
+        "The Census address list has no match for this address. New homes are often missing, so "
+        "this is information only."
+    ),
+    "place.census_not_checked": "Not checked (the Census address list did not answer).",
+    # RDAP: how old the domain of a link in the ad is.
+    "rule.link.new_domain": (
+        "A link in the ad is on a domain registered in the last few weeks. Red flag."
+    ),
+    "link.domain_age": "A link in the ad is on a domain registered {years}+ years ago. No flag.",
+    "link.domain_age_months": "A link in the ad is on a domain registered {days} days ago.",
+    "link.domain_not_checked": "Not checked (the domain registry did not answer).",
+    "rent.hud_within": "Not far below the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
+    "rent.hud_below": (
+        "Typical rent here (HUD, ZIP {zip}, {size}): {rent}. This rent is {percent}% under it. "
+        "Ask why; discounts happen."
+    ),
+    "rent.hud_size.studio": "studio",
+    "rent.hud_size.beds": "{beds} bed",
     "rent.plan.studio": "studio",
     "rent.plan.beds": "{beds} bed",
     "rent.per_bed": "Not checked (priced per bed here, so the rent was not compared).",
@@ -607,6 +645,9 @@ ES: dict[str, str] = {
     "label.data_ask": "Datos que piden",
     "label.pressure": "Presión",
     "label.rent_vs_record": "Renta frente al registro",
+    "label.rent_vs_hud": "Renta frente a la típica de HUD",
+    "label.address": "Dirección",
+    "label.link_domain": "Dominio del enlace",
     "label.seen_before": "Visto antes",
     "label.for_sale": "En venta",
     "label.recently_rented": "Historial de alquiler",
@@ -619,6 +660,9 @@ ES: dict[str, str] = {
     "label.src_houston": "Ciudad de Houston",
     "records.comptroller_active": (
         "Contralor de Texas: {company} es una empresa activa de Texas desde {year}."
+    ),
+    "records.comptroller_active_no_year": (
+        "Contralor de Texas: {company} es una empresa activa de Texas."
     ),
     "records.comptroller_inactive": (
         "Contralor de Texas: {company} está en la lista, pero no como empresa activa."
@@ -634,6 +678,9 @@ ES: dict[str, str] = {
     "records.address_point": (
         "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad "
         "(código postal {zip_code})."
+    ),
+    "records.address_point_no_zip": (
+        "Ciudad de Houston: esta dirección está en los puntos de dirección de la ciudad."
     ),
     "label.owner": "Propietario registrado",
     "label.owner_rule": "Regla del propietario",
@@ -918,6 +965,37 @@ ES: dict[str, str] = {
         "{percent}% por debajo de la renta más baja que figura en el registro de este edificio "
         "para {plan}. Pregunte por qué; hay descuentos."
     ),
+    "place.census_found": (
+        "La dirección está en la lista de direcciones del Censo (condado de {county}, código "
+        "postal {zip}). Eso muestra que la dirección existe, no quién la ofrece."
+    ),
+    "place.census_found_bare": (
+        "La dirección está en la lista de direcciones del Censo. Eso muestra que la dirección "
+        "existe, no quién la ofrece."
+    ),
+    "place.census_no_match": (
+        "La lista de direcciones del Censo no tiene esta dirección. Las casas nuevas suelen "
+        "faltar, así que es solo información."
+    ),
+    "place.census_not_checked": "No comprobado (la lista de direcciones del Censo no respondió).",
+    "rule.link.new_domain": (
+        "Un enlace del anuncio está en un dominio registrado hace pocas semanas. Señal de alerta."
+    ),
+    "link.domain_age": "Un enlace del anuncio está en un dominio registrado hace {years}+ años.",
+    "link.domain_age_months": (
+        "Un enlace del anuncio está en un dominio registrado hace {days} días."
+    ),
+    "link.domain_not_checked": "No comprobado (el registro de dominios no respondió).",
+    "rent.hud_within": (
+        "No muy por debajo de la renta típica de la zona (HUD, código postal {zip}, {size}): "
+        "{rent}."
+    ),
+    "rent.hud_below": (
+        "Renta típica de la zona (HUD, código postal {zip}, {size}): {rent}. Esta renta está "
+        "{percent}% por debajo. Pregunte por qué; hay descuentos."
+    ),
+    "rent.hud_size.studio": "estudio",
+    "rent.hud_size.beds": "{beds} hab.",
     "rent.plan.studio": "un estudio",
     "rent.plan.beds": "{beds} hab.",
     "rent.per_bed": "No comprobado (aquí se cobra por cama, así que la renta no se comparó).",
@@ -1535,6 +1613,9 @@ EN.update(
         "timeline.record": "Found the building on CoStar's record",
         "timeline.record_missing": "Looked for the building on CoStar's record",
         "timeline.rent": "Compared the rent with {n} floor plans",
+        "timeline.rent_hud": "Compared the rent with HUD's typical rent for the ZIP",
+        "timeline.census": "Looked up the address in the Census address list",
+        "timeline.rdap": "Looked up how old a link's domain is",
         "timeline.phone": "Checked the phone against the leasing office",
         "timeline.for_sale": "Looked for a for-sale listing",
         "timeline.license": "Looked up the license the ad names",
@@ -1570,6 +1651,15 @@ EN.update(
         "timeline.result.rent.within_range": "Inside the range on record.",
         "timeline.result.rent.below_range": "Below the range on record.",
         "timeline.result.rent.not_checked": "No rent on record to compare.",
+        "timeline.result.rent_hud.within_range": "Not far under HUD's typical rent.",
+        "timeline.result.rent_hud.below_range": "Far below HUD's typical rent.",
+        "timeline.result.rent_hud.not_checked": "No HUD rent to compare.",
+        "timeline.result.census.found": "The address is in the list.",
+        "timeline.result.census.no_match": "No match (information only).",
+        "timeline.result.census.not_checked": "Not checked.",
+        "timeline.result.rdap.found": "The registry gave the domain's age.",
+        "timeline.result.rdap.no_match": "No match.",
+        "timeline.result.rdap.not_checked": "Not checked.",
         "timeline.result.phone.yes": "It is the office's number.",
         "timeline.result.phone.no": "It is not the office's number.",
         "timeline.result.plan": "One todo per step; the agent keeps it up to date.",
@@ -1703,6 +1793,9 @@ ES.update(
         "timeline.record": "Encontró el edificio en el registro de CoStar",
         "timeline.record_missing": "Buscó el edificio en el registro de CoStar",
         "timeline.rent": "Comparó la renta con {n} planos",
+        "timeline.rent_hud": "Comparó la renta con la renta típica de HUD para el código postal",
+        "timeline.census": "Buscó la dirección en la lista de direcciones del Censo",
+        "timeline.rdap": "Buscó la antigüedad del dominio de un enlace",
         "timeline.phone": "Comparó el teléfono con el de la oficina de arrendamiento",
         "timeline.for_sale": "Buscó un anuncio de venta",
         "timeline.license": "Buscó la licencia que nombra el anuncio",
@@ -1738,6 +1831,15 @@ ES.update(
         "timeline.result.rent.within_range": "Dentro del rango registrado.",
         "timeline.result.rent.below_range": "Por debajo del rango registrado.",
         "timeline.result.rent.not_checked": "No hay renta registrada para comparar.",
+        "timeline.result.rent_hud.within_range": "No muy por debajo de la renta típica de HUD.",
+        "timeline.result.rent_hud.below_range": "Muy por debajo de la renta típica de HUD.",
+        "timeline.result.rent_hud.not_checked": "No hay renta de HUD para comparar.",
+        "timeline.result.census.found": "La dirección está en la lista.",
+        "timeline.result.census.no_match": "Sin coincidencia (solo información).",
+        "timeline.result.census.not_checked": "No comprobado.",
+        "timeline.result.rdap.found": "El registro dio la antigüedad del dominio.",
+        "timeline.result.rdap.no_match": "Sin coincidencia.",
+        "timeline.result.rdap.not_checked": "No comprobado.",
         "timeline.result.phone.yes": "Es el número de la oficina.",
         "timeline.result.phone.no": "No es el número de la oficina.",
         "timeline.result.plan": "Una tarea por paso; el agente la mantiene al día.",

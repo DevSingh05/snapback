@@ -52,6 +52,9 @@ class TimelineStep(BaseModel):
     # None for steps that are not one check (reading the ad, the verdict, a retry).
     kind: str | None = None
     skipped: bool = False  # the plan left this check out; `result` says why
+    # Which source answered the step: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
+    # None for a step no outside source answered (reading the ad, the verdict).
+    source_name: str | None = None
 
 
 class TimelineTodo(BaseModel):
@@ -135,6 +138,14 @@ _CHECK_KINDS = {
     PlanKind.ASK.value: "ask_license",
     PlanKind.REPORT.value: "report",
 }
+# Which source answers each check, named on its step.
+_CHECK_SOURCES = {
+    PlanKind.RECORD.value: "CoStar record",
+    PlanKind.BROKERAGE.value: "CoStar record",
+    PlanKind.CLAIMS.value: "CoStar record",
+    PlanKind.LICENSE.value: "TREC",
+    PlanKind.OWNER.value: "HCAD",
+}
 _CHOICE_KEYS = {
     ChoiceKind.WHICH_CHECKS: "timeline.which_checks",
     ChoiceKind.WHICH_FLOOR_PLAN: "timeline.floor_plan",
@@ -201,6 +212,7 @@ class _Builder:
         source: DataSource | None = None,
         kind: str | None = None,
         skipped: bool = False,
+        source_name: str | None = None,
         **v: object,
     ) -> None:
         self.steps.append(
@@ -213,6 +225,7 @@ class _Builder:
                 "by": by,
                 "kind": kind,
                 "skipped": skipped,
+                "source_name": source_name,
                 "derived": took is not None,
             }
         )
@@ -229,7 +242,42 @@ class _Builder:
                 took=0,
                 source=self.evidence.record_source,
                 kind="rent",
+                source_name="CoStar record",
                 n=price.n_floor_plans,
+            )
+        if price is not None and price.baseline_source == "hud_safmr":
+            self.add(
+                "timeline.rent_hud",
+                at_ms,
+                self.say(f"timeline.result.rent_hud.{price.status.value}"),
+                "code",
+                took=0,
+                kind="rent",
+                source_name="HUD",
+            )
+        place = self.evidence.place_check
+        if place is not None:
+            self.add(
+                "timeline.census",
+                at_ms,
+                self.say(f"timeline.result.census.{place.status.value}"),
+                "code",
+                took=0,
+                source=place.source,
+                kind="place_check",
+                source_name="Census",
+            )
+        domain = self.evidence.domain_check
+        if domain is not None:
+            self.add(
+                "timeline.rdap",
+                at_ms,
+                self.say(f"timeline.result.rdap.{domain.status.value}"),
+                "code",
+                took=0,
+                source=domain.source,
+                kind="link_domain",
+                source_name="RDAP",
             )
         authority = self.evidence.authority
         if authority is not None and authority.office_phone_match is not PhoneMatch.NOT_CHECKED:
@@ -241,6 +289,7 @@ class _Builder:
                 took=0,
                 source=self.evidence.record_source,
                 kind="phone",
+                source_name="CoStar record",
             )
 
 
@@ -378,6 +427,7 @@ def build_timeline(
                 model=by == "agent",
                 source=evidence.record_source if on_record else None,
                 kind=_CHECK_KINDS.get(event.pick or ""),
+                source_name=_CHECK_SOURCES.get(event.pick or ""),
             )
             if key == "timeline.record":
                 b.record_lines(at)
