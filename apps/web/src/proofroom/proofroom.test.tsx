@@ -598,7 +598,7 @@ describe("the graph", () => {
     const node = (id: string) =>
       screen.getAllByTestId("team-node").find((n) => n.getAttribute("data-agent") === id)!;
     render(<TeamGraph desks={shownFor(deepTimeline())} label="t" moving={false} />);
-    expect(within(node("planner")).getByTestId("node-model")).toHaveTextContent("Claude Sonnet");
+    expect(within(node("planner")).getByTestId("node-model")).toHaveTextContent("Sonnet");
     expect(node("planner")).not.toHaveTextContent("By code");
     expect(within(node("photo")).getByTestId("node-model")).toHaveTextContent("Haiku");
     // Code ran the rules and sets the verdict: no model chip on either.

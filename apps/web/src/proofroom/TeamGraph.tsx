@@ -26,10 +26,11 @@ export function shortName(name: string): string {
   return bare.charAt(0).toUpperCase() + bare.slice(1);
 }
 
-/** What ran a member, for its chip: nothing for code; else the model, by family on a small mark. */
-export function modelChip(desk: Desk, wide: boolean): string | null {
+/** What ran a member, for its chip: nothing for code; else the model's family ("Sonnet"). The
+ *  trace card carries the full name. */
+export function modelChip(desk: Desk): string | null {
   if (desk.model === "code" || desk.state === "unused") return null;
-  return wide ? desk.model : desk.model.replace(/^Claude /, "");
+  return desk.model.replace(/^Claude /, "");
 }
 
 function Node({
@@ -51,7 +52,7 @@ function Node({
   const style: CSSProperties = wide
     ? { left: spot.x - AVATAR / 2, top: spot.y }
     : { left: spot.x - width / 2, top: spot.y, width };
-  const chip = modelChip(desk, wide);
+  const chip = modelChip(desk);
   const body = (
     <>
       <span className="pr-node-mark">

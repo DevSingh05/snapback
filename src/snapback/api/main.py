@@ -37,7 +37,7 @@ import secrets
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
@@ -52,7 +52,7 @@ from snapback.agent.casework import CaseNotes
 from snapback.agent.intake import OcrUnavailable, read_listing
 from snapback.agent.join import KitLookups, KitMissing, Lookups
 from snapback.agent.reply import UnreadablePhoto
-from snapback.agent.roster import Roster, roster_for
+from snapback.agent.roster import Roster, roster_for, runners
 from snapback.agent.search_agent import agentic_alternatives, agentic_search, search_chooser_for
 from snapback.agent.timeline import CaseTimeline, build_timeline
 from snapback.api.card_cache import CardPictures
@@ -246,7 +246,22 @@ TIMELINE_POLL_SECONDS = 0.25
 TIMELINE_STREAM_MAX_SECONDS = 180.0
 
 
-async def _timeline_stream(case: RecordedCase | SessionCase, lang: str) -> AsyncIterator[str]:
+def trace_cards(settings: Settings) -> dict[str, Any]:
+    """What the timeline needs for its trace cards: what runs the planner and the sub-agents on
+    this server, and the LangSmith page when one is named (a plain address, never a token)."""
+    return {
+        "runners": runners(
+            settings.snapback_agent,
+            settings.snapback_agent_model,
+            settings.snapback_subagent_model,
+        ),
+        "trace_url": settings.snapback_langsmith_url,
+    }
+
+
+async def _timeline_stream(
+    case: RecordedCase | SessionCase, lang: str, cards: dict[str, Any]
+) -> AsyncIterator[str]:
     """The case's timeline now, then again each time it changes, until the background agent has
     finished (or the cap). `event: timeline`, `data` is a CaseTimeline. A case with no agent at
     work gets its one snapshot and the stream ends."""
@@ -257,7 +272,14 @@ async def _timeline_stream(case: RecordedCase | SessionCase, lang: str) -> Async
         running = case.agent_running  # read first: a step written after this is caught next lap
         evidence = case.evidence
         snapshot = build_timeline(
-            case.case_id, evidence.source, case.events(), evidence, lang, running=running
+            case.case_id,
+            evidence.source,
+            case.events(),
+            evidence,
+            lang,
+            running=running,
+            work=case.work,
+            **cards,
         ).model_dump_json()
         if snapshot != last:
             last = snapshot
@@ -1167,7 +1189,14 @@ def create_app(
         response.headers.update(NO_STORE)
         evidence = case.evidence
         return build_timeline(
-            case.case_id, evidence.source, case.events(), evidence, lang, running=case.agent_running
+            case.case_id,
+            evidence.source,
+            case.events(),
+            evidence,
+            lang,
+            running=case.agent_running,
+            work=case.work,
+            **trace_cards(settings),
         )
 
     @app.get("/cases/{case_id}/timeline/stream")
@@ -1187,7 +1216,7 @@ def create_app(
         no_token_in_the_address(request)
         check_read(case, _bearer(authorization, x_case_token))
         return StreamingResponse(
-            _timeline_stream(case, lang),
+            _timeline_stream(case, lang, trace_cards(settings)),
             media_type="text/event-stream",
             headers={**NO_STORE, "X-Accel-Buffering": "no"},
         )

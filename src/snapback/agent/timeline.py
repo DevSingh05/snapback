@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from snapback.agent.planner import PlanKind
 from snapback.agent.session import UPDATED
+from snapback.agent.worklog import AgentWork, MemberTrace, member_traces
 from snapback.card import strings
 from snapback.contracts import (
     ChoiceKind,
@@ -69,6 +70,13 @@ class CaseTimeline(BaseModel):
     steps: list[TimelineStep]
     todos: list[TimelineTodo] = Field(default_factory=list)  # the agent's last todo list
     plan: list[str] = Field(default_factory=list)  # sub-agents handed work, in order
+    # The trace cards, when the deep agent ran: the planner, then each member in the order work
+    # reached it, with what it was asked, the tools it called, what it said and its model calls.
+    # Empty with the policy (no model ran), and for a case whose run this server did not see.
+    members: list[MemberTrace] = Field(default_factory=list)
+    # Where the run's full trace can be opened in LangSmith, when the server names a project
+    # page. A plain address with no key or token in it. None when there is none.
+    trace_url: str | None = None
 
 
 # --- scrubbing -----------------------------------------------------------------------------------
@@ -228,6 +236,9 @@ def build_timeline(
     lang: str = strings.DEFAULT_LANG,
     *,
     running: bool = False,
+    work: AgentWork | None = None,
+    runners: dict[str, str] | None = None,
+    trace_url: str | None = None,
 ) -> CaseTimeline:
     """The case's steps in trace order. Reads only; never changes the case. `running` says the
     deep agent is still at work on it (SNAPBACK_AGENT=deepagents_async)."""
@@ -376,4 +387,8 @@ def build_timeline(
         ],
         todos=todos,
         plan=plan,
+        # Cards only for a run the model took part in, and only with the server's own word
+        # for what ran it.
+        members=member_traces(work, runners, lang) if ran_agent and runners else [],
+        trace_url=trace_url if ran_agent else None,
     )
