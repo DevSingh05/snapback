@@ -16,18 +16,39 @@
  */
 
 import {
+  CHECKING,
   handleMessage,
   isAllowed,
   renterId,
   type InboundMessage,
   type SidecarConfig,
 } from "./handler";
+import {
+  MAX_VOICE_BYTES,
+  MAX_VOICE_SECONDS,
+  VOICE_TOO_LONG,
+  heardFailure,
+  ffmpegToM4a,
+  speak,
+  spokenReply,
+  transcribe,
+  type Audio,
+  type ConvertVoice,
+} from "./voice";
 import { answerCommand, type WatchBook } from "./watch";
 
 export type PhotonContent =
   | { type: "text"; text: string }
   | { type: "attachment"; mimeType: string; size?: number; read: () => Promise<Uint8Array> }
   | { type: "richlink"; url: string }
+  // a voice memo (Apple sends CAF); `duration` in seconds
+  | {
+      type: "voice";
+      mimeType: string;
+      duration?: number;
+      size?: number;
+      read: () => Promise<Uint8Array>;
+    }
   // more than one part in one send (a caption and a photo), and a swipe-reply
   | { type: "group"; items: { content: PhotonContent }[] }
   | { type: "reply"; content: PhotonContent }
@@ -35,7 +56,8 @@ export type PhotonContent =
 
 export type PhotonMessage = { direction: "inbound" | "outbound"; content: PhotonContent };
 
-export type PhotonSpace = { id: string; send: (text: string) => Promise<unknown> };
+/** `send` takes text, or what the SDK's `voice()` builder returns (see `makeVoice`). */
+export type PhotonSpace = { id: string; send(content: unknown): Promise<unknown> };
 
 export type PhotonApp = {
   messages: AsyncIterable<[PhotonSpace, PhotonMessage]>;
@@ -50,9 +72,29 @@ export type PhotonConfig = SidecarConfig & {
   maxPhotoBytes?: number;
   /** Watch alerts (M10). Without it, "watch" and "stop" are read as any other text. */
   watches?: WatchBook;
+  /** Voice replies: the SDK's `voice(buffer, { mimeType })` builder. Without it, text only. */
+  makeVoice?: (bytes: Uint8Array, mimeType: string) => unknown;
+  /** U1: one "checking" reply per batch before a new check (not for follow-ups). */
+  acknowledge?: boolean;
+  /** The card picture: the SDK's `attachment(buffer, { mimeType, name })`. Without it, text only. */
+  makeImage?: (bytes: Uint8Array, mimeType: string) => unknown;
+  /** CAF to m4a before speech to text. Defaults to ffmpeg. */
+  convertVoice?: ConvertVoice;
 };
 
 type Log = (line: string) => void;
+
+/** Stage switches, so either can be turned off on stage: the card picture
+ * (SNAPBACK_SEND_CARD_IMAGE=1) and the "checking" reply (SNAPBACK_SEND_CHECKING=1). Off unless 1. */
+export function stageOptions(env: Record<string, string | undefined>): {
+  sendCardImage: boolean;
+  acknowledge: boolean;
+} {
+  return {
+    sendCardImage: env.SNAPBACK_SEND_CARD_IMAGE === "1",
+    acknowledge: env.SNAPBACK_SEND_CHECKING === "1",
+  };
+}
 
 const QUIET_MS = 4000;
 const MAX_PHOTOS = 10;
@@ -69,7 +111,14 @@ export function publicWebUrl(env: Record<string, string | undefined>): string {
   return url;
 }
 
-type Pending = { space: PhotonSpace; texts: string[]; images: Blob[]; timer?: NodeJS.Timeout };
+type Pending = {
+  space: PhotonSpace;
+  texts: string[];
+  images: Blob[];
+  voices?: Audio[]; // memos to write down before the check
+  notes?: string[]; // things to tell the renter when nothing can be checked (a memo too long)
+  timer?: NodeJS.Timeout;
+};
 
 type Limits = { maxPhotos: number; maxPhotoBytes: number; skipped: string[] };
 
@@ -90,6 +139,23 @@ async function collect(pending: Pending, content: PhotonContent, limits: Limits)
   }
   if (content.type === "richlink" && "url" in content) {
     pending.texts.push(content.url);
+    return true;
+  }
+  if (content.type === "voice" && "read" in content) {
+    // never download a memo over the caps: it is not written down or sent anywhere
+    const long = "duration" in content && (content.duration ?? 0) > MAX_VOICE_SECONDS;
+    const big = (content.size ?? 0) > MAX_VOICE_BYTES;
+    if (long || big) {
+      limits.skipped.push("voice memo over the limit");
+      pending.notes = [...(pending.notes ?? []), VOICE_TOO_LONG];
+      return true;
+    }
+    const bytes = await content.read();
+    if (bytes.length > MAX_VOICE_BYTES) {
+      pending.notes = [...(pending.notes ?? []), VOICE_TOO_LONG];
+      return true;
+    }
+    pending.voices = [...(pending.voices ?? []), { bytes, mimeType: content.mimeType }];
     return true;
   }
   if (content.type === "attachment" && "read" in content && content.mimeType.startsWith("image/")) {
@@ -113,26 +179,71 @@ export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log =
   const running: Promise<void>[] = [];
   const quietMs = config.quietMs ?? QUIET_MS;
 
-  const flush = (id: string) => {
-    const item = pending.get(id);
-    if (!item) return;
-    pending.delete(id);
+  const get = config.fetch ?? fetch;
+
+  /** Check what the renter sent (writing down any voice memo first), then reply. */
+  const answer = async (item: Pending): Promise<void> => {
+    const spoken = (item.voices?.length ?? 0) > 0;
+    for (const audio of item.voices ?? []) {
+      const convert = config.convertVoice ?? ffmpegToM4a;
+      const heard = await transcribe(audio, config.apiUrl, get, convert);
+      if ("text" in heard) item.texts.push(heard.text);
+      else if (item.texts.length === 0 && item.images.length === 0) {
+        // nothing to check without the words: say why (off, too long, or not heard)
+        await item.space.send(heardFailure(heard.fail));
+        return;
+      }
+    }
+    if (item.texts.length === 0 && item.images.length === 0) {
+      for (const note of item.notes ?? []) await item.space.send(note);
+      return;
+    }
     const msg: InboundMessage = {
-      threadId: id,
+      threadId: item.space.id,
       text: item.texts.join("\n"),
       imageUrls: [],
       images: item.images,
       receivedAt: new Date().toISOString(),
     };
+    let replied = "";
     // The client is bound to this space: it cannot send anywhere else.
     const client = {
       async reply(threadId: string, text: string) {
         if (threadId !== item.space.id) throw new Error("a reply may only go to its own thread");
         await item.space.send(text);
+        replied = text;
       },
+      // the card picture, through the SDK's attachment builder, to the same space only
+      ...(config.makeImage
+        ? {
+            async image(threadId: string, bytes: Uint8Array, mimeType: string) {
+              if (threadId !== item.space.id)
+                throw new Error("a reply may only go to its own thread");
+              await item.space.send(config.makeImage!(bytes, mimeType));
+            },
+          }
+        : {}),
     };
+    const checking = config.acknowledge
+      ? async () => void (await item.space.send(CHECKING))
+      : undefined;
+    await handleMessage(msg, client, config, checking);
+    if (!spoken || !replied || !config.makeVoice) return;
+    // A spoken ad gets a spoken answer too. If it fails, the text has already gone out.
+    try {
+      const audio = await speak(spokenReply(replied), config.apiUrl, get);
+      if (audio) await item.space.send(config.makeVoice(audio.bytes, audio.mimeType));
+    } catch {
+      log("[sidecar] a voice reply could not be sent; the text reply went out");
+    }
+  };
+
+  const flush = (id: string) => {
+    const item = pending.get(id);
+    if (!item) return;
+    pending.delete(id);
     running.push(
-      handleMessage(msg, client, config).then(
+      answer(item).then(
         () => log("[sidecar] replied in an allowed thread"),
         () => log("[sidecar] a reply could not be sent"),
       ),

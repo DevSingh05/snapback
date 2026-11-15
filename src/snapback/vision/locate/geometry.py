@@ -137,6 +137,27 @@ def matrix_from_quaternion(q: tuple[float, float, float, float]) -> np.ndarray:
 CV_TO_GL = np.diag([1.0, -1.0, -1.0])
 
 
+# The scan cache is z-up and the 3D viewer is y-up: (x, y, z) -> (x, z, -y), a proper rotation.
+Z_UP_TO_Y_UP = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]])
+
+
+def viewer_yaw_pitch(pano: np.ndarray, camera_to_pano_cv: np.ndarray) -> tuple[float, float]:
+    """(yaw, pitch) in degrees of a camera in the 3D viewer's frame.
+
+    The cube faces are in the pano's y-up frame (three.js: front along -Z), but the cache's pano
+    rotation turns about the cache's z (up) axis. In the viewer's y-up frame that same rotation is
+    Z_UP_TO_Y_UP @ pano @ Z_UP_TO_Y_UP.T, which then takes the face camera into the viewer's
+    world. Yaw 0 looks down -Z and grows turning left; pitch is positive looking up. Measured on
+    renders made with pitch in [-15, 10]: these angles land in that range, while reading the
+    raw pose quaternion as y-up gave pitches out to +-75."""
+    m = Z_UP_TO_Y_UP
+    world = m @ pano @ m.T @ camera_to_pano_cv
+    forward = world[:, 2]  # OpenCV camera axes: z forward
+    yaw = math.degrees(math.atan2(-forward[0], -forward[2]))
+    pitch = math.degrees(math.asin(max(-1.0, min(1.0, float(forward[1])))))
+    return round(yaw, 2), round(pitch, 2)
+
+
 def camera_quaternion(camera_to_world_cv: np.ndarray) -> tuple[float, float, float, float]:
     """The three.js camera quaternion for a camera given as OpenCV-axes camera-to-world."""
     return quaternion_from_matrix(camera_to_world_cv @ CV_TO_GL)

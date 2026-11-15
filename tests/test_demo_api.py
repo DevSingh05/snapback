@@ -56,7 +56,11 @@ ROWS = {
         "price": [("Payment ask", "Matches"), ("Rent vs record", "Warning")],
     },
     "b": {
-        "place": [("Real", "Doesn't match"), ("Unit on record", "Warning")],
+        "place": [
+            ("Real", "Doesn't match"),
+            ("Home in the photos", "Not checked"),
+            ("Unit on record", "Warning"),
+        ],
         "person": [
             ("Here now", "Matches"),
             ("Allowed to rent it", "Not confirmed"),

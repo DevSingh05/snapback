@@ -17,6 +17,18 @@ export function sdkRotation(q: [number, number, number, number]): SdkRotation {
   return { x: pitch, y: YAW_SIGN * yaw };
 }
 
+/** The matched view's rotation: the locator's own viewer angles when it sent them (they account
+ *  for the scan's z-up frame), else angles read off the quaternion. */
+export function photoRotation(p: {
+  rotation_quat?: [number, number, number, number] | null;
+  yaw_deg?: number | null;
+  pitch_deg?: number | null;
+}): SdkRotation | null {
+  if (typeof p.yaw_deg === "number" && typeof p.pitch_deg === "number")
+    return { x: p.pitch_deg, y: YAW_SIGN * p.yaw_deg };
+  return p.rotation_quat ? sdkRotation(p.rotation_quat) : null;
+}
+
 export interface StopMove {
   sweepId: string;
   options: {
@@ -32,16 +44,19 @@ export interface StopMove {
  * to the stop's own sweep. A stop with no sweep (arrive, outro) has no move.
  */
 export function stopMove(stop: TourStop, reduced: boolean): StopMove | null {
-  const photo = stop.photos.find((p) => p.sweep_id && p.rotation_quat);
+  const photo = stop.photos.find(
+    (p) => p.sweep_id && (p.rotation_quat || typeof p.yaw_deg === "number"),
+  );
   const sweepId = photo?.sweep_id ?? stop.sweep_id;
   if (!sweepId) return null;
-  const quat = photo?.rotation_quat ?? stop.rotation_quat ?? [0, 0, 0, 1];
+  const rotation =
+    (photo && photoRotation(photo)) ?? sdkRotation(stop.rotation_quat ?? [0, 0, 0, 1]);
   return {
     sweepId,
     options: {
       transition: reduced ? "transition.instant" : "transition.fly",
       transitionTime: reduced ? 0 : 2000,
-      rotation: sdkRotation(quat),
+      rotation,
     },
   };
 }

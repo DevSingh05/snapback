@@ -135,6 +135,11 @@ class Pose(BaseModel):
     position: tuple[float, float, float]
     rotation_quat: tuple[float, float, float, float]  # x, y, z, w
     fov_deg: float | None = None
+    # Where the camera looks in the 3D viewer's own frame (y up; yaw 0 looks down -Z and turns
+    # left as it grows; pitch positive looks up), degrees. Set by the locator, which knows the
+    # pano's rotation; a viewer uses these instead of reading angles off `rotation_quat`.
+    yaw_deg: float | None = None
+    pitch_deg: float | None = None
 
 
 class FloorPlanCandidate(BaseModel):
@@ -436,6 +441,9 @@ class ModuleEvidence(BaseModel):
     # Ad vs record: what the ad claims against what CoStar's record says. Information only; no
     # verdict reads it. Empty means nothing to say (a record that is silent is not a finding).
     ad_notes: list[AdNote] = Field(default_factory=list)
+    # X1: when a photo was placed in a different home, that home's office on CoStar's record
+    # (company only). Information for the card; no verdict reads it.
+    matched_office: str | None = None
 
 
 # ---------------------------------------------------------------------------------------------
@@ -487,6 +495,9 @@ class Card(BaseModel):
     footer: list[str]
     verify_url: str | None = None
     lang: str = "en"
+    # Words for the headline when the state's own words would mislead: today only a HOLD with
+    # nothing against it. None means "use the state's headline". It never changes the state.
+    headline: str | None = None
     # A7 (#67): set when the home is listed for sale or was rented recently, so the web can
     # draw the dates as a history strip. The sentence about it is a PLACE line like any other.
     for_sale: ForSaleMatch | None = None
@@ -925,6 +936,9 @@ class RentalHouse(BaseModel):
     available_on: date | None = None
     office: str | None = None  # the listing office, company name only
     has_scan: bool = False
+    # M1: where the home is, for the map only. Never shown as an address.
+    lat: float | None = None
+    lon: float | None = None
 
 
 class BudgetFit(StrEnum):

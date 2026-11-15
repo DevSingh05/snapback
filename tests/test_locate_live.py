@@ -878,3 +878,23 @@ def test_a_cache_entry_from_before_the_pairs_were_kept_is_run_again(world, tmp_p
     again = make_live(data, adapter).locate("c2", blobs, "fx-prop-1")
     assert not again.from_cache and again.points == first.points
     assert "points" in json.loads(path.read_text())
+
+
+def test_a_cache_entry_whose_poses_lack_the_viewer_angles_is_run_again(world, tmp_path):
+    """#244 review: an entry written before poses carried yaw_deg/pitch_deg would make the walk
+    read the quaternion again. It is run again, and the rewritten entry carries the angles."""
+    data, sweeps, adapter = fresh_data(world, tmp_path)
+    blobs = [photo(sweeps, "fx-model-a", 2, 1)]
+    live = make_live(data, adapter, budget=120.0)
+    first = live.locate("c1", blobs, "fx-prop-1")
+    assert first.result.poses and all(p.yaw_deg is not None for p in first.result.poses.values())
+    path = live._cache_path(live._load(), blobs, "fx-prop-1")
+    old = json.loads(path.read_text())
+    for pose in old["result"]["poses"].values():
+        pose.pop("yaw_deg", None)
+        pose.pop("pitch_deg", None)
+    path.write_text(json.dumps(old))
+    again = make_live(data, adapter, budget=120.0).locate("c2", blobs, "fx-prop-1")
+    assert not again.from_cache
+    rewritten = json.loads(path.read_text())["result"]["poses"]
+    assert all(p["yaw_deg"] is not None and p["pitch_deg"] is not None for p in rewritten.values())

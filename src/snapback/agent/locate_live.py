@@ -199,6 +199,11 @@ class LiveLocate:
             if "points" not in raw:
                 # Written before the pairs were kept: running again draws the lines and rewrites it.
                 return None
+            poses = (raw.get("result") or {}).get("poses") or {}
+            if any(p.get("yaw_deg") is None or p.get("pitch_deg") is None for p in poses.values()):
+                # Written before poses carried the viewer's angles (#244): the walk would fall back
+                # to reading the quaternion. Run again.
+                return None
             points = {
                 str(pid): EvidencePoints.model_validate(value)
                 for pid, value in (raw.get("points") or {}).items()

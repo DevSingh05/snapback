@@ -140,7 +140,7 @@ export function TourView({
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, last)), [last]);
   const back = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
 
-  const landing = landingOfStop(stop);
+  const landing = landingOfStop(stop, plan.up_axis ?? "y");
   // The ad's real photo when this browser can read it; else the labelled placeholder.
   const realPhoto = useAdPhoto(caseId, stop.photos[0]?.alias);
   const photoNote = realPhoto
@@ -429,12 +429,42 @@ export function TourView({
             photoNote={photoNote}
             rail={rail}
           />
+          {stop.kind === "door" && (
+            <div className="tour-door-scan" data-testid="tour-door-scan">
+              {plan.scan_label && <p>This is {plan.scan_label}.</p>}
+              {plan.scan_date_line && <p className="mono">{plan.scan_date_line}</p>}
+              {plan.scan_age_note && <p>{plan.scan_age_note}</p>}
+            </div>
+          )}
+          {stop.kind === "outro" && plan.summary && (
+            <div className="tour-summary">
+              <section aria-label="What you now know">
+                <h2>What you now know</h2>
+                <ul>
+                  {plan.summary.know.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </section>
+              <section aria-label="What you still need to see in person">
+                <h2>What you still need to see in person</h2>
+                <ul>
+                  {plan.summary.see.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          )}
           {stop.kind === "outro" && (
             <p className="tour-outro">
               <a className="pf-action" href={plan.links.tour_prep} data-testid="tour-prep-link">
                 Tour prep: what to ask
               </a>{" "}
-              <span className="tour-note">{plan.links.tour_draft_hint}</span>
+              <span className="tour-note">{plan.links.tour_draft_hint}</span>{" "}
+              <span className="tour-note">
+                A tour request draft can name the rooms the ad left out. Nothing is sent for you.
+              </span>
             </p>
           )}
           {!plan.has_scan && <p className="tour-note">No 3D scan is on record for this place.</p>}

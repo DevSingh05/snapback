@@ -85,6 +85,11 @@ FONT_CANDIDATES = (
 REQUIRED_GLYPHS = "áéíóúñüÁÉÍÓÚÑ¿¡·"
 
 
+def headline(card: Card) -> str:
+    """The words at the top of the card: its own headline when it has one, else its state's."""
+    return card.headline or strings.text(f"state.{card.state.value}", card.lang)
+
+
 def _lacks(font: ImageFont.FreeTypeFont, char: str) -> bool:
     """True if `font` has no glyph for `char` (it would draw its "missing" box)."""
     return bytes(font.getmask(char)) == bytes(font.getmask("\uffff"))
@@ -257,7 +262,7 @@ def render_card(card: Card) -> RenderedCard:
 
     # The state, in words on a solid band.
     state_colour = STATE_COLOUR[card.state]
-    state_lines = wrap(pen, say(f"state.{card.state.value}"), _font(50), CONTENT - 64)
+    state_lines = wrap(pen, headline(card), _font(50), CONTENT - 64)
     band_height = 40 + len(state_lines) * 62
     pen.rounded_rectangle(
         (MARGIN, y, WIDTH - MARGIN, y + band_height), radius=24, fill=state_colour

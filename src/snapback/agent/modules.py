@@ -228,6 +228,10 @@ class FixtureModules:
     def license(self, case_id: str) -> LicenseResult | None:
         return self._license if self._license is not None else self.evidence.license
 
+    def matched_office(self, case_id: str, locate: object) -> str | None:
+        """X1: a fixture case carries its own team-made office for the home placed elsewhere."""
+        return self.evidence.matched_office
+
     def ad_notes(self, case_id: str) -> list[AdNote]:
         """Ad vs record: the ad's claims against this fixture's record. No ad text, no notes."""
         if not self._ad_text:

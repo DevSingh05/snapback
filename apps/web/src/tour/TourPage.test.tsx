@@ -201,3 +201,115 @@ describe("link to where the photos were taken", () => {
     expect(link.getAttribute("href")).toMatch(/^\/tour\/.+\?case=fx-7Q2M&where=photos$/);
   });
 });
+
+const withScanDate = (): typeof FIXTURE_TOUR => ({
+  ...FIXTURE_TOUR,
+  scan_date_line: "Scanned Mar 2026 (Matterport)",
+  scan_age_note: "Things can change after a scan: check finishes in person.",
+});
+
+describe("Arrive and door (W4)", () => {
+  it("the door stop names the kind of scan, its date and the age note", async () => {
+    render(<TourView plan={withScanDate()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    const door = screen.getByTestId("tour-door-scan");
+    expect(door).toHaveTextContent("a 3D scan in this building");
+    expect(door).toHaveTextContent("Scanned Mar 2026 (Matterport)");
+    expect(door).toHaveTextContent("check finishes in person");
+  });
+
+  it("the door stop says when the scan date is not on record", async () => {
+    render(<TourView plan={{ ...FIXTURE_TOUR, scan_date_line: "Scan date not on record" }} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByTestId("tour-door-scan")).toHaveTextContent("Scan date not on record");
+  });
+
+  it("the arrive stop has no door scan block", () => {
+    render(<TourView plan={withScanDate()} />);
+    expect(screen.queryByTestId("tour-door-scan")).toBeNull();
+  });
+});
+
+describe("Summary (W5)", () => {
+  const summarised = () => ({
+    ...FIXTURE_TOUR,
+    summary: {
+      know: ["The ad showed 2 of the 5 rooms in this scan."],
+      see: [
+        "The ad did not show the second bathroom.",
+        "Door widths, steps and the real condition of each room.",
+      ],
+    },
+  });
+  const toEnd = async () => {
+    const rail = screen.getByRole("navigation", { name: "Tour progress" });
+    await userEvent.setup().click(rail.querySelector("li:last-child button")!);
+  };
+
+  it("shows what you now know and what you still need to see, in two columns", async () => {
+    render(<TourView plan={summarised()} />);
+    await toEnd();
+    const know = screen.getByRole("region", { name: "What you now know" });
+    const see = screen.getByRole("region", { name: "What you still need to see in person" });
+    expect(know).toHaveTextContent("The ad showed 2 of the 5 rooms in this scan.");
+    expect(see).toHaveTextContent("The ad did not show the second bathroom.");
+    expect(know).not.toHaveTextContent("second bathroom");
+  });
+
+  it("keeps the tour-prep link and says nothing is sent", async () => {
+    render(<TourView plan={summarised()} />);
+    await toEnd();
+    expect(screen.getByTestId("tour-prep-link")).toHaveAttribute(
+      "href",
+      "/prep/place/fixture-bldg-1",
+    );
+    expect(screen.getByText(/Nothing is sent for you/)).toBeInTheDocument();
+  });
+
+  it("shows no summary columns when the plan has none", async () => {
+    render(<TourView plan={FIXTURE_TOUR} />);
+    await toEnd();
+    expect(screen.queryByRole("region", { name: "What you now know" })).toBeNull();
+  });
+});
+
+describe("links to the tour", () => {
+  it("the twin page links to the claimed building's tour with its case", () => {
+    render(<TwinView caseId="fx-7Q2M" sdkKey={undefined} modelId={undefined} />);
+    expect(screen.getByTestId("walk-it-first-link")).toHaveAttribute(
+      "href",
+      "/tour/fx-prop-1?case=fx-7Q2M",
+    );
+  });
+});
+
+describe("TourView passes the plan's up axis to the mini-map (#246)", () => {
+  it("draws a z-up live photo at its viewer-frame floor point", () => {
+    const room = FIXTURE_TOUR.stops.find((s) => s.kind === "room")!;
+    const plan = {
+      ...FIXTURE_TOUR,
+      up_axis: "z" as const,
+      stops: [
+        {
+          ...room,
+          photos: [
+            {
+              photo_id: "l1",
+              sweep_id: room.sweep_id,
+              position: [4, 5, 1.4] as [number, number, number],
+              rotation_quat: [0, 0, 0, 1] as [number, number, number, number],
+              fov_deg: 62,
+              yaw_deg: 30,
+              pitch_deg: -5,
+            },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<TourView plan={plan} />);
+    // (4, 5, 1.4) z-up is (4, -5) on the viewer's floor: 120 + clamp(80, 60), 120 + clamp(-100, 60).
+    expect(container.querySelector(".landing-map > g")?.getAttribute("transform")).toBe(
+      "translate(180 60)",
+    );
+  });
+});

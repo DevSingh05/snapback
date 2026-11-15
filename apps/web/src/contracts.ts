@@ -79,6 +79,8 @@ export interface Card {
   summary?: string[];
   checks_out?: string[]; // lines with tone ok
   does_not?: string[]; // red flag, hold and not-shown lines
+  // Set by the API when the state's own words would mislead (a HOLD with nothing against it).
+  headline?: string | null;
 }
 
 export type TraceKind =
@@ -145,6 +147,10 @@ export interface Pose {
   position: [number, number, number];
   rotation_quat: [number, number, number, number]; // x, y, z, w
   fov_deg?: number | null;
+  // The matched camera direction in the 3D viewer's frame, degrees (yaw 0 looks down -Z and
+  // grows turning left; pitch positive looks up). Set by the locator; prefer these to the quat.
+  yaw_deg?: number | null;
+  pitch_deg?: number | null;
 }
 
 // Mirrors LocateStatus (contracts.py).
@@ -428,6 +434,8 @@ export interface TourPhoto {
   position?: [number, number, number] | null;
   rotation_quat?: [number, number, number, number] | null;
   fov_deg?: number | null;
+  yaw_deg?: number | null; // the matched camera direction in the 3D viewer's frame (Pose.yaw_deg)
+  pitch_deg?: number | null;
 }
 
 export interface TourStop {
@@ -491,6 +499,9 @@ export interface TourPlan {
   mode_line?: string | null;
   coverage?: WalkCoverage | null;
   director?: TourDirector | null;
+  scan_date_line?: string | null; // "Scanned Mar 2026 (Matterport)" or "Scan date not on record"
+  scan_age_note?: string | null; // set when the scan is older than 12 months
+  summary?: { know: string[]; see: string[] } | null; // the last screen's two columns
 }
 
 // Mirrors PackLine and TourPrepPack in src/snapback/pack.py (GET /cases/{id}/tour-prep and

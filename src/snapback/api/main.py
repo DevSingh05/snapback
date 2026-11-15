@@ -13,6 +13,7 @@ Routes the web app and the iMessage sidecar call:
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
     GET  /eval/locate_real.csv            locate accuracy on the buildings' own photos
+    GET  /eval/ads.csv                    measured ad batch: ad type by verdict, n, misses
     GET  /healthz                         liveness and the data source
     POST /voice/tts, POST /voice/stt      the Finder's voice (ElevenLabs; see api/voice.py)
     POST /verdict                         decide() on evidence the caller already has
@@ -58,7 +59,7 @@ from snapback.api.cases import (
     SessionCase,
     UnknownProperty,
 )
-from snapback.api.eval_results import NotTheAgreedCsv, read_results
+from snapback.api.eval_results import ADS_COLUMNS, RESULTS_COLUMNS, NotTheAgreedCsv, read_results
 from snapback.api.finder import make_router as finder_router
 from snapback.api.forensics import router as forensics_router
 from snapback.api.limits import DailyLimit, PerMinuteLimit
@@ -107,6 +108,16 @@ from snapback.office.models import (
 )
 from snapback.office.proof import TOKEN_TTL_SECONDS, OfficeProofs, Outcome, RateLimited, Redeemed
 from snapback.pack import TourPrepPack, build_tour_prep
+from snapback.places_map import (
+    PlaceSheet,
+    PlacesIndex,
+    PlacesMap,
+    SheetAerial,
+    captured_line,
+    fixture_tile_jpeg,
+    place_sheet,
+    source_of,
+)
 from snapback.preferences import merge as merge_preferences
 from snapback.real_listing import real_listing
 from snapback.replays import SLUG as REPLAY_SLUG
@@ -135,7 +146,9 @@ from snapback.tour import (
     map_locate,
     must_have_kinds_of,
     office_on_record,
+    rooms_to_see_line,
     scan_model_of,
+    with_summary,
 )
 from snapback.verdict import decide
 
@@ -913,6 +926,88 @@ def create_app(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    places_index = PlacesIndex(lookups)
+
+    @app.post("/places/map")
+    def post_places_map(request: Request, brief: RenterBrief | None = None) -> PlacesMap:
+        """The map's pins: one GeoJSON feature per researched place, with `fits_brief` set from
+        the optional brief. Public and read only; no address, office or name in any feature."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            return places_index.feed(brief)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+
+    def place_tile(property_id: str, direction: str):
+        """The tile for a place through the shared vexcel cache (7 days under data/vexcel/)."""
+        return aerial_side(
+            source_of(lookups),
+            property_id,
+            direction=direction,
+            records=kit_records_for_aerial(),
+            data_dir=settings.snapback_data_dir,
+        )
+
+    @app.get("/places/{property_id}")
+    def get_place_sheet(property_id: str, request: Request) -> PlaceSheet:
+        """The map's sheet for one place: plans, prices and units reported (as of CoStar's last
+        research), the company on record, the scan badge and the aerial. Public and read only,
+        built by code from the record (no case data). 404 for a place with no priced plan."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        try:
+            sheet = place_sheet(property_id, lookups)
+        except KitMissing as missing:
+            raise HTTPException(status_code=503, detail=str(missing)) from None
+        if sheet is None:
+            raise HTTPException(status_code=404, detail="No researched place with that id.")
+        tile = place_tile(property_id, "north")
+        live = tile is not None and tile.source == DataSource.LIVE
+        if live or sheet.source is DataSource.FIXTURE:
+            sheet.aerial = SheetAerial(
+                source=DataSource.LIVE if live else DataSource.FIXTURE,
+                captured_on=tile.captured_on if tile is not None else None,
+                line=captured_line(
+                    tile.captured_on if tile is not None else None,
+                    DataSource.LIVE if live else DataSource.FIXTURE,
+                ),
+                image_path=f"/places/{property_id}/aerial.jpg",
+            )
+        return sheet
+
+    @app.get("/places/{property_id}/aerial.jpg")
+    def get_place_aerial(
+        property_id: str, request: Request, direction: AerialDirection = "north"
+    ) -> Response:
+        """The place's aerial: a live Vexcel tile from the shared 7-day cache, or, for a FIXTURE
+        place, a plain stand-in labelled as one. 404 when there is none. Rate limited."""
+        address = request.client.host if request.client else "unknown"
+        if not search_limit.allow(address):
+            raise HTTPException(status_code=429, detail="Too many searches. Try again in a minute.")
+        if place_sheet(property_id, lookups) is None:
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        headers = {"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"}
+        tile = place_tile(property_id, direction)
+        if tile is not None and tile.source == DataSource.LIVE:
+            tile_path = Path(tile.path).resolve()
+            data_root = resolve_data_dir(settings.snapback_data_dir).resolve()
+            if tile_path.is_relative_to(data_root):
+                try:
+                    return Response(
+                        content=tile_path.read_bytes(), media_type="image/jpeg", headers=headers
+                    )
+                except FileNotFoundError:
+                    pass
+            raise HTTPException(status_code=404, detail=NO_TILE)
+        if source_of(lookups) is DataSource.FIXTURE:
+            return Response(
+                content=fixture_tile_jpeg(property_id), media_type="image/jpeg", headers=headers
+            )
+        raise HTTPException(status_code=404, detail=NO_TILE)
+
     @app.get("/events/stream")
     def get_events(
         request: Request,
@@ -1223,17 +1318,19 @@ def create_app(
             )
             if tile is not None:
                 aerial_on, aerial_ok = tile.captured_on, tile.source == DataSource.LIVE
-        return build_tour(
-            property_id=property_id,
-            kind=place.kind if place else "apartment",
-            source=source,
-            sweeps=sweeps,
-            has_scan=place.has_3d_scan if place else bool(record and record.model_ids),
-            place=place,
-            record=record,
-            aerial_on=aerial_on,
-            aerial_image=aerial_ok,
-            plan_key=place.plan_key if place else None,
+        return with_summary(
+            build_tour(
+                property_id=property_id,
+                kind=place.kind if place else "apartment",
+                source=source,
+                sweeps=sweeps,
+                has_scan=place.has_3d_scan if place else bool(record and record.model_ids),
+                place=place,
+                record=record,
+                aerial_on=aerial_on,
+                aerial_image=aerial_ok,
+                plan_key=place.plan_key if place else None,
+            )
         )
 
     @app.get("/places/{property_id}/tour")
@@ -1283,13 +1380,17 @@ def create_app(
             model = scan_model_of(locate, other)
             plan = tour_for(other, None, any_plan=True, model_id=model)
             plan, fields = map_elsewhere(plan, locate, other, office_of(other))
-            return choose_walk(plan), locate, fields, model
+            return with_summary(choose_walk(plan)), locate, fields, model
         if case.property_id is None:
             raise HTTPException(status_code=404, detail="This case has no building on record.")
+        return claimed_walk(case, locate)
+
+    def claimed_walk(case, locate) -> tuple:
+        """The case's own building walk (the claimed home), with its placed photos and summary."""
         model = scan_model_of(locate)
         plan = tour_for(case.property_id, None, any_plan=True, model_id=model)
         if locate is None:
-            return plan, None, {}, model
+            return with_summary(plan), None, {}, model
         scan_plan = locate.chosen.floor_plan if locate.chosen else None
         plan, fields = map_locate(
             plan,
@@ -1300,7 +1401,12 @@ def create_app(
         )
         plan = attach_claims(plan, ad_notes_of(case))
         prefs = getattr(case, "preferences", None)
-        return choose_walk(plan, None, must_have_kinds_of(prefs)), locate, fields, model
+        return (
+            with_summary(choose_walk(plan, None, must_have_kinds_of(prefs))),
+            locate,
+            fields,
+            model,
+        )
 
     @app.get("/cases/{case_id}/tour")
     def get_case_tour(
@@ -1409,6 +1515,16 @@ def create_app(
             aerial_on=capture_date_of(record),
         )
 
+    def rooms_line_for(case, property_id: str) -> str | None:
+        """The rooms the ad left out, only for the case's own building and only when the walk
+        knows them. Any trouble building the walk just leaves the line out."""
+        if case.property_id is None or case.property_id != property_id:
+            return None
+        try:
+            return rooms_to_see_line(claimed_walk(case, case.evidence.locate)[0])
+        except HTTPException:
+            return None
+
     @app.post("/cases/{case_id}/tour-draft")
     def post_tour_draft(
         case_id: str,
@@ -1434,7 +1550,7 @@ def create_app(
         if place is None:
             raise HTTPException(status_code=404, detail="No researched place with that id.")
         try:
-            return draft_tour_request(place, body.brief)
+            return draft_tour_request(place, body.brief, rooms_line_for(case, body.property_id))
         except NoOfficeOnRecord:
             raise HTTPException(
                 status_code=422, detail="That place has no leasing office on record."
@@ -1538,10 +1654,10 @@ def create_app(
             challenge_text=status.challenge_text,
         )
 
-    def eval_file(path: Path, missing: str) -> Response:
+    def eval_file(path: Path, missing: str, columns: tuple[str, ...] = RESULTS_COLUMNS) -> Response:
         """One of the eval harness's CSVs, as written. Only the agreed format is served."""
         try:
-            results = read_results(path)
+            results = read_results(path, columns)
         except NotTheAgreedCsv:
             raise HTTPException(
                 status_code=500, detail="The results file is not the agreed eval results CSV."
@@ -1572,6 +1688,19 @@ def create_app(
         return eval_file(
             settings.snapback_eval_locate_real,
             "No locate results yet. Run `make eval-locate-real`.",
+        )
+
+    @app.get("/eval/ads.csv")
+    def get_eval_ads() -> Response:
+        """The measured ad batch (`make eval-ads`): ad type by verdict, with n and a miss flag.
+
+        Same rules as `/eval/results.csv`: public, read-only, a fixed path, only the agreed CSV.
+        Composed ads are labelled composed in the file; it holds counts only, no ad text.
+        """
+        return eval_file(
+            settings.snapback_eval_ads,
+            "No ad results yet. Run `make eval-ads`.",
+            ADS_COLUMNS,
         )
 
     return app

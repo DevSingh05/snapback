@@ -19,6 +19,11 @@ DEFAULT_LANG = "en"
 EN: dict[str, str] = {
     # --- line labels -----------------------------------------------------------------------
     "label.real": "Real",
+    "label.matched_home": "Home in the photos",
+    "place.matched_office": (
+        "Not checked. The home in these photos is listed by its office on CoStar's record: "
+        "{office}. We can't tell you if it is offered, or at this price."
+    ),
     "label.here_now": "Here now",
     "label.allowed": "Allowed to rent it",
     "label.payment_ask": "Payment ask",
@@ -508,6 +513,12 @@ EN: dict[str, str] = {
     "tone.not_shown": "Not confirmed",
     "tone.not_checked": "Not checked",
     "state.hold": "Hold off for now",
+    # A HOLD with nothing against it: every line matches and only the presence step is left.
+    # Same state, different words, so an honest ad does not read like a scam (#10, Sat 19:0x).
+    "state.hold_clean": (
+        "Everything we checked matches the record. "
+        "One step left before you pay: ask them to prove they're inside."
+    ),
     "state.dont_pay": "Don't pay. Something here doesn't match.",
     "state.unverified": "Could not place these photos",
     "state.verified": "Checks passed. Still follow the two rules.",
@@ -526,6 +537,11 @@ EN: dict[str, str] = {
 # "No comprobado".
 ES: dict[str, str] = {
     "label.real": "Real",
+    "label.matched_home": "Vivienda de las fotos",
+    "place.matched_office": (
+        "No comprobado. La vivienda de estas fotos figura con esta oficina en el registro de "
+        "CoStar: {office}. No podemos decirle si se ofrece, ni a este precio."
+    ),
     "label.here_now": "Aquí ahora",
     "label.allowed": "Con permiso para alquilarlo",
     "label.payment_ask": "Pago que piden",
@@ -1042,6 +1058,10 @@ ES: dict[str, str] = {
     "tone.not_shown": "Sin confirmar",
     "tone.not_checked": "No comprobado",
     "state.hold": "Espere por ahora",
+    "state.hold_clean": (
+        "Todo lo que revisamos coincide con el registro. "
+        "Falta un paso antes de pagar: pídales que demuestren que están dentro."
+    ),
     "state.dont_pay": "No pague. Algo aquí no coincide.",
     "state.unverified": "No se pudieron ubicar estas fotos",
     "state.verified": "Las revisiones pasaron. Siga igual las dos reglas.",
