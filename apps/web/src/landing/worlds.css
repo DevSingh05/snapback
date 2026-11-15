@@ -1,4 +1,4 @@
-/* SNAPBACK Worlds, the front door at "/". Every colour is a token (tokens.css); Day only. Sharp corners, nothing boxed. */
+/* SNAPBACK Worlds, the front door at "/". Every colour is a token (tokens.css); Day only. One soft radius and a pill (tokens.css), nothing boxed. */
 
 .wl {
   background: var(--paper);
@@ -462,6 +462,87 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .wl-btn {
+    transition: none;
+  }
+}
+
+/* ---------- Soft pass: the same surfaces as inside the app ---------- */
+/* One radius for surfaces and photographs, a pill for every button, three soft shadow layers
+   in place of one heavy one, and one quiet pulse: the ring around the hero's way in. Motion
+   moves only transform and opacity, and rests under reduced motion. */
+.wl {
+  --wl-edge: color-mix(in srgb, var(--ink) 7%, transparent);
+  --wl-lift:
+    0 0 0 1px var(--wl-edge), 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent),
+    0 8px 18px -6px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 26px 52px -24px color-mix(in srgb, var(--ink) 20%, transparent);
+  --wl-glow: color-mix(in srgb, var(--act) 26%, transparent);
+  caret-color: var(--act);
+}
+.wl ::selection {
+  background: color-mix(in srgb, var(--act) 24%, transparent);
+}
+.wl-hero-card,
+.wl-card,
+.wl .ui-photo {
+  border-radius: var(--radius);
+}
+.wl-hero-card,
+.wl-card {
+  box-shadow: var(--wl-lift);
+}
+.wl-card,
+.wl .ui-photo {
+  overflow: hidden;
+}
+.wl a.wl-btn,
+.wl-nav a,
+.wl-theme,
+.wl-theme button {
+  border-radius: var(--radius-pill);
+}
+.wl a.wl-btn {
+  position: relative;
+  transition:
+    transform 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+.wl a.wl-btn:hover {
+  transform: translateY(-2px);
+  filter: none;
+  box-shadow: var(--wl-lift);
+}
+.wl a.wl-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+.wl-hero-card .wl-btn-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 6px var(--wl-glow);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wl-hero-card .wl-btn-main::after {
+    animation: wl-ring 3.2s var(--ease-out) 1.2s infinite;
+  }
+  @keyframes wl-ring {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.96);
+    }
+    55%,
+    100% {
+      opacity: 0;
+      transform: scale(1.12, 1.3);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wl a.wl-btn {
     transition: none;
   }
 }
