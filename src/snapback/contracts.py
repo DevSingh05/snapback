@@ -479,6 +479,9 @@ class CardLine(BaseModel):
     # card can hold lines from a real record beside stand-ins for the twin and the challenge.
     # None means "the same as the card".
     source: DataSource | None = None
+    # The label's table key ("label.payment_ask"), so a page can tell which check a line came
+    # from in any language. None on an older card.
+    key: str | None = None
 
 
 class CardRow(BaseModel):
@@ -731,7 +734,9 @@ class RealListing(BaseModel):
     provenance: str | None = None  # "N of M of the ad's photos are in CoStar's own scan..."
     phone_line: str | None = None
     cta_label: str | None = None  # "See the real listing"
-    cta_url: str | None = None  # the availability link, else https://<website_host>; with figures
+    cta_url: str | None = (
+        None  # the availability link, else https://<website_host>; shown with figures on or off
+    )
 
 
 class CopyAlert(BaseModel):

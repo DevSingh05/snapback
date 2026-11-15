@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adRentFrom,
   briefFromWords,
+  caseTopic,
   isFacebook,
   missingFor,
   rentFrom,
   route,
+  saferWords,
   switchOf,
   viewFrom,
   withoutFacebookLinks,
@@ -116,6 +119,29 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(at("what should I ask before paying?", { caseOnScreen: true })).toBe("ask");
   });
 
+  it("why, who do I call, what now and is it safe are about the case on screen, not the Finder", () => {
+    const on = (text: string) => route({ text, files: 0, caseOnScreen: true });
+    expect(on("why?")).toEqual({ kind: "ask", topic: "why" });
+    expect(on("Why is it a hold")).toEqual({ kind: "ask", topic: "why" });
+    expect(on("Who do I call?")).toEqual({ kind: "ask", topic: "who" });
+    expect(on("who should I report this to")).toEqual({ kind: "ask", topic: "who" });
+    expect(on("what now?")).toEqual({ kind: "ask", topic: "next" });
+    expect(on("What should I do")).toEqual({ kind: "ask", topic: "next" });
+    expect(on("is it safe?")).toEqual({ kind: "ask", topic: "safe" });
+    expect(on("Is this landlord real?")).toEqual({ kind: "ask", topic: "safe" });
+    expect(on("should I pay him?")).toEqual({ kind: "ask", topic: "safe" });
+    expect(on("what about the rent?")).toEqual({ kind: "ask", topic: "other" });
+    // Without a case on screen the same words are not about a case.
+    expect(at("why?")).toBe("unsure");
+    expect(at("Is this landlord real?")).toBe("check-ask");
+    // A wish still finds places, and a view command still opens the view.
+    expect(at("Find me safer places like this, 2 bed, under $1,350", { caseOnScreen: true })).toBe(
+      "find",
+    );
+    expect(at("Show me on the map", { caseOnScreen: true })).toBe("open");
+    expect(caseTopic("how do you know")).toBe("why");
+  });
+
   it("asking for a check with nothing to check asks for the ad", () => {
     expect(at("Check this ad I found")).toBe("check-ask");
     expect(at("Is this landlord real?")).toBe("check-ask");
@@ -139,10 +165,23 @@ describe("intent routing: code reads what the renter meant", () => {
     expect(at("what about this one?")).toBe("unsure");
   });
 
-  it("offers the other reading as a one-tap switch", () => {
-    expect(switchOf({ kind: "check" })).toEqual({ kind: "find" });
+  it("offers the other reading only for words that were read as a wish or a view", () => {
+    // A pasted ad is not offered back as "I'm looking for a place", and a follow-up about the
+    // case is not offered as an ad.
+    expect(switchOf({ kind: "check" })).toBeNull();
+    expect(switchOf({ kind: "ask", topic: "why" })).toBeNull();
     expect(switchOf({ kind: "find" })).toEqual({ kind: "check" });
     expect(switchOf({ kind: "unsure" })).toBeNull();
+  });
+
+  it("safer homes start from the ad's own beds and rent", () => {
+    expect(adRentFrom("send the $600 deposit now. 2 bed, $1,350/month")).toBe(1350);
+    expect(saferWords(AD)).toBe("Find me safer places like this, 2 bed, under $1,350");
+    expect(saferWords("studio, $900 a month")).toBe(
+      "Find me safer places like this, studio, under $900",
+    );
+    // Nothing to read: no filter is made up.
+    expect(saferWords("")).toBe("Find me safer places like this");
   });
 });
 

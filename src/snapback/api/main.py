@@ -10,6 +10,7 @@ Routes the web app and the iMessage sidecar call:
     GET  /cases/{case_id}/trace           the agent trace as server-sent events
     GET  /cases/{case_id}/notes           the agent's working notes (read-only)
     GET  /cases/{case_id}/timeline        what the agent did, step by step (?lang=en|es)
+    GET  /cases/{case_id}/timeline/stream the same, live (SSE), until the background agent is done
     POST /cases/{case_id}/challenge/approve   the renter's answer: send, edit or cancel
     POST /cases/{case_id}/reply           the poster's reply photo, checked (form: photo)
     GET  /eval/results.csv                the eval harness's results, for the Lab panel
@@ -33,6 +34,7 @@ import json
 import re
 import secrets
 from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -236,6 +238,37 @@ async def _event_stream(events: EventBus, after: int, follow: bool) -> AsyncIter
                 quiet = 0.0
 
 
+TIMELINE_POLL_SECONDS = 0.25
+TIMELINE_STREAM_MAX_SECONDS = 180.0
+
+
+async def _timeline_stream(case: RecordedCase | SessionCase, lang: str) -> AsyncIterator[str]:
+    """The case's timeline now, then again each time it changes, until the background agent has
+    finished (or the cap). `event: timeline`, `data` is a CaseTimeline. A case with no agent at
+    work gets its one snapshot and the stream ends."""
+    last = ""
+    quiet = 0.0
+    waited = 0.0
+    while True:
+        running = case.agent_running  # read first: a step written after this is caught next lap
+        evidence = case.evidence
+        snapshot = build_timeline(
+            case.case_id, evidence.source, case.events(), evidence, lang, running=running
+        ).model_dump_json()
+        if snapshot != last:
+            last = snapshot
+            quiet = 0.0
+            yield f"event: timeline\ndata: {snapshot}\n\n"
+        if not running or waited >= TIMELINE_STREAM_MAX_SECONDS:
+            return
+        await asyncio.sleep(TIMELINE_POLL_SECONDS)
+        waited += TIMELINE_POLL_SECONDS
+        quiet += TIMELINE_POLL_SECONDS
+        if quiet >= KEEP_ALIVE_SECONDS:
+            yield ": keep-alive\n\n"
+            quiet = 0.0
+
+
 async def _trace_stream(
     case: RecordedCase | SessionCase, after: int, pace: float
 ) -> AsyncIterator[str]:
@@ -293,7 +326,12 @@ def create_app(
     search_limit = PerMinuteLimit(SEARCH_PER_MINUTE)
     chooser = search_chooser or search_chooser_for(settings.snapback_agent)
 
-    app = FastAPI(title="SNAPBACK API", version="0.0.1")
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        store.shutdown_agents()  # queued background agent runs are dropped, none start late
+
+    app = FastAPI(title="SNAPBACK API", version="0.0.1", lifespan=lifespan)
     app.state.store = store
     # M3: one bus for the process, logged under the data folder (git-ignored, purged with it).
     events = EventBus(Path(settings.snapback_data_dir) / "events" / "log.jsonl")
@@ -1076,7 +1114,31 @@ def create_app(
         check_read(case, _bearer(authorization, x_case_token))
         response.headers.update(NO_STORE)
         evidence = case.evidence
-        return build_timeline(case.case_id, evidence.source, case.events(), evidence, lang)
+        return build_timeline(
+            case.case_id, evidence.source, case.events(), evidence, lang, running=case.agent_running
+        )
+
+    @app.get("/cases/{case_id}/timeline/stream")
+    def get_timeline_stream(
+        case_id: str,
+        request: Request,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        """The timeline as server-sent events while the deep agent works the case in the
+        background: `event: timeline`, `data` is a CaseTimeline, sent whenever a step lands, and
+        the stream ends once the agent has finished (its last event has `running: false`).
+        Read token in `Authorization: Bearer` or `X-Case-Token`, never in the address (401).
+        A browser reads it with `fetch`, not EventSource, which cannot send a header."""
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        return StreamingResponse(
+            _timeline_stream(case, lang),
+            media_type="text/event-stream",
+            headers={**NO_STORE, "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/search")
     def post_search(
