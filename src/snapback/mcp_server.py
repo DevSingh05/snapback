@@ -283,26 +283,32 @@ class Snapback:
         except SnapbackError:
             return None
 
-    def proof_of(self, cid: str, card: dict[str, Any]) -> dict[str, Any]:
+    def proof_of(self, cid: str, card: dict[str, Any], status: str) -> dict[str, Any]:
         """The card's own summary, checks_out and does_not, and the real-listing hand-off link,
-        all as the API words them. Absent fields stay empty; nothing is made up here."""
+        as the API words them. All None until the case is done. On a LIVE case the real-listing
+        panel carries CoStar record figures, which never leave SNAPBACK for an outside model
+        (decisions.md, AGENTS.md rule 4): only the photo count is passed on."""
+        if status != "done":
+            return dict.fromkeys(("headline", "summary", "checks_out", "does_not", "real_listing"))
         real = self.optional("real-listing", cid) or {}
-        link = real.get("cta_url")
+        live = label(card.get("source")) == "LIVE"
+        if live:
+            real_listing = {"provenance": real["provenance"]} if real.get("provenance") else None
+        elif real.get("cta_url"):
+            real_listing = {
+                "headline": real.get("headline"),
+                "provenance": real.get("provenance"),
+                "link_label": real.get("cta_label"),
+                "link": real["cta_url"],
+            }
+        else:
+            real_listing = None
         return {
             "headline": card.get("headline"),
             "summary": card.get("summary", []),
             "checks_out": card.get("checks_out", []),
             "does_not": card.get("does_not", []),
-            "real_listing": (
-                {
-                    "headline": real.get("headline"),
-                    "provenance": real.get("provenance"),
-                    "link_label": real.get("cta_label"),
-                    "link": link,
-                }
-                if link
-                else None
-            ),
+            "real_listing": real_listing,
         }
 
     # --- tools --------------------------------------------------------------------------------
@@ -349,7 +355,7 @@ class Snapback:
             card = self.call("GET", f"/cases/{quote(case_id, safe='')}/card")
         except SnapbackError:
             card = None  # the card is not ready yet; snapback_get_verdict will have it
-        proof = self.proof_of(case_id, card) if card else {}
+        proof = self.proof_of(case_id, card, status) if card else {}
         return {
             **proof,
             "case_id": case_id,
@@ -388,7 +394,7 @@ class Snapback:
         state = card.get("state", "")
         status = progress.get("status", "done")
         return {
-            **self.proof_of(cid, card),
+            **self.proof_of(cid, card, status),
             "case_id": card.get("case_id", case_id),
             "source": card_source,
             "verdict": card.get("headline") or strings.text(f"state.{state}"),
@@ -524,6 +530,8 @@ class Snapback:
         if not cid:
             raise SnapbackError("Give the case id that snapback_check_listing returned.")
         card = self.call("GET", f"/cases/{quote(cid, safe='')}/card")
+        status = self.call("GET", f"/cases/{quote(cid, safe='')}").get("status", "done")
+        proof = self.proof_of(cid, card, status)
         timeline = self.optional("timeline", cid)  # None on an API without it (404)
         if isinstance(timeline, dict):
             timeline = timeline.get("steps") or timeline.get("events")
@@ -532,9 +540,8 @@ class Snapback:
             steps = [
                 item
                 if isinstance(item, str)
-                else next(
-                    (str(item[k]) for k in ("text", "summary", "label", "title") if item.get(k)),
-                    "",
+                else " - ".join(
+                    str(item[k]) for k in ("label", "text", "summary", "result") if item.get(k)
                 )
                 for item in timeline
                 if isinstance(item, str | dict)
@@ -544,9 +551,10 @@ class Snapback:
             "source": label(card.get("source")),
             "verdict": card.get("headline") or strings.text(f"state.{card.get('state', '')}"),
             "verdict_set_by": "code (snapback.verdict.decide), never a language model",
-            "reasons": card.get("summary", []),
-            "does_not_check_out": card.get("does_not", []),
-            "checks_out": card.get("checks_out", []),
+            "status": status,
+            "reasons": proof["summary"],
+            "does_not_check_out": proof["does_not"],
+            "checks_out": proof["checks_out"],
             "steps": steps,
             "steps_note": None if steps is not None else "This API has no step list for a case.",
         }
@@ -557,6 +565,7 @@ class Snapback:
             raise SnapbackError("Give the case id that snapback_check_listing returned.")
         card = self.call("GET", f"/cases/{quote(cid, safe='')}/card")
         office = self.optional("office", cid)
+        status = self.call("GET", f"/cases/{quote(cid, safe='')}").get("status", "done")
         state = card.get("state", "")
         return {
             "case_id": card.get("case_id", cid),
@@ -567,7 +576,9 @@ class Snapback:
             "not_checked": card.get("not_checked", []),
             "office_on_record": (office or {}).get("guidance"),
             "office_domain": (office or {}).get("domain"),
-            "real_listing_link": (self.proof_of(cid, card)["real_listing"] or {}).get("link"),
+            "real_listing_link": (self.proof_of(cid, card, status)["real_listing"] or {}).get(
+                "link"
+            ),
         }
 
     def walk_summary(self, case_id: str) -> dict[str, Any]:

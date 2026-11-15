@@ -128,9 +128,10 @@ moment an ad shows up that did not come from the site. Run it with the fixture A
 3. **It answers in the verdict's own words.** Ask "why?" and it calls `snapback_why`; ask "what
    do I do?" and it calls `snapback_what_to_do`. It never calls the poster a scammer: it says
    what does not match and that the renter should not pay.
-4. **It links the real listing.** When the photos sit in a building SNAPBACK has a record for,
-   the result carries `real_listing.link`, the building's own listing, so the renter goes back
-   to the real one instead of paying the copy.
+4. **It links the real listing.** On a fixture case, when the photos sit in a building SNAPBACK
+   has a record for, the result carries `real_listing.link`, the building's own listing, so the renter goes back
+   to the real one instead of paying the copy. On a LIVE case no record figures or record links go to the
+   assistant (CoStar data rules): it gets only how many of the ad's photos are in the scan.
 
 ## Example conversation
 
