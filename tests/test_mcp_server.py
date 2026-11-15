@@ -48,6 +48,12 @@ CARD = {
             ],
         },
     ],
+    "summary": [
+        "Photo 1 was taken in a different building.",
+        "It asks for Zelle before a viewing.",
+    ],
+    "checks_out": ["Rent: close to the record."],
+    "does_not": ["Here now: Photo 1 was taken elsewhere."],
     "not_checked": ["ID", "lease", "ownership"],
     "footer": ["Two rules: never pay before a signed lease and a viewing."],
     "verify_url": "http://localhost:5173/c/7Q2M",
@@ -120,12 +126,55 @@ PICK = {
 }
 
 
+REAL = {
+    "headline": "The record lists a 1 bed at $1,450 a month; the ad says $1,350.",
+    "provenance": "1 of 1 photos are in the scan.",
+    "cta_label": "See the real listing",
+    "cta_url": "https://example-apts.test",
+}
+
+
+TIMELINE = {
+    "case_id": "7Q2M",
+    "source": "fixture",
+    "mode": "policy",
+    "fell_back": False,
+    "steps": [
+        {
+            "step": 0,
+            "label": "Read the ad",
+            "started_ms": 0,
+            "took_ms": 120,
+            "result": "1 photo, 1 claim",
+            "source": "fixture",
+            "by": "code",
+        },
+        {
+            "step": 1,
+            "label": "Placed the photos",
+            "started_ms": 120,
+            "took_ms": 0,
+            "result": "photo 1 is in another building",
+            "source": "fixture",
+            "by": "agent",
+        },
+    ],
+    "todos": [],
+    "plan": [],
+}
+
+
 class FakeApi:
     """SNAPBACK's routes, as far as the MCP server uses them. Records every request."""
 
     def __init__(self) -> None:
         self.seen: list[httpx.Request] = []
         self.finder = True
+        self.real = True
+        self.timeline = False
+        self.live = False
+        self.post_status = "waiting_for_approval"
+        self.status = "done"
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.seen.append(request)
@@ -141,7 +190,7 @@ class FakeApi:
                     "source": "fixture",
                     "token": WRITE,
                     "read_token": READ,
-                    "status": "waiting_for_approval",
+                    "status": self.post_status,
                     "state": None,
                     "challenge_text": "Please hold up a paper with 4821.",
                     "photos": 1,
@@ -154,10 +203,24 @@ class FakeApi:
                 return httpx.Response(403, json={"detail": "That token cannot write to this case."})
             return httpx.Response(200, json={"max_rent": json.loads(request.content)["max_rent"]})
         if method == "GET" and path == "/cases/7Q2M/card":
-            return httpx.Response(200, json=CARD)
+            return httpx.Response(200, json={**CARD, "source": "live"} if self.live else CARD)
         if method == "GET" and path == "/cases/7Q2M":
             return httpx.Response(
-                200, json={"case_id": "7Q2M", "source": "fixture", "status": "done"}
+                200, json={"case_id": "7Q2M", "source": "fixture", "status": self.status}
+            )
+        if method == "GET" and path == "/cases/7Q2M/real-listing" and self.real:
+            if auth != f"Bearer {READ}":
+                return httpx.Response(401, json={"detail": "This needs the case's read token."})
+            return httpx.Response(200, json=REAL)
+        if method == "GET" and path == "/cases/7Q2M/timeline" and self.timeline:
+            if auth != f"Bearer {READ}":
+                return httpx.Response(401, json={"detail": "This needs the case's read token."})
+            return httpx.Response(200, json=TIMELINE)
+        if method == "GET" and path == "/cases/7Q2M/office":
+            if auth != f"Bearer {READ}":
+                return httpx.Response(401, json={"detail": "This needs the case's read token."})
+            return httpx.Response(
+                200, json={"domain": "example-apts.test", "guidance": "Call the office yourself."}
             )
         if method == "GET" and path == "/cases/NOPE/card":
             return httpx.Response(404, json={"detail": "No case with that id."})
@@ -279,6 +342,8 @@ def test_tool_list_and_schemas(app: Snapback) -> None:
         "snapback_accept_preference",
         "snapback_walk_summary",
         "snapback_draft_tour_request",
+        "snapback_why",
+        "snapback_what_to_do",
     }
     schema = {name: tool.input_schema for name, tool in tools.items()}
     check = schema["snapback_check_listing"]
@@ -380,6 +445,111 @@ def test_get_verdict_returns_the_card_lines(app: Snapback) -> None:
     assert out["not_checked"] == ["ID", "lease", "ownership"]
     assert out["next_action"].startswith("Do not send money")
     assert "scam" not in json.dumps(out).lower()
+
+
+def test_check_listing_returns_the_proof_and_the_real_listing_link(
+    app: Snapback, api: FakeApi
+) -> None:
+    api.post_status = "done"
+    [result] = call(app, ("snapback_check_listing", {"ad_text": "1 bed, Zelle today"}))
+    out = body(result)
+    assert out["case_id"] == "7Q2M"
+    assert out["summary"][0] == "Photo 1 was taken in a different building."
+    assert out["checks_out"] == ["Rent: close to the record."]
+    assert out["does_not"] == ["Here now: Photo 1 was taken elsewhere."]
+    assert out["real_listing"]["link"] == "https://example-apts.test"
+    assert out["source"] == "FIXTURE"
+    no_secret(result)
+
+
+def test_no_real_listing_link_when_the_api_has_none(app: Snapback, api: FakeApi) -> None:
+    api.real = False
+    api.post_status = "done"
+    [result] = call(app, ("snapback_check_listing", {"ad_text": "1 bed, Zelle today"}))
+    assert body(result)["real_listing"] is None
+
+
+def test_why_gives_reasons_and_steps_when_the_api_has_them(app: Snapback, api: FakeApi) -> None:
+    api.timeline = True
+    [made, result] = call(
+        app,
+        ("snapback_check_listing", {"ad_text": "1 bed"}),
+        ("snapback_why", {"case_id": "7Q2M"}),
+    )
+    out = body(result)
+    assert out["reasons"] == CARD["summary"]
+    assert out["steps"] == [
+        "Read the ad - 1 photo, 1 claim",
+        "Placed the photos - photo 1 is in another building",
+    ]
+    assert any(
+        r.url.path == "/cases/7Q2M/timeline" and r.headers["authorization"] == f"Bearer {READ}"
+        for r in api.seen
+    )
+    assert out["verdict_set_by"].startswith("code")
+    no_secret(result)
+
+
+def test_why_survives_a_missing_timeline(app: Snapback) -> None:
+    [result] = call(app, ("snapback_why", {"case_id": "7Q2M"}))
+    out = body(result)
+    assert out["steps"] is None
+    assert out["steps_note"]
+    assert out["reasons"] == CARD["summary"]
+
+
+def test_what_to_do_relays_the_apis_words(app: Snapback) -> None:
+    [_, result] = call(
+        app,
+        ("snapback_check_listing", {"ad_text": "1 bed"}),
+        ("snapback_what_to_do", {"case_id": "7Q2M"}),
+    )
+    out = body(result)
+    assert out["next_steps"] == CARD["footer"]
+    assert out["office_on_record"] == "Call the office yourself."
+    assert out["real_listing_link"] == "https://example-apts.test"
+    assert out["next_action"].startswith("Do not send money")
+    no_secret(result)
+
+
+def test_what_to_do_for_a_case_this_server_did_not_start(app: Snapback) -> None:
+    [result] = call(app, ("snapback_what_to_do", {"case_id": "7Q2M"}))
+    out = body(result)
+    assert out["office_on_record"] is None  # no token held, so no office read
+    assert out["next_steps"] == CARD["footer"]
+
+
+def test_a_live_case_passes_no_record_figures_and_no_link(app: Snapback, api: FakeApi) -> None:
+    api.live = True
+    api.post_status = "done"
+    [made, verdict] = call(
+        app,
+        ("snapback_check_listing", {"ad_text": "1 bed"}),
+        ("snapback_get_verdict", {"case_id": "7Q2M"}),
+    )
+    for result in (made, verdict):
+        out = body(result)
+        assert out["real_listing"] == {"provenance": REAL["provenance"]}
+        dumped = text_of(result)
+        assert "$1,450" not in dumped
+        assert "example-apts.test" not in dumped
+    [again] = call(app, ("snapback_what_to_do", {"case_id": "7Q2M"}))
+    assert body(again)["real_listing_link"] is None
+
+
+def test_proof_fields_wait_until_the_case_is_done(app: Snapback, api: FakeApi) -> None:
+    api.status = "waiting_for_approval"
+    [result] = call(app, ("snapback_get_verdict", {"case_id": "7Q2M"}))
+    out = body(result)
+    assert out["summary"] is None and out["real_listing"] is None
+    assert out["checks_out"] is None and out["does_not"] is None
+
+
+def test_why_and_what_to_do_say_plain_errors(app: Snapback) -> None:
+    for name in ("snapback_why", "snapback_what_to_do"):
+        [result] = call(app, (name, {"case_id": "NOPE"}))
+        assert result.is_error
+        assert text_of(result) == "No case with that id."
 
 
 # --- find_places and accept_preference ----------------------------------------------------------

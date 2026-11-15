@@ -86,6 +86,8 @@ your own machine, never as a shared or public service.
 | ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `snapback_check_listing`      | `ad_text`, `photo_urls` = [], `max_rent` = null | Starts a check. The case id, LIVE or FIXTURE, the status, the verdict once known, a link to the result page.           |
 | `snapback_get_verdict`        | `case_id`                                       | The card: the verdict words, every check line with its status and LIVE or FIXTURE, what is not checked, one next step. |
+| `snapback_why`                | `case_id`                                       | The reasons in the API's words, what checks out, what does not, and the check's steps when the API lists them.         |
+| `snapback_what_to_do`         | `case_id`                                       | The next steps as the API words them, what is not checked, the office on record, the real-listing link.                |
 | `snapback_find_places`        | `brief`                                         | The Finder's reply, its picks (each with a Walk it first link) and any proposal that needs the renter's yes.           |
 | `snapback_accept_preference`  | `proposal_id`, `yes` (a real boolean)           | The renter's yes or no on a Finder proposal. Only after the renter has answered.                                       |
 | `snapback_walk_summary`       | `case_id`                                       | The walk's rooms, which ad photo landed in which room, the coverage line, a link to Walk it first.                     |
@@ -112,6 +114,24 @@ What every tool keeps to:
   capped at 10 MB; 10 photos at most.
 - **The renter decides.** A Finder proposal changes nothing until `snapback_accept_preference`
   carries the renter's own yes. A tour request is a draft the renter sends, or not.
+
+## Demo script: an assistant checks an ad (CoStar story)
+
+The story: a renter's assistant, such as one built into a listing site, can call this check the
+moment an ad shows up that did not come from the site. Run it with the fixture API
+(`SNAPBACK_DATA_SOURCE=fixture make api`) and the Claude Desktop or Claude Code setup above.
+
+1. **Paste an ad** into the assistant, for example "1 bed near Montrose, $1,350, owner is
+   overseas, Zelle deposit today. Is this real?"
+2. **The assistant calls `snapback_check_listing`** with the ad text. It gets the case id, LIVE or
+   FIXTURE, what checks out and what does not, and the verdict as code set it.
+3. **It answers in the verdict's own words.** Ask "why?" and it calls `snapback_why`; ask "what
+   do I do?" and it calls `snapback_what_to_do`. It never calls the poster a scammer: it says
+   what does not match and that the renter should not pay.
+4. **It links the real listing.** On a fixture case, when the photos sit in a building SNAPBACK
+   has a record for, the result carries `real_listing.link`, the building's own listing, so the renter goes back
+   to the real one instead of paying the copy. On a LIVE case no record figures or record links go to the
+   assistant (CoStar data rules): it gets only how many of the ad's photos are in the scan.
 
 ## Example conversation
 
