@@ -15,7 +15,7 @@ record. Code sets every verdict. SNAPBACK never pays, books or sends anything fo
 [Measured](#measured) · [Quickstart](#quickstart) · [Data and privacy](#data-and-privacy) ·
 [Team](#team)
 
-<!-- PENDING #314: /under-the-hood, one panel per technology with its measured numbers and a Show me link -->
+The app also has an Under the hood page (`/under-the-hood`): one panel per technology with its measured numbers and a Show me link.
 
 ## Why
 
@@ -108,7 +108,9 @@ flowchart TD
    each check family to its own sub-agent, and each sub-agent has one read-only tool and writes its
    findings as notes in the agent file system. It explains the case and never moves it. The report
    never waits on it, and a hard time limit stops it.
-   <!-- PENDING #316: the Planner's plan per ad, re-planned follow-ups for the card's gaps (up to 2 from a fixed menu), and one drafted next step -->
+   For each ad the Planner also picks up to 2 follow-up checks for the card's open gaps from a fixed
+   menu, and drafts one next step for the renter. It never sends that step, and the verdict code
+   never reads these picks.
 5. **The report.** The web report shows the verdict, the sourced lines, the ad beside the real
    listing and a check team you can watch work beside the 3D scan. A readable trace shows each
    member's model, tools, findings and time, and links out to the LangSmith run.
@@ -133,7 +135,7 @@ sentence, photo ids and a score. The investigator view at `/investigate` plays a
 by day, shows each ring forming and its time to detect, and exports a case file per group. It runs
 on synthetic data only.
 
-<!-- PENDING #313: the ring case file and a detector-grounded case study -->
+Each flagged ring opens a case file with a detector-grounded case study, so an investigator sees which phones, photos and wording tie the ads together.
 
 | Path                         | What it is                                                                        |
 | ---------------------------- | --------------------------------------------------------------------------------- |
@@ -153,26 +155,26 @@ on synthetic data only.
 Every number comes from merged code and its eval files. LIVE means real CoStar kit data or real
 photos. FIXTURE means team-made data through the real pipeline. SYNTHETIC means generated data.
 
-| What                                                                                                             | Result                                                                                                                                            | n                                  | Label     |
-| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------- |
-| Real listing photos placed in the right home (`eval/locate_real.csv`, #242; re-measured after #296, same counts) | 43 of 48 right home, 0 of 48 in a wrong home                                                                                                      | 48 photos                          | LIVE      |
-| Decoy photos placed in the claimed building                                                                      | 0 of 30                                                                                                                                           | 30 decoys                          | LIVE      |
-| Tamper test: a real listing with its phone changed, "Zelle before the tour" added, or a lookalike link           | Each change caught 6 of 6 on real photos and 2 of 2 on scan renders                                                                               | 6 photos and 2 renders, per change | LIVE      |
-| Batch run: composed ads and labelled messages through the real pipeline (`eval/ads_results.csv`, #262)           | 117 of 123 handled as expected, including 43 of 43 clean messages left alone                                                                      | 123                                | FIXTURE   |
-| Deep agent in the background (#273, real model runs)                                                             | Report returns in 0.03 to 0.09 s without waiting; agent done in a median 22.9 s, no fallbacks                                                     | 6 cases, 5 timed runs              | FIXTURE   |
-| Ring finder over a 90-day stream of 3,039 ads with 10 seeded rings (#293)                                        | 10 of 10 rings flagged, median 3 days after a ring's first ad; 0 of 2,684 honest ads flagged                                                      | 10 rings, 2,684 honest ads         | SYNTHETIC |
-| Ring finder on a 301-ad corpus with 4 seeded rings                                                               | 4 of 4 rings, 0 of 244 honest ads flagged; a keyword search found 0 of 4                                                                          | 301 ads                            | SYNTHETIC |
-| Vexcel aerial matcher, including next-door buildings (`eval/vexcel/results.json`, #308)                          | 17 of 28 against a bar of 18 of 20: it told every next-door and wrong building apart (16 of 16) but recognised the right building in only 1 of 12 | 28 cases                           | LIVE      |
+| What                                                                                                             | Result                                                                                                                                                                                       | n                                  | Label     |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------- |
+| Real listing photos placed in the right home (`eval/locate_real.csv`, #242; re-measured after #296, same counts) | 43 of 48 right home, 0 of 48 in a wrong home                                                                                                                                                 | 48 photos                          | LIVE      |
+| Decoy photos placed in the claimed building                                                                      | 0 of 30                                                                                                                                                                                      | 30 decoys                          | LIVE      |
+| Tamper test: a real listing with its phone changed, "Zelle before the tour" added, or a lookalike link           | Each change caught 6 of 6 on real photos and 2 of 2 on scan renders                                                                                                                          | 6 photos and 2 renders, per change | LIVE      |
+| Batch run: composed ads and labelled messages through the real pipeline (`eval/ads_results.csv`, #262)           | 117 of 123 handled as expected, including 43 of 43 clean messages left alone                                                                                                                 | 123                                | FIXTURE   |
+| Deep agent in the background (#273, real model runs)                                                             | Report returns in 0.03 to 0.09 s without waiting; agent done in a median 22.9 s, no fallbacks                                                                                                | 6 cases, 5 timed runs              | FIXTURE   |
+| Ring finder over a 90-day stream of 3,039 ads with 10 seeded rings (#293)                                        | 10 of 10 rings flagged, median 3 days after a ring's first ad; 0 of 2,684 honest ads flagged                                                                                                 | 10 rings, 2,684 honest ads         | SYNTHETIC |
+| Ring finder on a 301-ad corpus with 4 seeded rings                                                               | 4 of 4 rings, 0 of 244 honest ads flagged; a keyword search found 0 of 4                                                                                                                     | 301 ads                            | SYNTHETIC |
+| Vexcel aerial matcher v2, SIFT with RANSAC (`eval/vexcel/results.json`)                                          | 52 of 54 placed right (right building 23 of 24, next-door 17 of 18, other wrong 12 of 12). Held-out half, with thresholds tuned on the other half: right building 11 of 12, next-door 8 of 9 | 54 cases                           | LIVE      |
 
-<!-- PENDING #312: | Ring finder on reworded ads, with the phone and photo-link fallback on | 9 of 10 rings; 0 of 2,684 honest ads flagged | 10 rings | SYNTHETIC | -->
+| Ring finder on reworded ads, phone and photo-link fallback on (#312) | 9 of 10 rings flagged; 0 of 2,684 honest ads flagged; a keyword baseline found 0 of 10; only 171 of 355 ring ads (48%) caught once reworded | 10 rings, 2,684 honest ads | SYNTHETIC |
 
 **What the numbers mean, and where they stop.**
 
-- **Aerials are evidence only.** The Vexcel matcher compares perceptual hashes, and a shifted view
-  of the same building looks like the building next door. It missed the bar, so the aerial stays a
-  picture on the place sheet and the switch that would let it hold a payment stays off. Matching
-  building footprints is next.
-  <!-- PENDING Vexcel v2: footprint matching result -->
+- **Aerials are evidence only.** The first matcher (v1, perceptual hashes) scored 17 of 28 because a
+  shifted view of the same building looked like the building next door. The v2 matcher fixes most
+  of that, but one held-out next-door building would still pass, so the aerial is shown on the
+  place sheet as evidence and is not in the verdict. The switch stays off. Matching building
+  footprints is next.
 - **Right home, not right room.** Photo placement is scored by home. The room is not measured, and
   we don't claim it.
 - **Mirrored photos mostly stop matching** (4 of 18 placed, LIVE). They were never placed in a
