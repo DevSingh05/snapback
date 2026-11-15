@@ -3,14 +3,20 @@
   "census": {
     "14 example lane, houston, tx 77096": {
       "result": {
-        "input": {"address": {"address": "14 Example Lane, Houston, TX 77096"}},
+        "input": { "address": { "address": "14 Example Lane, Houston, TX 77096" } },
         "addressMatches": [
           {
             "matchedAddress": "14 EXAMPLE LN, HOUSTON, TX, 77096",
-            "addressComponents": {"zip": "77096", "city": "HOUSTON", "state": "TX"},
+            "addressComponents": { "zip": "77096", "city": "HOUSTON", "state": "TX" },
             "geographies": {
               "Counties": [
-                {"GEOID": "48201", "STATE": "48", "COUNTY": "201", "BASENAME": "Harris", "NAME": "Harris County"}
+                {
+                  "GEOID": "48201",
+                  "STATE": "48",
+                  "COUNTY": "201",
+                  "BASENAME": "Harris",
+                  "NAME": "Harris County"
+                }
               ]
             }
           }
@@ -18,21 +24,24 @@
       }
     },
     "9 nowhere court, houston, tx 77096": {
-      "result": {"input": {"address": {"address": "9 Nowhere Court, Houston, TX 77096"}}, "addressMatches": []}
+      "result": {
+        "input": { "address": { "address": "9 Nowhere Court, Houston, TX 77096" } },
+        "addressMatches": []
+      }
     }
   },
   "rdap": {
     "new-lease-portal.example": {
       "ldhName": "NEW-LEASE-PORTAL.EXAMPLE",
       "events": [
-        {"eventAction": "registration", "eventDate": "2026-11-09T04:00:00Z"},
-        {"eventAction": "last changed", "eventDate": "2026-11-10T04:00:00Z"}
+        { "eventAction": "registration", "eventDate": "2026-11-09T04:00:00Z" },
+        { "eventAction": "last changed", "eventDate": "2026-11-10T04:00:00Z" }
       ]
     },
     "old-property-co.example": {
       "ldhName": "OLD-PROPERTY-CO.EXAMPLE",
-      "events": [{"eventAction": "registration", "eventDate": "2009-03-02T05:00:00Z"}]
+      "events": [{ "eventAction": "registration", "eventDate": "2009-03-02T05:00:00Z" }]
     },
-    "no-date.example": {"ldhName": "NO-DATE.EXAMPLE", "events": []}
+    "no-date.example": { "ldhName": "NO-DATE.EXAMPLE", "events": [] }
   }
 }
