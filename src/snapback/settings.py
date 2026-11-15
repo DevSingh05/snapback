@@ -117,6 +117,25 @@ class Settings(BaseSettings):
     # Sponsor credentials. SecretStr keeps them out of logs and reprs.
     matterport_api_key: SecretStr | None = None
     matterport_api_token: SecretStr | None = None
+    # W1 web sub-agent (#8, Vidyut 20:10). A missing key means "not checked", never a failure.
+    brightdata_api_token: SecretStr | None = None
+    apify_token: SecretStr | None = None
+    browser_use_api_key: SecretStr | None = None
+    # Bright Data zone names (not secret): one Web Unlocker zone and one SERP API zone.
+    brightdata_unlocker_zone: str = "snapback_unlocker"
+    brightdata_serp_zone: str = "snapback_serp"
+    # Apify actors for the same home posted elsewhere, as "owner~name". None turns one off.
+    apify_zillow_actor: str | None = "maxcopell~zillow-scraper"
+    apify_craigslist_actor: str | None = None
+    # The three checks share one limit; past it a check reads "timed out" and the case goes on.
+    snapback_web_limit_s: float = 20.0  # Apify's search measured 8.9 to 14.2 s (n=3, LIVE)
+    # Browser Use spend cap per link check, in dollars (the account has little credit).
+    browser_use_max_cost_usd: float = 0.10
+    # At most this many cases start web checks in any rolling hour (each case starts them once).
+    snapback_web_max_per_hour: int = 30
+    # Without Bright Data zones, read the building's own site with a plain direct fetch (free).
+    # Off by default so a case with no keys makes no call; the demo laptop turns it on.
+    snapback_web_direct_fetch: bool = False
     vexcel_api_key: SecretStr | None = None
     costar_zip_password: SecretStr | None = None
     costar_kit_url: str | None = None

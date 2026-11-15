@@ -212,3 +212,63 @@ def test_a_slow_model_call_is_cut_off_at_the_time_limit_and_cannot_touch_the_cas
     time.sleep(2.0)  # the abandoned call returns a tool call; it must not land
     assert len(case.trace.events) == seen
     assert not any(e.chosen_by == "model" for e in case.trace.events)
+
+
+def test_after_the_time_limit_the_agent_makes_no_more_model_calls():
+    """The gate keeps a late answer off the case, but the worker must stop too: an agent left
+    looping in the background keeps paying for model calls until its recursion limit."""
+    import time
+
+    class Endless(ScriptedChat):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            time.sleep(0.1)
+            self.calls.append(1)
+            plan = [{"content": f"step {len(self.calls)}", "status": "in_progress"}]
+            return ChatResult(generations=[ChatGeneration(message=call("write_todos", todos=plan))])
+
+    case = new_case()
+    model = Endless(turns=[AIMessage(content="unused")], calls=[])
+    run_case_with_agent(case, build_agent(case, model), lambda d: "send", deadline_s=0.35)
+    time.sleep(0.3)  # let a call that was in flight at the limit finish
+    settled = len(model.calls)
+    time.sleep(1.0)  # ten more calls' worth of time
+    assert len(model.calls) == settled, (settled, len(model.calls))
+
+
+def test_a_sub_agent_already_running_stops_calling_the_model_after_the_limit():
+    """A sub-agent works inside one `task` step, so the outer stream never sees a step between
+    its calls. The stop guard in the run config reaches it: no model call after the limit, and
+    the worker thread ends instead of looping in the background."""
+    import threading
+    import time
+
+    from langchain_core.messages import HumanMessage
+
+    class Looping(ScriptedChat):
+        sub_calls: list[int] = []
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            time.sleep(0.05)
+            if any(isinstance(m, HumanMessage) and m.content == "loop forever" for m in messages):
+                self.sub_calls.append(1)  # the sub-agent: reads its facts again, forever
+                msg = call("read_owner_facts")
+            else:  # the main agent: hand the work to the owner sub-agent
+                msg = call("task", description="loop forever", subagent_type="owner")
+            return ChatResult(generations=[ChatGeneration(message=msg)])
+
+    case = new_case()
+    model = Looping(turns=[AIMessage(content="unused")], calls=[], sub_calls=[])
+    run_case_with_agent(case, build_agent(case, model), lambda d: "send", deadline_s=0.4)
+    assert model.sub_calls, "the sub-agent never ran, so this test checks nothing"
+    time.sleep(0.3)  # let a call that was in flight at the limit finish
+    settled = len(model.sub_calls)
+    time.sleep(1.0)  # about twenty more calls' worth of time
+    assert len(model.sub_calls) == settled, (settled, len(model.sub_calls))
+    end = time.monotonic() + 3
+    while time.monotonic() < end and any(
+        t.name == f"agent-{case.case_id}" and t.is_alive() for t in threading.enumerate()
+    ):
+        time.sleep(0.05)
+    assert not any(
+        t.name == f"agent-{case.case_id}" and t.is_alive() for t in threading.enumerate()
+    )

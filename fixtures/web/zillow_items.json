@@ -1,0 +1,27 @@
+[
+  {
+    "zpid": "s1",
+    "propertyUrl": "https://rentals.example/a1",
+    "phone": "713-555-0142",
+    "units": [{ "beds": "2", "price": "$1,500", "roomForRent": false }]
+  },
+  {
+    "zpid": "s2",
+    "propertyUrl": "https://rentals.example/a2",
+    "phone": "(713) 555-0177",
+    "units": [
+      { "beds": "2", "price": "$1,725+", "roomForRent": false },
+      { "beds": "1", "price": "$990", "roomForRent": false }
+    ]
+  },
+  {
+    "zpid": "s3",
+    "propertyUrl": "https://rentals.example/a3",
+    "units": [{ "beds": "2", "price": "$650", "roomForRent": true }]
+  },
+  {
+    "zpid": "s1",
+    "propertyUrl": "https://rentals.example/a1",
+    "units": [{ "beds": "2", "price": "$1,500", "roomForRent": false }]
+  }
+]
