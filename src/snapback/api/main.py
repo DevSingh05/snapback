@@ -757,6 +757,39 @@ def create_app(
             headers=NO_STORE,
         )
 
+    @app.get("/cases/{case_id}/evidence-image")
+    def get_evidence_composite(
+        case_id: str,
+        request: Request,
+        photo: Annotated[int, Query(ge=1, le=100)] = 1,
+        lang: Language = "en",
+        authorization: Annotated[str | None, Header()] = None,
+        x_case_token: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        """J1 (#10): the ad photo beside the scan view it matched, the matched points joined, and
+        a caption from code. 404 when that photo was not placed. Read token in a header only;
+        drawn on the fly from the session's bytes, never a file."""
+        from snapback.vision.evidence_image import PLACED, caption, render
+
+        case = find(case_id)
+        no_token_in_the_address(request)
+        check_read(case, _bearer(authorization, x_case_token))
+        files = case_files(case, case_id)
+        evidence = files.evidence if files is not None else None
+        if evidence is None or photo > len(evidence.photos):
+            raise HTTPException(status_code=404, detail="No such photo in this case.")
+        entry = evidence.photos[photo - 1]
+        ad, scan = files.image(entry.alias, "photo"), files.image(entry.alias, "scan")
+        if entry.status not in PLACED or ad is None or scan is None:
+            raise HTTPException(status_code=404, detail="That photo was not placed.")
+        matched = entry.points.n_total if entry.points else entry.inliers
+        line = caption(entry.alias, entry.status, matched, entry.flipped, evidence.source, lang)
+        return Response(
+            content=render(ad, scan, entry.points, line),
+            media_type="image/png",
+            headers={**NO_STORE, "X-Content-Type-Options": "nosniff"},
+        )
+
     @app.get("/cases/{case_id}/evidence/{alias}/{kind}.jpg")
     def get_evidence_image(
         case_id: str,

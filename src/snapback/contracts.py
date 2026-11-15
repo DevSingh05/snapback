@@ -50,6 +50,9 @@ class PhotoLocation(BaseModel):
     bar_failed: Literal["inliers", "ratio", "spread", "ambiguity"] | None = None
     # Placed only after flipping the photo left to right: the ad's copy was mirrored (#10, V1).
     flipped: bool | None = None
+    # Which cube face of the matched scan point verified it (1 front, 2 right, 3 back, 4 left):
+    # the evidence image draws that view (J1, #10).
+    scan_face: int | None = None
 
 
 class AuthorityStatus(StrEnum):

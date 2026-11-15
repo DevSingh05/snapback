@@ -485,6 +485,28 @@ class JoinedModules:
             return []  # a live case has no floor-plan stand-in
         return self._stand_in.floor_plans(case_id)
 
+    def live_images(self, case_id: str) -> dict[str, tuple[bytes, bytes]]:
+        """(ad photo JPEG, matched scan view JPEG) per placed photo id, for the evidence image
+        (J1). Live cases only; empty otherwise. Bytes stay in memory."""
+        if self._stand_in is not None or not self.has_twin(case_id) or self._live_locate is None:
+            return {}
+        outcome = self._live_outcome(case_id)
+        if outcome is None:
+            return {}
+        out: dict[str, tuple[bytes, bytes]] = {}
+        for loc in outcome.result.photos:
+            if not (loc.model_id and loc.pano_id and loc.scan_face is not None):
+                continue
+            # live photo ids are l1, l2 … in the order the photos were sent
+            number = int(loc.photo_id[1:]) - 1 if loc.photo_id[1:].isdigit() else -1
+            if not 0 <= number < len(self._photo_bytes):
+                continue
+            scan = self._live_locate.scan_view(loc.model_id, loc.pano_id, loc.scan_face)
+            ad = _as_jpeg(self._photo_bytes[number])
+            if scan and ad:
+                out[loc.photo_id] = (ad, scan)
+        return out
+
     def live_points(self, case_id: str) -> dict:
         """The live run's matched pairs per photo id, for the evidence file only (E2b). Empty
         for a fixture case or when no live run placed anything."""
@@ -544,3 +566,18 @@ class JoinedModules:
         if self._stand_in is None:
             raise NoStandIn("a live case has no stand-in challenge")
         return self._stand_in
+
+
+def _as_jpeg(blob: bytes) -> bytes | None:
+    """The photo as JPEG bytes (the evidence routes serve JPEG only), or None if unreadable."""
+    import io
+
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(blob)) as opened:
+            out = io.BytesIO()
+            opened.convert("RGB").save(out, format="JPEG", quality=88)
+            return out.getvalue()
+    except Exception:  # noqa: BLE001 - not an image
+        return None

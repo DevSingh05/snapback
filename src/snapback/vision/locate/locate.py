@@ -746,6 +746,7 @@ class Locator:
                     spread=round(placed.check.spread, 4),
                     rival_ratio=rivals.get(photo_id),
                     flipped=True if photo_id in flipped else None,
+                    scan_face=placed.face,
                 )
             )
             # A flipped placement was matched on the mirrored copy: its pose is the real view,

@@ -240,6 +240,15 @@ class SessionCase:
             self.files = CaseFiles(evidence=evidence)
         else:
             self.files.evidence = evidence
+        # J1: the ad photo and the scan view it matched, per alias, in memory only.
+        reader = getattr(self.session.modules, "live_images", None)
+        located = self.session.evidence.locate
+        if reader is not None and located is not None:
+            alias = {p.photo_id: f"P{i}" for i, p in enumerate(located.photos, start=1)}
+            for photo_id, (ad, scan) in reader(self.session.case_id).items():
+                if photo_id in alias:
+                    self.files.images[(alias[photo_id], "photo")] = ad
+                    self.files.images[(alias[photo_id], "scan")] = scan
 
     @property
     def evidence(self) -> ModuleEvidence:
