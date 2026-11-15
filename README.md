@@ -1,330 +1,293 @@
-<div align="center">
-
 # SNAPBACK
 
-**Trust the home, not the ad.**
+**SNAPBACK checks a rental ad before you pay. Is it the real listing, and who do you call?**
 
-Paste a rental ad you found online. SNAPBACK checks it against the home's own record, then shows
-researched places that fit your budget.
+Send SNAPBACK the ad you found, by iMessage or in the box on the web: a link, its text or
+screenshots. It checks the place, the person and the price against the home's own record, gives
+you a short report with one verdict, and hands you back to the real listing and the office on
+record. Code sets every verdict. SNAPBACK never pays, books or sends anything for you.
 
 [![CI](https://github.com/DevSingh05/snapback/actions/workflows/ci.yml/badge.svg)](https://github.com/DevSingh05/snapback/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
 ![Node 22](https://img.shields.io/badge/node-22-5FA04E?logo=nodedotjs&logoColor=white)
 
-[About](#about) · [How it works](#how-it-works) · [Screenshots](#screenshots) ·
-[Quickstart](#quickstart) · [Limits and status](#limits-and-status)
+[Why](#why) · [What it checks](#what-it-checks) · [How it works](#how-it-works) ·
+[Measured](#measured) · [Quickstart](#quickstart) · [Data and privacy](#data-and-privacy) ·
+[Team](#team)
 
-<img src="docs/images/worlds-hero.webp" width="760" alt="The SNAPBACK landing page in the light theme. On the left, the heading 'Found a place online? Paste the ad.' with a short description, a Paste a link, Upload photos and Text it switch, a sample ad and a Check this ad button. On the right, an isometric 3D house cut open to show its rooms, a For Sale sign on the lawn and a 'Checking the record' label, standing among pale city blocks." />
-
-<sub>The first screen: paste the ad you found, in a link, photos or text. The house is the
-place being checked. Sample ad, fixture data made by the team.</sub>
-
-</div>
-
-## About
-
-SNAPBACK is a renter's agent for anyone about to pay for a home they found online. Paste the ad
-and it checks it against the home's own record: the CoStar property record, the building's
-Matterport 3D scan and Vexcel aerial imagery, plus the county owner of record and the Texas license
-list. Then it shows researched places from CoStar's Houston listings that fit your budget, and
-drafts a tour request to the leasing office on record. Code, not a language model, sets every
-verdict. SNAPBACK never pays, books or sends anything; you approve and send any message yourself.
+<!-- PENDING #314: /under-the-hood, one panel per technology with its measured numbers and a Show me link -->
 
 ## Why
 
-In February 2025 a renter in the Houston area found a house on Craigslist, paid $2,200 and moved
-in. Two days later the home's real owner, a rental company, said the person who took the money did
-not own it
+In February 2025 a renter near Houston found a house on Craigslist, paid $2,200 in rent and
+deposit, and moved in. Two days later the real owner, a rental company, said the person who took
+the money did not own the house
 ([ABC13, Feb 15 2025](https://abc13.com/post/conroe-woman-loses-2200-fears-homelessness-renting-home-landlord-did-not-own-property/15907951/)).
-The FTC counted nearly 65,000 rental-scam reports from January 2020 to June 2025, and about half of
-the people who reported one said it started with a fake ad on Facebook
-([FTC Data Spotlight, Dec 2025](https://www.ftc.gov/news-events/data-visualizations/data-spotlight/2025/12/rental-scams-hit-home-65-million-reported-losses)).
-Ads like these use real photos of real homes, so the photos pass. The person and the offer are
-fake, and the home's own record can show that.
+The photos were of a real house. The person and the offer were fake, and the home's own record
+could have shown it.
+
+| Number                                                                                                | Source                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nearly **65,000** rental-scam reports and about **$65 million** lost, Jan 2020 to Jun 2025            | [FTC Data Spotlight, Dec 22 2025](https://www.ftc.gov/news-events/data-visualizations/data-spotlight/2025/12/rental-scams-hit-home-65-million-reported-losses)                               |
+| That is about **32 reports a day**                                                                    | Our arithmetic on the FTC figure (65,000 reports over 2,008 days)                                                                                                                            |
+| About half of rental scams in the 12 months to Jun 2025 began with a fake Facebook ad                 | FTC Data Spotlight, Dec 22 2025                                                                                                                                                              |
+| **$275,110,419** lost by **12,368** people to real estate fraud in 2025, up 58 percent on 2024        | [FBI IC3 2025 Annual Report](https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf) (published Apr 2026). This covers all real estate fraud, rentals included, not rentals alone       |
+| About **$18.7 billion** a year in deposits, first month's rent and application fees, paid before keys | **Our estimate**: 10.2 million renter moves a year (Census HVS Q3 2026; 22 percent moved, ACS 2023 via Zillow) times about $1,835 paid up front (Zillow Consumer Housing Trends Report 2025) |
+
+Reported losses are a floor. The FTC says its count "likely reflects only a fraction of the
+actual harm". The money at risk is every deposit sent to someone met through an ad.
+
+## What it checks
+
+Every check reads one source, writes one line on the report, and names where its fact came from.
+The report sorts them into three rows.
+
+**The place: is this the real home?**
+
+- **CoStar's record of the building.** The address, the units and floor plans, and whether the
+  home is listed for sale on Homes.com while the ad offers it for rent.
+- **The building's Matterport 3D scan.** The ad's photos are matched against the scan. The report
+  says "Taken in this building (3 of 3 photos)" or "Taken in a different building. Red flag."
+- **Vexcel aerial imagery**, shown on the place sheet as a picture of the building. It is evidence
+  for you to look at and never changes the verdict (see [Measured](#measured)).
+
+**The person: are you talking to the people who rent it?**
+
+- **The phone against the office on record.** The ad's number is compared, as a keyed hash, with
+  the leasing office in CoStar's record. The report says yes or no and never shows the digits.
+- **The link against the building's website.** A lookalike link is a red flag.
+- **Public records.** The county owner of record (Harris County, Houston houses), the Texas Real
+  Estate Commission licence list, the Texas Comptroller's company check, HUD's manager record and
+  the website's domain age. Each is a neutral line that names its source.
+- **Here now.** You can ask the poster for a fresh photo of a spot in the home. A copy of a listing
+  photo is caught.
+
+**The price: is the deal or the ask a warning sign?**
+
+- **Rent against the record.** The ad's rent is compared with the rents in CoStar's record and with
+  HUD's typical rent for the ZIP code and bedroom count. Only a rent far below the building's
+  lowest is flagged, so honest discounts pass.
+- **The ad's own words.** Asks for money, papers or haste before a viewing: "Zelle before a
+  viewing. Red flag."
+
+**Then the hand-off.** The report shows the ad beside the real listing, with a "See the real
+listing" link to it on Apartments.com, and the office on record to call. When a listing is being
+copied, SNAPBACK drafts a note to that office. Every draft says "Draft, not sent. You send it."
+
+The report gives one of four verdicts: **Hold off for now**, **Don't pay. Something here doesn't
+match.**, **Could not place these photos** or **Checks passed. Still follow the two rules.** "Don't
+pay" needs proof: a listing photo taken in a different property, or a reply that copies one of the
+ad's own photos. A for-sale listing, a phone that isn't the office's or a name that isn't the
+owner's holds the payment but never says "Don't pay" alone. SNAPBACK never calls a named person a
+scammer.
 
 ## How it works
 
 ```mermaid
-flowchart LR
-    ad["The ad you found<br/>link, text, screenshots"] --> intake["Intake<br/>local OCR, listing fields,<br/>prompt-injection guard"]
-    intake --> planner["Planner<br/>picks the next check<br/>from options code wrote"]
-    planner --> checks["Checks<br/>3D scan, CoStar record,<br/>owner, license, contact, rules"]
-    checks --> decide["verdict.decide()<br/>code sets the verdict"]
-    decide --> card["Card<br/>verdict + sourced lines"]
-    decide --> places["Researched places that fit your budget<br/>as of CoStar's last research"]
-    decide --> draft["Tour-request draft<br/>to the office on record"]
-    draft --> you{"You approve<br/>and send it yourself"}
+flowchart TD
+    imsg["iMessage<br/>text, screenshots, photos, voice memo"] --> api
+    web["Web app<br/>one box: link, text or screenshots"] --> api
+    mcp["MCP server<br/>any AI assistant"] --> api
+    api["Intake<br/>local OCR, listing fields,<br/>prompt-injection guard"] --> checks
+    checks["Checks in code<br/>place, person, price"] --> decide
+    decide{"verdict.decide()<br/>code sets the verdict"} --> report
+    report["Report<br/>verdict, sourced lines,<br/>real listing, office to call"]
+    checks -.-> planner
+    planner["deepagents Planner<br/>todo plan for this ad"] --> subs
+    subs["Sub-agents<br/>Rules, Record, Phone and office,<br/>Owner and licence, Photo, Web"] --> notes
+    notes["Case notes and trace<br/>LangSmith"] -.-> report
 ```
 
-1. **Intake** reads the ad's text and screenshots with local OCR and pulls out the listing fields.
-2. **The planner** picks which check runs next, from a list that code writes. By default the
-   planner is code. With `SNAPBACK_AGENT=deepagents` a model picks the order, and each step on the
-   live trace is stamped with who picked it. Every check that can run still runs.
-3. **The checks** compare the ad with the home's record. The 3D scan says which building the photos
-   were taken in. The record says who is on record and whether the home is for sale.
-4. **`verdict.decide()`** in `src/snapback/verdict.py` turns the evidence into one verdict. It is
-   the only place a verdict is chosen, and no model ever sees or sets it.
-5. **You decide what is sent.** The proof-of-presence challenge and the tour request are drafts.
-   SNAPBACK never texts anyone for you; you approve and send any message yourself.
+1. **Intake.** The ad arrives by iMessage (a Node sidecar on Photon 2.0, the Spectrum SDK), by the
+   web app, or through the MCP server. Screenshots are read with local OCR, and the listing fields
+   are pulled out behind a prompt-injection guard.
+2. **The checks run in code.** Each one reads its source and returns evidence with its origin.
+3. **`verdict.decide()`** in `src/snapback/verdict.py` turns that evidence into one verdict. It is
+   the only place a verdict is chosen. No model sees or sets it.
+4. **The deepagents Planner runs on every case,** in the background. It writes a todo plan, hands
+   each check family to its own sub-agent, and each sub-agent has one read-only tool and writes its
+   findings as notes in the agent file system. It explains the case and never moves it. The report
+   never waits on it, and a hard time limit stops it.
+   <!-- PENDING #316: the Planner's plan per ad, re-planned follow-ups for the card's gaps (up to 2 from a fixed menu), and one drafted next step -->
+5. **The report.** The web report shows the verdict, the sourced lines, the ad beside the real
+   listing and a check team you can watch work beside the 3D scan. A readable trace shows each
+   member's model, tools, findings and time, and links out to the LangSmith run.
 
-## What it checks
+**In iMessage it is a conversation.** Photos get an instant "checking" line, then a short report
+with a picture of the card: the verdict, the top two reasons and one next step. "Why?", "Who do I
+call?", "Is it safe?" and "How did you check?" are answered from the same case without a new check.
+It remembers your language, budget and beds for 30 days, and "forget me" deletes them. A voice memo
+in gets a spoken reply of 15 seconds or less, which never reads out a phone number, a rent or a
+link. Only allowlisted threads are answered, and it never texts first.
 
-Each check reads one source, writes one line on the card, and says where the fact came from.
-"Merged" means it is on `main` and covered by tests in CI.
+**MCP server.** `src/snapback/mcp_server.py` exposes SNAPBACK as tools for any agent:
+`snapback_check_listing`, `snapback_get_verdict`, `snapback_why`, `snapback_what_to_do`,
+`snapback_find_places`, `snapback_accept_preference`, `snapback_walk_summary` and
+`snapback_draft_tour_request` (a draft only). It is a thin client over the
+API, so every rule and verdict stays in code. Setup: [docs/mcp.md](docs/mcp.md).
 
-| Check                             | Data it reads                                                      | What the card says                                                                                                                             | Status                                                |
-| --------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Photos taken in this home         | Matterport 3D scan of the building                                 | "Taken in this building (3 of 3 photos)" or "Taken in a different building (1 of 3 photos). Red flag."                                         | Merged. Runs where the scan is indexed on the machine |
-| For sale, posted as a rental      | Homes.com listings in the CoStar kit                               | "Listed for sale on Homes.com by (brokerage) since (date)", and to confirm with that brokerage before paying                                   | Merged                                                |
-| Owner of record                   | Harris County Appraisal District record (Houston houses only)      | "Owner of record: (company), not the poster", plus that owner's own published rule on where it takes applications                              | Merged                                                |
-| Agent license                     | Texas Real Estate Commission (TREC) public license data            | "Licensed in Texas", or that a license number in the ad has no active license                                                                  | Merged                                                |
-| Contact on record                 | CoStar property record: manager, leasing office phone, website     | "This number is not the leasing office's on record", or "A link in the listing imitates this building's website"                               | Merged                                                |
-| Unit and rent vs record           | CoStar property record: units and asking rents                     | "The record for this building lists no unit with that number", or "Below the rents on record for this building. Ask why; discounts happen."    | Merged                                                |
-| Payment, data and pressure asks   | The ad's own text                                                  | "Zelle before a viewing. Red flag.", "Social Security number before a viewing. Red flag."                                                      | Merged                                                |
-| Here now                          | A fresh reply photo from the poster, compared with the ad's photos | "The reply is a copy of listing photo 2. Red flag."                                                                                            | Merged                                                |
-| Aerial view                       | Vexcel aerial imagery                                              | A picture of the claimed building beside the building the photos were placed in. It never changes the verdict.                                 | Merged                                                |
-| Places that fit your budget       | CoStar kit: Houston apartment floor plans and house rentals        | Researched places with asking prices "as of CoStar's last research", picked and ordered by code (no model). `POST /search` returns places only | Merged (API and search screen)                        |
-| Tour request                      | The leasing office on record in the CoStar property record         | A draft to that office for you to send yourself, from `POST /cases/{id}/tour-draft` (needs a case and its write token)                         | Merged                                                |
-| Report this copy                  | The card's listing and record lines                                | An evidence pack a listing agent can take to the platform, from `GET /cases/{id}/report`                                                       | API merged. No button in the app yet                  |
-| The ad says X, the record shows Y | CoStar kit: room labels, listing features, amenities               | An information line, labelled "as of CoStar's last research"                                                                                   | In progress                                           |
-| "New management", "just sold"     | CoStar kit: property manager start dates, sale records             | An information line. It never changes the verdict by itself                                                                                    | In progress                                           |
+**Ring finder.** One renter's check answers one ad. An investigator needs the ring behind many.
+`src/snapback/forensics/` links ads by reworded text, shared photos, phone numbers and wordings,
+groups them with Louvain communities, and gives every finding its evidence: ad ids, the matched
+sentence, photo ids and a score. The investigator view at `/investigate` plays a 90-day stream day
+by day, shows each ring forming and its time to detect, and exports a case file per group. It runs
+on synthetic data only.
 
-The card answers with one of four verdicts: **Hold off for now**, **Don't pay. Something here
-doesn't match.**, **Could not place these photos** or **Checks passed. Still follow the two
-rules.** Don't pay needs proof: a listing photo taken in a different property, or a reply that
-copies one of the ad's own photos. A for-sale listing, a phone that is not the office's or a name
-that is not the owner's never says Don't pay by itself, and SNAPBACK never calls a named person a
-scammer. Cards come as a web page and as a PNG with a verify link.
+<!-- PENDING #313: the ring case file and a detector-grounded case study -->
 
-## Screenshots
+| Path                         | What it is                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `src/snapback/verdict.py`    | Evidence in, verdict out. Pure code, no model                                     |
+| `src/snapback/agent/`        | Case runner, intake, rules, deepagents graph and sub-agents, web checks, trace    |
+| `src/snapback/adapters/`     | CoStar records, Matterport, Vexcel, Harris County owner roll, TREC, Texas records |
+| `src/snapback/public/`       | HUD rents, Census address check, domain age (RDAP), reverse image search          |
+| `src/snapback/vision/`       | Photo placement in 3D scans: DINOv2 retrieval, DISK and LightGlue, RANSAC         |
+| `src/snapback/forensics/`    | The ring finder and its synthetic data generator                                  |
+| `src/snapback/api/`          | FastAPI: cases, report, card image, trace stream, search, drafts                  |
+| `src/snapback/mcp_server.py` | MCP server over the API                                                           |
+| `apps/web/`                  | Vite, React and TypeScript web app                                                |
+| `apps/sidecar/`              | iMessage sidecar on Photon 2.0, with voice                                        |
 
-<p align="center">
-  <img src="docs/images/map-glass-light.webp" width="900" alt="The Houston map in the Glass light theme, tilted to show extruded city blocks. Teal columns mark sample places, each with a white 'from' rent chip such as from $1,450. A brief panel sits on the left and a strip of sample place cards runs along the bottom." />
-  <br />
-  <sub>The map: sample places stand as columns on the city, with the lowest asking rent on each.</sub>
-</p>
+## Measured
 
-<table>
-  <tr>
-    <td width="50%" valign="top"><img src="docs/images/verdict-dont-pay.png" width="400" alt="A result card that reads 'Don't pay. Something here doesn't match.' Each row names a check, what it found and a status chip: one listing photo was taken in a different building, the unit is not on the building's record, and the poster's right to rent and phone number are not confirmed. A FIXTURE badge sits in the corner." /></td>
-    <td width="50%" valign="top"><img src="docs/images/places-tour-draft.png" width="400" alt="The 'Researched places that fit your budget' strip. A 1 bed, 1 bath floor plan at $1,100 to $1,250 a month as of CoStar's last research, with walk-up, utilities, parking and pet lines, a '3D scan in this building' tag, the leasing office on record, and an open tour-request draft addressed to that office with a Copy button." /></td>
-  </tr>
-  <tr>
-    <td valign="top"><sub>The card. One photo was taken in a different building, so it says Don't pay.</sub></td>
-    <td valign="top"><sub>Researched places in budget (a separate search), with a tour request you send yourself.</sub></td>
-  </tr>
-</table>
+Every number comes from merged code and its eval files. LIVE means real CoStar kit data or real
+photos. FIXTURE means team-made data through the real pipeline. SYNTHETIC means generated data.
 
-<p align="center">
-  <img src="docs/images/phone-verdict.png" width="220" alt="The Don't pay card for the same staged ad, on a phone, 390 pixels wide, with each check stacked above its status chip." />
-  <br />
-  <sub>The card for the same staged ad, on a phone.</sub>
-</p>
+| What                                                                                                             | Result                                                                                                                                            | n                                  | Label     |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------- |
+| Real listing photos placed in the right home (`eval/locate_real.csv`, #242; re-measured after #296, same counts) | 43 of 48 right home, 0 of 48 in a wrong home                                                                                                      | 48 photos                          | LIVE      |
+| Decoy photos placed in the claimed building                                                                      | 0 of 30                                                                                                                                           | 30 decoys                          | LIVE      |
+| Tamper test: a real listing with its phone changed, "Zelle before the tour" added, or a lookalike link           | Each change caught 6 of 6 on real photos and 2 of 2 on scan renders                                                                               | 6 photos and 2 renders, per change | LIVE      |
+| Batch run: composed ads and labelled messages through the real pipeline (`eval/ads_results.csv`, #262)           | 117 of 123 handled as expected, including 43 of 43 clean messages left alone                                                                      | 123                                | FIXTURE   |
+| Deep agent in the background (#273, real model runs)                                                             | Report returns in 0.03 to 0.09 s without waiting; agent done in a median 22.9 s, no fallbacks                                                     | 6 cases, 5 timed runs              | FIXTURE   |
+| Ring finder over a 90-day stream of 3,039 ads with 10 seeded rings (#293)                                        | 10 of 10 rings flagged, median 3 days after a ring's first ad; 0 of 2,684 honest ads flagged                                                      | 10 rings, 2,684 honest ads         | SYNTHETIC |
+| Ring finder on a 301-ad corpus with 4 seeded rings                                                               | 4 of 4 rings, 0 of 244 honest ads flagged; a keyword search found 0 of 4                                                                          | 301 ads                            | SYNTHETIC |
+| Vexcel aerial matcher, including next-door buildings (`eval/vexcel/results.json`, #308)                          | 17 of 28 against a bar of 18 of 20: it told every next-door and wrong building apart (16 of 16) but recognised the right building in only 1 of 12 | 28 cases                           | LIVE      |
 
-<sub>Every screenshot is the web app running locally on synthetic fixture data made by the team,
-and each screen says FIXTURE. Office names such as "Fixture Living LLC" are made up.</sub>
+<!-- PENDING #312: | Ring finder on reworded ads, with the phone and photo-link fallback on | 9 of 10 rings; 0 of 2,684 honest ads flagged | 10 rings | SYNTHETIC | -->
+
+**What the numbers mean, and where they stop.**
+
+- **Aerials are evidence only.** The Vexcel matcher compares perceptual hashes, and a shifted view
+  of the same building looks like the building next door. It missed the bar, so the aerial stays a
+  picture on the place sheet and the switch that would let it hold a payment stays off. Matching
+  building footprints is next.
+  <!-- PENDING Vexcel v2: footprint matching result -->
+- **Right home, not right room.** Photo placement is scored by home. The room is not measured, and
+  we don't claim it.
+- **Mirrored photos mostly stop matching** (4 of 18 placed, LIVE). They were never placed in a
+  wrong home, and the other checks still run.
+- **Not every home has a scan or a record.** Without a scan the photo row says "Not checked", and
+  the person and price rows run on public records. HUD's rent cutoff is not measured yet.
+- **Houston and Texas first.** Search, the owner roll and the licence list cover Houston and Texas.
+- **The ring finder is tested on data built alongside it,** so its numbers show the method works
+  on rings shaped like these. They are not an accuracy claim for real listings.
 
 ## Quickstart
 
-Needs [uv](https://docs.astral.sh/uv/), Python 3.12 and Node 22.
+Needs [uv](https://docs.astral.sh/uv/), Python 3.12, Node 22 and npm.
 
 ```bash
-make setup               # python and node dependencies
+make setup               # uv sync + npm install
 cp .env.example .env     # fixture mode by default; needs no keys
 make api                 # API on http://localhost:8000
 make web                 # web app on http://localhost:5173, in a second terminal
 ```
 
-`make check` runs the repo hygiene guard, ruff, ESLint, Prettier, TypeScript, pytest, and the web
-and sidecar tests. CI runs all of that, plus the eval gate and the web build (`npm run build`).
-
-Optional extras: `uv sync --extra intake` adds local OCR for screenshots, `--extra agent` adds the
-deepagents planner, and `--extra vision` adds the photo locator (torch, kornia, faiss, OpenCV).
-
-**Staged cases** in `fixtures/demo/` run end to end: three made-up ads and two replays of reported
-cases. Each card made from them says "Staged example" in its footer.
+Fixture mode (`SNAPBACK_DATA_SOURCE=fixture`, the default) runs on synthetic, team-made data, and
+every screen and number says FIXTURE. To see staged cases end to end:
 
 ```bash
-uv run python -m snapback.agent.demo   # prints all five cards
-DEMO_CASE=b make api                   # every new case runs on staged case b (a, b or c)
+uv run python -m snapback.agent.demo   # prints the staged cards
+DEMO_CASE=b make api                   # every new case runs on staged case b
 ```
 
-| Case | The staged ad                                                           | The card                                               |
-| ---- | ----------------------------------------------------------------------- | ------------------------------------------------------ |
-| `a`  | Real building, wrong unit, low rent, lookalike link, copied reply photo | Don't pay: the reply is a copy of listing photo 2      |
-| `b`  | The same ad, with one photo taken in a different building               | Don't pay: a photo was taken in a different property   |
-| `c`  | A house listed for sale, posted as a rental, with no scan               | Hold off: listed for sale; confirm with that brokerage |
+Optional extras: `uv sync --extra intake` adds local OCR for screenshots, `--extra agent` adds the
+deepagents Planner, and `--extra vision` adds the photo matcher (torch, kornia, FAISS, OpenCV).
+`make sidecar` runs the iMessage sidecar and `make mcp` runs the MCP server on stdio.
 
-The two replays, in `demo/replays/`, follow cases reported in the news: a move-in paid to a poster
-who did not own the house, and a Zelle deposit for a house that was never for rent. Both end in
-Hold off.
+`make check` runs what CI runs: the repo hygiene guard, ruff, ESLint, Prettier, TypeScript, pytest
+and the web and sidecar tests. `make eval` writes `eval/results.csv` and runs the regression gate.
 
-### Live mode (the CoStar kit)
+**Environment variables.** Names only; put values in `.env`, which is never committed.
+`.env.example` documents most of them, and `src/snapback/settings.py` has the rest.
 
-`SNAPBACK_DATA_SOURCE=fixture` (the default) runs on synthetic, team-made data.
-`SNAPBACK_DATA_SOURCE=live` reads the CoStar kit from `data/` and the sponsor APIs with your own
-keys. Every screen, card and number says LIVE or FIXTURE.
+| For                         | Variables                                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mode                        | `SNAPBACK_DATA_SOURCE`, `DEMO_CASE`, `SNAPBACK_SHOW_RECORD_FIGURES`                                                                             |
+| Deep agent and tracing      | `SNAPBACK_AGENT`, `ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`                                                                 |
+| CoStar kit and its partners | `COSTAR_KIT_URL`, `COSTAR_KIT_ZIP`, `COSTAR_ZIP_PASSWORD`, `MATTERPORT_API_KEY`, `MATTERPORT_API_TOKEN`, `VEXCEL_API_KEY`                       |
+| Web checks                  | `SNAPBACK_WEB_CHECKS`, `BRIGHTDATA_API_TOKEN`, `APIFY_TOKEN`, `BROWSER_USE_API_KEY`, `SERPAPI_API_KEY`                                          |
+| iMessage and voice          | `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET`, `SIDECAR_ALLOWED_THREADS`, `SIDECAR_RENTER_SALT`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` |
+| Safety                      | `SNAPBACK_PHONE_SALT`, `SNAPBACK_DAILY_LIMIT`                                                                                                   |
 
-1. Open the kit portal at https://beta-app.matterport.com/2026-princeton-hackathon and accept the
-   terms. Each person accepts for themselves.
-2. Get your own sponsor keys from the CoStar Discord (`/costar-keys` in `#costar-group`) and put
-   them in `.env` only. The names are in `.env.example`.
-3. Unzip the kit under `data/`, for example `data/raw/costar/costar-hackathon-kit/`.
-4. Run `python3 scripts/probe_kit.py`. It prints field names and counts only, never record values.
-
-### Integrations
-
-- **MCP server.** Any AI assistant (Claude Desktop, Claude Code, others) can call SNAPBACK to
-  check a rental ad, ask why, and get what to do next, with the verdict set by code and a link
-  back to the real listing. Setup and a demo script: [docs/mcp.md](docs/mcp.md).
-
-## Architecture
-
-| Path                        | What it is                                                                 | Lane |
-| --------------------------- | -------------------------------------------------------------------------- | ---- |
-| `src/snapback/verdict.py`   | Evidence in, verdict out. Pure code, no model                              | A    |
-| `src/snapback/agent/`       | Case runner, planner, intake, rules (price, unit, payment, contact, owner) | A    |
-| `src/snapback/search.py`    | Places that fit a budget, from CoStar's researched listings                | A    |
-| `src/snapback/api/`         | FastAPI: cases, card, PNG, trace stream, search, tour draft, report pack   | A    |
-| `src/snapback/card/`        | Card strings and the PNG card                                              | A    |
-| `src/snapback/vision/`      | Photo locator over 3D scans, photo memory, recapture model                 | V    |
-| `src/snapback/eval/`        | Eval harness and the locate gate                                           | V    |
-| `src/snapback/adapters/`    | CoStar, Homes.com, Matterport, Vexcel, county owner record, Texas license  | D    |
-| `src/snapback/challenge/`   | Proof-of-presence challenge: spots, codes, local OCR                       | D    |
-| `src/snapback/safety/`      | Daily limits, delete and purge                                             | D    |
-| `src/snapback/contracts.py` | Shared data shapes every lane reads and writes                             | XO   |
-| `apps/web/`                 | Vite, React and TypeScript web app                                         | T    |
-| `apps/sidecar/`             | iMessage intake handler                                                    | D    |
-| `fixtures/`, `tests/`       | Synthetic, team-made data and the Python tests                             | all  |
-
-Lanes: A agent and backend, T front end, V vision and ML, D data and iMessage. Owners are in
-[docs/ROLES.md](docs/ROLES.md).
-
-## Limits and status
-
-- **Photo accuracy on real ad photos is not measured yet.** That run (A8) waits on access to the
-  kit's listing photos. No accuracy number appears here, in the demo or on a card until the
-  harness measures it, with n shown.
-- **Numbers so far are on renders, not photos.** The locate gate is measured on renders of the
-  scans, and every line it prints says so. On renders of our scans (unseen directions from the
-  indexed scan points), n=20 claimed + 10 other-building views: 20/20 placed in the right
-  building, 0 false placements (held-out seed, main 04b9937, #28). Three demo houses are now indexed beside the apartment
-  scans; house results so far are on renders too.
-- **Houston only.** Search covers CoStar's Houston listings.
-- **Owner of record and license: Houston/Texas only.** The owner comes from the Harris County record
-  (Houston houses only), and the license check uses Texas (TREC) data.
-- **The data is as of CoStar's last research.** Nothing is called "available now", and lease
-  status is not public, so "recently rented" is information, never a flag.
-- **A scan shows a floor plan, not a unit.** Apartment scans are model units, so a match says "this
-  building, this floor plan", never a unit number.
-- **SNAPBACK never pays, books or sends anything for you.** Tour requests and challenges are drafts
-  you send yourself. iMessage intake is a tested handler, but the bridge is not connected yet.
-- **A model never sets a verdict.** It can pick the order of checks and write an explanation. A
-  recapture model for reply photos exists, is off by default, and its score never says Don't pay.
-- **A code on a reply photo is not proof.** The local reader can miss handwriting, so a wrong or
-  missing code asks again and then holds.
-- **The web replay page still shows a fictional replay,** labelled so. The two replays of reported
-  cases run as staged cases from the command line and are not on the web page yet.
-
-## Evaluation
-
-`make eval` writes `eval/results.csv` with aggregate numbers only (condition, metric, n, rate,
-interval) and runs a regression gate against `eval/baseline.csv`. The API serves the same file at
-`GET /eval/results.csv`, and its first line says FIXTURE or LIVE. Today its case-bank rows are
-synthetic and labelled FIXTURE, and its locate calibration rows were measured on renders of our
-scans and say so. Neither is accuracy on real ad photos, so this README quotes no accuracy number.
-
-## Forensics (Arlequin track)
-
-The investigator view at `/investigate` (API: `GET /forensics/rings`, `GET /forensics/rings/{id}`,
-`POST /forensics/ask`). One renter's check answers one ad; an investigator needs the ring behind
-many. **All data here is SYNTHETIC and FIXTURE**: about 300 generated rental ads in a made-up city
-(`fixtures/forensics/`, made by `uv run python -m snapback.forensics.generate`, seeded, same seed
-same bytes), 555 phone numbers, perceptual-hash-like photo ids. No CoStar, Matterport or Vexcel
-data, no real address or number.
-
-Pipeline (`src/snapback/forensics/`): claims and rule hits from the existing intake and rules code
-(the money-before-move-in rule and the payment rules), concept-folded TF-IDF for reworded text (no
-model, no network), a link graph of ads, photo-sets (ids within 6 bits), numbers and wordings,
-Louvain communities, then each ring's timeline. Every finding carries its evidence: ad ids, the
-matched sentence, photo ids, a score. The investigator Q&A answers only from that graph and says
-so when it has no evidence; an optional deepagents tool wraps it (not run in CI).
-
-Measured on the committed corpus (n = 301 ads, 4 seeded rings, 57 ring ads), against the seeded
-answer key, next to a keyword search that groups hits by exact number or photo id:
-
-| Method                              | Rings recovered | Ring recall | Ring ads found | Honest ads flagged |
-| ----------------------------------- | --------------- | ----------- | -------------- | ------------------ |
-| This pipeline                       | 4 of 4          | 100%        | 57 of 57       | 0 of 244           |
-| Keyword search + exact number/photo | 0 of 4          | 0%          | 11 of 57       | 0 of 244           |
-
-Honest limits: the corpus and the pipeline were built together and the folding lexicon is
-hand-written, so the table is a check that the method works on rings shaped like these, not an
-accuracy claim for real listings. On ten other seeded corpora (held-out seeds 101 to 110, about
-300 ads each; thresholds were set on the committed seed and seeds 1 to 3 before these were run, and
-three of them are also asserted in the tests) the pipeline averaged ring precision 0.88 and ring recall 0.93, and the
-keyword baseline ring recall 0.00 (`snapback.forensics.evaluate.evaluate_seed`). The existing
-money-before-move-in rule alone is not enough: it fires on honest wording such as "deposit due at
-lease signing", so the pipeline needs a second signal (shared wording, numbers or photos) before it
-calls anything a ring.
-
-**Rings over time (the top of `/investigate`, API: `GET /forensics/stream`).** The same finder is
-run once per day on a SYNTHETIC 90-day stream (3,039 ads, 10 seeded rings, seed 20261115;
-`uv run python -m snapback.forensics.detect` writes `fixtures/forensics/stream_timeline.json`,
-about two minutes). A day slider with Play shows ads arriving and links forming; each group has
-its time to detect (first ad to first flag), the shared signals that link its ads with the
-finder's weight for each, and a case file to export (JSON, and a printable summary). Measured on
-that stream, FIXTURE: 10 of 10 seeded rings flagged, median 3 days after the ring's first ad
-(n = 10), where flagged = at least 4 of its ads inside reported groups (any group). Under the
-stricter single-group rule (at least 4 of its ads inside one reported group) the median is 4.5
-days (n = 10). 329 of 355 ring ads flagged; 0 of 2,684 honest ads flagged. The limit, shown on the screen: the finder reports 6 groups for the 10 rings
-and separates 0 of 10 by the 70 percent rule above, because rings that share wording blend into
-one group at this size. Per group as reported, the median is 5 days (n = 6). "Renters who saw the
-ads before the flag" is an estimate (ad-days times an assumed 30 renters per ad per day), labelled
-as such wherever it appears.
+**LIVE mode** (`SNAPBACK_DATA_SOURCE=live`) reads the CoStar kit from `data/` with your own keys.
+Each person accepts the kit's terms for themselves. `python3 scripts/probe_kit.py` prints field
+names and counts only, never record values.
 
 ## Data and privacy
 
 The full account is in [DATA_USE.md](DATA_USE.md).
 
-- **Sponsor data stays in `data/`,** which is git-ignored. Scans, records, indexes and caches never
-  enter git, and `make hygiene` fails if anything there is tracked.
-- **No kit data goes to an outside model.** With the deepagents planner, a model sees only the
-  renter's own text and yes/no facts the code derived.
-- **Names stay out.** A private owner reads "a private owner". A company is named only when it is
-  one we already know, otherwise "a company owner". No real addresses or renter names appear in
-  code, fixtures, tests or docs.
-- **Photos are kept as hashes, never pixels,** for 7 days. Phones are compared as keyed hashes.
-- **Delete anytime.** `make purge` deletes everything in `data/`. To remove one renter's cases and
-  photo memory:
+| Where it goes                                | What is sent                                                                                                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Stays on our machine                         | CoStar kit records, Matterport scans and Vexcel imagery. Photo matching and OCR run locally                                                            |
+| The language model (Anthropic Claude)        | The renter's own text and yes/no facts the code derived. Never kit rows, record figures, photos or addresses                                           |
+| LangSmith                                    | The deep agent's trace: the same text and derived facts the model saw                                                                                  |
+| Web checks (Bright Data, Apify, Browser Use) | Small derived values: the record's website host, the ad link's host, a short phrase of the ad with no contact details, the rounded area, the bed count |
+| Reverse image search (SerpApi)               | At most 2 public photo links found in the ad text. Never an uploaded file                                                                              |
+| ElevenLabs                                   | The voice memo, and the spoken reply's text (which never holds a phone number, a rent or a link)                                                       |
+| Photon (iMessage)                            | The messages in allowlisted threads. Thread ids are kept as keyed hashes                                                                               |
+
+- **CoStar record figures never go to an outside model.** Rents and unit counts from the record
+  show only on a local LIVE demo with `SNAPBACK_SHOW_RECORD_FIGURES` on, never on a public host, the
+  card image, MCP or iMessage. The "See the real listing" link shows either way.
+- **Sponsor data stays in `data/`,** which is git-ignored. `make hygiene` fails if anything there is
+  tracked, and the kit is deleted by the date its terms set (Nov 15 2026, 16:00).
+- **Phone numbers are compared as keyed hashes,** and the report says yes or no, never the digits.
+  Every phone number in the fixtures is a 555 number.
+- **Names stay out.** A private owner reads "a private owner". A company is named only when it
+  matches one we already know. No real addresses or renter names are in code, fixtures, tests or
+  docs.
+- **Photos are kept as hashes, never pixels,** for 7 days.
+- **Delete anytime.** `make purge` deletes everything in `data/`. To remove one renter's cases:
 
   ```bash
   uv run python -m snapback.safety delete-case <case_id>
   uv run python -m snapback.safety delete-renter <renter_id>
   ```
 
-## Contributing
+## Team
 
-Read [AGENTS.md](AGENTS.md) first. It holds the hard rules: no sponsor data or secrets in git, code
-sets the verdict, LIVE or FIXTURE on everything, no number before it is measured, and never call a
-named person a scammer. Run `make check` before you open a pull request.
+- Vidyut ([@vs-githjk](https://github.com/vs-githjk))
+- Dev ([@DevSingh05](https://github.com/DevSingh05))
+- Jeffrey ([@jeffrey-g05](https://github.com/jeffrey-g05))
+- Rishit ([@RishitRai](https://github.com/RishitRai))
 
-## Credits
+**Built on:** CoStar property records and Homes.com listings, Matterport 3D scans and Vexcel aerial
+imagery from the CoStar kit, used under its terms; LangChain deepagents and LangSmith; Photon 2.0
+(the Spectrum SDK) for iMessage; Anthropic Claude; ElevenLabs; Bright Data, Apify and Browser Use;
+SerpApi. Arlequin AI's forensics brief shaped the ring finder. Public data from the Harris County
+Appraisal District, the Texas Real Estate Commission, the Texas Comptroller, HUD, the US Census
+Bureau and the City of Houston. Models and libraries: DINOv2 (Meta, Apache 2.0), DISK and
+LightGlue through kornia (Apache 2.0), RapidOCR on ONNX Runtime, MapLibre.
 
-Built by Vidyut ([@vs-githjk](https://github.com/vs-githjk)), Dev
-([@DevSingh05](https://github.com/DevSingh05)), Jeffrey
-([@jeffrey-g05](https://github.com/jeffrey-g05)) and Rishit
-([@RishitRai](https://github.com/RishitRai)).
+Read [AGENTS.md](AGENTS.md) before contributing. It holds the hard rules: no sponsor data or
+secrets in git, code sets the verdict, LIVE or FIXTURE on everything, no number before it is
+measured, and never call a named person a scammer.
 
-Data from the CoStar kit (CoStar property records, Homes.com listings, Matterport scans and Vexcel
-aerial imagery), used under its terms; Harris County Appraisal District public owner records; and
-Texas Real Estate Commission public license data. Models and libraries: DINOv2 (Meta, Apache 2.0),
-DISK and LightGlue through kornia (Apache 2.0), RapidOCR on ONNX Runtime, and deepagents.
+## What a realtor said
+
+A realtor reviewed SNAPBACK as rental tour prep, with scam safety built in: find a place, see it on
+the map, walk it in 3D before you go, and check the ad before any money moves.
+
+> "If he can add in additional safety features for preventing further scams and financial scams, I
+> think this would be a very good app to have in the marketplace."
+>
+> Ashwin Veeravalli, Realtor, The Agency, Los Gatos CA
 
 ## Rights
 
 Rights in this project are assigned to CoStar Realty Information, Inc. under the HackPrinceton Fall
 2026 hackathon agreement. No licence is granted. Third-party libraries remain under their own
 licences.
-
-<sub>Built at HackPrinceton Fall 2026.</sub>
