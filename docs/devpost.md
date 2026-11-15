@@ -209,11 +209,11 @@ or sends anything for you.
 
 Built, not yet on `main`, so not claimed above:
 
-- **The real listing:** a panel that shows the home's real listing, a hand-off link back to it on
-  Apartments.com, and a drafted "your listing is being copied" note for the office (#250).
+- **The report page** that shows the real listing beside the ad, with its hand-off link to
+  Apartments.com (#265). The real-listing API behind it is on `main` (#250).
 - **Adaptive memory in iMessage:** it learns the renter's language, budget and beds, and "show
   me safer homes" uses them (#264).
-- The **Stories** page (#260).
+- The **Stories** page (#265).
 
 ## What's next
 
@@ -259,8 +259,7 @@ section answers that sponsor's own criteria.
 - **Uses the record, not guesses:** each ad is checked against CoStar's own record of the
   building. In the event kit: 3,339 records; 2,139 with the building's website; 1,747 with
   floor-plan rents; 708 with an availability page (LIVE kit, counts).
-- **Measured on CoStar's own data (LIVE):** 43 of 48 real listing photos placed in the right
-  home, 0 in the wrong one, 0 of 30 decoys fooled it. In the live tamper test, a changed phone,
+- **Measured on CoStar's own data (LIVE):** "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it." In the live tamper test, a changed phone,
   "send the deposit by Zelle before the tour" and a lookalike website link were each caught 6 of
   6 (real photos) and 2 of 2 (scan renders).
 - **Sends renters back to CoStar:** the report ends with the real listing on Apartments.com.
@@ -276,7 +275,7 @@ section answers that sponsor's own criteria.
   expected, including 43 of 43 clean messages cleared.
 - **Technical work:** code sets every verdict; a model only picks the order of checks and writes
   explanations, through deepagents. Photo placement uses DINOv2 retrieval and DISK + LightGlue
-  matching over Matterport scans (43 of 48 real photos placed, 0 wrong, LIVE).
+  matching over Matterport scans (LIVE): "Measured on 78 real listing photos: 43 of 48 placed in the right home, 0 in the wrong one, 0 of 30 decoys fooled it."
 - **UX:** one text in, one short report out: the verdict, "Before you pay:" with the top two
   reasons, one next step and the full report. Text-only checks take about 1 s, and checks with
   photos about 19 to 26 s (LIVE).
@@ -328,10 +327,6 @@ section answers that sponsor's own criteria.
   answer comes back as text plus a voice memo, sent as a native voice bubble (#245).
 - **Safe by design:** only allowlisted threads, never texts first, no case token and no phone
   digits in any reply.
-
-### GoDaddy domain
-
-TBD.
 
 ## Team
 
