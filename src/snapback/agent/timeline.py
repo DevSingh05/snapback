@@ -55,6 +55,9 @@ class TimelineStep(BaseModel):
     # Which source answered the step: "CoStar record", "HUD", "Census", "HCAD", "RDAP", "TREC".
     # None for a step no outside source answered (reading the ad, the verdict).
     source_name: str | None = None
+    # The Planner's own choices, so a page can find them without reading a label: "follow_up"
+    # (a check it chose for a gap on the card) or "next_step" (a step it drafted, never sent).
+    choice: Literal["follow_up", "next_step"] | None = None
 
 
 class TimelineTodo(BaseModel):
@@ -229,6 +232,7 @@ class _Builder:
         kind: str | None = None,
         skipped: bool = False,
         source_name: str | None = None,
+        choice: str | None = None,
         **v: object,
     ) -> None:
         self.steps.append(
@@ -242,6 +246,7 @@ class _Builder:
                 "kind": kind,
                 "skipped": skipped,
                 "source_name": source_name,
+                "choice": choice,
                 "derived": took is not None,
             }
         )
@@ -467,6 +472,7 @@ def build_timeline(
                 model=by == "agent",
                 kind="followup",
                 source_name=picked.source_name if picked is not None else None,
+                choice="follow_up",
                 check=_followup_name(event.pick or ""),
                 gap=picked.gap if picked is not None else "",
             )
@@ -482,6 +488,7 @@ def build_timeline(
                 by,
                 model=by == "agent",
                 kind="followup",
+                choice="next_step",
                 step=item.name if item is not None else (event.pick or ""),
                 gap=gap,
             )
