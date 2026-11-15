@@ -315,7 +315,7 @@ describe("robustness line", () => {
     n_honest: 2684,
     variants: {
       original: {
-        pipeline: { rings_found: 10, honest_flagged: 0 },
+        pipeline: { rings_found: 10, honest_flagged: 0, groups_reported: 6, rings_told_apart: 0 },
         pipeline_wording_seeds: { rings_found: 10, honest_flagged: 0 },
         keyword_baseline: { rings_found: 1, honest_flagged: 0 },
       },
@@ -343,5 +343,32 @@ describe("robustness line", () => {
     expect(t?.headline).toMatch(
       /^Holds up when ads are reworded: \d+ of 10 rings \(synthetic, n=10 rings/,
     );
+  });
+
+  // Judge fix (XO 03:11): the hardest Arlequin question, answered on screen, from the eval file.
+  it("shows the honest limit beside the found line: 10 rings in 6 groups, 0 told apart", () => {
+    render(<RobustnessLine results={made} />);
+    const limit = screen.getByTestId("ring-limit");
+    expect(limit).toHaveTextContent(
+      "The 10 seeded rings land in 6 groups, and 0 of 10 is a group of its own " +
+        "(70% overlap bar, synthetic, n=10 rings).",
+    );
+    expect(limit).toHaveTextContent(/caught/);
+    expect(limit).toHaveTextContent(/not solved yet/);
+  });
+
+  it("takes the limit from the committed eval file, not a typed number", () => {
+    const t = robustnessText(real as unknown as Parameters<typeof robustnessText>[0]);
+    const orig = (real as { variants: { original: { pipeline: Record<string, number> } } }).variants
+      .original.pipeline;
+    expect(t?.limit).toContain(`land in ${orig.groups_reported} groups`);
+    expect(t?.limit).toContain(`${orig.rings_told_apart} of 10 is a group of its own`);
+  });
+
+  it("leaves the limit out when the file has no grouping numbers", () => {
+    const old = structuredClone(made);
+    old.variants.original.pipeline = { rings_found: 10, honest_flagged: 0 } as never;
+    render(<RobustnessLine results={old} />);
+    expect(screen.queryByTestId("ring-limit")).toBeNull();
   });
 });
