@@ -137,7 +137,9 @@ def test_card_route_returns_card_contract(client, case_id):
     response = client.get(f"/cases/{case_id}/card")
     assert response.status_code == 200
     served = Card.model_validate(response.json())
-    assert served == HOUSTON_CARD
+    # `has_evidence` is the one field the route adds to the saved card (False: no photos here).
+    assert served.has_evidence is False
+    assert served.model_copy(update={"has_evidence": None}) == HOUSTON_CARD
     # The same case as it was saved, apart from the clock its times are read on.
     assert (served.state, served.checked_at) == (FIXTURE_CARD.state, FIXTURE_CARD.checked_at)
     assert [row.kind for row in served.rows] == [row.kind for row in FIXTURE_CARD.rows]
