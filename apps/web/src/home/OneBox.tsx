@@ -7,6 +7,7 @@ import cardHold from "../../../../fixtures/contracts/card_hold.json";
 import sampleLivingRoom from "../assets/sample-living-room.webp";
 import sampleLounge from "../assets/sample-lounge.webp";
 import { SourceChip } from "../components/SourceChip";
+import { RealtorQuote } from "../landing/RealtorQuote";
 import type {
   Card,
   DataSource,
@@ -597,6 +598,7 @@ export function OneBox(props: Props) {
               <YourChecks />
               <SeeItHappen />
             </div>
+            <RealtorQuote />
             <footer className="ob-foot">
               <p className="ob-honest">
                 <SourceChip source={shownMode} />
