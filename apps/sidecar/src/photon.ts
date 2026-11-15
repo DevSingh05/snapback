@@ -175,7 +175,6 @@ async function collect(pending: Pending, content: PhotonContent, limits: Limits)
   return false;
 }
 
-/** Run the loop until the message stream ends. Every send is a reply in the renter's thread. */
 // Photon's SDK throws a RateLimitError (gRPC RESOURCE_EXHAUSTED) with `retryAfterMs` when the
 // project is over its send rate. A reply waits as asked (within bounds) and is retried, so a busy
 // minute never drops a renter's answer. Any other send error is not retried.
@@ -212,6 +211,7 @@ async function sendRetrying(
   }
 }
 
+/** Run the loop until the message stream ends. Every send is a reply in the renter's thread. */
 export async function runPhoton(app: PhotonApp, config: PhotonConfig, log: Log = console.log) {
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const send = (space: PhotonSpace, content: unknown) => sendRetrying(space, content, sleep, log);
