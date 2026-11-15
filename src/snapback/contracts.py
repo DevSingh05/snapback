@@ -81,6 +81,7 @@ class AerialResult(BaseModel):
 
     status: AerialStatus = AerialStatus.NOT_CHECKED
     distance_m: float | None = None
+    hash_diff: int | None = None  # LIVE only: differing bits of 64 between the two tiles
 
 
 class Evidence(BaseModel):

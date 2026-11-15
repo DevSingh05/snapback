@@ -93,13 +93,19 @@ def main(argv: list[str] | None = None) -> int:
     print(f"mode: {result['mode'].upper()}  cases: {where}")
     print(f"n={result['n']}  wrong-building cases={result['wrong_building_cases']}")
     print(f"hits={result['hits']}  misses={result['misses']}")
-    print(f"bar {result['bar']}: {'PASS' if result['bar_met'] else 'FAIL'}")
+    print(f"right={result['right_cases']}  next-door={result['next_door']}")
+    print(
+        f"hash-diff ranges (bits of 64, same-building if <= {result['hash_threshold']}): "
+        f"{result['hash_diff_range']}"
+    )
+    passed = result["bar_met"] and result["next_door_ok"]
+    print(f"bar {result['bar']}: {'PASS' if passed else 'FAIL'}")
     if result["mode"] == "fixture":
         print("FIXTURE measures the geometry only; it does not open the verdict gate.")
     elif result["gate_open"]:
         print("LIVE pass: SNAPBACK_VEXCEL_IN_VERDICT may be turned on.")
     print(f"wrote {RESULTS.relative_to(REPO)}")
-    return 0 if result["bar_met"] else 1
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

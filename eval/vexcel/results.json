@@ -1,12 +1,59 @@
 {
   "mode": "live",
-  "n": 24,
-  "wrong_building_cases": 10,
-  "hits": 24,
-  "misses": [],
-  "bar": "18 of 20 (at least 20 cases, 90 percent)",
-  "bar_met": true,
-  "gate_open": true,
+  "n": 28,
+  "right_cases": 12,
+  "wrong_building_cases": 16,
+  "hits": 17,
+  "misses": [
+    "vx-r01",
+    "vx-r02",
+    "vx-r04",
+    "vx-r05",
+    "vx-r06",
+    "vx-r07",
+    "vx-r08",
+    "vx-r09",
+    "vx-r10",
+    "vx-r11",
+    "vx-r12"
+  ],
+  "next_door": {
+    "n": 8,
+    "hits": 8
+  },
+  "by_kind": {
+    "right": {
+      "n": 12,
+      "hits": 1
+    },
+    "next_door": {
+      "n": 8,
+      "hits": 8
+    },
+    "wrong": {
+      "n": 8,
+      "hits": 8
+    }
+  },
+  "hash_diff_range": {
+    "right": [
+      5,
+      31
+    ],
+    "next_door": [
+      14,
+      42
+    ],
+    "wrong": [
+      27,
+      38
+    ]
+  },
+  "hash_threshold": 8,
+  "bar": "18 of 20 (at least 20 cases, 90 percent), and 6+ next-door cases at 90 percent",
+  "bar_met": false,
+  "next_door_ok": true,
+  "gate_open": false,
   "synthetic_cases": false,
   "cases_from": "local kit set"
 }

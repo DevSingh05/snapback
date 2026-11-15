@@ -143,30 +143,55 @@ def test_results_json_carries_no_addresses(tmp_path):
     assert json.loads(text)["n"] == 20
 
 
-def test_builder_makes_right_and_wrong_cases_from_listings():
+def test_builder_makes_right_next_door_and_wrong_cases_from_listings():
+    # 60 listings in pairs 20 m apart, pairs 1.1 km apart: next-door pairs exist, 50 m+ ones do not
     rows = [
         {
             "propertyId": i,
             "address": f"{i} Main St",
-            "lat": 29.7 + (i // 2) * 0.01 + (i % 2) * 0.001,
+            "lat": 29.7 + (i // 2) * 0.01 + (i % 2) * 0.0002,
             "lon": -95.3,
         }
         for i in range(60)
     ]
-    built = vs.build_cases(rows, n_right=14, n_wrong=10)
-    labels = [c["label"] for c in built["cases"]]
-    assert labels.count("right") == 14 and labels.count("wrong") == 10
+    built = vs.build_cases(rows, n_right=10, n_next_door=6, n_wrong=0)
+    kinds = [c["kind"] for c in built["cases"]]
+    assert kinds.count("right") == 10 and kinds.count("next_door") == 6
     for c in built["cases"]:
         same = c["claimed_property_id"] == c["expected_property_id"]
         assert same == (c["label"] == "right")
-    wrong = [c for c in built["cases"] if c["label"] == "wrong"]
-    assert all(40 <= c["distance_m"] <= 500 for c in wrong)
+        if c["kind"] == "next_door":
+            assert 8 <= c["distance_m"] < 50 and c["label"] == "wrong"
+        if c["kind"] == "right":
+            assert c["expected_offset_m"] > 0  # the check is not a tile against itself
+
+
+def test_right_cases_fetch_an_offset_tile_not_the_same_one():
+    seen = []
+
+    def tile(record, direction="north", **_):
+        seen.append((record.property_id, record.lat))
+        return None
+
+    d = doc(1, 0)
+    d["cases"][0]["expected_offset_m"] = 10
+    vs.run_cases(d, source=DataSource.LIVE, tile_fn=tile)
+    assert len({lat for _, lat in seen}) == 2  # two different centres
+    assert len({pid for pid, _ in seen}) == 2  # and two cache keys
+
+
+def test_a_next_door_case_counts_as_wrong_and_is_reported_apart():
+    d = doc(18, 2)
+    d["cases"][-1]["kind"] = "next_door"
+    r = vs.run_cases(d, source=DataSource.FIXTURE)
+    assert r["next_door"] == {"n": 1, "hits": 1}
 
 
 def test_the_committed_fixture_set_is_big_enough_and_synthetic():
     d = json.loads(FIXTURE_SET.read_text())
     assert len(d["cases"]) >= 20
     assert sum(c["label"] == "wrong" for c in d["cases"]) >= 6
+    assert sum(c.get("kind") == "next_door" for c in d["cases"]) >= 6
     assert d["synthetic"] is True
     r = vs.run_cases(d, source=DataSource.FIXTURE)
-    assert r["bar_met"] is True
+    assert r["bar_met"] is True and r["next_door_ok"] is True
