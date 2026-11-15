@@ -166,6 +166,25 @@ export interface TimelineTodo {
 // GET /cases/{id}/timeline. Read token in a header; served with Cache-Control no-store.
 // `todos` (the agent's last todo list) and `plan` (sub-agents it handed work to, in order)
 // are empty unless the deep agent ran. `fell_back`: the agent stopped and code finished.
+// One tool call on a member's trace card: the tool's own name, what it did in plain words and one
+// short line of what came back. Cleaned by the API: no phone, address, rent or result word.
+export interface TraceTool {
+  tool: string;
+  label: string;
+  result: string;
+}
+
+// One member's trace card (the planner first, then each sub-agent in the order work reached it).
+export interface MemberTrace {
+  kind: string; // "planner", or the sub-agent's name ("record", "owner", "place", ...)
+  model: string; // what ran it: "Claude Sonnet", "Claude Haiku", ...
+  asked?: string | null; // the planner's instruction to it; null for the planner
+  tools: TraceTool[];
+  said?: string | null; // what it handed back, trimmed
+  took_ms?: number | null;
+  model_calls: number;
+}
+
 export interface CaseTimeline {
   case_id: string;
   source: DataSource;
@@ -177,6 +196,10 @@ export interface CaseTimeline {
   steps: TimelineStep[];
   todos: TimelineTodo[];
   plan: string[];
+  // The trace cards when the deep agent ran; empty or absent with the policy and on older servers.
+  members?: MemberTrace[];
+  // The run's LangSmith project page, when the server names one. Never carries a key or token.
+  trace_url?: string | null;
 }
 
 // One working note the agent wrote (GET /cases/{id}/notes). Derived text only.

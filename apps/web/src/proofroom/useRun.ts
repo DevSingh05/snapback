@@ -16,7 +16,14 @@ import {
 import type { Card, CaseTimeline, RealListing } from "../contracts";
 import { openTimelineStream } from "../case/useTimelineStream";
 import { asRoster, bundledRoster, type Roster } from "./model";
-import { SAMPLE_ID, sampleCard, sampleTimeline } from "./sample";
+import {
+  DEEP_SAMPLE_ID,
+  SAMPLE_ID,
+  deepCard,
+  deepTimeline,
+  sampleCard,
+  sampleTimeline,
+} from "./sample";
 
 export function useRoster(lang: string): Roster {
   const [roster, setRoster] = useState<Roster>(() => bundledRoster(lang));
@@ -90,6 +97,9 @@ export function useRun(caseId: string | null, lang = "en"): Run {
   const [run, setRun] = useState<Run>(caseId ? { ...NONE, status: "loading" } : NONE);
   useEffect(() => {
     if (!caseId) return setRun(NONE);
+    if (caseId === DEEP_SAMPLE_ID) {
+      return setRun({ status: "ready", card: deepCard, timeline: deepTimeline, listing: null });
+    }
     const sample =
       caseId === SAMPLE_ID || (!apiBase() && caseId.toUpperCase() === sampleCard.case_id);
     if (sample) {

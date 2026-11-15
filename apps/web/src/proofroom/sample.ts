@@ -2,6 +2,7 @@
 // card (fixtures/contracts/card_hold.json) with a team-made timeline that fits it. Synthetic,
 // marked FIXTURE everywhere; the times are made up to read like a check with photos.
 import cardHold from "../../../../fixtures/contracts/card_hold.json";
+import deepSample from "./deepSample.json";
 import type { Card, CaseTimeline, TimelineStep } from "../contracts";
 
 export const SAMPLE_ID = "sample";
@@ -57,3 +58,11 @@ export const sampleTimeline: CaseTimeline = {
   todos: [],
   plan: [],
 };
+
+// A deep-agent run, for the trace cards: a real deepagents graph (planner, sub-agents, their
+// tools, the to-do list and the notes) driven by a scripted model instead of Claude, on the
+// fixture kit, then saved exactly as the API served it. The words the "model" says are the
+// team's; the shapes, the order and the counts are the graph's own. FIXTURE everywhere.
+export const DEEP_SAMPLE_ID = "deep-sample";
+export const deepCard = (deepSample as { card: Card }).card;
+export const deepTimeline = (deepSample as { timeline: CaseTimeline }).timeline;
