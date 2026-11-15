@@ -3,6 +3,8 @@ No network: answers are recordings in fixtures/public/recorded.json. The key her
 
 import logging
 
+import pytest
+
 from snapback.agent.join import KitLookups
 from snapback.contracts import (
     CardTone,
@@ -132,3 +134,79 @@ def test_a_live_run_with_a_key_searches_and_the_flag_turns_it_off(monkeypatch):
     finally:
         monkeypatch.undo()
         get_settings.cache_clear()
+
+
+# --- what counts as a for-sale page (reviewer FIX 1) -----------------------------------------
+
+
+def page(link, title="", **extra):
+    return {"visual_matches": [{"link": link, "title": title, **extra}]}
+
+
+def test_realtor_for_sale_path_is_a_sale():
+    body = page("https://www.realtor.com/realestateandhomes-detail/14-Example-Ln_Houston_TX_77096")
+    assert lens.listing_host_in(body) == "realtor.com"
+
+
+def test_realtor_rental_path_is_not():
+    body = page("https://www.realtor.com/rentals/details/14-Example-Ln_Houston_TX_77096")
+    assert lens.listing_host_in(body) is None
+
+
+def test_for_sale_in_the_title_is_a_sale_when_nothing_says_rent():
+    link = "https://www.redfin.com/TX/Houston/14-Example-Ln-77096/home/1"
+    assert lens.listing_host_in(page(link, "14 Example Ln | 3 bed house for sale")) == "redfin.com"
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://www.zillow.com/homedetails/14-Example-Ln-Houston-TX-77096/1_zpid/",
+        "https://www.homes.com/property/14-example-ln-houston-tx/abc/",
+    ],
+)
+def test_a_site_that_uses_one_pattern_for_both_is_not_flagged_without_a_sale_signal(link):
+    assert lens.listing_host_in(page(link, "14 Example Ln, Houston, TX 77096")) is None
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"title": "14 Example Ln - $2,400/mo"},
+        {"title": "House for sale or $2,400 per month"},
+        {"title": "3 bed home", "price": {"value": "$2,400/mo"}},
+        {"title": "14 Example Ln for rent"},
+        {"title": "Apartments at Example Ln, for sale"},
+    ],
+)
+def test_a_rental_signal_drops_the_match_even_with_for_sale_wording(extra):
+    link = "https://www.zillow.com/homedetails/14-Example-Ln-Houston-TX-77096/1_zpid/"
+    assert lens.listing_host_in(page(link, **{**extra})) is None
+
+
+@pytest.mark.parametrize("street", ["Brentwood", "Trenton", "Torrent", "Parentis"])
+def test_streets_that_contain_rent_are_not_rentals(street):
+    link = f"https://www.realtor.com/realestateandhomes-detail/9-{street}-Dr_Houston_TX_77096"
+    assert lens.listing_host_in(page(link)) == "realtor.com"
+    titled = page(
+        f"https://www.redfin.com/TX/Houston/9-{street}-Dr/home/1", f"9 {street} Dr for sale"
+    )
+    assert lens.listing_host_in(titled) == "redfin.com"
+
+
+def test_a_for_sale_word_in_the_address_counts():
+    link = "https://www.trulia.com/homes-for-sale/14-example-ln"
+    assert lens.listing_host_in(page(link)) == "trulia.com"
+
+
+def test_other_hosts_never_match():
+    assert lens.listing_host_in(page("https://blog.example.test/x", "house for sale")) is None
+
+
+def test_the_httpx_logger_cannot_print_the_api_key():
+    import logging
+
+    from snapback.public import fetch  # noqa: F401  (importing it sets the levels)
+
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
+    assert logging.getLogger("httpcore").getEffectiveLevel() >= logging.WARNING

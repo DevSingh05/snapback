@@ -346,7 +346,7 @@ EN: dict[str, str] = {
     "link.domain_age": "A link in the ad is on a domain registered {years}+ years ago. No flag.",
     "link.domain_age_months": "A link in the ad is on a domain registered {days} days ago.",
     "link.domain_not_checked": "Not checked (the domain registry did not answer).",
-    "rent.hud_within": "In line with the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
+    "rent.hud_within": "Not far below the typical rent here (HUD, ZIP {zip}, {size}): {rent}.",
     "rent.hud_below": (
         "Typical rent here (HUD, ZIP {zip}, {size}): {rent}. This rent is {percent}% under it. "
         "Ask why; discounts happen."
@@ -976,7 +976,8 @@ ES: dict[str, str] = {
     ),
     "link.domain_not_checked": "No comprobado (el registro de dominios no respondió).",
     "rent.hud_within": (
-        "Acorde con la renta típica de la zona (HUD, código postal {zip}, {size}): {rent}."
+        "No muy por debajo de la renta típica de la zona (HUD, código postal {zip}, {size}): "
+        "{rent}."
     ),
     "rent.hud_below": (
         "Renta típica de la zona (HUD, código postal {zip}, {size}): {rent}. Esta renta está "

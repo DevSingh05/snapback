@@ -25,12 +25,28 @@ _IMAGE = re.compile(
     r"https?://[^\s\"'<>]{1,300}?(?:\.(?:jpe?g|png|webp)(?:\?[^\s\"'<>]{0,100})?|/images?/[^\s\"'<>]{1,200})",
     re.I,
 )
-# Pages where a home is listed for sale. A page whose address says rent is not one.
+# Pages where a home may be listed. A host alone is not enough: Zillow, Redfin, Homes.com and HAR
+# use one address pattern for rentals and sales.
 LISTING_HOSTS = (
     "zillow.com", "redfin.com", "realtor.com", "homes.com", "har.com", "trulia.com",
     "movoto.com", "compass.com", "coldwellbanker.com", "century21.com", "remax.com", "kw.com",
 )  # fmt: skip
-_RENTAL = re.compile(r"rent|lease|apartment", re.I)
+# "rent" is a word only when no letter or digit touches it, so Brentwood and Trenton are streets.
+_NOT_ALNUM_BEFORE, _NOT_ALNUM_AFTER = r"(?<![a-z0-9])", r"(?![a-z0-9])"
+_RENTAL = re.compile(
+    _NOT_ALNUM_BEFORE + r"(?:for[-_ /]?rent|rentals?|rent|rented|lease|leases|leasing|apartments?|"
+    r"per[-_ ]?(?:month|mo))"
+    + _NOT_ALNUM_AFTER
+    + r"|/\s?mo"
+    + _NOT_ALNUM_AFTER,  # "$2,400/mo" has digits before the slash, so it needs its own branch
+    re.I,
+)
+# A sale shows itself in the page's address or its title. Only these count.
+_SALE_PATH = (
+    re.compile(_NOT_ALNUM_BEFORE + r"(?:homes?[-_]for[-_]sale|for[-_]sale)" + _NOT_ALNUM_AFTER),
+    re.compile(r"/realestateandhomes-detail/"),  # realtor.com: its rentals live under /rentals/
+)
+_SALE_TITLE = re.compile(_NOT_ALNUM_BEFORE + r"for sale" + _NOT_ALNUM_AFTER, re.I)
 
 
 def photo_urls(text: str) -> list[str]:
@@ -43,16 +59,44 @@ def _host(link: str) -> str:
     return (urlparse(link).hostname or "").lower().removeprefix("www.")
 
 
+def _text_of(match: dict) -> str:
+    """The words a match shows beside its link: title, source, snippet and price text."""
+    parts = [match.get("title"), match.get("source"), match.get("snippet")]
+    price = match.get("price")
+    if isinstance(price, dict):
+        parts.append(price.get("value"))
+    return " ".join(p for p in parts if isinstance(p, str))
+
+
+def is_for_sale_page(match: dict) -> str | None:
+    """The match's host if it is a page that says the home is FOR SALE, else None.
+
+    A sale signal is required: a for-sale path (realtor.com /realestateandhomes-detail/, or
+    "for-sale" in the address) or "for sale" in the title. Any rental signal (rent, lease,
+    apartment, "/mo", "per month") drops it. A site that uses one address pattern for rentals
+    and sales (Zillow homedetails, Homes.com /property/, ...) with nothing else to tell them
+    apart is not flagged."""
+    link = match.get("link")
+    if not isinstance(link, str):
+        return None
+    host = _host(link)
+    if not any(host == known or host.endswith("." + known) for known in LISTING_HOSTS):
+        return None
+    path = urlparse(link).path.lower()
+    shown = _text_of(match)
+    if _RENTAL.search(path) or _RENTAL.search(shown):
+        return None
+    if any(rule.search(path) for rule in _SALE_PATH) or _SALE_TITLE.search(shown):
+        return host
+    return None
+
+
 def listing_host_in(body: dict | None) -> str | None:
     """The first visual match that is a for-sale listing page, as its host. None if none."""
     matches = body.get("visual_matches") if isinstance(body, dict) else None
     for match in matches or []:
-        link = match.get("link") if isinstance(match, dict) else None
-        if not isinstance(link, str):
-            continue
-        host = _host(link)
-        listed = any(host == known or host.endswith("." + known) for known in LISTING_HOSTS)
-        if listed and not _RENTAL.search(urlparse(link).path):
+        host = is_for_sale_page(match) if isinstance(match, dict) else None
+        if host:
             return host
     return None
 

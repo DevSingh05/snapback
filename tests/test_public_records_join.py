@@ -4,7 +4,7 @@ two HUD lines read differently, and two copy bugs in #301's lines stay fixed."""
 import pytest
 
 from snapback.agent.intake import read_listing
-from snapback.agent.join import JoinedModules
+from snapback.agent.join import JoinedModules, owner_of_county
 from snapback.agent.rules.contact import FIXTURE_PHONE_SALT
 from snapback.contracts import (
     DataSource,
@@ -15,6 +15,7 @@ from snapback.contracts import (
     PublicStatus,
     RecordLine,
 )
+from snapback.public.census import in_harris_county
 from snapback.verdict import build_card
 
 
@@ -137,3 +138,51 @@ def test_the_lookup_passes_the_hit_on_to_the_registries(monkeypatch):
     assert seen["hit"] is True
     KitLookups(DataSource.FIXTURE).public_records("x")
     assert seen["hit"] is None
+
+
+# --- the owner roll is asked only about Harris County (reviewer FIX 2) -----------------------
+
+DALLAS = "House at 100 Fixture Ln, Dallas, TX 75201 for rent"
+HOUSTON = "House at 100 Fixture Ln, Houston, TX 77096 for rent"
+
+
+def found(fips):
+    return PlaceCheck(status=PublicStatus.FOUND, county_fips=fips, source=DataSource.FIXTURE)
+
+
+@pytest.mark.parametrize(
+    ("text", "place", "allowed"),
+    [
+        (DALLAS, found("48113"), False),  # Census says Dallas County
+        (HOUSTON, found("48201"), True),
+        (DALLAS, None, False),  # no Census check, no Harris city
+        (HOUSTON, None, True),  # no Census check, but the ad names Houston
+        (HOUSTON, PlaceCheck(status=PublicStatus.NO_MATCH, source=DataSource.FIXTURE), True),
+        ("House at 100 Fixture Ln, TX 75201", None, False),
+        (HOUSTON, found("48113"), False),  # the county wins over the ad's wording
+        ("Brenthouston Rd, Dallas, TX", None, False),
+    ],
+)
+def test_who_may_be_asked_the_harris_owner_roll(text, place, allowed):
+    assert in_harris_county(text, place) is allowed
+
+
+class OwnerLookups:
+    def __init__(self):
+        self.asked = 0
+
+    def owner(self, text):
+        from snapback.contracts import OwnerKind, OwnerResult
+
+        self.asked += 1
+        return OwnerResult(kind=OwnerKind.PERSON)
+
+
+def test_a_non_harris_address_with_a_harris_street_twin_gets_no_owner_line():
+    lookups = OwnerLookups()
+    assert owner_of_county(lookups, DALLAS, found("48113")) is None
+    assert lookups.asked == 0  # the roll was never asked
+    assert owner_of_county(lookups, HOUSTON, found("48201")) is not None
+    assert lookups.asked == 1
+    card_lines = lines_of([], owner=None)
+    assert not [ln for ln in card_lines if ln.source_name == "HCAD"]

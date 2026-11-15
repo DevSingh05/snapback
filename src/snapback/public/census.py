@@ -73,3 +73,26 @@ def check(address: str, fetcher: Fetcher, timeout: float = 2.0) -> PlaceCheck:
         county=name,
         source=fetcher.source,
     )
+
+
+HARRIS_FIPS = "48201"
+# Cities that sit in Harris County (a city that straddles a county line, like Katy, is left out).
+_HARRIS_CITIES = (
+    "Houston", "Pasadena", "Baytown", "Humble", "Spring", "Tomball", "Cypress", "Channelview",
+    "Bellaire", "Deer Park", "La Porte", "Galena Park", "Jersey Village", "South Houston",
+    "West University Place", "Seabrook", "Crosby", "Highlands", "Kingwood", "Atascocita",
+    "Aldine", "Katy Heights",
+)  # fmt: skip
+_HARRIS_CITY = re.compile(
+    r"(?<![A-Za-z])(?:" + "|".join(re.escape(c) for c in _HARRIS_CITIES) + r")(?![A-Za-z])", re.I
+)
+
+
+def in_harris_county(text: str, place: PlaceCheck | None) -> bool:
+    """May the HCAD owner roll be asked about this ad? When the Census check found the address,
+    its county decides (48201 is Harris). Without that, only an ad that names a Harris County
+    city. The HCAD street key has no city or county, so a street in Dallas must never be matched
+    against a Harris street of the same name."""
+    if place is not None and place.status is PublicStatus.FOUND and place.county_fips:
+        return place.county_fips == HARRIS_FIPS
+    return _HARRIS_CITY.search(text or "") is not None

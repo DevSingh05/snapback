@@ -128,3 +128,19 @@ def test_the_card_price_line_in_spanish():
     card = build_card(modules, lang="es")
     line = next(ln for row in card.rows for ln in row.lines if ln.key == "label.rent_vs_record")
     assert "HUD" in line.text and "77096" in line.text and "$1,930" in line.text
+
+
+@pytest.mark.parametrize(
+    ("lang", "starts"),
+    [("en", "Not far below the typical rent here"), ("es", "No muy por debajo de la renta típica")],
+)
+def test_a_rent_at_or_above_the_cutoff_is_not_called_in_line(lang, starts):
+    price = joined(1500).price("c")  # 78% of 1930: not flagged, but not "in line" either
+    modules = ModuleEvidence(case_id="fx-1", source=DataSource.FIXTURE, price=price)
+    line = next(
+        ln
+        for row in build_card(modules, lang=lang).rows
+        for ln in row.lines
+        if ln.source_name == "HUD"
+    )
+    assert line.text.startswith(starts) and "$1,930" in line.text

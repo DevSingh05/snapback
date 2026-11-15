@@ -16,6 +16,9 @@ import httpx
 from snapback.contracts import DataSource
 
 log = logging.getLogger("snapback.public")
+# httpx logs every request URL at INFO, and a SerpApi call carries its key in the query string.
+for _name in ("httpx", "httpcore"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 RECORDED = Path(__file__).resolve().parents[3] / "fixtures" / "public" / "recorded.json"
 USER_AGENT = "snapback-hackprinceton/1.0 (public-record checks; contact via repo)"
 

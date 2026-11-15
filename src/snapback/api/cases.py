@@ -38,7 +38,7 @@ from snapback.agent.join import (
     KitLookups,
     Lookups,
     license_of,
-    owner_of,
+    owner_of_county,
     public_checks_of,
 )
 from snapback.agent.locate_live import LiveLocate
@@ -712,10 +712,12 @@ class CaseStore:
             # D10: only a live run calls the licence list, and a lookup that breaks is "not
             # looked up". It reads the poster's own claim in the text and keeps no name.
             license = license_of(self._lookups, listing.text)
-            # D12: the owner of record of the home the listing claims, when lane D holds one.
-            owner = owner_of(self._lookups, listing.text)
             # Public data: the Census address check and the age of a link's domain (RDAP).
             place_check, domain_check = public_checks_of(self._lookups, listing.text)
+            # D12: the owner of record of the home the listing claims, when lane D holds one.
+            # After the Census check, and only for a Harris County address: the HCAD roll is
+            # keyed by street alone, so another county's street could match a Harris one.
+            owner = owner_of_county(self._lookups, listing.text, place_check)
 
         live = not asked_by_name and (
             self._settings.snapback_data_source is DataSource.LIVE

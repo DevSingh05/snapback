@@ -117,6 +117,18 @@ def owner_of(lookups: Lookups, listing_text: str) -> OwnerResult | None:
         return None
 
 
+def owner_of_county(
+    lookups: object, listing_text: str, place: PlaceCheck | None
+) -> OwnerResult | None:
+    """The owner of record, asked only about a Harris County address (HCAD's roll is keyed by
+    street alone, so another county's street must never be matched against a Harris one)."""
+    from snapback.public.census import in_harris_county
+
+    if not in_harris_county(listing_text, place):
+        return None
+    return owner_of(lookups, listing_text)  # type: ignore[arg-type]
+
+
 def public_checks_of(
     lookups: object, listing_text: str
 ) -> tuple[PlaceCheck | None, DomainCheck | None]:
