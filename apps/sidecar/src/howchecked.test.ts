@@ -88,7 +88,9 @@ const said = (text: string): InboundMessage => ({
 test("one line per agent from the real timeline, red flags first, the card's verdict last", () => {
   const text = howCheckedText(TIMELINE, card, "http://web.test/case/7Q2M");
   const lines = text.split("\n");
-  assert.equal(lines[0], "Hold off for now");
+  // the card's own headline when it has one (#280's red-flag headlines), else the state's
+  assert.equal(lines[0], card.headline ?? "Hold off for now");
+  assert.equal(lines.at(-3), `- Result: ${lines[0]}`, "the verdict is the headline");
   const flag = lines.findIndex((l) => /Red flag/.test(l));
   const agents = ["Rules", "Record", "Photo"].map((a) =>
     lines.findIndex((l) => l.startsWith(`- ${a} agent:`)),
