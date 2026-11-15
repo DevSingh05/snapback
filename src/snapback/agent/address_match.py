@@ -118,21 +118,24 @@ MIN_NAME_TOKENS = 2
 MIN_TOKEN_CHARS = 3
 
 
+CONNECTORS = frozenset({"at", "on", "of", "by", "the", "and", "in"})
+
+
 def _tokens(text: str) -> list[str]:
-    return _WORD.findall(text.lower())
+    """Lowercase words without connectors, so "District at Greenbriar" reads as two words and
+    "The Oaks" as one. Used for the building names and for the ad alike."""
+    return [word for word in _WORD.findall(text.lower()) if word not in CONNECTORS]
 
 
 def build_name_index(
     records: Iterable[PropertyRecord],
 ) -> dict[tuple[str, ...], list[PropertyRecord]]:
     """Every record under its building name as lowercase word tokens, with or without a
-    website: a name without one still blocks a shorter name inside it. A name of one word, or
-    with a word under 3 letters, is too common to name one building."""
+    website: a name without one still blocks a shorter name inside it. A name of one word,
+    or with a remaining word under 3 letters, is too common to name one building."""
     index: dict[tuple[str, ...], list[PropertyRecord]] = {}
     for record in records:
         name = tuple(_tokens(record.building_name or ""))
-        if name[:1] == ("the",):  # "The Oaks" is one word of name
-            name = name[1:]
         if len(name) >= MIN_NAME_TOKENS and all(len(word) >= MIN_TOKEN_CHARS for word in name):
             index.setdefault(name, []).append(record)
     return index
