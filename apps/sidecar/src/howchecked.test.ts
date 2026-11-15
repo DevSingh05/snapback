@@ -31,7 +31,11 @@ const DONE = {
       result: "$1,150 is under $1,450 on record.",
       by: "agent",
     },
-    { label: "The deep agent stopped: it waited too long behind other checks; code set the verdict", result: "Done.", by: "code" },
+    {
+      label: "The deep agent stopped: it waited too long behind other checks; code set the verdict",
+      result: "Done.",
+      by: "code",
+    },
     {
       label: "Code worked out the result",
       result: "Worked out by code from the evidence. No model picks it.",
@@ -156,9 +160,12 @@ test("[Low] license steps are the Record agent's, not the Rules agent's", () => 
   assert.doesNotMatch(rules, /license/);
 });
 
-test("[Low] 'the agent stopped, so code finished the checks' is shown as its own line", () => {
+test("[Low] the deep agent stopped line is shown as its own line", () => {
   const text = howCheckedText(DONE, card, "http://web.test/case/7Q2M");
-  assert.match(text, /\n- The agent stopped, so code finished the checks\n/);
+  assert.match(
+    text,
+    /\n- The deep agent stopped: it waited too long behind other checks; code set the verdict\n/,
+  );
 });
 
 test("never a phone digit or a rent figure, even if the timeline carried one", () => {
