@@ -559,6 +559,25 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
     else:
         main = _line(lang, "label.real", CardTone.NOT_SHOWN, "place.not_located")
 
+    # "Match this building": only photos placed in it. A flipped photo placed in another building
+    # already carries the red "different building" line.
+    flipped = sum(
+        photo.flipped is True and photo.status is LocateStatus.LOCATED_IN_CLAIMED
+        for photo in photos
+    )
+    mirrored = []
+    if flipped:
+        mirrored = [
+            _line(
+                lang,
+                "label.mirrored",
+                CardTone.HOLD,
+                "place.mirrored",
+                flipped=flipped,
+                total=total,
+            )
+        ]
+
     matched = []
     if elsewhere and modules.matched_office:
         matched = [
@@ -574,6 +593,7 @@ def _place_row(modules: ModuleEvidence, lang: str) -> CardRow:
         kind=CardRowKind.PLACE,
         lines=[
             main,
+            *mirrored,
             *_from_record(modules, matched),
             *_from_record(modules, [*_for_sale_lines(modules, lang), *_unit_lines(modules, lang)]),
             *_seen_before_lines(modules, lang, replies=False),

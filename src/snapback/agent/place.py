@@ -533,6 +533,7 @@ def write_evidence_file(
             rival_ratio=loc.rival_ratio,
             bar_failed=loc.bar_failed,
             room_label=loc.room_label,
+            flipped=loc.flipped,
             scan_alias=scan_alias.get(loc.model_id or ""),
             searches=list(steps.get(loc.photo_id, [])),
             points=points.get(loc.photo_id),
