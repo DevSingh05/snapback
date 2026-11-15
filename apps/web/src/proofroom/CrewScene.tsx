@@ -9,22 +9,27 @@
 // the fresh card on a run that was watched live). Members the ad did not need sit on the bench
 // at the edge; a check the plan left out shows as a dashed outline.
 //
+// The setting (crewGround.ts) is there so the crew sits well beside the listing's real photos:
+// a sky with a low warm sun, a street of neighbours fading into haze, a lawn with stripes and
+// a paved path, and a soft shadow under the home and under every member. What a member says
+// sits in one of two slots over the sky, large enough to read from across a room, and the
+// member who is speaking carries a small speech mark.
+//
 // With `moving` off (reduced motion, or nothing playing) no note flies and nothing loops: the
 // states, the bubbles and the stamp still change. Nothing here works out a result.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import "../draw/draw.css";
 import "./crew.css";
 import { Parts } from "../draw/Parts";
-import { makeScene, part, project, type Part, type Prim } from "../draw/kit";
+import { project, type Prim } from "../draw/kit";
 import { deskWord } from "./AgentStrip";
 import { Badge } from "./Badge";
 import {
   BUBBLES_MAX,
   HOME,
-  ORIGIN,
-  PLOT,
   VIEW,
+  bubbleSlots,
   crewActions,
   crewBubbles,
   crewCast,
@@ -32,6 +37,8 @@ import {
   type CrewActor,
 } from "./crew";
 import { DESK_TOP, figure } from "./crewFigure";
+import { crewScenery } from "./crewGround";
+import { BENCH_LINE, SLOTS, STAMP, nameLines, tagLayout, type Box } from "./crewLayout";
 import type { Floor, Lang, TeamView } from "./model";
 import { shortName } from "./TeamGraph";
 import type { RoomWords } from "./words";
@@ -50,55 +57,108 @@ function Prims({ prims }: { prims: Prim[] }) {
   return <Parts parts={[{ name: "p", prims }]} />;
 }
 
-/** The plot: a slab of lawn, the walk that loops round the home, the home itself. */
-function ground(): { lawn: Part[]; home: Part[] } {
-  const s = makeScene(ORIGIN);
-  const a = 44; // the walk's outer edge
-  const t = 11; // its width
-  const b = PLOT - a;
-  const door = HOME.y + HOME.d * 0.5;
-  return {
-    lawn: [
-      part("slab", [
-        s.contact(0, 0, PLOT, PLOT, 12, -8),
-        s.onY("house-plinth-left", PLOT, 0, PLOT, -8, 0),
-        s.onX("house-plinth-right", PLOT, 0, PLOT, -8, 0),
-        s.onZ("dk-lawn", 0, 0, 0, PLOT, PLOT),
-      ]),
-      part("walk", [
-        s.onZ("dk-path", 0.05, a, a, b - a, t),
-        s.onZ("dk-path", 0.05, a, b - t, b - a, t),
-        s.onZ("dk-path", 0.05, a, a, t, b - a),
-        s.onZ("dk-path", 0.05, b - t, a, t, b - a),
-        s.onZ("dk-path", 0.05, HOME.x + HOME.w, door, b - t - HOME.x - HOME.w, 12),
-      ]),
-      s.tree(62, 62, 0.9),
-    ],
-    home: [
-      ...s.house(HOME.x, HOME.y, HOME.w, HOME.d, HOME.h, "white", "slate"),
-      s.shrub(HOME.x + 4, HOME.y + HOME.d + 3, 20, 5),
-      s.tree(150, 150, 0.7),
-    ],
-  };
-}
+// Where the far ground meets the sky, and how far down the haze reaches, in stage units.
+const HORIZON = 150;
+const HAZE_END = 300;
+// A far line of trees along the horizon: a fixed silhouette, low and uneven.
+const RIDGE = (() => {
+  const rise = [6, 11, 8, 14, 9, 5, 12, 16, 10, 7, 13, 9, 6, 11, 15, 8, 5, 10, 13, 7, 9];
+  const step = VIEW.w / (rise.length - 1);
+  const top = rise.map((r, i) => `${(i * step).toFixed(1)} ${HORIZON - r}`).join(" L");
+  return `M0 ${HORIZON + 2} L${top} L${VIEW.w} ${HORIZON + 2} Z`;
+})();
 
-/** A member on the far side of the plot: its name tag goes over its head, into the sky. */
-const isBack = (a: CrewActor) =>
-  a.place === "lead" || (a.place === "ring" && a.sy < ORIGIN.oy + PLOT / 2 - 1);
 const HOME_DEPTH = HOME.x + HOME.w / 2 + HOME.y + HOME.d / 2;
-// How wide a speech bubble is, in stage units.
-const BUBBLE_W = 182;
 const [PILE_X, PILE_Y] = project(DESK_TOP, { ox: 0, oy: 0 });
 const pct = (v: number, of: number) => `${Math.round((v / of) * 10000) / 100}%`;
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** A box of crewLayout.ts as CSS, in parts of the stage. */
+const place = (b: Box): CSSProperties => ({
+  left: pct(b.x, VIEW.w),
+  top: pct(b.y, VIEW.h),
+  width: pct(b.w, VIEW.w),
+  height: pct(b.h, VIEW.h),
+});
+
+interface GradIds {
+  sky: string;
+  sun: string;
+  haze: string;
+  shade: string;
+}
+
+/** Everything that never changes while a run plays: the sky, the streets, the neighbours, the
+ *  lawn. Drawn once; the player's clock does not redraw it. */
+const Setting = memo(function Setting({ ids }: { ids: GradIds }) {
+  const scene = useMemo(crewScenery, []);
+  return (
+    <>
+      <defs>
+        <linearGradient id={ids.sky} x1="0" y1="0" x2="0" y2="1">
+          <stop className="cs-sky-high" offset="0" />
+          <stop className="cs-sky-low" offset="1" />
+        </linearGradient>
+        <radialGradient id={ids.sun} cx="0.1" cy="0.5" r="0.75">
+          <stop className="cs-sun-stop" offset="0" stopOpacity="0.85" />
+          <stop className="cs-sun-stop" offset="1" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={ids.haze} x1="0" y1="0" x2="0" y2="1">
+          <stop className="cs-haze-stop" offset="0" stopOpacity="0" />
+          <stop className="cs-haze-stop" offset="0.5" stopOpacity="0.92" />
+          <stop className="cs-haze-stop" offset="1" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id={ids.shade}>
+          <stop className="cs-shade-stop" offset="0.2" stopOpacity="0.42" />
+          <stop className="cs-shade-stop" offset="1" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <g data-testid="crew-sky" className="cs-sky">
+        <rect width={VIEW.w} height={HORIZON + 4} fill={`url(#${ids.sky})`} />
+        <rect width={VIEW.w} height={HORIZON + 4} fill={`url(#${ids.sun})`} />
+        <path className="cs-ridge" d={RIDGE} />
+        <rect className="cs-verge" y={HORIZON} width={VIEW.w} height={VIEW.h - HORIZON} />
+      </g>
+      <Parts parts={scene.streets} />
+      <g data-testid="crew-backdrop" className="cs-backdrop">
+        <Parts parts={scene.backdrop} />
+      </g>
+      <rect
+        data-testid="crew-haze"
+        className="cs-haze"
+        width={VIEW.w}
+        height={HAZE_END}
+        fill={`url(#${ids.haze})`}
+      />
+      <Parts parts={scene.verge} />
+      <Parts parts={scene.lawn} />
+      <g data-testid="crew-home-shadow" className="cs-soft">
+        <Prims prims={[scene.shadow]} />
+      </g>
+    </>
+  );
+});
+
+/** The home in the ad: it never changes either. */
+const Home = memo(function Home() {
+  const scene = useMemo(crewScenery, []);
+  return (
+    <g data-testid="crew-home" className="cs-home">
+      <Parts parts={scene.home} />
+    </g>
+  );
+});
 
 function Figure({
   actor,
   notes,
+  shade,
+  speaking = false,
   onPick,
 }: {
   actor: CrewActor;
   notes: { id: string; flag: boolean }[];
+  // The id of the soft shadow's gradient.
+  shade: string;
+  speaking?: boolean;
   onPick?: (id: string) => void;
 }) {
   const fig = useMemo(() => figure(actor.persona), [actor.persona]);
@@ -112,8 +172,11 @@ function Figure({
       data-place={actor.place}
       data-state={actor.state}
       data-tone={actor.tone}
+      data-speaking={speaking ? "yes" : "no"}
       onClick={onPick && actor.place !== "bench" ? () => onPick(actor.id) : undefined}
     >
+      {/* A soft shadow on the grass, cast the way the home's is. */}
+      <ellipse className="cs-shadow" cx="5" cy="3" rx="21" ry="8.5" fill={`url(#${shade})`} />
       {actor.place === "bench" ? null : (
         <polygon className="cs-pad" points="0,-11 19,0 0,11 -19,0" />
       )}
@@ -179,8 +242,31 @@ export function CrewScene({
   const bench = cast.filter((a) => a.place === "bench");
   // While the run plays, the two newest speakers; once it is over, the one line that matters.
   const bubbles = crewBubbles(floor, cast, floor.phase === "done" ? 1 : BUBBLES_MAX);
+  const slots = bubbleSlots(bubbles, cast);
+  const speakers = new Set(bubbles.map((b) => b.deskId));
   const filed = reported(floor);
-  const scene = useMemo(ground, []);
+  const uid = useId().replace(/[^A-Za-z0-9_-]/g, "");
+  const ids = useMemo<GradIds>(
+    () => ({
+      sky: `cs-sky-${uid}`,
+      sun: `cs-sun-${uid}`,
+      haze: `cs-haze-${uid}`,
+      shade: `cs-shade-${uid}`,
+    }),
+    [uid],
+  );
+  // Where each name tag goes: worked out from who is on stage, so it holds all run.
+  const names = tagged.map((a) => ({
+    id: a.id,
+    name: shortName(a.card.name),
+    model: a.desk!.model === "code" ? w.code : a.desk!.model,
+  }));
+  const layoutKey = names.map((n) => `${n.id}:${n.name}:${n.model}`).join("|");
+  const layout = useMemo(
+    () => tagLayout(cast, new Map(names.map((n) => [n.id, n]))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layoutKey],
+  );
   const spot = (id: string) => cast.find((a) => a.id === id);
   const lead = cast.find((a) => a.place === "lead");
   const judge = cast.find((a) => a.place === "desk");
@@ -235,7 +321,6 @@ export function CrewScene({
     if (!moving) setNotes([]);
   }, [moving]);
 
-  const wingRow = (a: CrewActor) => staged.filter((x) => x.place === "wing").indexOf(a);
   const far = staged.filter((a) => a.depth < HOME_DEPTH);
   const near = staged.filter((a) => a.depth >= HOME_DEPTH);
   const flying = new Set(notes.filter((n) => n.kind === "report").map((n) => n.id));
@@ -256,18 +341,30 @@ export function CrewScene({
           aria-hidden="true"
           focusable="false"
         >
-          <Parts parts={scene.lawn} />
+          <Setting ids={ids} />
           {far.map((a) => (
-            <Figure key={a.id} actor={a} notes={onDesk} onPick={onPick} />
+            <Figure
+              key={a.id}
+              actor={a}
+              notes={onDesk}
+              shade={ids.shade}
+              speaking={speakers.has(a.id)}
+              onPick={onPick}
+            />
           ))}
-          <g data-testid="crew-home" className="cs-home">
-            <Parts parts={scene.home} />
-          </g>
+          <Home />
           {near.map((a) => (
-            <Figure key={a.id} actor={a} notes={onDesk} onPick={onPick} />
+            <Figure
+              key={a.id}
+              actor={a}
+              notes={onDesk}
+              shade={ids.shade}
+              speaking={speakers.has(a.id)}
+              onPick={onPick}
+            />
           ))}
           {bench.map((a) => (
-            <Figure key={a.id} actor={a} notes={[]} />
+            <Figure key={a.id} actor={a} notes={[]} shade={ids.shade} />
           ))}
           {notes.map((n) => (
             <g
@@ -303,42 +400,31 @@ export function CrewScene({
             </g>
           ))}
         </svg>
+      </div>
 
+      {/* The words on the stage. Every box comes from crewLayout.ts, so none touches another:
+          one name tag per member, speech in two slots over the sky, the stamp beside the desk,
+          the bench's line. On a phone they leave the stage and sit under it, in that order. */}
+      <div className="cs-over" style={{ aspectRatio: `${VIEW.w} / ${VIEW.h}` }}>
         <ol className="cs-tags" aria-label={w.team}>
           {tagged.map((a) => {
             const desk = a.desk!;
-            const above = isBack(a);
-            const x =
-              a.place === "lead"
-                ? a.sx + 36
-                : a.place === "desk"
-                  ? a.sx - 44
-                  : a.place === "wing"
-                    ? VIEW.w - 62
-                    : clamp(a.sx + (a.side === "left" ? -10 : 10), 64, VIEW.w - 64);
-            const y =
-              a.place === "lead"
-                ? a.sy - 60
-                : a.place === "desk"
-                  ? a.sy + 26
-                  : a.place === "wing"
-                    ? VIEW.h - 38 + wingRow(a) * 20
-                    : above
-                      ? a.sy - 58
-                      : a.sy + 9;
+            const box = layout.get(a.id);
             const body = (
               <>
                 <span className="cs-tag-name">
-                  <Badge id={a.id} size={20} />
-                  {shortName(a.card.name)}
+                  <Badge id={a.id} size={22} />
+                  <span>
+                    {nameLines(shortName(a.card.name)).map((line) => (
+                      <span key={line}>{line}</span>
+                    ))}
+                  </span>
                 </span>
-                <span className="cs-tag-line">
-                  <span className="cs-tag-model" title={w.runsOn} data-testid="node-model">
-                    {desk.model === "code" ? w.code : desk.model}
-                  </span>
-                  <span className="cs-tag-state" data-testid="node-state">
-                    {deskWord(desk, lang)}
-                  </span>
+                <span className="cs-tag-model" title={w.runsOn} data-testid="node-model">
+                  {desk.model === "code" ? w.code : desk.model}
+                </span>
+                <span className="cs-tag-state" data-testid="node-state">
+                  {deskWord(desk, lang)}
                 </span>
               </>
             );
@@ -346,12 +432,13 @@ export function CrewScene({
               <li
                 key={a.id}
                 className="cs-tag"
-                style={{ left: pct(x, VIEW.w), top: pct(y, VIEW.h) }}
-                data-at={above ? "above" : "below"}
+                style={box ? place(box) : undefined}
+                data-place={a.place}
                 data-who={a.id}
                 data-agent={a.id}
                 data-state={a.state}
                 data-tone={a.tone}
+                data-speaking={speakers.has(a.id) ? "yes" : "no"}
                 data-testid="team-node"
               >
                 {onPick ? (
@@ -368,47 +455,30 @@ export function CrewScene({
 
         {/* The same words are in the thread below, which is the part a screen reader hears. */}
         <div className="cs-bubbles" aria-hidden="true">
-          {[...bubbles].reverse().map((b) => {
+          {bubbles.map((b, i) => {
             const a = spot(b.deskId)!;
-            // A bubble opens away from the home, into the empty corner on its member's side,
-            // and its tail points back at the member.
-            // The Planner and the Decider speak to the side of where they stand (the Decider
-            // where its stamp will land); a member speaks over its own head.
-            const aside = a.place === "lead" || a.place === "desk";
-            const out = a.side !== "right";
-            const left = aside
-              ? a.sx + (a.place === "desk" ? 46 : 16)
-              : clamp(out ? a.sx + 16 - BUBBLE_W : a.sx - 16, 3, VIEW.w - BUBBLE_W - 3);
-            const tail = clamp(((a.sx - left) / BUBBLE_W) * 100, 6, 94);
-            const style = {
-              left: pct(left, VIEW.w),
-              width: pct(Math.min(BUBBLE_W, VIEW.w - left - 3), VIEW.w),
-              "--tail": `${Math.round(tail)}%`,
-              ...(a.place === "lead"
-                ? { top: pct(4, VIEW.h) }
-                : a.place === "desk"
-                  ? { top: pct(a.sy + 8, VIEW.h) }
-                  : { bottom: pct(VIEW.h - (a.sy - 62 * a.scale - (isBack(a) ? 46 : 0)), VIEW.h) }),
-            } as unknown as CSSProperties;
             const desk = a.desk!;
+            const slot = SLOTS[slots[i] ?? "left"];
             return (
               <p
                 key={`${b.deskId}-${b.kind}`}
                 className="cs-bubble"
-                style={style}
+                style={{ ...place(slot), height: undefined, maxHeight: pct(slot.h, VIEW.h) }}
                 data-testid="crew-bubble"
                 data-agent={b.deskId}
                 data-who={b.deskId}
                 data-kind={b.kind}
                 data-tone={b.tone}
-                data-side={aside ? "lead" : "ring"}
+                data-slot={slots[i]}
               >
-                <Badge id={b.deskId} size={26} />
+                <span className="cs-bubble-who">
+                  <Badge id={b.deskId} size={24} />
+                  {shortName(a.card.name)}
+                </span>
+                {b.kind === "finding" ? (
+                  <span className="cs-bubble-state">{deskWord(desk, lang)}</span>
+                ) : null}
                 <span className="cs-bubble-text">
-                  <span className="cs-bubble-who">
-                    {shortName(a.card.name)}
-                    {b.kind === "finding" ? `: ${deskWord(desk, lang)}` : ""}
-                  </span>
                   {b.text}
                   {b.kind === "working" ? "…" : ""}
                 </span>
@@ -420,18 +490,18 @@ export function CrewScene({
         {floor.verdict && judge ? (
           <p
             className="cs-verdict"
-            style={{ left: pct(judge.sx + 46, VIEW.w), top: pct(judge.sy + 12, VIEW.h) }}
+            style={place(STAMP)}
             data-testid="crew-verdict"
             data-verdict={verdictTone}
             data-stamped={stamped ? "yes" : "no"}
             aria-hidden="true"
           >
-            {floor.verdict.headline}
+            <span>{floor.verdict.headline}</span>
           </p>
         ) : null}
 
         {bench.length > 0 ? (
-          <p className="cs-bench" data-testid="team-not-needed">
+          <p className="cs-bench" style={place(BENCH_LINE)} data-testid="team-not-needed">
             <span className="cs-bench-why">{w.notNeeded}: </span>
             {bench.map((a) => a.card.name).join(", ")}
           </p>

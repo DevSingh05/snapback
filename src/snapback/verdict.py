@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta, tzinfo
 
 from snapback.card import strings
 from snapback.contracts import (
+    AerialStatus,
     AuthorityStatus,
     Card,
     CardLine,
@@ -47,6 +48,7 @@ from snapback.contracts import (
     Verdict,
     VerdictState,
 )
+from snapback.settings import get_settings
 
 CARD_TTL = timedelta(hours=24)
 FIXTURE_ID_PREFIX = "fx-"
@@ -174,6 +176,11 @@ def to_evidence(modules: ModuleEvidence, lang: str = strings.DEFAULT_LANG) -> Ev
             modules.authority is not None and modules.authority.link_domain is LinkDomain.LOOKALIKE
         ),
         unit_flag=modules.price is not None and modules.price.unit in _UNIT_DOES_NOT_FIT,
+        aerial_wrong_building_flag=(
+            get_settings().snapback_vexcel_in_verdict
+            and modules.aerial is not None
+            and modules.aerial.status is AerialStatus.WRONG_BUILDING
+        ),
         license_flag=_license(modules) is LicenseStatus.NOT_FOUND and not _renter_number(modules),
         license_given_flag=(
             _license(modules) is LicenseStatus.NOT_FOUND and _renter_number(modules)
@@ -219,6 +226,7 @@ REASON_ORDER = (
     "reason.not_located",
     "reason.not_indexed",
     "reason.unit_flag",
+    "reason.aerial_wrong_building",
     # Price, and what the renter's own text raised.
     "reason.price_flag",
     "reason.payment_flag",
@@ -360,6 +368,8 @@ def decide(evidence: Evidence, lang: str = strings.DEFAULT_LANG) -> Verdict:
             ("reason.for_sale", evidence.for_sale_flag),
             ("reason.lookalike_link", evidence.lookalike_link_flag),
             ("reason.unit_flag", evidence.unit_flag),
+            # Behind SNAPBACK_VEXCEL_IN_VERDICT: holds, is not proof, never clears.
+            ("reason.aerial_wrong_building", evidence.aerial_wrong_building_flag),
             # A18 (#124): the ad gives a licence number that is not an active Texas licence.
             ("reason.license_not_found", evidence.license_flag),
         )
@@ -1471,6 +1481,7 @@ _RED_REASONS = (
     "reason.for_sale",
     "reason.lookalike_link",
     "reason.unit_flag",
+    "reason.aerial_wrong_building",
     "reason.license_not_found",
 )
 _GOOD_REASONS = (
