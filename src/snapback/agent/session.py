@@ -166,6 +166,9 @@ class CaseSession:
         # W1: the web checks, started by whoever opens the case (`agent/web/run.py`). Returns
         # the WebFacts found so far, or None while they run. None (the default): no web checks.
         self.web_facts: Callable[[], Any] | None = None
+        # The Planner's follow-up menu (agent/followups.py): menu id -> a lookup the API bound
+        # to this case. Empty: nothing to follow up on. Results are information lines only.
+        self.followup_runners: dict[str, Callable[[], Any]] = {}
 
     # --- reading the state -----------------------------------------------------------------
 
