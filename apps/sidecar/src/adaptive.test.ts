@@ -95,7 +95,7 @@ test("an ad written in Spanish gets the report in Spanish, card and labels", asy
     config(calls),
   );
   assert.ok(calls.some((x) => x.url.endsWith(`/cases/${card.case_id}/card?lang=es`)));
-  assert.match(c.texts[0] ?? "", /^Espere por ahora/);
+  assert.match(c.texts[0] ?? "", /^Espere/);
   assert.match(c.texts[0] ?? "", /Antes de pagar:/);
   assert.match(c.texts[0] ?? "", /Informe completo:/);
 });
@@ -111,7 +111,7 @@ test("once it knows Spanish, a short follow-up is answered in Spanish too", asyn
   const c = client();
   await handleMessage(said("¿por qué?"), c, cfg);
   assert.equal(posts(calls).length, 1, "a follow-up never makes a case");
-  assert.match(c.texts[0] ?? "", /^Espere por ahora/);
+  assert.match(c.texts[0] ?? "", /^Espere/);
 });
 
 test("the 'checking' reply is in the renter's language", async () => {
@@ -239,7 +239,7 @@ test("[Med] an English ad never flips a Spanish renter, nor sets their city or b
   );
   assert.equal(posts(calls).length, 1, "the ad was checked");
   assert.deepEqual(cfg.profiles.get(KEY), { lang: "es", budget: 1200, beds: 2 });
-  assert.match(c.texts[0] ?? "", /^Espere por ahora/, "still answered in Spanish");
+  assert.match(c.texts[0] ?? "", /^Espere/, "still answered in Spanish");
 });
 
 test("[Med] 'what do you remember?' with nothing kept never wipes the case", async () => {
@@ -352,4 +352,34 @@ test("[Low] 'Room available, need 2 bedroom apartment? DM me' is checked, not re
   await handleMessage(said("Room available, need 2 bedroom apartment? DM me"), client(), cfg);
   assert.equal(posts(calls).length, 1);
   assert.equal(cfg.profiles.get(KEY), null);
+});
+
+// --- #280 on main: red-flag headlines (strings.py state.hold_red_*) -----------------------------
+
+test("a red-flag headline from the card reads in Spanish for a Spanish renter, word for word", async () => {
+  const { headlineOf } = await import("./handler");
+  const base = { case_id: "7Q2M", source: "fixture", state: "hold", rows: [], not_checked: [] };
+  const pairs: [string, string][] = [
+    [
+      "Hold off: it asks for money before you've seen the place",
+      "Espere: pide dinero antes de que usted haya visto el lugar",
+    ],
+    [
+      "Hold off: it asks for personal papers before you've seen the place",
+      "Espere: pide documentos personales antes de que haya visto el lugar",
+    ],
+    [
+      "Hold off: it pushes you to act before you've seen the place",
+      "Espere: le presiona para actuar antes de ver el lugar",
+    ],
+    [
+      "Hold off: something in this ad is a red flag",
+      "Espere: algo en este anuncio es una señal de alerta",
+    ],
+  ];
+  for (const [en, es] of pairs) {
+    const card = { ...base, headline: en } as never;
+    assert.equal(headlineOf(card, "es"), es);
+    assert.equal(headlineOf(card, "en"), en);
+  }
 });
