@@ -133,7 +133,7 @@ describe("Home is one box", () => {
     render(<OneBox mode="fixture" createCase={made()} checkingMs={0} />);
     const sample = screen.getByTestId("ob-sample");
     expect(sample).toHaveTextContent("Sample report 7Q2M");
-    expect(sample).toHaveTextContent("Hold off for now");
+    expect(sample).toHaveTextContent("Hold off: it asks for money before you've seen the place");
     expect(within(sample).getByTestId("source-chip")).toHaveTextContent("FIXTURE");
     // Proof, not features: the ad's photo beside the scan view, then the fixture card's own lines.
     const pair = within(sample).getByTestId("ob-pair");
