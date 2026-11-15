@@ -124,17 +124,53 @@ def test_an_identify_case_searches_flipped_too(twins):
     assert all(p.flipped is True for p in result.photos)
 
 
+def _view_change(hfov_deg: float, yaw_deg: float, side: int = 1024):
+    """H = K_face . R . K_photo^-1: a photo of the given field of view, turned by yaw degrees,
+    seen by a 90 degree cube face of side px. Maps photo pixels to face pixels."""
+    import math
+
+    import numpy as np
+
+    def k(hfov: float) -> np.ndarray:
+        f = (side / 2) / math.tan(math.radians(hfov) / 2)
+        return np.array([[f, 0.0, side / 2], [0.0, f, side / 2], [0.0, 0.0, 1.0]])
+
+    yaw = math.radians(yaw_deg)
+    rot = np.array(
+        [[math.cos(yaw), 0.0, math.sin(yaw)], [0.0, 1.0, 0.0], [-math.sin(yaw), 0.0, math.cos(yaw)]]
+    )
+    return k(90.0) @ rot @ np.linalg.inv(k(hfov_deg))
+
+
 def test_a_reflecting_homography_is_not_a_match():
     """No real view change mirrors the photo: a reflecting homography gives no inliers."""
     import numpy as np
 
     from snapback.vision.locate.verify import reflects
 
-    size = (200, 170)
-    assert not reflects(np.eye(3), size)
-    assert not reflects(np.array([[1.2, 0.1, 5.0], [-0.05, 0.9, 3.0], [1e-4, 0.0, 1.0]]), size)
+    centre = (100.0, 85.0)
+    assert not reflects(np.eye(3), centre)
+    assert not reflects(np.array([[1.2, 0.1, 5.0], [-0.05, 0.9, 3.0], [1e-4, 0.0, 1.0]]), centre)
     mirror = np.array([[-1.0, 0.0, 200.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
-    assert reflects(mirror, size)
+    assert reflects(mirror, centre)
+    # a mirror combined with a real view change is still a mirror
+    assert reflects(_view_change(60.0, 20.0) @ np.diag([-1.0, 1.0, 1.0]), (512.0, 512.0))
+
+
+def test_a_wide_angle_rotated_real_view_is_not_a_mirror():
+    """#298 review: hfov 100 turned 45 degrees sends a photo corner behind the face camera
+    (w < 0), which flipped the old corner-area test and gave an honest photo no inliers."""
+    import numpy as np
+
+    from snapback.vision.locate.verify import reflects
+
+    for hfov, yaw in ((100.0, 45.0), (120.0, 30.0), (80.0, 40.0), (100.0, -45.0)):
+        h = _view_change(hfov, yaw)
+        corners = np.array([[0, 0, 1.0], [1024, 0, 1.0], [0, 1024, 1.0], [1024, 1024, 1.0]]) @ h.T
+        if (hfov, yaw) == (100.0, 45.0):
+            assert np.any(corners[:, 2] < 0)  # the case the old test got wrong
+        assert not reflects(h, (512.0, 512.0)), (hfov, yaw)
+        assert not reflects(h, (200.0, 700.0)), (hfov, yaw)
 
 
 def test_a_mirrored_copy_is_placed_only_through_the_flip(twins):
